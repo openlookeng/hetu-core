@@ -16,17 +16,18 @@ package io.prestosql.server.remotetask;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.SetThreadName;
-import io.airlift.http.client.FullJsonResponseHandler;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.HttpUriBuilder;
 import io.airlift.http.client.Request;
-import io.airlift.json.JsonCodec;
+import io.airlift.http.client.ResponseHandler;
 import io.airlift.units.Duration;
 import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.execution.TaskStatus;
+import io.prestosql.protocol.BaseResponse;
+import io.prestosql.protocol.Codec;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -39,12 +40,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
-import static com.google.common.net.MediaType.JSON_UTF_8;
-import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.units.Duration.nanosSince;
+import static io.prestosql.protocol.AdaptingJsonResponseHandler.createAdaptingJsonResponseHandler;
+import static io.prestosql.protocol.FullSmileResponseHandler.createFullSmileResponseHandler;
+import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
+import static io.prestosql.protocol.RequestHelpers.setContentTypeHeaders;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -55,7 +57,7 @@ public class TaskInfoFetcher
     private final Consumer<Throwable> onFail;
     private final StateMachine<TaskInfo> taskInfo;
     private final StateMachine<Optional<TaskInfo>> finalTaskInfo;
-    private final JsonCodec<TaskInfo> taskInfoCodec;
+    private final Codec<TaskInfo> taskInfoCodec;
 
     private final long updateIntervalMillis;
     private final AtomicLong lastUpdateNanos = new AtomicLong();
@@ -71,6 +73,7 @@ public class TaskInfoFetcher
     private final AtomicLong currentRequestStartNanos = new AtomicLong();
 
     private final RemoteTaskStats stats;
+    private final boolean isBinaryEncoding;
 
     @GuardedBy("this")
     private boolean running;
@@ -79,20 +82,21 @@ public class TaskInfoFetcher
     private ScheduledFuture<?> scheduledFuture;
 
     @GuardedBy("this")
-    private ListenableFuture<FullJsonResponseHandler.JsonResponse<TaskInfo>> future;
+    private ListenableFuture<BaseResponse<TaskInfo>> future;
 
     public TaskInfoFetcher(
             Consumer<Throwable> onFail,
             TaskInfo initialTask,
             HttpClient httpClient,
             Duration updateInterval,
-            JsonCodec<TaskInfo> taskInfoCodec,
+            Codec<TaskInfo> taskInfoCodec,
             Duration maxErrorDuration,
             boolean summarizeTaskInfo,
             Executor executor,
             ScheduledExecutorService updateScheduledExecutor,
             ScheduledExecutorService errorScheduledExecutor,
-            RemoteTaskStats stats)
+            RemoteTaskStats stats,
+            boolean isBinaryEncoding)
     {
         requireNonNull(initialTask, "initialTask is null");
         requireNonNull(errorScheduledExecutor, "errorScheduledExecutor is null");
@@ -112,6 +116,7 @@ public class TaskInfoFetcher
         this.executor = requireNonNull(executor, "executor is null");
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.stats = requireNonNull(stats, "stats is null");
+        this.isBinaryEncoding = isBinaryEncoding;
     }
 
     public TaskInfo getTaskInfo()
@@ -202,13 +207,20 @@ public class TaskInfoFetcher
 
         HttpUriBuilder httpUriBuilder = uriBuilderFrom(taskStatus.getSelf());
         URI uri = summarizeTaskInfo ? httpUriBuilder.addParameter("summarize").build() : httpUriBuilder.build();
-        Request request = prepareGet()
+        Request request = setContentTypeHeaders(isBinaryEncoding, prepareGet())
                 .setUri(uri)
-                .setHeader(CONTENT_TYPE, JSON_UTF_8.toString())
                 .build();
 
+        ResponseHandler responseHandler;
+        if (isBinaryEncoding) {
+            responseHandler = createFullSmileResponseHandler((io.prestosql.protocol.SmileCodec<TaskInfo>) taskInfoCodec);
+        }
+        else {
+            responseHandler = createAdaptingJsonResponseHandler(unwrapJsonCodec(taskInfoCodec));
+        }
+
         errorTracker.startRequest();
-        future = httpClient.executeAsync(request, createFullJsonResponseHandler(taskInfoCodec));
+        future = httpClient.executeAsync(request, responseHandler);
         currentRequestStartNanos.set(System.nanoTime());
         Futures.addCallback(future, new SimpleHttpResponseHandler<>(this, request.getUri(), stats), executor);
     }

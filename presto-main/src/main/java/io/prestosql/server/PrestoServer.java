@@ -40,6 +40,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.jmx.HetuJmxModule;
 import io.prestosql.metadata.StaticCatalogStore;
 import io.prestosql.metastore.HetuMetaStoreManager;
+import io.prestosql.protocol.SmileModule;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AccessControlModule;
 import io.prestosql.seedstore.SeedStoreManager;
@@ -95,6 +96,7 @@ public class PrestoServer
                 Modules.override(new DiscoveryModule()).with(new HetuDiscoveryModule()),
                 new HttpServerModule(),
                 new JsonModule(),
+                new SmileModule(),
                 new JaxrsModule(),
                 new MBeanModule(),
                 new PrefixObjectNameGeneratorModule("io.prestosql"),

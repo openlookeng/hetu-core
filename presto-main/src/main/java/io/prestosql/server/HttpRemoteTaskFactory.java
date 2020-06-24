@@ -33,6 +33,8 @@ import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.ForScheduler;
+import io.prestosql.protocol.Codec;
+import io.prestosql.protocol.SmileCodec;
 import io.prestosql.server.remotetask.HttpRemoteTask;
 import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.sql.planner.PlanFragment;
@@ -50,6 +52,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static io.prestosql.protocol.JsonCodecWrapper.wrapJsonCodec;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -59,9 +62,9 @@ public class HttpRemoteTaskFactory
 {
     private final HttpClient httpClient;
     private final LocationFactory locationFactory;
-    private final JsonCodec<TaskStatus> taskStatusCodec;
-    private final JsonCodec<TaskInfo> taskInfoCodec;
-    private final JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec;
+    private final Codec<TaskStatus> taskStatusCodec;
+    private final Codec<TaskInfo> taskInfoCodec;
+    private final Codec<TaskUpdateRequest> taskUpdateRequestCodec;
     private final Duration maxErrorDuration;
     private final Duration taskStatusRefreshMaxWait;
     private final Duration taskInfoUpdateInterval;
@@ -71,22 +74,24 @@ public class HttpRemoteTaskFactory
     private final ScheduledExecutorService updateScheduledExecutor;
     private final ScheduledExecutorService errorScheduledExecutor;
     private final RemoteTaskStats stats;
+    private final boolean isBinaryEncoding;
 
     @Inject
     public HttpRemoteTaskFactory(QueryManagerConfig config,
             TaskManagerConfig taskConfig,
             @ForScheduler HttpClient httpClient,
             LocationFactory locationFactory,
-            JsonCodec<TaskStatus> taskStatusCodec,
-            JsonCodec<TaskInfo> taskInfoCodec,
-            JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec,
-            RemoteTaskStats stats)
+            JsonCodec<TaskStatus> taskStatusJsonCodec,
+            SmileCodec<TaskStatus> taskStatusSmileCodec,
+            JsonCodec<TaskInfo> taskInfoJsonCodec,
+            SmileCodec<TaskInfo> taskInfoSmileCodec,
+            JsonCodec<TaskUpdateRequest> taskUpdateRequestJsonCodec,
+            SmileCodec<TaskUpdateRequest> taskUpdateRequestSmileCodec,
+            RemoteTaskStats stats, InternalCommunicationConfig internalCommunicationConfig)
     {
         this.httpClient = httpClient;
         this.locationFactory = locationFactory;
-        this.taskStatusCodec = taskStatusCodec;
-        this.taskInfoCodec = taskInfoCodec;
-        this.taskUpdateRequestCodec = taskUpdateRequestCodec;
+
         this.maxErrorDuration = config.getRemoteTaskMaxErrorDuration();
         this.taskStatusRefreshMaxWait = taskConfig.getStatusRefreshMaxWait();
         this.taskInfoUpdateInterval = taskConfig.getInfoUpdateInterval();
@@ -94,6 +99,19 @@ public class HttpRemoteTaskFactory
         this.executor = new BoundedExecutor(coreExecutor, config.getRemoteTaskMaxCallbackThreads());
         this.executorMBean = new ThreadPoolExecutorMBean((ThreadPoolExecutor) coreExecutor);
         this.stats = requireNonNull(stats, "stats is null");
+        requireNonNull(internalCommunicationConfig, "internaCommnicationConfig is null");
+        this.isBinaryEncoding = internalCommunicationConfig.isBinaryEncoding();
+
+        if (isBinaryEncoding) {
+            this.taskStatusCodec = taskStatusSmileCodec;
+            this.taskInfoCodec = taskInfoSmileCodec;
+            this.taskUpdateRequestCodec = taskUpdateRequestSmileCodec;
+        }
+        else {
+            this.taskStatusCodec = wrapJsonCodec(taskStatusJsonCodec);
+            this.taskInfoCodec = wrapJsonCodec(taskInfoJsonCodec);
+            this.taskUpdateRequestCodec = wrapJsonCodec(taskUpdateRequestJsonCodec);
+        }
 
         this.updateScheduledExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("task-info-update-scheduler-%s"));
         this.errorScheduledExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("remote-task-error-delay-%s"));
@@ -145,6 +163,7 @@ public class HttpRemoteTaskFactory
                 taskInfoCodec,
                 taskUpdateRequestCodec,
                 partitionedSplitCountTracker,
-                stats);
+                stats,
+                isBinaryEncoding);
     }
 }
