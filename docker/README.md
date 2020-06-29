@@ -1,11 +1,11 @@
-# Hetu Docker Image
+# openLooKeng Docker Image
 
 ## About the Container
 This Docker image is designed to provide the following
 * An out-of-the-box single node cluster with the JMX, memory, TPC-DS, and TPC-H
  catalogs
 * An image that can be deployed as a full cluster by mounting in configuration
-* An image to be used as the basis for the Kubernetes Hetu operator
+* An image to be used as the basis for the Kubernetes openLooKeng operator
 
 ## Configuration
 

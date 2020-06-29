@@ -78,9 +78,9 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 1. 在打开的ODBC数据源管理器(64位)中单击用户DSN选项卡，单击“添加”按钮
 
-2. 在弹出的创建新数据源窗口中找到Hetu ODBC Driver,  单击“完成”
+2. 在弹出的创建新数据源窗口中找到openLooKeng ODBC Driver,  单击“完成”
 
-3. 此时弹出了Hetu ODBC Driver配置的UI界面， 在第1页欢迎页面的Name输入框中输入想要创建的DSN的名字，在Description输入框中输入对该DSN的附加描述，单击"Next"按钮
+3. 此时弹出了openLooKeng ODBC Driver配置的UI界面， 在第1页欢迎页面的Name输入框中输入想要创建的DSN的名字，在Description输入框中输入对该DSN的附加描述，单击"Next"按钮
 
 4. 第2页主要包括如下六个输入框，功能和用法如下：
 

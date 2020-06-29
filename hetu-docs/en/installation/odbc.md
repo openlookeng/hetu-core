@@ -74,9 +74,9 @@ Before an application uses the openLooKeng ODBC driver, the data source DSN must
 
 1. In the ODBC Data Source Administrator (64-bit), click the **User DSN** tab and click **Add**.
 
-2. In the displayed **Create New Data Source** dialog box, click **Hetu ODBC Driver** and click **Finish**.
+2. In the displayed **Create New Data Source** dialog box, click **openLooKeng ODBC Driver** and click **Finish**.
 
-3. The Hetu ODBC Driver configuration page is displayed. On the welcome page, enter the name of the DSN to be created in the **Name** text box, enter the additional description of the DSN in the **Description** text box, and click **Next**.
+3. The openLooKeng ODBC Driver configuration page is displayed. On the welcome page, enter the name of the DSN to be created in the **Name** text box, enter the additional description of the DSN in the **Description** text box, and click **Next**.
 
 4. The second page contains the following six text boxes. The functions and usage are as follows:
    
