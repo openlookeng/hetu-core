@@ -7,7 +7,7 @@ title = "Get Started"
 
 # Get Started
 
-This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation Guide] (https://www.openlookeng.io/docs/docs/installation.html).
+This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation Guide](https://www.openlookeng.io/docs/docs/installation.html).
 
 ## Preparing the Environment
 
@@ -48,7 +48,7 @@ After successful deployment, you can learn the following information to better u
 
 - One-click deployment also provides scripts for common management commands. You can find `/opt/openlookeng/bin` here.
 
-- OpenLooKeng run logs are stored in `/home/openlookeng/.openlkadmin/`.
+- openLooKeng run logs are stored in `/home/openlookeng/.openlkadmin/`.
 
 - One-click deployment also provides [CLI](https://www.openlookeng.io/docs/docs/installation/cli.html) for connecting to the openLooKeng service.
 

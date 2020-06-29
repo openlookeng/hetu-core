@@ -17,13 +17,13 @@ In addition to the manual deployment of openLooKeng Sever, you can follow below 
 Execute below command can help you download the necessary packages and deploy openLooKeng server in one-click:
 
 ```shell
-bash <(wget -qO- http://openlookeng.io/install.sh)
+bash <(wget -qO- https://download.openlookeng.io/install.sh)
 ```
 
 or:
 
 ```shell
-wget -O - http://openlookeng.io/install.sh|bash
+wget -O - https://download.openlookeng.io/install.sh|bash
 ```
 
 Normally, you don\'t need to do any thing, except for the installation to complete. It will automatically start the service.
@@ -47,13 +47,13 @@ Execute below command to start openLooKeng Command Line client:
 Execute below command to install openLooKeng cluster:
 
 ```shell
-bash <(wget -qO- http://openlookeng.io/install.sh) -m
+bash <(wget -qO- https://download.openlookeng.io/install.sh) -m
 ```
 
 or:
 
 ```shell
-bash <(wget -qO- http://openlookeng.io/install.sh) --multi-node
+bash <(wget -qO- https://download.openlookeng.io/install.sh) --multi-node
 ```
 
 First of all, this command will download scripts and packages required by openLooKeng service. After the download is completed, it will check whether the dependent packages `expect` and `sshpass` are installed. If not, those dependencies will be installed automatically.
@@ -104,16 +104,16 @@ Execute below command to start openLooKeng Command Line client.:
 
 If you are going to deploy openLooKeng on a big cluster with lots of nodes, instead of inputting the nodes' IP address one by one. It is better to prepare a file containing all nodes' IP address then pass this file as parameter to the installation script. Here is the command:
 
-   `bash <(wget -qO- http://openlookeng.io/install.sh) -f <cluster_node_info_path>`
+   `bash <(wget -qO- https://download.openlookeng.io/install.sh) -f <cluster_node_info_path>`
 or:
-    `bash <(wget -qO- http://openlookeng.io/install.sh) --file <cluster_node_info_path>`
+    `bash <(wget -qO- https://download.openlookeng.io/install.sh) --file <cluster_node_info_path>`
 
 
 
 For more help message,execute below command to deploy single node cluster:
-    `bash <(wget -qO- http://openlookeng.io/install.sh) -h`     
+    `bash <(wget -qO- https://download.openlookeng.io/install.sh) -h`     
 or:
-    `bash <(wget -qO- http://openlookeng.io/install.sh) --help`
+    `bash <(wget -qO- https://download.openlookeng.io/install.sh) --help`
 
 
 
@@ -122,7 +122,7 @@ or:
 Execute below command to Upgrade openLooKeng Service:
 
 ```shell
-bash <(wget -qO- http://openlookeng.io/install.sh) -u <version>
+bash <(wget -qO- https://download.openlookeng.io/install.sh) -u <version>
 ```
 
 This command will upgrade the current openLooKeng Service to target version,
@@ -130,13 +130,13 @@ preserving all the existing configurations on current cluster. Execute
 below command to list all available versions:
 
 ```shell
-bash <(wget -qO- http://openlookeng.io/install.sh) -l
+bash <(wget -qO- https://download.openlookeng.io/install.sh) -l
 ```
 
 or:
 
 ```shell
-bash <(wget -qO- http://openlookeng.io/install.sh) --list
+bash <(wget -qO- https://download.openlookeng.io/install.sh) --list
 ```
 
 ## Deploying Configuration to openLooKeng Cluster

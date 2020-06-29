@@ -17,11 +17,11 @@ title = "自动部署openLooKeng"
 
 执行以下命令可以帮助你一键下载所需的软件包和部署openLooKeng服务器：
 
-    bash <(wget -qO- http://openlookeng.io/install.sh)
+    bash <(wget -qO- https://download.openlookeng.io/install.sh)
 
 或：
 
-    wget -O - http://openlookeng.io/install.sh|sh
+    wget -O - https://download.openlookeng.io/install.sh|sh
 
 通常情况下，你只需等待整个处理完成。服务会自动启动。
 
@@ -37,11 +37,11 @@ title = "自动部署openLooKeng"
 
 执行下面命令安装openLooKeng集群：
 
-    bash <(wget -qO- http://openlookeng.io/install.sh) -m
+    bash <(wget -qO- https://download.openlookeng.io/install.sh) -m
 
 或：
 
-    bash <(wget -qO- http://openlookeng.io/install.sh) --mutil-node
+    bash <(wget -qO- https://download.openlookeng.io/install.sh) --mutil-node
 
 首先，该命令将下载openLooKeng服务所需的脚本和包。下载完成后，会检查依赖包`expect`和`sshpass`是否安装。如果没有，这些依赖项将自动安装。
 
@@ -82,24 +82,24 @@ openLooKeng的协调节点和工作节点的通用配置从配置文件`/home/he
 
 如果想将openLooKeng部署到一个节点较多的大集群中，而不逐个输入节点的IP地址，则最好准备一个包含所有节点IP地址的文件，然后将该文件作为参数传递给安装脚本。命令如下：
 
-`bash <(wget -qO- http://openlookeng.io/install.sh) -f <cluster_node_info_path>`或`bash <(wget -qO- http://openlookeng.io/install.sh) --file <cluster_node_info_path>`
+`bash <(wget -qO- https://download.openlookeng.io/install.sh) -f <cluster_node_info_path>`或`bash <(wget -qO- https://download.openlookeng.io/install.sh) --file <cluster_node_info_path>`
 
-更多帮助信息，请执行下面的命令部署单节点集群：`bash <(wget -qO- http://openlookeng.io/install.sh) -h`  
-或`bash <(wget -qO- http://openlookeng.io/install.sh) --help`
+更多帮助信息，请执行下面的命令部署单节点集群：`bash <(wget -qO- https://download.openlookeng.io/install.sh) -h`  
+或`bash <(wget -qO- https://download.openlookeng.io/install.sh) --help`
 
 ## openLooKeng服务升级
 
 执行下面命令升级openLooKeng服务：
 
-    bash <(wget -qO- http://openlookeng.io/install.sh) -u <version>
+    bash <(wget -qO- https://download.openlookeng.io/install.sh) -u <version>
 
 此命令会将当前openLooKeng服务升级到目标版本，并保留当前集群上的所有现有配置。执行以下命令可以列出所有可用的版本：
 
-    bash <(wget -qO- http://openlookeng.io/install.sh) -l
+    bash <(wget -qO- https://download.openlookeng.io/install.sh) -l
 
 或：
 
-    bash <(wget -qO- http://openlookeng.io/install.sh) --list
+    bash <(wget -qO- https://download.openlookeng.io/install.sh) --list
 
 ## 将配置部署到openLooKeng集群
 
