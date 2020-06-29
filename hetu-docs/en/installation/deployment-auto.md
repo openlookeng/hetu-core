@@ -104,16 +104,23 @@ Execute below command to start openLooKeng Command Line client.:
 
 If you are going to deploy openLooKeng on a big cluster with lots of nodes, instead of inputting the nodes' IP address one by one. It is better to prepare a file containing all nodes' IP address then pass this file as parameter to the installation script. Here is the command:
 
-   `bash <(wget -qO- https://download.openlookeng.io/install.sh) -f <cluster_node_info_path>`
+```shell
+bash <(wget -qO- https://download.openlookeng.io/install.sh) -f <cluster_node_info_path>
+```
 or:
-    `bash <(wget -qO- https://download.openlookeng.io/install.sh) --file <cluster_node_info_path>`
-
+```shell
+bash <(wget -qO- https://download.openlookeng.io/install.sh) --file <cluster_node_info_path>
+```
 
 
 For more help message,execute below command to deploy single node cluster:
-    `bash <(wget -qO- https://download.openlookeng.io/install.sh) -h`     
+```shell
+bash <(wget -qO- https://download.openlookeng.io/install.sh) -h
+```   
 or:
-    `bash <(wget -qO- https://download.openlookeng.io/install.sh) --help`
+```shell
+bash <(wget -qO- https://download.openlookeng.io/install.sh) --help
+```
 
 
 
@@ -145,7 +152,7 @@ Modify configuration file (/home/openlkadmin/.openlkadmin/cluster\_config\_info)
 execute below command to deploy the configurations to openLooKeng cluster:
 
 ```shell
-sh /opt/openlookeng/bin/configuration_deploy.sh
+bash /opt/openlookeng/bin/configuration_deploy.sh
 ```
 
 Note, if you want to add more configrations or customize the configurations, you can add properties to the templates into file located at

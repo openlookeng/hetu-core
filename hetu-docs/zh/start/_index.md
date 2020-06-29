@@ -6,7 +6,7 @@ title = "快速入门"
 +++
 
 # 快速入门
-本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装指南](https://www.openlookeng.io/docs/docs/installation.html )
+本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装指南](https://www.openlookeng.io/zh-cn/docs/docs/installation.html)
 
 ## 环境准备
 
@@ -37,12 +37,11 @@ wget -O - https://download.openlookeng.io/install.sh|sh
 
 - 一键部署给openLooKeng 默认配置了以下几个内置数据源，供用户直接使用。
 
-  - [tpcds]( https://www.openlookeng.io/docs/docs/connector/tpcds.html )
+  - [tpcds](https://www.openlookeng.io/zh-cn/docs/docs/connector/tpcds.html)
+  - [tpch](https://www.openlookeng.io/zh-cn/docs/docs/connector/tpch.html)
+  - [memory](https://www.openlookeng.io/zh-cn/docs/docs/connector/memory.html)
 
-  -  [tpch]( https://www.openlookeng.io/docs/docs/connector/tpch.html )
-  -  [memory]( https://www.openlookeng.io/docs/docs/connector/memory.html )
-
-- openLooKeng 的安装路径为`/opt/openlookeng`。用户可以在这里找到openLooKeng 的配置文件。关于配置文件以及配置项，你可以从[这里]( https://www.openlookeng.io/docs/docs/installation/deployment.html )了解到更多信息。
+- openLooKeng 的安装路径为`/opt/openlookeng`。用户可以在这里找到openLooKeng 的配置文件。关于配置文件以及配置项，你可以从[这里]( https://www.openlookeng.io/zh-cn/docs/docs/installation/deployment.html )了解到更多信息。
 
 - 新的用户`openlkadmin`会被创建用于执行 openLooKeng 相关的操作，包括启动/停止openLooKeng 服务、扩展/减小集群规模等。
 
@@ -50,7 +49,7 @@ wget -O - https://download.openlookeng.io/install.sh|sh
 
 - openLooKeng的运行日志存储于`/home/openlookeng/.openlkadmin/`
 
-- 一键部署也提供了[命令行工具（cli）]( https://www.openlookeng.io/docs/docs/installation/cli.html )，用于连接openLooKeng 服务。
+- 一键部署也提供了[命令行工具（cli)]( https://www.openlookeng.io/zh-cn/docs/docs/installation/cli.html )，用于连接openLooKeng 服务。
 
 
 
@@ -76,7 +75,7 @@ show catalogs;
 
 ![img](../images/catalogs.png)
 
-查看有tpcds 有包含哪些[schema]( https://www.openlookeng.io/docs/docs/overview/concepts.html )：
+查看有tpcds 有包含哪些[schema]( https://www.openlookeng.io/zh-cn/docs/docs/overview/concepts.html )：
 
 ```sql
 show schemas from tpcds;
@@ -131,8 +130,8 @@ SELECT
 ```
 ![image-20200629141757336](../images/image-20200629141757336.png)
 
-用户可以查阅[openLooKeng语法文档]( https://gitee.com/openlookeng/hetu-core/tree/master/hetu-docs/en/sql )，了解更多语法规则。
+用户可以查阅 [openLooKeng语法文档](https://www.openlookeng.io/zh-cn/docs/docs/sql.html )，了解更多语法规则。
 
-关于openLooKeng 的更多功能和特性，请查阅[用户指导手册]( https://www.openlookeng.io/docs/docs/overview.html )
+关于openLooKeng 的更多功能和特性，请查阅[用户指导手册](https://www.openlookeng.io/zh-cn/docs/docs/overview.html)
 
 

@@ -48,7 +48,7 @@ After successful deployment, you can learn the following information to better u
 
 - One-click deployment also provides scripts for common management commands. You can find `/opt/openlookeng/bin` here.
 
-- openLooKeng run logs are stored in `/home/openlookeng/.openlkadmin/`.
+- openLooKeng run logs are stored in `/home/openlkadmin/.openlkadmin/logs`.
 
 - One-click deployment also provides [CLI](https://www.openlookeng.io/docs/docs/installation/cli.html) for connecting to the openLooKeng service.
 
@@ -132,7 +132,7 @@ GROUP BY "sr_customer_sk", "sr_store_sk"
 
 ![image-20200629141757336](../images/image-20200629141757336.png)
 
-You can read the [openLooKeng syntax document](https://gitee.com/openlookeng/hetu-core/tree/master/hetu-docs/en/sql) to learn more syntax rules.
+You can read the [openLooKeng syntax document](https://www.openlookeng.io/docs/docs/sql.html) to learn more syntax rules.
 
 For more features and features of openLooKeng, please refer to the [User Guide](https://www.openlookeng.io/docs/docs/overview.html).
 
