@@ -1,0 +1,5 @@
+/etc/init.d/hetu status > /dev/null 2>&1
+if [[ $? != 3 ]]; then
+    echo "Please stop the Hetu service before erasing RPM"
+    exit 1
+fi

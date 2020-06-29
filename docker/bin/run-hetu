@@ -1,0 +1,159 @@
+#!/bin/bash
+
+set -xeuo pipefail
+
+CONFIG_PATH='/usr/lib/hetu/etc'
+
+if [[ ! -d $CONFIG_PATH ]]; then
+    if [[ -d /etc/hetu ]]; then
+        ln -s /etc/hetu $CONFIG_PATH
+    else
+        ln -s /usr/lib/hetu/default/etc /usr/lib/hetu/etc
+    fi
+fi
+if [[ ! -d /etc/hetu/catalog ]]; then
+    if [[ -d $CONFIG_PATH/catalog ]]; then
+        [[ ! -d /etc/hetu ]] && sudo mkdir -p /etc/hetu
+        sudo ln -s $CONFIG_PATH/catalog /etc/hetu/catalog
+    fi
+fi
+if [[ ! -d /usr/lib/hetu/lib/plugin ]]; then
+    if [[ -d /usr/lib/hetu/plugin ]]; then
+        ln -s /usr/lib/hetu/plugin /usr/lib/hetu/lib/plugin
+    fi
+fi
+
+setConfig() {
+    i=0
+    unset attributes
+    declare -a attributes
+    while read line; do
+       attributes[$((i++))]=$line
+    done < $1
+    numPattern=${#patterns[@]}
+    for ((i=0; i<${#attributes[@]}; i++)); do
+        for ((k=0; k<$numPattern; k++)); do
+            attributes[$i]=$(echo ${attributes[$i]}| sed -e "s|${patterns[$k]}|${values[$k]}|m")
+        done
+        if [ "" != "${attributes[$i]}" ]; then
+            echo "${attributes[$i]}" >> "$1.tmp"
+        fi
+    done
+    mv "$1"{.tmp,}
+    unset patterns
+    unset values
+}
+
+declare -a patterns
+declare -a values
+
+type=coordinator
+discoveryURI=
+nodeEnv=
+includeCoordinator=
+
+# check if user specified node.id & node.environment
+set +e
+tmp=$(grep -s 'node.id' /usr/lib/hetu/etc/node.properties)
+NODE_ID=${tmp:8}
+[[ -n $NODE_ID ]] && NODE_ID_EXISTS=0
+[[ -z $NODE_ID ]] && NODE_ID_EXISTS=1
+grep -s -q 'node.environment' /usr/lib/hetu/etc/node.properties
+NODE_ENV_EXISTS=$?
+tmp=$(grep -s 'node.environment' /usr/lib/hetu/etc/node.properties)
+nodeEnv=${tmp:17}
+set -e
+
+if [[ $# != 0 ]]; then
+    while [[ $# != 0 && -n "$1" ]]; do
+        case "$1" in
+            -t | --type)
+                type="$2"
+                shift
+                shift
+                ;;
+            -discoveryURI)
+                discoveryURI="$2"
+                shift
+                shift
+                ;;
+            -nodeEnv)
+                nodeEnv="$2"
+                shift
+                shift
+                ;;
+            -includeCoordinator)
+                includeCoordinator="$2"
+                shift
+                shift
+                ;;
+            *)
+                echo "not supported option $1"
+                exit 1
+                ;;
+        esac
+    done
+
+
+    case "$type" in
+        worker)
+            patterns=("^discovery-server.enabled=.*" "^coordinator=.*")
+            values=("" "coordinator=false")
+            setConfig "$CONFIG_PATH/config.properties"
+            echo "Run Hetu engine as worker node"
+            ;;
+        coordinator)
+            patterns=("^coordinator=.*" "^discovery-server.enabled=.*")
+            values=("coordinator=true" "discovery-server.enabled=true")
+            setConfig "$CONFIG_PATH/config.properties"
+            echo "Run Hetu engine as Coordinator node"
+            ;;
+        *)
+            echo "no matching supported server type: \"$type\"; Please specify \"coordinator\" or \"worker\""
+            exit 1
+    esac
+
+    if [ -n "$discoveryURI" ]; then
+        echo "Use discovery.uri $discoveryURI"
+        patterns=("^discovery.uri=.*")
+        values=("discovery.uri=$discoveryURI")
+        setConfig "$CONFIG_PATH/config.properties"
+    else
+        echo "empty discoveryURI, using default \"http://localhost:8080\""
+    fi
+
+    if [ -n "$includeCoordinator" ] && [ "true" != $includeCoordinator ]; then
+        echo "Allow scheduling work on the coordinator"
+        patterns=("^node-scheduler.include-coordinator=.*")
+        values=("node-scheduler.include-coordinator=$includeCoordinator")
+        setConfig "$CONFIG_PATH/config.properties"
+    fi
+
+fi
+
+if [ $NODE_ID_EXISTS != 0 ]; then
+    if [ -n "$nodeEnv" ]; then
+        echo "Set node.environment as $nodeEnv"
+        NODE_ID="$nodeEnv-${HOSTNAME}"
+    else
+        nodeEnv="default"
+        echo "using default node.environment=test"
+        NODE_ID="default-${HOSTNAME}"
+    fi
+    patterns=("^node.environment=.*" "^node.id=.*")
+    values=("node.environment=$nodeEnv" "node.id=$NODE_ID")
+    setConfig "$CONFIG_PATH/node.properties"
+    NODE_ID="-Dnode.id=$NODE_ID"
+else
+    if [ -n "$nodeEnv" ]; then
+        echo "Set node.environment as $nodeEnv"
+    else
+        nodeEnv="default"
+        echo "using default node.environment=test"
+    fi
+    patterns=("^node.environment=.*")
+    values=("node.environment=$nodeEnv")
+    setConfig "$CONFIG_PATH/node.properties"
+fi
+
+exec /usr/lib/hetu/bin/launcher run ${NODE_ID} "$@"

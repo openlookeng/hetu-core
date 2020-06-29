@@ -1,0 +1,108 @@
+/*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.hetu.core.plugin.hbase.test;
+
+import io.hetu.core.plugin.hbase.client.TestUtils;
+import io.hetu.core.plugin.hbase.conf.HBaseConfig;
+import io.hetu.core.plugin.hbase.metadata.HBaseMetastoreFactory;
+import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
+import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.SchemaTableName;
+import org.testng.annotations.Test;
+
+import java.util.UUID;
+
+import static org.testng.Assert.assertEquals;
+
+/**
+ * TestHBaseMetastoreFactory
+ *
+ * @since 2020-03-20
+ */
+public class TestHBaseMetastoreFactory
+{
+    /**
+     * testLocalHBaseMetastoreGetId
+     */
+    @Test
+    public void testLocalHBaseMetastoreGetId()
+    {
+        LocalHBaseMetastore lhBMetastore = new LocalHBaseMetastore(new HBaseConfig());
+        assertEquals("LOCAL", lhBMetastore.getId());
+    }
+
+    /**
+     * testHBaseMetastoreFactoryHdfs
+     */
+    @Test
+    public void testHBaseMetastoreFactoryHdfs()
+    {
+        HBaseConfig hBConf = new HBaseConfig();
+        hBConf.setMetastoreType("hdfs");
+        hBConf.setHdfsSitePath("./hdfs-site.xml" + UUID.randomUUID());
+        hBConf.setCoreSitePath("./core-site.xml" + UUID.randomUUID());
+        hBConf.setKerberos("KERBEROS");
+        hBConf.setUserKeytabPath("./user.keytab" + UUID.randomUUID());
+        hBConf.setKrb5ConfPath("./krb5.conf" + UUID.randomUUID());
+        hBConf.setPrincipalUsername("root");
+        HBaseMetastoreFactory hBMetaFactory = new HBaseMetastoreFactory(hBConf);
+        hBMetaFactory.create();
+    }
+
+    /**
+     * testHBaseMetastoreFactoryHetuMetastore
+     */
+    @Test
+    public void testHBaseMetastoreFactoryHetuMetastore()
+    {
+        HBaseConfig hBConf = new HBaseConfig();
+        hBConf.setMetastoreType("hetuMetastore");
+        HBaseMetastoreFactory hBMetaFactory = new HBaseMetastoreFactory(hBConf);
+        hBMetaFactory.create();
+    }
+
+    /**
+     * testHBaseMetastoreFactoryOthers
+     */
+    @Test
+    public void testHBaseMetastoreFactoryOthers()
+    {
+        HBaseConfig hBConf = new HBaseConfig();
+        hBConf.setMetastoreType("others");
+        HBaseMetastoreFactory hBMetaFactory = new HBaseMetastoreFactory(hBConf);
+        try {
+            hBMetaFactory.create();
+            throw new PrestoException(HBaseErrorCode.UNSUPPORTED_TYPE, "testHBaseMetastoreFactory -> Others : failed");
+        }
+        catch (PrestoException e) {
+            assertEquals(e.getMessage(), "Unsupported metastore type");
+        }
+    }
+
+    /**
+     * testConnectorTableMetadata
+     */
+    @Test
+    public void testConnectorTableMetadata()
+    {
+        ConnectorTableMetadata ctm =
+                new ConnectorTableMetadata(
+                        new SchemaTableName("hbase", "newTable"), TestUtils.createColumnMetadataList());
+        ctm.getComment();
+        ctm.toString();
+    }
+}

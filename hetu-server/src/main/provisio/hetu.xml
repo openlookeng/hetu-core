@@ -1,0 +1,294 @@
+<runtime>
+    <!-- Target -->
+    <archive name="${process-name}-${project.version}.tar.gz" />
+
+    <!-- Notices -->
+    <fileSet to="/">
+        <directory path="${basedir}">
+            <include>NOTICE</include>
+            <include>README.txt</include>
+            <include>THIRD_PARTY_OPEN_SOURCE_SOFTWARE_NOTICE</include>
+        </directory>
+    </fileSet>
+
+    <!-- Launcher -->
+    <artifactSet to="bin">
+        <artifact id="io.airlift:launcher:tar.gz:bin:${dep.packaging.version}">
+            <unpack />
+        </artifact>
+        <artifact id="io.hetu.core:hetu-heuristic-index:tar.gz:bin:${project.version}">
+            <unpack />
+        </artifact>
+        <artifact id="io.airlift:launcher:tar.gz:properties:${dep.packaging.version}">
+            <unpack filter="true" />
+        </artifact>
+    </artifactSet>
+
+    <!-- heuristic-index -->
+    <artifactSet to="bin/hetu-heuristic-index">
+        <artifact id="io.hetu.core:hetu-heuristic-index:jar:jar-with-dependencies:${project.version}"
+                  as="hetu-heuristic-index.jar"/>
+    </artifactSet>
+    <artifactSet to="bin/hetu-heuristic-index/plugins/hdfsindexstore">
+        <artifact id="io.hetu.core:hetu-heuristic-index-hdfs-store:${project.version}" />
+    </artifactSet>
+    <artifactSet to="bin/hetu-heuristic-index/plugins/hive">
+        <artifact id="io.hetu.core:hetu-heuristic-index-hive:${project.version}" />
+    </artifactSet>
+    <artifactSet to="bin/hetu-heuristic-index/plugins/bitmap">
+        <artifact id="io.hetu.core:hetu-heuristic-index-bitmap:${project.version}" />
+    </artifactSet>
+
+    <!-- Server -->
+    <artifactSet to="lib">
+        <artifact id="${project.groupId}:presto-main:${dep.prestosql.version}" />
+    </artifactSet>
+
+    <!-- Plugins -->
+    <artifactSet to="plugin/resource-group-managers">
+        <artifact id="${project.groupId}:presto-resource-group-managers:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/password-authenticators">
+        <artifact id="${project.groupId}:presto-password-authenticators:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/session-property-managers">
+        <artifact id="${project.groupId}:presto-session-property-managers:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/jmx">
+        <artifact id="${project.groupId}:presto-jmx:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/example-http">
+        <artifact id="${project.groupId}:presto-example-http:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hive-hadoop2">
+        <artifact id="${project.groupId}:presto-hive-hadoop2:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/memory">
+        <artifact id="${project.groupId}:presto-memory:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/kafka">
+        <artifact id="${project.groupId}:presto-kafka:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/atop">
+        <artifact id="${project.groupId}:presto-atop:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/ml">
+        <artifact id="${project.groupId}:presto-ml:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/geospatial">
+        <artifact id="${project.groupId}:presto-geospatial:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/mysql">
+        <artifact id="${project.groupId}:presto-mysql:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/oracle">
+        <artifact id="${project.groupId}:hetu-oracle:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-datacenter">
+        <artifact id="${project.groupId}:hetu-datacenter:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/postgresql">
+        <artifact id="${project.groupId}:presto-postgresql:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hana">
+        <artifact id="${project.groupId}:hetu-hana:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/sqlserver">
+        <artifact id="${project.groupId}:presto-sqlserver:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <!--
+    Skipped as they are not first class connectors
+    <artifactSet to="plugin/cassandra">
+        <artifact id="${project.groupId}:presto-cassandra:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/blackhole">
+        <artifact id="${project.groupId}:presto-blackhole:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/kudu">
+        <artifact id="${project.groupId}:presto-kudu:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/phoenix">
+        <artifact id="${project.groupId}:presto-phoenix:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/redshift">
+        <artifact id="${project.groupId}:presto-redshift:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/raptor">
+        <artifact id="${project.groupId}:presto-raptor-legacy:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/redis">
+        <artifact id="${project.groupId}:presto-redis:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/accumulo">
+        <artifact id="${project.groupId}:presto-accumulo:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/mongodb">
+        <artifact id="${project.groupId}:presto-mongodb:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>-->
+
+    <artifactSet to="plugin/tpch">
+        <artifact id="${project.groupId}:presto-tpch:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-listener">
+        <artifact id="${project.groupId}:hetu-listener:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/tpcds">
+        <artifact id="${project.groupId}:presto-tpcds:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/teradata-functions">
+        <artifact id="${project.groupId}:presto-teradata-functions:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/localfile">
+        <artifact id="${project.groupId}:presto-local-file:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/presto-thrift">
+        <artifact id="${project.groupId}:presto-thrift:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/presto-elasticsearch">
+        <artifact id="${project.groupId}:presto-elasticsearch:zip:${dep.prestosql.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-hbase">
+        <artifact id="${project.groupId}:hetu-hbase:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/carbondata">
+        <artifact id="${project.groupId}:hetu-carbondata:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-vdm">
+        <artifact id="${project.groupId}:hetu-vdm:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hive-functions">
+        <artifact id="${project.groupId}:hetu-hive-functions:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-state-store">
+        <artifact id="${project.groupId}:hetu-state-store:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-seed-store">
+        <artifact id="${project.groupId}:hetu-seed-store:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-filesystem-client">
+        <artifact id="${project.groupId}:hetu-filesystem-client:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+    <artifactSet to="plugin/hetu-metastore">
+        <artifact id="${project.groupId}:hetu-metastore:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+</runtime>

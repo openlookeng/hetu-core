@@ -1,0 +1,14 @@
+#!/bin/bash
+
+loglevel=warn
+
+for i in "$@"
+do
+    if [[ $i == -v* ]] ; then
+        loglevel=debug
+    fi
+done
+
+java -Dorg.slf4j.simpleLogger.defaultLogLevel=$loglevel\
+    -jar ./hetu-heuristic-index/hetu-heuristic-index.jar\
+    "$@"

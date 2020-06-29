@@ -1,0 +1,105 @@
+# Assuming this machine has a local copy of the following in the same directory as the docker-compose.yml
+# - A hdfs_configs directory containing default Hive connector configuration files
+
+version: "3.7"
+services:
+  # Hetu Engine - coordinator node
+  coordinator:
+    image: 10.122.251.118:5000/hetucore:latest
+    ports:
+      - "8080:8080"
+    # mount config files for hive connector
+    networks:
+      - cluster1
+    configs:
+      - source: hive_prop
+        target: /usr/lib/hetu/etc/catalog/hive.properties
+      - source: hive_core_site
+        target: /opt/hdfs_configs/core-site.xml
+      - source: hive_hdfs_site
+        target: /opt/hdfs_configs/hdfs-site.xml
+    command: ["-t","coordinator","-nodeEnv","cluster1","-includeCoordinator","false"]
+
+  coordinator1:
+    image: 10.122.251.118:5000/hetucore:latest
+    ports:
+      - "8081:8080"
+    # mount config files for hive connector
+    networks:
+      - cluster2
+    configs:
+      - source: hive_prop
+        target: /usr/lib/hetu/etc/catalog/hive.properties
+      - source: hive_core_site
+        target: /opt/hdfs_configs/core-site.xml
+      - source: hive_hdfs_site
+        target: /opt/hdfs_configs/hdfs-site.xml
+    command: ["-t","coordinator","-nodeEnv","cluster2","-includeCoordinator","false"]
+
+  # Hetu Engine - worker node
+  worker:
+    image: 10.122.251.118:5000/hetucore:latest
+    depends_on:
+      - coordinator
+    # mount config files for hive connector
+    networks:
+      - cluster1
+    configs:
+      - source: hive_prop
+        target: /usr/lib/hetu/etc/catalog/hive.properties
+      - source: hive_core_site
+        target: /opt/hdfs_configs/core-site.xml
+      - source: hive_hdfs_site
+        target: /opt/hdfs_configs/hdfs-site.xml
+    deploy:
+      replicas: 2
+    # -discoveryURI need to be full path; hostname must align with the coordinator service node
+    command: ["-t", "worker","-nodeEnv","cluster1","-discoveryURI","http://coordinator:8080"]
+
+  worker1:
+    image: 10.122.251.118:5000/hetucore:latest
+    depends_on:
+      - coordinator1
+    # mount config files for hive connector
+    networks:
+      - cluster2
+    configs:
+      - source: hive_prop
+        target: /usr/lib/hetu/etc/catalog/hive.properties
+      - source: hive_core_site
+        target: /opt/hdfs_configs/core-site.xml
+      - source: hive_hdfs_site
+        target: /opt/hdfs_configs/hdfs-site.xml
+    deploy:
+      replicas: 2
+    # -discoveryURI need to be full path; hostname must align with the coordinator service node
+    command: ["-t", "worker","-nodeEnv","cluster2","-discoveryURI","http://coordinator1:8080"]
+
+
+  # Hive
+  # must be named as hadoop-master
+  hadoop-master:
+    image: 127.0.0.1:5000/hetudev/hdp2.6-hive:13
+    # must align container port with the one in hdfs_configs/hive.properties
+    ports:
+      - "9083:9083"
+    networks:
+      - cluster1
+      - cluster2
+
+
+configs:
+  hive_prop:
+    file: ${PWD}/hdfs_configs/hive.properties
+  hive_core_site:
+    file: ${PWD}/hdfs_configs/core-site.xml
+  hive_hdfs_site:
+    file: ${PWD}/hdfs_configs/hdfs-site.xml
+
+networks:
+  cluster1:
+    driver: overlay
+    attachable: true
+  cluster2:
+    driver: overlay
+    attachable: true

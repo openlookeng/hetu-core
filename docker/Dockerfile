@@ -1,0 +1,43 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+FROM centos:centos7
+LABEL maintainer="Hetu Community"
+
+ENV JAVA_HOME /usr/lib/jvm/java-8
+RUN \
+    set -xeu &&\
+    yum -y -q update &&\
+    yum -y -q install  java-1.8.0-openjdk-devel sudo less &&\
+    yum -q clean all &&\
+    rm -rf /var/cache/yum /tmp/* /var/tmp/* && \
+    groupadd hetu --gid 1000 && \
+    useradd hetu --uid 1000 --gid 1000 && \
+    echo 'hetu:admin' | chpasswd &&\
+    gpasswd -a hetu wheel &&\
+    echo 'hetu ALL=(ALL) NOPASSWD:ALL' | tee -a /etc/sudoers > /dev/null &&\
+    mkdir -p /usr/lib/hetu /var/lib/hetu/data /var/log/hetu &&\
+    chown -RL "hetu:hetu" /var/lib/hetu/data /usr/lib/hetu /var/log/hetu
+
+ARG HETU_VERSION
+ARG PORT=8080
+
+# Install Hetu Engine Executable
+COPY --chown=hetu:hetu hetu-server-${HETU_VERSION} /usr/lib/hetu
+# Install CLI
+COPY hetu-cli-${HETU_VERSION}-executable.jar /usr/bin/hetu
+
+EXPOSE $PORT
+USER hetu:hetu
+ENV LANG en_US.UTF-8
+ENTRYPOINT ["/usr/lib/hetu/bin/run-hetu"]

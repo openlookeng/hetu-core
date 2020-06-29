@@ -1,0 +1,18 @@
+# Post erase script
+
+# if this is the last version of hetu-server-rpm being removed (i.e. not on upgrade)
+if [ "$1" -eq 0 ]
+then
+    # Delete /etc/hetu/env.sh manually during uninstall.
+    # rpm -e wont remove it, because this file is created during preinstall
+    rm -f /etc/hetu/env.sh
+    # Delete the data directory manually during uninstall.
+    # rpm -e wont remove it, because this directory may later contain files not
+    # deployed by the rpm
+    rm -rf /var/lib/hetu
+    # Remove /etc/hetu directory if no other files present
+    if [ -z "$(ls -A /etc/hetu)" ]
+    then
+        rm -rf /etc/hetu
+    fi
+fi
