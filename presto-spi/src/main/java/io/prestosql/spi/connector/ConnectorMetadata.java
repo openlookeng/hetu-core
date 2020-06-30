@@ -507,6 +507,14 @@ public interface ConnectorMetadata
     }
 
     /**
+     * start vacuum scan
+     */
+    default List<ConnectorVacuumTableInfo> getTablesForVacuum()
+    {
+        return null;
+    }
+
+    /**
      * Create the specified view. The view definition is intended to
      * be serialized by the connector for permanent storage.
      */

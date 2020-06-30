@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
+import io.prestosql.spi.connector.ConnectorVacuumTableInfo;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
@@ -754,5 +755,13 @@ public class ClassLoaderSafeConnectorMetadata
     public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
     {
         return delegate.isExecutionPlanCacheSupported(session, handle);
+    }
+
+    @Override
+    public List<ConnectorVacuumTableInfo> getTablesForVacuum()
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.getTablesForVacuum();
+        }
     }
 }

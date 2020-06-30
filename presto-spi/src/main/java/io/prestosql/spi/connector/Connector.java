@@ -195,4 +195,12 @@ public interface Connector
     {
         return Collections.emptyList();
     }
+
+    /**
+     * @return the connector metadata
+     */
+    default ConnectorMetadata getConnectorMetadata()
+    {
+        throw new UnsupportedOperationException();
+    }
 }
