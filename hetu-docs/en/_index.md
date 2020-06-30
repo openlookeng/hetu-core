@@ -5,7 +5,7 @@ bookToc = false
 title = "Release Notes"
 +++
 
-# Release Notes
+# Release 0.1.0
 
 | Feature                                      | Description                                                  |
 | -------------------------------------------- | ------------------------------------------------------------ |
