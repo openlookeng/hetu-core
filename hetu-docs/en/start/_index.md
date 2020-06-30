@@ -30,7 +30,7 @@ This command is used to download the installation script from the openLooKeng of
 
 If the following log is displayed, openLooKeng is successfully deployed.
 
-![img](../images/BE670A8C-9EA4-461D-AD22-AF12849D72F0.png)
+![img](/images/BE670A8C-9EA4-461D-AD22-AF12849D72F0.png)
 
 
 
@@ -62,7 +62,7 @@ Users can use the command line tool (cli) to connect to the openLooKeng service 
 bash /opt/openlookeng/bin/openlk-cli
 ```
 
-![img](../images/cli.png)
+![img](/images/cli.png)
 
 
 Users can enter standard SQL in the CLI to interact with the openLooKeng server.
@@ -73,7 +73,7 @@ For example, to view the configured [catalog](https://www.openlookeng.io/docs/do
 show catalogs;
 ```
 
-![img](../images/catalogs.png)
+![img](/images/catalogs.png)
 
 Run the following command to check the [schema](https://www.openlookeng.io/docs/docs/overview/concepts.html) contained in the tpcds:
 
@@ -103,7 +103,7 @@ Check the data tables in sf1.
 show tables from tpcds.sf1;
 ```
 
-![image-20200629140454598](../images/image-20200629140454598.png)
+![image-20200629140454598](/images/image-20200629140454598.png)
 
 
 
@@ -113,7 +113,7 @@ You can select a table to search for data.
 select c_customer_id, c_first_name, c_last_name from tpcds.sf1.customer limit 10;
 ```
 
-![image-20200629141214172](../images/image-20200629141214172.png)
+![image-20200629141214172](/images/image-20200629141214172.png)
 
 Or run more complex multi-table joint query:
 
@@ -130,7 +130,7 @@ AND ("d_year" = 2000)
 GROUP BY "sr_customer_sk", "sr_store_sk"
 ```
 
-![image-20200629141757336](../images/image-20200629141757336.png)
+![image-20200629141757336](/images/image-20200629141757336.png)
 
 You can read the [openLooKeng syntax document](https://www.openlookeng.io/docs/docs/sql.html) to learn more syntax rules.
 
