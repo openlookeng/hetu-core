@@ -29,7 +29,7 @@ wget -O - https://download.openlookeng.io/install.sh|sh
 
 当用户看到如下日志，便可以认为openLooKeng 部署成功了。
 
-![img](/images/BE670A8C-9EA4-461D-AD22-AF12849D72F0.png)
+![img](./images/BE670A8C-9EA4-461D-AD22-AF12849D72F0.png)
 
 
 
@@ -61,7 +61,7 @@ wget -O - https://download.openlookeng.io/install.sh|sh
 bash /opt/openlookeng/bin/openlk-cli 
 ```
 
-![img](/images/cli.png)
+![img](./images/cli.png)
 
 
 
@@ -73,7 +73,7 @@ bash /opt/openlookeng/bin/openlk-cli
 show catalogs;
 ```
 
-![img](/images/catalogs.png)
+![img](./images/catalogs.png)
 
 查看有tpcds 有包含哪些[schema]( https://www.openlookeng.io/zh-cn/docs/docs/overview/concepts.html )：
 
