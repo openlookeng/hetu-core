@@ -1,6 +1,6 @@
 +++
 bookCollapseSection = "true"
-weight = 2
+weight = 4
 bookToc = false
 title = "安装"
 +++
