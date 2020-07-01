@@ -11,3 +11,4 @@ title = "概述"
 
 openLooKeng是一个分布式SQL查询引擎，用于查询分布在一个或多个不同数据源中的大数据集。
 
+[NOTICE](https://gitee.com/openlookeng/hetu-core/blob/master/hetu-docs/NOTICE.md)

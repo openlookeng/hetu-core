@@ -11,4 +11,6 @@ openLooKeng is a drop in engine which enables in-situ analytics on any data, any
 
 The goal of openLooKeng is to support data exploration, ad hoc queries, and batch processing with near real time latency ranging from 100+ms to minutes, without moving your data around. openLooKeng also supports hierarchical deployment enabling geographically remote openLooKeng clusters to participate in the same query. With its cross region query plan optimization capability, queries involving remote data can achieve close to "local" performance.
 
+[NOTICE](https://gitee.com/openlookeng/hetu-core/blob/master/hetu-docs/NOTICE.md)
+
 
