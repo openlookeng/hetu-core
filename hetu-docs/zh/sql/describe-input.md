@@ -56,4 +56,4 @@ Position | Type
 See Also
 --------
 
-[prepare](./prepare)
+[prepare](./prepare.html)

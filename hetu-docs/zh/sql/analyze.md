@@ -17,7 +17,7 @@ The optional `WITH` clause can be used to provide connector-specific properties.
 
     SELECT * FROM system.metadata.analyze_properties
 
-Currently, this statement is only supported by the [Hive connector](../connector/hive.md).
+Currently, this statement is only supported by the [Hive connector](../connector/hive.html).
 
 Examples
 --------

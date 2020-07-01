@@ -36,20 +36,20 @@ Below Hive statements are partially supported, which mean some keywords or attri
 
 | SQL                    | Description                                                  | openLooKeng Syntax Reference                     |
 | ---------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
-| CREATE DATABASE/SCHEMA | statement with "COMMENT", "WITH DBPROPERTIES" is not supported | [CREATE SCHEMA](../sql/create-schema.md)         |
-| DROP DATABASE/SCHEMA   | statement with  "CASCADE" is not supported                   | [DROP SCHEMA](../sql/drop-schema.md)             |
-| SHOW DATABASE/SCHEMA   | statement with  "like" is not supported                      | [SHOW SCHEMA](../sql/show-schemas.md)            |
-| CREATE TABLE           | statement with "SKEWED BY","ROW FORMAT" is not supported     | [CREATE TABLE](../sql/create-table.md)           |
-| DROP TABLE             | statement with  "PURGE" is not supported                     | [DROP TABLE](../sql/drop-table.md)               |
-| ALTER TABLE            | only "Rename table" and "Add a single column "are supported  | [ALTER TABLE](../sql/alter-table.md)             |
-| SHOW CREATE TABLE      | To hive show table can works on both table and view. But in openLooKeng,  this can only be applied to table. | [SHOW CREATE TABLE](../sql/show-create-table.md) |
-| DESCRIBE               | statement with column name is supported                      | [DESCRIBE](../sql/describe.md)                   |
-| CREATE VIEW            | statement with   "COMMENT", "WITH DBPROPERTIES" is not supported | [CREATE VIEW](../sql/create-view.md)             |
-| SHOW FUCNTIONS         | statement with "like" is not supported                       | [SHOW FUCNTIONS](../sql/show-functions.md)       |
-| SHOW COLUMNS           | statement with  "like" is not supported                      | [SHOW COLUMNS](../sql/show-columns.md)           |
-| SHOW GRANT             | Statement with Specified  user or role is not supported      | [SHOW GRANT](../sql/show-grants.md)              |
-| INSERT                 | statement with "partition"  is not supported                 | [INSERT](../sql/insert.md)                       |
-| SELECT                 | statement with  "cluster by",  "offset" is not supported     | [SELECT](../sql/select.md)                       |
+| CREATE DATABASE/SCHEMA | statement with "COMMENT", "WITH DBPROPERTIES" is not supported | [CREATE SCHEMA](../sql/create-schema.html)         |
+| DROP DATABASE/SCHEMA   | statement with  "CASCADE" is not supported                   | [DROP SCHEMA](../sql/drop-schema.html)             |
+| SHOW DATABASE/SCHEMA   | statement with  "like" is not supported                      | [SHOW SCHEMA](../sql/show-schemas.html)            |
+| CREATE TABLE           | statement with "SKEWED BY","ROW FORMAT" is not supported     | [CREATE TABLE](../sql/create-table.html)           |
+| DROP TABLE             | statement with  "PURGE" is not supported                     | [DROP TABLE](../sql/drop-table.html)               |
+| ALTER TABLE            | only "Rename table" and "Add a single column "are supported  | [ALTER TABLE](../sql/alter-table.html)             |
+| SHOW CREATE TABLE      | To hive show table can works on both table and view. But in openLooKeng,  this can only be applied to table. | [SHOW CREATE TABLE](../sql/show-create-table.html) |
+| DESCRIBE               | statement with column name is supported                      | [DESCRIBE](../sql/describe.html)                   |
+| CREATE VIEW            | statement with   "COMMENT", "WITH DBPROPERTIES" is not supported | [CREATE VIEW](../sql/create-view.html)             |
+| SHOW FUCNTIONS         | statement with "like" is not supported                       | [SHOW FUCNTIONS](../sql/show-functions.html)       |
+| SHOW COLUMNS           | statement with  "like" is not supported                      | [SHOW COLUMNS](../sql/show-columns.html)           |
+| SHOW GRANT             | Statement with Specified  user or role is not supported      | [SHOW GRANT](../sql/show-grants.html)              |
+| INSERT                 | statement with "partition"  is not supported                 | [INSERT](../sql/insert.html)                       |
+| SELECT                 | statement with  "cluster by",  "offset" is not supported     | [SELECT](../sql/select.html)                       |
 
 
 Below Hive statements are not supported, because of feature differences:

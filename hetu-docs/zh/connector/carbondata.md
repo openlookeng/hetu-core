@@ -43,7 +43,7 @@ The configuration files must exist on all openLooKeng nodes. If user is referenc
 
 Before running any `CREATE TABLE` or `CREATE TABLE AS` statements for Carbondata tables, openLooKeng should have access to Hive and HDFS. The Hive warehouse directory is specified by the configuration variable `hive.metastore.warehouse.dir` in `hive-site.xml`, and the default value is `/user/hive/warehouse`.
 
-When not using Kerberos with HDFS, openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.md#jvm-config), replacing `hdfs_user` with the appropriate username:
+When not using Kerberos with HDFS, openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.html#jvm-config), replacing `hdfs_user` with the appropriate username:
 
 ``` properties
 -DHADOOP_USER_NAME=hdfs_user
@@ -57,7 +57,7 @@ Whenever you change the user which openLooKeng is using to access HDFS, remove `
 
 Kerberos authentication is supported for both HDFS and the Hive metastore. However, Kerberos authentication by ticket cache is not yet supported.
 
-The properties that apply to Carbondata connector security are listed in the [Carbondata Configuration Properties](#carbondata-configuration-properties) table. Please see the [Hive Security Configuration](hive-security.md) section for a more detailed discussion of the security options.
+The properties that apply to Carbondata connector security are listed in the [Carbondata Configuration Properties](#carbondata-configuration-properties) table. Please see the [Hive Security Configuration](hive-security.html) section for a more detailed discussion of the security options.
 
 ## <a name="carbondata-configuration-properties">Carbondata Configuration Properties</a>
 
@@ -70,7 +70,7 @@ The properties that apply to Carbondata connector security are listed in the [Ca
 | `hive.hdfs.impersonation.enabled`         | Enable HDFS end user impersonation.                          | `false`                                         |
 | `hive.hdfs.presto.principal`              | The Kerberos principal that openLooKeng will use when connecting to HDFS. |                                                 |
 | `hive.hdfs.presto.keytab`                 | HDFS client keytab location.                                 |                                                 |
-| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](hive.md#table-statistics) for details. | `true`                                          |
+| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](hive.html#table-statistics) for details. | `true`                                          |
 
 ## <a name="hive-thrift-metastore-configuration-properties">Hive Thrift Metastore Configuration Properties</a>
 

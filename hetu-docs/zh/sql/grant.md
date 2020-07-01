@@ -15,7 +15,7 @@ Description
 
 Grants the specified privileges to the specified grantee.
 
-Specifying `ALL PRIVILEGES` grants [DELETE](delete.md), [INSERT](insert.md) and [SELECT](select.md) privileges.
+Specifying `ALL PRIVILEGES` grants [DELETE](delete.html), [INSERT](insert.html) and [SELECT](select.html) privileges.
 
 Specifying `ROLE PUBLIC` grants privileges to the `PUBLIC` role and hence to all users.
 
@@ -47,4 +47,4 @@ Some connectors have no support for `GRANT`. See connector documentation for mor
 See Also
 --------
 
-[revoke](./revoke), [ show-grants](./ show-grants)
+[revoke](./revoke.html), [ show-grants](./show-grants.html)

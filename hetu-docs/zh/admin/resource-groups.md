@@ -28,7 +28,7 @@ resource-groups.config-file=etc/resource-groups.json
 - `schedulingPolicy`（可选）：指定如何选择排队的查询来运行，以及子组如何成为符合条件的查询。可以是以下三个值之一：
   - `fair`（默认）：排队的查询将按先进先出的顺序处理，子组必须轮流启动新的查询（如果它们有排队的话）。
   - `weighted_fair`：根据子组的`schedulingWeight`和子组的并发数选择子组。子组正在运行的查询的预期份额基于当前所有符合条件的子组的权重计算。选择与其份额相比并发度最小的子组开始下一次查询。
-- `weighted`：按其优先级（通过`query_priority`[会话属性](../sql/set-session)指定）的比例随机选择排队的查询。选择子组以按其`schedulingWeight`的比例启动新查询。
+- `weighted`：按其优先级（通过`query_priority`[会话属性](../sql/set-session.html)指定）的比例随机选择排队的查询。选择子组以按其`schedulingWeight`的比例启动新查询。
   - `query_priority`：所有子组都必须配置`query_priority`。排队的查询将严格按照其优先级进行选择。
 - `schedulingWeight`（可选）：该子组的权重。参见上文。默认为`1`。
 - `jmxExport`（可选）：如果为true，则导出群组统计信息到JMX进行监控。默认为`false`。

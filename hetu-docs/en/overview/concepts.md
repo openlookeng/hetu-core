@@ -35,9 +35,9 @@ Throughout this documentation, you\'ll read terms such as connector, catalog, sc
 ### Connector
 
 A connector adapts openLooKeng to a data source such as Hive or a relational database. You can think of a connector the same way you think of a driver for a database. It is an implementation of openLooKeng\'s
-[SPI](../en/develop/spi-overview) which allows openLooKeng to interact with a resource using a standard API.
+[SPI](../en/develop/spi-overview.html) which allows openLooKeng to interact with a resource using a standard API.
 
-openLooKeng contains several built-in connectors: a connector for [JMX](../en/connector/jmx) , a [System](../en/connector/system) connector which provides access to built-in system tables, a [Hive](../en/connector/hive) connector, and a [TPCH](../en/connector/tpch) connector designed to serve TPC-H benchmark data. Many third-party developers have contributed connectors so that openLooKeng can access data in a variety of data sources.
+openLooKeng contains several built-in connectors: a connector for [JMX](../en/connector/jmx.html) , a [System](../en/connector/system.html) connector which provides access to built-in system tables, a [Hive](../en/connector/hive) connector, and a [TPCH](../en/connector/tpch) connector designed to serve TPC-H benchmark data. Many third-party developers have contributed connectors so that openLooKeng can access data in a variety of data sources.
 
 Every catalog is associated with a specific connector. If you examine a catalog configuration file, you will see that each contains a mandatory property `connector.name` which is used by the catalog manager to create a connector for a given catalog. It is possible to have more than one catalog use the same connector to access two different instances of a similar database. For example, if you have two Hive clusters, you can configure two catalogs in a single openLooKeng cluster that both use the Hive connector, allowing you to query data from both Hive clusters (even within the same SQL query).
 

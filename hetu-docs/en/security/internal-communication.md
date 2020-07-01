@@ -100,7 +100,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
 
 ### Internal SSL/TLS communication with Kerberos
 
-If [Kerberos](/server) authentication is enabled, specify valid Kerberos credentials for the internal communication, in addition to the SSL/TLS properties.
+If [Kerberos](./server.html) authentication is enabled, specify valid Kerberos credentials for the internal communication, in addition to the SSL/TLS properties.
 
 > ``` properties
 > internal-communication.kerberos.enabled=true

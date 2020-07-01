@@ -6,7 +6,7 @@ title = "Deploying openLooKeng Manually"
 
 # Deploying openLooKeng Manually
 
-This is a Manual deployment method, you can also use automatic deployment via script. (see [deployment-auto](./deployment-auto))
+This is a Manual deployment method, you can also use automatic deployment via script. (see [deployment-auto](./deployment-auto.html))
 
 ## Installing openLooKeng
 
@@ -21,7 +21,7 @@ Create an `etc` directory inside the installation directory. This will hold the 
 -   Node Properties: environmental configuration specific to each node
 -   JVM Config: command line options for the Java Virtual Machine
 -   Config Properties: configuration for the openLooKeng server
--   Catalog Properties: configuration for [connector](../connector/_index.md) (data sources)
+-   Catalog Properties: configuration for [connector](../connector.html) (data sources)
 
 ### Node Properties
 
@@ -119,7 +119,7 @@ The following properties may be set:
 -   `jmx.rmiregistry.port`: Specifies the port for the JMX RMI registry. JMX clients should connect to this port.
 -   `jmx.rmiserver.port`: Specifies the port for the JMX RMI server. openLooKeng exports many metrics that are useful for monitoring via JMX.
 
-See also [resource-groups](../en/admin/resource-groups).
+See also [resource-groups](../en/admin/resource-groups.html).
 
 ### Log Levels
 
@@ -143,7 +143,7 @@ Catalogs are registered by creating a catalog properties file in the `etc/catalo
 connector.name=jmx
 ```
 
-See [connector](../connector/_index.md) for more information about configuring connectors.
+See [connector](../connector.html) for more information about configuring connectors.
 
 ## Running openLooKeng
 
@@ -169,4 +169,4 @@ After launching, you can find the log files in `var/log`:
 
 ## See Also
 
-[deployment-auto](deployment.md)
+[deployment-auto](deployment.html)

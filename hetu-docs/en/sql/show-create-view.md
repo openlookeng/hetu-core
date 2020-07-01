@@ -16,4 +16,4 @@ Show the SQL statement that creates the specified view.
 See Also
 --------
 
-[create-view](./create-view)
+[create-view](./create-view.html)

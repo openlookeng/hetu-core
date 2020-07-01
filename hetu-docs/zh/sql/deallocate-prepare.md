@@ -23,5 +23,5 @@ Deallocate a statement with the name `my_query`:
 See Also
 --------
 
-[prepare](./prepare)
+[prepare](./prepare.html)
 

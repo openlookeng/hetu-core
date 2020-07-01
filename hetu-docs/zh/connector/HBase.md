@@ -57,7 +57,7 @@ hbase.metastore.uri=hdfs://xxx.xxx.xxx.xxx:21088/xxx/hbasemetastore.ini
 
 **Use openLooKeng Metastore to store HBase metadata**
 
-You have to create `etc/hetu-metastore.properties` to connect database. For the details of configuration, please refer to [VDM](vdm.md) Connector. Adding below property to the configuration file:
+You have to create `etc/hetu-metastore.properties` to connect database. For the details of configuration, please refer to [VDM](vdm.html) Connector. Adding below property to the configuration file:
 
 ```properties
 hbase.metastore.type=hetuMetastore

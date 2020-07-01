@@ -30,5 +30,5 @@ Only Hive connector support this functionality. See connector documentation for 
 See Also
 --------
 
-[show-cache](./show-cache)
-[drop-cache](./drop-cache)
+[show-cache](./show-cache.html)
+[drop-cache](./drop-cache.html)

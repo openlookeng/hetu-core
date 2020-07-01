@@ -30,7 +30,7 @@ Change the value of `resource-groups.config-file` to point to a JSON config file
 -   `schedulingPolicy` (optional): specifies how queued queries are selected to run, and how sub-groups become eligible to start their queries. May be one of three values:
     - `fair` (default): queued queries are processed first-in-first-out, and sub-groups must take turns starting new queries (if they have any queued).
     - `weighted_fair`: sub-groups are selected based on their `schedulingWeight` and the number of queries they are already running concurrently. The expected share of running queries for a sub-group is computed based on the weights for all currently eligible sub-groups. The sub-group with the least concurrency relative to its share is selected to start the next query.
-- `weighted`: queued queries are selected stochastically in proportion to their priority (specified via the `query_priority` [session property](../sql/set-session)). Sub groups are selected to start new queries in proportion to their `schedulingWeight`.
+- `weighted`: queued queries are selected stochastically in proportion to their priority (specified via the `query_priority` [session property](../sql/set-session.html)). Sub groups are selected to start new queries in proportion to their `schedulingWeight`.
     - `query_priority`: all sub-groups must also be configured with `query_priority`. Queued queries will be selected strictly according to their priority.
 -   `schedulingWeight` (optional): weight of this sub-group. See above. Defaults to `1`.
 -   `jmxExport` (optional): If true, group statistics are exported to JMX for monitoring. Defaults to `false`.

@@ -69,4 +69,4 @@ types](https://msdn.microsoft.com/en-us/library/ms187752.aspx).
 
 The following SQL statements are not yet supported:
 
-[delete](../sql/delete), [grant](../sql/grant), [revoke](../sql/revoke)
+[delete](../sql/delete.html), [grant](../sql/grant.html), [revoke](../sql/revoke.html)

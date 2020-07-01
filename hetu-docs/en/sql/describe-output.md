@@ -71,4 +71,4 @@ rows        |         |        |       | bigint |         8 | false
 See Also
 --------
 
-[prepare](./prepare)
+[prepare](./prepare.html)

@@ -323,7 +323,7 @@ title = "属性参考"
 > 
 > 在执行期间的早期为分布、联接和聚合计算哈希代码，允许在查询的后期在操作之间共享结果。这可以通过避免多次计算相同的哈希来降低CPU使用率，但代价是为哈希进行额外的网络传输。在大多数情况下，这将减少整个查询处理时间。也可以使用`optimize_hash_generation`会话属性在每个查询基础上指定。
 > 
-> 在使用[EXPLAIN](../sql/explain)时禁用此属性通常很有帮助，这样可以使查询计划更易读。
+> 在使用[EXPLAIN](../sql/explain.html)时禁用此属性通常很有帮助，这样可以使查询计划更易读。
 
 ### `optimizer.optimize-metadata-queries`
 
@@ -378,7 +378,7 @@ title = "属性参考"
 
 ## 正则表达式函数属性
 
-下列属性允许调优[regexp](../functions/regexp)。
+下列属性允许调优[regexp](../functions/regexp.html)。
 
 ### `regex-library`
 

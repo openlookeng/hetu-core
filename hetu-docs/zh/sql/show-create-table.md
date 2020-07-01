@@ -39,4 +39,4 @@ partitioned_by = ARRAY['orderdate']
 See Also
 --------
 
-[create-table](./create-table)
+[create-table](./create-table.html)

@@ -36,7 +36,7 @@ Another requirement is that you have enabled and configured a Hive connector in 
     >     > catalog properties file to
     >     > `thrift://${METASTORE_ADDRESS}:${METASTORE_THRIFT_PORT}`. If
     >     > the metastore uses authentication, please refer to
-    >     > [hive-security](./hive-security).
+    >     > [hive-security](./hive-security.html).
 
 -   GCS access:
 

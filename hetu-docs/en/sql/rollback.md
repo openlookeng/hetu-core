@@ -24,4 +24,4 @@ ROLLBACK WORK;
 See Also
 --------
 
-[commit](./commit), [start-transaction](./start-transaction)
+[commit](./commit.html), [start-transaction](./start-transaction.html)

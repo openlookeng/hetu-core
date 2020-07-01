@@ -193,7 +193,7 @@ Troubleshooting
 
 ### Java Keystore File Verification
 
-Verify the password for a keystore file and view its contents using [troubleshooting_keystore](./tls.md#Java-Keystore-File-Verification).
+Verify the password for a keystore file and view its contents using [troubleshooting_keystore](./tls.html#Java-Keystore-File-Verification).
 
 ### SSL Debugging for openLooKeng CLI
 

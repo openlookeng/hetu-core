@@ -142,4 +142,4 @@ exchange.client-threads=8
 
 ## 参考资料
 
-[部署](./deployment.md)
+[部署](./deployment.html)

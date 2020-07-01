@@ -50,4 +50,4 @@ PostgreSQL Connector Limitations
 
 The following SQL statements are not yet supported:
 
-[delete](../sql/delete), [grant](../sql/grant), [revoke](../sql/revoke), [show-grants](../sql/show-grants), [show-roles](../sql/show-roles), [show-role-grants](../sql/show-role-grants)
+[delete](../sql/delete.html), [grant](../sql/grant.html), [revoke](../sql/revoke.html), [show-grants](../sql/show-grants.html), [show-roles](../sql/show-roles.html), [show-role-grants](../sql/show-role-grants.html)

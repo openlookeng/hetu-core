@@ -35,20 +35,20 @@ SQL迁移工具帮助用户将SQL语法转换为openLooKeng兼容的SQL语法。
 
 | SQL| 描述| openLooKeng语法参考|
 |----------|----------|----------|
-| CREATE DATABASE/SCHEMA| 不支持带“COMMENT”、“WITH DBPROPERTIES”的语句| [CREATE SCHEMA](../sql/create-schema.md)|
-| DROP DATABASE/SCHEMA| 不支持带“CASCADE”的语句| [DROP SCHEMA](../sql/drop-schema.md)|
-| SHOW DATABASE/SCHEMA| 不支持带“like”的语句| [SHOW SCHEMA](../sql/show-schemas.md)|
-| CREATE TABLE| 不支持带“SKEWED BY”、“ROW FORMAT”的语句| [CREATE TABLE](../sql/create-table.md)|
-| DROP TABLE| 不支持带“PURGE”的语句| [DROP TABLE](../sql/drop-table.md)|
-| ALTER TABLE| 只支持“重命名表”和“添加单列”| [ALTER TABLE](../sql/alter-table.md)|
-| SHOW CREATE TABLE| 对Hive而言，SHOW TABLE可用于表和视图。但在openLooKeng中，这只能应用于表。| [SHOW CREATE TABLE](../sql/show-create-table.md)|
-| DESCRIBE| 支持带列名的语句| [DESCRIBE](../sql/describe.md)|
-| CREATE VIEW| 不支持带“COMMENT”、“WITH DBPROPERTIES”的语句| [CREATE VIEW](../sql/create-view.md)|
-| SHOW FUCNTIONS| 不支持带“like”的语句| [SHOW FUCNTIONS](../sql/show-functions.md)|
-| SHOW COLUMNS| 不支持带“like”的语句| [SHOW COLUMNS](../sql/show-columns.md)|
-| SHOW GRANT| 不支持指定用户或角色的语句| [SHOW GRANT](../sql/show-grants.md)|
-| INSERT| 不支持带“partition”的语句| [INSERT](../sql/insert.md)|
-| SELECT| 不支持带“cluster by”、“offset”的语句| [SELECT](../sql/select.md)|
+| CREATE DATABASE/SCHEMA| 不支持带“COMMENT”、“WITH DBPROPERTIES”的语句| [CREATE SCHEMA](../sql/create-schema.html)|
+| DROP DATABASE/SCHEMA| 不支持带“CASCADE”的语句| [DROP SCHEMA](../sql/drop-schema.html)|
+| SHOW DATABASE/SCHEMA| 不支持带“like”的语句| [SHOW SCHEMA](../sql/show-schemas.html)|
+| CREATE TABLE| 不支持带“SKEWED BY”、“ROW FORMAT”的语句| [CREATE TABLE](../sql/create-table.html)|
+| DROP TABLE| 不支持带“PURGE”的语句| [DROP TABLE](../sql/drop-table.html)|
+| ALTER TABLE| 只支持“重命名表”和“添加单列”| [ALTER TABLE](../sql/alter-table.html)|
+| SHOW CREATE TABLE| 对Hive而言，SHOW TABLE可用于表和视图。但在openLooKeng中，这只能应用于表。| [SHOW CREATE TABLE](../sql/show-create-table.html)|
+| DESCRIBE| 支持带列名的语句| [DESCRIBE](../sql/describe.html)|
+| CREATE VIEW| 不支持带“COMMENT”、“WITH DBPROPERTIES”的语句| [CREATE VIEW](../sql/create-view.html)|
+| SHOW FUCNTIONS| 不支持带“like”的语句| [SHOW FUCNTIONS](../sql/show-functions.html)|
+| SHOW COLUMNS| 不支持带“like”的语句| [SHOW COLUMNS](../sql/show-columns.html)|
+| SHOW GRANT| 不支持指定用户或角色的语句| [SHOW GRANT](../sql/show-grants.html)|
+| INSERT| 不支持带“partition”的语句| [INSERT](../sql/insert.html)|
+| SELECT| 不支持带“cluster by”、“offset”的语句| [SELECT](../sql/select.html)|
 
 由于特性差异，如下Hive语句暂不支持：
 

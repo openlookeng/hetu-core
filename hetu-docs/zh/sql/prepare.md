@@ -34,4 +34,4 @@ Prepare an insert query:
 See Also
 --------
 
-[execute](./execute), [deallocate-prepare](./deallocate-prepare), [describe-input](./describe-input), [describe-output](./describe-output)
+[execute](./execute.html), [deallocate-prepare](./deallocate-prepare.html), [describe-input](./describe-input.html), [describe-output](./describe-output.html)

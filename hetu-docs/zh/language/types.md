@@ -223,11 +223,11 @@ HyperLogLog
 -----------
 
 Calculating the approximate distinct count can be done much more cheaply than an exact count using the
-[HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) data sketch. See [HyperLogLog Functions](../functions/hyperloglog.md).
+[HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) data sketch. See [HyperLogLog Functions](../functions/hyperloglog.html).
 
 ### `HyperLogLog`
 
-> A HyperLogLog sketch allows efficient computation of [approx_distinct()](../functions/aggregate.md). It starts as a sparse representation, switching to a dense representation when it becomes more efficient.
+> A HyperLogLog sketch allows efficient computation of [approx_distinct()](../functions/aggregate.html). It starts as a sparse representation, switching to a dense representation when it becomes more efficient.
 
 ### `P4HyperLogLog`
 

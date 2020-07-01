@@ -35,4 +35,4 @@ Functionally, `CASCADE` and `RESTRICT` is not supported yet.
 See Also
 --------
 
-[alter-schema](./alter-schema), [create-schema](./create-schema)
+[alter-schema](./alter-schema.html), [create-schema](./create-schema.html)

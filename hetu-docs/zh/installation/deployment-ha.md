@@ -10,7 +10,7 @@ openLooKeng HA解决协调节点单点故障问题。如果一个协调节点出
 
 ## 安装HA
 
-安装具有HA的openLooKeng要求集群中至少有2个协调节点。请按照[openLooKeng手动设置](deployment.md)或[openLooKeng自动设置](deployment-auto.md)进行基本设置。
+安装具有HA的openLooKeng要求集群中至少有2个协调节点。请按照[openLooKeng手动设置](deployment.html)或[openLooKeng自动设置](deployment-auto.html)进行基本设置。
 
 ## 配置HA
 

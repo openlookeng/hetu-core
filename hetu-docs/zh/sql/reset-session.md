@@ -25,4 +25,4 @@ RESET SESSION hive.optimized_reader_enabled;
 See Also
 --------
 
-[set-session](./set-session), [show-session](./show-session)
+[set-session](./set-session.html), [show-session](./show-session.html)

@@ -40,7 +40,7 @@ This example creates a schema `schema1` in `vdm1` catalog, and creates two views
     create view view2 as select * from hive.table.test;
     select * from view1;
 
-VDM datasource can also be managed through dynamic catalog API. See [Dynamic Catalog](../admin/dynamic-catalog.md) topic for more information.
+VDM datasource can also be managed through dynamic catalog API. See [Dynamic Catalog](../admin/dynamic-catalog.html) topic for more information.
 
 ## All supported CLI queries
 

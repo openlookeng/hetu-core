@@ -1,7 +1,7 @@
 Quantile Digest Functions
 =========================
 
-openLooKeng implements the `approx_percentile` function with the quantile digest data structure. The underlying data structure, [qdigest](../language/types), is exposed as a data type in openLooKeng, and can be created, queried and stored separately from `approx_percentile`.
+openLooKeng implements the `approx_percentile` function with the quantile digest data structure. The underlying data structure, [qdigest](../language/types.html), is exposed as a data type in openLooKeng, and can be created, queried and stored separately from `approx_percentile`.
 
 Data Structures
 ---------------

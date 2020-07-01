@@ -28,5 +28,5 @@ Only Hive connector support this functionality. See connector documentation for 
 See Also
 --------
 
-[cache-table](./cache-table), [show-cache](./show-cache)
+[cache-table](./cache-table.html), [show-cache](./show-cache.html)
 

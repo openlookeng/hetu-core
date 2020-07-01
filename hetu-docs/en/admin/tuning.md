@@ -10,7 +10,7 @@ The default openLooKeng settings should work well for most workloads. The follow
 
 ## Config Properties
 
-See [properties](./properties).
+See [properties](./properties.html).
 
 ## JVM Settings
 

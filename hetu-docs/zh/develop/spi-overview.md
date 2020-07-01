@@ -6,7 +6,7 @@ title = "SPI 概述"
 
 # SPI 概述
 
-当您实现一个新的 openLooKeng 插件时，您将实现多个接口并覆盖 SPI 定义的方法。插件可以提供额外的[连接器](connectors.md)、[类型](types.md)、[函数](functions.md)和[系统访问控制](system-access-control.md)。特别地，连接器是用于在 openLooKeng 中进行查询的所有数据的源：它们支持 openLooKeng 可用的每个目录。
+当您实现一个新的 openLooKeng 插件时，您将实现多个接口并覆盖 SPI 定义的方法。插件可以提供额外的[连接器](connectors.html)、[类型](types.html)、[函数](functions.html)和[系统访问控制](system-access-control.html)。特别地，连接器是用于在 openLooKeng 中进行查询的所有数据的源：它们支持 openLooKeng 可用的每个目录。
 
 ## 代码
 

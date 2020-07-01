@@ -28,4 +28,4 @@ Only Hive connector support this functionality. See connector documentation for 
 See Also
 --------
 
-[cache-table](./cache-table), [drop-cache](./drop-cache)
+[cache-table](./cache-table.html), [drop-cache](./drop-cache.html)

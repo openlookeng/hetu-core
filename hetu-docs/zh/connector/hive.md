@@ -69,7 +69,7 @@ The configuration files must exist on all openLooKeng nodes. If you are referenc
 Before running any `CREATE TABLE` or `CREATE TABLE AS` statements for Hive tables in openLooKeng, you need to check that the user openLooKeng is using to access HDFS has access to the Hive warehouse directory. The Hive warehouse directory is specified by the configuration variable `hive.metastore.warehouse.dir` in `hive-site.xml`, and the default value is `/user/hive/warehouse`.
 
 When not using Kerberos with HDFS, openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by
-setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.md#jvm-config), replacing `hdfs_user`with the appropriate username:
+setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.html#jvm-config), replacing `hdfs_user`with the appropriate username:
 
 ``` properties
 -DHADOOP_USER_NAME=hdfs_user
@@ -84,7 +84,7 @@ Whenever you change the user openLooKeng is using to access HDFS, remove `/tmp/o
 Kerberos authentication is supported for both HDFS and the Hive metastore. However, Kerberos authentication by ticket cache is not yet supported.
 
 The properties that apply to Hive connector security are listed in the [Hive Configuration Properties](#hive-configuration-properties) table.
-Please see the [hive-security](../hive-security) section for a more detailed discussion of the security options in the Hive connector.
+Please see the [hive-security](../hive-security.html) section for a more detailed discussion of the security options in the Hive connector.
 
 Hive Configuration Properties
 -----------------------------
@@ -106,13 +106,13 @@ Hive Configuration Properties
 | `hive.hdfs.impersonation.enabled`         | Enable HDFS end user impersonation.                          | `false`  |
 | `hive.hdfs.presto.principal`                | The Kerberos principal that openLooKeng will use when connecting to HDFS. |          |
 | `hive.hdfs.presto.keytab`                   | HDFS client keytab location.                                 |          |
-| `hive.security`                           | See [Hive Security Configuration](hive-security.md). |          |
-| `security.config-file`                    | Path of config file to use when `hive.security=file`. See [File Based Authorization](hive-security.md#hive-file-based-authorization) for details. |          |
+| `hive.security`                           | See [Hive Security Configuration](hive-security.html). |          |
+| `security.config-file`                    | Path of config file to use when `hive.security=file`. See [File Based Authorization](hive-security.html#hive-file-based-authorization) for details. |          |
 | `hive.non-managed-table-writes-enabled`   | Enable writes to non-managed (external) Hive tables.         | `false`  |
 | `hive.non-managed-table-creates-enabled`  | Enable creating non-managed (external) Hive tables.          | `true`   |
-| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.md#table-statistics) for details. | `true`   |
+| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.html#table-statistics) for details. | `true`   |
 | `hive.s3select-pushdown.enabled`          | Enable query pushdown to AWS S3 Select service.              | `false`  |
-| `hive.s3select-pushdown.max-connections`  | Maximum number of simultaneously open connections to S3 for [S3 Select Pushdown](./hive.md#s3selectpushdown). | 500      |
+| `hive.s3select-pushdown.max-connections`  | Maximum number of simultaneously open connections to S3 for [S3 Select Pushdown](./hive.html#s3selectpushdown). | 500      |
 | `hive.orc.use-column-names`               | To support alter table drop column, it is recommended to add `hive.orc.use-column-names=true` in hive properties, otherwise the drop column might not work properly. | false    |
 
 
@@ -700,8 +700,8 @@ DROP SCHEMA hive.web
 Hive Connector Limitations
 --------------------------
 
-- [delete](../sql/delete) is only supported if the `WHERE` clause matches entire partitions when table is non-transactional. for transactional table, the `WHERE` clause can be any condition.
-- [alter-schema](../sql/alter-schema) usage fails, since the Hive metastore does not support renaming schemas.
+- [delete](../sql/delete.html) is only supported if the `WHERE` clause matches entire partitions when table is non-transactional. for transactional table, the `WHERE` clause can be any condition.
+- [alter-schema](../sql/alter-schema.html) usage fails, since the Hive metastore does not support renaming schemas.
 
 - openLooKeng supports ACID transactions on Hive tables only for Hive version 3.x
 

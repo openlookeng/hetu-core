@@ -99,7 +99,7 @@ $ bin/launcher start
 
 Because the Kafka tables all have the `tpch.` prefix in the configuration, the tables are in the `tpch` schema. The connector is mounted into the `kafka` catalog because the properties file is named `kafka.properties`.
 
-Start the [openLooKeng CLI](../installation/cli.md):
+Start the [openLooKeng CLI](../installation/cli.html):
 
 ``` shell
 $ ./openlk-cli --catalog kafka --schema tpch
@@ -165,7 +165,7 @@ lk:tpch> SELECT sum(cast(json_extract_scalar(_message, '$.accountBalance') AS do
 (1 row)
 ```
 
-The data from Kafka can be queried using openLooKeng but it is not yet in actual table shape. The raw data is available through the `_message` and `_key` columns but it is not decoded into columns. As the sample data is in JSON format, the [json](../functions/json) built into openLooKeng can be used to slice the data.
+The data from Kafka can be queried using openLooKeng but it is not yet in actual table shape. The raw data is available through the `_message` and `_key` columns but it is not decoded into columns. As the sample data is in JSON format, the [json](../functions/json.html) built into openLooKeng can be used to slice the data.
 
 ### Step 5: Add a topic description file
 

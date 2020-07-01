@@ -1,7 +1,7 @@
 Cost in EXPLAIN
 ===============
 
-During planning, the cost associated with each node of the plan is computed based on the table statistics for the tables in the query. This calculated cost is printed as part of the output of an [EXPLAIN](../sql/explain) statement.
+During planning, the cost associated with each node of the plan is computed based on the table statistics for the tables in the query. This calculated cost is printed as part of the output of an [EXPLAIN](../sql/explain.html) statement.
 
 Cost information is displayed in the plan tree using the format `{rows: XX (XX), cpu: XX, memory: XX, network: XX}`.  `rows` refers to the expected number of rows output by each plan node during execution.  The value in the parentheses following the number of rows refers to the expected size of the data output by each plan node in bytes. Other parameters indicate the estimated amount of CPU, memory, and network utilized by the execution of a plan node. These values do not represent any actual unit, but are numbers that are used to compare the relative costs between plan nodes, allowing the optimizer to choose the best plan for executing a query. If any of the values is not known, a `?` is printed.
 
@@ -26,4 +26,4 @@ Generally, there is only one cost printed for each plan node.  However, when a `
 
  
 
-Estimated cost is also printed in [explain-analyze](../sql/explain-analyze) in addition to actual runtime statistics.
+Estimated cost is also printed in [explain-analyze](../sql/explain-analyze.html) in addition to actual runtime statistics.

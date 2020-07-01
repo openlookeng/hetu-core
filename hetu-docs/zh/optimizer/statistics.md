@@ -3,7 +3,7 @@ Table Statistics
 
 openLooKeng supports statistics based optimizations for queries. For a query to  take advantage of these optimizations, openLooKeng must have statistical information for the tables in that query.
 
-Table statistics are provided to the query planner by connectors. Currently, the only connector that supports statistics is the [hive](../en/connector/hive).
+Table statistics are provided to the query planner by connectors. Currently, the only connector that supports statistics is the [hive](../en/connector/hive.html).
 
 Table Layouts
 -------------
@@ -39,4 +39,4 @@ The following statistics are available in openLooKeng:
 
 The set of statistics available for a particular query depends on the connector being used and can also vary by table or even by table layout. For example, the Hive connector does not currently provide statistics on data size.
 
-Table statistics can be displayed via the openLooKeng SQL interface using the [show-stats](../sql/show-stats) command. For the Hive connector, refer to the [Hive connector](../en/connector/hive#hive_analyze) documentation to learn how to update table statistics.
+Table statistics can be displayed via the openLooKeng SQL interface using the [show-stats](../sql/show-stats.html) command. For the Hive connector, refer to the [Hive connector](../en/connector/hive#hive_analyze.html) documentation to learn how to update table statistics.
