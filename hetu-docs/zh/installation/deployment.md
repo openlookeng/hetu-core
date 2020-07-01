@@ -7,7 +7,7 @@ title = "手动部署openLooKeng"
 # 手动部署openLooKeng
 
 
-这是一种手动部署方法，你也可以通过脚本使用自动部署方法。（参见[自动部署](./deployment-auto)）
+这是一种手动部署方法，你也可以通过脚本使用自动部署方法。（参见[自动部署](./deployment-auto.html)
 
 ## 安装openLooKeng
 
