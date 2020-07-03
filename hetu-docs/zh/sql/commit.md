@@ -1,28 +1,27 @@
-COMMIT
-======
++++
 
-Synopsis
---------
+title = "COMMIT"
++++
+
+# COMMIT
+
+## 摘要
 
 ``` sql
 COMMIT [ WORK ]
 ```
 
-Description
------------
+## 说明
 
-Commit the current transaction.
+提交当前事务。
 
-Examples
---------
+## 示例
 
 ``` sql
 COMMIT;
 COMMIT WORK;
 ```
 
-See Also
---------
+## 另请参见
 
-[rollback](./rollback.html)
-[start-transaction](./start-transaction.html)
+[rollback](./rollback.html)、[start-transaction](./start-transaction.html)

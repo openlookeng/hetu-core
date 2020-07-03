@@ -1,14 +1,16 @@
-SHOW CATALOGS
-=============
++++
 
-Synopsis
---------
+title = "SHOW CATALOGS"
++++
+
+# SHOW CATALOGS
+
+## 摘要
 
 ``` sql
 SHOW CATALOGS [ LIKE pattern ]
 ```
 
-Description
------------
+## 说明
 
-List the available catalogs. The `LIKE` clause can be used to restrict the list of catalog names.
+列出可用的目录。`LIKE` 子句可用于限制目录名称列表。

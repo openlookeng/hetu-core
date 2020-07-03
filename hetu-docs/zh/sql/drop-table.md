@@ -1,32 +1,32 @@
-DROP TABLE
-==========
++++
 
-Synopsis
---------
+title = "DROP TABLE"
++++
+
+# DROP TABLE
+
+## 摘要
 
 ``` sql
 DROP TABLE  [ IF EXISTS ] table_name
 ```
 
-Description
------------
+## 说明
 
-Drops an existing table.
+删除一个现有的表。
 
-The optional `IF EXISTS` clause causes the error to be suppressed if the table does not exist.
+如果使用可选的 `IF EXISTS` 子句，则在该表不存在时禁止显示错误。
 
-Examples
---------
+## 示例
 
-Drop the table `orders_by_date`:
+删除表 `orders_by_date`：
 
     DROP TABLE orders_by_date
 
-Drop the table `orders_by_date` if it exists:
+如果表 `orders_by_date` 存在，则删除该表：
 
     DROP TABLE IF EXISTS orders_by_date
 
-See Also
---------
+## 另请参见
 
-[alter-table](./alter-table.html), [create-table](./create-table.html)
+[alter-table](./alter-table.html)、[create-table](./create-table.html)

@@ -1,8 +1,11 @@
-EXPLAIN
-=======
++++
 
-Synopsis
---------
+title = "EXPLAIN"
++++
+
+# EXPLAIN
+
+## 摘要
 
 ``` sql
 EXPLAIN [ ( option [, ...] ) ] statement
@@ -13,36 +16,33 @@ where option can be one of:
     TYPE { LOGICAL | DISTRIBUTED | VALIDATE | IO }
 ```
 
-Description
------------
+## 说明
 
-Show the logical or distributed execution plan of a statement, or validate the statement. Use `TYPE DISTRIBUTED` option to display fragmented plan. Each plan fragment is executed by a single or multiple
-openLooKeng nodes. Fragments separation represent the data exchange between openLooKeng nodes. Fragment type specifies how the fragment is executed by openLooKeng nodes and how the data is distributed between fragments:
+显示语句的逻辑或分布式执行计划，或者对语句进行验证。使用 `TYPE DISTRIBUTED` 选项可以显示分片计划。每个计划片段由单个或多个 openLooKeng 节点执行。片段之间的间隔表示 openLooKeng 节点之间的数据交换。片段类型指定 openLooKeng 节点如何执行片段以及数据如何在片段之间分布：
 
 `SINGLE`
 
-Fragment is executed on a single node.
+：   片段在单个节点上执行。
 
 `HASH`
 
-Fragment is executed on a fixed number of nodes with the input data distributed using a hash function.
+：   片段在固定数量的节点上执行，输入数据通过哈希函数进行分布。
 
 `ROUND_ROBIN`
 
-Fragment is executed on a fixed number of nodes with the input data distributed in a round-robin fashion.
+：   片段在固定数量的节点上执行，输入数据以轮循方式进行分布。
 
 `BROADCAST`
 
-Fragment is executed on a fixed number of nodes with the input data broadcasted to all nodes.
+：   片段在固定数量的节点上执行，输入数据广播到所有节点。
 
 `SOURCE`
 
-Fragment is executed on nodes where input splits are accessed.
+：   片段在访问输入分段的节点上执行。
 
-Examples
---------
+## 示例
 
-Logical plan:
+逻辑计划：
 
 ``` sql
 lk:tiny> EXPLAIN SELECT regionkey, count(*) FROM nation GROUP BY 1;
@@ -63,7 +63,7 @@ lk:tiny> EXPLAIN SELECT regionkey, count(*) FROM nation GROUP BY 1;
                                      regionkey := tpch:regionkey
 ```
 
-Distributed plan:
+分布式计划：
 
 ``` sql
 lk:tiny> EXPLAIN (TYPE DISTRIBUTED) SELECT regionkey, count(*) FROM nation GROUP BY 1;
@@ -95,7 +95,7 @@ lk:tiny> EXPLAIN (TYPE DISTRIBUTED) SELECT regionkey, count(*) FROM nation GROUP
                      regionkey := tpch:regionkey
 ```
 
-Validate:
+验证：
 
 ``` sql
 lk:tiny> EXPLAIN (TYPE VALIDATE) SELECT regionkey, count(*) FROM nation GROUP BY 1;
@@ -104,7 +104,7 @@ lk:tiny> EXPLAIN (TYPE VALIDATE) SELECT regionkey, count(*) FROM nation GROUP BY
  true
 ```
 
-IO:
+IO：
 
 ``` sql
 lk:hive> EXPLAIN (TYPE IO, FORMAT JSON) INSERT INTO test_nation SELECT * FROM nation WHERE regionkey = 2;
@@ -147,7 +147,6 @@ lk:hive> EXPLAIN (TYPE IO, FORMAT JSON) INSERT INTO test_nation SELECT * FROM na
  }
 ```
 
-See Also
---------
+## 另请参见
 
 [explain-analyze](./explain-analyze.html)

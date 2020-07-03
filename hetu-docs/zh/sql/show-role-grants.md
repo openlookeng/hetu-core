@@ -1,14 +1,16 @@
-SHOW ROLE GRANTS
-================
++++
 
-Synopsis
---------
+title = "SHOW ROLE GRANTS"
++++
+
+# SHOW ROLE GRANTS
+
+## 摘要
 
 ``` sql
 SHOW ROLE GRANTS [ FROM catalog ]
 ```
 
-Description
------------
+## 说明
 
-List non-recursively the `ROLE`s that have been granted to the session user in `catalog`, or the current catalog if `catalog` is not specified.
+非递归地列出向 `catalog`（如果未指定 `catalog`，则为当前目录）中的会话用户授予的 `ROLE`。

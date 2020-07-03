@@ -1,41 +1,41 @@
-DELETE
-======
++++
 
-Synopsis
---------
+title = "DELETE"
++++
+
+# DELETE
+
+## 摘要
 
 ``` sql
 DELETE FROM table_name [ WHERE condition ]
 ```
 
-Description
------------
+## 说明
 
-Delete rows from a table. If the `WHERE` clause is specified, only the matching rows are deleted. Otherwise, all rows from the table are deleted.
+删除表中的行。如果指定了 `WHERE` 子句，则仅删除匹配的行。否则，将删除表中的所有行。
 
-Examples
---------
+## 示例
 
-Delete all line items shipped by air:
+删除所有空运行项目：
 
     DELETE FROM lineitem WHERE shipmode = 'AIR';
 
-Delete all line items for low priority orders:
+删除低优先级订单的所有行项目：
 
     DELETE FROM lineitem
     WHERE orderkey IN (SELECT orderkey FROM orders WHERE priority = 'LOW');
 
-Delete all orders:
+删除所有订单：
 
     DELETE FROM orders;
 
-Limitations
------------
+## 限制
 
-Some connectors have limited or no support for `DELETE`.
+某些连接器对 `DELETE` 的支持有限或不支持该语句。
 
-For example, to Hive connector, the behavior is different for transactional table and non-transactional table.
+例如，对于 Hive 连接器，事务表和非事务表的行为是不同的。
 
-For transactional table, you can delete any row by where condition. However, for non-transactional table, DELETE is only supported if the WHERE clause matches entire partitions.
+对于事务表，可以通过 WHERE 条件来删除任何行。不过，对于非事务表，仅当 WHERE 子句匹配整个分区时才支持 DELETE。
 
-See connector documentation for more details.
+有关更多详细信息，请参见连接器文档。

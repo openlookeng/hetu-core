@@ -1,27 +1,31 @@
-SHOW STATS
-==========
++++
 
-Synopsis
---------
+title = "SHOW STATS"
++++
+
+# SHOW STATS
+
+## 摘要
 
 ``` sql
 SHOW STATS FOR table
 SHOW STATS FOR ( SELECT * FROM table [ WHERE condition ] )
 ```
 
-Description
------------
+## 说明
 
-Returns approximated statistics for the named table or for the results of a (limited) query.
+返回命名表或（有限）查询结果的近似统计信息。
 
-Statistics are returned for each column, along with a summary row.
+针对每列返回统计信息并返回一个摘要行。
 
-  Column                    Description
-------------------------- --------------------------------------------------------------
-  `column_name`             The name of the column (`NULL` for the summary row)
-  `data_size`               The total size in bytes of all of the values in the column
-  `distinct_values_count`   The number of distinct values in the column
-  `nulls_fractions`         The portion of the values in the column that are `NULL`
-  `row_count`               The number of rows (only returned for the summary row)
-  `low_value`               The lowest value found in this column (only for some types)
-  `high_value`              The highest value found in this column (only for some types)
+列                    			说明
+
+---------------------------------------------------------------------------------------
+
+`column_name`             列的名称（对于摘要行为 `NULL`）
+`data_size`               列中所有值的总大小（以字节为单位）
+`distinct_values_count`   列中唯一值的数量
+`nulls_fractions`         列中为 `NULL` 的值部分
+`row_count`               行数（仅针对摘要行返回）
+`low_value`               在该列中找到的最小值（仅适用于某些类型）
+`high_value`              在该列中找到的最大值（仅适用于某些类型）

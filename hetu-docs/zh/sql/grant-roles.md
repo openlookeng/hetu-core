@@ -1,8 +1,11 @@
-GRANT ROLES
-===========
++++
 
-Synopsis
---------
+title = "GRANT ROLES"
++++
+
+# GRANT ROLES
+
+## 摘要
 
 ``` sql
 GRANT role [, ...]
@@ -11,34 +14,30 @@ TO ( user | USER user | ROLE role) [, ...]
 [ WITH ADMIN OPTION ]
 ```
 
-Description
------------
+## 说明
 
-Grants the specified role(s) to the specified principal(s) in the current catalog.
+将指定的角色授给当前目录中的指定主体。
 
-If the `WITH ADMIN OPTION` clause is specified, the role(s) are granted to the users with `GRANT` option.
+如果指定了 `WITH ADMIN OPTION` 子句，则可以使用 `GRANT` 选项将角色授给用户。
 
-For the `GRANT` statement for roles to succeed, the user executing it either should be the role admin or should possess the `GRANT` option for the given role.
+为了使针对角色的 `GRANT` 语句成功执行，执行该语句的用户应具有管理员角色或者应对于给定的角色拥有 `GRANT` 选项。
 
-The optional `GRANTED BY` clause causes the role(s) to be granted with the specified principal as a grantor. If the `GRANTED BY` clause is not specified, the roles are granted with the current user as a grantor.
+可选的 `GRANTED BY` 子句可使指定的主体作为授予方来授给角色。如果未指定 `GRANTED BY` 子句，则当前用户作为授予方来授给角色。
 
-Examples
---------
+## 示例
 
-Grant role `bar` to user `foo` :
+将角色 `bar` 授给用户 `foo`：
 
     GRANT bar TO USER foo;
 
-Grant roles `bar` and `foo` to user `baz` and role `qux` with admin option :
+将角色 `bar` 和 `foo` 授给用户 `baz` 和角色 `qux` 并使其具有管理员选项：
 
     GRANT bar, foo TO USER baz, ROLE qux WITH ADMIN OPTION;
 
-Limitations
------------
+## 限制
 
-Some connectors do not support role management. See connector documentation for more details.
+某些连接器不支持角色管理。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[create-role](./create-role.html), [drop-role](./drop-role).html, [ set-role](./set-role.html), [revoke-roles](./revoke-roles.html)
+[create-role](./create-role.html)、[drop-role](./drop-role.html)、[set-role](./ set-role.html)、[revoke-roles](./ revoke-roles.html)

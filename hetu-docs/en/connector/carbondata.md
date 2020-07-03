@@ -2,8 +2,6 @@
 
 # Carbondata Connector
 
-
-<hr/>
 ## Overview
 
 The Carbondata connector allows querying data stored in a Carbondata warehouse. Carbondata is a combination of three components:

@@ -1,22 +1,23 @@
-DESCRIBE OUTPUT
-===============
++++
 
-Synopsis
---------
+title = "DESCRIBE OUTPUT"
++++
+
+# DESCRIBE OUTPUT
+
+## 摘要
 
 ``` sql
 DESCRIBE OUTPUT statement_name
 ```
 
-Description
------------
+## 说明
 
-List the output columns of a prepared statement, including the column name (or alias), catalog, schema, table, type, type size in bytes, and a boolean indicating if the column is aliased.
+列出预编译语句的输出列，包括列名（或别名）、目录、模式、表、类型、类型大小（以字节为单位）以及表明列是否为别名的布尔值。
 
-Examples
---------
+## 示例
 
-Prepare and describe a query with four output columns:
+预编译并描述一个具有四个输出列的查询：
 
     PREPARE my_select1 FROM
     SELECT * FROM nation
@@ -25,7 +26,7 @@ Prepare and describe a query with four output columns:
 DESCRIBE OUTPUT my_select1;
 ```
 
-``` 
+```
 Column Name | Catalog | Schema | Table  |  Type   | Type Size | Aliased
 -------------+---------+--------+--------+---------+-----------+---------
 nationkey   | tpch    | sf1    | nation | bigint  |         8 | false
@@ -35,7 +36,7 @@ comment     | tpch    | sf1    | nation | varchar |         0 | false
 (4 rows)
 ```
 
-Prepare and describe a query whose output columns are expressions:
+预编译并描述一个输出列是表达式的查询：
 
     PREPARE my_select2 FROM
     SELECT count(*) as my_count, 1+2 FROM nation
@@ -44,7 +45,7 @@ Prepare and describe a query whose output columns are expressions:
 DESCRIBE OUTPUT my_select2;
 ```
 
-``` 
+```
 Column Name | Catalog | Schema | Table |  Type  | Type Size | Aliased
 -------------+---------+--------+-------+--------+-----------+---------
 my_count    |         |        |       | bigint |         8 | true
@@ -52,7 +53,7 @@ _col1       |         |        |       | bigint |         8 | false
 (2 rows)
 ```
 
-Prepare and describe a row count query:
+预编译并描述一个行计数查询：
 
     PREPARE my_create FROM
     CREATE TABLE foo AS SELECT * FROM nation
@@ -61,14 +62,13 @@ Prepare and describe a row count query:
 DESCRIBE OUTPUT my_create;
 ```
 
-``` 
+```
 Column Name | Catalog | Schema | Table |  Type  | Type Size | Aliased
 -------------+---------+--------+-------+--------+-----------+---------
 rows        |         |        |       | bigint |         8 | false
 (1 row)
 ```
 
-See Also
---------
+## 另请参见
 
 [prepare](./prepare.html)

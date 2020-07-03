@@ -1,3 +1,8 @@
++++
+
+title = "DROP VIEW"
++++
+
 DROP VIEW
 =========
 

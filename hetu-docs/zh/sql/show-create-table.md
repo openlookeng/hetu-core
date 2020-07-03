@@ -1,22 +1,23 @@
-SHOW CREATE TABLE
-=================
++++
 
-Synopsis
---------
+title = "SHOW CREATE TABLE"
++++
+
+# SHOW CREATE TABLE
+
+## 摘要
 
 ``` sql
 SHOW CREATE TABLE table_name
 ```
 
-Description
------------
+## 说明
 
-Show the SQL statement that creates the specified table.
+显示创建指定的表的 SQL 语句。
 
-Examples
---------
+## 示例
 
-Show the SQL that can be run to create the `orders` table:
+显示可用于创建 `orders` 表的 SQL 语句：
 
     SHOW CREATE TABLE sf1.orders;
 
@@ -36,7 +37,6 @@ partitioned_by = ARRAY['orderdate']
 (1 row)
 ```
 
-See Also
---------
+## 另请参见
 
 [create-table](./create-table.html)

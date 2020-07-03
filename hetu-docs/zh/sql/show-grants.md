@@ -1,44 +1,42 @@
-SHOW GRANTS
-===========
++++
 
-Synopsis
---------
+title = "SHOW GRANTS"
++++
+
+# SHOW GRANTS
+
+## 摘要
 
 ``` sql
 SHOW GRANTS [ ON [ TABLE ] table_name ]
 ```
 
-Description
------------
+## 说明
 
-List the grants for the current user on the specified table in the current catalog.
+列出当前用户对当前目录中指定表的权限。
 
-If no table name is specified, the command lists the grants for the current user on all the tables in all schemas of the current catalog.
+如果未指定表名，该命令将列出当前用户对当前目录的所有模式中所有表的权限。
 
-The command requires the current catalog to be set.
+该命令要求设置当前目录。
 
+**注意**
 
-**Note**
+在执行任何授权命令之前，确保已启用身份验证。
 
-*Ensure that authentication has been enabled before running any of the* *authorization commands.*
+## 示例
 
-Examples
---------
-
-List the grants for the current user on table `orders`:
+列出当前用户对表 `orders` 的权限：
 
     SHOW GRANTS ON TABLE orders;
 
-List the grants for the current user on all the tables in all schemas of the current catalog:
+列出当前用户对当前目录的所有模式中所有表的权限：
 
     SHOW GRANTS;
 
-Limitations
------------
+## 限制
 
-Some connectors have no support for `SHOW GRANTS`. See connector documentation for more details.
+某些连接器不支持 `SHOW GRANTS`。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[grant](./grant.html), [ revoke](./revoke.html)
+[grant](./grant.html)、[revoke](./ revoke.html)

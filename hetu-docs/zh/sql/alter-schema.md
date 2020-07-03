@@ -1,32 +1,31 @@
-ALTER SCHEMA
-============
++++
 
-Synopsis
---------
+title = "ALTER SCHEMA"
++++
 
-``` sql
+# ALTER SCHEMA
+
+## 摘要
+
+```sql
 ALTER {SCHEMA|DATABASE} name RENAME TO new_name
 ```
 
-Description
------------
+## 说明
 
-Change the definition of an existing schema.
+更改现有模式的定义。
 
-Examples
---------
+## 示例
 
-Rename schema `web` to `traffic`:
+将模式 `web` 重命名为 `traffic`：
 
     ALTER SCHEMA web RENAME TO traffic
     ALTER DATABASE web RENAME TO traffic
 
-Limitations
------------
+## 限制
 
-Some connectors do not support renaming schema, such as Hive Connector. See connector documentation for more details.
+某些连接器（如 Hive 连接器）不支持重命名模式。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
 [create-schema](./create-schema.html)

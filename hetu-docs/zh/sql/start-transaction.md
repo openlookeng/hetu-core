@@ -1,27 +1,28 @@
-START TRANSACTION
-=================
++++
 
-Synopsis
---------
+title = "START TRANSACTION"
++++
+
+# START TRANSACTION
+
+## 摘要
 
 ``` sql
 START TRANSACTION [ mode [, ...] ]
 ```
 
-where `mode` is one of
+其中 `mode` 是以下值之一：
 
 ``` sql
 ISOLATION LEVEL { READ UNCOMMITTED | READ COMMITTED | REPEATABLE READ | SERIALIZABLE }
 READ { ONLY | WRITE }
 ```
 
-Description
------------
+## 说明
 
-Start a new transaction for the current session.
+为当前会话启动一个新事务。
 
-Examples
---------
+## 示例
 
 ``` sql
 START TRANSACTION;
@@ -31,7 +32,6 @@ START TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;
 START TRANSACTION READ WRITE, ISOLATION LEVEL SERIALIZABLE;
 ```
 
-See Also
---------
+## 另请参见
 
-[commit](./commit.html), [ rollback](./rollback.html)
+[commit](./commit.html)、[rollback](./ rollback.html)

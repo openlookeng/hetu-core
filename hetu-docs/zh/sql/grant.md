@@ -1,8 +1,11 @@
-GRANT
-=====
++++
 
-Synopsis
---------
+title = "GRANT"
++++
+
+# GRANT
+
+## 摘要
 
 ``` sql
 GRANT ( privilege [, ...] | ( ALL PRIVILEGES ) )
@@ -10,41 +13,36 @@ ON [ TABLE ] table_name TO ( user | USER user | ROLE role )
 [ WITH GRANT OPTION ]
 ```
 
-Description
------------
+## 说明
 
-Grants the specified privileges to the specified grantee.
+将指定的权限授给指定的被授权者。
 
-Specifying `ALL PRIVILEGES` grants [DELETE](delete.html), [INSERT](insert.html) and [SELECT](select.html) privileges.
+指定 `ALL PRIVILEGES` 可以授予 [DELETE](./delete.html)、[INSERT](./insert.html) 和 [SELECT](./select.html) 权限。
 
-Specifying `ROLE PUBLIC` grants privileges to the `PUBLIC` role and hence to all users.
+指定 `ROLE PUBLIC` 可以将权限授给 `PUBLIC` 角色，从而将权限授给所有用户。
 
-The optional `WITH GRANT OPTION` clause allows the grantee to grant these same privileges to others.
+通过使用可选的 `WITH GRANT OPTION` 子句，可以允许被授权者将同样的权限授给其他用户。
 
-For `GRANT` statement to succeed, the user executing it should possess the specified privileges as well as the `GRANT OPTION` for those privileges.
+为了使 `GRANT` 语句成功执行，执行该语句的用户应拥有指定的权限并且对于这些权限拥有 `GRANT OPTION`。
 
-Examples
---------
+## 示例
 
-Grant `INSERT` and `SELECT` privileges on the table `orders` to user
-`alice`:
+将对表 `orders` 的 `INSERT` 和 `SELECT` 权限授给用户 `alice`：
 
     GRANT INSERT, SELECT ON orders TO alice;
 
-Grant `SELECT` privilege on the table `nation` to user `alice`, additionally allowing `alice` to grant `SELECT` privilege to others:
+将对表 `nation` 的 `SELECT` 权限授给用户 `alice`，此外允许 `alice` 将 `SELECT` 权限授给其他用户：
 
     GRANT SELECT ON nation TO alice WITH GRANT OPTION;
 
-Grant `SELECT` privilege on the table `orders` to everyone:
+将对表 `orders` 的 `SELECT` 权限授给所有用户：
 
     GRANT SELECT ON orders TO ROLE PUBLIC;
 
-Limitations
------------
+## 限制
 
-Some connectors have no support for `GRANT`. See connector documentation for more details.
+某些连接器不支持 `GRANT`。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[revoke](./revoke.html), [ show-grants](./show-grants.html)
+[revoke](./revoke.html)、[show-grants](./ show-grants.html)

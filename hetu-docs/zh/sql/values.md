@@ -1,41 +1,42 @@
-VALUES
-======
++++
 
-Synopsis
---------
+title = "VALUES"
++++
+
+# VALUES
+
+## 摘要
 
 ``` sql
 VALUES row [, ...]
 ```
 
-where `row` is a single expression or
+其中 `row` 是单个表达式或
 
 ``` sql
 ( column_expression [, ...] )
 ```
 
-Description
------------
+## 说明
 
-Defines a literal inline table.
+定义字面量内联表。
 
-`VALUES` can be used anywhere a query can be used (e.g., the `FROM` clause of a [SELECT](select.html), an [INSERT](insert.html), or even at the top level). `VALUES` creates an anonymous table without column names, but the table and columns can be named using an `AS` clause with column aliases.
+可以在任何可以使用查询的地方（如 [SELECT](./select.html) 和 [INSERT](./insert.html) 语句的`FROM` 子句甚至是在顶级中）使用 `VALUES`。`VALUES` 创建一个不含列名的匿名表，但可以使用带列别名的子句 `AS` 对表和列进行命名。
 
-Examples
---------
+## 示例
 
-Return a table with one column and three rows:
+返回一个具有一列和三行的表：
 
     VALUES 1, 2, 3
 
-Return a table with two columns and three rows:
+返回一个具有两列和三行的表：
 
     VALUES
         (1, 'a'),
         (2, 'b'),
         (3, 'c')
 
-Return table with column `id` and `name`:
+返回一个具有列 `id` 和 `name` 的表：
 
     SELECT * FROM (
         VALUES
@@ -44,7 +45,7 @@ Return table with column `id` and `name`:
             (3, 'c')
     ) AS t (id, name)
 
-Create a new table with column `id` and `name`:
+创建一个具有列 `id` 和 `name` 的表：
 
     CREATE TABLE example AS
     SELECT * FROM (
@@ -54,7 +55,6 @@ Create a new table with column `id` and `name`:
             (3, 'c')
     ) AS t (id, name)
 
-See Also
---------
+## 另请参见
 
-[insert](./insert.html), [select](./select.html)
+[insert](./insert.html)、[select](./ select.html)

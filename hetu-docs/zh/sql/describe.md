@@ -1,14 +1,16 @@
-DESCRIBE
-========
++++
 
-Synopsis
---------
+title = "DESCRIBE"
++++
+
+# DESCRIBE
+
+## 摘要
 
 ``` sql
 DESCRIBE table_name
 ```
 
-Description
------------
+## 说明
 
-DESCRIBE is an alias for [SHOW COLUMNS](show-columns.html) 
+DESCRIBE 是 [SHOW COLUMNS](./show-columns.html) 的别名。

@@ -1,34 +1,33 @@
-CACHE TABLE
-===========
++++
 
-Synopsis
---------
+title = "CACHE TABLE"
++++
+
+# CACHE TABLE
+
+## 摘要
 
 ``` sql
 CACHE TABLE table_name WHERE condition
 ```
 
-Description
------------
+## 说明
 
-`CACHE TABLE` updates coordinator metadata with table name and partition that should be cached by the connector.
+`CACHE TABLE` 使用连接器应缓存的表名和分区更新协调器元数据。
 
-`condition` must be provided and is defined on only partition column(s).
+必须提供 `condition`，并且仅在分区列上对其进行定义。
 
-Examples
---------
+## 示例
 
-Cache table :
+缓存表：
 
     CACHE TABLE store_sales where location = 'CA';
 
-Limitations
------------
+## 限制
 
-Only Hive connector support this functionality. See connector documentation for more details.
+仅 Hive 连接器支持该功能。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
 [show-cache](./show-cache.html)
 [drop-cache](./drop-cache.html)

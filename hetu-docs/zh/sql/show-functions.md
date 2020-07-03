@@ -1,14 +1,16 @@
-SHOW FUNCTIONS
-==============
++++
 
-Synopsis
---------
+title = "SHOW FUNCTIONS"
++++
+
+# SHOW FUNCTIONS
+
+## 摘要
 
 ``` sql
 SHOW FUNCTIONS
 ```
 
-Description
------------
+## 说明
 
-List all the functions available for use in queries.
+列出所有可以在查询中使用的函数。

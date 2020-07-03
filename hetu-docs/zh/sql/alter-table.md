@@ -1,8 +1,11 @@
-ALTER TABLE
-===========
++++
 
-Synopsis
---------
+title = "ALTER TABLE"
++++
+
+# ALTER TABLE
+
+## 摘要
 
 ``` sql
 ALTER TABLE name RENAME TO new_name
@@ -11,31 +14,28 @@ ALTER TABLE name DROP COLUMN column_name
 ALTER TABLE name RENAME COLUMN column_name TO new_column_name
 ```
 
-Description
------------
+## 说明
 
-Change the definition of an existing table.
+更改现有表的定义。
 
-Examples
---------
+## 示例
 
-Rename table `users` to `people`:
+将表 `users` 重命名为 `people`：
 
     ALTER TABLE users RENAME TO people;
 
-Add column `zip` to the `users` table:
+在 `users` 表中添加 `zip` 列：
 
     ALTER TABLE users ADD COLUMN zip varchar;
 
-Drop column `zip` from the `users` table:
+从 `users` 表中删除 `zip` 列：
 
     ALTER TABLE users DROP COLUMN zip;
 
-Rename column `id` to `user_id` in the `users` table:
+将 `users` 表中的 `id` 列重命名为 `user_id`。
 
     ALTER TABLE users RENAME COLUMN id TO user_id;
 
-See Also
---------
+## 另请参见
 
 [create-table](./create-table.html)

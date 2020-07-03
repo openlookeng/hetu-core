@@ -1,14 +1,16 @@
-SHOW TABLES
-===========
++++
 
-Synopsis
---------
+title = "SHOW TABLES"
++++
+
+# SHOW TABLES
+
+## 摘要
 
 ``` sql
 SHOW TABLES [ FROM schema ] [ LIKE pattern ]
 ```
 
-Description
------------
+## 说明
 
-List the tables in `schema` or in the current schema. The `LIKE` clause can be used to restrict the list of table names.
+列出`schema` 或当前模式中的表。`LIKE` 子句可用于限制表名称列表。

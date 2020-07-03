@@ -1,3 +1,8 @@
++++
+
+title = "CREATE TABLE AS"
++++
+
 CREATE TABLE AS
 ===============
 

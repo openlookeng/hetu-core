@@ -1,19 +1,20 @@
-SHOW SESSION
-============
++++
 
-Synopsis
---------
+title = "SHOW SESSION"
++++
+
+# SHOW SESSION
+
+## 摘要
 
 ``` sql
 SHOW SESSION
 ```
 
-Description
------------
+## 说明
 
-List the current session properties.
+列出当前会话属性。
 
-See Also
---------
+## 另请参见
 
-[reset-session](./reset-session.html), [set-session](./set-session.html)
+[reset-session](./reset-session.html)、[set-session](./set-session.html)
