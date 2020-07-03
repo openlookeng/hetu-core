@@ -1,8 +1,11 @@
-CREATE VIEW
-===========
++++
 
-Synopsis
---------
+title = "CREATE VIEW"
++++
+
+# CREATE VIEW
+
+## 摘要
 
 ``` sql
 CREATE [ OR REPLACE ] VIEW view_name
@@ -10,46 +13,41 @@ CREATE [ OR REPLACE ] VIEW view_name
 AS query
 ```
 
-Description
------------
+## 说明
 
-Create a new view of a [SELECT](select.html) query. The view is a logical table that can be referenced by future queries. Views do not contain any data. Instead, the query stored by the view is executed everytime the view is referenced by another query.
+创建 [SELECT](./select.html) 查询的视图。视图是一个可以由将来的查询引用的逻辑表。视图不包含任何数据。相反，视图存储的查询在每次被其他查询引用时执行。
 
-The optional `OR REPLACE` clause causes the view to be replaced if it already exists rather than raising an error.
+如果使用可选的 `OR REPLACE` 子句，则在视图已存在时替换该视图，而不是产生错误。
 
-Security
---------
+## 安全
 
-In the default `DEFINER` security mode, tables referenced in the view are accessed using the permissions of the view owner (the *creator* or *definer* of the view) rather than the user executing the query. This allows providing restricted access to the underlying tables, for which the user may not be allowed to access directly.
+在默认的 `DEFINER` 安全模式下，使用视图拥有者（视图的创建者或定义者）的权限来访问视图中引用的表，而不是使用执行查询的用户的权限。这样，对于用户可能无法直接访问的基础表，可以提供对这些表的受限访问。
 
-In the `INVOKER` security mode, tables referenced in the view are accessed using the permissions of the user executing the query (the *invoker* of the view). A view created in this mode is simply a stored
-query.
+在 `INVOKER` 安全模式下，使用执行查询的用户（视图的调用者）的权限来访问在视图中引用的表。以该模式创建的视图只是一个存储查询。
 
-Regardless of the security mode, the `current_user` function will always return the user executing the query and thus may be used within views to filter out rows or otherwise restrict access.
+无论安全模式如何，`current_user` 函数都始终返回执行查询的用户，因此可以在视图中使用该函数来滤除行或限制访问。
 
-Examples
---------
+## 示例
 
-Create a simple view `test` over the `orders` table:
+在表 `orders` 上创建简单视图 `test`：
 
     CREATE VIEW test AS
     SELECT orderkey, orderstatus, totalprice / 2 AS half
     FROM orders
 
-Create a view `orders_by_date` that summarizes `orders`:
+创建对 `orders` 进行汇总的视图 `orders_by_date`：
 
     CREATE VIEW orders_by_date AS
     SELECT orderdate, sum(totalprice) AS price
     FROM orders
     GROUP BY orderdate
 
-Create a view that replaces an existing view:
+创建一个替换现有视图的视图：
 
     CREATE OR REPLACE VIEW test AS
     SELECT orderkey, orderstatus, totalprice / 4 AS quarter
     FROM orders
 
-See Also
---------
+## 另请参见
 
-[drop-view](./drop-view.html), [show-create-view](./show-create-view.html)
+[drop-view](./drop-view.html)、[show-create-view](./show-create-view.html)

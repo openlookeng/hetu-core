@@ -1,27 +1,26 @@
-DEALLOCATE PREPARE
-==================
++++
 
-Synopsis
---------
+title = "DEALLOCATE PREPARE"
++++
+
+# DEALLOCATE PREPARE
+
+## 摘要
 
 ``` sql
 DEALLOCATE PREPARE statement_name
 ```
 
-Description
------------
+## 说明
 
-Removes a statement with the name `statement_name` from the list of prepared statements in a session.
+从会话中的预编译语句列表中删除名称为 `statement_name` 的语句。
 
-Examples
---------
+## 示例
 
-Deallocate a statement with the name `my_query`:
+取消分配名称为 `my_query` 的语句：
 
     DEALLOCATE PREPARE my_query;
 
-See Also
---------
+## 另请参见
 
 [prepare](./prepare.html)
-

@@ -1,21 +1,22 @@
-COMMENT
-=======
++++
 
-Synopsis
---------
+title = "COMMENT"
++++
+
+# COMMENT
+
+## 摘要
 
 ``` sql
 COMMENT ON TABLE name IS 'comments'
 ```
 
-Description
------------
+## 说明
 
-Set the comment for a table. The comment can be removed by setting the comment to `NULL`.
+设置表的注释。可以通过将注释设置为 `NULL` 来删除注释。
 
-Examples
---------
+## 示例
 
-Change the comment for the `users` table to be `master table`:
+将 `users` 表的注释更改为 `master table`：
 
     COMMENT ON TABLE users IS 'master table';

@@ -1,38 +1,37 @@
-CREATE ROLE
-===========
++++
 
-Synopsis
---------
+title = "CREATE ROLE"
++++
+
+# CREATE ROLE
+
+## 摘要
 
 ``` sql
 CREATE ROLE role_name
 [ WITH ADMIN ( user | USER user | ROLE role | CURRENT_USER | CURRENT_ROLE ) ]
 ```
 
-Description
------------
+## 说明
 
-`CREATE ROLE` creates the specified role in the current catalog.
+`CREATE ROLE` 在当前目录中创建指定的角色。
 
-The optional `WITH ADMIN` clause causes the role to be created with the specified user as a role admin. A role admin has permission to drop or grant a role. If the optional `WITH ADMIN` clause is not specified, the role is created with current user as admin.
+如果使用可选的 `WITH ADMIN` 子句，则在创建角色时使指定的用户成为角色管理员。角色管理员具有删除或授予角色的权限。如果未指定可选的 `WITH ADMIN` 子句，在创建角色时使当前用户成为角色管理员。
 
-Examples
---------
+## 示例
 
-Create role `admin` :
+创建角色 `admin`：
 
     CREATE ROLE admin;
 
-Create role `moderator` with admin `bob`:
+创建角色 `moderator` 并使 `bob` 成为角色管理员：
 
     CREATE ROLE moderator WITH ADMIN USER bob;
 
-Limitations
------------
+## 限制
 
-Some connectors do not support role management. See connector documentation for more details.
+某些连接器不支持角色管理。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[drop-role](./drop-role.html), [set-role](./set-role.html), [grant-role](./grant-role.html),[revoke-roles](./revoke-roles.html)
+[drop-role](./drop-role.html)、[set-role](./set-role.html)、[grant-role](./grant-role.html)、[revoke-roles](./revoke-roles.html)

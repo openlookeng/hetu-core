@@ -1,22 +1,23 @@
-EXECUTE
-=======
++++
 
-Synopsis
---------
+title = "EXECUTE"
++++
+
+# EXECUTE
+
+## 摘要
 
 ``` sql
 EXECUTE statement_name [ USING parameter1 [ , parameter2, ... ] ]
 ```
 
-Description
------------
+## 说明
 
-Executes a prepared statement with the name `statement_name`. Parameter values are defined in the `USING` clause.
+执行名称为 `statement_name` 的预编译语句。在 `USING` 子句中定义参数值。
 
-Examples
---------
+## 示例
 
-Prepare and execute a query with no parameters:
+预编译并执行一个不具有参数的查询：
 
     PREPARE my_select1 FROM
     SELECT name FROM nation;
@@ -25,7 +26,7 @@ Prepare and execute a query with no parameters:
 EXECUTE my_select1;
 ```
 
-Prepare and execute a query with two parameters:
+预编译并执行一个具有两个参数的查询：
 
     PREPARE my_select2 FROM
     SELECT name FROM nation WHERE regionkey = ? and nationkey < ?;
@@ -34,11 +35,10 @@ Prepare and execute a query with two parameters:
 EXECUTE my_select2 USING 1, 3;
 ```
 
-This is equivalent to:
+这等效于：
 
     SELECT name FROM nation WHERE regionkey = 1 AND nationkey < 3;
 
-See Also
---------
+## 另请参见
 
 [prepare](./prepare.html)

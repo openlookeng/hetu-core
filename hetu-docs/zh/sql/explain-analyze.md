@@ -1,30 +1,29 @@
-EXPLAIN ANALYZE
-===============
++++
 
-Synopsis
---------
+title = "EXPLAIN ANALYZE"
++++
+
+# EXPLAIN ANALYZE
+
+## 摘要
 
 ``` sql
 EXPLAIN ANALYZE [VERBOSE] statement
 ```
 
-Description
------------
+## 说明
 
-Execute the statement and show the distributed execution plan of the statement along with the cost of each operation.
+执行语句并显示语句的分布式执行计划以及每个操作的开销。
 
-The `VERBOSE` option will give more detailed information and low-level statistics; understanding these may require knowledge of openLooKeng internals and implementation details.
+`VERBOSE` 选项可提供更详细的信息和具体的统计数据；了解这些信息可能需要了解 openLooKeng 内部细节和实现细节。
 
+**注意**
 
-**Note**
+*统计数据可能不完全准确，尤其是对于快速完成的查询。*
 
-*The stats may not be entirely accurate, especially for queries that* *complete quickly.*
+## 示例
 
-Examples
---------
-
-In the example below, you can see the CPU time spent in each stage, as well as the relative cost of each plan node in the stage. Note that the relative cost of the plan nodes is based on wall time, which may or may not be correlated to CPU time. For each plan node you can see some additional statistics (e.g: average input per node instance, average number of hash collisions for relevant plan nodes). Such statistics are
-useful when one wants to detect data anomalies for a query (skewness, abnormal hash collisions).
+在下面的示例中，您可以看到每个阶段消耗的 CPU 时间，以及该阶段中每个计划节点的相对开销。请注意，计划节点的相对开销基于挂钟时间，挂钟时间可能与 CPU 时间相关，也可能与之不相关。对于每个计划节点，您都可以看到一些额外的统计数据（例如每个节点实例的平均输入以及相关计划节点的平均哈希冲突数）。当您希望检测查询的数据异常（偏斜、异常哈希冲突）时，这些统计数据很有用。
 
 ``` sql
 lk:sf1> EXPLAIN ANALYZE SELECT count(*), clerk FROM orders WHERE orderdate > date '1995-01-01' GROUP BY clerk;
@@ -66,7 +65,7 @@ Fragment 2 [tpch:orders:1500000]
                 clerk := tpch:clerk
 ```
 
-When the `VERBOSE` option is used, some operators may report additional information. For example, the window function operator will output the following:
+使用 `VERBOSE` 选项后，某些运算符可能会报告额外的信息。例如，窗口函数运算符将输出以下信息：
 
 ``` sql
 EXPLAIN ANALYZE VERBOSE SELECT count(clerk) OVER() FROM orders WHERE orderdate > date '1995-01-01';
@@ -87,7 +86,6 @@ EXPLAIN ANALYZE VERBOSE SELECT count(clerk) OVER() FROM orders WHERE orderdate >
  ...
 ```
 
-See Also
---------
+## 另请参见
 
 [explain](./explain.html)

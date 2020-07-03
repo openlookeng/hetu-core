@@ -1,14 +1,16 @@
-SHOW COLUMNS
-============
++++
 
-Synopsis
---------
+title = "SHOW COLUMNS"
++++
+
+# SHOW COLUMNS
+
+## 摘要
 
 ``` sql
 SHOW COLUMNS FROM table
 ```
 
-Description
------------
+## 说明
 
-List the columns in `table` along with their data type and other attributes.
+列出 `table` 中的列及其数据类型和其他属性。

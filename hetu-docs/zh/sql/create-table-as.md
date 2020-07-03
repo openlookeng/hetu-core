@@ -1,8 +1,11 @@
-CREATE TABLE AS
-===============
++++
 
-Synopsis
---------
+title = "CREATE TABLE AS"
++++
+
+# CREATE TABLE AS
+
+## 摘要
 
 ``` sql
 CREATE TABLE [ IF NOT EXISTS ] table_name [ ( column_alias, ... ) ]
@@ -12,28 +15,26 @@ AS query
 [ WITH [ NO ] DATA ]
 ```
 
-Description
------------
+## 说明
 
-Create a new table containing the result of a [SELECT](select.html) query. Use [CREATE TABLE](create-table.html) to create an empty table.
+创建一个包含 [SELECT](./select.html) 查询结果的表。使用 [CREATE TABLE](./create-table.html) 可以创建空表。
 
-The optional `IF NOT EXISTS` clause causes the error to be suppressed if the table already exists.
+如果使用可选的 `IF NOT EXISTS` 子句，则在表已存在时禁止显示错误。
 
-The optional `WITH` clause can be used to set properties on the newly created table. To list all available table properties, run the following query:
+可以使用可选的 `WITH` 子句来设置创建的表的属性。要列出所有可用的表属性，请运行以下查询：
 
     SELECT * FROM system.metadata.table_properties
 
-Examples
---------
+## 示例
 
-Create a new table `orders_column_aliased` with the results of a query and the given column names:
+使用查询结果和给定的列名创建表 `orders_column_aliased`：
 
     CREATE TABLE orders_column_aliased (order_date, total_price)
     AS
     SELECT orderdate, totalprice
     FROM orders
 
-Create a new table `orders_by_date` that summarizes `orders`:
+创建对 `orders` 进行汇总的表 `orders_by_date`：
 
     CREATE TABLE orders_by_date
     COMMENT 'Summary of orders by date'
@@ -43,21 +44,20 @@ Create a new table `orders_by_date` that summarizes `orders`:
     FROM orders
     GROUP BY orderdate
 
-Create the table `orders_by_date` if it does not already exist:
+如果表 `orders_by_date` 尚不存在，则创建该表：
 
     CREATE TABLE IF NOT EXISTS orders_by_date AS
     SELECT orderdate, sum(totalprice) AS price
     FROM orders
     GROUP BY orderdate
 
-Create a new `empty_nation` table with the same schema as `nation` and no data:
+创建模式与 `nation` 相同的表 `empty_nation`，但表中不含数据。
 
     CREATE TABLE empty_nation AS
     SELECT *
     FROM nation
     WITH NO DATA
 
-See Also
---------
+## 另请参见
 
-[create-table](./create-table.html), [ select](./select.html)
+[create-table](./create-table.html)、[select](./ select.html)

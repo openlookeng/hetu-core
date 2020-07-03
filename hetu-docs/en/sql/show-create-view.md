@@ -1,3 +1,8 @@
++++
+
+title = "SHOW CREATE VIEW"
++++
+
 SHOW CREATE VIEW
 ================
 

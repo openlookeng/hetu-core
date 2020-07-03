@@ -1,28 +1,28 @@
-RESET SESSION
-=============
++++
 
-Synopsis
---------
+title = "RESET SESSION"
++++
+
+# RESET SESSION
+
+## 摘要
 
 ``` sql
 RESET SESSION name
 RESET SESSION catalog.name
 ```
 
-Description
------------
+## 说明
 
-Reset a session property value to the default value.
+将会话属性值重置为默认值。
 
-Examples
---------
+## 示例
 
 ``` sql
 RESET SESSION optimize_hash_generation;
 RESET SESSION hive.optimized_reader_enabled;
 ```
 
-See Also
---------
+## 另请参见
 
-[set-session](./set-session.html), [show-session](./show-session.html)
+[set-session](./set-session.html)、[show-session](./show-session.html)

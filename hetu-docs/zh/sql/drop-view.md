@@ -1,32 +1,32 @@
-DROP VIEW
-=========
++++
 
-Synopsis
---------
+title = "DROP VIEW"
++++
+
+# DROP VIEW
+
+## 摘要
 
 ``` sql
 DROP VIEW [ IF EXISTS ] view_name
 ```
 
-Description
------------
+## 说明
 
-Drop an existing view.
+删除一个现有的视图。
 
-The optional `IF EXISTS` clause causes the error to be suppressed if the view does not exist.
+如果使用可选的 `IF EXISTS` 子句，则在该视图不存在时禁止显示错误。
 
-Examples
---------
+## 示例
 
-Drop the view `orders_by_date`:
+删除视图 `orders_by_date`：
 
     DROP VIEW orders_by_date
 
-Drop the view `orders_by_date` if it exists:
+如果视图 `orders_by_date` 存在，则删除该视图：
 
     DROP VIEW IF EXISTS orders_by_date
 
-See Also
---------
+## 另请参见
 
 [create-view](./create-view.html)

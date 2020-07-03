@@ -1,28 +1,28 @@
-SET SESSION
-===========
++++
 
-Synopsis
---------
+title = "SET SESSION"
++++
+
+# SET SESSION
+
+## 摘要
 
 ``` sql
 SET SESSION name = expression
 SET SESSION catalog.name = expression
 ```
 
-Description
------------
+## 说明
 
-Set a session property value.
+设置会话属性值。
 
-Examples
---------
+## 示例
 
 ``` sql
 SET SESSION optimize_hash_generation = true;
 SET SESSION hive.optimized_reader_enabled = true;
 ```
 
-See Also
---------
+## 另请参见
 
-[reset-session](./reset-session.html), [show-session](./show-session.html)
+[reset-session](./reset-session.html)、[show-session](./show-session.html)

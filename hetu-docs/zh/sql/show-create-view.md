@@ -1,19 +1,20 @@
-SHOW CREATE VIEW
-================
++++
 
-Synopsis
---------
+title = "SHOW CREATE VIEW"
++++
+
+# SHOW CREATE VIEW
+
+## 摘要
 
 ``` sql
 SHOW CREATE VIEW view_name
 ```
 
-Description
------------
+## 说明
 
-Show the SQL statement that creates the specified view.
+显示创建指定的视图的 SQL 语句。
 
-See Also
---------
+## 另请参见
 
 [create-view](./create-view.html)

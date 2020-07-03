@@ -1,8 +1,11 @@
-REVOKE ROLES
-============
++++
 
-Synopsis
---------
+title = "REVOKE ROLES"
++++
+
+# REVOKE ROLES
+
+## 摘要
 
 ``` sql
 REVOKE
@@ -12,34 +15,30 @@ FROM ( user | USER user | ROLE role) [, ...]
 [ GRANTED BY ( user | USER user | ROLE role | CURRENT_USER | CURRENT_ROLE ) ]
 ```
 
-Description
------------
+## 说明
 
-Revokes the specified role(s) from the specified principal(s) in the current catalog.
+从当前目录中的指定主体回收指定的角色。
 
-If the `ADMIN OPTION FOR` clause is specified, the `GRANT` permission is revoked instead of the role.
+如果指定了 `ADMIN OPTION FOR` 子句，则回收 `GRANT` 权限，而不是回收角色。
 
-For the `REVOKE` statement for roles to succeed, the user executing it either should be the role admin or should possess the `GRANT` option for the given role.
+为了使针对角色的 `REVOKE` 语句成功执行，执行该语句的用户应具有管理员角色或者应对于给定的角色拥有 `GRANT` 选项。
 
-The optional `GRANTED BY` clause causes the role(s) to be revoked with the specified principal as a revoker. If the `GRANTED BY` clause is not specified, the roles are revoked by the current user as a revoker.
+可选的 `GRANTED BY` 子句可使指定的主体作为回收方来回收角色。如果未指定 `GRANTED BY` 子句，则当前用户作为回收方来回收角色。
 
-Examples
---------
+## 示例
 
-Revoke role `bar` from user `foo` :
+从用户 `foo` 回收角色 `bar`：
 
     REVOKE bar FROM USER foo;
 
-Revoke admin option for roles `bar` and `foo` from user `baz` and role `qux` :
+从用户 `baz` 和角色 `qux` 回收角色 `bar` 和 `foo` 的管理员选项：
 
     REVOKE ADMIN OPTION FOR bar, foo FROM USER baz, ROLE qux;
 
-Limitations
------------
+## 限制
 
-Some connectors do not support role management. See connector documentation for more details.
+某些连接器不支持角色管理。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[create-role](./create-role.html), [drop-role](./drop-role.html), [set-role](./set-role.html), [grant-roles](./grant-roles.html)
+[create-role](./create-role.html)、[drop-role](./drop-role.html)、[set-role](./ set-role.html)、[grant-roles](./ grant-roles.html)

@@ -1,3 +1,8 @@
++++
+
+title = "ALTER TABLE"
++++
+
 ALTER TABLE
 ===========
 

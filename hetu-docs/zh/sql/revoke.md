@@ -1,8 +1,11 @@
-REVOKE
-======
++++
 
-Synopsis
---------
+title = "REVOKE"
++++
+
+# REVOKE
+
+## 摘要
 
 ``` sql
 REVOKE [ GRANT OPTION FOR ]
@@ -10,40 +13,36 @@ REVOKE [ GRANT OPTION FOR ]
 ON [ TABLE ] table_name FROM ( user | USER user | ROLE role )
 ```
 
-Description
------------
+## 说明
 
-Revokes the specified privileges from the specified grantee.
+从指定的被授权者回收指定的权限。
 
-Specifying `ALL PRIVILEGES` revokes [DELETE](delete.html), [INSERT](insert.html) and [SELECT](select.html) privileges.
+指定 `ALL PRIVILEGES` 可以回收 [DELETE](./delete.html)、[INSERT](./insert.html) 和 [SELETE](./select.html) 权限。
 
-Specifying `ROLE PUBLIC` revokes privileges from the `PUBLIC` role. Users will retain privileges assigned to them directly or via other roles.
+指定 `ROLE PUBLIC` 可以从 `PUBLIC` 角色回收权限。用户将保留直接或通过其他角色分配给他们的权限。
 
-The optional `GRANT OPTION FOR` clause also revokes the privileges to grant the specified privileges.
+可选的 `GRANT OPTION FOR` 子句还会回收授予指定权限的权限。
 
-For `REVOKE` statement to succeed, the user executing it should possess the specified privileges as well as the `GRANT OPTION` for those privileges.
+为了使 `REVOKE` 语句成功执行，执行该语句的用户应拥有指定的权限并且对于这些权限拥有 `GRANT OPTION`。
 
-Examples
---------
+## 示例
 
-Revoke `INSERT` and `SELECT` privileges on the table `orders` from user `alice`:
+从用户 `alice` 回收对表 `orders` 的 `INSERT` 和 `SELECT` 权限：
 
     REVOKE INSERT, SELECT ON orders FROM alice;
 
-Revoke `SELECT` privilege on the table `nation` from everyone, additionally revoking the privilege to grant `SELECT` privilege:
+从所有用户回收对表 `nation` 的 `SELECT` 权限，此外还回收授予 `SELECT` 权限的权限：
 
     REVOKE GRANT OPTION FOR SELECT ON nation FROM ROLE PUBLIC;
 
-Revoke all privileges on the table `test` from user `alice`:
+从用户 `alice` 回收对表 `test` 的所有权限：
 
     REVOKE ALL PRIVILEGES ON test FROM alice;
 
-Limitations
------------
+## 限制
 
-Some connectors have no support for `REVOKE`. See connector documentation for more details.
+某些连接器不支持 `REVOKE`。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[grant](./grant.html), [show-grants](./show-grants.html)
+[grant](./grant.html)、[show-grants](./ show-grants.html)

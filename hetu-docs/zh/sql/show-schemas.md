@@ -1,14 +1,16 @@
-SHOW SCHEMAS
-============
++++
 
-Synopsis
---------
+title = "SHOW SCHEMAS"
++++
+
+# SHOW SCHEMAS
+
+## 摘要
 
 ``` sql
 SHOW SCHEMAS [ FROM catalog ] [ LIKE pattern ]
 ```
 
-Description
------------
+## 说明
 
-List the schemas in `catalog` or in the current catalog. The `LIKE` clause can be used to restrict the list of schema names.
+列出 `catalog` 或当前目录中的模式。`LIKE` 子句可用于限制模式名称列表。

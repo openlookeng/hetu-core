@@ -1,39 +1,40 @@
-ANALYZE
-=======
++++
 
-Synopsis
---------
+title = "ANALYZE"
++++
+
+# ANALYZE
+
+## 摘要
 
 ``` sql
 ANALYZE table_name [ WITH ( property_name = expression [, ...] ) ]
 ```
 
-Description
------------
+## 说明
 
-Collects table and column statistics for a given table.
+收集给定表的表和列统计信息。
 
-The optional `WITH` clause can be used to provide connector-specific properties. To list all available properties, run the following query:
+可选的 `WITH` 子句可用于提供特定于连接器的属性。要列出所有可用的属性，请运行以下查询：
 
     SELECT * FROM system.metadata.analyze_properties
 
-Currently, this statement is only supported by the [Hive connector](../connector/hive.html).
+目前仅 [Hive 连接器](../connector/hive.html)支持该语句。
 
-Examples
---------
+## 示例
 
-Analyze table `web` to collect table and column statistics:
+分析表 `web` 以收集表和列统计信息：
 
     ANALYZE web;
 
-Analyze table `stores` in catalog `hive` and schema `default`:
+分析目录 `hive` 和模式 `default` 中的表 `stores`：
 
     ANALYZE hive.default.stores;
 
-Analyze partitions `'1992-01-01', '1992-01-02'` from a Hive partitioned table `sales`:
+分析 Hive 分区表 `sales` 中的分区 `'1992-01-01', '1992-01-02'`：
 
     ANALYZE hive.default.sales WITH (partitions = ARRAY[ARRAY['1992-01-01'], ARRAY['1992-01-02']]);
 
-Analyze partitions with complex partition key (`state` and `city` columns) from a Hive partitioned table `customers`:
+分析 Hive 分区表 `customers` 中具有复杂分区键（`state` 和 `city` 列）的分区。
 
     ANALYZE hive.default.customers WITH (partitions = ARRAY[ARRAY['CA', 'San Francisco'], ARRAY['NY', 'NY']]);

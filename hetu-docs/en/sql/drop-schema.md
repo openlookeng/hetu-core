@@ -1,3 +1,8 @@
++++
+
+title = "DROP SCHEMA"
++++
+
 DROP SCHEMA
 ===========
 

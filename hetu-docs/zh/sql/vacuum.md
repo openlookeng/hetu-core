@@ -1,68 +1,66 @@
-VACUUM
-======
++++
 
-Synopsis
---------
+title = "VACUUM"
++++
+
+# VACUUM
+
+## 摘要
 
 ``` sql
 VACUUM TABLE table_name [FULL] [PARTITION partition_value]? [AND WAIT]?
 ```
 
-Description
------------
+## 说明
 
-BigData systems usually use HDFS as the storage to achieve durability and transparent distribution and balancing of data among the nodes in the cluster. HDFS being a immutable file system, data cannot be edited in between, but can only be appended. In order to work with the immutable file system, different file formats resort to writing new files in order to support data mutations, and later use asynchronous background merging to maintain the performance and avoid many small files.
+大数据系统通常使用 HDFS 进行存储，以实现数据在集群中各个节点之间的持久性、透明分布和均衡。HDFS 是一个不可变的文件系统，其间的数据不可编辑，只能追加。为了使用不可变的文件系统，不同的文件格式采用写入新文件以支持数据突变，随后使用异步后台合并来保持性能并避免产生许多小文件。
 
-For example, in Hive Connector you can update or delete ORC transactional table row by row. But whenever run update, an new delta and delete\_delta file will be generated in HDFS file system. Use `VACUUM` can merge all those small files to a larger file, and optimize parallelism and performance
+例如，在 Hive 连接器中，您可以逐行更新或删除 ORC 事务性表。不过，每当运行更新时，就会在 HDFS 文件系统中生成新的增量和 delete\_delta 文件。使用 `VACUUM` 可以将所有这些小文件合并成一个大文件，并优化并行性和性能。
 
-**Types of VACUUMs:**
+**VACUUM 的类型：**
 
-**Default**
+**默认**
 
-Default vacuum can be treated as a first level of merging small data sets of the table. These will be frequent and usually will be faster compared to FULL vacuum.
+可以将默认 VACUUM 视为合并表的小数据集的第一级。该操作经常发生，通常比 FULL VACUUM 更快。
 
-*Hive:*
+*Hive：*
 
-Default Vacuum corresponds to \'Minor Compaction' in Hive Connector. Merges all the valid delta directories into one compacted delta directory and similarly merge all valid delete\_delta directories to one
-delete\_delta directory. The base file will not be changed. The old, smaller delta files will be removed once all readers are finished reading them.
+在 Hive 连接器中，默认 VACUUM 对应于“轻量级压缩”。将所有有效的增量目录合并到一个压缩的增量目录中，并类似地将所有有效的 delete\_delta 目录合并到一个 delete\_delta 目录中。基本文件不会更改。一旦所有读取方都完成了对较小的旧增量文件的读取，就删除这些文件。
 
 **FULL**
 
-FULL vacuum can be treated as the next level of merging of all data sets of table. These will be less frequent and takes longer time to complete compare to default vacuum.
+可以将 FULL VACUUM 视为合并表的所有数据集的下一级。与默认 VACUUM 相比，该操作发生的频率更低，完成时间也更长。
 
-*Hive:*
+*Hive：*
 
-FULL Vacuum corresponds to 'Major Compaction' in Hive Connector. Merges all base and delta files together. As part of this operation, the deleted or updated rows are permanently removed. All the aborted
-transactions are removed from the transaction table in the metastore. The old delta files will be removed once all readers are finished reading them.
+在 Hive 连接器中，FULL VACUUM 对应于“重量级压缩”。将所有基本文件和增量文件合并在一起。作为该操作的一部分，会永久删除已删除或更新的行。会从元存储中的事务表中删除所有中止的事务。一旦所有读取方都完成了对旧增量文件的读取，就删除这些文件。
 
-The `FULL` keyword indicate whether to start a Major Compaction. Without this option, it will do a Minor compaction;
+`FULL` 关键字表示是否启动重量级压缩。如果没有该选项，它将执行轻量级压缩。
 
-Use `PARTITION` clause to specify which partition to vacuum.
+可以使用 `PARTITION` 子句来指定清理哪个分区。
 
-Use `AND WAIT` to identify this vacuum running as synchronous mode. Without this option, it will run as asynchronous mode.
+可以使用 `AND WAIT` 来指定该 VACUUM 以同步模式运行。如果没有该选项，它将以异步模式运行。
 
-Examples
---------
+## 示例
 
-Example 1: Default vacuum and wait for completion:
+示例 1：默认 VACUUM，等待完成：
 
-```sql
-VACUUM TABLE compact_test_table AND WAIT;
+``` sql
+    VACUUM TABLE compact_test_table AND WAIT;
 ```
 
-Example 2: FULL vacuum on partition \'partition\_key=p1\':
+示例 2：对分区“partition\_key=p1”执行 FULL VACUUM：
 
-```sql
-VACUUM TABLE compact_test_table_with_partition FULL PARTITION 'partition_key=p1';
+``` sql
+    VACUUM TABLE compact_test_table_with_partition FULL PARTITION 'partition_key=p1';
 ```
 
-Example 3: FULL vacuum and wait for completion:
+示例 3：FULL VACUUM，等待完成：
 
-```sql
-VACUUM TABLE compact_test_table_with_partition FULL AND WAIT;
+``` sql
+    VACUUM TABLE compact_test_table_with_partition FULL AND WAIT;
 ```
 
-See Also
---------
+## 另请参见
 
-[update](./update.html), [delete](./delete.html)
+[update](./update.html)、[delete](./ delete.html)

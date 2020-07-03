@@ -1,43 +1,42 @@
-CREATE SCHEMA
-=============
++++
 
-Synopsis
---------
+title = "CREATE SCHEMA"
++++
+
+# CREATE SCHEMA
+
+## 摘要
 
 ``` sql
 CREATE {SCHEMA|DATABASE} [ IF NOT EXISTS ] schema_name
 [ WITH ( property_name = expression [, ...] ) ]
 ```
 
-Description
------------
+## 说明
 
-Create a new, empty schema. A schema is a container that holds tables, views and other database objects.
+创建一个空模式。模式是保存表、视图和其他数据库对象的容器。
 
-The optional `IF NOT EXISTS` clause causes the error to be suppressed if the schema already exists.
+如果使用可选的 `IF NOT EXISTS` 子句，则在模式已存在时禁止显示错误。
 
-The optional `WITH` clause can be used to set properties on the newly created schema. To list all available schema properties, run the following query:
+可以使用可选的 `WITH` 子句来设置创建的模式的属性。要列出所有可用的模式属性，请运行以下查询：
 
     SELECT * FROM system.metadata.schema_properties
 
-Examples
---------
+## 示例
 
-Create a new schema `web` in the current catalog:
+在当前目录中创建模式 `web`：
 
     CREATE SCHEMA web
     CREATE DATABASE web
 
-Create a new schema `sales` in the `hive` catalog:
+在 `hive` 目录中创建模式 `sales`：
 
     CREATE SCHEMA hive.sales
 
-Create the schema `traffic` if it does not already exist:
+如果模式 `traffic` 尚不存在，则创建该模式：
 
     CREATE SCHEMA IF NOT EXISTS traffic
 
-See Also
---------
+## 另请参见
 
-
-[alter-schema](./alter-schema.html) ,[drop-schema](./drop-schema.html)
+[alter-schema](./alter-schema.html)、[drop-schema](./drop-schema.html)

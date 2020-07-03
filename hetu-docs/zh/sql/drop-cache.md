@@ -1,32 +1,30 @@
-DROP CACHE
-==========
++++
 
-Synopsis
---------
+title = "DROP CACHE"
++++
+
+# DROP CACHE
+
+## 摘要
 
 ``` sql
 DROP CACHE table
 ```
 
-Description
------------
+## 说明
 
-`DROP CACHE` deletes cache metadata of the `table` from coordinator.
+`DROP CACHE` 从协调器中删除 `table` 的缓存元数据。
 
-Examples
---------
+## 示例
 
-Drop cache :
+删除缓存：
 
     DROP CACHE table
 
-Limitations
------------
+## 限制
 
-Only Hive connector support this functionality. See connector documentation for more details.
+仅 Hive 连接器支持该功能。有关更多详细信息，请参见连接器文档。
 
-See Also
---------
+## 另请参见
 
-[cache-table](./cache-table.html), [show-cache](./show-cache.html)
-
+[cache-table](./cache-table.html)、[show-cache](./show-cache.html)

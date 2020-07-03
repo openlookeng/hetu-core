@@ -1,27 +1,27 @@
-ROLLBACK
-========
++++
 
-Synopsis
---------
+title = "ROLLBACK"
++++
+
+# ROLLBACK
+
+## 摘要
 
 ``` sql
 ROLLBACK [ WORK ]
 ```
 
-Description
------------
+## 说明
 
-Rollback the current transaction.
+回滚当前事务。
 
-Examples
---------
+## 示例
 
 ``` sql
 ROLLBACK;
 ROLLBACK WORK;
 ```
 
-See Also
---------
+## 另请参见
 
-[commit](./commit.html), [start-transaction](./start-transaction.html)
+[commit](./commit.html)、[start-transaction](./start-transaction.html)

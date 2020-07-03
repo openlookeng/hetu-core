@@ -1,22 +1,23 @@
-DESCRIBE INPUT
-==============
++++
 
-Synopsis
---------
+title = "DESCRIBE INPUT"
++++
+
+# DESCRIBE INPUT
+
+## 摘要
 
 ``` sql
 DESCRIBE INPUT statement_name
 ```
 
-Description
------------
+## 说明
 
-Lists the input parameters of a prepared statement along with the position and type of each parameter. Parameter types that cannot be determined will appear as `unknown`.
+列出预编译语句的输入参数以及每个参数的位置和类型。无法确定的参数类型将显示为 `unknown`。
 
-Examples
---------
+## 示例
 
-Prepare and describe a query with three parameters:
+预编译并描述一个具有三个参数的查询：
 
 ``` sql
 PREPARE my_select1 FROM
@@ -27,7 +28,7 @@ SELECT ? FROM nation WHERE regionkey = ? AND name < ?;
 DESCRIBE INPUT my_select1;
 ```
 
-``` 
+``` sql
 Position | Type
 --------------------
        0 | unknown
@@ -36,7 +37,7 @@ Position | Type
 (3 rows)
 ```
 
-Prepare and describe a query with no parameters:
+预编译并描述一个不具有参数的查询：
 
 ``` sql
 PREPARE my_select2 FROM
@@ -47,13 +48,12 @@ SELECT * FROM nation;
 DESCRIBE INPUT my_select2;
 ```
 
-``` 
+``` sql
 Position | Type
 -----------------
 (0 rows)
 ```
 
-See Also
---------
+## 另请参见
 
 [prepare](./prepare.html)
