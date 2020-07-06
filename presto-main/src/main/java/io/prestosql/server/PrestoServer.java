@@ -125,8 +125,9 @@ public class PrestoServer
             logLocation(log, "Etc directory", Paths.get("etc"));
 
             injector.getInstance(PluginManager.class).loadPlugins();
-            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetatstore();
-            injector.getInstance(FileSystemClientManager.class).loadFactoryConfigs();
+            FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
+            fileSystemClientManager.loadFactoryConfigs();
+            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetatstore(fileSystemClientManager);
             injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogScanner.class).start();

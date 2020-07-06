@@ -12,21 +12,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.metastore;
+package io.prestosql.spi.connector;
 
-import com.google.common.collect.ImmutableList;
-import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreFactory;
-import io.hetu.core.metastore.jdbc.JdbcHetuMetastoreFactory;
-import io.prestosql.spi.Plugin;
-import io.prestosql.spi.metastore.HetuMetaStoreFactory;
+import io.prestosql.spi.PrestoException;
 
-public class HetuMetastorePlugin
-        implements Plugin
+import static io.prestosql.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
+import static java.lang.String.format;
+
+public class SchemaNotEmptyException
+        extends PrestoException
 {
-    @Override
-    public Iterable<HetuMetaStoreFactory> getHetuMetaStoreFactories()
+    private final String schemaName;
+
+    public SchemaNotEmptyException(String schemaName)
     {
-        return ImmutableList.of(new JdbcHetuMetastoreFactory(HetuMetastorePlugin.class.getClassLoader()),
-                new HetuFsMetastoreFactory(HetuMetastorePlugin.class.getClassLoader()));
+        this(schemaName, format("Schema not empty: '%s'", schemaName));
+    }
+
+    public SchemaNotEmptyException(String schemaName, String message)
+    {
+        super(SCHEMA_NOT_EMPTY, message);
+        this.schemaName = schemaName;
+    }
+
+    public String getSchemaName()
+    {
+        return schemaName;
     }
 }

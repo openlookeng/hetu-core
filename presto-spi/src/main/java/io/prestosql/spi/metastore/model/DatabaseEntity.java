@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.metastore.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.metastore.util.MetastoreUtil;
 
 import java.util.LinkedHashMap;
@@ -55,8 +57,13 @@ public class DatabaseEntity
      * @param comment     comment
      * @param parameters  parameters of database
      */
-    public DatabaseEntity(String catalogName, String name, String owner, long createTime,
-                          String comment, Map<String, String> parameters)
+    @JsonCreator
+    public DatabaseEntity(@JsonProperty("catalogName") String catalogName,
+            @JsonProperty("name") String name,
+            @JsonProperty("owner") String owner,
+            @JsonProperty("createTime") long createTime,
+            @JsonProperty("comment") String comment,
+            @JsonProperty("parameters") Map<String, String> parameters)
     {
         this.catalogName = requireNonNull(catalogName, "catalog name is null");
         this.name = requireNonNull(name, "database name is null");
@@ -66,6 +73,7 @@ public class DatabaseEntity
         this.parameters = parameters;
     }
 
+    @JsonProperty
     public String getCatalogName()
     {
         return catalogName;
@@ -76,6 +84,7 @@ public class DatabaseEntity
         this.catalogName = catalogName;
     }
 
+    @JsonProperty
     public String getName()
     {
         return name;
@@ -86,6 +95,7 @@ public class DatabaseEntity
         this.name = name;
     }
 
+    @JsonProperty
     public String getOwner()
     {
         return owner;
@@ -96,6 +106,7 @@ public class DatabaseEntity
         this.owner = owner;
     }
 
+    @JsonProperty
     public long getCreateTime()
     {
         return createTime;
@@ -106,6 +117,7 @@ public class DatabaseEntity
         this.createTime = createTime;
     }
 
+    @JsonProperty
     public String getComment()
     {
         return comment;
@@ -116,6 +128,7 @@ public class DatabaseEntity
         this.comment = comment;
     }
 
+    @JsonProperty
     public Map<String, String> getParameters()
     {
         return parameters;

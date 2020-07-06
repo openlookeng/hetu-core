@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.metastore.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.metastore.util.MetastoreUtil;
 
 import java.util.LinkedHashMap;
@@ -45,13 +47,16 @@ public class ColumnEntity
     /**
      * construction
      *
-     * @param name       column name
-     * @param type       column type
-     * @param comment    comment
+     * @param name column name
+     * @param type column type
+     * @param comment comment
      * @param parameters parameters of column
      */
-    public ColumnEntity(String name, String type, String comment,
-                        Map<String, String> parameters)
+    @JsonCreator
+    public ColumnEntity(@JsonProperty("name") String name,
+            @JsonProperty("type") String type,
+            @JsonProperty("comment") String comment,
+            @JsonProperty("parameters") Map<String, String> parameters)
     {
         this.name = requireNonNull(name, "column name is null");
         this.type = requireNonNull(type, "column type is null");
@@ -59,6 +64,7 @@ public class ColumnEntity
         this.parameters = parameters;
     }
 
+    @JsonProperty
     public String getName()
     {
         return name;
@@ -69,6 +75,7 @@ public class ColumnEntity
         this.name = name;
     }
 
+    @JsonProperty
     public String getComment()
     {
         return comment;
@@ -79,6 +86,7 @@ public class ColumnEntity
         this.comment = comment;
     }
 
+    @JsonProperty
     public Map<String, String> getParameters()
     {
         return parameters;
@@ -89,6 +97,7 @@ public class ColumnEntity
         this.parameters = parameters;
     }
 
+    @JsonProperty
     public String getType()
     {
         return type;

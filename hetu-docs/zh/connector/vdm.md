@@ -1,7 +1,7 @@
 
 # VDM连接器
 
-有一些用例需要在同一个会话或视图中管理和访问多个数据源。此外，用户可能根本不关心数据的分布和来源。虚拟数据市场（VDM）连接器旨在将该特性引入openLooKeng。
+在一些场景中，需要在同一个会话或视图中管理或访问多个数据源，同时，用户不需要关心数据的分布和来源。虚拟数据市场（VDM）连接器旨在将该特性引入openLooKeng。
 
 VDM连接器支持：
 
@@ -10,24 +10,36 @@ VDM连接器支持：
 - 通过视图管理用户权限
 - 记录每个用户使用VDM视图的情况
 
-## 使用
+## 配置
 
 VDM使用openLooKeng元存储存储其数据库信息。信息可以存储在HDFS或关系数据库中，这取决于openLooKeng元存储的实现。
 
-因此必须先配置元存储。下面是使用RDBMS作为元存储的示例，创建`etc/hetu-metastore.properties`：
+因此必须先配置VDM元数据的存储方式。
+* 下面是使用RDBMS作为VDM元数据的示例，创建`etc/hetu-metastore.properties`：
+```
+hetu.metastore.type=jdbc
+hetu.meatstore.db.url=jdbc:mysql://localhost:3306
+hetu.metastore.db.user=root
+hetu.metastore.db.password=my-mysql-pwd
+```
+* 下面是使用HDFS作为元数据存储的实例，创建`etc/hetu-metastore.properties`：
+```
+# the type of metastore storage
+hetu.metastore.type=hetufilesystem
+# profile name of hetu file system
+hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
+#the path of metastore storage
+hetu.metastore.hetufilesystem.path=/etc/hetu/metastore
+```    
+可以从[文件系统](../develop/filesystem.md )中获取更多的文件系统相关的信息
 
-    hetu.metastore.type=jdbc
-    hetu.meatstore.db.url=jdbc:mysql://....
-    hetu.metastore.db.user=root
-    hetu.metastore.db.password=123456
+对于用户界面，可以从openLooKeng的JDBC或命令行界面访问连接器。当前VDM仅支持schema和view，不支持table。
 
-对于用户界面，可以从JDBC或命令行界面访问连接器。当前VDM仅支持模式和视图。不支持表。
+schema操作与常用的openLooKeng目录相同，包括`create schema`、`drop schema`、`rename schema`和`show schemas`。
 
-模式操作与常用的openLooKeng目录相同，包括`create schema`、`drop schema`、`rename schema`和`show schemas`。
+view可以创建在特定的模式下：`create view as ...`，`drop view`。
 
-视图可以创建在特定的模式下：`create view as ...`，`drop view`。
-
-## 使用示例：
+## 使用示例
 
 配置数据源`vdm1`，在`etc/catalogs`中创建`vdm1.properties`，内容如下：
 
@@ -47,8 +59,8 @@ VDM数据源也可以通过动态目录API进行管理。有关更多信息，�
 
 | 支持操作| 外部接口（SQL命令）|
 |:----------|:----------|
-| 添加VDM| `create catalog`（resulful）|
-| 删除VDM| `drop catalog`（resulful）|
+| 添加VDM| `create catalog`（RESTful）|
+| 删除VDM| `drop catalog`（RESTful）|
 | 查询所有VDM| `show catalogs`|
 | 创建模式| `create schema`|
 | 删除模式| `drop schema`|

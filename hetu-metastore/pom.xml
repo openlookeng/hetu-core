@@ -123,6 +123,20 @@
             <artifactId>testing-mysql-server</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-filesystem-client</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>

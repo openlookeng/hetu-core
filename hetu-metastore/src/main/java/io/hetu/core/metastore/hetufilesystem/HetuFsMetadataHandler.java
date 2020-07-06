@@ -12,28 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi.metastore;
+package io.hetu.core.metastore.hetufilesystem;
 
-import io.prestosql.spi.filesystem.HetuFileSystemClient;
-
-import java.util.Map;
-
-public interface HetuMetaStoreFactory
+@FunctionalInterface
+public interface HetuFsMetadataHandler<X extends Exception>
 {
-    /**
-     * Get the name of the hetu metastore factory
-     *
-     * @return hetu metastore factory name
-     */
-    String getName();
-
-    /**
-     * Create new hetu metastore
-     *
-     * @param name name of the hetu metastore
-     * @param config hetu metastore configurations
-     * @param client hetu file system client
-     * @return created hetu metastore
-     */
-    HetuMetastore create(String name, Map<String, String> config, HetuFileSystemClient client);
+    void handle()
+            throws X;
 }
