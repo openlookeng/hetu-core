@@ -245,7 +245,8 @@ public class TestSqlTaskManager
                 new NodeMemoryConfig(),
                 localSpillManager,
                 new NodeSpillConfig(),
-                new TestingGcMonitor());
+                new TestingGcMonitor(),
+                new EmptyMockMetadata());
     }
 
     private TaskInfo createTask(SqlTaskManager sqlTaskManager, TaskId taskId, ImmutableSet<ScheduledSplit> splits, OutputBuffers outputBuffers)

@@ -39,6 +39,7 @@ import io.prestosql.memory.MemoryPoolAssignment;
 import io.prestosql.memory.MemoryPoolAssignmentsRequest;
 import io.prestosql.memory.NodeMemoryConfig;
 import io.prestosql.memory.QueryContext;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spiller.LocalSpillManager;
@@ -121,7 +122,8 @@ public class SqlTaskManager
             NodeMemoryConfig nodeMemoryConfig,
             LocalSpillManager localSpillManager,
             NodeSpillConfig nodeSpillConfig,
-            GcMonitor gcMonitor)
+            GcMonitor gcMonitor,
+            Metadata metadata)
     {
         requireNonNull(nodeInfo, "nodeInfo is null");
         requireNonNull(config, "config is null");
@@ -159,7 +161,8 @@ public class SqlTaskManager
                             return null;
                         },
                         maxBufferSize,
-                        failedTasks)));
+                        failedTasks,
+                        metadata)));
     }
 
     private QueryContext createQueryContext(

@@ -108,7 +108,6 @@ public class TestDynamicCatalogRunner
             server.installPlugin(new HetuFileSystemClientPlugin());
             server.getInstance(Key.get(FileSystemClientManager.class)).loadFactoryConfigs();
         }
-        server.getInstance(Key.get(CatalogStoreUtil.class));
     }
 
     private void prepareDirectory(String directory)

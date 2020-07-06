@@ -153,7 +153,7 @@ public class DataCenterConfig
      * @return DataCenterConfig object.
      */
     @Config("dc.http-request-readTimeout")
-    @ConfigDescription("http request read timeout, default value is 2min")
+    @ConfigDescription("http request read timeout, default value is 30s")
     public DataCenterConfig setHttpRequestReadTimeout(Duration httpRequestReadTimeout)
     {
         this.httpRequestReadTimeout = httpRequestReadTimeout;
@@ -177,7 +177,7 @@ public class DataCenterConfig
      * @return DataCenterConfig object.
      */
     @Config("dc.http-request-connectTimeout")
-    @ConfigDescription("http request connect timeout, default value is 1min")
+    @ConfigDescription("http request connect timeout, default value is 30s")
     public DataCenterConfig setHttpRequestConnectTimeout(Duration httpRequestConnectTimeout)
     {
         this.httpRequestConnectTimeout = httpRequestConnectTimeout;
@@ -778,7 +778,7 @@ public class DataCenterConfig
      * @return DataCenterConfig object
      */
     @Config("dc.http-compression")
-    @ConfigDescription("whether use gzip compress response body, default value is true")
+    @ConfigDescription("whether use gzip compress response body, default value is false")
     public DataCenterConfig setCompressionEnabled(boolean isCompressionEnabledParameter)
     {
         this.isCompressionEnabled = isCompressionEnabledParameter;
@@ -797,7 +797,7 @@ public class DataCenterConfig
      * @return DataCenterConfig object
      */
     @Config("dc.httpclient.maximum.idle.connections")
-    @ConfigDescription("whether use gzip compress response body, default value is true")
+    @ConfigDescription("http client maximum idle connections")
     public DataCenterConfig setMaxIdleConnections(int maxIdleConnectionsParameter)
     {
         this.maxIdleConnections = maxIdleConnectionsParameter;
