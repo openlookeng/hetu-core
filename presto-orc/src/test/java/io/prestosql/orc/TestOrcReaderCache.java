@@ -82,7 +82,8 @@ public class TestOrcReaderCache
                 100, Duration.ofMinutes(10),
                 100, Duration.ofMinutes(10),
                 100, Duration.ofMinutes(10),
-                new DataSize(100, MEGABYTE), Duration.ofMinutes(10));
+                new DataSize(100, MEGABYTE), Duration.ofMinutes(10),
+                false);
     }
 
     @Test(dataProvider = "orcCacheProvider")

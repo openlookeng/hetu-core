@@ -20,6 +20,7 @@ import io.airlift.tpch.Nation;
 import io.airlift.tpch.NationColumn;
 import io.airlift.tpch.NationGenerator;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.plugin.hive.DeleteDeltaLocations;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HiveColumnHandle;
@@ -41,6 +42,7 @@ import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -76,7 +78,15 @@ public class TestOrcAcidPageSource
             TYPE_MANAGER,
             new HiveConfig().setUseOrcColumnNames(false),
             HiveTestUtils.createTestHdfsEnvironment(new HiveConfig()),
-            new FileFormatDataSourceStats());
+            new FileFormatDataSourceStats(), OrcCacheStore.builder().newCacheStore(
+            new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+            new HiveConfig().getOrcStripeFooterCacheLimit(),
+            Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+            new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+            new HiveConfig().getOrcBloomFiltersCacheLimit(),
+            Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+            new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+            new HiveConfig().isOrcCacheStatsMetricCollectionEnabled()));
 
     @Test
     public void testFullFileRead()

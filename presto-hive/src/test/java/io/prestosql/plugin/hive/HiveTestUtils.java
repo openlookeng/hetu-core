@@ -21,6 +21,7 @@ import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.PagesIndex;
+import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.gcs.GoogleGcsConfigurationInitializer;
 import io.prestosql.plugin.hive.gcs.HiveGcsConfig;
@@ -51,6 +52,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -87,7 +89,15 @@ public final class HiveTestUtils
         HdfsEnvironment testHdfsEnvironment = createTestHdfsEnvironment(hiveConfig);
         return ImmutableSet.<HivePageSourceFactory>builder()
                 .add(new RcFilePageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats))
-                .add(new OrcPageSourceFactory(TYPE_MANAGER, hiveConfig, testHdfsEnvironment, stats))
+                .add(new OrcPageSourceFactory(TYPE_MANAGER, hiveConfig, testHdfsEnvironment, stats, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())))
                 .add(new ParquetPageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats))
                 .build();
     }

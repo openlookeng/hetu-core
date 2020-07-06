@@ -31,6 +31,7 @@ import io.prestosql.operator.SourceOperatorFactory;
 import io.prestosql.operator.TableScanOperator.TableScanOperatorFactory;
 import io.prestosql.operator.project.CursorProcessor;
 import io.prestosql.operator.project.PageProcessor;
+import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
@@ -79,6 +80,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -467,7 +469,15 @@ public class TestOrcPageSourceMemoryTracking
 
         public ConnectorPageSource newPageSource(FileFormatDataSourceStats stats, ConnectorSession session)
         {
-            OrcPageSourceFactory orcPageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HDFS_ENVIRONMENT, stats);
+            OrcPageSourceFactory orcPageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HDFS_ENVIRONMENT, stats, OrcCacheStore.builder().newCacheStore(
+                    new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                    new HiveConfig().getOrcStripeFooterCacheLimit(),
+                    Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                    new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                    new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                    Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                    new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                    new HiveConfig().isOrcCacheStatsMetricCollectionEnabled()));
             return HivePageSourceProvider.createHivePageSource(
                     ImmutableSet.of(),
                     ImmutableSet.of(orcPageSourceFactory),
