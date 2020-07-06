@@ -56,6 +56,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.difference;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
+import static io.prestosql.connector.DataCenterUtility.isDCCatalog;
 import static io.prestosql.metadata.NodeState.ACTIVE;
 import static io.prestosql.metadata.NodeState.INACTIVE;
 import static java.util.Locale.ENGLISH;
@@ -79,6 +80,7 @@ public final class DiscoveryNodeManager
     private final ExecutorService nodeStateEventExecutor;
     private final boolean httpsRequired;
     private final InternalNode currentNode;
+    private final Metadata metadata;
 
     @GuardedBy("this")
     private SetMultimap<CatalogName, InternalNode> activeNodesByCatalogName;
@@ -102,7 +104,8 @@ public final class DiscoveryNodeManager
             FailureDetector failureDetector,
             NodeVersion expectedNodeVersion,
             @ForNodeManager HttpClient httpClient,
-            InternalCommunicationConfig internalCommunicationConfig)
+            InternalCommunicationConfig internalCommunicationConfig,
+            Metadata metadata)
     {
         this.serviceSelector = requireNonNull(serviceSelector, "serviceSelector is null");
         this.failureDetector = requireNonNull(failureDetector, "failureDetector is null");
@@ -111,6 +114,7 @@ public final class DiscoveryNodeManager
         this.nodeStateUpdateExecutor = newSingleThreadScheduledExecutor(threadsNamed("node-state-poller-%s"));
         this.nodeStateEventExecutor = newCachedThreadPool(threadsNamed("node-state-events-%s"));
         this.httpsRequired = internalCommunicationConfig.isHttpsRequired();
+        this.metadata = metadata;
 
         this.currentNode = findCurrentNode(
                 serviceSelector.selectAllServices(),
@@ -368,6 +372,13 @@ public final class DiscoveryNodeManager
     @Override
     public synchronized Set<InternalNode> getActiveConnectorNodes(CatalogName catalogName)
     {
+        if (catalogName.getCatalogName().contains(".")) {
+            String fullCatalogName = catalogName.getCatalogName();
+            String parentCatalogName = fullCatalogName.substring(0, fullCatalogName.indexOf("."));
+            if (isDCCatalog(metadata, parentCatalogName)) {
+                return activeNodesByCatalogName.get(new CatalogName(parentCatalogName));
+            }
+        }
         return activeNodesByCatalogName.get(catalogName);
     }
 

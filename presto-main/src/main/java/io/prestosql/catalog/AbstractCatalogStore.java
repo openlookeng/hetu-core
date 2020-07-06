@@ -19,6 +19,7 @@ import com.google.common.io.ByteStreams;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.hetu.core.common.filesystem.FileBasedLock;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.io.IOException;
@@ -37,6 +38,9 @@ import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.fromProperties;
+import static io.prestosql.catalog.CatalogFilePath.getCatalogBasePath;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toCollection;
 
 public abstract class AbstractCatalogStore
@@ -52,9 +56,17 @@ public abstract class AbstractCatalogStore
 
     public AbstractCatalogStore(String baseDirectory, HetuFileSystemClient fileSystemClient, int maxFileSizeInBytes)
     {
-        this.baseDirectory = baseDirectory;
-        this.maxFileSizeInBytes = maxFileSizeInBytes;
-        this.fileSystemClient = fileSystemClient;
+        this.baseDirectory = requireNonNull(baseDirectory, "baseDirectory is null");
+        this.maxFileSizeInBytes = requireNonNull(maxFileSizeInBytes, "maxFileSizeInBytes is null");
+        this.fileSystemClient = requireNonNull(fileSystemClient, "fileSystemClient is null");
+        if (!fileSystemClient.exists(getCatalogBasePath(baseDirectory))) {
+            try {
+                fileSystemClient.createDirectories(getCatalogBasePath(baseDirectory));
+            }
+            catch (IOException e) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to prepare base directory.", e);
+            }
+        }
     }
 
     /**
@@ -260,7 +272,7 @@ public abstract class AbstractCatalogStore
     {
         // if the file extension is ".properties", then that is a properties file of catalog,
         // the catalog name is the file name without extension.
-        try (Stream<Path> stream = fileSystemClient.list(Paths.get(baseDirectory))) {
+        try (Stream<Path> stream = fileSystemClient.list(getCatalogBasePath(baseDirectory))) {
             return stream.map(Path::getFileName)
                     .map(Path::toString)
                     .filter(fileName -> fileName.endsWith(".properties"))

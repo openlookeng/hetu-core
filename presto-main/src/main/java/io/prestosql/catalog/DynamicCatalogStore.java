@@ -120,7 +120,11 @@ public class DynamicCatalogStore
             catch (IOException e) {
                 log.error(e, "Delete catalog [%s] failed", catalogName);
             }
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Try to load catalog failed, check your configuration", ex);
+            String throwMessage = "Try to load catalog failed, check your configuration.";
+            if (ex.getMessage() != null) {
+                throwMessage = throwMessage + " cause by " + ex.getMessage();
+            }
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, throwMessage, ex);
         }
     }
 
@@ -231,6 +235,9 @@ public class DynamicCatalogStore
             // store the config files to share file system.
             shareCatalogStore.createCatalog(catalogInfo, configFiles);
 
+            // wait for at least one node added catalog.
+            waitForAtLeastOneNodeAddedCatalog(catalogName);
+
             log.info("-- Added catalog [%s] --", catalogName);
         }
         catch (IOException | PrestoException ex) {
@@ -256,16 +263,55 @@ public class DynamicCatalogStore
         }
     }
 
-    private boolean isDeletedForAllNodes(String catalogName)
+    private void refreshConnectorNodes()
     {
         // default refresh time is 10s
         selectorManager.forceRefresh();
         // default refresh time is 10s
         nodeManager.refreshNodes();
+    }
+
+    private boolean isAtLeastOneNodeAdded(String catalogName)
+    {
+        refreshConnectorNodes();
+        Set<InternalNode> nodes = nodeManager.getActiveConnectorNodes(new CatalogName(catalogName));
+        return nodes.size() >= 1;
+    }
+
+    private void waitForAtLeastOneNodeAddedCatalog(String catalogName)
+    {
+        Future<Integer> future = executorService.submit(new Callable<Integer>()
+        {
+            @Override
+            public Integer call()
+            {
+                try {
+                    while (!isAtLeastOneNodeAdded(catalogName)) {
+                        TimeUnit.SECONDS.sleep(1);
+                    }
+                }
+                catch (InterruptedException e) {
+                    log.error(e, "Wait for at least one node loaded catalog, but sleep been interrupted");
+                }
+                return 0;
+            }
+        });
+
+        try {
+            future.get((long) scanInterval.getValue(), scanInterval.getUnit());
+        }
+        catch (InterruptedException | ExecutionException | TimeoutException e) {
+            future.cancel(true);
+            log.warn("Wait for at least one node loaded catalog, but timeout");
+        }
+    }
+
+    private boolean isDeletedForAllNodes(String catalogName)
+    {
         InternalNode currentNode = nodeManager.getCurrentNode();
+        refreshConnectorNodes();
         Set<InternalNode> nodes = nodeManager.getAllConnectorNodes(new CatalogName(catalogName));
-        return (nodes.size() == 1 && nodes.contains(currentNode)) || // Current node has update catalog, so we just wait other nodes has deleted catalog.
-                nodes.isEmpty(); // In the dc connector, when load dc catalog, it just load properties, sub-catalogs are not loaded.
+        return (nodes.size() == 1 && nodes.contains(currentNode)); // Current node has update catalog, so we just wait other nodes has deleted catalog.
     }
 
     private void waitForAllNodeDeletedCatalog(String catalogName)
@@ -288,17 +334,16 @@ public class DynamicCatalogStore
         });
 
         try {
-            long startTime = System.currentTimeMillis();
             future.get((long) scanInterval.getValue() * 3, scanInterval.getUnit());
-            long endTime = System.currentTimeMillis();
-            log.info("Time required for deleting catalogs from all nodes : %dms", endTime - startTime);
         }
         catch (InterruptedException | ExecutionException | TimeoutException e) {
             future.cancel(true);
-            Set<InternalNode> nodes = nodeManager.getAllConnectorNodes(new CatalogName(catalogName));
-            List<String> nodeIds = nodes.stream().map(InternalNode::getNodeIdentifier).collect(Collectors.toList());
-            log.error("Wait all nodes unload catalog, but some nodes " + nodeIds + " timeout");
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Wait all nodes unload catalog, but some nodes timeout");
+            List<String> nodeIds = nodeManager.getAllConnectorNodes(new CatalogName(catalogName))
+                    .stream()
+                    .map(InternalNode::getNodeIdentifier)
+                    .collect(Collectors.toList());
+            log.error("Wait for all nodes unload catalog, but timeout, current nodes: " + nodeIds);
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Wait all nodes unload catalog, but timeout");
         }
     }
 
@@ -322,6 +367,8 @@ public class DynamicCatalogStore
         catch (IOException ex) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Store new catalog files to share file system failed");
         }
+        // wait for at least one node added catalog.
+        waitForAtLeastOneNodeAddedCatalog(catalogName);
     }
 
     public synchronized void updateCatalogAndShareFiles(CatalogStore localCatalogStore, CatalogStore shareCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
@@ -350,7 +397,7 @@ public class DynamicCatalogStore
         // prepare new files.
         CatalogFileInputStream.Builder builder = new CatalogFileInputStream.Builder((int) dynamicCatalogConfig.getCatalogMaxFileSize().toBytes());
 
-        log.info("-- Try to updating catalog [%s] to version [%d] --", catalogName, catalogInfo.getVersion());
+        log.info("-- Try to updating catalog [%s] to version [%s] --", catalogName, catalogInfo.getVersion());
         previousCatalogFiles.mark();
         try (CatalogFileInputStream newCatalogFiles = builder
                 .putAll(previousCatalogFiles)
@@ -373,7 +420,7 @@ public class DynamicCatalogStore
                 shareCatalogStore.createCatalog(previousCatalogInfo, previousCatalogFiles);
             }
             catch (IOException ignore) {
-                log.error(ignore, "Backup previous catalog information and files failed");
+                log.error(ignore, "Rollback previous catalog information and files failed");
             }
             throw new PrestoException(GENERIC_INTERNAL_ERROR, ex.getMessage(), ex);
         }

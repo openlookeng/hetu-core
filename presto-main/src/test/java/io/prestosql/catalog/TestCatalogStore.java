@@ -180,9 +180,9 @@ public class TestCatalogStore
         assertTrue(Files.exists(Paths.get(globalDirectory, "krb5.conf")));
         assertTrue(isFileEqual(Paths.get(globalDirectory, "krb5.conf"),
                 Paths.get(orgCatalogPath.getGlobalDirPath().toString(), "krb5.conf")));
-        assertTrue(Files.exists(Paths.get(localPath, "hive.properties")));
-        assertTrue(isPropertiesEqual(Paths.get(localPath, "hive.properties"),
-                Paths.get(orgBaseDirectory, "hive.properties")));
+        assertTrue(Files.exists(localCatalogPath.getPropertiesPath()));
+        assertTrue(isPropertiesEqual(localCatalogPath.getPropertiesPath(),
+                Paths.get(orgBaseDirectory, "catalog", "hive.properties")));
         assertTrue(Files.exists(Paths.get(catalogDirectory, "hive.metadata")));
         assertTrue(isPropertiesEqual(Paths.get(catalogDirectory, "hive.metadata"),
                 Paths.get(orgCatalogPath.getCatalogDirPath().toString(), "hive.metadata")));

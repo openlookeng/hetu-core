@@ -18,6 +18,8 @@ package io.prestosql.catalog;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static java.util.Objects.requireNonNull;
+
 public final class CatalogFilePath
 {
     private final Path catalogDirPath;
@@ -26,13 +28,41 @@ public final class CatalogFilePath
     private final Path metadataPath;
     private final Path lockPath;
 
+    /*
+    * baseDirectory
+    * ├── global
+    * │   └── krb5.conf
+    * ├── catalog
+    * │   ├── hive.properties
+    * │   ├── hive
+    * │   │   ├── hive.metadata
+    * │   │   ├── hdfs-site.xml
+    * │   │   ├── core-site.xml
+    * │   │   └── user.keytab
+    * │   ├── mysql.properties
+    * │   └── mysql
+    * │       └── mysql.metadata
+    * ├── lock
+     * */
     public CatalogFilePath(String baseDirectory, String catalogName)
     {
-        this.catalogDirPath = Paths.get(baseDirectory, "catalog", catalogName);
+        requireNonNull(baseDirectory, "base directory is null");
+        requireNonNull(catalogName, "catalog name is null");
+
+        // global files directory
         this.globalDirPath = Paths.get(baseDirectory, "global");
-        this.propertiesPath = Paths.get(baseDirectory, catalogName + ".properties");
-        this.metadataPath = Paths.get(baseDirectory, "catalog", catalogName, catalogName + ".metadata");
-        this.lockPath = Paths.get(baseDirectory, "catalog", catalogName + ".lock");
+        // catalog files directory
+        String catalogBasePath = getCatalogBasePath(baseDirectory).toString();
+        this.catalogDirPath = Paths.get(catalogBasePath, catalogName);
+        this.propertiesPath = Paths.get(catalogBasePath, catalogName + ".properties");
+        this.metadataPath = Paths.get(catalogDirPath.toString(), catalogName + ".metadata");
+        // lock files directory
+        this.lockPath = Paths.get(catalogBasePath);
+    }
+
+    public static Path getCatalogBasePath(String baseDirectory)
+    {
+        return Paths.get(baseDirectory, "catalog");
     }
 
     public Path getCatalogDirPath()
