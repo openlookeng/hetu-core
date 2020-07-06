@@ -14,7 +14,7 @@
  */
 package io.prestosql.plugin.hive.util;
 
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import org.testng.annotations.Test;
 
 import java.util.LinkedList;
@@ -31,12 +31,12 @@ public class TestIndexManager
     public void testGetIndices()
     {
         LocalIndexCache localIndexCache = mock(LocalIndexCache.class);
-        List<SplitIndexMetadata> expectedSplitsIndexes = new LinkedList<>();
-        expectedSplitsIndexes.add(mock(SplitIndexMetadata.class));
+        List<IndexMetadata> expectedSplitsIndexes = new LinkedList<>();
+        expectedSplitsIndexes.add(mock(IndexMetadata.class));
         when(localIndexCache.getIndices(any(), any(), any(), any(), any())).thenReturn(expectedSplitsIndexes);
 
         IndexManager indexManager = new IndexManager(localIndexCache);
-        List<SplitIndexMetadata> actualSplitIndex = indexManager.getIndices(any(), any(), any(), any(), any());
+        List<IndexMetadata> actualSplitIndex = indexManager.getIndices(any(), any(), any(), any(), any());
         assertEquals(actualSplitIndex.size(), expectedSplitsIndexes.size());
     }
 }

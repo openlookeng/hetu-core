@@ -26,6 +26,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.TestingBlockEncodingSerde;
@@ -40,7 +41,6 @@ import io.prestosql.spi.type.TestingTypeManager;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.type.TypeDeserializer;
-import io.prestosql.utils.HetuConstant;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 

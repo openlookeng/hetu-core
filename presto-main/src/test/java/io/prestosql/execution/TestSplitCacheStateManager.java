@@ -17,11 +17,11 @@ package io.prestosql.execution;
 import io.airlift.units.Duration;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.StateStoreConstants;
 import io.prestosql.statestore.StateStoreProvider;
-import io.prestosql.utils.HetuConstant;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 

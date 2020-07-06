@@ -131,4 +131,25 @@ public class IndexServiceUtils
 
         return new String[]{catalogName, databaseName, tableName};
     }
+
+    /**
+     * Returns the subset of properties that start with the prefix, prefix is removed
+     *
+     * @param properties <code>Properties</code> object to extract properties with
+     * @param prefix A String prefix of some property key
+     * @return A new <code>Properties</code> object with all property key starting with the <code>prefix</code>
+     * given and is present in <code>properties</code>,
+     * and the value of each key is exactly the same as it is in <code>properties</code>
+     */
+    public static Properties getPropertiesSubset(Properties properties, String prefix)
+    {
+        Properties subsetProps = new Properties();
+        properties.stringPropertyNames().forEach(k -> {
+            if (k.startsWith(prefix)) {
+                subsetProps.put(k.substring(k.indexOf(prefix) + prefix.length()), properties.getProperty(k));
+            }
+        });
+
+        return subsetProps;
+    }
 }

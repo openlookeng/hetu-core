@@ -32,14 +32,8 @@ public class HetuConfig
 {
     private Boolean enableFilter = Boolean.FALSE;
     private Long maxIndicesInCache = Long.valueOf(10000000);
-    private String filterPlugins;
     private String indexStoreUri = "/opt/hetu/indices/";
-    private String indexStoreType = "local";
-    private String indexStoreHdfsConfigResources = "/opt/hetu/config/core-site.xml,/opt/hetu/config/hdfs-site.xml";
-    private String indexStoreHdfsAuthenticationType = "KERBEROS";
-    private String indexStoreHdfsKrb5ConfigPath = "/etc/krb5.conf";
-    private String indexStoreHdfsKrb5KeytabPath = "/opt/hetu/config/user.keytab";
-    private String indexStoreHdfsKrb5Principal;
+    private String indexStoreFileSystemProfile = "local-config-default";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
     private Boolean enableMultipleCoordinator = Boolean.FALSE;
     private Boolean enableSeedStore = Boolean.FALSE;
@@ -65,7 +59,7 @@ public class HetuConfig
         return enableFilter;
     }
 
-    @Config("hetu.filter.enabled")
+    @Config("hetu.heuristicindex.filter.enabled")
     @ConfigDescription("Is split filter enabled")
     public HetuConfig setFilterEnabled(boolean enabled)
     {
@@ -79,7 +73,7 @@ public class HetuConfig
         return indexStoreUri;
     }
 
-    @Config("hetu.filter.indexstore.uri")
+    @Config("hetu.heuristicindex.indexstore.uri")
     @ConfigDescription("default indexstore uri")
     public HetuConfig setIndexStoreUri(String indexStoreUri)
     {
@@ -88,16 +82,16 @@ public class HetuConfig
     }
 
     @NotNull
-    public String getIndexStoreType()
+    public String getIndexStoreFileSystemProfile()
     {
-        return indexStoreType;
+        return indexStoreFileSystemProfile;
     }
 
-    @Config("hetu.filter.indexstore.type")
-    @ConfigDescription("default indexstore type")
-    public HetuConfig setIndexStoreType(String indexStoreType)
+    @Config("hetu.heuristicindex.indexstore.filesystem.profile")
+    @ConfigDescription("filesystem client profile for indexstore")
+    public HetuConfig setIndexStoreFileSystemProfile(String indexStoreFileSystemProfile)
     {
-        this.indexStoreType = indexStoreType;
+        this.indexStoreFileSystemProfile = indexStoreFileSystemProfile;
         return this;
     }
 
@@ -106,94 +100,11 @@ public class HetuConfig
         return this.maxIndicesInCache;
     }
 
-    @Config("hetu.filter.cache.max-indices-number")
+    @Config("hetu.heuristicindex.filter.cache.max-indices-number")
     @ConfigDescription("The maximum number of indices that could be loaded into cache before eviction happens")
     public HetuConfig setMaxIndicesInCache(Long maxIndicesInCache)
     {
         this.maxIndicesInCache = maxIndicesInCache;
-        return this;
-    }
-
-    /**
-     * Getter for enableEmbeddedStateStore
-     *
-     * @return if embedded state store is enabled
-     */
-    public String getIndexStoreHdfsConfigResources()
-    {
-        return indexStoreHdfsConfigResources;
-    }
-
-    @Config("hetu.filter.indexstore.hdfs.config.resources")
-    @ConfigDescription("HDFS config resource files, required when hetu.filter.indexstore.type=hdfs")
-    public HetuConfig setIndexStoreHdfsConfigResources(String indexStoreHdfsConfigResources)
-    {
-        this.indexStoreHdfsConfigResources = indexStoreHdfsConfigResources;
-        return this;
-    }
-
-    public String getIndexStoreHdfsAuthenticationType()
-    {
-        return indexStoreHdfsAuthenticationType;
-    }
-
-    @Config("hetu.filter.indexstore.hdfs.authentication.type")
-    @ConfigDescription("HDFS authentication type, supported values are NONE and KERBEROS, required when hetu.filter.indexstore.type=hdfs")
-    public HetuConfig setIndexStoreHdfsAuthenticationType(String indexStoreHdfsAuthenticationType)
-    {
-        this.indexStoreHdfsAuthenticationType = indexStoreHdfsAuthenticationType;
-        return this;
-    }
-
-    public String getIndexStoreHdfsKrb5ConfigPath()
-    {
-        return indexStoreHdfsKrb5ConfigPath;
-    }
-
-    @Config("hetu.filter.indexstore.hdfs.krb5.conf.path")
-    @ConfigDescription("Kerberos config file, required when hetu.filter.indexstore.hdfs.authentication.type=KERBEROS")
-    public HetuConfig setIndexStoreHdfsKrb5ConfigPath(String indexStoreHdfsKrb5ConfigPath)
-    {
-        this.indexStoreHdfsKrb5ConfigPath = indexStoreHdfsKrb5ConfigPath;
-        return this;
-    }
-
-    public String getIndexStoreHdfsKrb5KeytabPath()
-    {
-        return indexStoreHdfsKrb5KeytabPath;
-    }
-
-    @Config("hetu.filter.indexstore.hdfs.krb5.keytab.path")
-    @ConfigDescription("Kerberos keytab file, required when hetu.filter.indexstore.hdfs.authentication.type=KERBEROS")
-    public HetuConfig setIndexStoreHdfsKrb5KeytabPath(String indexStoreHdfsKrb5KeytabPath)
-    {
-        this.indexStoreHdfsKrb5KeytabPath = indexStoreHdfsKrb5KeytabPath;
-        return this;
-    }
-
-    public String getIndexStoreHdfsKrb5Principal()
-    {
-        return indexStoreHdfsKrb5Principal;
-    }
-
-    @Config("hetu.filter.indexstore.hdfs.krb5.principal")
-    @ConfigDescription("Kerberos principal, required when hetu.filter.indexstore.hdfs.authentication.type=KERBEROS")
-    public HetuConfig setIndexStoreHdfsKrb5Principal(String indexStoreHdfsKrb5Principal)
-    {
-        this.indexStoreHdfsKrb5Principal = indexStoreHdfsKrb5Principal;
-        return this;
-    }
-
-    public String getFilterPlugins()
-    {
-        return filterPlugins;
-    }
-
-    @Config("hetu.filter.plugins")
-    @ConfigDescription("Comma separated paths of filter plugin files or directories")
-    public HetuConfig setFilterPlugins(String filterPlugins)
-    {
-        this.filterPlugins = filterPlugins;
         return this;
     }
 

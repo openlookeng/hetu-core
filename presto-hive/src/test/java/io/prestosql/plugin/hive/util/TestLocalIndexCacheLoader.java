@@ -14,17 +14,17 @@
  */
 package io.prestosql.plugin.hive.util;
 
-import io.hetu.core.heuristicindex.IndexClient;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
+import io.hetu.core.common.heuristicindex.IndexCacheKey;
+import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.utils.HetuConstant;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -39,8 +39,7 @@ public class TestLocalIndexCacheLoader
     private void setProperties()
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
-        PropertyService.setProperty(HetuConstant.FILTER_PLUGINS, "");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_TYPE, HetuConstant.INDEXSTORE_TYPE_LOCAL);
+        PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
         PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, 10L);
     }
 
@@ -106,48 +105,15 @@ public class TestLocalIndexCacheLoader
         IndexClient indexclient = mock(IndexClient.class);
         LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
 
-        List<SplitIndexMetadata> expectedSplitIndexes = new LinkedList<>();
-        expectedSplitIndexes.add(mock(SplitIndexMetadata.class));
+        List<IndexMetadata> expectedSplitIndexes = new LinkedList<>();
+        expectedSplitIndexes.add(mock(IndexMetadata.class));
 
         long lastModifiedTime = 1L;
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", lastModifiedTime);
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenReturn(expectedSplitIndexes);
 
-        List<SplitIndexMetadata> actualSplitIndexes = localIndexCacheLoader.load(indexCacheKey);
+        List<IndexMetadata> actualSplitIndexes = localIndexCacheLoader.load(indexCacheKey);
         assertEquals(expectedSplitIndexes.size(), actualSplitIndexes.size());
-    }
-
-    @Test
-    public void testGetIndexStoreProperties()
-    {
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, "/tmp/hetu/indices");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_TYPE, "local");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES,
-                "/tmp/core-site.xml,/tmp/hdfs-site.xml");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE,
-                "KERBEROS");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH,
-                "/tmp/krb5.conf");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH,
-                "/tmp/user.keytab");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL, "user");
-        // Filter Plugin is needed to instantiate LocalIndexCacheLoader.indexClient
-        // but it won't be part of the expected properties because only the IndexFactory needs to know the plugin dir
-        // IndexClient should be ignorant to the plugin directory
-        PropertyService.setProperty(HetuConstant.FILTER_PLUGINS, "");
-
-        Properties actual = LocalIndexCacheLoader.getIndexStoreProperties();
-
-        Properties expected = new Properties();
-        expected.setProperty("uri", "/tmp/hetu/indices");
-        expected.setProperty("type", "local");
-        expected.setProperty("hdfs.config.resources", "/tmp/core-site.xml,/tmp/hdfs-site.xml");
-        expected.setProperty("hdfs.authentication.type", "KERBEROS");
-        expected.setProperty("hdfs.krb5.conf.path", "/tmp/krb5.conf");
-        expected.setProperty("hdfs.krb5.keytab.path", "/tmp/user.keytab");
-        expected.setProperty("hdfs.krb5.principal", "user");
-
-        assertEquals(actual, expected);
     }
 }

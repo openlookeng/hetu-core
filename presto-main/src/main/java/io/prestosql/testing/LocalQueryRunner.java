@@ -75,6 +75,7 @@ import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.metadata.AnalyzePropertyManager;
@@ -339,7 +340,9 @@ public class LocalQueryRunner
         this.joinFilterFunctionCompiler = new JoinFilterFunctionCompiler(metadata);
 
         NodeInfo nodeInfo = new NodeInfo("test");
+        FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
+        HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager);
         this.connectorManager = new ConnectorManager(
                 hetuMetaStoreManager,
                 metadata,
@@ -362,7 +365,8 @@ public class LocalQueryRunner
                 catalogConnectorStore,
                 null,
                 new ServerConfig(),
-                new NodeSchedulerConfig());
+                new NodeSchedulerConfig(),
+                heuristicIndexerManager);
 
         GlobalSystemConnectorFactory globalSystemConnectorFactory = new GlobalSystemConnectorFactory(ImmutableSet.of(
                 new NodeSystemTable(nodeManager),
@@ -375,7 +379,6 @@ public class LocalQueryRunner
                 new TransactionsSystemTable(metadata, transactionManager)),
                 ImmutableSet.of());
 
-        FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         HttpServerConfig httpServerConfig = new HttpServerConfig();
         httpServerConfig.setHttpEnabled(false);
@@ -396,7 +399,8 @@ public class LocalQueryRunner
                 new SessionPropertyDefaults(nodeInfo),
                 seedStoreManager,
                 fileSystemClientManager,
-                hetuMetaStoreManager);
+                hetuMetaStoreManager,
+                heuristicIndexerManager);
 
         connectorManager.addConnectorFactory(globalSystemConnectorFactory);
         connectorManager.createConnection(GlobalSystemConnector.NAME, GlobalSystemConnector.NAME, ImmutableMap.of());

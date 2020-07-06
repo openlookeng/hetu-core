@@ -14,8 +14,8 @@
  */
 package io.prestosql.execution;
 
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.utils.HetuConstant;
 
 import java.lang.reflect.Field;
 

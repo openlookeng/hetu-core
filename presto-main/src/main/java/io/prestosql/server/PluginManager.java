@@ -23,6 +23,7 @@ import io.prestosql.connector.ConnectorManager;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControlManager;
@@ -35,6 +36,7 @@ import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.function.SqlFunction;
+import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.resourcegroups.ResourceGroupConfigurationManagerFactory;
 import io.prestosql.spi.security.PasswordAuthenticatorFactory;
@@ -101,6 +103,7 @@ public class PluginManager
     private final SeedStoreManager seedStoreManager;
     private final HetuMetaStoreManager hetuMetaStoreManager;
     private final FileSystemClientManager fileSystemClientManager;
+    private final HeuristicIndexerManager heuristicIndexerManager;
     private final SessionPropertyDefaults sessionPropertyDefaults;
     private final ArtifactResolver resolver;
     private final File installedPluginsDir;
@@ -124,7 +127,8 @@ public class PluginManager
             SessionPropertyDefaults sessionPropertyDefaults,
             SeedStoreManager seedStoreManager,
             FileSystemClientManager fileSystemClientManager,
-            HetuMetaStoreManager hetuMetaStoreManager)
+            HetuMetaStoreManager hetuMetaStoreManager,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         requireNonNull(nodeInfo, "nodeInfo is null");
         requireNonNull(config, "config is null");
@@ -153,6 +157,7 @@ public class PluginManager
         this.sessionPropertyDefaults = requireNonNull(sessionPropertyDefaults, "sessionPropertyDefaults is null");
         this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClientManager is null");
         this.hetuMetaStoreManager = requireNonNull(hetuMetaStoreManager, "hetuMetaStoreManager is null");
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
     public void loadPlugins()
@@ -302,6 +307,11 @@ public class PluginManager
         for (HetuMetaStoreFactory hetuMetaStoreFactory : plugin.getHetuMetaStoreFactories()) {
             log.info("Registering hetu metastore %s", hetuMetaStoreFactory.getName());
             hetuMetaStoreManager.addHetuMetaStoreFactory(hetuMetaStoreFactory);
+        }
+
+        for (IndexFactory indexFactory : plugin.getIndexFactories()) {
+            log.info("Loading index factory");
+            heuristicIndexerManager.loadIndexFactories(indexFactory);
         }
 
         installFunctionsPlugin(plugin);

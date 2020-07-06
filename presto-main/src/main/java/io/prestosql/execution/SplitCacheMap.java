@@ -18,11 +18,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.sql.tree.QualifiedName;
-import io.prestosql.utils.HetuConstant;
 
 import javax.annotation.concurrent.ThreadSafe;
 

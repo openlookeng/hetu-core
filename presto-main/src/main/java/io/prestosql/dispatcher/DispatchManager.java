@@ -31,6 +31,7 @@ import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.SessionContext;
 import io.prestosql.server.SessionPropertyDefaults;
 import io.prestosql.server.SessionSupplier;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.resourcegroups.SelectionContext;
@@ -44,7 +45,6 @@ import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.StateUpdater;
 import io.prestosql.transaction.TransactionManager;
 import io.prestosql.utils.HetuConfig;
-import io.prestosql.utils.HetuConstant;
 import org.weakref.jmx.Flatten;
 import org.weakref.jmx.Managed;
 

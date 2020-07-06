@@ -27,6 +27,7 @@ import io.prestosql.connector.system.StaticSystemTablesProvider;
 import io.prestosql.connector.system.SystemConnector;
 import io.prestosql.connector.system.SystemTablesProvider;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
@@ -83,7 +84,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.connector.CatalogName.createInformationSchemaCatalogName;
 import static io.prestosql.connector.CatalogName.createSystemTablesCatalogName;
-import static io.prestosql.utils.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
+import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -111,6 +112,7 @@ public class ConnectorManager
     private final TransactionManager transactionManager;
     // dataCenterConnectorStore is used to store the Connector objects of the catalogs
     private final CatalogConnectorStore catalogConnectorStore;
+    private final HeuristicIndexerManager heuristicIndexerManager;
 
     @GuardedBy("this")
     private final ConcurrentMap<String, ConnectorFactory> connectorFactories = new ConcurrentHashMap<>();
@@ -144,7 +146,8 @@ public class ConnectorManager
             CatalogConnectorStore catalogConnectorStore,
             Announcer announcer,
             ServerConfig serverConfig,
-            NodeSchedulerConfig schedulerConfig)
+            NodeSchedulerConfig schedulerConfig,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         this.hetuMetaStoreManager = hetuMetaStoreManager;
         this.metadataManager = metadataManager;
@@ -166,6 +169,7 @@ public class ConnectorManager
         this.announcer = announcer;
         this.serverConfig = serverConfig;
         this.schedulerConfig = schedulerConfig;
+        this.heuristicIndexerManager = heuristicIndexerManager;
     }
 
     @PreDestroy
@@ -393,7 +397,8 @@ public class ConnectorManager
                 new InternalTypeManager(metadataManager),
                 pageSorter,
                 pageIndexerFactory,
-                hetuMetaStoreManager.getHetuMetastore());
+                hetuMetaStoreManager.getHetuMetastore(),
+                heuristicIndexerManager.getIndexClient());
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
             return factory.create(catalogName.getCatalogName(), properties, context);

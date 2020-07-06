@@ -20,14 +20,11 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
-import io.hetu.core.heuristicindex.base.BloomIndex;
-import io.hetu.core.heuristicindex.base.MinMaxIndex;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
+import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.utils.HetuConstant;
-
-import javax.inject.Inject;
 
 import java.net.URI;
 import java.util.Collections;
@@ -39,18 +36,16 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 public class LocalIndexCache
-        implements IndexCache
 {
     private static final Logger LOG = Logger.get(LocalIndexCache.class);
     private final int loadDelay = 5 * 1000; // ms
 
     private boolean loadAsync = true;
-    private static LoadingCache<IndexCacheKey, List<SplitIndexMetadata>> cache;
+    private static LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
 
     private ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Main-LocalIndexCache-pool-%d").setDaemon(true).build();
     private ScheduledExecutorService executor = Executors.newScheduledThreadPool(2, threadFactory);
 
-    @Inject
     public LocalIndexCache(CacheLoader loader)
     {
         this(loader, true);
@@ -68,8 +63,7 @@ public class LocalIndexCache
         this.loadAsync = loadAsync;
     }
 
-    @Override
-    public List<SplitIndexMetadata> getIndices(String table, String column, Split split)
+    public List<IndexMetadata> getIndices(String table, String column, Split split)
     {
         if (cache == null) {
             return Collections.emptyList();
@@ -78,11 +72,11 @@ public class LocalIndexCache
         URI splitUri = URI.create(split.getConnectorSplit().getFilePath());
         String filterKeyPath = getCacheKey(table, column, splitUri.getPath());
         long lastModifiedTime = split.getConnectorSplit().getLastModifiedTime();
-        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, MinMaxIndex.ID, BloomIndex.ID);
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, "MINMAX", "BLOOM");
         //it is possible to return multiple SplitIndexMetadata due to the range mismatch, especially in the case
         //where the split has a wider range than the original splits used for index creation
         // check if cache contains the key
-        List<SplitIndexMetadata> indices;
+        List<IndexMetadata> indices;
         if (loadAsync) {
             // if cache didn't contain the key, it has not been loaded, load it asynchronously
             indices = cache.getIfPresent(filterKey);
@@ -117,7 +111,7 @@ public class LocalIndexCache
         if (indices != null) {
             // if key was present in cache, we still need to check if the index is validate based on the lastModifiedTime
             // the index is only valid if the lastModifiedTime of the split matches the index's lastModifiedTime
-            for (SplitIndexMetadata index : indices) {
+            for (IndexMetadata index : indices) {
                 if (index.getLastUpdated() != lastModifiedTime) {
                     cache.invalidate(filterKey);
                     indices = Collections.emptyList();

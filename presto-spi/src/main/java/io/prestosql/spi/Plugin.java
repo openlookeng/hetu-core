@@ -17,6 +17,7 @@ import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
+import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.resourcegroups.ResourceGroupConfigurationManagerFactory;
 import io.prestosql.spi.security.PasswordAuthenticatorFactory;
@@ -112,6 +113,11 @@ public interface Plugin
     }
 
     default Iterable<HetuMetaStoreFactory> getHetuMetaStoreFactories()
+    {
+        return emptyList();
+    }
+
+    default Iterable<IndexFactory> getIndexFactories()
     {
         return emptyList();
     }

@@ -22,13 +22,13 @@ import io.airlift.units.Duration;
 import io.prestosql.block.BlockJsonSerde;
 import io.prestosql.execution.SplitCacheStateInitializer.InitializationStatus;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.type.Type;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.type.TypeDeserializer;
-import io.prestosql.utils.HetuConstant;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;

@@ -47,6 +47,7 @@ import io.prestosql.spi.connector.classloader.ClassLoaderSafeConnectorPageSinkPr
 import io.prestosql.spi.connector.classloader.ClassLoaderSafeConnectorPageSourceProvider;
 import io.prestosql.spi.connector.classloader.ClassLoaderSafeConnectorSplitManager;
 import io.prestosql.spi.connector.classloader.ClassLoaderSafeNodePartitioningProvider;
+import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.procedure.Procedure;
 import io.prestosql.spi.type.TypeManager;
 import org.weakref.jmx.guice.MBeanModule;
@@ -114,6 +115,7 @@ public class HiveConnectorFactory
                         binder.bind(PageIndexerFactory.class).toInstance(context.getPageIndexerFactory());
                         binder.bind(PageSorter.class).toInstance(context.getPageSorter());
                         binder.bind(HiveCatalogName.class).toInstance(new HiveCatalogName(catalogName));
+                        binder.bind(IndexClient.class).toInstance(context.getIndexClient());
                     });
 
             Injector injector = app

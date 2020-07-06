@@ -25,6 +25,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TablePropertyManager;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllAccessControl;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -35,7 +36,6 @@ import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.transaction.TransactionManager;
-import io.prestosql.utils.HetuConstant;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 

@@ -15,11 +15,9 @@
 package io.prestosql.heuristicindex;
 
 import io.airlift.log.Logger;
-import io.hetu.core.heuristicindex.base.BloomIndex;
-import io.hetu.core.heuristicindex.base.MinMaxIndex;
-import io.hetu.core.spi.heuristicindex.Operator;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.Operator;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.utils.RangeUtil;
 
@@ -42,15 +40,15 @@ public class SplitFilter
     private static final List<String> INDEX_ORDER = new ArrayList<String>(2)
     {
         {
-            add(MinMaxIndex.ID);
-            add(BloomIndex.ID);
+            add("MINMAX");
+            add("BLOOM");
         }
     };
 
-    private final Map<String, List<SplitIndexMetadata>> indices;
+    private final Map<String, List<IndexMetadata>> indices;
     private ComparisonExpression.Operator operator;
 
-    public SplitFilter(Map<String, List<SplitIndexMetadata>> indices, ComparisonExpression.Operator operator)
+    public SplitFilter(Map<String, List<IndexMetadata>> indices, ComparisonExpression.Operator operator)
     {
         this.indices = indices;
         this.operator = operator;
@@ -62,7 +60,7 @@ public class SplitFilter
         Set<Split> validSplits = Collections.synchronizedSet(new HashSet<>());
 
         splits.parallelStream().forEach(split -> {
-            List<SplitIndexMetadata> splitIndices = indices.get(getSplitKey(split));
+            List<IndexMetadata> splitIndices = indices.get(getSplitKey(split));
 
             if (splitIndices == null || splitIndices.size() == 0) {
                 validSplits.add(split);
@@ -71,9 +69,9 @@ public class SplitFilter
 
             // Group each type of index together and make sure they are sorted in ascending order
             // with respect to their SplitStart
-            Map<String, List<SplitIndexMetadata>> indexGroupMap = new HashMap<>();
-            for (SplitIndexMetadata splitIndex : splitIndices) {
-                List<SplitIndexMetadata> indexGroup = indexGroupMap.get(splitIndex.getIndex().getId());
+            Map<String, List<IndexMetadata>> indexGroupMap = new HashMap<>();
+            for (IndexMetadata splitIndex : splitIndices) {
+                List<IndexMetadata> indexGroup = indexGroupMap.get(splitIndex.getIndex().getId());
                 if (indexGroup == null) {
                     indexGroup = new ArrayList<>();
                     indexGroupMap.put(splitIndex.getIndex().getId(), indexGroup);
@@ -86,7 +84,7 @@ public class SplitFilter
             sortedIndexTypeKeys.sort(Comparator.comparingInt(e -> INDEX_ORDER.contains(e) ? INDEX_ORDER.indexOf(e) : Integer.MAX_VALUE));
 
             for (String indexTypeKey : sortedIndexTypeKeys) {
-                List<SplitIndexMetadata> validIndices = indexGroupMap.get(indexTypeKey);
+                List<IndexMetadata> validIndices = indexGroupMap.get(indexTypeKey);
                 if (validIndices != null) {
                     validIndices = RangeUtil.subArray(validIndices, split.getConnectorSplit().getStartIndex(), split.getConnectorSplit().getEndIndex());
                     // If any index groups returns false, then the value is definitely not in split.
@@ -106,11 +104,11 @@ public class SplitFilter
         return new ArrayList<>(validSplits);
     }
 
-    private boolean isMatched(List<SplitIndexMetadata> indices, Object value)
+    private boolean isMatched(List<IndexMetadata> indices, Object value)
     {
-        for (SplitIndexMetadata splitIndexMetadata : indices) {
+        for (IndexMetadata indexMetadata : indices) {
             // if there was no valid split index data, then we the whole indices are incomplete/invalid
-            if (splitIndexMetadata == null || splitIndexMetadata.getIndex() == null) {
+            if (indexMetadata == null || indexMetadata.getIndex() == null) {
                 return true;
             }
 
@@ -119,7 +117,7 @@ public class SplitFilter
             // Only when all the splitIndices return false, can we conclude the split does not contain the value
             // that we are searching for
             try {
-                if (splitIndexMetadata.getIndex().matches(value, Operator.fromValue(operator.getValue()))) {
+                if (indexMetadata.getIndex().matches(value, Operator.fromValue(operator.getValue()))) {
                     return true;
                 }
             }
@@ -139,7 +137,7 @@ public class SplitFilter
      * @param list List to be inserted element obj
      * @param obj  SplitIndexMetadata to be inserted to the list
      */
-    private void insert(List<SplitIndexMetadata> list, SplitIndexMetadata obj)
+    private void insert(List<IndexMetadata> list, IndexMetadata obj)
     {
         int listSize = list.size();
         // If there's no element, just insert it

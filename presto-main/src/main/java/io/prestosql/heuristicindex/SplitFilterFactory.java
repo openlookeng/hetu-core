@@ -14,10 +14,9 @@
  */
 package io.prestosql.heuristicindex;
 
-import com.google.inject.Inject;
-import io.hetu.core.spi.heuristicindex.Operator;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.Operator;
 import io.prestosql.utils.Predicate;
 
 import java.util.LinkedList;
@@ -29,12 +28,11 @@ import static io.prestosql.utils.SplitUtils.getSplitKey;
 
 public class SplitFilterFactory
 {
-    IndexManager indexManager;
+    public static LocalIndexCache indexCache;
 
-    @Inject
-    private SplitFilterFactory(IndexManager indexManager)
+    public SplitFilterFactory(LocalIndexCache indexCache)
     {
-        this.indexManager = indexManager;
+        SplitFilterFactory.indexCache = indexCache;
     }
 
     /**
@@ -49,14 +47,14 @@ public class SplitFilterFactory
      */
     public SplitFilter getFilter(Predicate predicate, List<Split> splits)
     {
-        Map<String, List<SplitIndexMetadata>> indices = new ConcurrentHashMap<>();
+        Map<String, List<IndexMetadata>> indices = new ConcurrentHashMap<>();
         splits.stream().parallel().forEach(split -> {
             String splitKey = getSplitKey(split);
             if (!indices.containsKey(splitKey)) {
-                List<SplitIndexMetadata> allIndices = indexManager.getIndices(predicate.getTableName(), predicate.getColumnName(), split);
-                List<SplitIndexMetadata> matchingIndices = new LinkedList<>();
+                List<IndexMetadata> allIndices = indexCache.getIndices(predicate.getTableName(), predicate.getColumnName(), split);
+                List<IndexMetadata> matchingIndices = new LinkedList<>();
 
-                for (SplitIndexMetadata i : allIndices) {
+                for (IndexMetadata i : allIndices) {
                     if (i.getIndex().supports(Operator.fromValue(predicate.getOperator().getValue()))) {
                         matchingIndices.add(i);
                     }

@@ -32,9 +32,9 @@ import io.prestosql.execution.RemoteTask;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.utils.HetuConstant;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;

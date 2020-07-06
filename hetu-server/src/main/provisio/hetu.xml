@@ -11,32 +11,23 @@
         </directory>
     </fileSet>
 
+    <fileSet to="bin">
+        <directory path="${basedir}/../hetu-heuristic-index-cli/target/">
+            <include>hetu-heuristic-index-cli-shaded.jar</include>
+        </directory>
+    </fileSet>
+
     <!-- Launcher -->
     <artifactSet to="bin">
         <artifact id="io.airlift:launcher:tar.gz:bin:${dep.packaging.version}">
             <unpack />
         </artifact>
-        <artifact id="io.hetu.core:hetu-heuristic-index:tar.gz:bin:${project.version}">
+        <artifact id="io.hetu.core:hetu-heuristic-index-cli:tar.gz:bin:${project.version}">
             <unpack />
         </artifact>
         <artifact id="io.airlift:launcher:tar.gz:properties:${dep.packaging.version}">
             <unpack filter="true" />
         </artifact>
-    </artifactSet>
-
-    <!-- heuristic-index -->
-    <artifactSet to="bin/hetu-heuristic-index">
-        <artifact id="io.hetu.core:hetu-heuristic-index:jar:jar-with-dependencies:${project.version}"
-                  as="hetu-heuristic-index.jar"/>
-    </artifactSet>
-    <artifactSet to="bin/hetu-heuristic-index/plugins/hdfsindexstore">
-        <artifact id="io.hetu.core:hetu-heuristic-index-hdfs-store:${project.version}" />
-    </artifactSet>
-    <artifactSet to="bin/hetu-heuristic-index/plugins/hive">
-        <artifact id="io.hetu.core:hetu-heuristic-index-hive:${project.version}" />
-    </artifactSet>
-    <artifactSet to="bin/hetu-heuristic-index/plugins/bitmap">
-        <artifact id="io.hetu.core:hetu-heuristic-index-bitmap:${project.version}" />
     </artifactSet>
 
     <!-- Server -->
@@ -288,6 +279,11 @@
     </artifactSet>
     <artifactSet to="plugin/hetu-metastore">
         <artifact id="${project.groupId}:hetu-metastore:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+    <artifactSet to="plugin/hetu-heuristic-index">
+        <artifact id="${project.groupId}:hetu-heuristic-index:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>

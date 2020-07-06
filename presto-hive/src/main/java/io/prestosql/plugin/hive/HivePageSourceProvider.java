@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.util.IndexManager;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -31,6 +30,7 @@ import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
@@ -126,14 +126,14 @@ public class HivePageSourceProvider
         Configuration configuration = hdfsEnvironment.getConfiguration(
                 new HdfsEnvironment.HdfsContext(session, hiveSplit.getDatabase(), hiveSplit.getTable()), path);
 
-        List<SplitIndexMetadata> indexes = null;
+        List<IndexMetadata> indexes = null;
         if (indexManager != null) {
             indexes = indexManager.getIndices(
                     session.getCatalog().orElse(null),
                     hiveTable.getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
                     hiveTable.getPartitionColumns());
         }
-        Optional<List<SplitIndexMetadata>> indexOptional =
+        Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
         Optional<ConnectorPageSource> pageSource = createHivePageSource(
@@ -188,7 +188,7 @@ public class HivePageSourceProvider
             Map<ColumnHandle, DynamicFilter> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             boolean splitCacheable)
     {
         List<ColumnMapping> columnMappings = ColumnMapping.buildColumnMappings(

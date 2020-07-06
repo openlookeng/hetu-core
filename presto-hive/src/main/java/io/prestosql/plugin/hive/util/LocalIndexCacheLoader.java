@@ -15,56 +15,31 @@
 package io.prestosql.plugin.hive.util;
 
 import com.google.common.cache.CacheLoader;
-import io.hetu.core.heuristicindex.IndexClient;
-import io.hetu.core.heuristicindex.IndexFactory;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.StandardErrorCode;
-import io.prestosql.spi.service.PropertyService;
+import com.google.inject.Inject;
+import io.hetu.core.common.heuristicindex.IndexCacheKey;
+import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static java.util.Comparator.comparingLong;
 import static java.util.Objects.requireNonNull;
 
 public class LocalIndexCacheLoader
-        extends CacheLoader<IndexCacheKey, List<SplitIndexMetadata>>
+        extends CacheLoader<IndexCacheKey, List<IndexMetadata>>
 {
     private static IndexClient indexClient;
 
-    // Initialize indexClient in a static block to ensure it only gets initialized once
-    // Also, this ensures the correct thread loads in the plugins for the indexer
-    // As only the thread that injected this class is able to load the plugins
-    static {
-        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
-            IndexFactory factory = IndexFactory.getInstance();
-
-            List<String> plugins = PropertyService.getCommaSeparatedList(HetuConstant.FILTER_PLUGINS);
-            try {
-                factory.loadPlugins(plugins.toArray(new String[0]));
-            }
-            catch (IOException e) {
-                throw new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, "Failed to load Indexer plugins", e);
-            }
-            indexClient = factory.getIndexClient(getIndexStoreProperties());
-        }
-    }
-
-    public LocalIndexCacheLoader()
+    @Inject
+    public LocalIndexCacheLoader(IndexClient indexClient)
     {
-    }
-
-    public LocalIndexCacheLoader(IndexClient client)
-    {
-        indexClient = client;
+        LocalIndexCacheLoader.indexClient = indexClient;
     }
 
     @Override
-    public List<SplitIndexMetadata> load(IndexCacheKey key)
+    public List<IndexMetadata> load(IndexCacheKey key)
             throws Exception
     {
         requireNonNull(key);
@@ -85,7 +60,7 @@ public class LocalIndexCacheLoader
             throw new Exception(String.format("Index file(s) are expired for key %s.", key));
         }
 
-        List<SplitIndexMetadata> indices;
+        List<IndexMetadata> indices;
         try {
             indices = indexClient.readSplitIndex(key.getPath(), key.getIndexTypes());
         }
@@ -100,56 +75,7 @@ public class LocalIndexCacheLoader
 
         // Sort the indices based on split starting position
         return indices.stream()
-                .sorted(comparingLong(SplitIndexMetadata::getSplitStart))
+                .sorted(comparingLong(IndexMetadata::getSplitStart))
                 .collect(Collectors.toList());
-    }
-
-    protected static Properties getIndexStoreProperties()
-    {
-        Properties properties = new Properties();
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_URI)) {
-            properties.setProperty(
-                    HetuConstant.INDEXSTORE_URI.replaceFirst(HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI));
-        }
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_TYPE)) {
-            properties.setProperty(
-                    HetuConstant.INDEXSTORE_TYPE.replaceFirst(HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_TYPE));
-        }
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES)) {
-            properties.setProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES.replaceFirst(
-                    HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES));
-        }
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE)) {
-            properties.setProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE.replaceFirst(
-                    HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE));
-        }
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH)) {
-            properties.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH.replaceFirst(
-                    HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH));
-        }
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH)) {
-            properties.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH.replaceFirst(
-                    HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH));
-        }
-
-        if (PropertyService.containsProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL)) {
-            properties.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL.replaceFirst(
-                    HetuConstant.INDEXSTORE_KEYS_PREFIX, ""),
-                    PropertyService.getStringProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL));
-        }
-
-        return properties;
     }
 }

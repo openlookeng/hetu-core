@@ -32,9 +32,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.utils.HetuConstant.CONNECTION_URL;
-import static io.prestosql.utils.HetuConstant.CONNECTION_USER;
-import static io.prestosql.utils.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
+import static io.prestosql.spi.HetuConstant.CONNECTION_URL;
+import static io.prestosql.spi.HetuConstant.CONNECTION_USER;
+import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
 
 @ThreadSafe
 public class DataCenterConnectorManager
