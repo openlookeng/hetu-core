@@ -25,6 +25,7 @@ public class CarbondataColumnVectorWrapper
         implements CarbonColumnVector
 {
     private CarbonColumnVectorImpl columnVector;
+    private CarbondataColumnVectorWrapper dictionaryVectorWrapper;
 
     private boolean[] filteredRows;
 
@@ -38,6 +39,11 @@ public class CarbondataColumnVectorWrapper
     {
         this.columnVector = columnVector;
         this.filteredRows = filteredRows;
+
+        if (columnVector.getDictionaryVector() != null) {
+            dictionaryVectorWrapper = new CarbondataColumnVectorWrapper(
+                    (CarbonColumnVectorImpl) columnVector.getDictionaryVector(), filteredRows);
+        }
     }
 
     @Override
@@ -307,7 +313,7 @@ public class CarbondataColumnVectorWrapper
     @Override
     public CarbonColumnVector getDictionaryVector()
     {
-        return this.columnVector.getDictionaryVector();
+        return this.dictionaryVectorWrapper;
     }
 
     @Override
