@@ -27,6 +27,8 @@ public class SqlConverterFactory
         switch (convertionOptions.getSourceType()) {
             case HIVE:
                 return HiveSqlConverter.getHiveSqlConverter(convertionOptions);
+            case IMPALA:
+                return ImpalaSqlConverter.getImpalaSqlConverter(convertionOptions);
             default:
                 throw new SqlMigrationException(format("Migration tool doesn't support type: %s", convertionOptions.getSourceType()));
         }
