@@ -20,7 +20,9 @@ import io.prestosql.plugin.hive.metastore.DateStatistics;
 import io.prestosql.plugin.hive.metastore.DecimalStatistics;
 import io.prestosql.plugin.hive.metastore.DoubleStatistics;
 import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
+import io.prestosql.plugin.hive.metastore.HivePrincipal;
 import io.prestosql.plugin.hive.metastore.IntegerStatistics;
+import io.prestosql.spi.security.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -34,10 +36,12 @@ import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 
+import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.applyRoleNameCaseSensitive;
 import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.fromMetastoreApiColumnStatistics;
 import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.getHiveBasicStatistics;
 import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.toMetastoreDecimal;
@@ -391,5 +395,20 @@ public class TestThriftMetastoreUtil
     private static void testBasicStatisticsRoundTrip(HiveBasicStatistics expected)
     {
         assertEquals(getHiveBasicStatistics(updateStatisticsParameters(ImmutableMap.of(), expected)), expected);
+    }
+
+    @Test
+    public void testApplyRoleNameCaseSensitive()
+    {
+        assertEquals(applyRoleNameCaseSensitive(null, true), null);
+
+        String userName = "TestString";
+        HivePrincipal caseSensitivePrincipalUser = new HivePrincipal(PrincipalType.USER, userName);
+        HivePrincipal caseSensitivePrincipalRole = new HivePrincipal(PrincipalType.ROLE, userName);
+        assertEquals(applyRoleNameCaseSensitive(caseSensitivePrincipalUser, false).getName(), userName);
+        assertEquals(applyRoleNameCaseSensitive(caseSensitivePrincipalUser, true).getName(), userName);
+        assertEquals(applyRoleNameCaseSensitive(caseSensitivePrincipalRole, true).getName(), userName);
+        // only impact the role principal and isRoleNameCaseSensitive=false
+        assertEquals(applyRoleNameCaseSensitive(caseSensitivePrincipalRole, false).getName(), userName.toLowerCase(Locale.ENGLISH));
     }
 }
