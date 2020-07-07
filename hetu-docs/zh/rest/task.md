@@ -1,28 +1,23 @@
-Task Resource
++++
+weight = 5
+title = "任务资源"
++++
+
+任务资源
 =============
 
-The Task resource provides a set of REST endpoints that give openLooKeng
-servers the ability to communicate about tasks and task output. This
-isn\'t a service that will be used by end users, but it supports the
-execution of queries on a openLooKeng installation.
+任务资源提供了一组REST端点，这些端点使openLooKeng服务器能够就任务和任务输出进行交流。这不是一个供最终用户使用的服务，但它支持在openLooKeng上执行查询任务。
 
 - GET /v1/task
 
-Returns information about all tasks known to a openLooKengServer.
+返回openLooKeng服务器已知的所有任务的信息。
 
-Note that the output of a call to `/v1/task` can be quite large. If you
-execute this against a busy openLooKeng server the response received will
-include a listing of every task known to that server along with detailed
-statistics about operators and drivers.
+注意，对`/v1/task`的调用的输出可能相当大。如果你对忙碌的openLooKeng服务器执行这个命令，收到的响应将包括该服务器已知的每个任务的列表以及详细的操作符和驱动的统计信息。
+为了便于本手册描述，下列的示例响应经过适当的删减。一个高负荷的openLooKeng服务器实际的响应输出可能有很多页。下面是一个状态为`CANCELED`的任务的`taskId`。
 
-The following example response shows a trivial task response that has
-been truncated to fit this manual. A real response from a busy openLooKeng
-server would generate pages and pages of output. Here there is a
-`taskId` for a task which is in the `CANCELED` state.
+**响应样例**：
 
-**Example response**:
-
-``` http
+``` json
 [ {
   "taskId" : "20131222_183944_00011_dk5x2.1.0",
   "version" : 9223372036854775807,
@@ -67,15 +62,14 @@ server would generate pages and pages of output. Here there is a
 
 - DELETE /v1/task/{taskId}
 
-Deletes a given task from a openLooKeng server.
+从openLooKeng服务器删除指定的任务。
 
-- 
-  GET /v1/task/{taskId}
 
-Retrieves information about a specific task by `taskId`.
+- GET /v1/task/{taskId}
 
-The following example lists the output of a task. It contains the
-following high-level sections:
+通过`taskId`检索指定任务的信息。
+
+下面是一个任务的输出结果示例。它包含以下为高级别部分：
 
 -   `outputBuffers`
 -   `noMoreSplits`
@@ -83,13 +77,11 @@ following high-level sections:
 -   `failures`
 -   `outputs`
 
-This is the same output that is also present in the response from the
-Query resource which lists all of the stages and tasks involved in a
-particular query. This is call is used by openLooKeng to coordinate a queries.
+查询资源的响应中也有相同的输出。该响应列出了特定查询中涉及的所有阶段和任务。openLooKeng使用此调用协调查询。
 
-**Example response**:
+**响应样例**：
 
-``` http
+``` json
 {
 "taskId" : "20140115_170528_00004_dk5x2.0.0",
 "version" : 42,
@@ -306,12 +298,13 @@ particular query. This is call is used by openLooKeng to coordinate a queries.
 ```
 
 
+
 - GET /v1/task/{taskId}/results/{outputId}/{token}
 
-This service is used by openLooKeng to retrieve task output.
+openLooKeng通过此服务检索任务输出。
 
 
 - DELETE /v1/task/{taskId}/results/{outputId}
+openLooKeng通过此服务删除任务输出。
 
-This service is used by openLooKeng to delete task output.
 

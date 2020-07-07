@@ -1,3 +1,8 @@
++++
+weight = 4
+title = "Statement Resource"
++++
+
 Statement Resource
 ==================
 
@@ -49,46 +54,47 @@ additional results from the query.
 
 > ``` http
 > POST /v1/statement HTTP/1.1
-> ```
 >
 > Host: localhost:8001 X-Presto-Catalog: jmx X-Presto-Source: presto-cli
 > X-Presto-Schema: jmx User-Agent: StatementClient/0.55-SNAPSHOT
 > X-Presto-User: tobrie1 Content-Length: 41
 >
-> select name from \"java.lang:type=runtime\"
+> select name from "java.lang:type=runtime"
+> ```
+
 
 **Example response**:
 
 > ``` http
 > HTTP/1.1 200 OK
-> ```
 >
 > Content-Type: application/json X-Content-Type-Options: nosniff
 > Transfer-Encoding: chunked
 >
 > {
 >
-> :   \"id\":\"20140108\_110629\_00011\_dk5x2\",
->     \"infoUri\":\"<http://localhost:8001/v1/query/20140108_110629_00011_dk5x2>\",
->     \"partialCancelUri\":\"<http://10.193.207.128:8080/v1/stage/20140108_110629_00011_dk5x2.1>\",
->     \"nextUri\":\"<http://localhost:8001/v1/statement/20140108_110629_00011_dk5x2/1>\",
->     \"columns\": \[ { \"name\":\"name\", \"type\":\"varchar\" } \],
->     \"stats\": { \"state\":\"RUNNING\", \"scheduled\":false,
->     \"nodes\":1, \"totalSplits\":0, \"queuedSplits\":0,
->     \"runningSplits\":0, \"completedSplits\":0, \"cpuTimeMillis\":0,
->     \"wallTimeMillis\":0, \"processedRows\":0, \"processedBytes\":0,
->     \"rootStage\": { \"stageId\":\"0\", \"state\":\"SCHEDULED\",
->     \"done\":false, \"nodes\":1, \"totalSplits\":0,
->     \"queuedSplits\":0, \"runningSplits\":0, \"completedSplits\":0,
->     \"cpuTimeMillis\":0, \"wallTimeMillis\":0, \"processedRows\":0,
->     \"processedBytes\":0, \"subStages\": \[ { \"stageId\":\"1\",
->     \"state\":\"SCHEDULED\", \"done\":false, \"nodes\":1,
->     \"totalSplits\":0, \"queuedSplits\":0, \"runningSplits\":0,
->     \"completedSplits\":0, \"cpuTimeMillis\":0, \"wallTimeMillis\":0,
->     \"processedRows\":0, \"processedBytes\":0, \"subStages\":\[\] } \]
+>     "id":"20140108_110629_00011_dk5x2",
+>     "infoUri":"<http://localhost:8001/v1/query/20140108_110629_00011_dk5x2>",
+>     "partialCancelUri":"<http://10.193.207.128:8080/v1/stage/20140108_110629_00011_dk5x2.1>",
+>     "nextUri":"<http://localhost:8001/v1/statement/20140108_110629_00011_dk5x2/1>",
+>     "columns": [ { "name":"name", "type":"varchar" } ],
+>     "stats": { "state":"RUNNING", "scheduled":false,
+>     "nodes":1, "totalSplits":0, "queuedSplits":0,
+>     "runningSplits":0, "completedSplits":0, "cpuTimeMillis":0,
+>     "wallTimeMillis":0, "processedRows":0, "processedBytes":0,
+>     "rootStage": { "stageId":"0", "state":"SCHEDULED",
+>     "done":false, "nodes":1, "totalSplits":0,
+>     "queuedSplits":0, "runningSplits":0, "completedSplits":0,
+>     "cpuTimeMillis":0, "wallTimeMillis":0, "processedRows":0,
+>     "processedBytes":0, "subStages": [ { "stageId":"1",
+>     "state":"SCHEDULED", "done":false, "nodes":1,
+>     "totalSplits":0, "queuedSplits":0, "runningSplits":0,
+>     "completedSplits":0, "cpuTimeMillis":0, "wallTimeMillis":0,
+>     "processedRows":0, "processedBytes":0, "subStages":[] } ]
 >     } }
 >
 > }
+> ```
    
 
 - GET /v1/statement/{queryId}/{token}
@@ -119,28 +125,28 @@ in progress or it can deliver the final results to the client.
 
 > ``` http
 > HTTP/1.1 200 OK
-> ```
 >
 > Content-Type: application/json X-Content-Type-Options: nosniff Vary:
 > Accept-Encoding, User-Agent Transfer-Encoding: chunked
 >
-> 383 { \"id\":\"20140108\_110629\_00011\_dk5x2\",
-> \"infoUri\":\"<http://localhost:8001/v1/query/20140108_110629_00011_dk5x2>\",
-> \"columns\": \[ { \"name\":\"name\", \"type\":\"varchar\" } \],
-> \"data\": \[ \[\"<4165@domU-12-31-39-0F-CC-72>\"\] \], \"stats\": {
-> \"state\":\"FINISHED\", \"scheduled\":true, \"nodes\":1,
-> \"totalSplits\":2, \"queuedSplits\":0, \"runningSplits\":0,
-> \"completedSplits\":2, \"cpuTimeMillis\":1, \"wallTimeMillis\":4,
-> \"processedRows\":1, \"processedBytes\":27, \"rootStage\": {
-> \"stageId\":\"0\", \"state\":\"FINISHED\", \"done\":true, \"nodes\":1,
-> \"totalSplits\":1, \"queuedSplits\":0, \"runningSplits\":0,
-> \"completedSplits\":1, \"cpuTimeMillis\":0, \"wallTimeMillis\":0,
-> \"processedRows\":1, \"processedBytes\":32, \"subStages\": \[ {
-> \"stageId\":\"1\", \"state\":\"FINISHED\", \"done\":true, \"nodes\":1,
-> \"totalSplits\":1, \"queuedSplits\":0, \"runningSplits\":0,
-> \"completedSplits\":1, \"cpuTimeMillis\":0, \"wallTimeMillis\":4,
-> \"processedRows\":1, \"processedBytes\":27, \"subStages\":\[\] } \] }
+> 383 { "id":"20140108_110629_00011_dk5x2",
+> "infoUri":"<http://localhost:8001/v1/query/20140108_110629_00011_dk5x2>",
+> "columns": [ { "name":"name", "type":"varchar" } ],
+> "data": [ ["<4165@domU-12-31-39-0F-CC-72>"] ], "stats": {
+> "state":"FINISHED", "scheduled":true, "nodes":1,
+> "totalSplits":2, "queuedSplits":0, "runningSplits":0,
+> "completedSplits":2, "cpuTimeMillis":1, "wallTimeMillis":4,
+> "processedRows":1, "processedBytes":27, "rootStage": {
+> "stageId":"0", "state":"FINISHED", "done":true, "nodes":1,
+> "totalSplits":1, "queuedSplits":0, "runningSplits":0,
+> "completedSplits":1, "cpuTimeMillis":0, "wallTimeMillis":0,
+> "processedRows":1, "processedBytes":32, "subStages": [ {
+> "stageId":"1", "state":"FINISHED", "done":true, "nodes":1,
+> "totalSplits":1, "queuedSplits":0, "runningSplits":0,
+> "completedSplits":1, "cpuTimeMillis":0, "wallTimeMillis":4,
+> "processedRows":1, "processedBytes":27, "subStages":[] } ] }
 > } }
+> ```
    
 
 - DELETE /v1/statement/{queryId}/{token}

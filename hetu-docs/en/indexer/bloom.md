@@ -1,3 +1,8 @@
++++
+weight = 5
+title = "Bloom Index"
++++
+
 # Bloom Index
 
 ## Use cases

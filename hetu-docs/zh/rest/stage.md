@@ -1,10 +1,16 @@
-Stage Resource
++++
+weight = 3
+title = "阶段资源"
++++
+
+阶段资源
 ==============
 
 - GET /v1/stage
 
-Returns detail about a stage in a openLooKeng query.
+
+返回openLooKeng查询中有关阶段的详细信息。
 
 - DELETE /v1/stage/{stageId}
 
-Deletes a stage in a openLooKeng query.
+删除openLooKeng查询中的指定阶段。

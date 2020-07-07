@@ -1,3 +1,8 @@
++++
+weight = 2
+title = "Query Resource"
++++
+
 Query Resource
 ==============
 
@@ -25,7 +30,7 @@ query will reveal a link to this service.
 
 **Example response**:
 
-> ``` http
+> ``` json
 > {
 > "queryId" : "20131229_211533_00017_dk5x2",
 > "session" : {

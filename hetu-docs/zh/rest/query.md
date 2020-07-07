@@ -1,31 +1,27 @@
-Query Resource
++++
+weight = 2
+title = "查询资源"
++++
+
+查询资源
 ==============
 
-The Query REST service is the most complex of the rest services. It
-contains detailed information about nodes, and other details that
-capture the state and history of a query being executed on a openLooKeng
-installation.
+Query REST服务是rest服务中最复杂的。它包含节点的详细信息，以及其它在openLooKeng上执行的查询的状态和历史的详细信息。
 
 - GET /v1/query
 
-This service returns information and statistics about queries that are
-currently being executed on a openLooKeng coordinator.
+此服务返回有关当前在openLooKeng协调器上执行的查询的信息和统计信息。
 
-When you point a web browser at a openLooKeng coordinate you\'ll see a rendered
-version of the output from this service which will display recent
-queries that have executed on a openLooKeng installation.
+当你将浏览器指向一个openLooKeng坐标时，你会看到此服务输出的一个渲染的版本，将显示最近的在openLooKeng上执行的查询。
    
 
 - GET /v1/query/{queryId}
 
-If you are looking to gather very detailed statistics about a query,
-this is the service you would call. If you load the web interface of a
-openLooKeng coordinator you will see a list of current queries. Clicking on a
-query will reveal a link to this service.
+可调用此服务收集详细的有关查询的统计数据。如果您加载openLooKeng协调器的Web界面，您会看到一个关于当前查询的清单。单击查询将显示指向此服务的链接。
 
-**Example response**:
+**响应样例**：
 
-> ``` http
+> ``` json
 > {
 > "queryId" : "20131229_211533_00017_dk5x2",
 > "session" : {
