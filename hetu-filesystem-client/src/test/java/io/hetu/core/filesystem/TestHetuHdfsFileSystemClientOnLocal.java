@@ -14,9 +14,6 @@
  */
 package io.hetu.core.filesystem;
 
-import io.hetu.core.filesystem.utils.DockerizedHive;
-import org.apache.hadoop.conf.Configuration;
-import org.testng.SkipException;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -33,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,35 +40,32 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Test for HetuHdfsFileSystemClient
+ * Test for HetuHdfsFileSystemClient when used locally. Some modules may use hdfs locally
+ * for tests or other usages. Therefore having consistent behaviors on it is also required.
  *
  * @since 2020-04-01
  */
-public class TestHetuHdfsFileSystemClient
+public class TestHetuHdfsFileSystemClientOnLocal
 {
     private static final Path NON_EXISTING_PATH = Paths.get("/path/to/a/non/existing/file");
-    private String rootPath = "/tmp/test-hetuhdfs";
+    private String rootPath = "/tmp/test-hetuhdfs-local";
     private HetuHdfsFileSystemClient fs;
+
+    private HetuHdfsFileSystemClient getLocalHdfs()
+            throws IOException
+    {
+        Properties properties = new Properties();
+        properties.setProperty("fs.client.type", "hdfs");
+        properties.setProperty("hdfs.config.resources", "");
+        properties.setProperty("hdfs.authentication.type", "NONE");
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties));
+    }
 
     @BeforeClass
     public void prepare()
             throws IOException
     {
-        // Will skip the test if exception occurs in this process
-        Configuration config = null;
-        int trialCount = 0;
-
-        while (config == null && trialCount < 3) {
-            config = DockerizedHive.getContainerConfig(this.getClass().getName());
-            trialCount++;
-        }
-
-        if (config == null) {
-            throw new SkipException("Docker environment for this test not setup");
-        }
-
-        fs = new HetuHdfsFileSystemClient(new HdfsConfig(config));
-
+        fs = getLocalHdfs();
         if (fs.getHdfs().exists(new org.apache.hadoop.fs.Path(rootPath))) {
             fs.getHdfs().delete(new org.apache.hadoop.fs.Path(rootPath), true);
         }

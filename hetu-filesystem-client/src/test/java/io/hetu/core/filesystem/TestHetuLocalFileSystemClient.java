@@ -17,7 +17,7 @@ package io.hetu.core.filesystem;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.BufferedReader;
@@ -50,7 +50,7 @@ public class TestHetuLocalFileSystemClient
     HetuFileSystemClient fs;
     TempFolder tFolder;
 
-    @BeforeTest
+    @BeforeClass
     public void prepare()
             throws IOException
     {
