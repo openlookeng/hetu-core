@@ -1,3 +1,8 @@
++++
+weight = 5
+title = "Task Resource"
++++
+
 Task Resource
 =============
 
@@ -8,7 +13,7 @@ execution of queries on a openLooKeng installation.
 
 - GET /v1/task
 
-Returns information about all tasks known to a openLooKengServer.
+Returns information about all tasks known to a openLooKeng server.
 
 Note that the output of a call to `/v1/task` can be quite large. If you
 execute this against a busy openLooKeng server the response received will
@@ -22,7 +27,7 @@ server would generate pages and pages of output. Here there is a
 
 **Example response**:
 
-``` http
+``` json
 [ {
   "taskId" : "20131222_183944_00011_dk5x2.1.0",
   "version" : 9223372036854775807,
@@ -89,7 +94,7 @@ particular query. This is call is used by openLooKeng to coordinate a queries.
 
 **Example response**:
 
-``` http
+``` json
 {
 "taskId" : "20140115_170528_00004_dk5x2.0.0",
 "version" : 42,

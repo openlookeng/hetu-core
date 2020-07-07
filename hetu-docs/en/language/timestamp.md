@@ -1,3 +1,8 @@
++++
+weight = 3
+title = "Legacy and New Timestamp"
++++
+
 Legacy and New Timestamp
 ========================
 
@@ -20,7 +25,7 @@ Additionally, it can be enabled or disabled on a per-session basis with the `leg
 
 Previously, the `TIMESTAMP` type described an instance in time in the openLooKeng session\'s time zone. Now, openLooKeng treats `TIMESTAMP` values as a set of the following fields representing wall time:
 
-- `YEAR OF ERA`
+-   `YEAR OF ERA`
 -   `MONTH OF YEAR`
 -   `DAY OF MONTH`
 -   `HOUR OF DAY`

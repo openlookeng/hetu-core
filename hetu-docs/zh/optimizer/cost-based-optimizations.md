@@ -1,52 +1,53 @@
-Cost based optimizations
++++
+weight = 3
+title = "基于成本的优化"
++++
+
+基于成本的优化
 ========================
 
-openLooKeng supports several cost based optimizations, described below.
+openLooKeng支持多种基于成本的优化，如下所述。
 
-Join Enumeration
+Join枚举
 ----------------
 
-The order in which joins are executed in a query can have a significant impact on the query\'s performance. The aspect of join ordering that has the largest impact on performance is the size of the data being processed and transferred over the network. If a join that produces a lot of data is performed early in the execution, then subsequent stages will need to process large amounts of data for longer than necessary,
-increasing the time and resources needed for the query.
+在查询中执行join的顺序会对查询的性能产生重大影响。join排序方面对性能影响最大的是网络处理和传输的数据的大小。如果一个产生大量数据的join在早期执行，那么后续的阶段需要处理大量数据的时间将长于需要的时间, 这样会增加查询所需的时间和资源。
 
-With cost based join enumeration, openLooKeng uses `/optimizer/statistics` provided by connectors to estimate the costs for different join orders and automatically pick the join order with the lowest computed costs.
+使用基于成本的join枚举，openLooKeng使用连接器提供的`/optimizer/statistics`来评估不同join排序的成本，并自动选择计算成本最低的join排序。
 
-The join enumeration strategy is governed by the `join_reordering_strategy` session property, with the
-`optimizer.join-reordering-strategy` configuration property providing the default value.
+join枚举策略由`join_reordering_strategy`会话属性控制，其中`optimizer.join-reordering-strategy`配置属性提供默认值。
 
-The valid values are:
+有效值如下：
 
--  `AUTOMATIC` (default) - full automatic join enumeration enabled
-- `ELIMINATE_CROSS_JOINS` - eliminate unnecessary cross joins
--   `NONE` - purely syntactic join order
+- `AUTOMATIC`（默认值） -启用全自动join枚举
+- `ELIMINATE_CROSS_JOINS` -消除不必要的交叉join
+- `NONE` -纯句法join顺序
 
-If using `AUTOMATIC` and statistics are not available, or if for any other reason a cost could not be computed, the `ELIMINATE_CROSS_JOINS` strategy is used instead.
+如果使用`AUTOMATIC`但没有统计数据，或由于任何其他原因成本无法计算，则改用`ELIMINATE_CROSS_JOINS`策略。
 
-Join Distribution Selection
+Join分布选择
 ---------------------------
 
-openLooKeng uses a hash based join algorithm. That implies that for each join operator a hash table must be created from one join input (called build side). The other input (probe side) is then iterated and for each row the hash table is queried to find matching rows.
+openLooKeng使用基于哈希的join算法。这意味着对于每个join操作符，必须从一个join输入（称为构建侧）创建哈希表。然后，迭代另一个输入（探针侧），并查询哈希表以找到匹配的行。
 
-There are two types of join distributions:
+有两种类型的join分布：
 
-- Partitioned: each node participating in the query builds a hash table from only fraction of the data
-- Broadcast: each node participating in the query builds a hash table from all of the data (data is replicated to each node)
+- 分区模式：参与查询的每个节点仅从部分数据构建哈希表
+- 广播模式：参与查询的每个节点从所有数据构建一个哈希表（数据复制到每个节点）
 
-Each type have their trade offs. Partitioned joins require redistributing both tables using a hash of the join key. This can be slower (sometimes substantially) than broadcast joins, but allows much larger joins. In particular, broadcast joins will be faster if the build side is much smaller than the probe side. However, broadcast joins require that the tables on the build side of the join after filtering fit in memory on each node, whereas distributed joins only need to fit in distributed memory across all nodes.
+这两种类型各有利弊。分区join要求使用join键的散列重分布这两个表。这使得分区join比广播join慢（有时慢很多），但允许更大的join。特别是，当构建端比探测端小得多时，广播join将更快。但是，广播join要求join的构建端上的表在过滤后适合每个节点上的内存，而分布式join只需要适合所有节点上的分布式内存。
 
-With cost based join distribution selection, openLooKeng automatically chooses to use a partitioned or broadcast join. With cost based join enumeration, openLooKeng automatically chooses which side is the probe and
-which is the build.
+使用基于成本的join分布选择，openLooKeng自动选择使用分区join或广播join。使用基于成本的join枚举，openLooKeng自动选择哪一侧是探针侧，哪一侧是构建侧。
 
-The join distribution strategy is governed by the `join_distribution_type` session property, with the
-`join-distribution-type` configuration property providing the default value.
+join分发策略由`join_distribution_type`会话属性控制，其中`join-distribution-type`配置属性提供默认值。
 
-The valid values are:
+有效值如下：
 
-- `AUTOMATIC` (default) - join distribution type is determined automatically for each join
-      -   `BROADCAST` - broadcast join distribution is used for all joins
- -   PARTITIONED` - partitioned join distribution is used for all join
+- `AUTOMATIC`（默认值） -自动为每个join确定join分布类型
+- `BROADCAST` -对所有join使用广播join分布
+- `PARTITIONED` -对所有join使用分区join分布
 
-Connector Implementations
+连接器实现
 -------------------------
 
-In order for the openLooKeng optimizer to use the cost based strategies, the connector implementation must provide `statistics`.
+为了使openLooKeng优化器使用基于成本的策略，连接器实现必须提供`statistics`。

@@ -1,29 +1,34 @@
-# openLooKeng Heuristic Indexer
++++
+weight = 1
+title = "openLooKeng启发式索引器"
++++
 
-## Introduction
+# openLooKeng启发式索引器
 
-Indexes can be created using one or more columns of a database table, providing faster random lookups. Most Big Data formats such as ORC, Parquet and CarbonData already have indices embedded in them.
+## 简介
 
-The Heuristic Indexer allows creating indexes on existing data but stores the index external to the original data source. This provides several benefits:
+可以在数据库表的一个或多个列创建索引，从而提供更快的随机查找。大多数大数据格式，如ORC、Parquet和CarbonData，都已经内置了索引。
 
-  - The index is agnostic to the underlying data source and can be used by any query engine
-  - Existing data can be indexed without having to rewrite the existing data files
-  - New index types not supported by the underlying data source can be created
-  - Index data does not use the storage space of the data source
+启发式索引器允许在现有数据上创建索引，但将索引存储在外部的的原始数据源中。这样做好处如下：
 
-## Example Usecases
+  - 索引对底层数据源不可知，并且可由任何查询引擎使用
+  - 无需重写现有数据文件即可对现有数据进行索引
+  - 可以创建底层数据源不支持的新索引类型
+  - 索引数据不占用数据源存储空间
 
-### 1. Filtering scheduled Splits during query execution
+## 示例
 
-When the engine needs to schedule a TableScan operation, it schedules Splits on the workers. These Splits are responsible for reading a portion of the source data. However, not all Splits will return data if a predicate is applied.
+### 1.查询过程中过滤预定分段
 
-By keeping an external index for the predicate column, the Heuristic Indexer can determine whether each split contains the values being searched for and only schedule the read operation for the splits which possibly contain the value.
+当引擎需要调度一个TableScan操作时，它可以调度worker节点上的Split。这些Split负责读取部分源数据。但是如果应用了谓词，则并非所有Split都会返回数据。
+
+通过为谓词列保留外部索引，启发式索引器可以确定每个Split是否包含正在搜索的值，并且只对可能包含该值的Split安排读操作。
 
 ![](indexer_filter_splits.png)
 
-### 2. Filtering Block early when reading ORC files
+### 2.读取ORC文件时提前筛选块
 
-When data needs to be read from an ORC file, the ORCRecordReader is used. This reader reads data from Stripes as batches (e.g. 1024 rows), which then form Pages. However, if a predicate is present, not all entries in the batch are required, some may be filtered out later by the Filter operator.
+当需要从ORC文件中读取数据时，使用ORCRecordReader读取器。此读取器从数据条带批量（例如1024行）读取数据，然后形成页。但是，如果有一个谓词存在，那么就不需要批量读取中的所有条目，有些条目可能会在稍后被Filter运算符过滤掉。
 
-By keeping an external bitmap index for the predicate column, the Heuristic Indexer can filter out rows which do not match the predicates before the Filter operator is even applied.
+通过为谓词列保留外部位图索引，启发式索引器甚至可以在应用Filter运算符之前筛选出与谓词不匹配的行。
 

@@ -1,3 +1,8 @@
++++
+weight = 2
+title = "Index Command Line Interface"
++++
+
 # Index Command Line Interface
 
 ## Usage

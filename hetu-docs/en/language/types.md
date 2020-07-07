@@ -1,3 +1,8 @@
++++
+weight = 1
+title = "Data Types"
++++
+
 Data Types
 ==========
 
@@ -6,7 +11,7 @@ openLooKeng has a set of built-in data types, described below. Additional types 
 
 **Note**
 
-*Connectors are not required to support all types. See connector* *documentation for details on supported types.*
+*Connectors are not required to support all types. See [connector](../connector.html) for details on supported types.*
 
 Boolean
 -------
@@ -126,7 +131,7 @@ String
 Date and Time
 -------------
 
-See also `/language/timestamp`
+See also [timestamp](timestamp.html).
 
 ### `DATE`
 
@@ -178,6 +183,7 @@ Structural
 > An array of the given component type.
 >
 > Example: `ARRAY[1, 2, 3]`
+
 
 ### `MAP`
 

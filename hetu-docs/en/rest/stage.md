@@ -1,3 +1,8 @@
++++
+weight = 3
+title = "Stage Resource"
++++
+
 Stage Resource
 ==============
 

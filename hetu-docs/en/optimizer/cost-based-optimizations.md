@@ -1,3 +1,8 @@
++++
+weight = 3
+title = "Cost based optimizations"
++++
+
 Cost based optimizations
 ========================
 
@@ -16,9 +21,9 @@ The join enumeration strategy is governed by the `join_reordering_strategy` sess
 
 The valid values are:
 
--  `AUTOMATIC` (default) - full automatic join enumeration enabled
+- `AUTOMATIC` (default) - full automatic join enumeration enabled
 - `ELIMINATE_CROSS_JOINS` - eliminate unnecessary cross joins
--   `NONE` - purely syntactic join order
+- `NONE` - purely syntactic join order
 
 If using `AUTOMATIC` and statistics are not available, or if for any other reason a cost could not be computed, the `ELIMINATE_CROSS_JOINS` strategy is used instead.
 
@@ -43,8 +48,8 @@ The join distribution strategy is governed by the `join_distribution_type` sessi
 The valid values are:
 
 - `AUTOMATIC` (default) - join distribution type is determined automatically for each join
-      -   `BROADCAST` - broadcast join distribution is used for all joins
- -   PARTITIONED` - partitioned join distribution is used for all join
+- `BROADCAST` - broadcast join distribution is used for all joins
+- `PARTITIONED` - partitioned join distribution is used for all join
 
 Connector Implementations
 -------------------------

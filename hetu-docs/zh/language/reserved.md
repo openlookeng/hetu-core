@@ -1,82 +1,87 @@
-Reserved Keywords
++++
+weight = 2
+title = "预留关键字"
++++
+
+预留关键字
 =================
 
-The following table lists all of the keywords that are reserved in openLooKeng, along with their status in the SQL standard. These reserved keywords must be quoted (using double quotes) in order to be used as an identifier.
+下表列出了openLooKeng中预留的所有关键字，以及它们在SQL标准中的状态。这些预留的关键字必须加引号（使用双引号），以便用作标识符。
 
-| Keyword             | SQL:2016 | SQL-92   |
+|关键字             | SQL:2016 | SQL-92 |
 | ------------------- | -------- | -------- |
-| `ALTER`             | reserved | reserved |
-| `AND`               | reserved | reserved |
-| `AS`                | reserved | reserved |
-| `BETWEEN`           | reserved | reserved |
-| `BY`                | reserved | reserved |
-| `CASE`              | reserved | reserved |
+| `ALTER`             | 预留 | 预留 |
+| `AND`               | 预留 | 预留 |
+| `AS`                | 预留 | 预留 |
+| `BETWEEN`           | 预留 | 预留 |
+| `BY`                | 预留 | 预留 |
+| `CASE`              | 预留 | 预留 |
 | `CACHE`             |          |          |
-| `CAST`              | reserved | reserved |
-| `CONSTRAINT`        | reserved | reserved |
-| `CREATE`            | reserved | reserved |
-| `CROSS`             | reserved | reserved |
-| `CUBE`              | reserved |          |
-| `CURRENT_DATE`      | reserved | reserved |
-| `CURRENT_PATH`      | reserved |          |
-| `CURRENT_ROLE`      | reserved | reserved |
-| `CURRENT_TIME`      | reserved | reserved |
-| `CURRENT_TIMESTAMP` | reserved | reserved |
-| `CURRENT_USER`      | reserved |          |
-| `DEALLOCATE`        | reserved | reserved |
-| `DELETE`            | reserved | reserved |
-| `DESCRIBE`          | reserved | reserved |
-| `DISTINCT`          | reserved | reserved |
-| `DROP`              | reserved | reserved |
-| `ELSE`              | reserved | reserved |
-| `END`               | reserved | reserved |
-| `ESCAPE`            | reserved | reserved |
-| `EXCEPT`            | reserved | reserved |
-| `EXECUTE`           | reserved | reserved |
-| `EXISTS`            | reserved | reserved |
-| `EXTRACT`           | reserved | reserved |
-| `FALSE`             | reserved | reserved |
-| `FOR`               | reserved | reserved |
-| `FROM`              | reserved | reserved |
-| `FULL`              | reserved | reserved |
-| `GROUP`             | reserved | reserved |
-| `GROUPING`          | reserved |          |
-| `HAVING`            | reserved | reserved |
-| `IN`                | reserved | reserved |
-| `INNER`             | reserved | reserved |
-| `INSERT`            | reserved | reserved |
-| `INTERSECT`         | reserved | reserved |
-| `INTO`              | reserved | reserved |
-| `IS`                | reserved | reserved |
-| `JOIN`              | reserved | reserved |
-| `LEFT`              | reserved | reserved |
-| `LIKE`              | reserved | reserved |
-| `LOCALTIME`         | reserved |          |
-| `LOCALTIMESTAMP`    | reserved |          |
-| `NATURAL`           | reserved | reserved |
-| `NORMALIZE`         | reserved |          |
-| `NOT`               | reserved | reserved |
-| `NULL`              | reserved | reserved |
-| `ON`                | reserved | reserved |
-| `OR`                | reserved | reserved |
-| `ORDER`             | reserved | reserved |
-| `OUTER`             | reserved | reserved |
-| `OVERWRITE`         | reserved |          |
-| `PREPARE`           | reserved | reserved |
-| `RECURSIVE`         | reserved |          |
-| `RIGHT`             | reserved | reserved |
-| `ROLLUP`            | reserved |          |
-| `SELECT`            | reserved | reserved |
-| `TABLE`             | reserved | reserved |
-| `THEN`              | reserved | reserved |
-| `TRUE`              | reserved | reserved |
-| `UESCAPE`           | reserved |          |
-| `UNION`             | reserved | reserved |
-| `UNNEST`            | reserved |          |
-| `UPDATE`            | reserved |          |
-| `USING`             | reserved | reserved |
-| `VALUES`            | reserved | reserved |
+| `CAST`              | 预留 | 预留 |
+| `CONSTRAINT`        | 预留 | 预留 |
+| `CREATE`            | 预留 | 预留 |
+| `CROSS`             | 预留 | 预留 |
+| `CUBE`              | 预留 |          |
+| `CURRENT_DATE`      | 预留 | 预留 |
+| `CURRENT_PATH`      | 预留 |          |
+| `CURRENT_ROLE`      | 预留 | 预留 |
+| `CURRENT_TIME`      | 预留 | 预留 |
+| `CURRENT_TIMESTAMP` | 预留 | 预留 |
+| `CURRENT_USER`      | 预留 |          |
+| `DEALLOCATE`        | 预留 | 预留 |
+| `DELETE`            | 预留 | 预留 |
+| `DESCRIBE`          | 预留 | 预留 |
+| `DISTINCT`          | 预留 | 预留 |
+| `DROP`              | 预留 | 预留 |
+| `ELSE`              | 预留 | 预留 |
+| `END`               | 预留 | 预留 |
+| `ESCAPE`            | 预留 | 预留 |
+| `EXCEPT`            | 预留 | 预留 |
+| `EXECUTE`           | 预留 | 预留 |
+| `EXISTS`            | 预留 | 预留 |
+| `EXTRACT`           | 预留 | 预留 |
+| `FALSE`             | 预留 | 预留 |
+| `FOR`               | 预留 | 预留 |
+| `FROM`              | 预留 | 预留 |
+| `FULL`              | 预留 | 预留 |
+| `GROUP`             | 预留 | 预留 |
+| `GROUPING`          | 预留 |          |
+| `HAVING`            | 预留 | 预留 |
+| `IN`                | 预留 | 预留 |
+| `INNER`             | 预留 | 预留 |
+| `INSERT`            | 预留 | 预留 |
+| `INTERSECT`         | 预留 | 预留 |
+| `INTO`              | 预留 | 预留 |
+| `IS`                | 预留 | 预留 |
+| `JOIN`              | 预留 | 预留 |
+| `LEFT`              | 预留 | 预留 |
+| `LIKE`              | 预留 | 预留 |
+| `LOCALTIME`         | 预留 |          |
+| `LOCALTIMESTAMP`    | 预留 |          |
+| `NATURAL`           | 预留 | 预留 |
+| `NORMALIZE`         | 预留 |          |
+| `NOT`               | 预留 | 预留 |
+| `NULL`              | 预留 | 预留 |
+| `ON`                | 预留 | 预留 |
+| `OR`                | 预留 | 预留 |
+| `ORDER`             | 预留 | 预留 |
+| `OUTER`             | 预留 | 预留 |
+| `OVERWRITE`         | 预留 |          |
+| `PREPARE`           | 预留 | 预留 |
+| `RECURSIVE`         | 预留 |          |
+| `RIGHT`             | 预留 | 预留 |
+| `ROLLUP`            | 预留 |          |
+| `SELECT`            | 预留 | 预留 |
+| `TABLE`             | 预留 | 预留 |
+| `THEN`              | 预留 | 预留 |
+| `TRUE`              | 预留 | 预留 |
+| `UESCAPE`           | 预留 |          |
+| `UNION`             | 预留 | 预留 |
+| `UNNEST`            | 预留 |          |
+| `UPDATE`            | 预留 |          |
+| `USING`             | 预留 | 预留 |
+| `VALUES`            | 预留 | 预留 |
 | `VACUUM`            |          |          |
-| `WHEN`              | reserved | reserved |
-| `WHERE`             | reserved | reserved |
-| `WITH`              | reserved | reserved |
+| `WHEN`              | 预留 | 预留 |
+| `WHERE`             | 预留 | 预留 |
+| `WITH`              | 预留 | 预留 |
