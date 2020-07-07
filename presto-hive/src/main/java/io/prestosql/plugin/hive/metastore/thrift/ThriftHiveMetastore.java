@@ -1425,6 +1425,18 @@ public class ThriftHiveMetastore
     @Override
     public void acquireSharedReadLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions)
     {
+        DataOperationType operationType = DataOperationType.SELECT;
+        acquireLock(identity, queryId, transactionId, fullTables, partitions, operationType);
+    }
+
+    @Override
+    public void acquireLock(HiveIdentity identity,
+                             String queryId,
+                             long transactionId,
+                             List<SchemaTableName> fullTables,
+                             List<HivePartition> partitions,
+                             DataOperationType operationType)
+    {
         checkArgument(!identity.getUsername().map(String::isEmpty).orElse(true), "User should be provided to acquire locks");
         requireNonNull(queryId, "queryId is null");
 
@@ -1437,11 +1449,11 @@ public class ThriftHiveMetastore
                 .setUser(identity.getUsername().get());
 
         for (SchemaTableName table : fullTables) {
-            request.addLockComponent(createLockComponentForRead(table, Optional.empty()));
+            request.addLockComponent(createLockComponent(table, Optional.empty(), operationType));
         }
 
         for (HivePartition partition : partitions) {
-            request.addLockComponent(createLockComponentForRead(partition.getTableName(), Optional.of(partition.getPartitionId())));
+            request.addLockComponent(createLockComponent(partition.getTableName(), Optional.of(partition.getPartitionId()), operationType));
         }
 
         LockRequest lockRequest = request.build();
@@ -1486,14 +1498,27 @@ public class ThriftHiveMetastore
         }
     }
 
-    private static LockComponent createLockComponentForRead(SchemaTableName table, Optional<String> partitionName)
+    private static LockComponent createLockComponent(SchemaTableName table,
+                                                     Optional<String> partitionName,
+                                                     DataOperationType operationType)
     {
         requireNonNull(table, "table is null");
         requireNonNull(partitionName, "partitionName is null");
 
         LockComponentBuilder builder = new LockComponentBuilder();
-        builder.setShared();
-        builder.setOperationType(DataOperationType.SELECT);
+        builder.setOperationType(operationType);
+        switch (operationType) {
+            case SELECT:
+            case INSERT:
+                builder.setShared();
+                break;
+            case DELETE:
+            case UPDATE:
+                builder.setSemiShared();
+                break;
+            default:
+                throw new PrestoException(HiveErrorCode.HIVE_UNKNOWN_ERROR, "Unexpected operationType to aquireLock " + operationType);
+        }
 
         builder.setDbName(table.getSchemaName());
         builder.setTableName(table.getTableName());

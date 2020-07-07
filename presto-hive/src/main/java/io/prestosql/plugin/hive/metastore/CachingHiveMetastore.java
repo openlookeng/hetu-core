@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -793,6 +794,12 @@ public class CachingHiveMetastore
     public void acquireSharedReadLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions)
     {
         delegate.acquireSharedReadLock(identity, queryId, transactionId, fullTables, partitions);
+    }
+
+    @Override
+    public void acquireLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions, DataOperationType operationType)
+    {
+        delegate.acquireLock(identity, queryId, transactionId, fullTables, partitions, operationType);
     }
 
     @Override

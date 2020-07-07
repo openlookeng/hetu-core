@@ -366,8 +366,7 @@ public final class HiveWriteUtils
         throw new PrestoException(NOT_SUPPORTED, "unsupported type: " + type);
     }
 
-    public static void checkTableIsWritable(Table table, boolean writesToNonManagedTablesEnabled, boolean isUpdate,
-                                            boolean isVacuum)
+    public static void checkTableIsWritable(Table table, boolean writesToNonManagedTablesEnabled, HiveACIDWriteType writeType)
     {
         if (!writesToNonManagedTablesEnabled && !table.getTableType().equals(MANAGED_TABLE.toString())) {
             throw new PrestoException(NOT_SUPPORTED, "Cannot write to non-managed Hive table");
@@ -379,8 +378,7 @@ public final class HiveWriteUtils
                 MetastoreUtil.getProtectMode(table),
                 table.getParameters(),
                 table.getStorage(),
-                isUpdate,
-                isVacuum);
+                writeType);
     }
 
     public static void checkPartitionIsWritable(String partitionName, Partition partition)
@@ -391,8 +389,7 @@ public final class HiveWriteUtils
                 MetastoreUtil.getProtectMode(partition),
                 partition.getParameters(),
                 partition.getStorage(),
-                false,
-                false);
+                HiveACIDWriteType.INSERT);
     }
 
     private static void checkWritable(
@@ -401,8 +398,7 @@ public final class HiveWriteUtils
             ProtectMode protectMode,
             Map<String, String> parameters,
             Storage storage,
-            boolean isUpdate,
-            boolean isVacuum)
+            HiveACIDWriteType writeType)
     {
         String tablePartitionDescription = "Table '" + tableName + "'";
         if (partitionName.isPresent()) {
@@ -423,7 +419,7 @@ public final class HiveWriteUtils
         }
 
         // verify transactional for update
-        if (isUpdate) {
+        if (writeType == HiveACIDWriteType.UPDATE) {
             if (!isTransactionalTable(parameters)) {
                 throw new PrestoException(NOT_SUPPORTED, "Updates to Hive Non-transactional tables are not supported: " + tableName);
             }
@@ -432,7 +428,7 @@ public final class HiveWriteUtils
             }
         }
         // verify transactional for Vacuum
-        if (isVacuum && !isTransactionalTable(parameters)) {
+        if (writeType == HiveACIDWriteType.VACUUM && !isTransactionalTable(parameters)) {
             throw new PrestoException(NOT_SUPPORTED, "Vacuum on Hive Non-transactional tables are not supported: " + tableName);
         }
     }

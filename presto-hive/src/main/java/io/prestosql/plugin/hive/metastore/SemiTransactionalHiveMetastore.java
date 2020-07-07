@@ -26,6 +26,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
+import io.prestosql.plugin.hive.HiveACIDWriteType;
 import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveErrorCode;
 import io.prestosql.plugin.hive.HiveTableHandle;
@@ -1048,7 +1049,7 @@ public class SemiTransactionalHiveMetastore
         return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle));
     }
 
-    public synchronized Optional<Long> getTableWriteId(ConnectorSession session, HiveTableHandle tableHandle)
+    public synchronized Optional<Long> getTableWriteId(ConnectorSession session, HiveTableHandle tableHandle, HiveACIDWriteType writeType)
     {
         String queryId = session.getQueryId();
         checkState(currentQueryId.equals(Optional.of(queryId)), "Invalid query id %s while current query is", queryId, currentQueryId);
@@ -1062,7 +1063,7 @@ public class SemiTransactionalHiveMetastore
                     .get());
         }
 
-        return Optional.of(currentHiveTransaction.get().getTableWriteId(delegate, tableHandle));
+        return Optional.of(currentHiveTransaction.get().getTableWriteId(delegate, tableHandle, writeType));
     }
 
     public synchronized void cleanupQuery(ConnectorSession session)
@@ -2073,7 +2074,7 @@ public class SemiTransactionalHiveMetastore
                 boolean eligible = false;
                 // never delete presto dot files
                 if (!fileName.startsWith(".presto")) {
-                    eligible = queryIds.stream().anyMatch(id -> fileName.startsWith(id) || fileName.endsWith(id));
+                    eligible = queryIds.stream().anyMatch(id -> fileName.startsWith(id) || fileName.endsWith(id) || fileName.startsWith("bucket_") || fileName.startsWith("_orc"));
                 }
                 if (eligible) {
                     if (!deleteIfExists(fileSystem, filePath, false)) {

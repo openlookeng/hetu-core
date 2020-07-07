@@ -21,6 +21,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
 
 import java.util.List;
 import java.util.Map;
@@ -125,6 +126,11 @@ public interface HiveMetastore
     }
 
     default void acquireSharedReadLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void acquireLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions, DataOperationType operationType)
     {
         throw new UnsupportedOperationException();
     }
