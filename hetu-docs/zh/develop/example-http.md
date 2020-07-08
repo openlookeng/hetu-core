@@ -17,7 +17,7 @@ Example HTTP 连接器有一个简单目标：通过 HTTP 读取逗号分隔的�
 
 Example HTTP 连接器中的插件实现与其他插件实现非常相似。大部分实现都聚焦于处理可选配置，唯一相关的函数如下所示：
 
-```{.java}
+``` java
 @Override
 public Iterable<ConnectorFactory> getConnectorFactories()
 {
@@ -35,7 +35,7 @@ public Iterable<ConnectorFactory> getConnectorFactories()
 
 类 `ExampleConnectorFactory` 中提供了该实现。连接器工厂实现所做的第一件事是指定该连接器的名称。这是用于在 openLooKeng 配置中引用此连接器的同一字符串。
 
-```{.java}
+``` java
 @Override
 public String getName()
 {
@@ -45,7 +45,7 @@ public String getName()
 
 连接器工厂的实际工作在 `create()` 方法中执行。在 `ExampleConnectorFactory` 类中，`create()` 方法配置连接器，然后请求 Guice 创建对象。以下是不含参数校验和异常处理的 `create()` 方法的内容：
 
-```{.java}
+``` java
 // A plugin is not required to use Guice; it is just very convenient
 Bootstrap app = new Bootstrap(
         new JsonModule(),

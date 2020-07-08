@@ -6,7 +6,7 @@ title = "SPI 概述"
 
 # SPI 概述
 
-当您实现一个新的 openLooKeng 插件时，您将实现多个接口并覆盖 SPI 定义的方法。插件可以提供额外的[连接器](connectors.html)、[类型](types.html)、[函数](functions.html)和[系统访问控制](system-access-control.html)。特别地，连接器是用于在 openLooKeng 中进行查询的所有数据的源：它们支持 openLooKeng 可用的每个目录。
+当您实现一个新的 openLooKeng 插件时，您将实现多个接口并覆盖 SPI 定义的方法。插件可以提供额外的[连接器](connectors.md)、[类型](types.md)、[函数](functions.md)和[系统访问控制](system-access-control.md)。特别地，连接器是用于在 openLooKeng 中进行查询的所有数据的源：它们支持 openLooKeng 可用的每个目录。
 
 ## 代码
 
@@ -16,13 +16,13 @@ title = "SPI 概述"
 
 每个插件标识一个入口点：`Plugin` 接口的实现。该类名通过标准 Java `ServiceLoader` 接口提供给 openLooKeng：classpath 包含 `META-INF/services` 目录中一个名为 `io.prestosql.core.spi.Plugin` 的资源文件。该文件的内容只有一行，其中列出了插件类的名称：
 
-```{.none}
+```
 com.example.plugin.ExamplePlugin
 ```
 
 对于包含在 openLooKeng 源代码中的内置插件，每当插件的 `pom.xml` 文件包含以下行时，就会创建该资源文件：
 
-```{.none}
+``` xml
 <packaging>presto-plugin</packaging>
 ```
 
@@ -34,7 +34,7 @@ com.example.plugin.ExamplePlugin
 
 插件依赖于 openLooKeng 的 SPI：
 
-```{.xml}
+``` xml
 <dependency>
     <groupId>io.prestosql</groupId>
     <artifactId>presto-spi</artifactId>

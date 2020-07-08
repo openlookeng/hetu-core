@@ -11,7 +11,7 @@ openLooKeng有一组内置的数据类型，如下所述。可能通过插件提
 
 **注意**
 
-*连接器不需要支持所有的数据类型。连接器支持的数据类型，请参见[连接器](../connector.html)文档。*
+*连接器不需要支持所有的数据类型。连接器支持的数据类型，请参见[连接器](../connector/_index.md)文档。*
 
 布尔类型
 -------
@@ -129,7 +129,7 @@ openLooKeng有一组内置的数据类型，如下所述。可能通过插件提
 日期和时间类型
 -------------
 
-另见[timestamp](timestamp.html)。
+另见[旧时间戳和新时间戳](timestamp.md)。
 
 ### `DATE`
 
@@ -208,7 +208,7 @@ openLooKeng有一组内置的数据类型，如下所述。可能通过插件提
 
 ### `IPADDRESS`
 
-> 可表示IPv4地址或IPv6地址。对内为纯IPv6地址。可通过*IPv4-mapped IPv6 address* range ([RFC 4291#section-2.5.5.2](https://tools.ietf.org/html/rfc4291.html#section-2.5.5.2 ))来支持对IPv4地址的处理。在创建`IPADDRESS`时，IPv4地址将映射到指定的范围。格式化`IPADDRESS`时，在映射范围内的任何地址都会被格式化为IPv4地址。其他地址将使用[RFC 5929] (https://tools.ietf.org/html/rfc5952.html)中定义的规范格式格式化为IPv6地址。
+> 可表示IPv4地址或IPv6地址。对内为纯IPv6地址。可通过*IPv4-mapped IPv6 address* range ([RFC 4291#section-2.5.5.2](https://tools.ietf.org/html/rfc4291.md#section-2.5.5.2 ))来支持对IPv4地址的处理。在创建`IPADDRESS`时，IPv4地址将映射到指定的范围。格式化`IPADDRESS`时，在映射范围内的任何地址都会被格式化为IPv4地址。其他地址将使用[RFC 5929](https://tools.ietf.org/html/rfc5952.md)中定义的规范格式格式化为IPv6地址。
 >
 > 例如: `IPADDRESS '10.0.0.1'`, `IPADDRESS '2001:db8::1'`
 
@@ -217,7 +217,7 @@ UUID
 
 ### `UUID`
 
-> 此类型表示UUID（通用唯一标识符），也称为GUID（全局唯一标识符），使用[RFC 4122](https://tools.ietf.org/html/rfc4122.html)中定义的格式。
+> 此类型表示UUID（通用唯一标识符），也称为GUID（全局唯一标识符），使用[RFC 4122](https://tools.ietf.org/html/rfc4122.md)中定义的格式。
 >
 > 例如: `UUID '12151fd2-7586-11e9-8f9e-2a86e4085a59'`
 
@@ -225,11 +225,11 @@ HyperLogLog
 -----------
 
 计算近似的非重复计数比使用[HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLogLog)数据草图进行精确计数成本低得多。
-请参见 [HyperLogLog Functions](../functions/hyperloglog.html)。
+请参见 [HyperLogLog 函数](../functions/hyperloglog.md)。
 
 ### `HyperLogLog`
 
-> HyperLogLog 草图可高效地计算 [approx_distinct()](../functions/aggregate.html)。它开始时是稀疏表示，当效率提高时，就切换到密集表示。
+> HyperLogLog 草图可高效地计算 [approx_distinct()](../functions/aggregate.md)。它开始时是稀疏表示，当效率提高时，就切换到密集表示。
 
 ### `P4HyperLogLog`
 

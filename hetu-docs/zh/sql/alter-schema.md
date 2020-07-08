@@ -28,4 +28,4 @@ ALTER {SCHEMA|DATABASE} name RENAME TO new_name
 
 ## 另请参见
 
-[create-schema](./create-schema.html)
+[CREATE SCHEMA](./create-schema.md)

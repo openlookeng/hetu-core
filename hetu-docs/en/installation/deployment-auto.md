@@ -155,11 +155,7 @@ execute below command to deploy the configurations to openLooKeng cluster:
 bash /opt/openlookeng/bin/configuration_deploy.sh
 ```
 
-Note, if you want to add more configrations or customize the configurations, you can add properties to the templates into file located at
-`/home/openlkadmin/.openlkadmin/.etc_template/coordinator` 
-
-or
-`/home/openlkadmin/.openlkadmin/.etc_template/worker`. 
+Note, if you want to add more configrations or customize the configurations, you can add properties to the templates into file located at `/home/openlkadmin/.openlkadmin/.etc_template/coordinator` or `/home/openlkadmin/.openlkadmin/.etc_template/worker`. 
 
 The property format has to be key=\<value\>, where value is wrapped with \'\<\' and \'\>\', which means it it a dynamic value. For example:
 
@@ -210,6 +206,7 @@ bash /opt/openlookeng/bin/install_offline.sh --multi-node
 ```
 
 execute the below command to get help on all available options:
+
 ```shell
 bash /opt/openlookeng/bin/install_offline.sh --help
 ```
@@ -266,4 +263,4 @@ If there are multiple nodes, separate them with commas(,).
 
 ## See Also
 
-[deployment](deployment.html)
+[Deploying openLooKeng Manually](./deployment.md)

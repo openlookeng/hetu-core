@@ -35,4 +35,4 @@ SHOW CACHE
 
 ## 另请参见
 
-[cache-table](./cache-table.html)、[drop-cache](./drop-cache.html)
+[CACHE TABLE](./cache-table.md)、[DROP CACHE](./drop-cache.md)

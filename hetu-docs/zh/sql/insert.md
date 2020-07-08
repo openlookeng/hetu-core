@@ -44,4 +44,4 @@ INSERT INTO table_name [ ( column [, ... ] ) ] query
 
 ## 另请参见
 
-[values](./values.html)、[insert-overwrite](./insert-overwrite.html)
+[VALUES](./values.md)、[INSERT OVERWRITE](./insert-overwrite.md)

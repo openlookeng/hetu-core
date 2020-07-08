@@ -1,3 +1,8 @@
++++
+weight = 4
+title = "Hana"
++++
+
 Hana Connector
 ==============
 
@@ -233,8 +238,8 @@ The other differences between hana and openLooKeng sql grammar, please refer to 
 
 | name        | web address                                                                                                    |
 | :-----------| :------------------------------------------------------------------------------------------------------------- |
-| openLooKeng | https://openlookeng.io/docs/current/                                                                                  |
-| hana        | https://help.sap.com/viewer/7c78579ce9b14a669c1f3295b0d8ca16/Cloud/en-US/20ff532c751910148657c32fe3431a9f.html |
+| openLooKeng | [SQL Grammar](../sql/_index.md)                                                                                  |
+| hana        | [SQL Grammar](https://help.sap.com/viewer/7c78579ce9b14a669c1f3295b0d8ca16/Cloud/en-US/20ff532c751910148657c32fe3431a9f.html) |
 
 ### Time dependent type\'s Differences
 

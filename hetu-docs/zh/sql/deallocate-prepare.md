@@ -23,4 +23,4 @@ DEALLOCATE PREPARE statement_name
 
 ## 另请参见
 
-[prepare](./prepare.html)
+[PREPARE](./prepare.md)

@@ -39,4 +39,4 @@ Prepare an insert query:
 See Also
 --------
 
-[execute](./execute.html), [deallocate-prepare](./deallocate-prepare.html), [describe-input](./describe-input.html), [describe-output](./describe-output.html)
+[EXECUTE](./execute.md), [DEALLOCATE PREPARE](./deallocate-prepare.md), [DESCRIBE INPUT](./describe-input.md), [DESCRIBE OUTPUT](./describe-output.md)

@@ -1,7 +1,12 @@
++++
+weight = 5
+title = "Built-in System Access Control"
++++
+
 Built-in System Access Control
 ==============================
 
-A system access control plugin enforces authorization at a global level, before any connector level authorization. You can either use one of the built-in plugins in openLooKeng or provide your own by following the guidelines in [system-access-control](../en/develop/system-access-control.html). openLooKeng offers three built-in plugins:
+A system access control plugin enforces authorization at a global level, before any connector level authorization. You can either use one of the built-in plugins in openLooKeng or provide your own by following the guidelines in [System Access Control](../develop/system-access-control.md). openLooKeng offers three built-in plugins:
 
 | Plugin Name                 | Description                                                  |
 | :-------------------------- | :----------------------------------------------------------- |
@@ -39,8 +44,7 @@ The config file is specified in JSON format.
 -   It contains the rules defining which catalog can be accessed by which user (see Catalog Rules below).
 -   The principal rules specifying what principals can identify as what users (see Principal Rules below).
 
-This plugin currently only supports catalog access control rules and principal rules. If you want to limit access on a system level in any other way, you must implement a custom SystemAccessControl plugin (see
-[system-access-control](../en/develop/system-access-control.html).
+This plugin currently only supports catalog access control rules and principal rules. If you want to limit access on a system level in any other way, you must implement a custom SystemAccessControl plugin (see [System Access Control](../develop/system-access-control.md).
 
 ### Refresh
 

@@ -22,7 +22,7 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 * ANSI结构化查询语言（SQL） 
 
-* [ODBC程序员参考](https://docs.microsoft.com/en-us/sql/odbc/reference/odbc-programmer-s-reference?view=sql-server-ver15)
+* [ODBC 程序员's 参考](https://docs.microsoft.com/en-us/sql/odbc/reference/odbc-programmer-s-reference?view=sql-server-ver15)
 
 ### 支持的版本
 
@@ -103,7 +103,7 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 ### 连接配置文件
 
-通过连接配置文件传入连接参数时，支持配置openLooKeng JDBC定义的所有连接参数，参见openLooKeng JDBC Driver的[Parameter Reference#](https://openLooKeng.io/docs/current/installation/jdbc.html#parameter-reference)
+通过连接配置文件传入连接参数时，支持配置openLooKeng JDBC定义的所有连接参数，参见openLooKeng JDBC驱动的[参数参考](jdbc.md#参数参考)
 
 连接配置文件中需要以文本形式提供一组按行分隔如user=root或SSL=true这样的参数键值，驱动会自动对其解析并完成对连接的配置，下面给出一个示例：
 

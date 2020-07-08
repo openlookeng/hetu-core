@@ -37,5 +37,5 @@ CACHE TABLE table_name WHERE condition
 
 ## 另请参见
 
-[show-cache](./show-cache.html)
-[drop-cache](./drop-cache.html)
+[SHOW CACHE](./show-cache.md)
+[DROP CACHE](./drop-cache.md)

@@ -6,13 +6,13 @@ title = "EXPLAIN成本"
 EXPLAIN成本
 ===============
 
-在计划期间，与计划的每个节点相关联的开销将根据查询中的表的表统计信息计算。此计算的成本将作为[EXPLAIN](../sql/explain.html)语句的输出的一部分打印出来。
+在计划期间，与计划的每个节点相关联的开销将根据查询中的表的表统计信息计算。此计算的成本将作为[EXPLAIN](../sql/explain.md)语句的输出的一部分打印出来。
 
 在计划树中，成本信息以`{rows: XX (XX), cpu: XX, memory: XX, network: XX}`格式呈现。`rows`是指每个计划节点在执行过程中期望输出的行数。行数后面括号中的值表示每个计划节点期望输出的数据大小（以字节为单位）。其他参数表示计划节点执行时预计占用的CPU、内存、网络等资源。这些值并不代表任何实际的单位，而是用于比较计划节点之间的相对成本，使优化器能够选择执行查询的最佳计划。如果其中任何一个值未知，则打印`?`。
 
  
 
-例如：
+示例：
 
 ``` sql
 lk:default> EXPLAIN SELECT comment FROM tpch.sf1.nation WHERE nationkey > 3;
@@ -32,4 +32,4 @@ lk:default> EXPLAIN SELECT comment FROM tpch.sf1.nation WHERE nationkey > 3;
 
  
 
-除了实际运行时统计数据外，预估成本也在[explain-analyze](../sql/explain-analyze.html)中打印。
+除了实际运行时统计数据外，预估成本也在[EXPLAIN ANALYZE](../sql/explain-analyze.md)中打印。

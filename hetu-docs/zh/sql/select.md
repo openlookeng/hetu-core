@@ -666,7 +666,7 @@ MOZAMBIQUE |         0
 
 ## UNNEST
 
-`UNNEST`可用于将[数组](../language/types.html)或[映射](../language/types.html)展开为关系。数组被扩展为单列，而映射被扩展为两列（键值）。`UNNEST`也可以与多个参数一起使用，在这种情况下，它们会扩展为多列，行数为最高基数参数（其他列用NULL填充）。`UNNEST`也可以带`WITH ORDINALITY`子句，在这种情况下，一个额外的普通列被添加到末尾。`UNNEST`通常与`JOIN`一起使用，并且可以引JOIN左侧的关系中的列。
+`UNNEST`可用于将[数组](../language/types.md)或[映射](../language/types.md)展开为关系。数组被扩展为单列，而映射被扩展为两列（键值）。`UNNEST`也可以与多个参数一起使用，在这种情况下，它们会扩展为多列，行数为最高基数参数（其他列用NULL填充）。`UNNEST`也可以带`WITH ORDINALITY`子句，在这种情况下，一个额外的普通列被添加到末尾。`UNNEST`通常与`JOIN`一起使用，并且可以引JOIN左侧的关系中的列。
 
 使用单列：
 

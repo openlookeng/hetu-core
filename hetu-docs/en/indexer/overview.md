@@ -24,7 +24,7 @@ When the engine needs to schedule a TableScan operation, it schedules Splits on 
 
 By keeping an external index for the predicate column, the Heuristic Indexer can determine whether each split contains the values being searched for and only schedule the read operation for the splits which possibly contain the value.
 
-![](indexer_filter_splits.png)
+![indexer_filter_splits](../images/indexer_filter_splits.png)
 
 ### 2. Filtering Block early when reading ORC files
 

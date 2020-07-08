@@ -1,6 +1,6 @@
 +++
 
-title = "SHOW ROLE GRANTS"
+title = "SHOW ROLE GRANTS"
 +++
 
 SHOW ROLE GRANTS

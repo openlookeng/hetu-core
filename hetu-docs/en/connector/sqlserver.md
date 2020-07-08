@@ -1,3 +1,8 @@
++++
+weight = 16
+title = "SQL Server"
++++
+
 SQL Server Connector
 ====================
 
@@ -68,4 +73,4 @@ Complete list of [SQL Server data types](https://msdn.microsoft.com/en-us/librar
 
 The following SQL statements are not yet supported:
 
-[delete](../sql/delete.html), [grant](../sql/grant.html), [revoke](../sql/revoke.html)
+[DELETE](../sql/delete.md), [GRANT](../sql/grant.md), [REVOKE](../sql/revoke.md)

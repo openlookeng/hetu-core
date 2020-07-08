@@ -1,62 +1,58 @@
-Teradata Functions
-==================
++++
+weight = 25
+title = "Teradata函数"
++++
 
-These functions provide compatibility with Teradata SQL.
+# Teradata函数
 
-String Functions
-----------------
+这些函数提供与Teradata SQL的兼容性
 
-**char2hexint(string)** -\> varchar
+## 字符串函数
 
-Returns the hexadecimal representation of the UTF-16BE encoding of the string.
+**char2hexint(string)** -> varchar
 
-**index(string, substring)** -\> bigint
+返回字符串的UTF-16BE编码的十六进制表示形式。
 
-Alias for `strpos` function.
+**index(string, substring)** -> bigint
 
-**substring(string, start)** -\> varchar
+`strpos`函数的别名。
 
-Alias for `substr` function.
+**substring(string, start)** -> varchar
 
+`substr`函数的别名。
 
-**substring(string, start, length)** -\> varchar
+**substring(string, start, length)** -> varchar
 
-Alias for `substr` function.
+`substr`函数的别名。
 
+## 日期函数
 
-Date Functions
---------------
+该部分中的函数使用与Teradata日期时间函数兼容的格式字符串。下表基于Teradata参考手册，描述了支持的格式说明符：
 
-The functions in this section use a format string that is compatible with the Teradata datetime functions. The following table, based on the Teradata reference manual, describes the supported format specifiers:
+| 说明符| 说明| 
+|:----------|:----------| 
+| `- / , . ; :`| 忽略标点符号| 
+| `dd`| 一个月中的第几日(1–31)| 
+| `hh`| 一天中的第几个小时(1–12)| 
+| `hh24`| 一天中的第几个小时(0–23)| 
+| `mi`| 分钟(0–59)| 
+| `mm`| 月份（01–12）| 
+| `ss`| 秒(0–59)| 
+| `yyyy`| 四位年份| 
+| `yy`| 两位年份| 
 
-| Specifier     | Description                        |
-| :------------ | :--------------------------------- |
-| `- / , . ; :` | Punctuation characters are ignored |
-| `dd`          | Day of month (1-31)                |
-| `hh`          | Hour of day (1-12)                 |
-| `hh24`        | Hour of the day (0-23)             |
-| `mi`          | Minute (0-59)                      |
-| `mm`          | Month (01-12)                      |
-| `ss`          | Second (0-59)                      |
-| `yyyy`        | 4-digit year                       |
-| `yy`          | 2-digit year                       |
+**警告**
 
-**Warning**
+当前不支持不区分大小写。所有说明符必须为小写。
 
-Case insensitivity is not currently supported. All specifiers must be lowercase.
+**to\_char(timestamp**, format) -> varchar
 
+使用`format`将`timestamp`格式化为一个字符串。
 
-**to\_char(timestamp**, format) -\> varchar
+**to\_timestamp(string**, format) -> timestamp
 
-Formats `timestamp` as a string using `format`.
+使用`format`将`string`解析为`TIMESTAMP`。
 
+**to\_date(string**, format) -> date
 
-**to\_timestamp(string**, format) -\> timestamp
-
-Parses `string` into a `TIMESTAMP` using `format`.
-
-
-**to\_date(string**, format) -\> date
-
-Parses `string` into a `DATE` using `format`.
-
+使用`format`将`string`解析为`DATE`。

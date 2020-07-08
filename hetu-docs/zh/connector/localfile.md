@@ -1,32 +1,33 @@
-Local File Connector
-====================
++++
+weight = 12
+title = "本地文件"
++++
 
-The local file connector allows querying data stored on the local file system of each worker.
+# 本地文件连接器
 
-Configuration
--------------
+本地文件连接器允许查询每个工作节点的本地文件系统上存储的数据。
 
-To configure the local file connector, create a catalog properties file under `etc/catalog` named, for example, `localfile.properties` with the following contents:
+## 配置
+
+要配置本地文件连接器，需在`etc/catalog`目录下新建一个例如名为`localfile.properties`的文件，内容如下：
 
 ``` properties
 connector.name=localfile
 ```
 
-Configuration Properties
-------------------------
+## 配置属性
 
-| Property Name                         | Description                                                  |
-| :------------------------------------ | :----------------------------------------------------------- |
-| `presto-logs.http-request-log.location` | Directory or file where HTTP request logs are written        |
-| `presto-logs.http-request-log.pattern`  | If the log location is a directory this glob is used to match file names in the directory |
+| 属性名称| 说明|
+|:----------|:----------|
+| `presto-logs.http-request-log.location`| 写入HTTP请求日志的目录或文件|
+| `presto-logs.http-request-log.pattern`| 如果日志位置是一个目录，这个glob将用于匹配目录中的文件名。|
 
-Local File Connector Schemas and Tables
----------------------------------------
+## 本地文件连接器模式和表
 
-The local file connector provides a single schema named `logs`. You can see all the available tables by running `SHOW TABLES`:
+本地文件连接器提供了一个名为`logs`的模式。通过执行`SHOW TABLES`，可以看到所有可用的表：
 
     SHOW TABLES FROM localfile.logs;
 
 ### `http_request_log`
 
-This table contains the HTTP request logs from each node on the cluster.
+该表包含来自集群中每个节点的HTTP请求日志。

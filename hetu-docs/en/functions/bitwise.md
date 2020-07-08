@@ -1,3 +1,8 @@
++++
+weight = 7
+title = "Bitwise Functions"
++++
+
 Bitwise Functions
 =================
 

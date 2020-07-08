@@ -1,26 +1,27 @@
-Kafka Connector Tutorial
-========================
++++
+weight = 11
+title = "Kafka连接器教程"
++++
 
-Introduction
-------------
+# Kafka连接器教程
 
-The Kafka Connector for openLooKeng allows access to live topic data from Apache Kafka using openLooKeng. This tutorial shows how to set up topics and how to create the topic description files that back openLooKeng tables.
+## 介绍
 
-Installation
-------------
+适用于openLooKeng的Kafka连接器允许使用openLooKeng从Apache Kafka访问实时主题数据。本教程演示如何设置主题以及如何创建支持openLooKeng表的主题描述文件。
 
-This tutorial assumes familiarity with openLooKeng and a working local openLooKeng installation (see [deployment](../installation/deployment). It will focus on setting up Apache Kafka and integrating it with openLooKeng.
+## 安装
 
-### Step 1: Install Apache Kafka
+本教程假定用户熟悉openLooKeng且本地安装有可用的openLooKeng（见[手动部署openLooKeng](../installation/deployment.md)）。教程将专注于设置Apache Kafka并将其与openLooKeng集成。
 
-Download and extract [Apache Kafka](https://kafka.apache.org/).
+### 步骤1：安装Apache Kafka
 
+下载并解压[Apache Kafka](https://kafka.apache.org/ )。
 
-**Note**
+**说明**
 
-*This tutorial was tested with Apache Kafka 0.8.1. It should work with* *any 0.8.x version of Apache Kafka.*
+*本教程使用Apache Kafka 0.8.1进行了测试。***教程应适用于任何0.8.x版本的Apache Kafka。
 
-Start ZooKeeper and the Kafka server:
+启动ZooKeeper和Kafka服务器：
 
 ``` shell
 $ bin/zookeeper-server-start.sh config/zookeeper.properties
@@ -35,18 +36,18 @@ $ bin/kafka-server-start.sh config/server.properties
 ...
 ```
 
-This will start Zookeeper on port `2181` and Kafka on port `9092`.
+这将在端口`2181`上启动ZooKeeper，在端口`9092`上启动Kafka。
 
-### Step 2: Load data
+### 步骤2：加载数据
 
-Download the tpch-kafka loader from Maven central:
+从Maven Central下载tpch-kafka加载器：
 
 ``` shell
 $ curl -o kafka-tpch https://repo1.maven.org/maven2/de/softwareforge/kafka_tpch_0811/1.0/kafka_tpch_0811-1.0.sh
 $ chmod 755 kafka-tpch
 ```
 
-Now run the `kafka-tpch` program to preload a number of topics with tpch data:
+现在运行`kafka-tpch`程序，预加载带有tpch数据多个主题：
 
 ``` shell
 $ ./kafka-tpch load --brokers localhost:9092 --prefix tpch. --tpch-type tiny
@@ -78,11 +79,11 @@ $ ./kafka-tpch load --brokers localhost:9092 --prefix tpch. --tpch-type tiny
 2014-07-28T17:17:13.877-0700     INFO    pool-1-thread-3    de.softwareforge.kafka.LoadCommand    Generated 60175 rows for table 'lineitem'.
 ```
 
-Kafka now has a number of topics that are preloaded with data to query.
+现在，Kafka拥有了多个预先装载了要查询的数据的主题。
 
-### Step 3: Make the Kafka topics known to openLooKeng
+### 步骤3：使Kafka主题对openLooKeng可见
 
-In your openLooKeng installation, add a catalog properties file `etc/catalog/kafka.properties` for the Kafka connector. This file lists the Kafka nodes and topics:
+在openLooKeng安装中，为Kafka连接器添加目录属性文件`etc/catalog/kafka.properties`。该文件列出了Kafka节点和主题：
 
 ``` properties
 connector.name=kafka
@@ -91,21 +92,21 @@ kafka.table-names=tpch.customer,tpch.orders,tpch.lineitem,tpch.part,tpch.partsup
 kafka.hide-internal-columns=false
 ```
 
-Now start openLooKeng:
+现在启动openLooKeng：
 
 ``` shell
 $ bin/launcher start
 ```
 
-Because the Kafka tables all have the `tpch.` prefix in the configuration, the tables are in the `tpch` schema. The connector is mounted into the `kafka` catalog because the properties file is named `kafka.properties`.
+因为Kafka的表在配置中都有`tpch.`前缀，所以这些表都在`tpch`模式中。因为属性文件命名为`kafka.properties`，所以连接器被装入到`kafka`目录中。
 
-Start the [openLooKeng CLI](../installation/cli.html):
+启动[openLooKeng CLI](../installation/cli.md)：
 
 ``` shell
 $ ./openlk-cli --catalog kafka --schema tpch
 ```
 
-List the tables to verify that things are working:
+列出表，以验证操作是否成功：
 
 ``` sql
 lk:tpch> SHOW TABLES;
@@ -122,9 +123,9 @@ lk:tpch> SHOW TABLES;
 (8 rows)
 ```
 
-### Step 4: Basic data querying
+### 步骤4：基础数据查询
 
-Kafka data is unstructured and it has no metadata to describe the format of the messages. Without further configuration, the Kafka connector can access the data and map it in raw form but there are no actual columns besides the built-in ones:
+Kafka数据是非结构化的，没有元数据来描述消息的格式。无需进一步配置，Kafka连接器可以访问数据并以原始形式映射数据，但除了内置列之外没有实际列：
 
 ``` sql
 lk:tpch> DESCRIBE customer;
@@ -165,14 +166,13 @@ lk:tpch> SELECT sum(cast(json_extract_scalar(_message, '$.accountBalance') AS do
 (1 row)
 ```
 
-The data from Kafka can be queried using openLooKeng but it is not yet in actual table shape. The raw data is available through the `_message` and `_key` columns but it is not decoded into columns. As the sample data is in JSON format, the [json](../functions/json.html) built into openLooKeng can be used to slice the data.
+Kafka中的数据可以使用openLooKeng查询，但并不是呈实际表的形式。原始数据可以通过`_message`和`_key`列获得，但不会解码为列。由于样本数据是JSON格式，因此可以使用openLooKeng内置的[json](../functions/json.md)对数据进行切片。
 
-### Step 5: Add a topic description file
+### 步骤5：添加主题描述文件
 
-The Kafka connector supports topic description files to turn raw data into table format. These files are located in the `etc/kafka` folder in the openLooKeng installation and must end with `.json`. It is recommended that
-the file name matches the table name but this is not necessary.
+Kafka连接器支持主题描述文件，将原始数据转换为表格式。这些文件位于openLooKeng安装的`etc/kafka`文件夹中，必须以`.json`结尾。建议文件名与表名匹配，但不一定必须匹配。
 
-Add the following file as `etc/kafka/tpch.customer.json` and restart openLooKeng:
+将如下文件添加为`etc/kafka/tpch.customer.json`，并重启openLooKeng。
 
 ``` json
 {
@@ -193,7 +193,7 @@ Add the following file as `etc/kafka/tpch.customer.json` and restart openLooKeng
 }
 ```
 
-The customer table now has an additional column: `kafka_key`.
+customer表现在有一个额外的列：`kafka_key`。
 
 ``` sql
 lk:tpch> DESCRIBE customer;
@@ -229,11 +229,11 @@ lk:tpch> SELECT kafka_key FROM customer ORDER BY kafka_key LIMIT 10;
 (10 rows)
 ```
 
-The topic definition file maps the internal Kafka key (which is a raw long in eight bytes) onto a openLooKeng `BIGINT` column.
+主题定义文件将内部Kafka密钥（8字节，原始长度）映射到openLooKeng `BIGINT`列。
 
-### Step 6: Map all the values from the topic message onto columns
+### 步骤6：将来自主题消息的所有值映射到列
 
-Update the `etc/kafka/tpch.customer.json` file to add fields for the message and restart openLooKeng. As the fields in the message are JSON, it uses the `json` data format. This is an example where different data formats are used for the key and the message.
+更新`etc/kafka/tpch.customer.json`文件，为消息添加字段，并重启openLooKeng。由于消息中的字段是JSON，因此使用`json`数据格式。以下是对键和消息使用不同的数据格式的示例。
 
 ``` json
 {
@@ -304,7 +304,7 @@ Update the `etc/kafka/tpch.customer.json` file to add fields for the message and
 }
 ```
 
-Now for all the fields in the JSON of the message, columns are defined and the sum query from earlier can operate on the `account_balance` column directly:
+现在，对于消息的JSON中的所有字段，都定义了列，并且来自早期的求和查询可以直接对`account_balance`列进行操作：
 
 ``` sql
 lk:tpch> DESCRIBE customer;
@@ -350,23 +350,23 @@ lk:tpch> SELECT sum(account_balance) FROM customer LIMIT 10;
 (1 row)
 ```
 
-Now all the fields from the `customer` topic messages are available as openLooKeng table columns.
+现在，`customer`主题消息的所有字段都作为openLooKeng表列可用。
 
-### Step 7: Use live data
+### 步骤7：使用实时数据
 
-openLooKeng can query live data in Kafka as it arrives. To simulate a live feed of data, this tutorial sets up a feed of live tweets into Kafka.
+openLooKeng可以在实时数据到达时从Kafka中查询实时数据。为了模拟一个实时数据推送，本教程将实时推文的推送设置到Kafka中。
 
-#### Setup a live Twitter feed
+#### 设置实时Twitter推送
 
--   Download the twistr tool
+- 下载twistr工具
 
 ``` shell
 $ curl -o twistr https://repo1.maven.org/maven2/de/softwareforge/twistr_kafka_0811/1.2/twistr_kafka_0811-1.2.sh
 $ chmod 755 twistr
 ```
 
--   Create a developer account at <https://dev.twitter.com/> and set up an access and consumer token.
--   Create a `twistr.properties` file and put the access and consumer key and secrets into it:
+- 在<https://dev.twitter.com/>创建开发者账号，并设置访问和消费token。
+- 创建`twistr.properties`文件，将访问密钥和消费者密钥放入其中：
 
 ``` properties
 twistr.access-token-key=...
@@ -376,9 +376,9 @@ twistr.consumer-secret=...
 twistr.kafka.brokers=localhost:9092
 ```
 
-#### Create a tweets table on openLooKeng
+#### 在openLooKeng上创建tweets表
 
-Add the tweets table to the `etc/catalog/kafka.properties` file:
+在`etc/catalog/kafka.properties`文件中添加tweets表：
 
 ``` properties
 connector.name=kafka
@@ -387,7 +387,7 @@ kafka.table-names=tpch.customer,tpch.orders,tpch.lineitem,tpch.part,tpch.partsup
 kafka.hide-internal-columns=false
 ```
 
-Add a topic definition file for the Twitter feed as `etc/kafka/tweets.json`:
+将Twitter推送的主题定义文件添加为`etc/kafka/tweets.json`：
 
 ``` json
 {
@@ -464,19 +464,19 @@ Add a topic definition file for the Twitter feed as `etc/kafka/tweets.json`:
 }
 ```
 
-As this table does not have an explicit schema name, it will be placed into the `default` schema.
+由于此表没有显式的模式名称，因此将把它放入`default`模式中。
 
-#### Feed live data
+#### 推送实时数据
 
-Start the twistr tool:
+启动twistr工具：
 
 ``` shell
 $ java -Dness.config.location=file:$(pwd) -Dness.config=twistr -jar ./twistr
 ```
 
-`twistr` connects to the Twitter API and feeds the \"sample tweet\" feed into a Kafka topic called `twitter_feed`.
+`twistr`连接Twitter API，并将“sample tweet”推送到名为`twitter_feed`的Kafka主题。
 
-Now run queries against live data:
+现在对实时数据运行查询：
 
 ``` shell
 $ ./openlk-cli --catalog kafka --schema default
@@ -515,11 +515,11 @@ lk:default> SELECT kafka_key, user_name, lang, created_at FROM tweets LIMIT 10;
 (10 rows)
 ```
 
-There is now a live feed into Kafka which can be queried using openLooKeng.
+现在有一个实时推送到Kafka，可以使用openLooKeng查询。
 
-### Epilogue: Time stamps
+### 结语：时间戳
 
-The tweets feed that was set up in the last step contains a time stamp in RFC 2822 format as `created_at` attribute in each tweet.
+在上一步中设置的tweets推送在每个tweet中都包含一个RFC 2822格式的时间戳作为`created_at`属性。
 
 ``` sql
 lk:default> SELECT DISTINCT json_extract_scalar(_message, '$.created_at')) AS raw_date
@@ -534,7 +534,7 @@ lk:default> SELECT DISTINCT json_extract_scalar(_message, '$.created_at')) AS ra
 (5 rows)
 ```
 
-The topic definition file for the tweets table contains a mapping onto a timestamp using the `rfc2822` converter:
+tweets表的主题定义文件包含使用`rfc2822`转换器转换到时间戳的映射：
 
 ``` json
 ...
@@ -547,7 +547,7 @@ The topic definition file for the tweets table contains a mapping onto a timesta
 ...
 ```
 
-This allows the raw data to be mapped onto a openLooKeng timestamp column:
+这允许将原始数据映射到openLooKeng时间戳列：
 
 ``` sql
 lk:default> SELECT created_at, raw_date FROM (
@@ -564,4 +564,4 @@ lk:default> SELECT created_at, raw_date FROM (
 (5 rows)
 ```
 
-The Kafka connector contains converters for ISO 8601, RFC 2822 text formats and for number-based timestamps using seconds or miilliseconds since the epoch. There is also a generic, text-based formatter which uses Joda-Time format strings to parse text columns.
+Kafka连接器包含用于ISO8601、RFC 2822文本格式以及使用自epoch时间以来的秒或毫秒的数的时间戳的转换器。还有一个通用的、基于文本的格式化程序，它使用Joda-Time格式字符串来解析文本列。

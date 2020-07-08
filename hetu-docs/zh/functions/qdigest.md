@@ -1,39 +1,38 @@
-Quantile Digest Functions
-=========================
++++
+weight = 21
+title = "分位数摘要函数"
++++
 
-openLooKeng implements the `approx_percentile` function with the quantile digest data structure. The underlying data structure, [qdigest](../language/types.html), is exposed as a data type in openLooKeng, and can be created, queried and stored separately from `approx_percentile`.
+# 分位数摘要函数
 
-Data Structures
----------------
+openLooKeng使用分位数摘要数据结构实现`approx_percentile`函数。基础数据结构[qdigest](../language/types.md)在openLooKeng中公开为一种数据类型，可以独立于`approx_percentile`对其进行创建、查询和存储。
 
-A quantile digest is a data sketch which stores approximate percentile information. The openLooKeng type for this data structure is called `qdigest`, and it takes a parameter which must be one of `bigint`, `double` or `real` which represent the set of numbers that may be ingested by the `qdigest`. They may be merged without losing precision, and for storage and retrieval they may be cast to/from `VARBINARY`.
+## 数据结构
 
-Functions
----------
+分位点摘要是存储近似百分位信息的数据概要。该数据结构的openLooKeng类型称为`qdigest`，它接受一个参数，该参数必须是`bigint`、`double`或`real`，它们表示可以由`qdigest`获取的数字集合。可以在不损失精度的情况下对其进行合并，还可以将其与`VARBINARY`来回转换，以进行存储和检索。
 
-**merge(qdigest)** -\> qdigest
+## 函数
 
-Merges all input `qdigest`s into a single `qdigest`.
+**merge(qdigest)** -> qdigest
 
+将所有输入`qdigest`合并为单个`qdigest`。
 
-**value\_at\_quantile(qdigest(T), quantile)** -\> T
+**value\_at\_quantile(qdigest(T), quantile)** -> T
 
-Returns the approximate percentile values from the quantile digest given the number `quantile` between 0 and 1.
+在给定介于0和1之间的数字`quantile`的情况下从分位数摘要返回近似百分位值。
 
-**values\_at\_quantiles(qdigest(T), quantiles)** -\> T
+**values\_at\_quantiles(qdigest(T), quantiles)** -> T
 
-Returns the approximate percentile values as an array given the input quantile digest and array of values between 0 and 1 which represent the quantiles to return.
+在给定输入分位数摘要和0和1之间的值数组（表示要返回的分位数）的情况下以数组的形式返回近似百分位值。
 
-**qdigest\_agg(x)** -\> qdigest\<\[same as x\]\>
+**qdigest\_agg(x)** -> qdigest\<\[与x相同]>
 
-Returns the `qdigest` which is composed of all input values of `x`.
+返回由`x`的所有输入值组成的`qdigest`。
 
+**qdigest\_agg(x, w)** -> qdigest\<\[与x相同]>
 
+返回由`x`的所有输入值（使用每项权重`w`）组成的`qdigest`。
 
-**qdigest\_agg(x, w)** -\> qdigest\<\[same as x\]\>
+**qdigest\_agg(x, w, accuracy)** -> qdigest\<\[与x相同]>
 
-Returns the `qdigest` which is composed of all input values of `x` using the per-item weight `w`.
-
-**qdigest\_agg(x, w, accuracy)** -\> qdigest\<\[same as x\]\>
-
-Returns the `qdigest` which is composed of all input values of `x` using the per-item weight `w` and maximum error of `accuracy`. `accuracy` must be a value greater than zero and less than one, and it must be constant for all input rows.
+返回由`x`的所有输入值（使用每项权重`w`和最大误差`accuracy`）组成的`qdigest`。`accuracy`必须是一个大于0且小于1的值，并且对于所有输入行是一个常量。

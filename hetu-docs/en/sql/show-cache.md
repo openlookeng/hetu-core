@@ -41,4 +41,4 @@ Only Hive connector support this functionality at this time. See connector docum
 See Also
 --------
 
-[cache-table](./cache-table.html), [drop-cache](./drop-cache.html)
+[CACHE TABLE](./cache-table.md), [DROP CACHE](./drop-cache.md)

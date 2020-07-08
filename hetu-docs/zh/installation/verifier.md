@@ -9,7 +9,7 @@ title = "openLooKeng验证器"
 
 openLooKeng验证器可用于针对另一个数据库（如MySQL）测试openLooKeng，或针对彼此测试两个openLooKeng集群。在开发openLooKeng时，我们使用它来针对先前的发行版持续测试主干。使用下表创建MySQL数据库，并通过你想要运行的查询加载该数据库：
 
-```{.sql}
+``` sql
 CREATE TABLE verifier_queries(
     id INT NOT NULL AUTO_INCREMENT,
     suite VARCHAR(256) NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE verifier_queries(
 
 接下来，创建一个属性文件来配置验证器：
 
-```{.none}
+``` properties
 suite=my_suite
 query-database=jdbc:mysql://localhost:3306/my_database?user=my_username&password=my_password
 control.gateway=jdbc:lk://localhost:8080
@@ -43,8 +43,8 @@ test.gateway=jdbc:lk://localhost:8081
 thread-count=1
 ```
 
-最后，下载：maven\_download:\[cli]{.title-ref}，重命名为`verifier`后，通过`chmod +x`使其执行，然后运行：
+最后，下载：[presto-verifier-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-verifier/316/presto-verifier-316-executable.jar)，重命名为`verifier`后，通过`chmod +x`使其执行，然后运行：
 
-```{.none}
+``` shell
 ./verifier verify config.properties
 ```

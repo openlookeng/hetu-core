@@ -21,4 +21,4 @@ List the current session properties.
 See Also
 --------
 
-[reset-session](./reset-session.html), [set-session](./set-session.html)
+[RESET SESSION](./reset-session.md), [SET SESSION](./set-session.md)

@@ -7,7 +7,7 @@ title = "手动部署openLooKeng"
 # 手动部署openLooKeng
 
 
-这是一种手动部署方法，你也可以通过脚本使用自动部署方法。（参见[自动部署](./deployment-auto.html)
+这是一种手动部署方法，你也可以通过脚本使用自动部署方法。（参见[自动部署openLooKeng](./deployment-auto.md)
 
 ## 安装openLooKeng
 
@@ -22,16 +22,16 @@ openLooKeng需要一个*数据*目录来存储日志等。我们建议在安装�
 - 节点属性：每个节点特有的环境配置。
 - JVM配置：Java虚拟机的命令行选项。
 - 配置属性：openLooKeng服务器的配置。
-- 目录属性：[联接节点](../connector/_index)（数据源）配置。
+- 目录属性：[连接器](../connector/_index)（数据源）配置。
 
 ### 节点属性
 
 节点属性文件`etc/node.properties`包含每个节点特有的配置。*节点*是机器上已安装的openLooKeng的单个实例。该文件通常在首次安装openLooKeng时由部署系统创建。下面是最基本的`etc/node.properties`：
 
-```{.none}
+``` properties
 node.environment=production
 node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
-node.data-dir=/var/openLooKeng/data
+node.data-dir=/var/openlookeng/data
 ```
 
 上述属性说明如下：
@@ -46,7 +46,7 @@ JVM配置文件`etc/jvm.config`包含用于启动Java虚拟机的命令行选项
 
 以下为创建`etc/jvm.config`提供了一个良好的起点：
 
-```{.none}
+``` properties
 -server
 -Xmx16G
 -XX:-UseBiasedLocking
@@ -69,7 +69,7 @@ JVM配置文件`etc/jvm.config`包含用于启动Java虚拟机的命令行选项
 
 协调器的最基本配置如下：
 
-```{.none}
+``` properties
 coordinator=true
 node-scheduler.include-coordinator=false
 http-server.http.port=8080
@@ -82,7 +82,7 @@ discovery.uri=http://example.net:8080
 
 工作节点的最基本配置如下：
 
-```{.none}
+``` properties}
 coordinator=false
 http-server.http.port=8080
 query.max-memory=50GB
@@ -93,7 +93,7 @@ discovery.uri=http://example.net:8080
 
 或者，如果你正在为测试而安装一台同时作为协调节点和工作节点的机器，请使用以下配置：
 
-```{.none}
+``` properties
 coordinator=true
 node-scheduler.include-coordinator=true
 http-server.http.port=8080
@@ -115,22 +115,22 @@ discovery.uri=http://example.net:8080
 - `discovery-server.enabled`：openLooKeng使用Discovery服务查找集群中的所有节点。每个openLooKeng实例在启动时都会将自己注册到Discovery服务。为了简化部署并避免运行额外的服务，openLooKeng协调节点可以运行Discovery服务的嵌入式版本。该版本与openLooKeng共用HTTP服务器，因此使用相同端口。
 - `discovery.uri`：Discovery服务器的URI。由于我们已经在openLooKeng协调节点中启用了Discovery的嵌入式版本，因此这应该是openLooKeng协调节点的URI。替换`example.net:8080`以匹配openLooKeng协调器的主机和端口。该URI不能以斜杠结尾。
 
-你可能还希望设置以下属性：
+可以设置以下属性：
 
 - `jmx.rmiregistry.port`：JMX RMI注册表端口。JMX客户端应该连接到此端口。
 - `jmx.rmiserver.port`：JMX RMI服务器端口。openLooKeng导出了许多对通过JMX进行监视的有用指标。
 
-另见[资源组](../admin/resource-groups)。
+另见[资源组](../admin/resource-groups.md)。
 
 ### 日志级别
 
 可选日志级别文件`etc/log.properties`允许为命名日志记录器层次结构设置最低日志级别。每个记录器都有一个名称，通常是使用记录器的类的完全限定名。记录器具有基于名称中的点层次结构（如Java包）。例如，考虑如下日志级别文件：
 
-```{.none}
+``` properties
 io.prestosql=INFO
 ```
 
-这将把`io.prestosql.core.server`和`io.prestosql.core.plugin.hive`最低级别设置为`INFO`。默认的最低级别是`INFO`（因此上面的示例实际上不会做出任何更改）。有四个级别：`DEBUG`、`INFO`、`WARN`和`ERROR`。
+这将把`io.prestosql.core.server`和`io.prestosql.core.plugin.hive`最低级别设置为`INFO`。默认的最低级别是`INFO`。有四个级别：`DEBUG`、`INFO`、`WARN`和`ERROR`。
 
 ### 目录属性
 
@@ -138,23 +138,23 @@ openLooKeng通过*连接器*访问数据，这些连接器安装在目录中。�
 
 通过在`etc/catalog`目录中创建目录属性文件来注册目录。例如，用以下内容创建`etc/catalog/jmx.properties`，将`jmx`连接器挂载为`jmx`目录：
 
-```{.none}
+``` properties
 connector.name=jmx
 ```
 
-有关配置连接器的详细信息，请参阅[连接器](../connector.html)。
+有关配置连接器的详细信息，请参阅[连接器]((../connector/_index))。
 
 ## 运行openLooKeng
 
 安装目录中在`bin/launcher`中包含启动器脚本。openLooKeng可以通过运行如下命令以守护进程的方式启动：
 
-```{.none}
+``` shell
 bin/launcher start
 ```
 
 也可以在前台运行，将日志和其他输出写入stdout/stderr（如果使用像守护进程这样的监控系统，应该捕捉两个流）：
 
-```{.none}
+``` shell
 bin/launcher run
 ```
 
@@ -168,4 +168,4 @@ bin/launcher run
 
 ## 参考资料
 
-[自动部署](deployment.html)
+[自动部署openLooKeng](./deployment-auto.md)

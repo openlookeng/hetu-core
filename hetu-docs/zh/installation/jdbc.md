@@ -26,7 +26,7 @@ title = "JDBC驱动"
 
 JDBC URL支持如下格式：
 
-```{.none}
+```
 jdbc:lk://host:port
 jdbc:lk://host:port/catalog
 jdbc:lk://host:port/catalog/schema
@@ -34,13 +34,13 @@ jdbc:lk://host:port/catalog/schema
 
 例如，使用以下URL连接到运行于`example.net`端口`8080`的openLooKeng，其目录为`hive`，模式为`sales`：
 
-```{.none}
+```
 jdbc:lk://example.net:8080/hive/sales
 ```
 
 可以使用上面的URL创建连接，如下所示：
 
-```{.java}
+``` java
 String url = "jdbc:lk://example.net:8080/hive/sales";
 Connection connection = DriverManager.getConnection(url, "test", null);
 ```
@@ -49,7 +49,7 @@ Connection connection = DriverManager.getConnection(url, "test", null);
 
 该驱动支持各种参数，这些参数可以设置为URL参数或作为传递给`DriverManager`的属性。以下两个示例是等效的：
 
-```{.java}
+``` java
 // URL parameters
 String url = "jdbc:lk://example.net:8080/hive/sales";
 Properties properties = new Properties();

@@ -8,13 +8,13 @@ title = "基准驱动"
 
 基准驱动可用于测量openLooKeng集群中查询的性能。我们用它来连续测量主干的性能。
 
-下载：maven\_download:\[benchmark-driver]{.title-ref}，重命名为`presto-benchmark-driver`后，使用`chmod +x`使其可执行。
+下载：[presto-benchmark-driver-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/316/presto-benchmark-driver-316-executable.jar )，重命名为`presto-benchmark-driver`后，使用`chmod +x`使其可执行。
 
 ## 套件
 
 创建`suite.json`文件：
 
-```{.json}
+``` json
 {
     "file_formats": {
         "query": ["single_.*", "tpch_.*"],
@@ -58,7 +58,7 @@ file_formats single_bigint  zlib        orc    100   282         269          23
 
 创建其他输出列的另一种方法是向SQL文件添加标记。例如，下面的SQL文件中声明了两个标签`projection`和`filter`：
 
-```{.none}
+```
 projection=true
 filter=false
 =================

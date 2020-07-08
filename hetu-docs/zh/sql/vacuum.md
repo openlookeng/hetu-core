@@ -63,4 +63,4 @@ VACUUM TABLE table_name [FULL] [PARTITION partition_value]? [AND WAIT]?
 
 ## 另请参见
 
-[update](./update.html)、[delete](./ delete.html)
+[UPDATE](./update.md)、[DELETE](./delete.md)

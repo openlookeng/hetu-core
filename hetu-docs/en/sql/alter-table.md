@@ -43,4 +43,4 @@ Rename column `id` to `user_id` in the `users` table:
 See Also
 --------
 
-[create-table](./create-table.html)
+[CREATE TABLE](./create-table.md)

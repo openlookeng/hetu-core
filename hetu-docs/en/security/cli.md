@@ -1,3 +1,8 @@
++++
+weight = 2
+title = "CLI Kerberos Authentication"
++++
+
 CLI Kerberos Authentication
 ===========================
 
@@ -17,7 +22,7 @@ Kerberos needs to be configured on the client. At a minimum, there needs to be a
 
 ```
 [realms]
-  openlookeng.EXAMPLE.COM = {
+  OPENLOOKENG.EXAMPLE.COM = {
     kdc = kdc.example.com
     admin_server = kdc.example.com
   }

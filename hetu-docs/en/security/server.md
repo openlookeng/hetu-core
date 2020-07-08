@@ -1,3 +1,8 @@
++++
+weight = 1
+title = "Coordinator Kerberos Authentication"
++++
+
 Coordinator Kerberos Authentication
 ===================================
 

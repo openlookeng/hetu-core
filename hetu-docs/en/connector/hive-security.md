@@ -1,17 +1,22 @@
-Hive Security Configuration
-===========================
++++
+weight = 8
+title = "Hive Security Configuration"
++++
 
-Authorization
--------------
+# Hive Security Configuration
 
-You can enable authorization checks for the [hive](./hive.html) by setting the `hive.security` property in the Hive catalog properties file. This property must be one of the following values:
+
+## Authorization
+
+
+You can enable authorization checks for the [hive](./hive.md) by setting the `hive.security` property in the Hive catalog properties file. This property must be one of the following values:
 
 | Property Value           | Description                                                  |
 | :----------------------- | :----------------------------------------------------------- |
 | `legacy` (default value) | Few authorization checks are enforced, thus allowing most operations. The config properties `hive.allow-drop-table`, `hive.allow-rename-table`, `hive.allow-add-column`, `hive.allow-drop-column` and `hive.allow-rename-column` are used. |
 | `read-only`              | Operations that read data or metadata, such as `SELECT`, are permitted, but none of the operations that write data or metadata, such as `CREATE`, `INSERT` or `DELETE`, are allowed. |
-| `file`                   | Authorization checks are enforced using a config file specified by the Hive configuration property `security.config-file`. See [File Based Authorization](./hive-security.html#hive-file-based-authorization) for details. |
-| `sql-standard`           | Users are permitted to perform the operations as long as they have the required privileges as per the SQL standard. In this mode, openLooKeng enforces the authorization checks for queries based on the privileges defined in Hive metastore. To alter these privileges, use the [GRANT](../sql/grant) and [REVOKE](../sql/revoke) commands. See [SQL Standard Based Authorization](./hive-security.html#hive-sql-standard-based-authorization) for details. |
+| `file`                   | Authorization checks are enforced using a config file specified by the Hive configuration property `security.config-file`. See [File Based Authorization](./hive-security.md#file-based-authorization) for details. |
+| `sql-standard`           | Users are permitted to perform the operations as long as they have the required privileges as per the SQL standard. In this mode, openLooKeng enforces the authorization checks for queries based on the privileges defined in Hive metastore. To alter these privileges, use the [GRANT](../sql/grant.md) and [REVOKE](../sql/revoke.md) commands. See [SQL Standard Based Authorization](./hive-security.md#sql-standard-based-authorization) for details. |
 
 ### SQL Standard Based Authorization
 
@@ -28,15 +33,15 @@ Since openLooKeng\'s `ROLE` syntax support matches the SQL standard, and Hive do
 -   `SET ROLE ALL` enables all of a user\'s roles except `admin`.
 -   The `admin` role must be enabled explicitly by executing`SET ROLE admin`.
 
-Authentication
---------------
+## Authentication
+
 
 The default security configuration of the `/connector/hive` does not use
 authentication when connecting to a Hadoop cluster. All queries are executed as the user who runs the openLooKeng process, regardless of which user submits the query.
 
-The Hive connector provides additional security options to support Hadoop clusters that have been configured to use [Kerberos](./hive-security-kerberos-support.html).
+The Hive connector provides additional security options to support Hadoop clusters that have been configured to use [Kerberos](./hive-security.md/#kerberos-support).
 
-When accessing `HDFS (Hadoop Distributed File System)`, openLooKeng can [impersonate](./hive-security-impersonation#impersonate.html) the end user who is running the query. This can be used with HDFS permissions and `ACLs (Access Control Lists)` to provide additional security for data.
+When accessing `HDFS (Hadoop Distributed File System)`, openLooKeng can [impersonate](./hive-security.md#end-user-impersonation) the end user who is running the query. This can be used with HDFS permissions and `ACLs (Access Control Lists)` to provide additional security for data.
 
 
 **Warning**
@@ -44,12 +49,12 @@ When accessing `HDFS (Hadoop Distributed File System)`, openLooKeng can [imperso
 Access to the openLooKeng coordinator should be secured using Kerberos when using Kerberos authentication to Hadoop services. Failure to secure access to the openLooKeng coordinator could result in unauthorized access to
 sensitive data on the Hadoop cluster.
 
-See [server](../security/server.html) and [cli](../security/cli.html) for information on setting up Kerberos authentication.
+See [Coordinator Kerberos Authentication](../security/server.md) and [CLI Kerberos Authentication](../security/cli.md) for information on setting up Kerberos authentication.
 
    
 
-Kerberos Support
-----------------
+## Kerberos Support
+
 
 In order to use the Hive connector with a Hadoop cluster that uses `kerberos` authentication, you will need to configure the connector to work with two services on the Hadoop cluster:
 
@@ -140,7 +145,7 @@ When the authentication type for the Hive metastore Thrift service is `KERBEROS`
 
 Keytab files must be distributed to every node in the cluster that runs openLooKeng.
 
-[Additional Information About Keytab Files](./hive-security.html#Additional Information About Keytab Files)
+[Additional Information About Keytab Files](#additional-information-about-keytab-files)
 
 ### HDFS Authentication
 
@@ -212,10 +217,10 @@ When the authentication type is `KERBEROS`, openLooKeng accesses HDFS as the pri
 
 Keytab files must be distributed to every node in the cluster that runs openLooKeng.
 
-[Additional Information About Keytab Files](./hive-security.html#Additional Information About Keytab Files)
+[Additional Information About Keytab Files](./hive-security.md#additional-information-about-keytab-files)
 
-End User Impersonation
-----------------------
+## End User Impersonation
+
 
 ### Impersonation Accessing HDFS
 
@@ -246,7 +251,7 @@ allowed to impersonate this user, as discussed in the section `configuring-hadoo
 
 Keytab files must be distributed to every node in the cluster that runs openLooKeng.
 
-[Additional Information About Keytab Files](./hive-security.html#Additional Information About Keytab Files)
+[Additional Information About Keytab Files](#additional-information-about-keytab-files)
 
 ### Impersonation Accessing the Hive Metastore
 
@@ -257,8 +262,8 @@ openLooKeng does not currently support impersonating the end user when accessing
 In order to use `NONE` **authentication with HDFS impersonation** or `KERBEROS` **Authentication With HDFS Impersonation**, the Hadoop cluster must be configured to allow the user or principal that openLooKeng is running as to impersonate the users who log in to openLooKeng. Impersonation in Hadoop is configured in the file `core-site.xml`. A complete description of the configuration options can be found in the [Hadoop
 documentation](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/Superusers.html#Configurations).
 
-Additional Information About Keytab Files
------------------------------------------
+## Additional Information About Keytab Files
+
 
 Keytab files contain encryption keys that are used to authenticate principals to the Kerberos `KDC (Key Distribution Center)`. These encryption keys must be stored securely; you should take the same precautions to protect them that you would to protect ssh private keys.
 
@@ -270,8 +275,8 @@ same location on every node.
 
 You should ensure that the keytab files have the correct permissions on every node after distributing them.
 
-File Based Authorization
-------------------------
+## File Based Authorization
+
 
 The config file is specified using JSON and is composed of three sections, each of which is a list of rules that are matched in the orderspecified in the config file. The user is granted the privileges from the first matching rule. All regexes default to `.*` if not specified.
 

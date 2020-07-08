@@ -1,42 +1,41 @@
-Color Functions
-===============
++++
+weight = 23
+title = "颜色函数"
++++
 
-**bar(x, width)** -\> varchar
+# 颜色函数
 
-Renders a single bar in an ANSI bar chart using a default `low_color` of red and a `high_color` of green. For example, if `x` of 25% and width of 40 are passed to this function. A 10-character red bar will be drawn followed by 30 spaces to create a bar of 40 characters.
+**bar(x, width)** -> varchar
 
-**bar(x, width, low\_color, high\_color)** -\> varchar
+使用默认的`low_color` 红色和 `high_color` 绿色呈现 ANSI 条形图中的单个条形。例如，将 `x` 值 25% 和 width 值 40 传递给该函数，则呈现一个 10 字符红色条形图，后跟 30 个空格，从而创建一个 40 字符条形图。
 
-Renders a single line in an ANSI bar chart of the specified `width`. The parameter `x` is a double value between \[0,1\]. Values of `x` that fall outside the range \[0,1\] will be truncated to either a 0 or a 1 value.
-The `low_color` and `high_color` capture the color to use for either end of the horizontal bar chart. For example, if `x` is 0.5, `width` is 80, `low_color` is 0xFF0000, and `high_color` is 0x00FF00 this function will
-return a 40 character bar that varies from red (0xFF0000) and yellow (0xFFFF00) and the remainder of the 80 character bar will be padded with spaces.
+**bar(x, width, low\_color, high\_color)** -> varchar
 
-![img](/images/functions_color_bar.png)
+呈现 ANSI 条形图中具有指定 `width` 的单个行。参数 `x` 是处于 \[0,1] 范围之内的 double 值。处于范围 \[0,1] 之外的 `x` 值将被截断为值 0 或 1。`low_color` 和 `high_color` 捕获颜色以用于水平条形图的两端。例如，如果 `x` 为 0.5，`width` 为 80，`low_color` 为 0xFF0000，`high_color` 为 0x00FF00，则该函数返回一个 40 字符条形，其颜色从红色 (0xFF0000) 变为黄色 (0xFFFF00)，使用空格对 80 字符条形的其余部分进行填充。
 
+![img](../images/functions_color_bar.png)
 
-**color(string)** -\> color
+**color(string)** -> color
 
-Returns a color capturing a decoded RGB value from a 4-character string of the format \"\#000\". The input string should be varchar containing a CSS-style short rgb string or one of `black`, `red`, `green`, `yellow`,
-`blue`, `magenta`, `cyan`, `white`.
+从格式为“#000”的 4 字符字符串捕获解码的 RGB 值，返回相应的颜色。输入字符串应该为 varchar，其中包含 CSS 样式的短 RGB 字符串，或者为 `black`、`red`、`green`、`yellow`、`blue`、`magenta`、`cyan` 和 `white` 之一。
 
-**color(x, low, high, low\_color, high\_color)** -\> color
+**color(x, low, high, low\_color, high\_color)** -> color
 
-Returns a color interpolated between `low_color` and `high_color` using the double parameters `x`, `low`, and `high` to calculate a fraction which is then passed to the `color(fraction, low_color, high_color)`
-function shown below. If `x` falls outside the range defined by `low` and `high` it\'s value will be truncated to fit within this range.
+返回一个介于 `low_color` 和 `high_color` 之间的颜色，使用 double 参数 `x`、`low` 和 `high` 计算得出一个小数，然后将该小数传给下面显示的 `color(fraction, low_color, high_color)` 函数。如果 `x` 处于 `low` 和 `high` 定义的范围之外，则对其值进行截断，以使其处于该范围之内。
 
-**color(x, low\_color, high\_color)** -\> color
+**color(x, low\_color, high\_color)** -> color
 
-Returns a color interpolated between `low_color` and `high_color` according to the double argument `x` between 0 and 1.0. The parameter `x` is a double value between \[0,1\]. Values of `x` that fall outside the range \[0,1\] will be truncated to either a 0 or a 1 value.
+根据介于 0 和 1.0 之间的 double 参数 `x` 返回一个介于 `low_color` 和 `high_color` 之间的颜色。参数 `x` 是处于 \[0,1] 范围之内的 double 值。处于范围 \[0,1] 之外的 `x` 值将被截断为值 0 或 1。
 
-**render(x, color)** -\> varchar
+**render(x, color)** -> varchar
 
-Renders value `x` using the specific color using ANSI color codes. `x` can be either a double, bigint, or varchar.
+使用特定的颜色（使用 ANSI 颜色代码）呈现值 `x`。`x` 可以为 double、bigint 或 varchar 类型。
 
-**render(b)** -\> varchar
+**render(b)** -> varchar
 
-Accepts boolean value `b` and renders a green true or a red false using ANSI color codes.
+接受 boolean 值 `b` 并使用 ANSI 颜色代码将绿色呈现为 true 或将红色呈现为 false。
 
-**rgb(red, green, blue)** -\> color
+**rgb(red, green, blue)** -> color
 
-Returns a color value capturing the RGB value of three component color values supplied as int parameters ranging from 0 to 255: `red`, `green`, `blue`.
+返回一个颜色值，捕获三个作为 int 参数（范围为 0 至 255）提供的分量颜色值的 RGB 值：`red`、`green`、`blue`。
 

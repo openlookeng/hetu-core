@@ -40,4 +40,4 @@ Limitations
 See Also
 --------
 
-[insert](./insert.html), [insert-overwrite](./insert-overwrite.html)
+[INSERT](./insert.md), [INSERT OVERWRITE](./insert-overwrite.md)

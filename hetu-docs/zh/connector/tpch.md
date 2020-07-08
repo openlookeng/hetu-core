@@ -1,28 +1,29 @@
-TPCH Connector
-==============
++++
+weight = 20
+title = "TPCH"
++++
 
-The TPCH connector provides a set of schemas to support the TPC Benchmark™ H (TPC-H). TPC-H is a database benchmark used to measure the performance of highly-complex decision support databases.
+# TPCH连接器
 
-This connector can also be used to test the capabilities and query syntax of openLooKeng without configuring access to an external data source.
-When you query a TPCH schema, the connector generates the data on the fly using a deterministic lgorithm.
+TPCH连接器提供一组模式来支持TPC Benchmark™ H (TPC-H)。TPC-H是一个数据库基准，用于衡量高度复杂决策支持数据库的性能。
 
-Configuration
--------------
+此连接器还可以用于测试openLooKeng的功能和查询语法，而无需配置对外部数据源的访问。当查询TPCH模式时，连接器使用确定性算法动态生成数据。
 
-To configure the TPCH connector, create a catalog properties file `etc/catalog/tpch.properties` with the following contents:
+## 配置
+
+要配置TPCH连接器，创建一个具有以下内容的目录属性文件`etc/catalog/tpch.properties`：
 
 ``` properties
 connector.name=tpch
 ```
 
-TPCH Schemas
-------------
+## TPCH模式
 
-The TPCH connector supplies several schemas:
+TPCH连接器提供了几个模式：
 
     SHOW SCHEMAS FROM tpch;
 
-``` 
+```
 Schema
 --------------------
 information_schema
@@ -38,7 +39,6 @@ tiny
 (11 rows)
 ```
 
-Ignore the standard schema `information_schema` which exists in every catalog and is not directly provided by the TPCH connector.
+忽略标准模式`information_schema`，该模式每个目录中都存在，且不是由TPCH连接器直接提供的。
 
-Every TPCH schema provides the same set of tables. Some tables are identical in all schemas. Other tables vary based on the *scale factor* which is determined based on the schema name. For example, the schema
-`sf1` corresponds to scale factor `1` and the schema `sf300` corresponds to scale factor `300`. The TPCH connector provides an infinite number of schemas for any scale factor, not just the few common ones listed by `SHOW SCHEMAS`. The `tiny` schema is an alias for scale factor `0.01`, which is a very small data set useful for testing.
+每个TPCH模式都提供相同的一组表。有些表在所有模式中都是相同的。其他表根据模式名确定的*比例系数*不同而不同。例如模式`sf1`对应比例系数`1`，模式`sf300`对应比例系数`300`。TPCH连接器为任何比例系数提供了无限数量的模式，而不仅仅是由`SHOW SCHEMAS`列出的几个常用模式。`tiny`模式是比例系数`0.01`的别名，该模式是用于测试的一个非常小的数据集。

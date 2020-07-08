@@ -1,3 +1,8 @@
++++
+weight = 23
+title = "Color Functions"
++++
+
 Color Functions
 ===============
 
@@ -11,7 +16,7 @@ Renders a single line in an ANSI bar chart of the specified `width`. The paramet
 The `low_color` and `high_color` capture the color to use for either end of the horizontal bar chart. For example, if `x` is 0.5, `width` is 80, `low_color` is 0xFF0000, and `high_color` is 0x00FF00 this function will
 return a 40 character bar that varies from red (0xFF0000) and yellow (0xFFFF00) and the remainder of the 80 character bar will be padded with spaces.
 
-![img](/images/functions_color_bar.png)
+![img](../images/functions_color_bar.png)
 
 
 **color(string)** -\> color

@@ -41,4 +41,4 @@ EXECUTE my_select2 USING 1, 3;
 
 ## 另请参见
 
-[prepare](./prepare.html)
+[PREPARE](./prepare.md)

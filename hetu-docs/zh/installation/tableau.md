@@ -11,8 +11,8 @@ Tableau的openLooKeng网络连接器允许用户在Tableau上运行对openLooKen
 
 Tableau在创建新的web数据源时，会询问Web连接器的URL。使用以下URL，`example.net:8080`替换成openLooKeng协调节点的主机名和端口号（默认端口为`8080`）：
 
-```{.none}
-http://example.net:8080/tableau/presto-connector.html
+```
+http://example.net:8080/tableau/presto-connector.md
 ```
 
 当Tableau第一次加载openLooKeng Web连接器时，将呈现一个HTML表单。在这个表单中，你需要填写例如用户名、要查询的目录和架构、数据源名称、要设置的会话参数以及最终要运行的SQL查询等详细信息。点击`Submit`后，查询将提交给openLooKeng协调节点，Tableau将逐页从协调节点检索的结果中创建摘录。在Tableau摘录完查询的结果之后，你可以使用此摘录进一步分析Tableau。

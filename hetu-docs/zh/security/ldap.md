@@ -1,43 +1,48 @@
-LDAP Authentication
++++
+weight = 3
+title = "LDAP认证"
++++
+
+LDAP认证
 ===================
 
-openLooKeng can be configured to enable frontend LDAP authentication over HTTPS for clients, such as the `cli_ldap`, or the JDBC and ODBC drivers. At present only simple LDAP authentication mechanism involving username and password is supported. The openLooKeng client sends a username and password to the coordinator and coordinator validates these credentials using an external LDAP service.
+通过配置openLooKeng，可以为客户端（如`cli_ldap`）或JDBC、ODBC驱动启用HTTPS访问的前端LDAP认证。目前只支持涉及用户名和密码的简单的LDAP认证机制。openLooKeng客户端将用户名和密码发送给协调节点，协调节点使用外部LDAP服务验证这些凭据。
 
-To enable LDAP authentication for openLooKeng, configuration changes are made on the openLooKeng coordinator. No changes are required to the worker configuration; only the communication from the clients to the coordinator is authenticated. However, if you want to secure the communication between openLooKeng nodes with SSL/TLS configure `/security/internal-communication`.
+为了给openLooKeng启用LDAP身份验证，需要修改openLooKeng协调节点上的配置。Worker节点上的配置不需要更改，只为仅验证从客户端到协调节点的通信。但是，如果您希望使用SSL/TLS来确保openLooKeng节点之间的通信安全，需要配置`/security/internal- communication`。
 
-openLooKeng Server Configuration
+openLooKeng服务器配置
 -------------------------
 
-### Environment Configuration
+### 环境配置
 
-#### Secure LDAP
+#### 安全LDAP协议
 
-openLooKeng requires Secure LDAP (LDAPS), so make sure you have TLS enabled on your LDAP server.
+openLooKeng需要安全的LDAP (LDAPS)协议，所以请确保在LDAP服务器上启用了TLS。
 
-#### TLS Configuration on openLooKeng Coordinator
+#### openLooKeng协调节点的TLS配置
 
-You need to import the LDAP server\'s TLS certificate to the default Java truststore of the openLooKeng coordinator to secure TLS connection. You can use the following example `keytool` command to import the certificate `ldap_server.crt`, to the truststore on the coordinator.
+您需要将LDAP服务器的TLS证书导入到openLooKeng协调节点默认的Java信任库中，以保证TLS连接的安全。可以使用下面的示例中的`keytool`命令将证书`ldap_server.crt`导入到协调节点上的信任库中。
 
 ``` shell
 $ keytool -import -keystore <JAVA_HOME>/jre/lib/security/cacerts -trustcacerts -alias ldap_server -file ldap_server.crt
 ```
 
-In addition to this, access to the openLooKeng coordinator should be through HTTPS. You can do it by creating a
-`server_java_keystore` on the coordinator.
+除此之外，使用HTTPS访问openLooKeng协调节点。您可以通过在协调节点上创建`server_java_keystore`来实现。
 
-### openLooKeng Coordinator Node Configuration
 
-You must make the following changes to the environment prior to configuring the openLooKeng coordinator to use LDAP authentication and HTTPS.
+### openLooKeng协调节点配置
+
+在配置openLooKeng协调节点使用LDAP身份验证和HTTPS之前，必须对环境进行下列更改:
 
 > -   `ldap_server`
 > -   `server_java_keystore`
 
-You also need to make changes to the openLooKeng configuration files. LDAP authentication is configured on the coordinator in two parts. The first part is to enable HTTPS support and password authentication in the
-coordinator\'s `config.properties` file. The second part is to configure LDAP as the password authenticator plugin.
+您还需要对openLooKeng配置文件进行修改。LDAP认证在协调节点上分为两部分进行配置。第一部分是在协调节点的`config.properties`文件中启用HTTPS和密码认证。
+第二部分是将LDAP配置为密码验证器插件。
 
-#### Server Config Properties
+#### 服务器配置属性
 
-The following is an example of the required properties that need to be added to the coordinator\'s `config.properties` file:
+以下示例列出了需要在协调节点的`config.properties`文件中添加的属性：
 
 ``` properties
 http-server.authentication.type=PASSWORD
@@ -51,20 +56,20 @@ http-server.https.keystore.key=keystore_password
 
  
 
-| Property                          | Description                                                  |
+| 属性                          | 描述                                                  |
 | :-------------------------------- | :----------------------------------------------------------- |
-| `http-server.authentication.type` | Enable password authentication for the openLooKeng coordinator. Must be set to `PASSWORD`. |
-| `http-server.https.enabled`       | Enables HTTPS access for the openLooKeng coordinator. Should be set to `true`. Default value is `false`. |
-| `http-server.https.port`          | HTTPS server port.                                           |
-| `http-server.https.keystore.path` | The location of the Java Keystore file that will be used to secure TLS. |
-| `http-server.https.keystore.key`  | The password for the keystore. This must match the password you specified when creating the keystore. |
+| `http-server.authentication.type` | 对openLooKeng协调节点开启密码认证功能。必须设置为`PASSWORD`。|
+| `http-server.https.enabled`       | 对openLooKeng协调节点开启HTTPS访问功能。取值设置为`true`。默认值为`false`。|
+| `http-server.https.port`          | HTTPS服务器的端口号。                                           |
+| `http-server.https.keystore.path` |用于保证TLS安全连接的Java密钥库文件的位置。|
+| `http-server.https.keystore.key`  | 密钥库的密码。必须与创建密钥库时设置的密码一致。|
 
 
 
-#### Password Authenticator Configuration
+#### 密码验证器配置
 
-Password authentication needs to be configured to use LDAP. Create an `etc/password-authenticator.properties` file on the coordinator.
-Example:
+配置密码认证使用LDAP协议。在协调节点上创建`etc/password-authenticator.properties`文件。
+示例：
 
 ``` properties
 password-authenticator.name=ldap
@@ -72,96 +77,94 @@ ldap.url=ldaps://ldap-server:636
 ldap.user-bind-pattern=<Refer below for usage>
 ```
 
-| Property                 | Description                                                  |
+|属性                 |描述                                                  |
 | :----------------------- | :----------------------------------------------------------- |
-| `ldap.url`               | The url to the LDAP server. The url scheme must be `ldaps://` since openLooKeng allows only Secure LDAP. |
-| `ldap.user-bind-pattern` | This property can be used to specify the LDAP user bind string for password authentication. This property must contain the pattern `${USER}` which will be replaced by the actual username during the password authentication. Example: `${USER}@corp.example.com`. |
+| `ldap.url` |指向LDAP服务器的URL。由于openLooKeng只允许使用安全的LDAP，所以url模式必须是`ldaps://`。|
+| `ldap.user-bind-pattern` | 该属性可用于为密码验证指定LDAP用户绑定字符串。该属性必须包含`${USER}`，在密码验证期间，该字段将被实际的用户名替换。例如: `${USER}@corp.example.com`.|
 
- Based on the LDAP server implementation type, the property `ldap.user-bind-pattern` can be used as described below.
+根据LDAP服务器的实现类型，可以使用属性`ldap.user-bind-pattern`，如下所示。
 
-Based on the LDAP server implementation type, the property `ldap.user-bind-pattern` can be used as described below.
-
-##### Active Directory
+##### 活动目录
 
 ``` properties
 ldap.user-bind-pattern=${USER}@<domain_name_of_the_server>
 ```
 
-Example:
+示例：
 
 ``` properties
 ldap.user-bind-pattern=${USER}@corp.example.com
 ```
 
-##### OpenLDAP
+##### OpenLDAP协议
 
 ``` properties
 ldap.user-bind-pattern=uid=${USER},<distinguished_name_of_the_user>
 ```
 
-Example:
+示例：
 
 ``` properties
 ldap.user-bind-pattern=uid=${USER},OU=America,DC=corp,DC=example,DC=com
 ```
 
-#### Authorization based on LDAP Group Membership
+#### 基于LDAP群组组成员的授权
 
-You can further restrict the set of users allowed to connect to the openLooKeng coordinator based on their group membership by setting the optional `ldap.group-auth-pattern` and `ldap.user-base-dn` properties in addition to the basic LDAP authentication properties.
+除了基本的LDAP身份验证属性之外，还可以通过设置可选的`ldap.group-auth-pattern`和`ldap.user-base-dn`属性，进一步根据组成员身份限制允许连接到openLooKeng协调节点的用户集。
 
-| Property                  | Description                                                  |
+|属性                  | 描述                                                  |
 | :------------------------ | :----------------------------------------------------------- |
-| `ldap.user-base-dn`       | The base LDAP distinguished name for the user who tries to connect to the server. Example: `OU=America,DC=corp,DC=example,DC=com` |
-| `ldap.group-auth-pattern` | This property is used to specify the LDAP query for the LDAP group membership authorization. This query will be executed against the LDAP server and if successful, the user will be authorized. This property must contain a pattern `${USER}` which will be replaced by the actual username in the group authorization search query. See samples below. |
+| `ldap.user-base-dn` |尝试连接到服务器的用户的LDAP基本标识名。例如: `OU=America,DC=corp,DC=example,DC=com` |
+| `ldap.group-auth-pattern` | 该属性用于指定LDAP群组成员授权的LDAP查询。该查询将针对LDAP服务器执行，如果成功，用户将获得授权。此属性必须包含一个`${USER}`，它将在群组授权搜索查询中被替换为实际的用户名。见以下示例。|
 
- Based on the LDAP server implementation type, the property `ldap.group-auth-pattern` can be used as described below.
+ 根据LDAP服务器的实现类型，可以使用属性`ldap.group-auth-pattern`，如下所示。
 
-##### Active Directory
+##### 活动目录
 
-``` 
+```
 ldap.group-auth-pattern=(&(objectClass=<objectclass_of_user>)(sAMAccountName=${USER})(memberof=<dn_of_the_authorized_group>))
 ```
 
-Example:
+示例：
 
-``` 
+```
 ldap.group-auth-pattern=(&(objectClass=person)(sAMAccountName=${USER})(memberof=CN=AuthorizedGroup,OU=Asia,DC=corp,DC=example,DC=com))
 ```
 
-##### OpenLDAP
+##### OpenLDAP协议
 
-``` 
+```
 ldap.group-auth-pattern=(&(objectClass=<objectclass_of_user>)(uid=${USER})(memberof=<dn_of_the_authorized_group>))
 ```
 
-Example:
+示例：
 
-``` 
+```
 ldap.group-auth-pattern=(&(objectClass=inetOrgPerson)(uid=${USER})(memberof=CN=AuthorizedGroup,OU=Asia,DC=corp,DC=example,DC=com))
 ```
 
-For OpenLDAP, for this query to work, make sure you enable the `memberOf` [overlay](http://www.openldap.org/doc/admin24/overlays.html).
+对于OpenLDAP，要使这个查询起作用，请确保启用`memberOf` [overlay](http://www.openldap.org/doc/admin24/overlays.html)。
 
-You can also use this property for scenarios where you want to authorize a user based on complex group authorization search queries. For example, if you want to authorize a user belonging to any one of multiple groups (in OpenLDAP), this property may be set as follows:
+也可以使用此属性对用户进行基于复杂的群组授权搜索查询的授权。例如，如果要对属于多个组（在OpenLDAP中）中的任何一个组的用户进行授权，则此属性可以设置为：
 
-``` 
+```
 ldap.group-auth-pattern=(&(|(memberOf=CN=normal_group,DC=corp,DC=com)(memberOf=CN=another_group,DC=com))(objectClass=inetOrgPerson)(uid=${USER}))
 ```
 
-openLooKeng CLI
+openLooKeng命令行接口
 --------
 
-### Environment Configuration
+### 环境配置
 
-#### TLS Configuration
+#### TLS配置
 
-Access to the openLooKeng coordinator should be through HTTPS when using LDAP authentication. The openLooKeng CLI can use either a `Java Keystore <server_java_keystore>` file or `Java Truststore <cli_java_truststore>` for its TLS configuration.
+使用LDAP身份验证时，应该使用HTTPS访问openLooKeng协调节点。openLooKeng命令行接口可以使用`Java Keystore <server_java_keystore>`文件或`Java Truststore <cli_java_truststore>`文件进行TLS配置。
 
-If you are using keystore file, it can be copied to the client machine and used for its TLS configuration. If you are using truststore, you can either use default java truststores or create a custom truststore on the CLI. We do not recommend using self-signed certificates in production.
+如果您使用keystore文件，可以将它复制到客户端，并用于它进行TLS配置。如果您正在使用truststore文件，则可以使用默认的Java truststore，也可以在命令行界面创建自定义的truststore。不建议在生产中使用自签名证书。
 
-### openLooKeng CLI Execution
+### openLooKeng命令行执行
 
-In addition to the options that are required when connecting to a openLooKeng coordinator that does not require LDAP authentication, invoking the CLI with LDAP support enabled requires a number of additional command line options. You can either use `--keystore-*` or `--truststore-*`properties to secure TLS connection. The simplest way to invoke the CLI is with a wrapper script.
+如果命令行接口开启了LDAP支持，要调用此接口，除了要配置连接不需要LDAP身份验证的openLooKeng协调节点所需的选项之外，还需要配置其它一些命令行选项。您可以使用`--keystore-*`属性或`--truststore-*`属性来确保安全的TLS连接。调用CLI的最简单方法是使用包装脚本。
 
 ``` shell
 #!/bin/bash
@@ -178,28 +181,30 @@ In addition to the options that are required when connecting to a openLooKeng co
 --password
 ```
 
-| Option                  | Description                                                  |
+| 选项                  | 说明                                                  |
 | :---------------------- | :----------------------------------------------------------- |
-| `--server`              | The address and port of the openLooKeng coordinator.  The port must be set to the port the openLooKeng coordinator is listening for HTTPS connections on. openLooKeng CLI does not support using `http` scheme for the url when using LDAP authentication. |
-| `--keystore-path`       | The location of the Java Keystore file that will be used to secure TLS. |
-| `--keystore-password`   | The password for the keystore. This must match the password you specified when creating the keystore. |
-| `--truststore-path`     | The location of the Java Truststore file that will be used to secure TLS. |
-| `--truststore-password` | The password for the truststore. This must match the password you specified when creating the truststore. |
-| `--user`                | The LDAP username. For Active Directory this should be your `sAMAccountName` and for OpenLDAP this should be the `uid` of the user. This is the username which will be used to replace the `${USER}` placeholder pattern in the properties specified in `config.properties`. |
-| `--password`            | Prompts for a password for the `user`.                       |
+| `--server` | openLooKeng协调节点的地址和端口。  端口必须设置为openLooKeng协调节点侦听HTTPS连接的端口。使用LDAP认证时，openLooKeng命令行接口不支持使用`http`模式的URL。|
+| `--keystore-path` |用于确保安全TLS连接的Java 密钥库（Keystore）文件的位置。|
+| `--keystore-password` | 密钥库的密码。必须与创建密钥库时设置的密码一致。|
+| `--truststore-path` |用来确保安全TLS连接的Java 信任库（Truststore）文件的位置。|
+| `--truststore-password` | 信任库的密码。必须与创建信任库时设置的密码一致。|
+| `--user` | LDAP用户名。对于活动目录，它应该是您的`sAMAccountName`；对于OpenLDAP，它应该是用户的`uid`。它是替换`config.properties`文件中配置的属性中的`${USER}`的用户名。|
+| `--password` | 提示用户输入`user`的密码。                       |
 
-Troubleshooting
+异常处理
 ---------------
 
-### Java Keystore File Verification
+### Java密钥库文件校验
 
-Verify the password for a keystore file and view its contents using [troubleshooting_keystore](./tls.html#Java-Keystore-File-Verification).
+使用[troubleshooting_keystore](./tls.md#java-keystore-file-verification)验证keystore文件的密码，并查看其内容。
 
-### SSL Debugging for openLooKeng CLI
+### openLooKeng命令行的SSL调试
 
-If you encounter any SSL related errors when running openLooKeng CLI, you can run CLI 
+如果运行openLooKeng CLI时遇到SSL相关的错误，可以使用`-Djavax.net.debug=ssl`参数运行CLI进行调试。 
 
-using `-Djavax.net.debug=ssl` parameter for debugging. You should use the openLooKeng CLI executable jar to enable this. Eg:
+使用openLooKeng 命令行接口可执行jar来启用它。
+
+示例：
 
 ``` shell
 java -Djavax.net.debug=ssl \
@@ -209,25 +214,25 @@ hetu-cli-<version>-executable.jar \
 <other_cli_arguments>
 ```
 
-#### Common SSL errors
+#### 常见SSL错误
 
 ##### java.security.cert.CertificateException: No subject alternative names present
 
-This error is seen when the openLooKeng coordinator's certificate is invalid and does not have the IP you provide in the `--server` argument of the CLI. You will have to regenerate the coordinator\'s SSL certificate with the appropriate `SAN (Subject Alternative Name)` added.
+当openLooKeng协调节点的证书无效，且在命令行接口`--server`参数中没有您指定的的IP地址时，就会出现此错误。您必须重新生成协调节点的SSL证书，并添加适当的`SAN（使用者可选名称）`。
 
-Adding a SAN to this certificate is required in cases where `https://` uses IP address in the URL rather than the domain contained in the coordinator\'s certificate, and the certificate does not contain the `SAN (Subject Alternative Name)` parameter with the matching IP address as an alternative attribute.
+如果`https://`使用URL中的IP地址而不是协调节点证书中包含的域，且证书中不包含`SAN (使用者可选名称)`参数，其对应的IP地址作为备选属性，则需要将SAN添加到此证书中。
 
-#### Authentication or SSL errors with JDK Upgrade
+#### JDK升级相关的认证或SSL错误
 
-Starting with the JDK 8u181 release, to improve the robustness of LDAPS (secure LDAP over TLS) connections, endpoint identification algorithms have been enabled by default. See release notes
-[here](https://www.oracle.com/technetwork/java/javase/8u181-relnotes-4479407.html#JDK-8200666.).
-The same LDAP server certificate on the openLooKeng coordinator (running on JDK version \>= 8u181) that was previously able to successfully connect toan LDAPS server may now fail with the below error:
+为了提高LDAPS（LDAP over TLS）连接的健壮性， 从JDK 8u181版本开始，默认启用端点识别算法。请参见随版本发布的版本说明书[这里](https://www.oracle.com/technetwork/java/javase/8u181-relnotes-4479407.html#JDK-8200666.)。
 
-``` 
+openLooKeng协调节点（运行JDK版本\>= 8u181）上的同一个LDAP服务器证书，以前能够成功连接到LDAPS服务器，现在可能失败，并出现以下错误：
+
+```
 javax.naming.CommunicationException: simple bind failed: ldapserver:636
 [Root exception is javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No subject alternative DNS name matching ldapserver found.]
 ```
 
-If you want to temporarily disable endpoint identification you can add the 
+如果需要暂时关闭端点识别功能，可以在openLooKeng\的`jvm.config`文件中增加`-Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true`属性。 
 
-property`-Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true` to openLooKeng\'s `jvm.config` file. However, in a production environment, we suggest fixing the issue by regenerating the LDAP server certificate so that the certificate `SAN (Subject Alternative Name)` or certificate subject name matches the LDAP server.
+但是，在生产环境中，我们建议通过重新生成LDAP服务器证书来修复该问题，使证书`SAN (Subject Alternative Name)` 或证书使用者名称与LDAP服务器匹配。

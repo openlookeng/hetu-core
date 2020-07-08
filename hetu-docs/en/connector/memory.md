@@ -1,3 +1,8 @@
++++
+weight = 13
+title = "Memory"
++++
+
 Memory Connector
 ================
 

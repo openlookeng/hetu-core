@@ -149,4 +149,4 @@ lk:hive> EXPLAIN (TYPE IO, FORMAT JSON) INSERT INTO test_nation SELECT * FROM na
 
 ## 另请参见
 
-[explain-analyze](./explain-analyze.html)
+[EXPLAIN ANALYZE](./explain-analyze.md)

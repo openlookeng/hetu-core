@@ -49,4 +49,4 @@ Insert a row without specifying the `comment` column. That column will be `null`
 See Also
 --------
 
-[values](./values.html), [insert-overwrite](./insert-overwrite.html)
+[VALUES](./values.md), [INSERT OVERWRITE](./insert-overwrite.md)

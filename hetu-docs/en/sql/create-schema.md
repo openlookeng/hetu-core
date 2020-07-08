@@ -44,4 +44,4 @@ Create the schema `traffic` if it does not already exist:
 See Also
 --------
 
-[alter-schema](./alter-schema.html) ,[drop-schema](./drop-schema.html)
+[ALTER SCHEMA](./alter-schema.md) ,[DROP SCHEMA](./drop-schema.md)

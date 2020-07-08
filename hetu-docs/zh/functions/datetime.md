@@ -1,28 +1,30 @@
-Date and Time Functions and Operators
-=====================================
++++
+weight = 13
+title = "日期和时间函数和运算符"
++++
 
-Date and Time Operators
------------------------
+# 日期和时间函数和运算符
 
-| Operator | Example                                             | Result                    |
-| :------- | :-------------------------------------------------- | :------------------------ |
-| `+`      | `date '2012-08-08' + interval '2' day`              | `2012-08-10`              |
-| `+`      | `time '01:00' + interval '3' hour`                  | `04:00:00.000`            |
-| `+`      | `timestamp '2012-08-08 01:00' + interval '29' hour` | `2012-08-09 06:00:00.000` |
-| `+`      | `timestamp '2012-10-31 01:00' + interval '1' month` | `2012-11-30 01:00:00.000` |
-| `+`      | `interval '2' day + interval '3' hour`              | `2 03:00:00.000`          |
-| `+`      | `interval '3' year + interval '5' month`            | `3-5`                     |
-| `-`      | `date '2012-08-08' - interval '2' day`              | `2012-08-06`              |
-| `-`      | `time '01:00' - interval '3' hour`                  | `22:00:00.000`            |
-| `-`      | `timestamp '2012-08-08 01:00' - interval '29' hour` | `2012-08-06 20:00:00.000` |
-| `-`      | `timestamp '2012-10-31 01:00' - interval '1' month` | `2012-09-30 01:00:00.000` |
-| `-`      | `interval '2' day - interval '3' hour`              | `1 21:00:00.000`          |
-| `-`      | `interval '3' year - interval '5' month`            | `2-7`                     |
+## 日期和时间运算符
 
-Time Zone Conversion
---------------------
+| 运算符 | 示例                                                | 结果                      |
+| :----- | :-------------------------------------------------- | :------------------------ |
+| `+`    | `date '2012-08-08' + interval '2' day`              | `2012-08-10`              |
+| `+`    | `time '01:00' + interval '3' hour`                  | `04:00:00.000`            |
+| `+`    | `timestamp '2012-08-08 01:00' + interval '29' hour` | `2012-08-09 06:00:00.000` |
+| `+`    | `timestamp '2012-10-31 01:00' + interval '1' month` | `2012-11-30 01:00:00.000` |
+| `+`    | `interval '2' day + interval '3' hour`              | `2 03:00:00.000`          |
+| `+`    | `interval '3' year + interval '5' month`            | `3-5`                     |
+| `-`    | `date '2012-08-08' - interval '2' day`              | `2012-08-06`              |
+| `-`    | `time '01:00' - interval '3' hour`                  | `22:00:00.000`            |
+| `-`    | `timestamp '2012-08-08 01:00' - interval '29' hour` | `2012-08-06 20:00:00.000` |
+| `-`    | `timestamp '2012-10-31 01:00' - interval '1' month` | `2012-09-30 01:00:00.000` |
+| `-`    | `interval '2' day - interval '3' hour`              | `1 21:00:00.000`          |
+| `-`    | `interval '3' year - interval '5' month`            | `2-7`                     |
 
-The `AT TIME ZONE` operator sets the time zone of a timestamp:
+## 时区转换
+
+`AT TIME ZONE`运算符设置时间戳的时区：
 
     SELECT timestamp '2012-10-31 01:00 UTC';
     2012-10-31 01:00:00.000 UTC
@@ -30,101 +32,87 @@ The `AT TIME ZONE` operator sets the time zone of a timestamp:
     SELECT timestamp '2012-10-31 01:00 UTC' AT TIME ZONE 'America/Los_Angeles';
     2012-10-30 18:00:00.000 America/Los_Angeles
 
-Date and Time Functions
------------------------
+## 日期和时间函数
 
-**current\_date** -\> date
+**current\_date** -> date
 
-Returns the current date as of the start of the query.
+返回查询开始时的当前日期。
 
+**current\_time** -> time with time zone
 
-**current\_time** -\> time with time zone
+返回查询开始时的当前时间。
 
-Returns the current time as of the start of the query.
+**current\_timestamp** -> timestamp with time zone
 
+返回查询开始时的当前时间戳。
 
-**current\_timestamp** -\> timestamp with time zone
+**current\_timezone()** -> varchar
 
-Returns the current timestamp as of the start of the query.
+以IANA定义的格式（如`America/Los_Angeles`）或相对于UTC的固定偏移量（如`+08:35`）返回当前时区。
 
+**date(x)** -> date
 
-**current\_timezone()** -\> varchar
+这是`CAST(x AS date)`的别名。
 
-Returns the current time zone in the format defined by IANA (e.g., `America/Los_Angeles`) or as fixed offset from UTC (e.g., `+08:35`)
+**from\_iso8601\_timestamp(string)** -> timestamp with time zone
 
+将以ISO 8601格式表示的`string`解析为`timestamp with time zone`。
 
-**date(x)** -\> date
+**from\_iso8601\_date(string)** -> date
 
-This is an alias for `CAST(x AS date)`.
+将以ISO 8601格式表示的`string`解析为`date`。
 
+**from\_unixtime(unixtime)** -> timestamp
 
-**from\_iso8601\_timestamp(string)** -\> timestamp with time zone
+将UNIX时间戳`unixtime`作为时间戳返回。`unixtime`是从`1970-01-01 00:00:00`开始经历的秒数。
 
-Parses the ISO 8601 formatted `string` into a `timestamp with time zone`.
+**from\_unixtime(unixtime, string)** -> timestamp with time zone
 
+将UNIX时间戳`unixtime`作为timestamp with time zone返回，其中使用`string`作为时区。`unixtime`是从`1970-01-01 00:00:00`开始经历的秒数。
 
-**from\_iso8601\_date(string)** -\> date
+**from\_unixtime(unixtime, hours, minutes)** -> timestamp with time zone
 
-Parses the ISO 8601 formatted `string` into a `date`.
+将UNIX时间戳`unixtime`作为timestamp with time zone返回，其中使用`hours`和`minutes`作为时区偏移量。`unixtime`是从`1970-01-01 00:00:00`开始经历的秒数。
 
+**localtime** -> time
 
-**from\_unixtime(unixtime)** -\> timestamp
+返回查询开始时的当前时间。
 
-Returns the UNIX timestamp `unixtime` as a timestamp. `unixtime` is the number of seconds since `1970-01-01 00:00:00`.
+**localtimestamp** -> timestamp
 
-**from\_unixtime(unixtime, string)** -\> timestamp with time zone
+返回查询开始时的当前时间戳。
 
-Returns the UNIX timestamp `unixtime` as a timestamp with time zone using `string` for the time zone. `unixtime` is the number of seconds since `1970-01-01 00:00:00`.
+**now()** -> timestamp with time zone
 
-**from\_unixtime(unixtime, hours, minutes)** -\> timestamp with time zone
+这是`current_timestamp`的别名。
 
-Returns the UNIX timestamp `unixtime` as a timestamp with time zone using `hours` and `minutes` for the time zone offset. `unixtime` is the number of seconds since `1970-01-01 00:00:00`.
+**to\_iso8601(x)** -> varchar
 
-**localtime** -\> time
+将`x`格式化为ISO 8601字符串。`x`可以是date、timestamp或timestamp with time zone。
 
-Returns the current time as of the start of the query.
+**to\_milliseconds(interval)** -> bigint
 
-**localtimestamp** -\> timestamp
+以毫秒为单位返回以天和秒为单位的间隔`interval`。
 
-Returns the current timestamp as of the start of the query.
+**to\_unixtime(timestamp)** -> double
 
-**now()** -\> timestamp with time zone
+将`timestamp`作为UNIX时间戳返回。
 
-This is an alias for `current_timestamp`.
+**注意**
 
+以下SQL标准函数不使用括号：
 
-**to\_iso8601(x)** -\> varchar
+- `current_date`
+- `current_time`
+- `current_timestamp`
+- `localtime`
+- `localtimestamp`
 
-Formats `x` as an ISO 8601 string. `x` can be date, timestamp, or timestamp with time zone.
+## 截断函数
 
+`date_trunc`函数支持以下单位：
 
-**to\_milliseconds(interval)** -\> bigint
-
-Returns the day-to-second `interval` as milliseconds.
-
-
-**to\_unixtime(timestamp)** -\> double
-
-Returns `timestamp` as a UNIX timestamp.
-
-
-**Note**
-
-The following SQL-standard functions do not use parenthesis:
-
--   `current_date`
--   `current_time`
--   `current_timestamp`
--   `localtime`
--   `localtimestamp`
-
-
-Truncation Function
--------------------
-
-The `date_trunc` function supports the following units:
-
-| Unit      | Example Truncated Value   |
+| 单位      | 截断值示例                |
 | :-------- | :------------------------ |
 | `second`  | `2001-08-22 03:04:05.000` |
 | `minute`  | `2001-08-22 03:04:00.000` |
@@ -135,307 +123,296 @@ The `date_trunc` function supports the following units:
 | `quarter` | `2001-07-01 00:00:00.000` |
 | `year`    | `2001-01-01 00:00:00.000` |
 
-The above examples use the timestamp `2001-08-22 03:04:05.321` as the
-input.
+上面的示例使用时间戳`2001-08-22 03:04:05.321`作为输入。
 
-**date\_trunc(unit, x)** -\> \[same as input\]
+**date\_trunc(unit, x)** -> \[与输入相同]
 
-Returns `x` truncated to `unit`.
+返回`x`截断至`unit`后的值。
 
+## 间隔函数
 
-Interval Functions
-------------------
+该部分中的函数支持以下间隔单位：
 
-The functions in this section support the following interval units:
+| 单位          | 说明 |
+| :------------ | :--- |
+| `millisecond` | 毫秒 |
+| `second`      | 秒   |
+| `minute`      | 分钟 |
+| `hour`        | 小时 |
+| `day`         | 天   |
+| `week`        | 周   |
+| `month`       | 月   |
+| `quarter`     | 季度 |
+| `year`        | 年   |
 
- 
+**date\_add(unit, value, timestamp)** -> \[与输入相同]
 
-| Unit          | Description        |
-| :------------ | :----------------- |
-| `millisecond` | Milliseconds       |
-| `second`      | Seconds            |
-| `minute`      | Minutes            |
-| `hour`        | Hours              |
-| `day`         | Days               |
-| `week`        | Weeks              |
-| `month`       | Months             |
-| `quarter`     | Quarters of a year |
-| `year`        | Years              |
+向`timestamp`添加类型为`unit`的间隔`value`。可以使用负值做减法。
 
-**date\_add(unit, value, timestamp)** -\> \[same as input\]
+**date\_diff(unit, timestamp1, timestamp2)** -> bigint
 
-Adds an interval `value` of type `unit` to `timestamp`. Subtraction can be performed by using a negative value.
+以`unit`为单位返回`timestamp2 - timestamp1`的值。
 
+## 持续时间函数
 
-**date\_diff(unit, timestamp1, timestamp2)** -\> bigint
+`parse_duration`函数支持以下单位：
 
-Returns `timestamp2 - timestamp1` expressed in terms of `unit`.
+| 单位 | 说明 |
+| :--- | :--- |
+| `ns` | 纳秒 |
+| `us` | 微秒 |
+| `ms` | 毫秒 |
+| `s`  | 秒   |
+| `m`  | 分钟 |
+| `h`  | 小时 |
+| `d`  | 天   |
 
+**parse\_duration(string)** -> interval
 
-Duration Function
------------------
-
-The `parse_duration` function supports the following units:
-
- 
-
-| Unit | Description  |
-| :--- | :----------- |
-| `ns` | Nanoseconds  |
-| `us` | Microseconds |
-| `ms` | Milliseconds |
-| `s`  | Seconds      |
-| `m`  | Minutes      |
-| `h`  | Hours        |
-| `d`  | Days         |
-
-**parse\_duration(string)** -\> interval
-
-Parses `string` of format `value unit` into an interval, where `value` is fractional number of `unit` values:
+将格式为`value unit`的`string`解析为一个间隔，其中`value`是以`unit`为单位的小数值。
 
     SELECT parse_duration('42.8ms'); -- 0 00:00:00.043
     SELECT parse_duration('3.81 d'); -- 3 19:26:24.000
     SELECT parse_duration('5m');     -- 0 00:05:00.000
 
+## MySQL日期函数
 
-MySQL Date Functions
---------------------
+该部分中的函数使用与MySQL `date_parse`和`str_to_date`函数兼容的格式字符串。下表根据MySQL手册说明了格式说明符：
 
-The functions in this section use a format string that is compatible with the MySQL `date_parse` and `str_to_date` functions. The following table, based on the MySQL manual, describes the format specifiers:
+| 说明符| 说明|
+|----------|----------|
+| `%a`| 工作日简称(`Sun` ... `Sat`)|
+| `%b`| 月份简称 (`Jan` ... `Dec`)|
+| `%c`| 以数字表示的月份 (`1` ... `12`) [4]|
+| `%D`| 带英文后缀的一个月中的第几日（`0th`、`1st`、`2nd`、`3rd`、...）|
+| `%d`| 以数字表示的一个月中的第几日(`01` ... `31`) [4]|
+| `%e`| 以数字表示的一个月中的第几日(`1` ... `31`) [4]|
+| `%f`| 微秒（打印6位：`000000` ... `999000`；解析1–9位：`0` ... `999999999`）[1]|
+| `%H`| 小时(`00` ... `23`)|
+| `%h`| 小时(`01` ... `12`)|
+| `%I`| 小时(`01` ... `12`)|
+| `%i`| 以数字表示的分钟(`00` ... `59`)|
+| `%j`| 一年中的某日(`001` ... `366`)|
+| `%k`| 小时(`0` ... `23`)|
+| `%l`| 小时(`1` ... `12`)|
+| `%M`| 月份名称(`January` ... `December`)|
+| `%m`| 以数字表示的月份(`01` ... `12`) [4]|
+| `%p`| `AM`或`PM`|
+| `%r`| 12小时制时间（`hh:mm:ss`，后跟`AM`或`PM`）|
+| `%S`| 秒(`00` ... `59`)|
+| `%s`| 秒(`00` ... `59`)|
+| `%T`| 24小时制时间(`hh:mm:ss`)|
+| `%U`| 周(`00` ... `53`)，其中星期日为一周中的第一天|
+| `%u`| 周(`00` ... `53`)，其中星期一为一周中的第一天|
+| `%V`| 周(`01` ... `53`)，其中星期日为一周中的第一天；与`%X`配合使用|
+| `%v`| 周(`01` ... `53`)，其中星期一为一周中的第一天；与`%x`配合使用|
+| `%W`| 周日名称(`Sunday` ... `Saturday`)|
+| `%w`| 星期几(`0` ... `6`)，其中星期日是一周中的第一天 [3]|
+| `%X`| 周所在的年份，其中星期日是一周中的第一天，以四位数字表示，与`%V`配合使用|
+| `%x`| 周所在的年份，其中星期一是一周中的第一天，以四位数字表示，与`%v`配合使用|
+| `%Y`| 年份，以四位数字表示|
+| `%y`| 年份，以两位数字表示 [2]|
+| `%%`| `%`字符|
+| `%x`| `x`，用于上面未列出的任何`x`|
 
-| Specifier | Description                                                  |
-| --------- | ------------------------------------------------------------ |
-| `%a`      | Abbreviated weekday name (`Sun` .. `Sat`)                    |
-| `%b`      | Abbreviated month name (`Jan` .. `Dec`)                      |
-| `%c`      | Month, numeric (`1` .. `12`) [[4\]](#z)                      |
-| `%D`      | Day of the month with English suffix (`0th`, `1st`, `2nd`, `3rd`, …) |
-| `%d`      | Day of the month, numeric (`01` .. `31`) [[4\]](#z)          |
-| `%e`      | Day of the month, numeric (`1` .. `31`) [[4\]](#z)           |
-| `%f`      | Fraction of second (6 digits for printing: `000000` .. `999000`; 1 - 9 digits for parsing: `0` .. `999999999`) [[1\]](#f) |
-| `%H`      | Hour (`00` .. `23`)                                          |
-| `%h`      | Hour (`01` .. `12`)                                          |
-| `%I`      | Hour (`01` .. `12`)                                          |
-| `%i`      | Minutes, numeric (`00` .. `59`)                              |
-| `%j`      | Day of year (`001` .. `366`)                                 |
-| `%k`      | Hour (`0` .. `23`)                                           |
-| `%l`      | Hour (`1` .. `12`)                                           |
-| `%M`      | Month name (`January` .. `December`)                         |
-| `%m`      | Month, numeric (`01` .. `12`) [[4\]](#z)                     |
-| `%p`      | `AM` or `PM`                                                 |
-| `%r`      | Time, 12-hour (`hh:mm:ss` followed by `AM` or `PM`)          |
-| `%S`      | Seconds (`00` .. `59`)                                       |
-| `%s`      | Seconds (`00` .. `59`)                                       |
-| `%T`      | Time, 24-hour (`hh:mm:ss`)                                   |
-| `%U`      | Week (`00` .. `53`), where Sunday is the first day of the week |
-| `%u`      | Week (`00` .. `53`), where Monday is the first day of the week |
-| `%V`      | Week (`01` .. `53`), where Sunday is the first day of the week; used with `%X` |
-| `%v`      | Week (`01` .. `53`), where Monday is the first day of the week; used with `%x` |
-| `%W`      | Weekday name (`Sunday` .. `Saturday`)                        |
-| `%w`      | Day of the week (`0` .. `6`), where Sunday is the first day of the week [[3\]](#w) |
-| `%X`      | Year for the week where Sunday is the first day of the week, numeric, four digits; used with `%V` |
-| `%x`      | Year for the week, where Monday is the first day of the week, numeric, four digits; used with `%v` |
-| `%Y`      | Year, numeric, four digits                                   |
-| `%y`      | Year, numeric (two digits) [[2\]](#y)                        |
-| `%%`      | A literal `%` character                                      |
-| `%x`      | `x`, for any `x` not listed above                            |
+| [1] | 时间戳被截断至毫秒。 |
+| ------------ | -------------------- |
+|              |                      |
 
-| [[1\]](#id4) | Timestamp is truncated to milliseconds. |
-| ------------ | --------------------------------------- |
-|              |                                         |
-
-| [[2\]](#id7) | When parsing, two-digit year format assumes range `1970` .. `2069`, so “70” will result in year `1970` but “69” will produce `2069`. |
+| [2] | 在进行解析时，两位数的年份格式采用的范围为`1970`至`2069`，因此“70”将产生年份`1970`，但“69”将产生`2069`。 |
 | ------------ | ------------------------------------------------------------ |
 |              |                                                              |
 
-| [[3\]](#id6) | This specifier is not supported yet. Consider using [`day_of_week()`](#day_of_week) (it uses `1-7` instead of `0-6`). |
+| [3] | 尚不支持该说明符。考虑使用[`day_of_week`](#day-of-week)（该函数使用`1-7`，而不使用`0-6`）。 |
 | ------------ | ------------------------------------------------------------ |
 |              |                                                              |
 
-| [4]  | *([1](#id1), [2](#id2), [3](#id3), [4](#id5))* This specifier does not support `0` as a month or day. |
+| [4] | *([1], [2], [3], [4])* 该说明符不支持使用`0`作为月份或日。 |
 | ---- | ------------------------------------------------------------ |
 |      |                                                              |
 
-**Warning**
+**警告**
 
-The following specifiers are not currently supported:
-`%D %U %u %V %w %X`
+当前不支持以下说明符：`%D %U %u %V %w %X`
 
+**date\_format(timestamp, format)** -> varchar
 
-**date\_format(timestamp, format)** -\> varchar
+使用`format`将`timestamp`格式化为一个字符串。
 
-Formats `timestamp` as a string using `format`.
+**date\_parse(string, format)** -> timestamp
 
+使用`format`将`string`解析为一个时间戳。
 
-**date\_parse(string, format)** -\> timestamp
+## Java日期函数
 
-Parses `string` into a timestamp using `format`.
+该部分中的函数使用与Joda-Time的[DateTimeFormat](http://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html)模式格式兼容的格式字符串。
 
+**format\_datetime(timestamp, format)** -> varchar
 
-Java Date Functions
--------------------
+使用`format`将`timestamp`格式化为一个字符串。
 
-The functions in this section use a format string that is compatible with JodaTime\'s
-[DateTimeFormat](http://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html) pattern format.
+**parse\_datetime(string, format)** -> timestamp with time zone
 
-**format\_datetime(timestamp, format)** -\> varchar
+使用`format`将`string`格式化为一个timestamp with time zone。
 
-Formats `timestamp` as a string using `format`.
+## 提取函数
 
-**parse\_datetime(string, format)** -\> timestamp with time zone
+`extract`函数支持以下字段：
 
-Parses `string` into a timestamp with time zone using `format`.
-
-
-Extraction Function
--------------------
-
-The `extract` function supports the following fields: 
-
-| Field             | Description                                                  |
-| :---------------- | :----------------------------------------------------------- |
+| 字段| 说明|
+|:----------|:----------|
 | `YEAR`            | [`year()`](#year) |
 | `QUARTER`         | [`quarter()`](#quarter) |
 | `MONTH`           | [`month()`](#month) |
 | `WEEK`            | [`week()`](#week) |
 | `DAY`             | [`day()`](#day) |
 | `DAY_OF_MONTH`    | [`day()`](#day) |
-| `DAY_OF_WEEK`     | [`day_of_week()`](#day_of_week) |
-| `DOW`             | [`day_of_week()`](#day_of_week) |
-| `DAY_OF_YEAR`     | [`day_of_year()`](#day_of_year) |
-| `DOY`             | [`day_of_year()`](#day_of_year) |
-| `YEAR_OF_WEEK`    | [`year_of_week()`](#year_of_week) |
-| `YOW`             | [`year_of_week()`](#year_of_week) |
+| `DAY_OF_WEEK`     | [`day_of_week()`](#day-of-week) |
+| `DOW`             | [`day_of_week()`](#day-of-week) |
+| `DAY_OF_YEAR`     | [`day_of_year()`](#day-of-year) |
+| `DOY`             | [`day_of_year()`](#day-of-year) |
+| `YEAR_OF_WEEK`    | [`year_of_week()`](#year-of-week) |
+| `YOW`             | [`year_of_week()`](#year-of-week) |
 | `HOUR`            | [`hour()`](#hour) |
 | `MINUTE`          | [`minute()`](#minute) |
 | `SECOND`          | [`second()`](#second) |
-| `TIMEZONE_HOUR`   | [`timezone_hour()`](#timezone_hour) |
-| `TIMEZONE_MINUTE` | [`timezone_minute()`](#timezone_minute) |
+| `TIMEZONE_HOUR`   | [`timezone_hour()`](#timezone-hour) |
+| `TIMEZONE_MINUTE` | [`timezone_minute()`](#timezone-minute) |
 
-The types supported by the `extract` function vary depending on the field to be extracted. Most fields support all date and time types.
+`extract`函数支持的类型因要提取的字段而异。大多数字段都支持所有日期和时间类型。
 
-**extract(field FROM x)** -\> bigint
+**extract(field FROM x)** -> bigint
 
-Returns `field` from `x`.
+从`x`返回`field`。
 
-**Note**
+**注意**
 
-This SQL-standard function uses special syntax for specifying the arguments.
+该SQL标准函数使用特殊的语法来指定参数。
 
-   
+## 便捷提取函数
 
-Convenience Extraction Functions
---------------------------------
+#### DAY
 
-**day(x)** -\> bigint
+**day(x)** -> bigint
 
-Returns the day of the month from `x`.
+从`x`返回一个月中的第几日。
 
+#### DAY OF MONTH
 
-**day\_of\_month(x)** -\> bigint
+**day\_of\_month(x)** -> bigint
 
-This is an alias for `day`.
+这是`day`的别名。
 
+#### DAY OF WEEK
 
-**day\_of\_week(x)** -\> bigint
+**day\_of\_week(x)** -> bigint
 
-Returns the ISO day of the week from `x`. The value ranges from `1` (Monday) to `7` (Sunday).
+从`x`返回星期几(ISO)。值的范围为`1`（星期一）至`7`（星期日）。
 
-**day\_of\_year(x)** -\> bigint
+#### DAY OF YEAR
 
-Returns the day of the year from `x`. The value ranges from `1` to `366`.
+**day\_of\_year(x)** -> bigint
 
+从`x`返回一年中的第几日。值的范围为`1`至`366`。
 
-**dow(x)** -\> bigint
+#### DOW
 
-This is an alias for `day_of_week`.
+**dow(x)** -> bigint
 
+这是`day_of_week`的别名。
 
-**doy(x)** -\> bigint
+#### DOY
 
-This is an alias for `day_of_year`.
+**doy(x)** -> bigint
 
+这是`day_of_year`的别名。
 
-**hour(x)** -\> bigint
+#### HOUR
 
-Returns the hour of the day from `x`. The value ranges from `0` to `23`.
+**hour(x)** -> bigint
 
+从`x`返回一天中的第几个小时。值的范围为`0`至`23`。
 
-**millisecond(x)** -\> bigint
+#### MILLISECOND
 
-Returns the millisecond of the second from `x`.
+**millisecond(x)** -> bigint
 
+从`x`返回一秒中的第几个毫秒。
 
-**minute(x)** -\> bigint
+#### MINUTE
 
-Returns the minute of the hour from `x`.
+**minute(x)** -> bigint
 
+从`x`返回一小时中的第几分钟。
 
-**month(x)** -\> bigint
+#### MONTH
 
-Returns the month of the year from `x`.
+**month(x)** -> bigint
 
+从`x`返回一年中的某个月份。
 
-**quarter(x)** -\> bigint
+#### QUARTER
 
-Returns the quarter of the year from `x`. The value ranges from `1` to
-`4`.
+**quarter(x)** -> bigint
 
+从`x`返回一年中的某个季度。值的范围为`1`至`4`。
 
-**second(x)** -\> bigint
+#### SECOND
 
-Returns the second of the minute from `x`.
+**second(x)** -> bigint
 
+从`x`返回一分中的第几秒。
 
-**timezone\_hour(timestamp)** -\> bigint
+#### TIMEZONE HOURS
 
-Returns the hour of the time zone offset from `timestamp`.
+**timezone\_hour(timestamp)** -> bigint
 
+从`timestamp`返回时区偏移量的小时数。
 
-**timezone\_minute(timestamp)** -\> bigint
+#### TIMEZONE MINUTE
 
-Returns the minute of the time zone offset from `timestamp`.
+**timezone\_minute(timestamp)** -> bigint
 
+从`timestamp`返回时区偏移量的分钟数。
 
-**week(x)** -\> bigint
+#### WEEK
 
-Returns the [ISO week]() of the year from `x`. The value ranges from `1`
-to `53`.
+**week(x)** -> bigint
 
+从`x`返回一年中的[第几周(ISO)](https://calendars.wikia.org/wiki/ISO_week_date)。值的范围为`1`至`53`。
 
-**week\_of\_year(x)** -\> bigint
+#### WEEK OF YEAR
 
-This is an alias for `week`.
+**week\_of\_year(x)** -> bigint
 
+这是`week`的别名。
 
-**year(x)** -\> bigint
+#### YEAR OF WEEK
 
-Returns the year from `x`.
+**year(x)** -> bigint
 
+从`x`返回年份。
 
-**year\_of\_week(x)** -\> bigint
+**year\_of\_week(x)** -> bigint
 
-Returns the year of the [ISO week]() from `x`.
+从`x`返回[ISO周](https://calendars.wikia.org/wiki/ISO_week_date)的年份。
 
+#### YOW
 
-**yow(x)** -\> bigint
+**yow(x)** -> bigint
 
-This is an alias for `year_of_week`.
+这是`year_of_week`的别名。
 
+[^1]: 该说明符不支持使用`0`作为月或日。
 
-[^1]: This specifier does not support `0` as a month or day.
+[^2]: 该说明符不支持使用`0`作为月或日。
 
-[^2]: This specifier does not support `0` as a month or day.
+[^3]: 该说明符不支持使用`0`作为月或日。
 
-[^3]: This specifier does not support `0` as a month or day.
+[^4]: 时间戳被截断至毫秒。
 
-[^4]: Timestamp is truncated to milliseconds.
+[^5]: 该说明符不支持使用`0`作为月或日。
 
-[^5]: This specifier does not support `0` as a month or day.
+[^6]: 尚不支持该说明符。考虑使用`day_of_week`（该函数使用`1-7`，而不使用`0-6`）。
 
-[^6]: This specifier is not supported yet. Consider using
-    `day_of_week` (it uses `1-7` instead
-    of `0-6`).
-
-[^7]: When parsing, two-digit year format assumes range `1970` ..
-    `2069`, so \"70\" will result in year `1970` but \"69\" will produce
-    `2069`.
+[^7]: 在进行解析时，两位数的年份格式采用的范围为`1970`至`2069`，因此“70”将产生年份`1970`，但“69”将产生`2069`。

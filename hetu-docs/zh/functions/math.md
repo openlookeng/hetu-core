@@ -1,286 +1,238 @@
-Mathematical Functions and Operators
-====================================
++++
+weight = 6
+title = "数学函数和运算符"
++++
 
-Mathematical Operators
-----------------------
+# 数学函数和运算符
 
-| Operator | Description                                     |
-| :------- | :---------------------------------------------- |
-| `+`      | Addition                                        |
-| `-`      | Subtraction                                     |
-| `*`      | Multiplication                                  |
-| `/`      | Division (integer division performs truncation) |
-| `%`      | Modulus (remainder)                             |
+## 数学运算符
 
-Mathematical Functions
-----------------------
+| 运算符| 说明| 
+|:----------|:----------| 
+| `+`| 加| 
+| `-`| 减| 
+| `*`| 乘| 
+| `/`| 除（整数除法会进行截断）| 
+| `%`| 取模（余数）| 
 
-**abs(x)** -\> \[same as input\]
+## 数学函数
 
-Returns the absolute value of `x`.
+**abs(x)** -> \[与输入相同]
 
+返回`x`的绝对值。
 
-**cbrt(x)** -\> double
+**cbrt(x)** -> double
 
-Returns the cube root of `x`.
+返回`x`的立方根。
 
+**ceil(x)** -> \[与输入相同]
 
-**ceil(x)** -\> \[same as input\]
+这是`ceiling`的别名。
 
-This is an alias for `ceiling`.
+**ceiling(x)** -> \[与输入相同]
 
+返回`x`向上舍入到最接近的整数后的值。
 
-**ceiling(x)** -\> \[same as input\]
+**cosine\_similarity(x, y)** -> double
 
-Returns `x` rounded up to the nearest integer.
-
-
-**cosine\_similarity(x, y)** -\> double
-
-Returns the cosine similarity between the sparse vectors `x` and `y`:
+返回稀疏向量`x`和`y`之间的余弦相似度：
 
     SELECT cosine_similarity(MAP(ARRAY['a'], ARRAY[1.0]), MAP(ARRAY['a'], ARRAY[2.0])); -- 1.0
 
+**degrees(x)** -> double
 
-**degrees(x)** -\> double
+将角`x`的弧度转换为角度。
 
-Converts angle `x` in radians to degrees.
+**e()** -> double
 
+返回常量欧拉数。
 
-**e()** -\> double
+**exp(x)** -> double
 
-Returns the constant Euler\'s number.
+返回欧拉数的`x`次幂。
 
+**floor(x)** -> \[与输入相同]
 
-**exp(x)** -\> double
+返回`x`向下舍入到最接近的整数后的值。
 
-Returns Euler\'s number raised to the power of `x`.
+**from\_base(string, radix)** -> bigint
 
+返回`string`解释为以`radix`为基数的数字后的值。
 
-**floor(x)** -\> \[same as input\]
+**inverse\_normal\_cdf(mean, sd, p)** -> double
 
-Returns `x` rounded down to the nearest integer.
+使用累积概率(p)的给定平均值和标准差(sd)计算正态分布CDF的反函数：P(N \< n)。平均值必须是实数值，标准差必须是正实数值。概率p必须处于区间(0,1)内。
 
+**normal\_cdf(mean, sd, v)** -> double
 
-**from\_base(string, radix)** -\> bigint
+使用给定的平均值和标准差(sd)计算正态分布CDF：P(N \< v; mean, sd)。平均值和值v必须是实数值，标准差必须是正实数值。
 
-Returns the value of `string` interpreted as a base-`radix` number.
+**inverse\_beta\_cdf(a, b, p)** -> double
 
+使用累积概率(p)的给定参数a和b计算Beta CDF的反函数：P(N \< n)。a和b参数必须为正实数值。概率p必须处于区间\[0,1]内。
 
-**inverse\_normal\_cdf(mean, sd, p)** -\> double
+**beta\_cdf(a, b, v)** -> double
 
-Compute the inverse of the Normal cdf with given mean and standard deviation (sd) for the cumulative probability (p): P(N \< n). The mean must be a real value and the standard deviation must be a real and
-positive value. The probability p must lie on the interval (0, 1).
+使用给定的参数a和b计算Beta CDF：P(N \< v; a, b)。参数a和b必须为正实数，值v必须为实数。值v必须处于区间\[0,1]内。
 
-**normal\_cdf(mean, sd, v)** -\> double
+**ln(x)** -> double
 
-Compute the Normal cdf with given mean and standard deviation (sd): P(N \< v; mean, sd). The mean and value v must be real values and the standard deviation must be a real and positive value.
+返回`x`的自然对数。
 
-**inverse\_beta\_cdf(a, b, p)** -\> double
+**log(b, x)** -> double
 
-Compute the inverse of the Beta cdf with given a, b parameters for the cumulative probability (p): P(N \< n). The a, b parameters must be positive real values. The probability p must lie on the interval \[0, 1\].
+返回以`b`为底`x`的对数。
 
-**beta\_cdf(a, b, v)** -\> double
+**log2(x)** -> double
 
-Compute the Beta cdf with given a, b parameters: P(N \< v; a, b). The a, b parameters must be positive real numbers and value v must be a real value. The value v must lie on the interval \[0, 1\].
+返回以2为底`x`的对数。
 
+**log10(x)** -> double
 
-**ln(x)** -\> double
+返回以10为底`x`的对数。
 
-Returns the natural logarithm of `x`.
+**mod(n, m)** -> \[与输入相同]
 
+返回`n`除以`m`的模（余数）。
 
-**log(b, x)** -\> double
+**pi()** -> double
 
-Returns the base `b` logarithm of `x`.
+返回常量Pi。
 
+**pow(x, p)** -> double
 
-**log2(x)** -\> double
+这是`power`的别名。
 
-Returns the base 2 logarithm of `x`.
+**power(x, p)** -> double
 
+返回`x`的`p`次幂。
 
-**log10(x)** -\> double
+**radians(x)** -> double
 
-Returns the base 10 logarithm of `x`.
+将角`x`的角度转换为弧度。
 
+**rand()** -> double
 
-**mod(n, m)** -\> \[same as input\]
+这是`random()`的别名。
 
-Returns the modulus (remainder) of `n` divided by `m`.
+**random()** -> double
 
+返回一个处于范围0.0 \<= x \< 1.0内的伪随机值。
 
-**pi()** -\> double
+**random(n)** -> \[与输入相同]
 
-Returns the constant Pi.
+返回一个介于0和n之间（不含0和n）的伪随机数。
 
+**round(x)** -> \[与输入相同]
 
-**pow(x, p)** -\> double
+返回`x`舍入到最接近的整数后的值。
 
-This is an alias for `power`.
+**round(x, d)** -> \[与输入相同]
 
+返回`x`舍入到小数点后`d`位后的值。
 
-**power(x, p)** -\> double
+**sign(x)** -> \[与输入相同]
 
-Returns `x` raised to the power of `p`.
+返回`x`的符号函数，即：
 
+- 0（参数为0）
+- 1（参数大于0）
+- -1（参数小于0）
 
-**radians(x)** -\> double
+对于double参数，该函数还返回：
 
-Converts angle `x` in degrees to radians.
+- NaN（参数为NaN）
+- 1（参数为正无穷大）
+- -1（参数为负无穷大）
 
+**sqrt(x)** -> double
 
-**rand()** -\> double
+返回`x`的平方根。
 
-This is an alias for `random()`.
+**to\_base(x, radix)** -> varchar
 
+返回以`radix`为基数的`x`表示形式。
 
-**random()** -\> double
+**truncate(x)** -> double
 
-Returns a pseudo-random value in the range 0.0 \<= x \< 1.0.
+返回通过删除小数点后的数字将`x`舍入为整数后的值。
 
+**width\_bucket(x, bound1, bound2, n)** -> bigint
 
-**random(n)** -\> \[same as input\]
+返回具有指定边界`bound1`和`bound2`以及`n`个桶的等宽直方图中`x`的直条数量。
 
-Returns a pseudo-random number between 0 and n (exclusive).
+**width\_bucket(x, bins)** -> bigint
 
+根据数组`bins`指定的直条返回`x`的直条数量。`bins`参数必须是double类型的数组，并且假定按升序排序。
 
-**round(x)** -\> \[same as input\]
+## 统计函数
 
-Returns `x` rounded to the nearest integer.
+**wilson\_interval\_lower(successes, trials, z)** -> double
 
+返回z分数`z`指定的置信度下伯努利试验过程威尔逊置信区间的下限。
 
-**round(x, d)** -\> \[same as input\]
+**wilson\_interval\_upper(successes, trials, z)** -> double
 
-Returns `x` rounded to `d` decimal places.
+返回z分数`z`指定的置信度下伯努利试验过程威尔逊置信区间的上限。
 
+## 三角函数
 
-**sign(x)** -\> \[same as input\]
+所有三角函数参数都以弧度表示。请参见单位转换函数`degrees`和`radians`。
 
-Returns the signum function of `x`, that is:
+**acos(x)** -> double
 
--   0 if the argument is 0,
--   1 if the argument is greater than 0,
--   -1 if the argument is less than 0.
+返回`x`的反余弦值。
 
-For double arguments, the function additionally returns:
+**asin(x)** -> double
 
--   NaN if the argument is NaN,
--   1 if the argument is +Infinity,
--   -1 if the argument is -Infinity.
+返回`x`的反正弦值。
 
+**atan(x)** -> double
 
-**sqrt(x)** -\> double
+返回`x`的反正切值。
 
-Returns the square root of `x`.
+**atan2(y, x)** -> double
 
+返回`y / x`的反正切值。
 
-**to\_base(x, radix)** -\> varchar
+**cos(x)** -> double
 
-Returns the base-`radix` representation of `x`.
+返回`x`的余弦值。
 
+**cosh(x)** -> double
 
-**truncate(x)** -\> double
+返回`x`的双曲余弦值。
 
-Returns `x` rounded to integer by dropping digits after decimal point.
+**sin(x)** -> double
 
+返回`x`的正弦值。
 
-**width\_bucket(x, bound1, bound2, n)** -\> bigint
+**tan(x)** -> double
 
-Returns the bin number of `x` in an equi-width histogram with the specified `bound1` and `bound2` bounds and `n` number of buckets.
+返回`x`的正切值。
 
-**width\_bucket(x, bins)** -\> bigint
+**tanh(x)** -> double
 
-Returns the bin number of `x` according to the bins specified by the array `bins`. The `bins` parameter must be an array of doubles and is assumed to be in sorted ascending order.
+返回`x`的双曲正切值。
 
+## 浮点函数
 
-Statistical Functions
----------------------
+**infinity()** -> double
 
-**wilson\_interval\_lower(successes, trials, z)** -\> double
+返回表示正无穷大的常数。
 
-Returns the lower bound of the Wilson score interval of a Bernoulli trial process at a confidence specified by the z-score `z`.
+**is\_finite(x)** -> boolean
 
-**wilson\_interval\_upper(successes, trials, z)** -\> double
+确定`x`是否为有限值。
 
-Returns the upper bound of the Wilson score interval of a Bernoulli trial process at a confidence specified by the z-score `z`.
+**is\_infinite(x)** -> boolean
 
+确定`x`是否为无穷大。
 
-Trigonometric Functions
------------------------
+**is\_nan(x)** -> boolean
 
-All trigonometric function arguments are expressed in radians. See unit conversion functions `degrees` and
-`radians`.
+确定`x`是否为非数字值。
 
-**acos(x)** -\> double
+**nan()** -> double
 
-Returns the arc cosine of `x`.
-
-
-**asin(x)** -\> double
-
-Returns the arc sine of `x`.
-
-
-**atan(x)** -\> double
-
-Returns the arc tangent of `x`.
-
-
-**atan2(y, x)** -\> double
-
-Returns the arc tangent of `y / x`.
-
-
-**cos(x)** -\> double
-
-Returns the cosine of `x`.
-
-
-**cosh(x)** -\> double
-
-Returns the hyperbolic cosine of `x`.
-
-
-**sin(x)** -\> double
-
-Returns the sine of `x`.
-
-
-**tan(x)** -\> double
-
-Returns the tangent of `x`.
-
-
-**tanh(x)** -\> double
-
-Returns the hyperbolic tangent of `x`.
-
-
-Floating Point Functions
-------------------------
-
-**infinity()** -\> double
-
-Returns the constant representing positive infinity.
-
-
-**is\_finite(x)** -\> boolean
-
-Determine if `x` is finite.
-
-
-**is\_infinite(x)** -\> boolean
-
-Determine if `x` is infinite.
-
-
-**is\_nan(x)** -\> boolean
-
-Determine if `x` is not-a-number.
-
-
-**nan()** -\> double
-
-Returns the constant representing not-a-number.
-
+返回表示非数字值的常量。

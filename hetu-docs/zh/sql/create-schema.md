@@ -39,4 +39,4 @@ CREATE {SCHEMA|DATABASE} [ IF NOT EXISTS ] schema_name
 
 ## 另请参见
 
-[alter-schema](./alter-schema.html)、[drop-schema](./drop-schema.html)
+[ALTER SCHEMA](./alter-schema.md)、[DROP SCHEMA](./drop-schema.md)

@@ -8,7 +8,7 @@ title = "表统计"
 
 openLooKeng支持基于统计信息的查询优化。为了让查询利用这些优化，openLooKeng必须提供该查询中表的统计信息。
 
-表统计信息由连接器提供给查询计划器。目前仅[hive connector](../connector/hive.html)连接器支持统计。
+表统计信息由连接器提供给查询计划器。目前仅[Hive连接器](../connector/hive.md)支持统计。
 
 表格布局
 -------------
@@ -43,4 +43,4 @@ openLooKeng提供以下统计数据：
 
 可用于特定查询的统计集取决于所使用的连接器，也因表甚至表布局而异。例如，Hive连接器目前不提供数据大小的统计信息。
 
-可以通过openLooKeng SQL接口使用[show-stats](../sql/show-stats.html)命令查询表统计信息。Hive连接器，请参考[Hive Connector](../connector/hive.html)文档了解如何更新表的统计信息。
+可以通过openLooKeng SQL接口使用[SHOW STATS](../sql/show-stats.md)命令查询表统计信息。Hive连接器，请参考[Hive连接器](../connector/hive.md)文档了解如何更新表的统计信息。

@@ -1,10 +1,13 @@
-Conditional Expressions
-=======================
++++
+weight = 3
+title = "条件表达式"
++++
 
-CASE
-----
+# 条件表达式
 
-The standard SQL `CASE` expression has two forms. The \"simple\" form searches each `value` expression from left to right until it finds one that equals `expression`:
+## CASE
+
+标准 SQL `CASE` 表达式具有两种形式。“简单”形式从左向右搜索每个 `value` 表达式，直到找到一个等于 `expression` 的表达式：
 
 ``` sql
 CASE expression
@@ -14,7 +17,7 @@ CASE expression
 END
 ```
 
-The `result` for the matching `value` is returned. If no match is found, the `result` from the `ELSE` clause is returned if it exists, otherwise null is returned. Example:
+会返回匹配的 `value` 的 `result`。如果没有找到任何匹配项，那么如果存在 `ELSE` 子句，则返回该子句中的 `result`，否则返回 NULL。示例：
 
     SELECT a,
            CASE a
@@ -23,7 +26,7 @@ The `result` for the matching `value` is returned. If no match is found, the `re
                ELSE 'many'
            END
 
-The \"searched\" form evaluates each boolean `condition` from left to right until one is true and returns the matching `result`:
+“搜索”形式从左向右计算每个 boolean `condition` 的值，直到其中一个为 true 并返回匹配的 `result`：
 
 ``` sql
 CASE
@@ -33,7 +36,7 @@ CASE
 END
 ```
 
-If no conditions are true, the `result` from the `ELSE` clause is returned if it exists, otherwise null is returned. Example:
+如果没有任何条件为 true，那么如果存在 `ELSE` 子句，则返回该子句中的 `result`，否则返回 NULL。示例：
 
     SELECT a, b,
            CASE
@@ -42,10 +45,9 @@ If no conditions are true, the `result` from the `ELSE` clause is returned if it
                ELSE 'ccc'
            END
 
-IF
---
+## IF
 
-The `IF` function is actually a language construct that is equivalent to the following `CASE` expression:
+`IF` 函数实际上是一个语言构造，该函数等效于下面的 `CASE` 表达式：
 
 > ``` sql
 > CASE
@@ -56,55 +58,47 @@ The `IF` function is actually a language construct that is equivalent to the fol
 
 **if(condition, true\_value)**
 
-Evaluates and returns `true_value` if `condition` is true, otherwise null is returned and `true_value` is not evaluated.
-
+如果 `condition` 为 true，则计算并返回 `true_value`，否则返回 NULL 并且不计算 `true_value`。
 
 **if(condition, true\_value, false\_value)**
 
-Evaluates and returns `true_value` if `condition` is true, otherwise evaluates and returns `false_value`.
+如果 `condition` 为 true，则计算并返回 `true_value`，否则计算并返回 `false_value`。
 
+## COALESCE
 
-COALESCE
---------
+**coalesce(value1, value2\[, ...])**
 
-**coalesce(value1, value2\[, \...\])**
+返回参数列表中的第一个非 NULL `value`。和 `CASE` 表达式一样，仅在必要时计算参数。
 
-Returns the first non-null `value` in the argument list. Like a `CASE` expression, arguments are only evaluated if necessary.
-
-
-NULLIF
-------
+## NULLIF
 
 **nullif(value1, value2)**
 
-Returns null if `value1` equals `value2`, otherwise returns `value1`.
+如果 `value1` 等于 `value2`，则返回 NULL，否则返回 `value1`。
 
-
-TRY
----
+## TRY
 
 **try(expression)**
 
-Evaluate an expression and handle certain types of errors by returning `NULL`.
+计算表达式并通过返回 `NULL` 来处理特定类型的错误。
 
-In cases where it is preferable that queries produce `NULL` or default values instead of failing when corrupt or invalid data is encountered, the `TRY` function may be useful. To specify default values, the `TRY`
-function can be used in conjunction with the `COALESCE` function.
+如果在遇到损坏或无效的数据时最好由查询生成 `NULL` 或默认值，而不是失败，则 `TRY` 函数可能是有用的。要指定默认值，可以将 `TRY` 函数与 `COALESCE` 函数配合使用。
 
-The following errors are handled by `TRY`:
+`TRY` 处理以下错误：
 
--   Division by zero
--   Invalid cast or function argument
--   Numeric value out of range
+- 被零除
+- 无效的转换或函数参数
+- 数值超出范围
 
-### Examples
+### 示例
 
-Source table with some invalid data:
+具有一些无效数据的源表：
 
 ``` sql
 SELECT * FROM shipping;
 ```
 
-``` 
+```
 origin_state | origin_zip | packages | total_cost
 --------------+------------+----------+------------
 California   |      94131 |       25 |        100
@@ -114,23 +108,23 @@ New Jersey   |      08544 |      225 |        490
 (4 rows)
 ```
 
-Query failure without `TRY`:
+不带 `TRY` 的查询失败：
 
 ``` sql
 SELECT CAST(origin_zip AS BIGINT) FROM shipping;
 ```
 
-``` 
+```
 Query failed: Can not cast 'P332a' to BIGINT
 ```
 
-`NULL` values with `TRY`:
+带 `TRY` 的 `NULL` 值：
 
 ``` sql
 SELECT TRY(CAST(origin_zip AS BIGINT)) FROM shipping;
 ```
 
-``` 
+```
 origin_zip
 ------------
      94131
@@ -140,23 +134,23 @@ NULL
 (4 rows)
 ```
 
-Query failure without `TRY`:
+不带 `TRY` 的查询失败：
 
 ``` sql
 SELECT total_cost / packages AS per_package FROM shipping;
 ```
 
-``` 
+```
 Query failed: Division by zero
 ```
 
-Default values with `TRY` and `COALESCE`:
+带 `TRY` 和 `COALESCE` 的默认值：
 
 ``` sql
 SELECT COALESCE(TRY(total_cost / packages), 0) AS per_package FROM shipping;
 ```
 
-``` 
+```
 per_package
 -------------
          4

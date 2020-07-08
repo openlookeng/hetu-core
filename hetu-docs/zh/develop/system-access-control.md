@@ -33,7 +33,7 @@ openLooKeng 将向协调节点进行身份验证的主体的概念与负责运�
 
 配置文件示例：
 
-``` {.none}
+``` properties
 access-control.name=custom-access-control
 custom-property1=custom-value1
 custom-property2=custom-value2

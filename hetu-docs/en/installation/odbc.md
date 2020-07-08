@@ -99,7 +99,7 @@ When configuring DSN, you can set up a basic ODBC connection by providing the co
 
 ### Connection Configuration File
 
-When connection parameters are transferred through the connection configuration file, all connection parameters defined by openLooKeng JDBC can be configured. For details, see [Parameter Reference#](https://openLooKeng.io/docs/current/installation/jdbc.html#parameter-reference) of openLooKeng JDBC Driver.
+When connection parameters are transferred through the connection configuration file, all connection parameters defined by openLooKeng JDBC can be configured. For details, see [Parameter Reference](./jdbc.md#parameter-reference) of openLooKeng JDBC Driver.
 
 The connection configuration file must provide a group of parameter key-value pairs separated by lines, such as **user=root** or **SSL=true**. The driver automatically parses the parameter key values and configures the connection. The following is an example:
 

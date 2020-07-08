@@ -17,7 +17,7 @@ AS query
 
 ## 说明
 
-创建一个包含 [SELECT](./select.html) 查询结果的表。使用 [CREATE TABLE](./create-table.html) 可以创建空表。
+创建一个包含 [SELECT](./select.md) 查询结果的表。使用 [CREATE TABLE](./create-table.md) 可以创建空表。
 
 如果使用可选的 `IF NOT EXISTS` 子句，则在表已存在时禁止显示错误。
 
@@ -60,4 +60,4 @@ AS query
 
 ## 另请参见
 
-[create-table](./create-table.html)、[select](./ select.html)
+[CREATE TABLE](./create-table.md)、[SELECT](./select.md)

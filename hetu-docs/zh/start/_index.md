@@ -6,7 +6,7 @@ title = "快速入门"
 +++
 
 # 快速入门
-本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装指南](https://openlookeng.io/zh-cn/docs/docs/installation.html)
+本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装指南](../installation/_index.md)
 
 ## 环境准备
 
@@ -22,7 +22,7 @@ title = "快速入门"
 运行如下命令即可启动安装部署：
 
 ```shell
-wget -O - https://download.openlookeng.io/install.sh|sh
+wget -O - https://download.openlookeng.io/install.sh|bash
 ```
 
 该命令从openLooKeng官网下载安装脚本并启动脚本运行。脚本在运行过程中，会自动从openLooKeng官网下载最新的安装包以及所依赖的组件。在下载完成后，会自动启动部署工作。整个过程不需要用户做额外的操作。
@@ -37,11 +37,11 @@ wget -O - https://download.openlookeng.io/install.sh|sh
 
 - 一键部署给openLooKeng 默认配置了以下几个内置数据源，供用户直接使用。
 
-  - [tpcds](https://openlookeng.io/zh-cn/docs/docs/connector/tpcds.html)
-  - [tpch](https://openlookeng.io/zh-cn/docs/docs/connector/tpch.html)
-  - [memory](https://openlookeng.io/zh-cn/docs/docs/connector/memory.html)
+  - [tpcds](../connector/tpcds.md)
+  - [tpch](../connector/tpch.md)
+  - [memory](../connector/memory.md)
 
-- openLooKeng 的安装路径为`/opt/openlookeng`。用户可以在这里找到openLooKeng 的配置文件。关于配置文件以及配置项，你可以从[这里]( https://openlookeng.io/zh-cn/docs/docs/installation/deployment.html)了解到更多信息。
+- openLooKeng 的安装路径为`/opt/openlookeng`。用户可以在这里找到openLooKeng 的配置文件。关于配置文件以及配置项，你可以从[这里](../installation/deployment.md)了解到更多信息。
 
 - 新的用户`openlkadmin`会被创建用于执行 openLooKeng 相关的操作，包括启动/停止openLooKeng 服务、扩展/减小集群规模等。
 
@@ -49,7 +49,7 @@ wget -O - https://download.openlookeng.io/install.sh|sh
 
 - openLooKeng的运行日志存储于`/home/openlookeng/.openlkadmin/`
 
-- 一键部署也提供了[命令行工具（cli)]( https://openlookeng.io/zh-cn/docs/docs/installation/cli.html)，用于连接openLooKeng 服务。
+- 一键部署也提供了[命令行工具（cli)](../installation/cli.md)，用于连接openLooKeng 服务。
 
 
 
@@ -66,7 +66,7 @@ bash /opt/openlookeng/bin/openlk-cli
 
 在cli 中用户可以输入标准SQL 与openLooKeng 服务器端进行交互。
 
-例如，用户查看当前系统有已经配置的[catalog]( https://openlookeng.io/docs/docs/overview/concepts.html):
+例如，用户查看当前系统有已经配置的[catalog](../overview/concepts.md):
 
 ```sql
 show catalogs;
@@ -74,7 +74,7 @@ show catalogs;
 
 <img src="./images/catalogs.png" >
 
-查看有tpcds 有包含哪些[schema]( https://openlookeng.io/zh-cn/docs/docs/overview/concepts.html)：
+查看有tpcds 有包含哪些[schema](../overview/concepts.md)：
 
 ```sql
 show schemas from tpcds;
@@ -130,8 +130,8 @@ SELECT
 
 <img src="./images//image-20200629141757336.png" >
 
-用户可以查阅 [openLooKeng语法文档](https://openlookeng.io/zh-cn/docs/docs/sql.html)，了解更多语法规则。
+用户可以查阅 [openLooKeng语法文档](../sql/_index.md)，了解更多语法规则。
 
-关于openLooKeng 的更多功能和特性，请查阅[用户指导手册](https://openlookeng.io/zh-cn/docs/docs/overview.html)
+关于openLooKeng 的更多功能和特性，请查阅[用户指导手册](../overview/_index.md)
 
 

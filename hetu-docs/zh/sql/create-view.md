@@ -15,7 +15,7 @@ AS query
 
 ## 说明
 
-创建 [SELECT](./select.html) 查询的视图。视图是一个可以由将来的查询引用的逻辑表。视图不包含任何数据。相反，视图存储的查询在每次被其他查询引用时执行。
+创建 [SELECT](./select.md) 查询的视图。视图是一个可以由将来的查询引用的逻辑表。视图不包含任何数据。相反，视图存储的查询在每次被其他查询引用时执行。
 
 如果使用可选的 `OR REPLACE` 子句，则在视图已存在时替换该视图，而不是产生错误。
 
@@ -50,4 +50,4 @@ AS query
 
 ## 另请参见
 
-[drop-view](./drop-view.html)、[show-create-view](./show-create-view.html)
+[DROP VIEW](./drop-view.md)、[SHOW CREATE VIEW](./show-create-view.md)

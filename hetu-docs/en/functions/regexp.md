@@ -1,7 +1,12 @@
++++
+weight = 10
+title = "Regular Expression Functions"
++++
+
 Regular Expression Functions
 ============================
 
-All of the regular expression functions use the [Java pattern]() syntax, with a few notable exceptions:
+All of the regular expression functions use the [Java pattern](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html) syntax, with a few notable exceptions:
 
 -   When using multi-line mode (enabled via the `(?m)` flag), only `\n` is recognized as a line terminator. Additionally, the `(?d)` flag is not supported and must not be used.
 -   Case-insensitive matching (enabled via the `(?i)` flag) is always performed in a Unicode-aware manner. However, context-sensitive and local-sensitive matching is not supported. Additionally, the `(?u)`
@@ -24,7 +29,7 @@ Returns the substring(s) matched by the regular expression `pattern` in `string`
 
 **regexp\_extract\_all(string, pattern, group)** -\> array(varchar)
 
-Finds all occurrences of the regular expression `pattern` in `string` and returns the [capturing group number]() `group`:
+Finds all occurrences of the regular expression `pattern` in `string` and returns the [capturing group number](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#gnumber) `group`:
 
     SELECT regexp_extract_all('1a 2b 14m', '(\d+)([a-z]+)', 2); -- ['a', 'b', 'm']
 
@@ -36,7 +41,7 @@ Returns the first substring matched by the regular expression `pattern` in `stri
 
 **regexp\_extract(string, pattern, group)** -\> varchar
 
-Finds the first occurrence of the regular expression `pattern` in `string` and returns the [capturing group number]() `group`:
+Finds the first occurrence of the regular expression `pattern` in `string` and returns the [capturing group number](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#gnumber) `group`:
 
     SELECT regexp_extract('1a 2b 14m', '(\d+)([a-z]+)', 2); -- 'a'
 
@@ -58,7 +63,7 @@ Removes every instance of the substring matched by the regular expression `patte
 
 **regexp\_replace(string, pattern, replacement)** -\> varchar
 
-Replaces every instance of the substring matched by the regular expression `pattern` in `string` with `replacement`. [Capturing groups]() can be referenced in `replacement` using `$g` for a numbered
+Replaces every instance of the substring matched by the regular expression `pattern` in `string` with `replacement`. [Capturing groups](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#gnumber) can be referenced in `replacement` using `$g` for a numbered
 group or `${name}` for a named group. A dollar sign (`$`) may be included in the replacement by escaping it with a backslash (`\$`):
 
     SELECT regexp_replace('1a 2b 14m', '(\d+)([ab]) ', '3c$2 '); -- '3ca 3cb 14m'
@@ -66,7 +71,7 @@ group or `${name}` for a named group. A dollar sign (`$`) may be included in the
 **regexp\_replace(string, pattern, function)** -\> varchar
 
 Replaces every instance of the substring matched by the regular expression `pattern` in `string` using `function`. The `lambda expression <lambda>` `function` is
-invoked for each match with the [capturing groups]() passed as an array. Capturing group numbers start at one; there is no group for the entire match (if you need this, surround the entire expression with
+invoked for each match with the [capturing groups](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#cg) passed as an array. Capturing group numbers start at one; there is no group for the entire match (if you need this, surround the entire expression with
 parenthesis). :
 
     SELECT regexp_replace('new york', '(\w)(\w*)', x -> upper(x[1]) || lower(x[2])); --'New York'

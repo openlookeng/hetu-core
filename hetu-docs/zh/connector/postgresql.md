@@ -1,13 +1,15 @@
-PostgreSQL Connector
-====================
++++
+weight = 15
+title = "PostgreSQL"
++++
 
-The PostgreSQL connector allows querying and creating tables in an external PostgreSQL database. This can be used to join data between different systems like PostgreSQL and Hive, or between two different
-PostgreSQL instances.
+# PostgreSQL连接器
 
-Configuration
--------------
+PostgreSQL连接器允许在外部PostgreSQL数据库中查询和创建表。这可用于在PostgreSQL和Hive等不同系统之间或在两个不同的PostgreSQL实例之间联接数据。
 
-To configure the PostgreSQL connector, create a catalog properties file in `etc/catalog` named, for example, `postgresql.properties`, to mount the PostgreSQL connector as the `postgresql` catalog. Create the file with the following contents, replacing the connection properties as appropriate for your setup:
+## 配置
+
+要配置PostgreSQL连接器，在`etc/catalog`中创建一个目录属性文件，例如`postgresql.properties`，将PostgreSQL连接器挂载为`postgresql`目录。使用以下内容创建文件，并根据设置替换连接属性：
 
 ``` properties
 connector.name=postgresql
@@ -16,38 +18,35 @@ connection-user=root
 connection-password=secret
 ```
 
-### Multiple PostgreSQL Databases or Servers
+### 多个PostgreSQL数据库或服务器
 
-The PostgreSQL connector can only access a single database within a PostgreSQL server. Thus, if you have multiple PostgreSQL databases, or want to connect to multiple PostgreSQL servers, you must configure
-multiple instances of the PostgreSQL connector.
+PostgreSQL连接器只能访问PostgreSQL服务器中的单个数据库。因此，如果有多个PostgreSQL数据库，或者想要连接到多个PostgreSQL服务器，则必须配置多个PostgreSQL连接器实例。
 
-To add another catalog, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if you name the property file `sales.properties`, openLooKeng will create a catalog named `sales` using the configured connector.
+要添加另一个目录，只需添加另一个属性文件到具有不同名称的`etc/catalog`中（确保它以`.properties`结尾）。例如，如果将属性文件命名为`sales.properties`，openLooKeng将使用配置的连接器创建一个名为`sales`的目录。
 
-Querying PostgreSQL
--------------------
+## 查询PostgreSQL
 
-The PostgreSQL connector provides a schema for every PostgreSQL schema. You can see the available PostgreSQL schemas by running `SHOW SCHEMAS`:
+PostgreSQL连接器为每个PostgreSQL模式提供一个模式。可通过执行`SHOW SCHEMAS`来查看可用的PostgreSQL模式：
 
     SHOW SCHEMAS FROM postgresql;
 
-If you have a PostgreSQL schema named `web`, you can view the tables in this schema by running `SHOW TABLES`:
+如果有一个名为`web`的PostgreSQL模式，那么可以通过执行`SHOW TABLES`来查看这个模式中的表：
 
     SHOW TABLES FROM postgresql.web;
 
-You can see a list of the columns in the `clicks` table in the `web` database using either of the following:
+可以使用以下方法之一查看数据库`web`中`clicks`表中的列的列表：
 
     DESCRIBE postgresql.web.clicks;
     SHOW COLUMNS FROM postgresql.web.clicks;
 
-Finally, you can access the `clicks` table in the `web` schema:
+最后，可以访问`web`模式中的`clicks`表：
 
     SELECT * FROM postgresql.web.clicks;
 
-If you used a different name for your catalog properties file, use that catalog name instead of `postgresql` in the above examples.
+如果对目录属性文件使用不同的名称，请使用该目录名称，而不要使用上述示例中的`postgresql`。
 
-PostgreSQL Connector Limitations
---------------------------------
+## PostgreSQL连接器限制
 
-The following SQL statements are not yet supported:
+暂不支持以下SQL语句：
 
-[delete](../sql/delete.html), [grant](../sql/grant.html), [revoke](../sql/revoke.html), [show-grants](../sql/show-grants.html), [show-roles](../sql/show-roles.html), [show-role-grants](../sql/show-role-grants.html)
+[DELETE](../sql/delete.md)、[GRANT](../sql/grant.md)、[REVOKE](../sql/revoke.md)、[SHOW GRANTS](../sql/show-grants.md)、[SHOW ROLES](../sql/show-roles.md)、[SHOW ROLE GRANTS](../sql/show-role-grants.md)

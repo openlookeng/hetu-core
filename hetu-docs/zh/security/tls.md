@@ -1,14 +1,19 @@
-Java Keystores and Truststores
++++
+weight = 4
+title = "Java密钥库和信任库"
++++
+
+Java密钥库和信任库
 ==============================
 
-Java Keystore File for TLS
+TLS的Java密钥库文件
 --------------------------
 
-Access to the openLooKeng coordinator must be through HTTPS when using Kerberos and LDAP authentication. The openLooKeng coordinator uses a `Java Keystore <server_java_keystore>` file for its TLS configuration. These keys are generated using `keytool` and stored in a Java Keystore file for the openLooKeng coordinator.
+使用Kerberos和LDAP身份验证时，必须通过HTTPS访问openLooKeng协调节点。openLooKeng协调节点使用`JavaKeystore<server_java_keystore>`文件进行TLS配置。这些密钥使用`keytool`生成，并存储在Java 密钥库文件中，供openLooKeng协调节点使用。
 
-The alias in the `keytool` command line should match the principal that the openLooKeng coordinator will use. You\'ll be prompted for the first and last name. Use the Common Name that will be used in the certificate. In this case, it should be the unqualified hostname of the openLooKeng coordinator. In the following example, you can see this in the prompt that confirms the information is correct:
+`keytool`命令行中的别名应与openLooKeng协调节点将要使用的主体匹配。系统将提示您输入姓名。使用将要在证书中使用的Common Name。在这种情况下，它应该是openLooKeng协调节点的非限定主机名。在下面的例子中，在确认信息正确的提示中可以看到这一点：
 
-``` 
+```
 keytool -genkeypair -alias openlookeng -keyalg RSA -keystore keystore.jks
 Enter keystore password:
 Re-enter new password:
@@ -31,27 +36,27 @@ Enter key password for <openlookeng>
         (RETURN if same as keystore password):
 ```
 
-Java Truststore File for TLS
+TLS的Java信任库文件
 ----------------------------
 
-Truststore files contain certificates of trusted TLS/SSL servers, or of Certificate Authorities trusted to identify servers. For securing access to the openLooKeng coordinator through HTTPS the clients can configure truststores. For the openLooKeng CLI to trust the openLooKeng coordinator, the coordinator\'s certificate must be imported to the CLI\'s truststore.
+信任库文件包含受信任的TLS/SSL服务器的证书，或证书颁发机构颁发的用于标识服务器的证书。为了确保通过HTTPS访问openLooKeng协调节点的安全性，客户端可以配置信任库。对于openLooKeng命令行要信任openLooKeng协调节点，协调节点的证书必须导入到命令行接口的信任库中。
 
-You can either import the certificate to the default Java truststore, or to a custom truststore. You should be careful if you choose to use the default one, since you may need to remove the certificates of CAs you do
-not deem trustworthy.
+您可以将证书导入到默认的Java信任库，或者导入到自定义信任库。如果您选择使用默认的Java信任库，则需要小心，因为您可能需要删除您认为不值得信任的CA证书。
 
-You can use `keytool` to import the certificate to the truststore. In the example, we are going to import `openlookeng_certificate.cer` to a custom truststore `openlookeng_trust.jks`, and you
-will get a prompt asking if the certificate can be trusted or not.
+
+可以使用`keytool`将证书导入到信任库。在这个例子中，我们要将`openlookeng_certificate.cer`导入到一个定制的信任库`openlookeng_trust.jks`中，系统会有提示，询问该证书是否可以信任。
+
 
 ``` shell
 $ keytool -import -v -trustcacerts -alias openlookeng_trust -file openlookeng_certificate.cer -keystore openlookeng_trust.jks -keypass <truststore_pass>
 ```
 
-Troubleshooting
+异常处理
 ---------------
 
 ### Java Keystore File Verification
 
-Verify the password for a keystore file and view its contents using [keytool](http://docs.oracle.com/javase/8/docs/technotes/tools/windows/keytool.html).
+使用[keytool](http://docs.oracle.com/javase/8/docs/technotes/tools/windows/keytool.html )验证keystore文件的密码，并查看其内容。
 
 ``` shell
 $ keytool -list -v -keystore /etc/openlookeng/openlookeng.jks

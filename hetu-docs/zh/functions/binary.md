@@ -1,156 +1,140 @@
-Binary Functions and Operators
-==============================
++++
+weight = 11
+title = "二进制函数和运算符"
++++
 
-Binary Operators
-----------------
+# 二进制函数和运算符
 
-The `||` operator performs concatenation.
+## 二进制运算符
 
-Binary Functions
-----------------
+`||` 运算符执行连接。
 
-**length(binary)** -\> bigint
+## 二进制函数
 
-Returns the length of `binary` in bytes.
+**length(binary)** -> bigint
 
-**concat(binary1, \..., binaryN)** -\> varbinary
+返回 `binary` 的长度，以字节为单位。
 
-Returns the concatenation of `binary1`, `binary2`, `...`, `binaryN`. This function provides the same functionality as the SQL-standard concatenation operator (`||`).
+**concat(binary1, ..., binaryN)** -> varbinary
 
-**substr(binary, start)** -\> varbinary
+返回 `binary1`、`binary2`、`...`、`binaryN` 的连接结果。该函数提供与 SQL 标准连接运算符 (`||`) 相同的功能。
 
-Returns the rest of `binary` from the starting position `start`, measured in bytes. Positions start with `1`. A negative starting position is interpreted as being relative to the end of the string.
+**substr(binary, start)** -> varbinary
 
-**substr(binary, start, length)** -\> varbinary
+从起始位置 `start` 开始返回 `binary` 的其余部分，以字节为单位。位置从 `1` 开始。负起始位置表示相对于字符串的末尾。
 
-Returns a substring from `binary` of length `length` from the starting position `start`, measured in bytes. Positions start with `1`. A negative starting position is interpreted as being relative to the end
-of the string.
+**substr(binary, start, length)** -> varbinary
 
-**to\_base64(binary)** -\> varchar
+从起始位置 `start` 开始从 `binary` 返回长度为 `length` 的子字符串，以字节为单位。位置从 `1` 开始。负起始位置表示相对于字符串的末尾。
 
-Encodes `binary` into a base64 string representation.
+**to\_base64(binary)** -> varchar
 
-**from\_base64(string)** -\> varbinary
+将 `binary` 编码为 base64 字符串表示形式。
 
-Decodes binary data from the base64 encoded `string`.
+**from\_base64(string)** -> varbinary
 
-**to\_base64url(binary)** -\> varchar
+从以 base64 编码的 `string` 解码二进制数据。
 
-Encodes `binary` into a base64 string representation using the URL safe alphabet.
+**to\_base64url(binary)** -> varchar
 
+使用 URL 安全字母表将 `binary` 编码为 base64 字符串表示形式。
 
-**from\_base64url(string)** -\> varbinary
+**from\_base64url(string)** -> varbinary
 
-Decodes binary data from the base64 encoded `string` using the URL safe alphabet.
+使用 URL 安全字母表从以 base64 编码的 `string` 解码二进制数据。
 
-**to\_hex(binary)** -\> varchar
+**to\_hex(binary)** -> varchar
 
-Encodes `binary` into a hex string representation.
+将 `binary` 编码为十六进制字符串表示形式。
 
-**from\_hex(string)** -\> varbinary
+**from\_hex(string)** -> varbinary
 
-Decodes binary data from the hex encoded `string`.
+从以十六进制编码的 `string` 解码二进制数据。
 
-**to\_big\_endian\_64(bigint)** -\> varbinary
+**to\_big\_endian\_64(bigint)** -> varbinary
 
-Encodes `bigint` in a 64-bit 2\'s complement big endian format.
+以 64 位二进制补码大端字节序格式对 `bigint` 进行编码。
 
-**from\_big\_endian\_64(binary)** -\> bigint
+**from\_big\_endian\_64(binary)** -> bigint
 
-Decodes `bigint` value from a 64-bit 2\'s complement big endian `binary`.
+从 64 位二进制补码大端字节序 `binary` 解码 `bigint` 值。
 
-**to\_big\_endian\_32(integer)** -\> varbinary
+**to\_big\_endian\_32(integer)** -> varbinary
 
-Encodes `integer` in a 32-bit 2\'s complement big endian format.
+以 32 位二进制补码大端字节序格式对 `integer` 进行编码。
 
-**from\_big\_endian\_32(binary)** -\> integer
+**from\_big\_endian\_32(binary)** -> integer
 
-Decodes `integer` value from a 32-bit 2\'s complement big endian`binary`.
+从 32 位二进制补码大端字节序 `binary` 解码 `integer` 值。
 
+**to\_ieee754\_32(real)** -> varbinary
 
-**to\_ieee754\_32(real)** -\> varbinary
+根据 IEEE 754 单精度浮点格式将 `real` 编码为 32 位大端字节序二进制数。
 
-Encodes `real` in a 32-bit big-endian binary according to IEEE 754 single-precision floating-point format.
+**from\_ieee754\_32(binary)** -> real
 
+对采用 IEEE 754 单精度浮点格式的 32 位大端字节序 `binary` 进行解码。
 
-**from\_ieee754\_32(binary)** -\> real
+**to\_ieee754\_64(double)** -> varbinary
 
-Decodes the 32-bit big-endian `binary` in IEEE 754 single-precision floating-point format.
+根据 IEEE 754 双精度浮点格式将 `double` 编码为 64 位大端字节序二进制数。
 
+**from\_ieee754\_64(binary)** -> double
 
-**to\_ieee754\_64(double)** -\> varbinary
+对采用 IEEE 754 双精度浮点格式的 64 位大端字节序 `binary` 进行解码。
 
-Encodes `double` in a 64-bit big-endian binary according to IEEE 754 double-precision floating-point format.
+**lpad(binary, size, padbinary)** -> varbinary
 
+使用 `padbinary` 将 `binary` 左填充至 `size` 个字节。如果 `size` 小于 `binary` 的长度，结果将被截断至 `size` 个字符。`size` 不得为负数，并且 `padbinary` 必须为非空值。
 
-**from\_ieee754\_64(binary)** -\> double
+**rpad(binary, size, padbinary)** -> varbinary
 
-Decodes the 64-bit big-endian `binary` in IEEE 754 double-precision floating-point format.
+使用 `padbinary` 将 `binary` 右填充至 `size` 个字节。如果 `size` 小于 `binary` 的长度，结果将被截断至 `size` 个字符。`size` 不得为负数，并且 `padbinary` 必须为非空值。
 
-**lpad(binary, size, padbinary)** -\> varbinary
+**crc32(binary)** -> bigint
 
-Left pads `binary` to `size` bytes with `padbinary`. If `size` is less than the length of `binary`, the result is truncated to `size` characters. `size` must not be negative and `padbinary` must be non-empty.
+计算 `binary` 的 CRC-32 值。对于通用哈希，使用 `xxhash64`，因为它快得多并且能生成质量更好的哈希值。
 
+**md5(binary)** -> varbinary
 
-**rpad(binary, size, padbinary)** -\> varbinary
+计算 `binary` 的 md5 哈希值。
 
-Right pads `binary` to `size` bytes with `padbinary`. If `size` is less than the length of `binary`, the result is truncated to `size` characters. `size` must not be negative and `padbinary` must be non-empty.
+**sha1(binary)** -> varbinary
 
-**crc32(binary)** -\> bigint
+计算 `binary` 的 sha1 哈希值。
 
-Computes the CRC-32 of `binary`. For general purpose hashing, use `xxhash64`, as it is much faster and produces a better quality hash.
+**sha256(binary)** -> varbinary
 
-**md5(binary)** -\> varbinary
+计算 `binary` 的 sha256 哈希值。
 
-Computes the md5 hash of `binary`.
+**sha512(binary)** -> varbinary
 
+计算 `binary` 的 sha512 哈希值。
 
-**sha1(binary)** -\> varbinary
+**xxhash64(binary)** -> varbinary
 
-Computes the sha1 hash of `binary`.
+计算 `binary` 的 xxhash64 哈希值。
 
+**spooky\_hash\_v2\_32(binary)** -> varbinary
 
-**sha256(binary)** -\> varbinary
+计算 `binary` 的 32 位 SpookyHashV2 哈希值。
 
-Computes the sha256 hash of `binary`.
+**spooky\_hash\_v2\_64(binary)** -> varbinary
 
+计算 `binary` 的 64 位 SpookyHashV2 哈希值。
 
-**sha512(binary)** -\> varbinary
+**hmac\_md5(binary, key)** -> varbinary
 
-Computes the sha512 hash of `binary`.
+使用给定的 `key` 计算 `binary` 的 HMAC 值（采用 md5）。
 
+**hmac\_sha1(binary, key)** -> varbinary
 
-**xxhash64(binary)** -\> varbinary
+使用给定的 `key` 计算 `binary` 的 HMAC 值（采用 sha1）。
 
-Computes the xxhash64 hash of `binary`.
+**hmac\_sha256(binary, key)** -> varbinary
 
+使用给定的 `key` 计算 `binary` 的 HMAC 值（采用 sha256）。
 
-**spooky\_hash\_v2\_32(binary)** -\> varbinary
+**hmac\_sha512(binary, key)** -> varbinary
 
-Computes the 32-bit SpookyHashV2 hash of `binary`.
-
-
-**spooky\_hash\_v2\_64(binary)** -\> varbinary
-
-Computes the 64-bit SpookyHashV2 hash of `binary`.
-
-
-**hmac\_md5(binary, key)** -\> varbinary
-
-Computes HMAC with md5 of `binary` with the given `key`.
-
-
-**hmac\_sha1(binary, key)** -\> varbinary
-
-Computes HMAC with sha1 of `binary` with the given `key`.
-
-
-**hmac\_sha256(binary, key)** -\> varbinary
-
-Computes HMAC with sha256 of `binary` with the given `key`.
-
-
-**hmac\_sha512(binary, key)** -\> varbinary
-
-Computes HMAC with sha512 of `binary` with the given `key`.
-
+使用给定的 `key` 计算 `binary` 的 HMAC 值（采用 sha512）。

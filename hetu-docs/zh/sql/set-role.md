@@ -27,4 +27,4 @@ SET ROLE ( role | ALL | NONE )
 
 ## 另请参见
 
-[create-role](./create-role.html)、[drop-role](./drop-role.html)、[grant-roles](./grant-roles.html)、[revoke-roles](./revoke-roles.html)
+[CREATE ROLE](./create-role.md)、[DROP ROLE](./drop-role.md)、[GRANT ROLES](./grant-roles.md)、[REVOKE ROLES](./revoke-roles.md)

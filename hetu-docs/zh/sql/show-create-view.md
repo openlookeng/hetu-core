@@ -17,4 +17,4 @@ SHOW CREATE VIEW view_name
 
 ## 另请参见
 
-[create-view](./create-view.html)
+[CREATE VIEW](./create-view.md)

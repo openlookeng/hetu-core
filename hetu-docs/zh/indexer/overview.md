@@ -24,7 +24,7 @@ title = "openLooKeng启发式索引器"
 
 通过为谓词列保留外部索引，启发式索引器可以确定每个Split是否包含正在搜索的值，并且只对可能包含该值的Split安排读操作。
 
-![](indexer_filter_splits.png)
+![indexer_filter_splits](../images/indexer_filter_splits.png)
 
 ### 2.读取ORC文件时提前筛选块
 

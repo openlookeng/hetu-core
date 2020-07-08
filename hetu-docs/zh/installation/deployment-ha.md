@@ -6,11 +6,11 @@ title = "部署具有高可用（HA）的openLooKeng"
 
 # 部署具有高可用（HA）的openLooKeng
 
-openLooKeng HA解决协调节点单点故障问题。如果一个协调节点出现故障，其他协调节点将不受影响。用户可以在任何协调节点上提交查询，这改进了工作负载平衡。
+openLooKeng HA解决协调节点单点故障问题。用户可以在任何协调节点上提交查询，以平衡工作负载。
 
 ## 安装HA
 
-安装具有HA的openLooKeng要求集群中至少有2个协调节点。请按照[openLooKeng手动设置](deployment.html)或[openLooKeng自动设置](deployment-auto.html)进行基本设置。
+安装具有HA的openLooKeng要求集群中至少有2个协调节点。请按照[手动部署openLooKeng](deployment.md)或[自动部署openLooKeng](deployment-auto.md)进行基本设置。
 
 ## 配置HA
 
@@ -20,7 +20,7 @@ openLooKeng HA解决协调节点单点故障问题。如果一个协调节点出
 
 状态存储属性文件`etc/state-store.properties`包含状态存储的配置。状态存储用于与协调节点和工作节点共享的存储状态。以下是最基本配置。
 
-```{.none}
+``` properties
 state-store.type=hazelcast
 state-store.name=query
 state-store.cluster=cluster1
@@ -36,14 +36,14 @@ state-store.cluster=cluster1
 
 在所有协调节点上的`etc/config.properties`中添加如下配置。
 
-```{.none}
+``` properties
 hetu.multiple-coordinator.enabled=true
 hetu.embedded-state-store.enabled=true
 ```
 
 在所有工作节点上的`etc/config.properties`中添加如下配置。
 
-```{.none}
+``` properties
 hetu.multiple-coordinator.enabled=true
 ```
 

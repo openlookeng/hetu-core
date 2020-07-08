@@ -26,7 +26,7 @@ title = "属性参考"
 > 
 > 此属性允许在写入数据之前重新分布数据。这可以通过在集群中的节点间散列数据来消除数据倾斜带来的性能影响。当已知输出数据集没有发生倾斜时，可以停用数据分布，以避免在网络上散列和重分布所有数据的开销。也可以使用`redistribute_writes`会话属性在每个查询基础上指定。
 
-## 内存管理属性{#tuning-memory}
+## 内存管理属性
 
 ### `query.max-memory-per-node`
 
@@ -63,7 +63,7 @@ title = "属性参考"
 > 
 > 此属性是在JVM堆中为openLooKeng不跟踪的分配留作裕量/缓冲区的内存量。
 
-## 溢出属性{#tuning-spilling}
+## 溢出属性
 
 ### `experimental.spill-enabled`
 
@@ -316,7 +316,7 @@ title = "属性参考"
 > 
 > 在执行期间的早期为分布、联接和聚合计算哈希代码，允许在查询的后期在操作之间共享结果。这可以通过避免多次计算相同的哈希来降低CPU使用率，但代价是为哈希进行额外的网络传输。在大多数情况下，这将减少整个查询处理时间。也可以使用`optimize_hash_generation`会话属性在每个查询基础上指定。
 > 
-> 在使用[EXPLAIN](../sql/explain.html)时禁用此属性通常很有帮助，这样可以使查询计划更易读。
+> 在使用[EXPLAIN](../sql/explain.md)时禁用此属性通常很有帮助，这样可以使查询计划更易读。
 
 ### `optimizer.optimize-metadata-queries`
 
@@ -334,7 +334,7 @@ title = "属性参考"
 > 
 > 如果聚合位于外联接上，并且来自联接外部的所有列都在分组子句中，则聚合被推送到外联接之下。这种优化对于相关的标量子查询尤其有用，这些子查询通过外联接被重写为聚合。例如：
 > 
-> ```
+> ``` sql
 > SELECT * FROM item i
 >        WHERE i.i_current_price > (
 >            SELECT AVG(j.i_current_price) FROM item j
@@ -371,7 +371,7 @@ title = "属性参考"
 
 ## 正则表达式函数属性
 
-下列属性允许调优[regexp](../functions/regexp.html)。
+下列属性允许调优[正则表达式函数](../functions/regexp.md)。
 
 ### `regex-library`
 

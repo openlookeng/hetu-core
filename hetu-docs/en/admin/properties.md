@@ -339,7 +339,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > 
 >  
 > 
-> It is often helpful to disable this property when using [EXPLAIN](../sql/explain.html) in order to make the query plan easier to read.
+> It is often helpful to disable this property when using [EXPLAIN](../sql/explain.md) in order to make the query plan easier to read.
 
 ### `optimizer.optimize-metadata-queries`
 
@@ -402,7 +402,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 
 ## Regular Expression Function Properties
 
-The following properties allow tuning the [regexp](../functions/regexp.html).
+The following properties allow tuning the [regexp](../functions/regexp.md).
 
 ### `regex-library`
 

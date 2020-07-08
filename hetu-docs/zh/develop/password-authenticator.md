@@ -25,7 +25,7 @@ openLooKeng 支持使用用户名和密码通过自定义密码验证器进行�
 
 配置文件示例：
 
-```{.none}
+``` properties
 password-authenticator.name=custom-access-control
 custom-property1=custom-value1
 custom-property2=custom-value2

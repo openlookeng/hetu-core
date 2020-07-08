@@ -39,4 +39,4 @@ SHOW GRANTS [ ON [ TABLE ] table_name ]
 
 ## 另请参见
 
-[grant](./grant.html)、[revoke](./ revoke.html)
+[GRANT](./grant.md)、[REVOKE](./revoke.md)
