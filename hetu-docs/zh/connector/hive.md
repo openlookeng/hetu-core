@@ -272,11 +272,11 @@ The Hive connector can access data stored in GCS, using the `gs://` URI prefix. 
 ORC Cache Configuration
 -----------------------
 
-Hive connector caches the ORC file data to provide better performance. The data is cached in worker local memory. Support for caching partitioned table is only available. `cache sql` can be used to customize the table and partition that should be cached by the Connector.
+Hive connector caches the ORC file data to provide better performance and reduce query latency. Workers cache the data on their local memory.
+When enabled, Workers cache all ORC files tail, stripe-footer, row-index, bloom-filter information. However, the workers cache row data of only specific ORC 
+files that are matching the predicates provided via `cache table` sql statement.
 
 ### ORC Cache Properties
-
- 
 
 | Property Name                              | Description                                          | Default   |
 | :----------------------------------------- | :--------------------------------------------------- | :-------- |
@@ -295,6 +295,9 @@ Hive connector caches the ORC file data to provide better performance. The data 
 | `hive.orc.row-data.block.cache.enabled`    | Enable ORC row group block cache                     | `false`   |
 | `hive.orc.row-data.block.cache.ttl`        | TTL for ORC row group cache                          | `30 mins` |
 | `hive.orc.row-data.block.cache.max.weight` | Maximum weight of ORC row group cache                | `500 MB`  |
+
+TTL is time taken since cache entry was last accessed by read or write. Timed expiration is performed with periodic maintenance during writes 
+and occasionally during reads, as discussed below.
 
 Table Statistics
 ----------------

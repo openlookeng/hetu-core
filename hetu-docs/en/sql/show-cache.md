@@ -21,14 +21,22 @@ Description
 Examples
 --------
 
-Show cache :
+Show all cache metadata
+ 
+```sql
+    SHOW CACHE;
+```
 
-    SHOW CACHE
+Show cache metadata for sales table
+
+```sql
+    SHOW CACHE sales;
+```  
 
 Limitations
 -----------
 
-Only Hive connector support this functionality. See connector documentation for more details.
+Only Hive connector support this functionality at this time. See connector documentation for more details.
 
 See Also
 --------
