@@ -33,6 +33,7 @@ import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.AbstractVariableWidthType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 
 import java.io.FileNotFoundException;
 import java.util.List;
@@ -103,6 +104,8 @@ class HiveSplitSource
     private final Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates;
     private final boolean isSplitFilteringEnabled;
 
+    private final TypeManager typeManager;
+
     private HiveSplitSource(
             ConnectorSession session,
             String databaseName,
@@ -114,7 +117,8 @@ class HiveSplitSource
             AtomicReference<State> stateReference,
             CounterStat highMemorySplitSourceCounter,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
-            Set<TupleDomain<ColumnMetadata>> userDefinedCachedPredicates)
+            Set<TupleDomain<ColumnMetadata>> userDefinedCachedPredicates,
+            TypeManager typeManager)
     {
         requireNonNull(session, "session is null");
         this.queryId = session.getQueryId();
@@ -133,6 +137,7 @@ class HiveSplitSource
         this.dynamicFilterSupplier = dynamicFilterSupplier;
         this.isSplitFilteringEnabled = isDynamicFilteringSplitFilteringEnabled(session);
         this.userDefinedCachePredicates = userDefinedCachedPredicates;
+        this.typeManager = typeManager;
     }
 
     public static HiveSplitSource allAtOnce(
@@ -147,7 +152,8 @@ class HiveSplitSource
             Executor executor,
             CounterStat highMemorySplitSourceCounter,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
-            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+            TypeManager typeManager)
     {
         AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
@@ -191,7 +197,8 @@ class HiveSplitSource
                 stateReference,
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
-                userDefinedCachePredicates);
+                userDefinedCachePredicates,
+                typeManager);
     }
 
     public static HiveSplitSource bucketed(
@@ -206,7 +213,8 @@ class HiveSplitSource
             Executor executor,
             CounterStat highMemorySplitSourceCounter,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
-            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+            TypeManager typeManager)
     {
         AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
@@ -270,7 +278,8 @@ class HiveSplitSource
                 stateReference,
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
-                userDefinedCachePredicates);
+                userDefinedCachePredicates,
+                typeManager);
     }
 
     /**
@@ -427,7 +436,7 @@ class HiveSplitSource
             // Filter out splits if dynamic filter is available
             if (dynamicFilterSupplier != null && isSplitFilteringEnabled) {
                 splits = splits.stream()
-                        .filter(split -> !isPartitionFiltered(HiveSplitWrapper.getOnlyHiveSplit(split).getPartitionKeys(), dynamicFilterSupplier.get()))
+                        .filter(split -> !isPartitionFiltered(HiveSplitWrapper.getOnlyHiveSplit(split).getPartitionKeys(), dynamicFilterSupplier.get(), typeManager))
                         .collect(Collectors.toList());
             }
 

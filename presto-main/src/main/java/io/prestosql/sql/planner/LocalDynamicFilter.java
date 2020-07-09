@@ -19,7 +19,6 @@ import com.google.common.collect.MultimapBuilder;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
@@ -65,12 +64,12 @@ public class LocalDynamicFilter
     // The resulting predicate for local dynamic filtering.
     private TupleDomain<String> result;
 
-    private SettableFuture<Map<Symbol, Set<String>>> bloomFilterResultFuture;
+    private SettableFuture<Map<Symbol, Set>> hashSetResultFuture;
 
     // Number of partitions left to be processed.
     private int partitionsLeft;
 
-    private Map<String, Set<String>> domainResult = new HashMap<>();
+    private Map<String, Set> domainResult = new HashMap<>();
 
     private final StateStoreProvider stateStoreProvider;
     private final DynamicFilter.Type type;
@@ -82,7 +81,7 @@ public class LocalDynamicFilter
         verify(probeSymbols.keySet().equals(buildChannels.keySet()), "probeSymbols and buildChannels must have same keys");
 
         this.resultFuture = SettableFuture.create();
-        this.bloomFilterResultFuture = SettableFuture.create();
+        this.hashSetResultFuture = SettableFuture.create();
 
         this.result = TupleDomain.none();
         this.partitionsLeft = partitionCount;
@@ -96,9 +95,9 @@ public class LocalDynamicFilter
     private synchronized void addPartition(TupleDomain<String> tupleDomain)
     {
         if (type == DynamicFilter.Type.GLOBAL) {
-            Map<Symbol, Set<String>> bloomFilterResult = new HashMap<>();
+            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
             if (isIncomplete) {
-                bloomFilterResultFuture.set(bloomFilterResult);
+                hashSetResultFuture.set(bloomFilterResult);
                 return;
             }
         }
@@ -120,17 +119,10 @@ public class LocalDynamicFilter
             if (!domainResult.containsKey(key)) {
                 domainResult.put(key, new HashSet<>());
             }
-            Set<String> set = domainResult.get(key);
+            Set set = domainResult.get(key);
             for (Range range : value.getValues().getRanges().getOrderedRanges()) {
                 Object obj = range.getSingleValue();
-                String val;
-                if (obj instanceof Slice) {
-                    val = new String(((Slice) obj).getBytes());
-                }
-                else {
-                    val = String.valueOf(obj);
-                }
-                set.add(val);
+                set.add(obj);
             }
         });
 
@@ -140,12 +132,12 @@ public class LocalDynamicFilter
         if (partitionsLeft == 0) {
             // No more partitions are left to be processed.
 //            verify(resultFuture.set(convertTupleDomain(result)), "dynamic filter result is provided more than once");
-            Map<Symbol, Set<String>> bloomFilterResult = new HashMap<>();
+            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
             if (isIncomplete) {
-                bloomFilterResultFuture.set(bloomFilterResult);
+                hashSetResultFuture.set(bloomFilterResult);
                 return;
             }
-            for (Map.Entry<String, Set<String>> entry : domainResult.entrySet()) {
+            for (Map.Entry<String, Set> entry : domainResult.entrySet()) {
                 for (Symbol probeSymbol : probeSymbols.get(entry.getKey())) {
                     if (!bloomFilterResult.containsKey(probeSymbol)) {
                         bloomFilterResult.put(probeSymbol, new HashSet<>());
@@ -153,7 +145,7 @@ public class LocalDynamicFilter
                     bloomFilterResult.put(probeSymbol, entry.getValue());
                 }
             }
-            bloomFilterResultFuture.set(bloomFilterResult);
+            hashSetResultFuture.set(bloomFilterResult);
         }
     }
 
@@ -278,9 +270,9 @@ public class LocalDynamicFilter
         return resultFuture;
     }
 
-    public ListenableFuture<Map<Symbol, Set<String>>> getBloomFilterResultFuture()
+    public ListenableFuture<Map<Symbol, Set>> getDynamicFilterResultFuture()
     {
-        return bloomFilterResultFuture;
+        return hashSetResultFuture;
     }
 
     public Consumer<TupleDomain<String>> getTupleDomainConsumer()

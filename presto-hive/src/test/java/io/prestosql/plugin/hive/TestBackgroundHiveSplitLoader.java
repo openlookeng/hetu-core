@@ -341,7 +341,7 @@ public class TestBackgroundHiveSplitLoader
                 Optional.empty(),
                 null,
                 Optional.empty(),
-                Collections.emptyMap());
+                Collections.emptyMap(), null);
 
         HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
         backgroundHiveSplitLoader.start(hiveSplitSource);
@@ -565,7 +565,7 @@ public class TestBackgroundHiveSplitLoader
                 Optional.empty(),
                 createTestDynamicFilterSupplier("partitionColumn", ImmutableList.of("0", "2", "3")),
                 Optional.empty(),
-                ImmutableMap.of());
+                ImmutableMap.of(), null);
 
         HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
         backgroundHiveSplitLoader.start(hiveSplitSource);
@@ -673,7 +673,7 @@ public class TestBackgroundHiveSplitLoader
                 validWriteIds,
                 null,
                 Optional.empty(),
-                Collections.emptyMap());
+                Collections.emptyMap(), null);
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoader(List<LocatedFileStatus> files, DirectoryLister directoryLister)
@@ -702,7 +702,7 @@ public class TestBackgroundHiveSplitLoader
                 Optional.empty(),
                 null,
                 Optional.empty(),
-                Collections.emptyMap());
+                Collections.emptyMap(), null);
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoaderOfflinePartitions()
@@ -725,7 +725,7 @@ public class TestBackgroundHiveSplitLoader
                 Optional.empty(),
                 null,
                 Optional.empty(),
-                Collections.emptyMap());
+                Collections.emptyMap(), null);
     }
 
     private static Iterable<HivePartitionMetadata> createPartitionMetadataWithOfflinePartitions()
@@ -770,7 +770,7 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 new CounterStat(),
                 null,
-                null);
+                null, null);
     }
 
     private static Table table(

@@ -101,7 +101,7 @@ public class CarbondataSplitManager
             CarbondataTableReader reader)
     {
         super(hiveConfig, metastoreProvider, partitionManager, namenodeStats, hdfsEnvironment,
-                directoryLister, executorService, versionEmbedder, coercionPolicy);
+                directoryLister, executorService, versionEmbedder, null, coercionPolicy);
         this.carbonTableReader = requireNonNull(reader, "client is null");
         this.metastoreProvider = requireNonNull(metastoreProvider, "metastore is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");

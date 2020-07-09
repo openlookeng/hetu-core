@@ -60,6 +60,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static com.google.common.base.Strings.repeat;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.SequencePageBuilder.createSequencePage;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
@@ -68,6 +69,7 @@ import static io.prestosql.block.BlockAssertions.createBooleansBlock;
 import static io.prestosql.block.BlockAssertions.createDoublesBlock;
 import static io.prestosql.block.BlockAssertions.createLongRepeatBlock;
 import static io.prestosql.block.BlockAssertions.createLongsBlock;
+import static io.prestosql.block.BlockAssertions.createSlicesBlock;
 import static io.prestosql.block.BlockAssertions.createStringsBlock;
 import static io.prestosql.operator.OperatorAssertion.toMaterializedResult;
 import static io.prestosql.operator.OperatorAssertion.toPages;
@@ -268,6 +270,39 @@ public class TestDynamicFilterSourceOperator
     }
 
     @Test
+    public void testGlobalDynamicFilterSourceOperatorBloomFilterSlice() throws IOException
+    {
+        String filterId = "909";
+        DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
+                (DynamicFilter.Type.GLOBAL, 0, channel(0, VARCHAR, filterId));
+
+        DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
+
+        verifyPassthrough(op1,
+                ImmutableList.of(VARCHAR),
+                new Page(createSlicesBlock(utf8Slice("test1"))),
+                new Page(createSlicesBlock(utf8Slice("test2"))),
+                new Page(createSlicesBlock(utf8Slice("test3"))));
+
+        String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, TEST_SESSION.getQueryId().toString());
+        String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, filterId, TEST_SESSION.getQueryId().toString());
+        String resultType = (String) ((StateMap) stateStoreProvider.getStateStore()
+                .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).get(typeKey);
+        StateSet states = ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key));
+        for (Object bfSerialized : states.getAll()) {
+            BloomFilterDynamicFilter bfdf = new BloomFilterDynamicFilter(filterId, null, (byte[]) bfSerialized, DynamicFilter.Type.GLOBAL);
+            String value = new String((utf8Slice("test1")).getBytes());
+            assertEquals(bfdf.getSize(), 3);
+            assertEquals(bfdf.contains(value), true);
+        }
+        assertEquals(resultType, DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL);
+        assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
+                .createKey(DynamicFilterUtils.FINISHREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
+        assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
+                .createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
+    }
+
+    @Test
     public void testGlobalDynamicFilterSourceOperatorHashSet() throws IOException
     {
         String filterId = "22";
@@ -290,7 +325,7 @@ public class TestDynamicFilterSourceOperator
         StateSet states = ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key));
         for (Object bfSerialized : states.getAll()) {
             HashSetDynamicFilter bfdf = new HashSetDynamicFilter(filterId, null, (Set) bfSerialized, DynamicFilter.Type.GLOBAL);
-            assertEquals(bfdf.contains("22"), true);
+            assertEquals(bfdf.contains(22L), true);
             assertEquals(bfdf.getSize(), 8);
         }
         assertEquals(resultType, DynamicFilterUtils.HASHSETTYPEGLOBAL);

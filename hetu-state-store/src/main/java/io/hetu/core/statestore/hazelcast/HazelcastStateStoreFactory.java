@@ -18,8 +18,10 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.config.DiscoveryStrategyConfig;
+import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.HazelcastInstance;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.seedstore.Seed;
@@ -84,6 +86,9 @@ public class HazelcastStateStoreFactory
         }
 
         ClientConfig clientConfig = new ClientConfig();
+        // Add serialization for Slice
+        SerializerConfig sc = new SerializerConfig().setImplementation(new HazelCastSliceSerializer()).setTypeClass(Slice.class);
+        clientConfig.getSerializationConfig().addSerializerConfig(sc);
         clientConfig.setClusterName(clusterId);
 
         final String discoveryMode = properties.get(DISCOVERY_MODE_CONFIG_NAME);

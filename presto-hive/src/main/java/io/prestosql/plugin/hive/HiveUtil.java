@@ -24,6 +24,7 @@ import io.airlift.compress.lzo.LzopCodec;
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonCodecFactory;
 import io.airlift.json.ObjectMapperProvider;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceUtf8;
 import io.airlift.slice.Slices;
@@ -42,12 +43,15 @@ import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.predicate.NullableValue;
+import io.prestosql.spi.type.AbstractVariableWidthType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -150,6 +154,8 @@ import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Cate
 
 public final class HiveUtil
 {
+    public static final Logger log = Logger.get(HiveUtil.class);
+
     public static final String PRESTO_VIEW_FLAG = "presto_view";
 
     private static final String VIEW_PREFIX = "/* Presto View: ";
@@ -982,7 +988,7 @@ public final class HiveUtil
         return HiveType.toHiveTypes(schema.getProperty(IOConstants.COLUMNS_TYPES, ""));
     }
 
-    public static boolean isPartitionFiltered(List<HivePartitionKey> partitionKeys, Set<DynamicFilter> dynamicFilters)
+    public static boolean isPartitionFiltered(List<HivePartitionKey> partitionKeys, Set<DynamicFilter> dynamicFilters, TypeManager typeManager)
     {
         if (partitionKeys == null || dynamicFilters == null) {
             return false;
@@ -1012,8 +1018,23 @@ public final class HiveUtil
                 continue;
             }
 
-            if (!dynamicFilter.contains(partitionValue)) {
-                return true;
+            if (typeManager != null && dynamicFilter instanceof HashSetDynamicFilter) {
+                try {
+                    Object realObjectValue = getValueAsType(((HiveColumnHandle) dynamicFilter.getColumnHandle())
+                            .getColumnMetadata(typeManager).getType(), partitionValue);
+                    if (realObjectValue != null && !dynamicFilter.contains(realObjectValue)) {
+                        return true;
+                    }
+                }
+                catch (PrestoException | ClassCastException e) {
+                    log.error("cannot cast class" + e.getMessage());
+                    return false;
+                }
+            }
+            else {
+                if (!dynamicFilter.contains(partitionValue)) {
+                    return true;
+                }
             }
         }
         return false;
@@ -1031,23 +1052,23 @@ public final class HiveUtil
     static List<Iterator<Page>> getPageSourceIterators(List<ConnectorPageSource> pageSources)
     {
         return pageSources.stream().map(source -> new AbstractIterator<Page>()
+        {
+            @Override
+            protected Page computeNext()
             {
-                @Override
-                protected Page computeNext()
-                {
-                    Page nextPage;
-                    do {
-                        nextPage = source.getNextPage();
-                        if (nextPage == null) {
-                            return endOfData();
-                        }
+                Page nextPage;
+                do {
+                    nextPage = source.getNextPage();
+                    if (nextPage == null) {
+                        return endOfData();
                     }
-                    while (nextPage.getPositionCount() == 0);
-
-                    nextPage = nextPage.getLoadedPage();
-                    return nextPage;
                 }
-            }).collect(toList());
+                while (nextPage.getPositionCount() == 0);
+
+                nextPage = nextPage.getLoadedPage();
+                return nextPage;
+            }
+        }).collect(toList());
     }
 
     @VisibleForTesting
@@ -1060,5 +1081,30 @@ public final class HiveUtil
             }
         }
         return OptionalInt.empty();
+    }
+
+    private static Object getValueAsType(Type type, String value) throws ClassCastException, PrestoException
+    {
+        Class<?> javaType = type.getJavaType();
+        if (javaType == long.class) {
+            if (type.equals(BIGINT) || type.equals(INTEGER)) {
+                return Long.valueOf(value);
+            }
+            else {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR,
+                        "Unhandled type for " + javaType.getSimpleName() + ":" + type.getTypeSignature());
+            }
+        }
+        else if (javaType == boolean.class) {
+            return Boolean.valueOf(value);
+        }
+        else if (javaType == double.class) {
+            return Double.valueOf(value);
+        }
+        else if (type instanceof AbstractVariableWidthType || javaType == Slice.class) {
+            return Slices.utf8Slice(value);
+        }
+        throw new PrestoException(GENERIC_INTERNAL_ERROR,
+                "Unhandled type for " + javaType.getSimpleName() + ":" + type.getTypeSignature());
     }
 }

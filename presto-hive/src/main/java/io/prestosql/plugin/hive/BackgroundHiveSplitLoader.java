@@ -40,6 +40,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.resourcegroups.QueryType;
+import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -152,6 +153,7 @@ public class BackgroundHiveSplitLoader
     private volatile boolean stopped;
     private Optional<QueryType> queryType;
     private Map<String, Object> queryInfo;
+    private TypeManager typeManager;
 
     private final Map<ColumnHandle, DynamicFilter> cachedDynamicFilters = new ConcurrentHashMap<>();
 
@@ -170,12 +172,14 @@ public class BackgroundHiveSplitLoader
             Optional<ValidWriteIdList> validWriteIds,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Optional<QueryType> queryType,
-            Map<String, Object> queryInfo)
+            Map<String, Object> queryInfo,
+            TypeManager typeManager)
     {
         this.table = table;
         this.compactEffectivePredicate = compactEffectivePredicate;
         this.tableBucketInfo = tableBucketInfo;
         this.loaderConcurrency = loaderConcurrency;
+        this.typeManager = typeManager;
         this.session = session;
         this.hdfsEnvironment = hdfsEnvironment;
         this.namenodeStats = namenodeStats;
@@ -341,7 +345,7 @@ public class BackgroundHiveSplitLoader
 
         if (dynamicFilterSupplier != null && isDynamicFilteringSplitFilteringEnabled(session)) {
             //buildDynamicFilters(dynamicFilterSupplier.get(), cachedDynamicFilters);
-            if (isPartitionFiltered(partitionKeys, dynamicFilterSupplier.get())) {
+            if (isPartitionFiltered(partitionKeys, dynamicFilterSupplier.get(), typeManager)) {
                 // Avoid listing files and creating splits from a partition if it has been pruned due to dynamic filters
                 return COMPLETED_FUTURE;
             }

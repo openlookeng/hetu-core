@@ -75,10 +75,9 @@ import static java.util.Objects.requireNonNull;
 public class DynamicFilterService
 {
     private static final Logger log = Logger.get(DynamicFilterService.class);
-    private static final double EXPECTED_FPP = 0.25;
     private final ScheduledExecutorService filterMergeExecutor;
     private static final int THREAD_POOL_SIZE = 3;
-    private static final int updateInterval = 50;
+    private static final int updateInterval = 20;
     private ScheduledFuture<?> backgroundTask;
     private boolean initialized;
 
@@ -152,9 +151,13 @@ public class DynamicFilterService
                     if (type != null) {
                         if (type.equals(DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL) || type.equals(DynamicFilterUtils.BLOOMFILTERTYPELOCAL)) {
                             BloomFilter mergedFilter = mergeBloomFilters(filterIterator);
-
-                            if (mergedFilter.expectedFpp() > EXPECTED_FPP) {
-                                log.info("FPP too high: " + mergedFilter.expectedFpp());
+                            if (mergedFilter == null || mergedFilter.expectedFpp() > DynamicFilterUtils.BLOOMFILTER_EXPECTEDFPP) {
+                                if (mergedFilter == null) {
+                                    log.error("could not merge dynamic filter");
+                                }
+                                else {
+                                    log.info("FPP too high: " + mergedFilter.expectedFpp());
+                                }
                                 clearPartialResults(filterId, queryId);
                                 return;
                             }
@@ -170,29 +173,31 @@ public class DynamicFilterService
                                 ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).put(filterKey, filter);
                                 // remove the filter so we don't need to monitor it anymore
                                 outerEntry.getValue().remove(filterId);
-                                log.info("Merged dynamic filter id: " + filterId + "-" + queryId + " type: " + type + ", column: " + column + ", item count: " + mergedFilter.approximateElementCount() + ", fpp: " + mergedFilter.expectedFpp());
-                                clearPartialResults(filterId, queryId);
+                                log.info("Merged successfully dynamic filter id: " + filterId + "-" + queryId + " type: " + type + ", column: " + column + ", item count: " + mergedFilter.approximateElementCount() + ", fpp: " + mergedFilter.expectedFpp());
                             }
                             catch (IOException e) {
                                 log.error(e);
                             }
+                            finally {
+                                clearPartialResults(filterId, queryId);
+                            }
                         }
                         else if (type.equals(DynamicFilterUtils.HASHSETTYPEGLOBAL) || type.equals(DynamicFilterUtils.HASHSETTYPELOCAL)) {
                             Set merged = mergeHashSets(results);
+                            if (merged == null) {
+                                log.error("could not merge dynamic filter");
+                                clearPartialResults(filterId, queryId);
+                                return;
+                            }
                             if (!cachedDynamicFilters.containsKey(queryId)) {
                                 cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
                             }
-                            try {
-                                cachedDynamicFilters.get(queryId).put(filterId, new HashSetDynamicFilter(filterKey, null, merged, DynamicFilter.Type.GLOBAL));
-                                ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).put(filterKey, merged);
-                                // remove the filter so we don't need to monitor it anymore
-                                outerEntry.getValue().remove(filterId);
-                                log.info("Merged dynamic filter id using stringsets: " + entry.getKey() + "-" + queryId + " type: " + type + ", column: " + entry.getValue() + ", item count: " + merged.size());
-                                clearPartialResults(entry.getKey(), queryId);
-                            }
-                            catch (NullPointerException e) {
-                                log.error(e);
-                            }
+                            cachedDynamicFilters.get(queryId).put(filterId, new HashSetDynamicFilter(filterKey, null, merged, DynamicFilter.Type.GLOBAL));
+                            ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).put(filterKey, merged);
+                            // remove the filter so we don't need to monitor it anymore
+                            outerEntry.getValue().remove(filterId);
+                            log.info("Merged successfully dynamic filter id using stringsets: " + entry.getKey() + "-" + queryId + " type: " + type + ", column: " + entry.getValue() + ", item count: " + merged.size());
+                            clearPartialResults(filterId, queryId);
                         }
                     }
                 }
@@ -218,7 +223,9 @@ public class DynamicFilterService
                 }
             }
             catch (IOException e) {
+                mergedFilter = null;
                 log.error(e);
+                break;
             }
         }
         return mergedFilter;
@@ -226,15 +233,10 @@ public class DynamicFilterService
 
     private Set mergeHashSets(Collection<Object> results)
     {
-        HashSet<String> merged = new HashSet<>();
+        Set merged = new HashSet<>();
         for (Object o : results) {
-            try {
-                HashSet<String> s = (HashSet<String>) o;
-                merged.addAll(s);
-            }
-            catch (NullPointerException e) {
-                log.error(e);
-            }
+            Set s = (Set) o;
+            merged.addAll(s);
         }
         return merged;
     }

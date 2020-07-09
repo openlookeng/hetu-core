@@ -40,6 +40,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.Type;
@@ -650,7 +651,13 @@ public class HivePageSource
             for (Map.Entry<Integer, String> column : eligibleColumns.entrySet()) {
                 Block block = page.getBlock(column.getKey()).getLoadedBlock();
 
-                String nativeValue = TypeUtils.readNativeValueForDynamicFilter(types[column.getKey()], block, position);
+                Object nativeValue;
+                if (dynamicFilter.get(column.getValue()) instanceof HashSetDynamicFilter) {
+                    nativeValue = TypeUtils.readNativeValue(types[column.getKey()], block, position);
+                }
+                else {
+                    nativeValue = TypeUtils.readNativeValueForDynamicFilter(types[column.getKey()], block, position);
+                }
 
                 if (nativeValue != null && dynamicFilter.get(column.getValue()) != null && !dynamicFilter.get(column.getValue()).contains(nativeValue)) {
                     shouldKeep = false;
@@ -661,7 +668,6 @@ public class HivePageSource
                 ids.add(position);
             }
         }
-
         return ids;
     }
 

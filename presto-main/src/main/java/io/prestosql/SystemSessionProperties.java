@@ -608,7 +608,7 @@ public final class SystemSessionProperties
                         false),
                 integerProperty(
                         DYNAMIC_FILTERING_DATA_STRUCTURE,
-                        "Experimental: Data structure for choosing the datas tructure of the dynamic filter (0 for BloomFilter, 1 for HashSet)",
+                        "Experimental: Data structure for choosing the datastructure of the dynamic filter (0 for BloomFilter, 1 for HashSet)",
                         featuresConfig.getDynamicFilteringDataStructure(),
                         false),
                 dataSizeProperty(

@@ -23,8 +23,10 @@ import com.hazelcast.config.JoinConfig;
 import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.MaxSizePolicy;
 import com.hazelcast.config.NetworkConfig;
+import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import io.airlift.slice.Slice;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.statestore.CipherService;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
@@ -68,6 +70,11 @@ public class HazelcastStateStoreBootstrapper
 
         Config hzConfig = new Config();
         // Config hazelcast cluster name
+
+        // Add serialization for Slice
+        SerializerConfig sc = new SerializerConfig().setImplementation(new HazelCastSliceSerializer()).setTypeClass(Slice.class);
+        hzConfig.getSerializationConfig().addSerializerConfig(sc);
+
         String clusterId = config.get(STATE_STORE_CLUSTER_CONFIG_NAME);
         if (clusterId == null) {
             clusterId = DEFAULT_CLUSTER_ID;
