@@ -300,13 +300,6 @@ title = "属性参考"
 > 
 > 设置调度拆分时使用的网络拓扑。`legacy`调度拆分时忽略拓扑。`flat`会尝试在数据所在的主机上调度拆分，为本地拆分预留50%的工作队列。对于分布式存储与openLooKeng worker运行在相同节点上的集群，推荐使用`flat`。
 
-### `node-scheduler.enable-split-cache-map`
-
-> - 类型：`boolean`
-> - 默认值：`true`
-> 
-> 此属性启**用SplitCacheAwareNodeSelector**。拆分缓存感知节点选择器跟踪所有拆分以及以前调度过拆分的节点。在后续的查询执行中，使用拆分缓存映射来调度同一节点上的任务。但是，拆分缓存映射只有在执行缓存表查询之后才有效。
-
 ## 优化器属性
 
 ### `optimizer.dictionary-aggregation`
@@ -406,38 +399,96 @@ title = "属性参考"
 
 ## 启发式索引属性
 
-启发式索引是外部索引模块，可用于筛选连接器级别的行。Bitmap、Bloom、MinMaxIndex是openLooKeng提供的索引列表。到目前为止，启发式索引仅用于Hive连接器，特别是ORC格式。
+启发式索引是外部索引模块，可用于过滤连接器级别的行。 位图，Bloom和MinMaxIndex是openLooKeng提供的索引列表。 到目前为止，位图索引支持使用ORC存储格式的表支持蜂巢连接器。
 
-- `hetu.filter.enabled`
-  
-  类型：`boolean` 默认值：`false` 此属性启用启发式索引。
-
-- `hetu.filter.cache.max-indices-number`
-  
-  类型：`integer` 默认值：`10,000,000` 缓存索引文件可以提供更好的性能，索引文件是只读的，很少被修改。缓存节省了从索引存储读取文件的时间。部分缓存此属性控制可以缓存的索引文件的最大数量。当超过限制时，基于LRU的现有条目将从缓存中移除，新条目将添加到缓存中。
-
-- `hetu.filter.plugins`
-  
-  类型：`string` 此属性用于定义支持启发式索引所需的插件的位置。属性接受多个插件，由逗号分隔。
-
-- `hetu.filter.indexstore.uri`
-  
-  类型：`string` 默认值：`/opt/hetu/indices/` 存放所有索引文件的目录。每个索引将存储在自己的子目录中。
-
-- `hetu.filter.indexstore.type`
-  
-  类型`string` 允许值：`hdfs, local` 默认值：`local` 此属性定义索引文件的持久性存储区。必须定义其他特定于存储的属性。
-
-```
-hetu.filter.hdfs.**
-```
-
-> HDFS索引存储的属性。一些例子如下：
+### `hetu.filter.enabled`
+ 
+> -   **类型:** `boolean`
+> -   **默认值:** `false`
+>
+> 此属性启用启发式索引.
+ 
+### `hetu.filter.cache.max-indices-number`
+ 
+> -   **类型:** `integer`
+> -   **默认值：** `10,000,000`
+>
+> 缓存索引文件可提供更好的性能，索引文件是只读的，很少修改。 缓存节省了从索引存储读取文件所花费的时间。 部分缓存该属性控制可以缓存的索引文件的最大数量。 当超过限制时，将基于LRU从缓存中删除现有条目，并将新条目添加到缓存中。
+ 
+### `hetu.filter.plugins`
+ 
+> -   **类型:** `string`
+>
+> 此属性用于定义支持启发式索引所需的插件的位置。 属性接受多个用逗号分隔的插件。
+ 
+### `hetu.filter.indexstore.uri`
+ 
+> -   **类型:** `string`
+> -   **默认值：** `/opt/hetu/indices/`
 > 
-> hetu.filter.indexstore.hdfs.config.resource hetu.filter.indexstore.hdfs.authentication.type hetu.filter.indexstore.hdfs.krb5.keytab.path hetu.filter.indexstore.hdfs.krb5.conf.path hetu.filter.indexstore.hdfs.krb5.principal
+> 所有索引文件存储在的目录。 每个索引将存储在其自己的子目录中。
+ 
+### `hetu.filter.indexstore.type`
+ 
+> -   **类型** `string` 
+> -   **允许的值：** `hdfs, local`
+> -   **默认值：** `local`
+>
+> 此属性定义索引文件的持久性存储。 其他属性必须是HDFS索引存储的提供者。
+>
+#### HDFS索引存储的属性
 
-```
-hetu.filter.local.**
-```
+ | 物业名称                                                    | 强制性的                           | 描述                                                               |
+ | ---------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
+ | `hetu.filter.indexstore.hdfs.config.resources`             | 是                               | hdfs资源文件的路径 (e.g. core-site.xml, hdfs-site.xml)               |
+ | `hetu.filter.indexstore.hdfs.authentication.type`          | 是                               | hdfs身份验证接受的值：`KERBEROS`, `NONE`                              |
+ | `hetu.filter.indexstore.hdfs.krb5.conf.path`               | 如果身份验证类型设置为YES KERBEROS   | krb5配置文件的路径                                                   |
+ | `hetu.filter.indexstore.hdfs.krb5.keytab.path`             | 如果身份验证类型设置为YES KERBEROS   | kerberos keytab文件的路径                                           |
+ | `hetu.filter.indexstore.hdfs.krb5.principal`               | 如果身份验证类型设置为YES KERBEROS   | Kerberos认证主体                                                    |
+ 
+##执行计划缓存属性
 
-> 本地索引存储的属性。
+执行计划缓存功能允许协调器在相同的查询之间重用执行计划，
+构建另一个执行计划的过程，从而减少了所需的查询预处理量。
+ 
+### `hetu.executionplan.cache.enabled`
+>
+> -    **类型:** `boolean` 
+> -    **默认值：** `false` 
+>
+> 启用或禁用执行计划缓存。 默认禁用。
+ 
+### `hetu.executionplan.cache.limit`
+> 
+> -  **类型:** `integer`
+> - **默认值：** `1000`
+>
+> 保留在缓存中的最大执行计划数
+ 
+### `hetu.executionplan.cache.timeout`
+> 
+> - **类型:** `integer`
+> - **默认值：** `60000 ms`
+> 
+> 上次访问后使缓存的执行计划失效的时间（以毫秒为单位）
+ 
+## SplitCacheMap属性
+
+必须启用SplitCacheMap以支持缓存行数据。 启用后，协调器将存储表，分区和拆分调度元数据
+帮助进行缓存亲和力调度。
+ 
+### `hetu.split-cache-map.enabled`
+    
+> -   **类型:** `boolean`
+> -   **默认值：** `false`
+>
+> 此属性启用拆分缓存功能。
+> 如果启用了状态存储，则拆分缓存映射配置也会自动复制到状态存储中。 
+> 在具有多个协调器的HA设置的情况下，状态存储用于在协调器之间共享拆分的缓存映射。 
+ 
+### `hetu.split-cache-map.state-update-interval`
+    
+> -   **类型:** `integer`
+> -   **默认值：** `2 seconds`
+> 
+> 此属性控制在状态存储中更新分割缓存映射的频率。 它主要适用于HA部署。

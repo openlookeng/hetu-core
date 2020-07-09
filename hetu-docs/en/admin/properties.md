@@ -321,13 +321,6 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Sets the network topology to use when scheduling splits. `legacy` will ignore the topology when scheduling splits. `flat` will try to schedule splits on the host where the data is located by reserving 50% of the work queue for local splits. It is recommended to use `flat` for clusters where distributed storage runs on the same nodes as openLooKeng workers.
 
-### `node-scheduler.enable-split-cache-map`
-
-> -   **Type:** `boolean`
-> -   **Default value:** `true`
->
-> This property enables SplitCacheAwareNodeSelector. Split cache aware node selector keeps track of all splits and the nodes on which splits were previously scheduled. Split cache map is used in subsequent query execution to schedule the tasks on the same nodes. However, split cache map would be  effective only after cache table query is executed.
-
 ## Optimizer Properties
 
 ### `optimizer.dictionary-aggregation`
@@ -437,46 +430,96 @@ The following properties allow tuning the [regexp](../functions/regexp.html).
 
 ## Heuristic Index Properties
 
-Heuristic index is external index module that which can be applied to filter to out rows at the connector level. Bitmap, Bloom, MinMaxIndex are list of indexes provided by openLooKeng. As of now, heuristic index is used only in hive connector and specifically ORC format.
-
-- `hetu.filter.enabled`
-
-   **Type:** `boolean` **Default value:** `false` This property enables heuristic index. 
-
-- `hetu.filter.cache.max-indices-number`
-
-   **Type:** `integer` **Default value:** `10,000,000` Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from index store. Cache in part of This property controls maximum number of index files that can be cached. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache. 
-
-- `hetu.filter.plugins`
-
-   **Type:** `string` This property is used to defined the location of the plugins required to support heuristic index. Property accepts multiple plugins separated by comma. 
-
-- `hetu.filter.indexstore.uri`
-
-   **Type:** `string` **Default value:** `/opt/hetu/indices/` Directory under which all index files are stored. Each index will be stored in its own subdirectory. 
-
-- `hetu.filter.indexstore.type`
-
-   **Type** `string` **Allowed values:** `hdfs, local` **Default value:** `local` This property defines the persistence store for the index files. Additional store specific properties must be defined. 
-
+Heuristic index is external index module that which can be used to filter to out rows at the connector level. Bitmap, Bloom, MinMaxIndex are list of indexes provided by openLooKeng. As of now, bitmap index supports supports hive connector for tables with ORC storage format.
  
-
-```
-hetu.filter.hdfs.**
-```
-
+### `hetu.filter.enabled`
  
-
-> Properties for HDFS indexstore. Few examples are
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
 >
-> hetu.filter.indexstore.hdfs.config.resource hetu.filter.indexstore.hdfs.authentication.type hetu.filter.indexstore.hdfs.krb5.keytab.path hetu.filter.indexstore.hdfs.krb5.conf.path hetu.filter.indexstore.hdfs.krb5.principal
-
+> This property enables heuristic index.
  
-
-```
-hetu.filter.local.**
-```
-
+### `hetu.filter.cache.max-indices-number`
  
+> -   **Type:** `integer`
+> -   **Default value:** `10,000,000`
+>
+> Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from index store. Cache in part of This property controls maximum number of index files that can be cached. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
+ 
+### `hetu.filter.plugins`
+ 
+> -   **Type:** `string`
+>
+> This property is used to defined the location of the plugins required to support heuristic index. Property accepts multiple plugins separated by comma.
+ 
+### `hetu.filter.indexstore.uri`
+ 
+> -   **Type:** `string`
+> -   **Default value:** `/opt/hetu/indices/`
+> 
+> Directory under which all index files are stored. Each index will be stored in its own subdirectory. 
+ 
+### `hetu.filter.indexstore.type`
+ 
+> -   **Type** `string` 
+> -   **Allowed values:** `hdfs, local`
+> -   **Default value:** `local`
+>
+> This property defines the persistence store for the index files. Additional properties must be provider for HDFS index store.
+>
+#### Properties for HDFS indexstore 
+  
+ | Property Name                                              | Mandatory                        | Description                                                       |
+ | ---------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
+ | `hetu.filter.indexstore.hdfs.config.resources`             | YES                              | Path to hdfs resource files (e.g. core-site.xml, hdfs-site.xml)   |
+ | `hetu.filter.indexstore.hdfs.authentication.type`          | YES                              | hdfs authentication Accepted values: `KERBEROS`, `NONE`           |
+ | `hetu.filter.indexstore.hdfs.krb5.conf.path`               | YES if auth type set to KERBEROS | Path to the krb5 config file                                      |
+ | `hetu.filter.indexstore.hdfs.krb5.keytab.path`             | YES if auth type set to KERBEROS | Path to the kerberos keytab file                                  |
+ | `hetu.filter.indexstore.hdfs.krb5.principal`               | YES if auth type set to KERBEROS | Principal of kerberos authentication                              |
+ 
+##Execution Plan Cache Properties
 
-> Properties for Local indexstore.
+Execution plan cache feature allows the coordinator to reuse execution plans between identical queries, instead
+of constructing another execution plan, thus reducing the amount of query pre-processing required.
+ 
+### `hetu.executionplan.cache.enabled`
+>
+> -    **Type:** `boolean` 
+> -    **Default value:** `false` 
+>
+> Enable or disable execution plan cache. Disabled by default.
+ 
+### `hetu.executionplan.cache.limit`
+> 
+> -  **Type:** `integer`
+> - **Default value:** `1000`
+>
+> Maximum number of execution plans to keep in the cache
+ 
+### `hetu.executionplan.cache.timeout`
+> 
+> - **Type:** `integer`
+> - **Default value:** `60000 ms`
+> 
+> Time in milliseconds to expire cached execution plans after the last access
+ 
+## SplitCacheMap Properties
+
+SplitCacheMap must be enabled to support caching row data. When enabled, the coordinator stores table, partition and split scheduling metadata that 
+helps with cache affinity scheduling.
+ 
+### `hetu.split-cache-map.enabled`
+    
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> This property enables split caching functionality.
+> If state store is enabled, the split cache map configuration is automatically replicated in state store as well. 
+> In case of HA setup with multiple coordinators, the state store is used to share split cache map between the coordinators. 
+ 
+### `hetu.split-cache-map.state-update-interval`
+    
+> -   **Type:** `integer`
+> -   **Default value:** `2 seconds`
+> 
+> This property controls how frequently the split cache map is updated in state store. It is primarily applicable for HA deployment.
