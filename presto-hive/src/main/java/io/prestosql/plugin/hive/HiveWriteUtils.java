@@ -49,6 +49,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarbinaryType;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -472,6 +473,26 @@ public final class HiveWriteUtils
         }
         catch (IOException e) {
             throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Failed checking path: " + path, e);
+        }
+    }
+
+    public static FileStatus getFileStatus(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
+    {
+        try {
+            return hdfsEnvironment.getFileSystem(context, path).getFileStatus(path);
+        }
+        catch (IOException e) {
+            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Failed getting listStatus: " + path, e);
+        }
+    }
+
+    public static FileStatus[] getChildren(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
+    {
+        try {
+            return hdfsEnvironment.getFileSystem(context, path).listStatus(path);
+        }
+        catch (IOException e) {
+            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Failed getting listStatus: " + path, e);
         }
     }
 

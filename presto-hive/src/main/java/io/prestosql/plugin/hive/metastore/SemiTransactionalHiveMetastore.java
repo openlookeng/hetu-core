@@ -84,6 +84,8 @@ import static io.prestosql.plugin.hive.HiveMetadata.PRESTO_QUERY_ID_NAME;
 import static io.prestosql.plugin.hive.HiveUtil.isPrestoView;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.plugin.hive.HiveWriteUtils.createDirectory;
+import static io.prestosql.plugin.hive.HiveWriteUtils.getChildren;
+import static io.prestosql.plugin.hive.HiveWriteUtils.getFileStatus;
 import static io.prestosql.plugin.hive.HiveWriteUtils.pathExists;
 import static io.prestosql.plugin.hive.LocationHandle.WriteMode.DIRECT_TO_TARGET_NEW_DIRECTORY;
 import static io.prestosql.plugin.hive.metastore.HivePrivilegeInfo.HivePrivilege.OWNERSHIP;
@@ -1468,16 +1470,17 @@ public class SemiTransactionalHiveMetastore
 
             PartitionAdder partitionAdder = partitionAdders.computeIfAbsent(
                     partition.getSchemaTableName(),
-                    ignored -> new PartitionAdder(partition.getDatabaseName(), partition.getTableName(), delegate, PARTITION_COMMIT_BATCH_SIZE));
+                    ignored -> new PartitionAdder(partition.getDatabaseName(), partition.getTableName(), delegate,
+                            PARTITION_COMMIT_BATCH_SIZE, updateStatisticsOperations));
 
             if (pathExists(context, hdfsEnvironment, currentPath)) {
                 if (!targetPath.equals(currentPath)) {
-                    renameDirectory(
+                    renameNewPartitionDirectory(
                             context,
                             hdfsEnvironment,
                             currentPath,
                             targetPath,
-                            () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, true)));
+                            cleanUpTasksForAbort);
                 }
             }
             else {
@@ -2001,6 +2004,31 @@ public class SemiTransactionalHiveMetastore
             log.error("Hdfs RPC Call Error", ignored);
         }
         return false;
+    }
+
+    // Since parallel inserts to add same partitions may race against each other and fail during rename,
+    // its better to handle renames at first level children from source path
+    // and corresponding cleanups to avoid whole partition deletion in case any insert fails.
+    private static void renameNewPartitionDirectory(HdfsContext context,
+                                                    HdfsEnvironment hdfsEnvironment,
+                                                    Path source,
+                                                    Path target,
+                                                    List<DirectoryCleanUpTask> cleanUpTasksForAbort)
+    {
+        FileStatus fileStatus = getFileStatus(context, hdfsEnvironment, source);
+        if (fileStatus.isDirectory()) {
+            FileStatus[] children = getChildren(context, hdfsEnvironment, source);
+            for (FileStatus child : children) {
+                Path subTarget = new Path(target, child.getPath().getName());
+                renameDirectory(context, hdfsEnvironment, child.getPath(),
+                        subTarget,
+                        () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, subTarget, true)));
+            }
+        }
+        else {
+            renameDirectory(context, hdfsEnvironment, source, target,
+                    () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true)));
+        }
     }
 
     private static void renameDirectory(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenPathDoesntExist)
@@ -2898,14 +2926,17 @@ public class SemiTransactionalHiveMetastore
         private final int batchSize;
         private final List<PartitionWithStatistics> partitions;
         private List<List<String>> createdPartitionValues = new ArrayList<>();
+        private final List<UpdateStatisticsOperation> updateStatisticsOperations;
 
-        public PartitionAdder(String schemaName, String tableName, HiveMetastore metastore, int batchSize)
+        public PartitionAdder(String schemaName, String tableName, HiveMetastore metastore, int batchSize,
+                              List<UpdateStatisticsOperation> updateStatisticsOperations)
         {
             this.schemaName = schemaName;
             this.tableName = tableName;
             this.metastore = metastore;
             this.batchSize = batchSize;
             this.partitions = new ArrayList<>(batchSize);
+            this.updateStatisticsOperations = updateStatisticsOperations;
         }
 
         public String getSchemaName()
@@ -2941,9 +2972,17 @@ public class SemiTransactionalHiveMetastore
                     for (PartitionWithStatistics partition : batch) {
                         try {
                             Optional<Partition> remotePartition = metastore.getPartition(schemaName, tableName, partition.getPartition().getValues());
-                            // getPrestoQueryId(partition) is guaranteed to be non-empty. It is asserted in PartitionAdder.addPartition.
-                            if (remotePartition.isPresent() && getPrestoQueryId(remotePartition.get()).equals(getPrestoQueryId(partition.getPartition()))) {
-                                createdPartitionValues.add(partition.getPartition().getValues());
+                            if (remotePartition.isPresent()) {
+                                // getPrestoQueryId(partition) is guaranteed to be non-empty. It is asserted in PartitionAdder.addPartition.
+                                if (getPrestoQueryId(remotePartition.get()).equals(getPrestoQueryId(partition.getPartition()))) {
+                                    createdPartitionValues.add(partition.getPartition().getValues());
+                                }
+                                else {
+                                    //If the remote partition is present and its not created by current query then update the statistics.
+                                    updateStatisticsOperations.add(new UpdateStatisticsOperation(partition.getPartition().getSchemaTableName(),
+                                            Optional.of(partition.getPartitionName()),
+                                            partition.getStatistics(), true));
+                                }
                             }
                             else {
                                 batchCompletelyAdded = false;
