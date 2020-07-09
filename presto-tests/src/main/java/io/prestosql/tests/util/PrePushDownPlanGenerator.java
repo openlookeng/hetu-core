@@ -173,7 +173,7 @@ public class PrePushDownPlanGenerator
                 estimatedExchangesCostCalculator,
                 new SimplifyExpressions(metadata, typeAnalyzer).rules());
 
-        PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer));
+        PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, false));
 
         builder.add(
                 // Clean up all the sugar in expressions, e.g. AtTimeZone, must be run before all the other optimizers

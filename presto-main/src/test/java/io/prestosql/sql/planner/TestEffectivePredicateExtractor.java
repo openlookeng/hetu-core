@@ -169,7 +169,8 @@ public class TestEffectivePredicateExtractor
     };
 
     private final TypeAnalyzer typeAnalyzer = new TypeAnalyzer(new SqlParser(), metadata);
-    private final EffectivePredicateExtractor effectivePredicateExtractor = new EffectivePredicateExtractor(new DomainTranslator(new LiteralEncoder(metadata)), metadata);
+    private final EffectivePredicateExtractor effectivePredicateExtractor = new EffectivePredicateExtractor(new DomainTranslator(new LiteralEncoder(metadata)), metadata, true);
+    private final EffectivePredicateExtractor effectivePredicateExtractorWithoutTableProperties = new EffectivePredicateExtractor(new DomainTranslator(new LiteralEncoder(metadata)), metadata, false);
 
     private Map<Symbol, ColumnHandle> scanAssignments;
     private TableScanNode baseTableScan;
@@ -403,7 +404,6 @@ public class TestEffectivePredicateExtractor
                 assignments);
         Expression effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(effectivePredicate, BooleanLiteral.TRUE_LITERAL);
-
         node = new TableScanNode(
                 newId(),
                 makeTableHandle(TupleDomain.none()),
@@ -412,7 +412,6 @@ public class TestEffectivePredicateExtractor
                 TupleDomain.none());
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(effectivePredicate, FALSE_LITERAL);
-
         TupleDomain<ColumnHandle> predicate = TupleDomain.withColumnDomains(ImmutableMap.of(scanAssignments.get(A), Domain.singleValue(BIGINT, 1L)));
         node = new TableScanNode(
                 newId(),
@@ -422,16 +421,35 @@ public class TestEffectivePredicateExtractor
                 predicate);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(1L), AE)));
-
         predicate = TupleDomain.withColumnDomains(ImmutableMap.of(
                 scanAssignments.get(A), Domain.singleValue(BIGINT, 1L),
                 scanAssignments.get(B), Domain.singleValue(BIGINT, 2L)));
         node = new TableScanNode(
                 newId(),
-                makeTableHandle(predicate),
+                makeTableHandle(TupleDomain.withColumnDomains(ImmutableMap.of(scanAssignments.get(A), Domain.singleValue(BIGINT, 1L)))),
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 predicate);
+        effectivePredicate = effectivePredicateExtractorWithoutTableProperties.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
+        assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
+
+        node = new TableScanNode(
+                newId(),
+                makeTableHandle(predicate),
+                ImmutableList.copyOf(assignments.keySet()),
+                assignments,
+                TupleDomain.all());
+        effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
+        assertEquals(effectivePredicate, and(equals(AE, bigintLiteral(1)), equals(BE, bigintLiteral(2))));
+
+        node = new TableScanNode(
+                newId(),
+                makeTableHandle(predicate),
+                ImmutableList.copyOf(assignments.keySet()),
+                assignments,
+                TupleDomain.withColumnDomains(ImmutableMap.of(
+                        scanAssignments.get(A), Domain.multipleValues(BIGINT, ImmutableList.of(1L, 2L, 3L)),
+                        scanAssignments.get(B), Domain.multipleValues(BIGINT, ImmutableList.of(1L, 2L, 3L)))));
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
 

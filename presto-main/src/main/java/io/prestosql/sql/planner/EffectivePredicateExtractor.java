@@ -90,16 +90,18 @@ public class EffectivePredicateExtractor
 
     private final DomainTranslator domainTranslator;
     private final Metadata metadata;
+    private final boolean useTableProperties;
 
-    public EffectivePredicateExtractor(DomainTranslator domainTranslator, Metadata metadata)
+    public EffectivePredicateExtractor(DomainTranslator domainTranslator, Metadata metadata, boolean useTableProperties)
     {
         this.domainTranslator = requireNonNull(domainTranslator, "domainTranslator is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.useTableProperties = useTableProperties;
     }
 
     public Expression extract(Session session, PlanNode node, TypeProvider types, TypeAnalyzer typeAnalyzer)
     {
-        return node.accept(new Visitor(domainTranslator, metadata, session, types, typeAnalyzer), null);
+        return node.accept(new Visitor(domainTranslator, metadata, session, types, typeAnalyzer, useTableProperties), null);
     }
 
     private static class Visitor
@@ -110,14 +112,16 @@ public class EffectivePredicateExtractor
         private final Session session;
         private final TypeProvider types;
         private final TypeAnalyzer typeAnalyzer;
+        private final boolean useTableProperties;
 
-        public Visitor(DomainTranslator domainTranslator, Metadata metadata, Session session, TypeProvider types, TypeAnalyzer typeAnalyzer)
+        public Visitor(DomainTranslator domainTranslator, Metadata metadata, Session session, TypeProvider types, TypeAnalyzer typeAnalyzer, boolean useTableProperties)
         {
             this.domainTranslator = requireNonNull(domainTranslator, "domainTranslator is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
             this.session = requireNonNull(session, "session is null");
             this.types = requireNonNull(types, "types is null");
             this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
+            this.useTableProperties = useTableProperties;
         }
 
         @Override
@@ -219,8 +223,11 @@ public class EffectivePredicateExtractor
         {
             Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
-            // TODO: replace with metadata.getTableProperties() when table layouts are fully removed
             TupleDomain<ColumnHandle> predicate = node.getEnforcedConstraint();
+            if (useTableProperties) {
+                predicate = metadata.getTableProperties(session, node.getTable()).getPredicate();
+            }
+
             return domainTranslator.toPredicate(predicate.simplify().transform(assignments::get));
         }
 

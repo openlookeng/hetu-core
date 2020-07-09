@@ -19,6 +19,7 @@ import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 import org.testng.annotations.Test;
 
@@ -462,5 +463,23 @@ public class TestPredicatePushdown
                                                         tableScan(
                                                                 "orders",
                                                                 ImmutableMap.of("CUST_KEY", "custkey"))))))));
+    }
+
+    @Test
+    public void testTablePredicateIsExtracted()
+    {
+        assertPlan(
+                "SELECT * FROM orders, nation WHERE orderstatus = CAST(nation.name AS varchar(1)) AND orderstatus BETWEEN 'A' AND 'O'",
+                anyTree(
+                        node(JoinNode.class,
+                                anyTree(
+                                        tableScan(
+                                                "orders",
+                                                ImmutableMap.of("ORDERSTATUS", "orderstatus"))),
+                                anyTree(
+                                        filter("CAST(NAME AS varchar(1)) IN ('F', 'O')",
+                                                tableScan(
+                                                        "nation",
+                                                        ImmutableMap.of("NAME", "name")))))));
     }
 }
