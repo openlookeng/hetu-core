@@ -1,3 +1,8 @@
++++
+weight = 7
+title = "Hive Connector GCS Tutorial"
++++
+
 Hive Connector GCS Tutorial
 ===========================
 
@@ -22,26 +27,15 @@ Another requirement is that you have enabled and configured a Hive connector in 
 
     > -   New Hive metastore on GCP:
     >
-    >     > If your openLooKeng nodes are provisioned by GCP, your Hive
-    >     > metastore should also be on GCP to minimize latency and
-    >     > costs. The simplest way to create a new Hive metastore on
-    >     > GCP is to create a small Cloud DataProc cluster (1 master, 0
-    >     > workers), accessible from your openLooKeng cluster. Follow the
-    >     > steps for existing Hive metastore after finishing this step.
+    >     If your openLooKeng nodes are provisioned by GCP, your Hive metastore should also be on GCP to minimize latency and costs. The simplest way to create a new Hive metastore on GCP is to create a small Cloud DataProc cluster (1 master, 0 workers), accessible from your openLooKeng cluster. Follow the steps for existing Hive metastore after finishing this step.
     >
     > -   Existing Hive metastore:
     >
-    >     > To use an existing Hive metastore with a openLooKeng cluster, you
-    >     > need to set the `hive.metastore.uri` property in your Hive
-    >     > catalog properties file to
-    >     > `thrift://${METASTORE_ADDRESS}:${METASTORE_THRIFT_PORT}`. If
-    >     > the metastore uses authentication, please refer to
-    >     > [hive-security](./hive-security.html).
+    >     To use an existing Hive metastore with a openLooKeng cluster, you need to set the `hive.metastore.uri` property in your Hive catalog properties file to `thrift://${METASTORE_ADDRESS}:${METASTORE_THRIFT_PORT}`. If the metastore uses authentication, please refer to [Hive Security Configuration](./hive-security.md).
 
 -   GCS access:
 
-    > Here are example values for all GCS configuration properties which
-    > can be set in Hive catalog properties file:
+    > Here are example values for all GCS configuration properties which can be set in Hive catalog properties file:
     >
     > ``` properties
     > # JSON key file used to access Google Cloud Storage

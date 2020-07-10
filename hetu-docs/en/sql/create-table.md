@@ -115,5 +115,5 @@ Different connector might support different data type, and different table/colum
 See Also
 --------
 
-[alter-table](./alter-table.html), [drop-table](./drop-table.html), [create-table-as](./create-table-as.html), [show-create-table](./show-create-table.html)
+[ALTER TABLE](./alter-table.md), [DROP TABLE](./drop-table.md), [CREATE TABLE AS](./create-table-as.md), [SHOW CREATE TABLE](./show-create-table.md)
 

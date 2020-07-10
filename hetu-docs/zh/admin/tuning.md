@@ -10,7 +10,7 @@ title = "openLooKeng调优"
 
 ## 配置属性
 
-参见[属性](./properties.html)。
+参见[属性参考](./properties.md)。
 
 ## JVM设置
 

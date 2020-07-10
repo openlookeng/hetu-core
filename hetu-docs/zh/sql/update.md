@@ -34,4 +34,4 @@ UPDATE table_name SET column_name = expression[, column_name = expression, ... ]
 
 ## 另请参见
 
-[insert](./insert.html)、[insert-overwrite](./insert-overwrite.html)
+[INSERT](./insert.md)、[INSERT OVERWRITE](./insert-overwrite.md)

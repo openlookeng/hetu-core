@@ -17,7 +17,7 @@ ON [ TABLE ] table_name FROM ( user | USER user | ROLE role )
 
 从指定的被授权者回收指定的权限。
 
-指定 `ALL PRIVILEGES` 可以回收 [DELETE](./delete.html)、[INSERT](./insert.html) 和 [SELETE](./select.html) 权限。
+指定 `ALL PRIVILEGES` 可以回收 [DELETE](./delete.md)、[INSERT](./insert.md) 和 [SELETE](./select.md) 权限。
 
 指定 `ROLE PUBLIC` 可以从 `PUBLIC` 角色回收权限。用户将保留直接或通过其他角色分配给他们的权限。
 
@@ -45,4 +45,4 @@ ON [ TABLE ] table_name FROM ( user | USER user | ROLE role )
 
 ## 另请参见
 
-[grant](./grant.html)、[show-grants](./ show-grants.html)
+[GRANT](./grant.md)、[SHOW GRANTS](./show-grants.md)

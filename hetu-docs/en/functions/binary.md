@@ -1,3 +1,8 @@
++++
+weight = 11
+title = "Binary Functions and Operators"
++++
+
 Binary Functions and Operators
 ==============================
 

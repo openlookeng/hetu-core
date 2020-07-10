@@ -70,4 +70,4 @@ VACUUM TABLE compact_test_table_with_partition FULL AND WAIT;
 See Also
 --------
 
-[update](./update.html), [delete](./delete.html)
+[UPDATE](./update.md), [DELETE](./delete.md)

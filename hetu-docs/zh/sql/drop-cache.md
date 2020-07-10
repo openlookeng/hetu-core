@@ -29,4 +29,4 @@ DROP CACHE table
 
 ## 另请参见
 
-[cache-table](./cache-table.html)、[show-cache](./show-cache.html)
+[CACHE TABLE](./cache-table.md)、[SHOW CACHE](./show-cache.md)

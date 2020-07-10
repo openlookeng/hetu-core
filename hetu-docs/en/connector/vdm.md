@@ -1,3 +1,8 @@
++++
+weight = 21
+title = "VDM"
++++
+
 # VDM Connector
 
 There are use cases that multiple data sources need to be managed and visited together in one single session or view. Also, users may not care about the distribution and source of data at all. The VDM  (Virtualize Data Market) connector is aimed at bringing in this feature to openLooKeng.
@@ -9,7 +14,7 @@ The VDM connector supports to:
 - Manage user previlege through the views
 - Log the use of VDM views by each user
 
-## <a name="usage_section">Usage</a>
+## Usage
 
 VDM uses openLooKeng metastore to store its database information. It can be stored either on HDFS or relational database, depending on the implementation of openLooKeng metastore. 
 
@@ -32,7 +37,7 @@ Configure a data source `vdm1` by creating `vdm1.properties` in `etc/catalogs` w
 
     connector.name=vdm
 
-This example creates a schema `schema1` in `vdm1` catalog, and creates two views from two other different data sources. Note that metastore must be configured in advance (See [usage](#usage_section) section).
+This example creates a schema `schema1` in `vdm1` catalog, and creates two views from two other different data sources. Note that metastore must be configured in advance (See [usage](./vdm.md#usage) section).
 
     create schema vdm1.schema1;
     use vdm1.schema1;
@@ -40,7 +45,7 @@ This example creates a schema `schema1` in `vdm1` catalog, and creates two views
     create view view2 as select * from hive.table.test;
     select * from view1;
 
-VDM datasource can also be managed through dynamic catalog API. See [Dynamic Catalog](../admin/dynamic-catalog.html) topic for more information.
+VDM datasource can also be managed through dynamic catalog API. See [Dynamic Catalog](../admin/dynamic-catalog.md) topic for more information.
 
 ## All supported CLI queries
 

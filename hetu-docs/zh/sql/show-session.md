@@ -17,4 +17,4 @@ SHOW SESSION
 
 ## 另请参见
 
-[reset-session](./reset-session.html)、[set-session](./set-session.html)
+[RESET SESSION](./reset-session.md)、[SET SESSION](./set-session.md)

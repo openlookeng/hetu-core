@@ -1,3 +1,8 @@
++++
+weight = 3
+title = "LDAP Authentication"
++++
+
 LDAP Authentication
 ===================
 
@@ -77,7 +82,6 @@ ldap.user-bind-pattern=<Refer below for usage>
 | `ldap.url`               | The url to the LDAP server. The url scheme must be `ldaps://` since openLooKeng allows only Secure LDAP. |
 | `ldap.user-bind-pattern` | This property can be used to specify the LDAP user bind string for password authentication. This property must contain the pattern `${USER}` which will be replaced by the actual username during the password authentication. Example: `${USER}@corp.example.com`. |
 
- Based on the LDAP server implementation type, the property `ldap.user-bind-pattern` can be used as described below.
 
 Based on the LDAP server implementation type, the property `ldap.user-bind-pattern` can be used as described below.
 
@@ -193,7 +197,7 @@ Troubleshooting
 
 ### Java Keystore File Verification
 
-Verify the password for a keystore file and view its contents using [troubleshooting_keystore](./tls.html#Java-Keystore-File-Verification).
+Verify the password for a keystore file and view its contents using [troubleshooting_keystore](./tls.md#java-keystore-file-verification).
 
 ### SSL Debugging for openLooKeng CLI
 

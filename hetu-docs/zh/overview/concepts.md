@@ -8,14 +8,6 @@ title = "openLooKeng概念"
 # openLooKeng概念
 
 
-## 概述
-
-要理解openLooKeng，首先必须理解openLooKeng文档中使用的术语和概念。
-
-虽然语句和查询很容易理解，但是作为最终用户应该熟悉阶段和拆分等概念，以便充分利用openLooKeng执行高效的查询。作为openLooKeng管理员或openLooKeng贡献者应该了解openLooKeng的阶段概念如何映射到任务，以及任务如何包含一组处理数据的驱动。
-
-本节提供了openLooKeng中引用的核心概念的确切定义，这些章节从最一般到最具体进行排序。
-
 ## 服务器类型
 
 openLooKeng服务器有两种类型：协调节点和工作节点。下一节将解释这两者的区别。
@@ -42,9 +34,9 @@ openLooKeng工作节点是openLooKeng安装中的服务器，负责执行任务�
 
 ### 连接器
 
-连接器将openLooKeng适配到如Hive或关系型数据库的数据源。你可以像理解数据库的驱动一样来理解连接器。它是openLooKeng的[SPI](../develop/spi-overview.html)的一个实现，它允许openLooKeng使用标准API与资源交互。
+连接器将openLooKeng适配到如Hive或关系型数据库的数据源。你可以像理解数据库的驱动一样来理解连接器。它是openLooKeng的[SPI](../develop/spi-overview.md)的一个实现，它允许openLooKeng使用标准API与资源交互。
 
-openLooKeng包含若干内置连接器：[JMX](../connector/jmx.html)的连接器、提供对内置系统表访问的[系统](../connector/system.html)连接器、[Hive](../connector/hive.html)连接器以及为TPC-H基准数据服务的[TPCH](../connector/tpch.html)连接器。许多第三方开发人员对连接器做出了贡献，以便openLooKeng可以访问各种数据源中的数据。
+openLooKeng包含若干内置连接器：[JMX连接器](../connector/jmx.md)、提供对内置系统表访问的[系统连接器](../connector/system.md)、[Hive连接器](../connector/hive.md)以及为TPC-H基准数据服务的[TPCH连接器](../connector/tpch.md)。许多第三方开发人员对连接器做出了贡献，以便openLooKeng可以访问各种数据源中的数据。
 
 每个目录都与一个特定的连接器相关联。如果检查目录配置文件，你将看到每个文件都包含一个强制属性`connector.name`，目录管理器使用该属性为给定的目录创建连接器。多个目录可以使用同一个连接器来访问类似数据库的两个不同实例。例如，如果有两个Hive集群，你可以在一个openLooKeng集群中配置两个都使用Hive连接器的目录，使你可以从两个Hive集群（甚至在同一个SQL查询中）查询数据。
 

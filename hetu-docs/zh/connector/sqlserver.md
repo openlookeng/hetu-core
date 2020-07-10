@@ -1,12 +1,15 @@
-SQL Server Connector
-====================
++++
+weight = 16
+title = "SQL Server"
++++
 
-The SQL Server connector allows querying and creating tables in an external SQL Server database. This can be used to join data between different systems like SQL Server and Hive, or between two different SQL Server instances.
+# SQL Server连接器
 
-Configuration
--------------
+SQL Server连接器允许在外部SQL Server数据库中查询和创建表。这可用于在SQL Server和Hive等不同系统之间或在两个不同的SQL Server实例之间联接数据。
 
-To configure the SQL Server connector, create a catalog properties file in `etc/catalog` named, for example, `sqlserver.properties`, to mount the SQL Server connector as the `sqlserver` catalog. Create the file with the following contents, replacing the connection properties as appropriate for your setup:
+## 配置
+
+要配置SQL Server连接器，在`etc/catalog`中创建一个目录属性文件，例如`sqlserver.properties`，将SQL Server连接器挂载为`sqlserver`目录。使用以下内容创建文件，并根据设置替换连接属性：
 
 ``` properties
 connector.name=sqlserver
@@ -15,58 +18,58 @@ connection-user=root
 connection-password=secret
 ```
 
-### Multiple SQL Server Databases or Servers
+### 多个SQL Server数据库或服务器
 
-The SQL Server connector can only access a single database within a SQL Server server. Thus, if you have multiple SQL Server databases, or want to connect to multiple instances of the SQL Server, you must configure multiple catalogs, one for each instance.
+SQL Server连接器只能访问SQL Server服务器中的单个数据库。因此，如果有多个SQL Server数据库，或者想要连接到多个SQL Server实例，则必须配置多个目录，每个实例一个。
 
-To add another catalog, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if you name the property file `sales.properties`, openLooKeng will create a catalog named `sales` using the configured connector.
+要添加另一个目录，只需添加另一个属性文件到具有不同名称的`etc/catalog`中（确保它以`.properties`结尾）。例如，如果将属性文件命名为`sales.properties`，openLooKeng将使用配置的连接器创建一个名为`sales`的目录。
 
-Querying SQL Server
--------------------
+## 查询SQL Server服务器
 
-The SQL Server connector provides access to all schemas visible to the specified user in the configured database. For the following examples, assume the SQL Server catalog is `sqlserver`.
+SQL Server连接器提供对配置数据库中指定用户可见的所有模式的访问。对于以下示例，假设SQL Server目录为`sqlserver`。
 
-You can see the available schemas by running `SHOW SCHEMAS`:
+可通过执行`SHOW SCHEMAS`来查看可用的模式：
 
     SHOW SCHEMAS FROM sqlserver;
 
-If you have a schema named `web`, you can view the tables in this schema by running `SHOW TABLES`:
+如果有一个名为`web`的模式，那么可以通过执行`SHOW TABLES`来查看这个模式中的表：
 
     SHOW TABLES FROM sqlserver.web;
 
-You can see a list of the columns in the `clicks` table in the `web` database using either of the following:
+可以使用以下方法之一查看`web`数据库中`clicks`表中的列的列表：
 
     DESCRIBE sqlserver.web.clicks;
     SHOW COLUMNS FROM sqlserver.web.clicks;
 
-Finally, you can query the `clicks` table in the `web` schema:
+最后，可以访问`web`模式中的`clicks`表：
 
     SELECT * FROM sqlserver.web.clicks;
 
-If you used a different name for your catalog properties file, use that catalog name instead of `sqlserver` in the above examples.
+如果对目录属性文件使用不同的名称，请使用该目录名称，而不要使用上述示例中的`sqlserver`。
 
-SQL Server Connector Limitations
---------------------------------
+## SQL Server连接器限制
 
-openLooKeng supports connecting to SQL Server 2016, SQL Server 2014, SQL Server 2012 and Azure SQL Database.
+openLooKeng支持连接SQL Server 2016、SQL Server 2014、SQL Server 2012以及Azure SQL Database。
 
-openLooKeng supports the following SQL Server data types. The following table shows the mappings between SQL Server and openLooKeng data types.
+openLooKeng支持以下SQL Server数据类型。下表显示了SQL Server和openLooKeng数据类型之间的映射。
 
-  SQL Server Type   openLooKeng Type
------------------ --------------
-| SQL Server Type | openLooKeng Type    |
-| :-------------- | :----------- |
-| `bigint`        | `bigint`     |
-| `smallint`      | `smallint`   |
-| `int`           | `integer`    |
-| `float`         | `double`     |
-| `char(n)`       | `char(n)`    |
-| `varchar(n)`    | `varchar(n)` |
-| `date`          | `date`       |
+SQL Server类型   openLooKeng类型
 
-Complete list of [SQL Server data
-types](https://msdn.microsoft.com/en-us/library/ms187752.aspx).
+-------------------------------
 
-The following SQL statements are not yet supported:
 
-[delete](../sql/delete.html), [grant](../sql/grant.html), [revoke](../sql/revoke.html)
+| SQL Server类型| openLooKeng类型|
+|:----------|:----------|
+| `bigint`| `bigint`|
+| `smallint`| `smallint`|
+| `int`| `integer`|
+| `float`| `double`|
+| `char(n)`| `char(n)`|
+| `varchar(n)`| `varchar(n)`|
+| `date`| `date`|
+
+[SQL Server数据类型](https://msdn.microsoft.com/en-us/library/ms187752.aspx )的完整列表。
+
+暂不支持以下SQL语句：
+
+[DELETE](../sql/delete.md)、[GRANT](../sql/grant.md)、[REVOKE](../sql/revoke.md)

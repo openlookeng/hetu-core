@@ -19,7 +19,7 @@ ANALYZE table_name [ WITH ( property_name = expression [, ...] ) ]
 
     SELECT * FROM system.metadata.analyze_properties
 
-目前仅 [Hive 连接器](../connector/hive.html)支持该语句。
+目前仅 [Hive连接器](../connector/hive.md)支持该语句。
 
 ## 示例
 

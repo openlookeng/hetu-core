@@ -1,30 +1,33 @@
-Bitwise Functions
-=================
++++
+weight = 7
+title = "按位运算函数"
++++
 
-**bit\_count(x, bits)** -\> bigint
+# 按位运算函数
 
-Count the number of bits set in `x` (treated as `bits`-bit signed integer) in 2\'s complement representation:
+**bit\_count(x, bits)** -> bigint
+
+获取以二进制补码表示的 `x`（被视为 `bits` 位有符号整数）中设置的位的数量。
 
     SELECT bit_count(9, 64); -- 2
     SELECT bit_count(9, 8); -- 2
     SELECT bit_count(-7, 64); -- 62
     SELECT bit_count(-7, 8); -- 6
 
-**bitwise\_and(x, y)** -\> bigint
+**bitwise\_and(x, y)** -> bigint
 
-Returns the bitwise AND of `x` and `y` in 2\'s complement representation.
+返回以二进制补码表示的 `x` 和 `y` 的按位与运算结果。
 
-**bitwise\_not(x)** -\> bigint
+**bitwise\_not(x)** -> bigint
 
-Returns the bitwise NOT of `x` in 2\'s complement representation.
+返回以二进制补码表示的 `x` 的按位取反运算结果。
 
-**bitwise\_or(x, y)** -\> bigint
+**bitwise\_or(x, y)** -> bigint
 
-Returns the bitwise OR of `x` and `y` in 2\'s complement representation.
+返回以二进制补码表示的 `x` 和 `y` 的按位或运算结果。
 
-**bitwise\_xor(x, y)** -\> bigint
+**bitwise\_xor(x, y)** -> bigint
 
-Returns the bitwise XOR of `x` and `y` in 2\'s complement representation.
+返回以二进制补码表示的 `x` 和 `y` 的按位异或运算结果。
 
-
-See also `bitwise_and_agg` and `bitwise_or_agg`.
+另请参见 `bitwise_and_agg` 和 `bitwise_or_agg`。

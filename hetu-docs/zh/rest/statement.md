@@ -29,13 +29,13 @@ reqheader X-Presto-Schema
 
 :   执行查询的模式
 
-提交语句给openLooKeng执行。openLooKeng客户端代表用户根据指定的目录和架构进行查询。当使用openLooKeng命令行进行查询时，则调用openLooKeng协调器的语句资源。
+提交语句给openLooKeng执行。openLooKeng客户端代表用户根据指定的目录和架构进行查询。当使用openLooKeng命令行进行查询时，则调用openLooKeng协调节点的语句资源。
 
 对语句资源的请求就是和标准X-Presto-Catalog、X-Presto-Source、X-Presto-Schema和X-Presto-User头域一起作为post执行的SQL查询。
 
 语句资源的响应包含一个查询标识符，该标识符可用于收集有关查询的详细信息。初始响应还包括有关为执行此查询而在openLooKeng worker上创建的阶段的信息。每个查询都有一个根阶段，并且根阶段被赋予一个\"0\"的阶段标识符，如下面的响应示例所示。
 
-这个根阶段聚合了在openLooKeng worker上运行的其他阶段的响应，并通过openLooKeng协调器将它们传递给客户端。
+这个根阶段聚合了在openLooKeng worker上运行的其他阶段的响应，并通过openLooKeng协调节点将它们传递给客户端。
 当一个客户端收到这个POST的响应时，它将包含一个\"nextUri\"属性，这个属性指示客户端查询这个地址以获得查询的更多结果。
 
 **请求样例**：

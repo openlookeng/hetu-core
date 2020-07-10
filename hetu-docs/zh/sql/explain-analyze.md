@@ -88,4 +88,4 @@ EXPLAIN ANALYZE VERBOSE SELECT count(clerk) OVER() FROM orders WHERE orderdate >
 
 ## 另请参见
 
-[explain](./explain.html)
+[EXPLAIN](./explain.md)

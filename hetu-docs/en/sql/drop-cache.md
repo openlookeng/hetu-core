@@ -36,5 +36,5 @@ Only Hive connector support this functionality at this time. See connector docum
 See Also
 --------
 
-[cache-table](./cache-table.html), [show-cache](./show-cache.html)
+[CACHE TABLE](./cache-table.md), [SHOW CACHE](./show-cache.md)
 

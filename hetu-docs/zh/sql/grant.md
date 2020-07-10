@@ -17,7 +17,7 @@ ON [ TABLE ] table_name TO ( user | USER user | ROLE role )
 
 将指定的权限授给指定的被授权者。
 
-指定 `ALL PRIVILEGES` 可以授予 [DELETE](./delete.html)、[INSERT](./insert.html) 和 [SELECT](./select.html) 权限。
+指定 `ALL PRIVILEGES` 可以授予 [DELETE](./delete.md)、[INSERT](./insert.md) 和 [SELECT](./select.md) 权限。
 
 指定 `ROLE PUBLIC` 可以将权限授给 `PUBLIC` 角色，从而将权限授给所有用户。
 
@@ -45,4 +45,4 @@ ON [ TABLE ] table_name TO ( user | USER user | ROLE role )
 
 ## 另请参见
 
-[revoke](./revoke.html)、[show-grants](./ show-grants.html)
+[REVOKE](./revoke.md)、[SHOW GRANTS](./show-grants.md)

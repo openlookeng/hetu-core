@@ -7,7 +7,7 @@ title = "Get Started"
 
 # Get Started
 
-This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation Guide](https://openlookeng.io/docs/docs/installation.html).
+This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation Guide](../installation/deployment.md).
 
 ## Preparing the Environment
 
@@ -23,7 +23,7 @@ This document provides guidance for users to quickly deploy and start the openLo
 Run the following command to start the installation and deployment:
 
 ```shell
-wget -O - https://download.openlookeng.io/install.sh|sh
+wget -O - https://download.openlookeng.io/install.sh|bash
 ```
 
 This command is used to download the installation script from the openLooKeng official website and start the script. During the script running, the latest installation package and dependent components are automatically downloaded from the openLooKeng official website. After the download is complete, the deployment automatically starts. No extra operation is required.
@@ -37,11 +37,11 @@ After successful deployment, you can learn the following information to better u
 
 - By default, the following built-in data sources are configured for openLooKeng for one-click deployment:
 
-  - [tpcds](https://openlookeng.io/docs/docs/connector/tpcds.html)
-  - [tpch](https://openlookeng.io/docs/docs/connector/tpch.html)
-  - [memory](https://openlookeng.io/docs/docs/connector/memory.html)
+  - [tpcds](../connector/tpcds.md)
+  - [tpch](../connector/tpch.md)
+  - [memory](../connector/memory.md)
 
-- The installation path of openLooKeng is `/opt/openlookeng`. You can find the configuration file of openLooKeng here. For more information about configuration files and configuration items, see [Here](https://openlookeng.io/docs/docs/installation/deployment.html).
+- The installation path of openLooKeng is `/opt/openlookeng`. You can find the configuration file of openLooKeng here. For more information about configuration files and configuration items, see [Here](../installation/deployment.md).
 
 - The new user `openlkadmin` will be created to perform operations related to openLooKeng, including starting/stopping the openLooKeng service and expanding/reducing the cluster scale.
 
@@ -49,7 +49,7 @@ After successful deployment, you can learn the following information to better u
 
 - openLooKeng run logs are stored in `/home/openlkadmin/.openlkadmin/logs`.
 
-- One-click deployment also provides [CLI](https://openlookeng.io/docs/docs/installation/cli.html) for connecting to the openLooKeng service.
+- One-click deployment also provides [CLI](../installation/cli.md) for connecting to the openLooKeng service.
 
 
 
@@ -66,7 +66,7 @@ bash /opt/openlookeng/bin/openlk-cli
 
 Users can enter standard SQL in the CLI to interact with the openLooKeng server.
 
-For example, to view the configured [catalog](https://openlookeng.io/docs/docs/overview/concepts.html), run the following command:
+For example, to view the configured [catalog](../overview/concepts.md), run the following command:
 
 ```sql
 show catalogs;
@@ -74,7 +74,7 @@ show catalogs;
 
 <img src="./images/catalogs.png" >
 
-Run the following command to check the [schema](https://openlookeng.io/docs/docs/overview/concepts.html) contained in the tpcds:
+Run the following command to check the [schema](../overview/concepts.md) contained in the tpcds:
 
 ```sql
 show schemas from tpcds;
@@ -131,9 +131,9 @@ GROUP BY "sr_customer_sk", "sr_store_sk"
 
 <img src="./images//image-20200629141757336.png" >
 
-You can read the [openLooKeng syntax document](https://openlookeng.io/docs/docs/sql.html) to learn more syntax rules.
+You can read the [openLooKeng syntax document](../sql/_index.md) to learn more syntax rules.
 
-For more features and features of openLooKeng, please refer to the [User Guide](https://openlookeng.io/docs/docs/overview.html).
+For more features and features of openLooKeng, please refer to the [User Guide](../overview/_index.md).
 
 
 

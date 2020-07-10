@@ -71,4 +71,4 @@ rows        |         |        |       | bigint |         8 | false
 
 ## 另请参见
 
-[prepare](./prepare.html)
+[PREPARE](./prepare.md)

@@ -34,4 +34,4 @@ DROP {SCHEMA|DATABASE} [ IF EXISTS ] schema_name [{CASCADE | RESTRICT}]
 
 ## 另请参见
 
-[alter-schema](./alter-schema.html)、[create-schema](./create-schema.html)
+[ALTER SCHEMA](./alter-schema.md)、[CREATE SCHEMA](./create-schema.md)

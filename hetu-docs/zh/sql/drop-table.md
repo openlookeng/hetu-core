@@ -29,4 +29,4 @@ DROP TABLE  [ IF EXISTS ] table_name
 
 ## 另请参见
 
-[alter-table](./alter-table.html)、[create-table](./create-table.html)
+[ALTER TABLE](./alter-table.md)、[CREATE TABLE](./create-table.md)

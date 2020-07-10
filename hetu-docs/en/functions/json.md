@@ -1,3 +1,8 @@
++++
+weight = 12
+title = "JSON Functions and Operators"
++++
+
 JSON Functions and Operators
 ============================
 
@@ -124,7 +129,7 @@ Returns the array length of `json` (a string containing a JSON array):
 
 **json\_extract(json, json\_path)** -\> json
 
-Evaluates the [JSONPath]()-like expression `json_path` on `json` (a string containing JSON) and returns the result as a JSON string:
+Evaluates the [JSONPath](https://goessner.net/articles/JsonPath/)-like expression `json_path` on `json` (a string containing JSON) and returns the result as a JSON string:
 
     SELECT json_extract(json, '$.store.book');
 

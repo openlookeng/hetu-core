@@ -34,15 +34,15 @@ title = "溢出到磁盘"
 
 不应使用系统驱动器来溢出，尤其是不要溢出到JVM正在运行并写日志的驱动器上。这样做可能导致集群不稳定。另外，建议对配置的溢出路径进行磁盘饱和度监控。
 
-openLooKeng将溢出路径视为独立的磁盘（参见[JBOD](https://en.wikipedia.org/wiki/Non-RAID_drive_architectures#JBOD)），因此无需使用RAID进行溢出。
+openLooKeng将溢出路径视为独立的磁盘（参见[JBOD](https://en.wikipedia.org/wiki/Non-RAID_drive_architectures#JBOD )），因此无需使用RAID进行溢出。
 
 ## 溢出压缩
 
-当启用溢出压缩（`tuning-spilling`{.interpreted-text role="ref"}中的`spill-compression-enabled`属性）时，溢出页将被压缩后再写入磁盘。启用此特性可以减少磁盘I/O，但会牺牲额外的CPU负载来压缩和解压缩溢出页。
+当启用溢出压缩（`tuning-spilling`中的`spill-compression-enabled`属性）时，溢出页将被压缩后再写入磁盘。启用此特性可以减少磁盘I/O，但会牺牲额外的CPU负载来压缩和解压缩溢出页。
 
 ## 溢出加密
 
-当启用溢出加密（`tuning-spilling`{.interpreted-text role="ref"}中的`spill-encryption-enabled`属性）时，溢出内容将使用随机生成的（每个溢出文件）密钥进行加密。启用此功能将增加CPU负载并降低溢出到磁盘的吞吐量，但可以防止溢出的数据从溢出文件中恢复。考虑在启用溢出加密时减小`experimental.memory-revoking-threshold`的值，以应对溢出延迟的增加。
+当启用溢出加密（`tuning-spilling`中的`spill-encryption-enabled`属性）时，溢出内容将使用随机生成的（每个溢出文件）密钥进行加密。启用此功能将增加CPU负载并降低溢出到磁盘的吞吐量，但可以防止溢出的数据从溢出文件中恢复。考虑在启用溢出加密时减小`experimental.memory-revoking-threshold`的值，以应对溢出延迟的增加。
 
 ## 支持操作
 

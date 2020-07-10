@@ -25,4 +25,4 @@ SET SESSION hive.optimized_reader_enabled = true;
 
 ## 另请参见
 
-[reset-session](./reset-session.html)、[show-session](./show-session.html)
+[RESET SESSION](./reset-session.md)、[SHOW SESSION](./show-session.md)

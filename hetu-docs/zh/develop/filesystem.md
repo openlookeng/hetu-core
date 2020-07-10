@@ -8,11 +8,11 @@ title = "文件系统访问实用程序"
 
 ## 概述
 
-openLooKeng 项目包含一组文件系统客户端实用程序，用于帮助访问和修改文件。当前支持两组文件系统：HDFS 和本地文件系统。SPI 中提供了 `openLooKengFileSystemClient` 接口，该接口定义了要在项目中使用的常用文件操作。该客户端的目标是在不同的文件系统上提供统一的接口、行为和异常。因此，客户端代码可以轻松地重用代码，无需更改代码即可传递其逻辑。
+openLooKeng 项目包含一组文件系统客户端实用程序，用于帮助访问和修改文件。当前支持两组文件系统：HDFS 和本地文件系统。SPI 中提供了 ``HetuFileSystemClient`` 接口，该接口定义了要在项目中使用的常用文件操作。该客户端的目标是在不同的文件系统上提供统一的接口、行为和异常。因此，客户端代码可以轻松地重用代码，无需更改代码即可传递其逻辑。
 
 SPI 中的实用程序类 `FileBasedLock` 可以提供对给定的文件系统的独占访问权限。该类利用统一的文件系统客户端接口，因此可用于不同的文件系统。
 
-文件系统客户端实现为 openLooKeng 插件。实现放置在 `openLooKeng-filesystem-client` 模块中，在该模块中，必须在 `openLooKengFileSystemClientPlugin` 中实现和注册一个扩展 `openLooKengFileSystemClientFactory` 的工厂。
+文件系统客户端实现为 openLooKeng 插件。实现放置在 ``hetu-filesystem-client`` 模块中，在该模块中，必须在 ``HetuFileSystemClientPlugin`` 中实现和注册一个扩展 ``HetuFileSystemClientFactory`` 的工厂。
 
 ## 文件系统配置文件
 
@@ -40,7 +40,7 @@ SPI 中的实用程序类 `FileBasedLock` 可以提供对给定的文件系统�
 
 openLooKengFileSystemClient
 
-`openLooKengFileSystemClient` 统一为以下各项设置文件系统访问标准：
+``HetuFileSystemClient`` 统一为以下各项设置文件系统访问标准：
 
 - 方法签名
 - 行为
@@ -66,7 +66,7 @@ openLooKengFileSystemClient
 
 ## FileBasedLock
 
-在 `io.prestosql.spi.filesystem` 中提供了 `FileBasedLock` 实用程序，该实用程序需要与 `openLooKengFileSystemClient` 一起使用。该锁是基于文件的，并且遵循“尝试并在发生异常时撤回”模式，以在并发场景中序列化操作。
+在 `io.prestosql.spi.filesystem` 中提供了 `FileBasedLock` 实用程序，该实用程序需要与 ``HetuFileSystemClient`` 一起使用。该锁是基于文件的，并且遵循“尝试并在发生异常时撤回”模式，以在并发场景中序列化操作。
 
 锁设计具有基于文件的两步式锁模式：`.lockFile` 用于标记锁状态，`.lockInfo` 用于记录锁的所有权：
 

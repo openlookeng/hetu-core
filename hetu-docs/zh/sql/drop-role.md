@@ -29,4 +29,4 @@ DROP ROLE role_name
 
 ## 另请参见
 
-[create-role](./create-role.html)、[set-role](./set-role.html)、[grant-roles](./grant-roles.html)、[revoke-roles](./revoke-roles.html)
+[CREATE ROLE](./create-role.md)、[SET ROLE](./set-role.md)、[GRANT ROLES](./grant-roles.md)、[REVOKE ROLES](./revoke-roles.md)

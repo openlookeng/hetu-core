@@ -1,3 +1,8 @@
++++
+weight = 2
+title = "DataCenter"
++++
+
 Data Center Connector
 ====================
 
@@ -89,4 +94,4 @@ Data Center Connector Limitations
 
 Data Center connector is a read-only connector. The following SQL statements are not yet supported:
 
-[alter-schema](../sql/alter-schema.html), [alter-table](../sql/alter-table.html), [analyze](../sql/analyze.html), [cache-table](../sql/cache-table.html), [comment](../sql/comment.html), [create-schema](../sql/create-schema.html), [create-table](../sql/create-table.html), [create-table-as](../sql/create-table-as.html), [create-view](../sql/create-view.html), [delete](../sql/delete.html), [drop-cache](../sql/drop-cache.html), [drop-schema](../sql/drop-schema.html), [drop-table](../sql/drop-table.html), [drop-view](../sql/drop-view.html), [grant](../sql/grant.html), [insert](../sql/insert.html), [insert-overwrite](../sql/insert-overwrite.html), [revoke](../sql/revoke.html), [revoke](../sql/revoke.html), [show-cache](../sql/show-cache.html), [show-create-view](../sql/show-create-view.html), [show-grants](../sql/show-grants.html), [show-roles](../sql/show-roles.html), [show-role-grants](../sql/show-role-grants.html), [update](../sql/update.html), [vacuum](../sql/vacuum.html)
+[ALTER SCHEMA](../sql/alter-schema.md), [ALTER TABLE](../sql/alter-table.md), [ANALYZE](../sql/analyze.md), [CACHE TABLE](../sql/cache-table.md), [COMMENT](../sql/comment.md), [CREATE SCHEMA](../sql/create-schema.md), [CREATE TABLE](../sql/create-table.md), [CREATE TABLE AS](../sql/create-table-as.md), [CREATE VIEW](../sql/create-view.md), [DELETE](../sql/delete.md), [DROP CACHE](../sql/drop-cache.md), [DROP SCHEMA](../sql/drop-schema.md), [DROP TABLE](../sql/drop-table.md), [DROP VIEW](../sql/drop-view.md), [GRANT](../sql/grant.md), [INSERT](../sql/insert.md), [INSERT OVERWRITE](../sql/insert-overwrite.md), [REVOKE](../sql/revoke.md), [SHOW CACHE](../sql/show-cache.md), [SHOW CREATE VIEW](../sql/show-create-view.md), [SHOW GRANTS](../sql/show-grants.md), [SHOW ROLES](../sql/show-roles.md), [SHOW ROLE GRANTS](../sql/show-role-grants.md), [UPDATE](../sql/update.md), [VACUUM](../sql/vacuum.md)

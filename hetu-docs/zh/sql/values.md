@@ -21,7 +21,7 @@ VALUES row [, ...]
 
 定义字面量内联表。
 
-可以在任何可以使用查询的地方（如 [SELECT](./select.html) 和 [INSERT](./insert.html) 语句的`FROM` 子句甚至是在顶级中）使用 `VALUES`。`VALUES` 创建一个不含列名的匿名表，但可以使用带列别名的子句 `AS` 对表和列进行命名。
+可以在任何可以使用查询的地方（如 [SELECT](./select.md) 和 [INSERT](./insert.md) 语句的`FROM` 子句甚至是在顶级中）使用 `VALUES`。`VALUES` 创建一个不含列名的匿名表，但可以使用带列别名的子句 `AS` 对表和列进行命名。
 
 ## 示例
 
@@ -57,4 +57,4 @@ VALUES row [, ...]
 
 ## 另请参见
 
-[insert](./insert.html)、[select](./ select.html)
+[INSERT](./insert.md)、[SELECT](./select.md)

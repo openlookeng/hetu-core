@@ -1,3 +1,8 @@
++++
+weight = 18
+title = "Thrift"
++++
+
 Thrift Connector
 ================
 

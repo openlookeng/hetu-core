@@ -1,70 +1,71 @@
-Thrift Connector
-================
++++
+weight = 18
+title = "Thrift"
++++
 
-The Thrift connector makes it possible to integrate with external storage systems without a custom openLooKeng connector implementation.
+# Thrift连接器
 
-In order to use the Thrift connector with an external system, you need to implement the `PrestoThriftService` interface, found below. Next, you configure the Thrift connector to point to a set of machines, called Thrift servers, that implement the interface. As part of the interface implementation, the Thrift servers will provide metadata, splits and data. The connector will randomly choose a server to talk to from the available instances for metadata calls, or for data calls unless the splits include a list of addresses. All requests are assumed to be idempotent and can be retried freely among any server.
+Thrift连接器使得无需定制openLooKeng连接器实现就可以与外部存储系统集成。
 
-Configuration
--------------
+为了与外部系统使用Thrift连接器，需要实现`PrestoThriftService`接口，见下文。接下来，将Thrift连接器配置为指向一组称为Thrift服务器的机器，这些机器实现该接口。作为接口实现的一部分，Thrift服务器将提供元数据、拆分和数据。除非拆分包含地址列表，否则连接器将从元数据调用或数据调用的可用实例中随机选择一个服务器与之通信。所有的请求都被假定为幂等的，并且可以在任何服务器之间自由地重试。
 
-To configure the Thrift connector, create a catalog properties file `etc/catalog/thrift.properties` with the following content, replacing the properties as appropriate:
+## 配置
+
+要配置Thrift连接器，创建具有以下内容的目录属性文件`etc/catalog/thrift.properties`，并适当替换以下属性：
 
 ``` properties
 connector.name=presto-thrift
 presto.thrift.client.addresses=host:port,host:port
 ```
 
-### Multiple Thrift Systems
+### 多Thrift系统
 
-You can have as many catalogs as you need, so if you have additional Thrift systems to connect to, simply add another properties file to`etc/catalog` with a different name (making sure it ends in `.properties`).
+可以根据需要创建任意多的目录，因此，如果有额外的Thrift系统供连接，只需添加另一个不同的名称的属性文件到`etc/catalog`中（确保它以`.properties`结尾）。
 
-Configuration Properties
-------------------------
+## 配置属性
 
-The following configuration properties are available: 
+配置属性包括：
 
-| Property Name                             | Description                                              |
-| :---------------------------------------- | :------------------------------------------------------- |
-| `presto.thrift.client.addresses`            | Location of Thrift servers                               |
-| `presto-thrift.max-response-size`           | Maximum size of data returned from Thrift server         |
-| `presto-thrift.metadata-refresh-threads`    | Number of refresh threads for metadata cache             |
-| `presto.thrift.client.max-retries`          | Maximum number of retries for failed Thrift requests     |
-| `presto.thrift.client.max-backoff-delay`    | Maximum interval between retry attempts                  |
-| `presto.thrift.client.min-backoff-delay`    | Minimum interval between retry attempts                  |
-| `presto.thrift.client.max-retry-time`       | Maximum duration across all attempts of a Thrift request |
-| `presto.thrift.client.backoff-scale-factor` | Scale factor for exponential back off                    |
-| `presto.thrift.client.connect-timeout`      | Connect timeout                                          |
-| `presto.thrift.client.request-timeout`      | Request timeout                                          |
-| `presto.thrift.client.socks-proxy`          | SOCKS proxy address                                      |
-| `presto.thrift.client.max-frame-size`       | Maximum size of a raw Thrift response                    |
-| `presto.thrift.client.transport`            | Thrift transport type (`UNFRAMED`, `FRAMED`, `HEADER`)   |
-| `presto.thrift.client.protocol`             | Thrift protocol type (`BINARY`, `COMPACT`, `FB_COMPACT`) |
+| 属性名称| 说明|
+|:----------|:----------|
+| `presto.thrift.client.addresses`| Thrift服务器位置|
+| `presto-thrift.max-response-size`| Thrift服务器返回的最大数据量|
+| `presto-thrift.metadata-refresh-threads`| 元数据缓存刷新线程数|
+| `presto.thrift.client.max-retries`| Thrift请求失败最大重试次数|
+| `presto.thrift.client.max-backoff-delay`| 最大重试间隔|
+| `presto.thrift.client.min-backoff-delay`| 最小重试间隔|
+| `presto.thrift.client.max-retry-time`| Thrift请求所有尝试的最大时长|
+| `presto.thrift.client.backoff-scale-factor`| 指数后退比例系数|
+| `presto.thrift.client.connect-timeout`| 连接超时|
+| `presto.thrift.client.request-timeout`| 请求超时|
+| `presto.thrift.client.socks-proxy`| SOCKS代理地址|
+| `presto.thrift.client.max-frame-size`| Thrift原始响应最大长度|
+| `presto.thrift.client.transport`| Thrift传输类型（`UNFRAMED`、`FRAMED`、`HEADER`）|
+| `presto.thrift.client.protocol`| Thrift协议类型（`BINARY`、`COMPACT`、`FB_COMPACT`）|
 
 ### `presto.thrift.client.addresses`
 
-Comma-separated list of thrift servers in the form of `host:port`. For example:
+表示以逗号分隔的Thrift服务器列表，呈`host:port`形式。例如：
 
 ``` properties
 presto.thrift.client.addresses=192.0.2.3:7777,192.0.2.4:7779
 ```
 
-This property is required; there is no default.
+此属性是必需的；没有默认值。
 
 ### `presto-thrift.max-response-size`
 
-Maximum size of a data response that the connector accepts. This value is sent by the connector to the Thrift server when requesting data, allowing it to size the response appropriately.
+连接器接受的数据响应的最大大小。此值由连接器在请求数据时发送给Thrift服务器，从而允许它适当地调整响应的大小。
 
-This property is optional; the default is `16MB`.
+此属性是可选的；默认值为`16MB`。
 
 ### `presto-thrift.metadata-refresh-threads`
 
-Number of refresh threads for metadata cache. This property is optional; the default is `1`.
+元数据缓存刷新线程数。此属性是可选的；默认值为`1`。
 
-Thrift IDL File
----------------
+## Thrift IDL文件
 
-The following IDL describes the `PrestoThriftService` that must be implemented:
+以下IDL描述了需要实现的`PrestoThriftService`：
 
 ``` java
 enum PrestoThriftBound {
@@ -436,6 +437,3 @@ service PrestoThriftService {
     throws (1: PrestoThriftServiceException ex1);
 }
 ```
-
-
-

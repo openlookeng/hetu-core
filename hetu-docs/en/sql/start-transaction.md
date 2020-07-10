@@ -39,4 +39,4 @@ START TRANSACTION READ WRITE, ISOLATION LEVEL SERIALIZABLE;
 See Also
 --------
 
-[commit](./commit.html), [rollback](./rollback.html)
+[COMMIT](./commit.md), [ROLLBACK](./rollback.md)

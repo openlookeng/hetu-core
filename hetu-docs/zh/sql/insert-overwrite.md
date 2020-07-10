@@ -63,4 +63,4 @@ insert overwrite 可以对分区表和非分区表进行操作，但是行为不
 
 ## 另请参见
 
-[values](./values.html)、[insert](./insert.html)
+[VALUES](./values.md)、[INSERT](./insert.md)

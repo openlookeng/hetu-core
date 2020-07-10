@@ -1,7 +1,10 @@
-UUID Functions
-==============
++++
+weight = 22
+title = "UUID函数"
++++
 
-**uuid()** -\> uuid
+# UUID函数
 
-Returns a pseudo randomly generated [uuid_type](../language/types.html) (type 4).
+**uuid()** -> uuid
 
+返回伪随机生成的[UUID类型](../language/types.md)（类型4）。

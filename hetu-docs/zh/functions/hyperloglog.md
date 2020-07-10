@@ -1,27 +1,25 @@
-HyperLogLog Functions
-=====================
++++
+weight = 20
+title = "HyperLogLog 函数"
++++
 
-openLooKeng implements the `approx_distinct` function using the [HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) data structure.
+# HyperLogLog 函数
 
-Data Structures
----------------
+openLooKeng 使用 [HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) 数据结构实现 `approx_distinct` 函数。
 
-openLooKeng implements HyperLogLog data sketches as a set of 32-bit buckets which store a *maximum hash*. They can be stored sparsely (as a map from bucket ID to bucket), or densely (as a contiguous memory block). The
-HyperLogLog data structure starts as the sparse representation, switching to dense when it is more efficient. The P4HyperLogLog structure is initialized densely and remains dense for its lifetime.
+## 数据结构
 
-`hyperloglog_type` implicitly casts to `p4hyperloglog_type`, while one can explicitly cast `HyperLogLog` to `P4HyperLogLog`:
+openLooKeng 将 HyperLogLog 数据草图实现为一组存储*最大哈希*的 32 位数据桶。这些数据桶能够以稀疏（作为数据桶 ID 到数据桶的映射）或密集（作为连续的内存块）的方式存储。HyperLogLog 数据结构以稀疏表示开始，当它更高效时会切换到密集表示。P4HyperLogLog 结构以密集方式初始化，并且在其生命周期内保持密集。
+
+`hyperloglog_type` 隐式转换为 `p4hyperloglog_type`，您可以显式地将 `HyperLogLog` 转换为 `P4HyperLogLog`：
 
     cast(hll AS P4HyperLogLog)
 
-Serialization
--------------
+## 序列化
 
-Data sketches can be serialized to and deserialized from `varbinary`. This allows them to be stored for later use. Combined with the ability  to merge multiple sketches, this allows one to calculate `approx_distinct` of the elements of a partition of a query, then for the entirety of a query with very little
-cost.
+可以将数据草图序列化为 `varbinary`，也可以从中反序列化数据草图。这样就可以存储数据草图供以后使用。这与合并多个草图的功能相结合，使您能够计算查询分区元素的 `approx_distinct`，然后以很小的代价计算整个查询。
 
-For example, calculating the `HyperLogLog` for daily unique users will allow weekly or monthly unique users to be calculated incrementally by combining the dailies. This is similar to computing weekly revenue by
-summing daily revenue. Uses of `approx_distinct` with `GROUPING SETS` can be converted to use `HyperLogLog`.
-Examples:
+例如，计算每日唯一用户的 `HyperLogLog` 之后，可以通过合并每日数据以增量方式计算每周或每月的唯一用户。这类似于通过汇总每日收入来计算每周收入。可以将 `approx_distinct` 与 `GROUPING SETS` 的结合使用转换为使用 `HyperLogLog`。示例：
 
     CREATE TABLE visit_summaries (
       visit_date date,
@@ -37,25 +35,20 @@ Examples:
     FROM visit_summaries
     WHERE visit_date >= current_date - interval '7' day;
 
-Functions
----------
+## 函数
 
-**approx\_set(x)** -\> HyperLogLog
+**approx\_set(x)** -> HyperLogLog
 
-Returns the `HyperLogLog` sketch of the input data set of `x`. This data sketch underlies `approx_distinct` and can be stored and used later by calling `cardinality()`.
+返回 `x` 的输入数据集的 `HyperLogLog` 草图。该数据草图是 `approx_distinct` 的基础，以后可以通过调用 `cardinality()` 来存储和使用该数据草图。
 
+**cardinality(hll)** -> bigint
 
-**cardinality(hll)** -\> bigint
+这将对 `hll` HyperLogLog 数据草图汇总的数据执行 `approx_distinct`。
 
-This will perform `approx_distinct` on the data summarized by the `hll` HyperLogLog data sketch.
+**empty\_approx\_set()** -> HyperLogLog
 
+返回一个空 `HyperLogLog`。
 
-**empty\_approx\_set()** -\> HyperLogLog
+**merge(HyperLogLog)** -> HyperLogLog
 
-Returns an empty `HyperLogLog`.
-
-
-**merge(HyperLogLog)** -\> HyperLogLog
-
-Returns the `HyperLogLog` of the aggregate union of the individual `hll` HyperLogLog structures.
-
+返回各个 `hll` HyperLogLog 结构聚合合并的 `HyperLogLog`。

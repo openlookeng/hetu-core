@@ -46,4 +46,4 @@ Some connectors have no support for `SHOW GRANTS`. See connector documentation f
 See Also
 --------
 
-[grant](./grant.html), [revoke](./revoke.html)
+[GRANT](./grant.md), [REVOKE](./revoke.md)

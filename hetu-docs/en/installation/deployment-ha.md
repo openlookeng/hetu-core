@@ -10,7 +10,7 @@ The openLooKeng HA solves single point failure of coordinators. Users can submit
 
 ## Installing HA
 openLooKeng with HA is required to be installed with minimum of 2 coordinators in the cluster.
-Please follow [openLooKeng Manual Setup](deployment.html) or [openLooKeng Auto Setup](deployment-auto.html) for basic installation.
+Please follow [Deploying openLooKeng Manually](./deployment.md) or [Deploying openLooKeng Automatically](./deployment-auto.md) for basic installation.
 
 ## Configuring HA
 

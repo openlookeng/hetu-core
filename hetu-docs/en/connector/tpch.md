@@ -1,3 +1,8 @@
++++
+weight = 20
+title = "TPCH"
++++
+
 TPCH Connector
 ==============
 

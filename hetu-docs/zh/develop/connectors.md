@@ -28,7 +28,7 @@ title = "连接器"
 
 
 
-该接口太大，无法在文档中列出，不过如果您有兴趣查看实现这些方法的策略，请查看 `example-http`{.interpreted-text role="doc"} 和 Cassandra 连接器。
+该接口太大，无法在文档中列出，不过如果您有兴趣查看实现这些方法的策略，请查看 `example-http` 和 Cassandra 连接器。
 
 如果您的基础数据源支持模式、表和列，则该接口应该很容易实现。
 

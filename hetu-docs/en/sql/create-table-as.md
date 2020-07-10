@@ -20,7 +20,7 @@ AS query
 Description
 -----------
 
-Create a new table containing the result of a [SELECT](select.html) query. Use [CREATE TABLE](create-table.html) to create an empty table.
+Create a new table containing the result of a [SELECT](./select.md) query. Use [CREATE TABLE](./create-table.md) to create an empty table.
 
 The optional `IF NOT EXISTS` clause causes the error to be suppressed if the table already exists.
 
@@ -65,4 +65,4 @@ Create a new `empty_nation` table with the same schema as `nation` and no data:
 See Also
 --------
 
-[create-table](./create-table.html), [ select](./select.html)
+[CREATE TABLE](./create-table.md), [SELECT](./select.md)

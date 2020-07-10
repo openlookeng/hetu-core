@@ -1,3 +1,8 @@
++++
+weight = 6
+title = "Secure Internal Communication"
++++
+
 Secure Internal Communication
 =============================
 
@@ -50,7 +55,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
     > Enter keystore password:
     > Re-enter new password:
     > What is your first and last name?
->   [Unknown]:  *.example.com
+    >   [Unknown]:  *.example.com
     > What is the name of your organizational unit?
     >   [Unknown]:
     > What is the name of your organization?
@@ -100,7 +105,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
 
 ### Internal SSL/TLS communication with Kerberos
 
-If [Kerberos](./server.html) authentication is enabled, specify valid Kerberos credentials for the internal communication, in addition to the SSL/TLS properties.
+If [Kerberos](server.md) authentication is enabled, specify valid Kerberos credentials for the internal communication, in addition to the SSL/TLS properties.
 
 > ``` properties
 > internal-communication.kerberos.enabled=true
@@ -109,7 +114,7 @@ If [Kerberos](./server.html) authentication is enabled, specify valid Kerberos c
 
 **Note**
 
-*The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`}, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Make sure you have the Kerberos setup done on the worker nodes as well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.*
+*The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Make sure you have the Kerberos setup done on the worker nodes as well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.*
 
 
 Performance with SSL/TLS enabled

@@ -1,7 +1,11 @@
-Lambda Expressions
-==================
++++
+weight = 4
+title = "Lambda表达式"
++++
 
-Lambda expressions are written with `->`:
+# Lambda表达式
+
+Lambda表达式使用`->`表示：
 
     x -> x + 1
     (x, y) -> x + y
@@ -12,7 +16,7 @@ Lambda expressions are written with `->`:
     x -> CAST(x AS JSON)
     x -> x + TRY(1 / 0)
 
-Most SQL expressions can be used in a lambda body, with a fewexceptions:
+大多数SQL表达式都可以用在lambda体中，但有一些例外：
 
--   Subqueries are not supported. `x -> 2 + (SELECT 3)`
--   Aggregations are not supported. `x -> max(y)`
+- 不支持子查询：`x -> 2 + (SELECT 3)`
+- 不支持聚合：`x -> max(y)`

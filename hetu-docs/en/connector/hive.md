@@ -1,8 +1,13 @@
++++
+weight = 6
+title = "Hive"
++++
+
 Hive Connector
 ==============
 
-Overview
---------
+## Overview
+
 
 The Hive connector allows querying data stored in a Hive data warehouse.
 Hive is a combination of three components:
@@ -13,8 +18,8 @@ Hive is a combination of three components:
 
 openLooKeng only uses the first two components: the data and the metadata. It does not use HiveQL or any part of Hive\'s execution environment.
 
-Supported File Types
---------------------
+## Supported File Types
+
 
 The following file types are supported for the Hive connector:
 
@@ -36,8 +41,8 @@ In order to enable first-class support for Avro tables and CSV files when using 
  </property>
 ```
 
-Configuration
--------------
+## Configuration
+
 
 The Hive connector supports Apache Hadoop 2.x and derivative distributions including Cloudera CDH 5 and Hortonworks Data Platform (HDP).
 
@@ -68,8 +73,7 @@ The configuration files must exist on all openLooKeng nodes. If you are referenc
 
 Before running any `CREATE TABLE` or `CREATE TABLE AS` statements for Hive tables in openLooKeng, you need to check that the user openLooKeng is using to access HDFS has access to the Hive warehouse directory. The Hive warehouse directory is specified by the configuration variable `hive.metastore.warehouse.dir` in `hive-site.xml`, and the default value is `/user/hive/warehouse`.
 
-When not using Kerberos with HDFS, openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by
-setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.html#jvm-config), replacing `hdfs_user`with the appropriate username:
+When not using Kerberos with HDFS, openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.md#jvm-config), replacing `hdfs_user` with the appropriate username:
 
 ``` properties
 -DHADOOP_USER_NAME=hdfs_user
@@ -83,11 +87,11 @@ Whenever you change the user openLooKeng is using to access HDFS, remove `/tmp/o
 
 Kerberos authentication is supported for both HDFS and the Hive metastore. However, Kerberos authentication by ticket cache is not yet supported.
 
-The properties that apply to Hive connector security are listed in the [Hive Configuration Properties](#hive-configuration-properties) table.
-Please see the [hive-security](../hive-security.html) section for a more detailed discussion of the security options in the Hive connector.
+The properties that apply to Hive connector security are listed in the [Hive Configuration Properties](./hive.md#hive-configuration-properties) table.
+Please see the [Hive Security Configuration](./hive-security.md) section for a more detailed discussion of the security options in the Hive connector.
 
-Hive Configuration Properties
------------------------------
+## Hive Configuration Properties
+
 
 | Property Name                             | Description                                                  | Default  |
 | ----------------------------------------- | ------------------------------------------------------------ | -------- |
@@ -106,20 +110,20 @@ Hive Configuration Properties
 | `hive.hdfs.impersonation.enabled`         | Enable HDFS end user impersonation.                          | `false`  |
 | `hive.hdfs.presto.principal`                | The Kerberos principal that openLooKeng will use when connecting to HDFS. |          |
 | `hive.hdfs.presto.keytab`                   | HDFS client keytab location.                                 |          |
-| `hive.security`                           | See [Hive Security Configuration](hive-security.html). |          |
-| `security.config-file`                    | Path of config file to use when `hive.security=file`. See [File Based Authorization](hive-security.html#hive-file-based-authorization) for details. |          |
+| `hive.security`                           | See [Hive Security Configuration](./hive-security.md). |          |
+| `security.config-file`                    | Path of config file to use when `hive.security=file`. See [File Based Authorization](./hive-security.md#file-based-authorization) for details. |          |
 | `hive.non-managed-table-writes-enabled`   | Enable writes to non-managed (external) Hive tables.         | `false`  |
 | `hive.non-managed-table-creates-enabled`  | Enable creating non-managed (external) Hive tables.          | `true`   |
-| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.html#table-statistics) for details. | `true`   |
+| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.md#table-statistics) for details. | `true`   |
 | `hive.s3select-pushdown.enabled`          | Enable query pushdown to AWS S3 Select service.              | `false`  |
-| `hive.s3select-pushdown.max-connections`  | Maximum number of simultaneously open connections to S3 for [S3 Select Pushdown](./hive.html#s3selectpushdown). | 500      |
+| `hive.s3select-pushdown.max-connections`  | Maximum number of simultaneously open connections to S3 for [S3 Select Pushdown](#s3-select-pushdown). | 500      |
 | `hive.orc.use-column-names`               | To support alter table drop column, it is recommended to add `hive.orc.use-column-names=true` in hive properties, otherwise the drop column might not work properly. | false    |
 
 
 
 
-Hive Thrift Metastore Configuration Properties
-----------------------------------------------
+## Hive Thrift Metastore Configuration Properties
+
 
 | Property Name                                       | Description                                                  |
 | :-------------------------------------------------- | :----------------------------------------------------------- |
@@ -134,8 +138,8 @@ Hive Thrift Metastore Configuration Properties
 
 
 
-AWS Glue Catalog Configuration Properties
------------------------------------------
+## AWS Glue Catalog Configuration Properties
+
 
 | Property Name                                      | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
@@ -147,8 +151,8 @@ AWS Glue Catalog Configuration Properties
 | `hive.metastore.glue.aws-secret-key`               | AWS secret key to use to connect to the Glue Catalog. If specified along with `hive.metastore.glue.aws-access-key`, this parameter takes precedence over `hive.metastore.glue.iam-role`. |
 | `hive.metastore.glue.iam-role`                     | ARN of an IAM role to assume when connecting to the Glue Catalog. |
 
-Amazon S3 Configuration
------------------------
+## Amazon S3 Configuration
+
 
 The Hive Connector can read and write tables that are stored in S3. This is accomplished by having a table or database location that uses an S3 prefix rather than an HDFS prefix.
 
@@ -253,12 +257,11 @@ S3 Select Pushdown bypasses the file systems when accessing Amazon S3 for predic
 
 If your workload experiences the error *Timeout waiting for connection from pool*, increase the value of both `hive.s3select-pushdown.max-connections` and the maximum connections configuration for the file system you are using.
 
-Google Cloud Storage Configuration
-----------------------------------
+## Google Cloud Storage Configuration
+
 
 The Hive connector can access data stored in GCS, using the `gs://` URI prefix. Please refer to the `hive-gcs-tutorial` for step-by-step instructions.
 
-### GCS Configuration properties
 
 ### GCS Configuration properties
 
@@ -269,8 +272,8 @@ The Hive connector can access data stored in GCS, using the `gs://` URI prefix. 
 | `hive.gcs.json-key-file-path` | JSON key file used to authenticate with Google Cloud Storage. |
 | `hive.gcs.use-access-token`   | Use client-provided OAuth token to access Google Cloud Storage. This is mutually exclusive with a global JSON key file. |
 
- ORC Cache Configuration
- -----------------------
+## ORC Cache Configuration
+
  
 Hive connector caches the ORC file data to provide better performance and reduce query latency. Workers cache the data on their local memory.
 When enabled, Workers cache all ORC files tail, stripe-footer, row-index, bloom-filter information. However, the workers cache row data of only specific ORC 
@@ -299,8 +302,7 @@ files that are matching the predicates provided via `cache table` sql statement.
 TTL is time taken since cache entry was last accessed by read or write. Timed expiration is performed with periodic maintenance during writes 
 and occasionally during reads, as discussed below.
 
-Table Statistics
-----------------
+## Table Statistics
 
 When writing data, the Hive connector always collects basic statistics (`numFiles`, `numRows`, `rawDataSize`, `totalSize`) and by default will also collect column level statistics:
 
@@ -548,8 +550,8 @@ VACUUM TABLE hive_acid_table_partitioned
 
 
 
-Schema Evolution
-----------------
+## Schema Evolution
+
 
 Hive allows the partitions in a table to have a different schema than the table. This occurs when the column types of a table are changed after partitions already exist (that use the original column types). The Hive connector supports this by allowing the same conversions as Hive:
 
@@ -559,8 +561,8 @@ Hive allows the partitions in a table to have a different schema than the table.
 
 Any conversion failure will result in null, which is the same behavior as Hive. For example, converting the string `'foo'` to a number, or converting the string `'1234'` to a `tinyint` (which has a maximum value of `127`).
 
-Avro Schema Evolution
----------------------
+## Avro Schema Evolution
+
 
 openLooKeng supports querying and manipulating Hive tables with Avro storage format which has the schema set based on an Avro schema file/literal. It is also possible to create tables in openLooKeng which infers the schema from a valid Avro schema file located locally or remotely in HDFS/Web server.
 
@@ -601,8 +603,8 @@ The following operations are not supported when `avro_schema_url` is set:
     columns are not supported in `CREATE TABLE`.
 -   `ALTER TABLE` commands modifying columns are not supported.
 
-Procedures
-----------
+## Procedures
+
 
 -   `system.create_empty_partition(schema_name, table_name, partition_columns, partition_values)`
 
@@ -612,12 +614,12 @@ Procedures
 
     > Check and update partitions list in metastore. There are three modes available:
     > 
-    >-   `ADD` : add any partitions that exist on the file system but  not in the metastore.
-    > -   `DROP`: drop any partitions that exist in the metastore but not on the file system.
-    >    -   `FULL`: perform both `ADD` and `DROP`.
+    > - `ADD` : add any partitions that exist on the file system but  not in the metastore.
+    > - `DROP`: drop any partitions that exist in the metastore but not on the file system.
+    > - `FULL`: perform both `ADD` and `DROP`.
 
-Examples
---------
+## Examples
+
 
 The Hive connector supports querying and manipulating Hive tables and schemas (databases). While some uncommon operations will need to be performed using Hive directly, most operations can be performed using openLooKeng.
 
@@ -700,11 +702,11 @@ DROP SCHEMA hive.web
 
 
 
-Hive Connector Limitations
---------------------------
+## Hive Connector Limitations
 
-- [delete](../sql/delete.html) is only supported if the `WHERE` clause matches entire partitions when table is non-transactional. for transactional table, the `WHERE` clause can be any condition.
-- [alter-schema](../sql/alter-schema.html) usage fails, since the Hive metastore does not support renaming schemas.
+
+- [DELETE](../sql/delete.md) is only supported if the `WHERE` clause matches entire partitions when table is non-transactional. for transactional table, the `WHERE` clause can be any condition.
+- [ALTER SCHEMA](../sql/alter-schema.md) usage fails, since the Hive metastore does not support renaming schemas.
 
 - openLooKeng supports ACID transactions on Hive tables only for Hive version 3.x
 

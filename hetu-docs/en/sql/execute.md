@@ -46,4 +46,4 @@ This is equivalent to:
 See Also
 --------
 
-[prepare](./prepare.html)
+[PREPARE](./prepare.md)

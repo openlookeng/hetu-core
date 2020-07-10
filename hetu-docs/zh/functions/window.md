@@ -1,14 +1,17 @@
-Window Functions
-================
++++
+weight = 15
+title = "窗口函数"
++++
 
-Window functions perform calculations across rows of the query result. They run after the `HAVING` clause but before the `ORDER BY` clause. Invoking a window function requires special syntax using the `OVER`
-clause to specify the window. A window has three components:
+# 窗口函数
 
--   The partition specification, which separates the input rows into different partitions. This is analogous to how the `GROUP BY` clause separates rows into different groups for aggregate functions.
--   The ordering specification, which determines the order in which input rows will be processed by the window function.
--   The window frame, which specifies a sliding window of rows to be processed by the function for a given row. If the frame is not specified, it defaults to `RANGE UNBOUNDED PRECEDING`, which is the same as `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. This frame contains all rows from the start of the partition up to the last peer of the current row.
+窗口函数对查询结果中的行执行计算。窗口函数在`HAVING`子句之后、`ORDER BY`子句之前运行。调用窗口函数需要使用特殊的语法（使用`OVER`子句来指定窗口）。一个窗口由三部分组成：
 
-For example, the following query ranks orders for each clerk by price:
+- 分区规范，它将输入行划分到不同的分区中。这与`GROUP BY`子句将行划分到不同的组中以用于聚合函数的方式类似。
+- 排序规范，它确定窗口函数处理输入行的顺序。
+- 窗口框架，它为给定的行指定要由函数处理的行滑动窗口。如果未指定框架，则默认使用`RANGE UNBOUNDED PRECEDING`，它与`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`相同。该框架包含从分区开头开始到当前行的最后一个对等点的所有行。
+
+例如，以下查询按价格对每个售货员的订单进行排序：
 
     SELECT orderkey, clerk, totalprice,
            rank() OVER (PARTITION BY clerk
@@ -16,13 +19,11 @@ For example, the following query ranks orders for each clerk by price:
     FROM orders
     ORDER BY clerk, rnk
 
-Aggregate Functions
--------------------
+## 聚合函数
 
-All `aggregate` can be used as window functions by adding the `OVER` clause. The aggregate function is
-computed for each row over the rows within the current row\'s window frame.
+通过添加`OVER`子句，可以将所有`aggregate`用作窗口函数。会为当前行的窗口框架中的每个行计算聚合函数。
 
-For example, the following query produces a rolling sum of order prices by day for each clerk:
+例如，以下查询为每个售货员生成按天滚动的订单价格总和：
 
     SELECT clerk, orderdate, orderkey, totalprice,
            sum(totalprice) OVER (PARTITION BY clerk
@@ -30,66 +31,54 @@ For example, the following query produces a rolling sum of order prices by day f
     FROM orders
     ORDER BY clerk, orderdate, orderkey
 
-Ranking Functions
------------------
+## 排序函数
 
-**cume\_dist()** -\> bigint
+**cume\_dist()** -> bigint
 
-Returns the cumulative distribution of a value in a group of values. The result is the number of rows preceding or peer with the row in the window ordering of the window partition divided by the total number of rows in the window partition. Thus, any tie values in the ordering will evaluate to the same distribution value.
+返回一组值中某个值的累积分布。结果是窗口分区的窗口排序中的行前面或与之对等的行数量除以窗口分区中的总行数。因此，排序中的任何绑定值都将计算为相同的分布值。
 
-**dense\_rank()** -\> bigint
+**dense\_rank()** -> bigint
 
-Returns the rank of a value in a group of values. This is similar to `rank`, except that tie values do not produce gaps in the sequence.
+返回某个值在一组值中的排序。这与`rank`类似，只是绑定值不在序列中产生间隙。
 
-**ntile(n)** -\> bigint
+**ntile(n)** -> bigint
 
-Divides the rows for each window partition into `n` buckets ranging from `1` to at most `n`. Bucket values will differ by at most `1`. If the number of rows in the partition does not divide evenly into the number
-of buckets, then the remainder values are distributed one per bucket,starting with the first bucket.
+将每个窗口分区的行分到`n`个桶中，范围为`1`至`n`（最大）。桶值最多相差`1`。如果分区中的行数未平均分成桶数，则从第一个桶开始每个桶分配一个剩余值。
 
-For example, with `6` rows and `4` buckets, the bucket values would be as follows: `1` `1` `2` `2` `3` `4`
+例如，对于`6`行和`4`个桶，桶值如下：`1` `1` `2` `2` `3` `4`
 
-**percent\_rank()** -\> double
+**percent\_rank()** -> double
 
-Returns the percentage ranking of a value in group of values. The result is `(r - 1) / (n - 1)` where `r` is the `rank` of the row and `n` is the total number of rows in the window partition.
+返回某个值在一组值中的百分比排名。结果是`(r - 1) / (n - 1)`，其中`r`是该行的`rank`，`n`是窗口分区中的总行数。
 
-**rank() -\> bigint**
+**rank() -> bigint**
 
-Returns the rank of a value in a group of values. The rank is one plus the number of rows preceding the row that are not peer with the row. 
+返回某个值在一组值中的排序。排序是该行之前与该行不对等的行数加一。
 
-Thus, tie values in the ordering will produce gaps in the sequence. The ranking is performed for each window partition.
+因此，排序中的绑定值将在序列中产生间隙。会对每个窗口分区进行排序。
 
-**row\_number()** -\> bigint
+**row\_number()** -> bigint
 
-Returns a unique, sequential number for each row, starting with one, according to the ordering of rows within the window partition.
+根据窗口分区内行的排序，从1开始返回每行的唯一序列号。
 
+## 值函数
 
-Value Functions
----------------
+**first\_value(x)** -> \[与输入相同]
 
-**first\_value(x)** -\> \[same as input\]
+返回窗口的第一个值。
 
-Returns the first value of the window.
+**last\_value(x)** -> \[与输入相同]
 
+返回窗口的最后一个值。
 
-**last\_value(x)** -\> \[same as input\]
+**nth\_value(x, offset)** -> \[与输入相同]
 
-Returns the last value of the window.
+返回相对于窗口开头的指定偏移处的值。偏移从`1`开始。偏移可以是任何标量表达式。如果偏移为NULL或大于窗口中的值的数量，则返回NULL。如果偏移为零或负数，则产生错误。
 
+**lead(x\[, offset \[, default\_value]])** -> \[与输入相同]
 
-**nth\_value(x, offset)** -\> \[same as input\]
+返回窗口中当前行之后`offset`行处的值。偏移从`0`（当前行）开始。偏移可以是任何标量表达式。默认`offset`为`1`。如果偏移为NULL或大于窗口，则返回`default_value`，如果未指定该值，则返回`null`。
 
-Returns the value at the specified offset from beginning the window.
-Offsets start at `1`. The offset can be any scalar expression. If the offset is null or greater than the number of values in the window, null is returned. It is an error for the offset to be zero or negative.
+**lag(x\[, offset \[, default\_value]])** -> \[与输入相同]
 
-**lead(x\[, offset \[, default\_value\]\])** -\> \[same as input\]
-
-Returns the value at `offset` rows after the current row in the window. Offsets start at `0`, which is the current row. The offset can be any scalar expression. The default `offset` is `1`. If the offset is null or
-larger than the window, the `default_value` is returned, or if it is not specified `null` is returned.
-
-
-
-**lag(x\[, offset \[, default\_value\]\])** -\> \[same as input\]
-
-Returns the value at `offset` rows before the current row in the window Offsets start at `0`, which is the current row. The offset can be any scalar expression. The default `offset` is `1`. If the offset is null or
-larger than the window, the `default_value` is returned, or if it is not specified `null` is returned.
-
+返回窗口中当前行之前`offset`行处的值。偏移从`0`（当前行）开始。偏移可以是任何标量表达式。默认`offset`为`1`。如果偏移为NULL或大于窗口，则返回`default_value`，如果未指定该值，则返回`null`。

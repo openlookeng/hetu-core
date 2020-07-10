@@ -16,4 +16,4 @@ DESCRIBE table_name
 Description
 -----------
 
-DESCRIBE is an alias for [SHOW COLUMNS](show-columns.html) 
+DESCRIBE is an alias for [SHOW COLUMNS](./show-columns.md) 

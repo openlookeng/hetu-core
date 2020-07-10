@@ -38,4 +38,4 @@ ALTER TABLE name RENAME COLUMN column_name TO new_column_name
 
 ## 另请参见
 
-[create-table](./create-table.html)
+[CREATE TABLE](./create-table.md)

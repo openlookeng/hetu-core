@@ -29,4 +29,4 @@ ROLLBACK WORK;
 See Also
 --------
 
-[commit](./commit.html), [start-transaction](./start-transaction.html)
+[COMMIT](./commit.md), [START TRANSACTION](./start-transaction.md)

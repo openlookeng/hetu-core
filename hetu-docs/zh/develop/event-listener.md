@@ -31,7 +31,7 @@ openLooKeng 支持为以下事件调用的自定义事件侦听器：
 
 配置文件示例：
 
-``` {.none}
+``` properties
 event-listener.name=custom-event-listener
 custom-property1=custom-value1
 custom-property2=custom-value2

@@ -1,3 +1,8 @@
++++
+weight = 3
+title = "Elasticsearch"
++++
+
 Elasticsearch Connector
 =======================
 
@@ -63,7 +68,7 @@ This property is optional; the default is `1000`.
 
 ### `elasticsearch.scroll-timeout`
 
-This property defines the amount of time (ms) Elasticsearch will keep the [search context alive](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-scroll.html#scroll-sea rch-context) for scroll requests
+This property defines the amount of time (ms) Elasticsearch will keep the [search context alive](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-scroll.html#scroll-search-context) for scroll requests
 
 This property is optional; the default is `1s`.
 

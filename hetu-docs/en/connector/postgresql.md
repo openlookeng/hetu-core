@@ -1,3 +1,8 @@
++++
+weight = 15
+title = "PostgreSQL"
++++
+
 PostgreSQL Connector
 ====================
 
@@ -50,4 +55,4 @@ PostgreSQL Connector Limitations
 
 The following SQL statements are not yet supported:
 
-[delete](../sql/delete.html), [grant](../sql/grant.html), [revoke](../sql/revoke.html), [show-grants](../sql/show-grants.html), [show-roles](../sql/show-roles.html), [show-role-grants](../sql/show-role-grants.html)
+[DELETE](../sql/delete.md), [GRANT](../sql/grant.md), [REVOKE](../sql/revoke.md), [SHOW GRANTS](../sql/show-grants.md), [SHOW ROLES](../sql/show-roles.md), [SHOW ROLE GRANTS](../sql/show-role-grants.md)

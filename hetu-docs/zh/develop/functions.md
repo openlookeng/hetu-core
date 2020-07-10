@@ -11,7 +11,7 @@ title = "函数"
 函数框架用于实现 SQL 函数。openLooKeng 包含大量的内置函数。
 为了实现新的函数，您可以编写一个插件，用于从 ``getFunctions()`` 返回一个或多个函数：
 
-``` {.java}
+``` java
 public class ExampleFunctionsPlugin
         implements Plugin
 {
@@ -43,7 +43,7 @@ public class ExampleFunctionsPlugin
 
 下面是一个实现 ``is_null`` 的示例函数：
 
-``` {.java}
+``` java
 public class ExampleNullFunction
 {
     @ScalarFunction("is_null")
@@ -80,7 +80,7 @@ public class ExampleNullFunction
 具有类型参数的标量函数更加复杂一些。
 要使前面的示例适用于任何类型，我们需要添加以下代码：
 
-``` {.java}
+``` java
 @ScalarFunction(name = "is_null")
 @Description("Returns TRUE if the argument is NULL")
 public final class IsNullFunction
@@ -119,7 +119,7 @@ public final class IsNullFunction
   
   例如，以下函数将仅绑定到定义了 equals 函数的类型：
   
-``` {.java}
+``` java
 @ScalarFunction(name = "is_equal_or_null")
 @Description("Returns TRUE if arguments are equal or both NULL")
 public final class IsEqualOrNullFunction
@@ -149,7 +149,7 @@ public final class IsEqualOrNullFunction
 ``lowercaser`` 函数接受单个 ``VARCHAR`` 参数并返回一个 ``VARCHAR`` 值，这是该参数转换为小写字母后的结果：
 
 
-``` {.java}
+``` java
 public class ExampleStringFunction
 {
     @ScalarFunction("lowercaser")
@@ -187,7 +187,7 @@ public class ExampleStringFunction
 以下代码实现了用于计算 ``DOUBLE`` 列的平均值的聚合函数 ``avg_double``：
 
 
-``` {.java}
+``` java
 @AggregationFunction("avg_double")
 public class AverageAggregation
 {
@@ -224,7 +224,7 @@ public class AverageAggregation
 ``LongAndDoubleState`` 是一个对 ``AccumulatorState`` 进行扩展的接口：
 
 
-``` {.java}
+``` java
 public interface LongAndDoubleState
         extends AccumulatorState
 {

@@ -8,7 +8,7 @@ title = "Benchmark Driver"
 
 The benchmark driver can be used to measure the performance of queries in a openLooKeng cluster. We use it to continuously measure the performance of trunk.
 
-Download :[presto-benchmark-driver-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/316/presto-benchmark-driver-316-executable.jar), rename it to `presto-benchmark-driver`, then make it executable with `chmod +x`.
+Download [presto-benchmark-driver-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/316/presto-benchmark-driver-316-executable.jar), rename it to `presto-benchmark-driver`, then make it executable with `chmod +x`.
 
 ## Suites
 

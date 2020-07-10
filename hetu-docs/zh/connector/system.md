@@ -1,71 +1,70 @@
-System Connector
-================
++++
+weight = 17
+title = "系统"
++++
 
-The System connector provides information and metrics about the currently running openLooKeng cluster. It makes this available via normal SQL queries.
+# 系统连接器
 
-Configuration
--------------
+系统连接器提供当前运行的openLooKeng集群的信息和指标。这通过正常SQL查询实现。
 
-The System connector doesn\'t need to be configured: it is automatically available via a catalog named `system`.
+## 配置
 
-Using the System Connector
---------------------------
+系统连接器无需配置：它通过一个名为`system`的目录自动可用。
 
-List the available system schemas:
+## 使用系统连接器
+
+列出可用的系统模式：
 
     SHOW SCHEMAS FROM system;
 
-List the tables in one of the schemas:
+列出其中一个模式中的表：
 
     SHOW TABLES FROM system.runtime;
 
-Query one of the tables:
+查询其中一个表：
 
     SELECT * FROM system.runtime.nodes;
 
-Kill a running query:
+杀掉正在运行的查询：
 
     CALL system.runtime.kill_query(query_id => '20151207_215727_00146_tx3nr', message => 'Using too many resources');
 
-System Connector Tables
------------------------
+## 系统连接器表
 
 ### `metadata.catalogs`
 
-The catalogs table contains the list of available catalogs.
+catalogs包含可用的目录列表。
 
 ### `metadata.schema_properties`
 
-The schema properties table contains the list of available properties that can be set when creating a new schema.
+schema properties表包含可在创建新模式时设置的可用属性列表。
 
 ### `metadata.table_properties`
 
-The table properties table contains the list of available properties that can be set when creating a new table.
+table properties表包含可在创建新表时设置的可用属性列表。
 
 ### `metadata.table_comments`
 
-The table comments table contains the list of table comment.
+table comments表包含表注释的列表。
 
 ### `runtime.nodes`
 
-The nodes table contains the list of visible nodes in the openLooKeng cluster along with their status.
+nodes表包含openLooKeng集群中可见的节点列表及其状态。
 
 ### `runtime.queries`
 
-The queries table contains information about currently and recently running queries on the openLooKeng cluster. From this table you can find out the original query text (SQL), the identity of the user who ran the query and performance information about the query including how long the query was queued and analyzed.
+queries表包含当前和最近运行的对openLooKeng集群查询的信息。从这个表中可以找到原始查询文本（SQL）、运行查询的用户的标识以及查询的性能信息，包括查询的排队和分析时间。
 
 ### `runtime.tasks`
 
-The tasks table contains information about the tasks involved in a openLooKeng query including where they were executed and and how many rows and bytes each task processed.
+tasks表包含有关openLooKeng查询中涉及的任务的信息，包括这些任务的执行位置以及每个任务处理的行数和字节数。
 
 ### `runtime.transactions`
 
-The transactions table contains the list of currently open transactions and related metadata. This includes information such as the create time, idle time, initialization parameters, and accessed catalogs.
+transactions表包含当前打开的事务和相关元数据的列表。这包括例如创建时间、空闲时间、初始化参数和访问的目录等信息。
 
-System Connector Procedures
----------------------------
+## 系统连接器流程
 
 **runtime.kill\_query(query\_id, message)**
 
-Kill the query identified by `query_id`. The query failure message will include the specified `message`.
-
+杀掉由`query_id`所标识的查询。查询失败消息中会包含指定的`message`。

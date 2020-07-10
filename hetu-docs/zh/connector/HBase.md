@@ -1,23 +1,22 @@
 +++
-title = "HBase"
+标题= "HBase"
 +++
-# HBase Connector
+# HBase连接器
 
 ------
 
-## Overview
 
-The HBase Connector allows querying and creating tables on an external Apache HBase instance. Users can create a table in HBase connector, mapping it to an existing table in HBase Cluster, and support insert, select, or delete.
+## 概述
 
-The HBase Connector maintains a Metastore to persist HBase metadata, currently only following storage format are supported as Metastore: `Local File System`,  `Hadoop Distributed File System (HDFS)`, and `openLooKeng Metastore`.
+HBase连接支持在外部Apache HBase实例上查询和创建表。用户可以在HBase连接器中创建表，并映射到HBase Cluster中已有的表，支持insert、select和delete操作。
 
-**Note:** *Apache HBase 1.3.1 version is supported by HBase connector*
+HBase连接器维护着一个元存储，用于持久化HBase元数据，目前元存储只支持以下存储格式：`Local File System`、`Hadoop Distributed File System (HDFS)`和`openLooKeng Metastore`。
 
+**注意：** *Hbase连接器支持Apache HBase 1.3.1版本。*
 
+## 连接器配置
 
-## Connector Configuration
-
-Create `etc/catalog/hbase.properties` to mount the HBase connector as the HBase catalog, replacing the `hbase.xxx` properties as required:
+创建`etc/catalog/hbase.properties`，将HBase连接器挂载为HBase目录，并按需要替换`hbase.xxx`属性：
 
 ```properties
 connector.name=hbase-connector
@@ -31,17 +30,15 @@ hbase.metastore.type=local
 hbase.metastore.uri=/xxx/hbasemetastore.ini
 ```
 
-For the value of `hbase.zookeeper.quorum`, please use comma (`,`) as the delimiter if it has multiple ip addresses. 
+对于`hbase.zookeeper.quorum`的值，如果有多个IP地址，请使用逗号（`,`）作为分隔符。
 
-**Note**
+**注意**
 
-If you are using `Local File System`,  `HDFS` as Metastore, you need to create an empty file , such as `hbasemetastore.ini`. 
+如果使用`Local File System`和`HDFS`作为元存储，则需要创建一个空文件，如`hbasemetastore.ini`。
 
+**使用HDFS存储HBase元数据**
 
-
-**Use HDFS to store HBase metadata**
-
-You need to add below properties:
+需要添加以下属性：
 
 ```properties
 hbase.core.site.path=/xxx/core-site.xml
@@ -53,19 +50,15 @@ hbase.metastore.type=hdfs
 hbase.metastore.uri=hdfs://xxx.xxx.xxx.xxx:21088/xxx/hbasemetastore.ini
 ```
 
+**使用openLooKeng元存储来存储HBase元数据**
 
-
-**Use openLooKeng Metastore to store HBase metadata**
-
-You have to create `etc/hetu-metastore.properties` to connect database. For the details of configuration, please refer to [VDM](vdm.html) Connector. Adding below property to the configuration file:
+必须创建`etc/hetu-metastore.properties`来连接数据库。具体配置请参见[VDM](vdm.html)连接器。将以下属性添加到配置文件：
 
 ```properties
 hbase.metastore.type=hetuMetastore
 ```
 
-
-
-**Kerberos Configuration:**
+**Kerberos配置：**
 
 ```properties
 hbase.jaas.conf.path=/xxx/jaas.conf
@@ -81,88 +74,73 @@ hbase.kerberos.principal=xxx
 hbase.authentication.type=KERBEROS
 ```
 
+## 配置属性
 
+| 属性名称| 默认值| 是否必填| 说明|
+|----------|----------|----------|----------|
+| hbase.zookeeper.quorum| （无）| 是| ZooKeeper集群地址|
+| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口。|
+| hbase.client.retries.number| 3| 否| HBase客户端连接重试次数|
+| hbase.client.pause.time| 100| 否| HBase客户端断连时间|
+| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值。|
+| hbase.default.value| NULL| 否| 表中数据的默认值|
+| hbase.metastore.type| local| 否| HBase元数据的存储，可以从`local/hdfs/hetuMetastore`中选择一种|
+| hbase.metastore.uri| （无）| 是| 存储HBase元数据的文件路径|
+| hbase.core.site.path| （无）| 否| 连接HDFS的配置文件|
+| hbase.hdfs.site.path| （无）| 否| 连接HDFS的配置文件|
+| hbase.authentication.type| （无）| 否| HDFS/HBase组件访问安全身份验证方式|
+| hbase.kerberos.principal| （无）| 否| 安全身份验证的用户名|
+| hbase.kerberos.keytab| （无）| 否| 安全身份验证的密钥|
+| hbase.hbase.site.path| （无）| 否| 连接安全HBase集群的配置|
+| hbase.jaas.conf.path| （无）| 否| 安全身份验证的JAAS|
+| hbase.krb5.conf.path| （无）| 否| 安全身份验证的krb5|
 
-## Configuration Properties
+## 表属性
 
-| Property Name                       | Default Value | Required | Description                                                  |
-| ----------------------------------- | ------------- | -------- | ------------------------------------------------------------ |
-| hbase.zookeeper.quorum              | (none)        | Yes      | Zookeeper cluster address                                    |
-| hbase.zookeeper.property.clientPort | (none)        | Yes      | Zookeeper client port                                        |
-| hbase.client.retries.number         | 3             | No       | Retry times to connect to hbase client                       |
-| hbase.client.pause.time             | 100           | No       | HBase client disconnect time                                 |
-| hbase.rpc.protection.enable         | false         | No       | Communication privacy protection. You can get this from `hbase-site.xml`. |
-| hbase.default.value                 | NULL          | No       | The default value of data in table                           |
-| hbase.metastore.type                | local         | No       | The storage of hbase metadata, you can choose one of `local/hdfs/hetuMetastore` |
-| hbase.metastore.uri                 | (none)        | Yes      | File path for storing hbase metadata                         |
-| hbase.core.site.path                | (none)        | No       | Configuration file for connecting hdfs                       |
-| hbase.hdfs.site.path                | (none)        | No       | Configuration file for connecting hdfs                       |
-| hbase.authentication.type           | (none)        | No       | Access security authentication mode of hdfs/hbase component  |
-| hbase.kerberos.principal            | (none)        | No       | User name for security authentication                        |
-| hbase.kerberos.keytab               | (none)        | No       | Key for security authentication                              |
-| hbase.hbase.site.path               | (none)        | No       | Configuration used to connect to a secure hbase cluster      |
-| hbase.jaas.conf.path                | (none)        | No       | Jaas for security authentication                             |
-| hbase.krb5.conf.path                | (none)        | No       | Krb5 for security authentication                             |
+| 属性| 类型| 默认值| 是否必填| 说明|
+|----------|----------|----------|----------|----------|
+| column\_mapping| String| 同一个族中的所有列| 否| 指定表中列族与列限定符的映射关系。如果需要链接HBase数据源中的表，则column\_mapping信息必须与HBase数据源一致；如果创建一个HBase数据源中不存在的新表，则column\_mapping由用户指定。|
+| row\_id| String| 第一个列名| 否| row\_id为HBase表中RowKey对应的列名|
+| hbase\_table\_name| String| NULL| 否| hbase\_table\_name指定要链接的HBase数据源上的表空间和表名，使用“:”连接表空间和表名，默认表空间为“default”。|
+| external| Boolean| true| 否| 如果external为true，表示该表是HBase数据源中表的映射表。不支持删除HBase数据源上原有的表。当external为false时，删除本地HBase表的同时也会删除HBase数据源上的表。|
 
+## 数据说明
 
+目前支持10种数据类型：  VARCHAR、TINYINT、SMALLINT、INTEGER、BIGINT、DOUBLE、BOOLEAN、TIME、DATE和TIMESTAMP。
 
-## Table Properties
+## 下推
 
-| Property         | Type    | Default Value                  | Required | Description                                                  |
-| ---------------- | ------- | ------------------------------ | -------- | ------------------------------------------------------------ |
-| column_mapping   | String  | All columns in the same family | No       | Specify the mapping relationship between column families and column qualifiers in the table. If you need to link a table in the hbase data source, the column_mapping information must be consistent with the hbase data source; if you create a new table that does not exist on the hbase data source, the column_mapping is specified by the user. |
-| row_id           | String  | The first column name          | No       | row_id is the column name corresponding to rowkey in the hbase table |
-| hbase_table_name | String  | null                           | No       | hbase_table_name specifies the tablespace and table name on the hbase data source to be linked, use ":" connect tablespace and table name, the default tablespace is "default". |
-| external         | Boolean | true                           | No       | If external is true, it means that the table is a mapping table of the table in the hbase data source. It does not support deleting the original table on the hbase data source; if external is false, the table on hbase data source will be deleted at the same time as the local hbase table is deleted. |
+HBase连接器支持下推大部分运算符，如基于RowKey的点查询、基于RowKey的范围查询等。此外，还支持这些谓词条件以进行下推：`=`、`>=`、`>`、`<`、`<=`、`!=`、`in`、`not in`、`is null`、`is not null`、`between and`。
 
+## 使用示例
 
+HBase连接器基本上支持所有的SQL语句，包括创建、查询、删除模式，添加、删除、修改表，插入数据，删除行等。
 
-## Data Types
+以下是一些示例：
 
-Currently, following 10 data type are supported:  VARCHAR, TINYINT, SMALLINT, INTEGER, BIGINT, DOUBLE, BOOLEAN, TIME, DATE and TIMESTAMP.
-
-
-
-## Push Down
-
-The HBase Connector supports push down most of operators, such as rowkey-based point query, rowkey-based range query. Besides, those predicate conditions are supported to push down: `=`, `>=`, `>`, `<`, `<=`, `!=`, `in`, `not in`, `is null`, `is not null`, `between and`. 
-
-
-
-## Usage Examples
-
-The HBase Connector basically supports all SQL statements, includes creating, querying, and deleting schemas; Adding, dropping, and modifying tables; Inserting data, deleting rows and so on. 
-
-Here are some example:
-
-### Create Schema
+### 创建模式
 
 ```sql
 CREATE SCHEMA schemaName;
 ```
 
+### 删除模式
 
-
-### Drop Schema
-
-It can only drop empty schema. 
+只支持删除空模式。
 
 ```sql
 DROP SCHEMA schemaName;
 ```
 
+### 创建表
 
+HBase连接器支持两种建表形式：
 
-### Create Table
+1. 创建表并直接链接到HBase数据源中已存在的表。
 
-HBase Connector supports two forms of table creation: 
+2. 创建HBase数据源中不存在的新表。
 
-1. Create a table and directly link to a existing table in the HBase data source.
-
-2. Create a new table that does not exist in the HBase data source.
-
-
-Below is an example of how to create a table `schemaName.tableName` and link it to an existing table named `hbaseNamespace:hbaseTable` :
+以下示例创建表`schemaName.tableName`并链接到一个名为`hbaseNamespace:hbaseTable`的现有表：
 
 ```sql
 CREATE TABLE schemaName.tableName (
@@ -187,11 +165,11 @@ WITH (
 );
 ```
 
-**Note**
+**注意**
 
-If user specifies `hbase_table_name`, then the `schemaName` must be same as the namespace in `hbase_table_name` when creating a table. Otherwise, the creation will be failed. 
+如果用户指定了`hbase_table_name`，则创建表时，`schemaName`必须和`hbase_table_name`中的命名空间一致。否则将会创建失败。
 
-Example (**failure to create table**):
+示例（**建表失败**）：
 
 ```sql
 CREATE TABLE default.typeMapping (
@@ -205,31 +183,25 @@ WITH (
 );
 ```
 
-When creating a table to link with HBase cluster, you must ensure that the schema name in HBase connector and HBase data source are the same and achieve the same isolation level.
+创建连接HBase集群的表时，必须保证HBase连接器和HBase数据源中的模式名称一致，且达到相同的隔离级别。
 
-
-
-### Drop Table
+### 删除表
 
 ```sql
 DROP TABLE schemaName.tableName;
 ```
 
-
-
-### Rename Table
+### 重命名表
 
 ```sql
 ALTER TABLE schemaName.tableName RENAME TO schemaName.tableNameNew;
 ```
 
-**Note**
+**注意**
 
-*Currently, it does not support renaming the tables which are created through HBase.*
+*目前不支持对通过HBase创建的表进行重命名。*
 
-
-
-### Add Column
+### 添加列
 
 ```sql
 ALTER TABLE schemaName.tableName
@@ -237,13 +209,11 @@ ADD COLUMN column_name INTEGER
 WITH (family = 'f1', qualifier = 'q1');
 ```
 
-**Note**
+**注意**
 
-*Currently, deleting columns is not supported*
+*目前不支持删除列。*
 
-
-
-### Delete row/rows
+### 删除行
 
 ```sql
 DELETE FROM schemeName.tableName where rowId = xxx;
@@ -251,8 +221,6 @@ DELETE FROM schemeName.tableName where qualifier1 = xxx;
 DELETE FROM schemeName.tableName;
 ```
 
+## 限制
 
-
-## Limitations
-
-Statement `show tables` can only display the tables that the user has established the associations with HBase data source. Because HBase does not provide an interface to retrieve metadata of tables.
+语句`show tables`只能显示用户已与HBase数据源建立关联的表，因为HBase没有提供接口来检索表的元数据。
