@@ -19,6 +19,10 @@ import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
+import org.apache.carbondata.core.datastore.impl.FileFactory;
+import org.apache.carbondata.core.locks.CarbonLockUtil;
+import org.apache.carbondata.core.locks.ICarbonLock;
+import org.apache.carbondata.core.locks.LockUsage;
 import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
 import org.apache.carbondata.core.metadata.CarbonMetadata;
 import org.apache.carbondata.core.metadata.converter.SchemaConverter;
@@ -63,6 +67,7 @@ public class CarbondataMetadataUtils
         AtomicInteger valIndex = new AtomicInteger(0);
         TableSchemaBuilder schemaBuilder = new TableSchemaBuilder();
         List<StructField> partitionStructFields = new ArrayList<StructField>();
+        ICarbonLock metadataLock = null;
 
         columnHandles.forEach(col -> {
             if (partitionedBy.contains(col.getName())) {
@@ -130,6 +135,17 @@ public class CarbondataMetadataUtils
                 catch (PrestoException ex) {
                     throw new FolderAlreadyExistException(GENERIC_INTERNAL_ERROR, format("Folder is not empty %s", ex.getMessage()), ex);
                 }
+                AbsoluteTableIdentifier identifier = carbonTable.getAbsoluteTableIdentifier();
+                try {
+                    metadataLock = CarbonLockUtil.getLockObject(identifier, LockUsage.METADATA_LOCK);
+                }
+                catch (RuntimeException ex) {
+                    throw new FolderAlreadyExistException(GENERIC_INTERNAL_ERROR, format("Error in getting lock: %s", ex.getMessage()), ex);
+                }
+                //after acquiring lock check schemaFile exist to avoid simultaneous cases issues
+                if (FileFactory.isFileExist(schemaFilePath)) {
+                    throw new FolderAlreadyExistException(GENERIC_INTERNAL_ERROR, "Folder is not empty");
+                }
                 // inside metadata directory schema file is created
                 ThriftWriter thriftWriter = new ThriftWriter(schemaFilePath, false);
                 try {
@@ -148,6 +164,11 @@ public class CarbondataMetadataUtils
         }
         catch (IOException | InterruptedException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error while creating carbon Metadata %s", e.getMessage()), e);
+        }
+        finally {
+            if (null != metadataLock) {
+                CarbonLockUtil.fileUnlock(metadataLock, LockUsage.METADATA_LOCK);
+            }
         }
     }
 }

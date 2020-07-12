@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.spi.session.PropertyMetadata.enumProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -70,22 +69,7 @@ public class CarbondataTableProperties
                         value -> ImmutableList.copyOf(((Collection<?>) value).stream()
                                 .map(name -> ((String) name).toLowerCase(ENGLISH))
                                 .collect(Collectors.toList())),
-                        value -> value),
-                new PropertyMetadata<>(
-                        SORTED_BY_PROPERTY,
-                        "Bucket sorting columns",
-                        typeManager.getType(parseTypeSignature("array(varchar)")),
-                        List.class,
-                        ImmutableList.of(),
-                        false,
-                        value -> ((Collection<?>) value).stream()
-                                .map(String.class::cast)
-                                .map(CarbondataTableProperties::sortingColumnFromString)
-                                .collect(toImmutableList()),
-                        value -> ((Collection<?>) value).stream()
-                                .map(SortingColumn.class::cast)
-                                .map(CarbondataTableProperties::sortingColumnToString)
-                                .collect(toImmutableList())));
+                        value -> value));
     }
 
     @Override
@@ -114,7 +98,8 @@ public class CarbondataTableProperties
     @SuppressWarnings("unchecked")
     protected static List<SortingColumn> getSortedBy(Map<String, Object> tableProperties)
     {
-        return (List<SortingColumn>) tableProperties.get(SORTED_BY_PROPERTY);
+        List<SortingColumn> sortedBy = (List<SortingColumn>) tableProperties.get(SORTED_BY_PROPERTY);
+        return sortedBy == null ? ImmutableList.of() : ImmutableList.copyOf(sortedBy);
     }
 
     private static SortingColumn sortingColumnFromString(String name)
