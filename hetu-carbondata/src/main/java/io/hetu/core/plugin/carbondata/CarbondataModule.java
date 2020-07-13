@@ -134,7 +134,7 @@ public class CarbondataModule
                 .in(Scopes.SINGLETON);
 
         jsonCodecBinder(binder).bindJsonCodec(PartitionUpdate.class);
-
+        jsonCodecBinder(binder).bindJsonCodec(CarbondataSegmentInfoUtil.class);
         binder.bind(FileFormatDataSourceStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(FileFormatDataSourceStats.class)
                 .as(generatedNameOf(FileFormatDataSourceStats.class, connectorId));

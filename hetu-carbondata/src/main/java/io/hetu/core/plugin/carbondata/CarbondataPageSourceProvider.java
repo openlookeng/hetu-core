@@ -73,9 +73,8 @@ public class CarbondataPageSourceProvider
             ConnectorSession session, ConnectorSplit split, ConnectorTableHandle table,
             List<ColumnHandle> columns)
     {
-        HiveSplit hiveSplit = HiveSplitWrapper.getOnlyHiveSplit(split);
         HiveSplit carbonSplit =
-                Types.checkType(hiveSplit, HiveSplit.class, "split is not class HiveSplit");
+                Types.checkType(((HiveSplitWrapper) (split)).getSplits().get(0), HiveSplit.class, "split is not class HiveSplit");
         this.queryId = carbonSplit.getSchema().getProperty("queryId");
         if (this.queryId == null) {
             // Fall back to hive pagesource.

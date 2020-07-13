@@ -104,15 +104,15 @@ public class HivePageSink
 
     private final List<HiveWriter> writers = new ArrayList<>();
 
-    private final ConnectorSession session;
+    protected final ConnectorSession session;
 
     private long rows;
     private long writtenBytes;
     private long systemMemoryUsage;
     private long validationCpuNanos;
-    private final List<HiveColumnHandle> inputColumns;
+    protected final List<HiveColumnHandle> inputColumns;
     private final TypeManager typeManager;
-    private final HiveWritableTableHandle writableTableHandle;
+    protected final HiveWritableTableHandle writableTableHandle;
     private final ThreadLocal<Options> vacuumOptions = ThreadLocal.withInitial(() -> null);
     private VaccumOp vacuumOp;
 
@@ -394,7 +394,7 @@ public class HivePageSink
                 //Findout the minWriteId and maxWriteId for current compaction.
                 Options options = new Options(writerFactory.getConf()).maximumWriteId(-1).minimumWriteId(Long.MAX_VALUE);
                 HiveVacuumTableHandle vacuumTableHandle = (HiveVacuumTableHandle) writableTableHandle;
-                if (vacuumTableHandle.isFull()) {
+                if (vacuumTableHandle.isFullVacuum()) {
                     //Major compaction, need to write the base
                     options.writingBase(true);
                     Range range = getOnlyElement(vacuumTableHandle.getRanges());

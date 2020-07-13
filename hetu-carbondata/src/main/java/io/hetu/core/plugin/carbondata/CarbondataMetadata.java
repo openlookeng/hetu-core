@@ -69,14 +69,18 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
+import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import org.apache.carbondata.common.exceptions.sql.NoSuchMVException;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
+import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
+import org.apache.carbondata.core.datastore.impl.FileFactory;
 import org.apache.carbondata.core.index.Segment;
 import org.apache.carbondata.core.locks.CarbonLockFactory;
 import org.apache.carbondata.core.locks.CarbonLockUtil;
@@ -89,15 +93,20 @@ import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
 import org.apache.carbondata.core.mutate.CarbonUpdateUtil;
 import org.apache.carbondata.core.mutate.SegmentUpdateDetails;
 import org.apache.carbondata.core.statusmanager.LoadMetadataDetails;
+import org.apache.carbondata.core.statusmanager.SegmentStatus;
 import org.apache.carbondata.core.statusmanager.SegmentStatusManager;
 import org.apache.carbondata.core.statusmanager.SegmentUpdateStatusManager;
 import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.ThreadLocalSessionInfo;
+import org.apache.carbondata.core.util.path.CarbonTablePath;
 import org.apache.carbondata.hadoop.api.CarbonOutputCommitter;
 import org.apache.carbondata.hadoop.api.CarbonTableOutputFormat;
 import org.apache.carbondata.hive.MapredCarbonOutputFormat;
 import org.apache.carbondata.hive.util.HiveCarbonUtil;
+import org.apache.carbondata.processing.loading.TableProcessingOperations;
 import org.apache.carbondata.processing.loading.model.CarbonLoadModel;
+import org.apache.carbondata.processing.merger.CarbonDataMergerUtil;
+import org.apache.carbondata.processing.merger.CompactionType;
 import org.apache.carbondata.processing.util.CarbonLoaderUtil;
 import org.apache.carbondata.processing.util.TableOptionConstant;
 import org.apache.commons.lang3.StringUtils;
@@ -128,6 +137,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -168,6 +178,7 @@ public class CarbondataMetadata
     private final String serdeIsVisible = "isVisible";
     private final String serdeSerializationFormat = "serialization.format";
     private final String serdeDbName = "dbname";
+    private final JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec;
 
     private OutputCommitter carbonOutputCommitter;
     private JobContextImpl jobContext;
@@ -186,11 +197,17 @@ public class CarbondataMetadata
     private String carbondataTableStore;
     private ICarbonLock carbonDropTableLock;
     private String schemaName;
+    private String compactionType;
+    private long minorVacuumSegCount;
+    private long majorVacuumSegSize;
+    private List<Segment> segmentFilesToBeUpdatedLatest = new ArrayList<>();
+    private List<LoadMetadataDetails> segmentsMerged = new ArrayList<>();
 
     private enum State {
         INSERT,
         UPDATE,
         DELETE,
+        VACUUM,
         CREATE_TABLE,
         CREATE_TABLE_AS,
         DROP_TABLE,
@@ -203,9 +220,10 @@ public class CarbondataMetadata
                               boolean createsOfNonManagedTablesEnabled, boolean tableCreatesWithLocationAllowed,
                               TypeManager typeManager, LocationService locationService,
                               JsonCodec<PartitionUpdate> partitionUpdateCodec,
+                              JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
                               TypeTranslator typeTranslator, String hetuVersion,
                               HiveStatisticsProvider hiveStatisticsProvider, AccessControlMetadata accessControlMetadata,
-                              CarbondataTableReader carbondataTableReader, String carbondataTableStore)
+                              CarbondataTableReader carbondataTableReader, String carbondataTableStore, long carbondataMajorVacuumSegSize, long carbondataMinorVacuumSegCount)
     {
         super(metastore, hdfsEnvironment, partitionManager, timeZone, allowCorruptWritesForTesting,
                 writesToNonManagedTablesEnabled, createsOfNonManagedTablesEnabled, tableCreatesWithLocationAllowed,
@@ -217,6 +235,9 @@ public class CarbondataMetadata
         this.carbonDropTableLock = null;
         this.schemaName = null;
         this.tableStorageLocation = Optional.empty();
+        this.majorVacuumSegSize = carbondataMajorVacuumSegSize;
+        this.minorVacuumSegCount = carbondataMinorVacuumSegCount;
+        this.segmentInfoCodec = requireNonNull(segmentInfoCodec, "segmentInfoCodec is null");
     }
 
     private void setupCommitWriter(Optional<Table> table, Path outputPath, Configuration initialConfiguration, boolean isOverwrite)
@@ -227,7 +248,7 @@ public class CarbondataMetadata
 
     private void setupCommitWriter(Properties hiveSchema, Path outputPath, Configuration initialConfiguration, boolean isOverwrite) throws PrestoException
     {
-        CarbonLoadModel carbonLoadModel = null;
+        CarbonLoadModel carbonLoadModel;
         TaskAttemptID taskAttemptID = TaskAttemptID.forName(initialConfiguration.get("mapred.task.id"));
         try {
             ThreadLocalSessionInfo.setConfigurationToCurrentThread(initialConfiguration);
@@ -318,9 +339,9 @@ public class CarbondataMetadata
 
     @Override
     public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session,
-                                                          ConnectorInsertTableHandle insertHandle,
-                                                          Collection<Slice> fragments,
-                                                          Collection<ComputedStatistics> computedStatistics)
+            ConnectorInsertTableHandle insertHandle,
+            Collection<Slice> fragments,
+            Collection<ComputedStatistics> computedStatistics)
     {
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
                 super.finishInsert(session, insertHandle, fragments, computedStatistics);
@@ -354,7 +375,7 @@ public class CarbondataMetadata
                     parent.getTableName(),
                     schema,
                     initialConfiguration);
-            takeLocksForUpdateAndDelete();
+            takeLocks(currentState);
             try {
                 CarbonUpdateUtil.cleanUpDeltaFiles(carbonTable, false);
             }
@@ -399,7 +420,7 @@ public class CarbondataMetadata
                     parent.getTableName(),
                     schema,
                     initialConfiguration);
-            takeLocksForUpdateAndDelete();
+            takeLocks(currentState);
             try {
                 CarbonUpdateUtil.cleanUpDeltaFiles(carbonTable, false);
             }
@@ -445,6 +466,153 @@ public class CarbondataMetadata
                 deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false);
 
         return finishUpdateAndDelete(session, insertTableHandle, fragments, computedStatistics);
+    }
+
+    @Override
+    public CarbondataVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition) throws PrestoException
+    {
+        // Not calling carbondata's beginInsert as no need to setup committer job, just get the table handle and locks
+        currentState = State.VACUUM;
+        HiveInsertTableHandle insertTableHandle = super.beginInsert(session, tableHandle);
+        return hdfsEnvironment.doAs(session.getUser(), () -> {
+            SchemaTableName tableName = insertTableHandle.getSchemaTableName();
+            Optional<Table> table =
+                    this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+            this.table = table;
+
+            // Fill this conf here and use it in finishVacuum also
+            initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment
+                    .getConfiguration(
+                            new HdfsEnvironment.HdfsContext(session, insertTableHandle.getSchemaName(),
+                                    insertTableHandle.getTableName()),
+                            new Path(insertTableHandle.getLocationHandle().getJsonSerializableWritePath())));
+            Properties hiveSchema = MetastoreUtil.getHiveSchema(table.get());
+            this.carbonTable = getCarbonTable(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
+                    hiveSchema, initialConfiguration);
+            try {
+                takeLocks(currentState);
+                carbonLoadModel = HiveCarbonUtil.getCarbonLoadModel(hiveSchema, initialConfiguration);
+                CarbonTableOutputFormat.setLoadModel(initialConfiguration, carbonLoadModel);
+            }
+            catch (IOException ex) {
+                releaseLocks();
+                LOG.error("Error while creating carbon load model", ex);
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while creating carbon load model", ex);
+            }
+
+            try {
+                //cleaning the stale delta files
+                CarbonUpdateUtil.cleanUpDeltaFiles(carbonTable, false);
+            }
+            catch (IOException ex) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while cleaning up delta files", ex);
+            }
+
+            return new CarbondataVacuumTableHandle(insertTableHandle.getSchemaName(),
+                    insertTableHandle.getTableName(),
+                    insertTableHandle.getInputColumns(),
+                    insertTableHandle.getPageSinkMetadata(),
+                    insertTableHandle.getLocationHandle(),
+                    insertTableHandle.getBucketProperty(),
+                    insertTableHandle.getTableStorageFormat(),
+                    insertTableHandle.getPartitionStorageFormat(),
+                    full,
+                    ImmutableMap.<String, String>of(CarbondataConstants.EncodedLoadModel, initialConfiguration.get(LOAD_MODEL),
+                    CarbondataConstants.TxnBeginTimeStamp, timeStamp.toString()));
+        });
+    }
+
+    @Override
+    public Optional<ConnectorOutputMetadata> finishVacuum(ConnectorSession session, ConnectorVacuumTableHandle handle,
+             Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    {
+        List<PartitionUpdate> partitionUpdates = new ArrayList<>();
+        CarbondataVacuumTableHandle carbondataVacuumTableHandle = (CarbondataVacuumTableHandle) handle;
+
+        return hdfsEnvironment.doAs(session.getUser(), () -> {
+            Properties hiveSchema = MetastoreUtil.getHiveSchema(this.table.get());
+            CarbonTable carbonTable = getCarbonTable(carbondataVacuumTableHandle.getSchemaName(),
+                    carbondataVacuumTableHandle.getTableName(),
+                    hiveSchema,
+                    initialConfiguration);
+
+            compactionType = carbondataVacuumTableHandle.isFullVacuum() ? CarbondataConstants.MajorCompaction : CarbondataConstants.MinorCompaction;
+
+            //get the codec here and unpack
+            List<CarbondataSegmentInfoUtil> mergedSegmentInfoUtilList = fragments.stream()
+                    .map(Slice::getBytes)
+                    .map(segmentInfoCodec::fromJson)
+                    .collect(toList());
+
+            Set<String> segmentIdSet = new HashSet<>();
+            for (CarbondataSegmentInfoUtil segment : mergedSegmentInfoUtilList) {
+                segmentIdSet.addAll(segment.getSourceSegmentIdSet());
+            }
+
+            Set<String> segmentNameSet = new HashSet<>();
+            for (String segmentId : segmentIdSet) {
+                segmentNameSet.add(Segment.getSegment(segmentId, (LoadMetadataDetails[]) carbonLoadModel
+                        .getLoadMetadataDetails().toArray())
+                        .getSegmentFileName());
+            }
+
+            for (LoadMetadataDetails load : carbonLoadModel.getLoadMetadataDetails()) {
+                if (load.isCarbonFormat() && load.getSegmentStatus() == SegmentStatus.SUCCESS
+                        && loadIsMergedInWorker(load.getSegmentFile(), segmentNameSet)) {
+                    segmentsMerged.add(load);
+                }
+            }
+
+            if (this.carbonTable.isHivePartitionTable()) {
+                List<String> partitionNames = partitionUpdates
+                        .stream()
+                        .map(PartitionUpdate::getName).collect(toList());
+                String readPath = CarbonTablePath.getSegmentFilesLocation(carbonLoadModel.getTablePath() +
+                        CarbonCommonConstants.FILE_SEPARATOR + carbonLoadModel.getSegmentId() + "_" + carbonLoadModel.getFactTimeStamp() + ".tmp");
+                String segmentFileName = SegmentFileStore.genSegmentFileName(carbonLoadModel.getSegmentId(), String.valueOf(timeStamp));
+
+                try {
+                    SegmentFileStore.mergeSegmentFiles(readPath, segmentFileName, CarbonTablePath.getSegmentFilesLocation(carbonLoadModel.getTablePath()));
+                    String source;
+                    for (String currPartitionName : partitionNames) {
+                        source = carbonTable.getTablePath() + "/" + currPartitionName;
+                        moveFromTempFolder(source + "/" + carbonLoadModel.getSegmentId() + "_" + timeStamp + ".tmp", source);
+                    }
+                    segmentFilesToBeUpdatedLatest.add(new Segment(carbonLoadModel.getSegmentId(), segmentFileName));
+                }
+                catch (IOException e) {
+                    throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while merging segment files", e);
+                }
+                segmentFileName = segmentFileName + CarbonTablePath.SEGMENT_EXT;
+            }
+            else {
+                for (CarbondataSegmentInfoUtil segmentInfo : mergedSegmentInfoUtilList) {
+                    String mergedLoadNumber = segmentInfo.getDestinationSegment();
+                    try {
+                        String segmentFileName = SegmentFileStore.writeSegmentFile(carbonTable, mergedLoadNumber, String.valueOf(carbonLoadModel.getFactTimeStamp()));
+                    }
+                    catch (IOException e) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while merging segment files", e);
+                    }
+                }
+            }
+            return Optional.empty();
+        });
+    }
+
+    private boolean loadIsMergedInWorker(String loadName, Set<String> mergedSegmentNames)
+    {
+        return mergedSegmentNames.contains(loadName);
+    }
+
+    private void moveFromTempFolder(String source, String dest)
+    {
+        CarbonFile oldFolder = FileFactory.getCarbonFile(source);
+        CarbonFile[] oldFiles = oldFolder.listFiles();
+        for (CarbonFile file : oldFiles) {
+            file.renameForce(dest + CarbonCommonConstants.FILE_SEPARATOR + file.getName());
+        }
+        oldFolder.delete();
     }
 
     @Override
@@ -523,6 +691,19 @@ public class CarbondataMetadata
                     hdfsEnvironment.doAs(user, () -> {
                         if (carbonTable != null) {
                             CarbonUpdateUtil.cleanStaleDeltaFiles(carbonTable, timeStamp.toString());
+                        }
+                    });
+                    break;
+                }
+                case VACUUM: {
+                    hdfsEnvironment.doAs(user, () -> {
+                        if (carbonTable != null) {
+                            try {
+                                TableProcessingOperations.deletePartialLoadDataIfExist(carbonTable, true);
+                            }
+                            catch (IOException e) {
+                                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("carbondata Vacuum Rollback failed: %s", e.getMessage()), e);
+                            }
                         }
                     });
                     break;
@@ -680,6 +861,13 @@ public class CarbondataMetadata
                     hdfsEnvironment.doAs(user, () -> {
                         commitUpdateAndDelete();
                         return true; //added return to avoid compilation issue
+                    });
+                    super.commit();
+                    break;
+                }
+                case VACUUM: {
+                    hdfsEnvironment.doAs(user, () -> {
+                        commitVacuum();
                     });
                     super.commit();
                     break;
@@ -932,32 +1120,74 @@ public class CarbondataMetadata
                 .getAbsoluteTableIdentifier(), LockUsage.COMPACTION_LOCK);
         updateLock = CarbonLockFactory.getCarbonLockObj(carbonTable
                 .getAbsoluteTableIdentifier(), LockUsage.UPDATE_LOCK);
+        carbonDropTableLock = CarbonLockFactory.getCarbonLockObj(carbonTable
+                .getAbsoluteTableIdentifier(), LockUsage.DROP_TABLE_LOCK);
     }
 
-    private void takeLocksForUpdateAndDelete()
+    private void takeLocks(State state) throws PrestoException
     {
         initLocksForCurrentTable();
         try {
-            boolean lockStatus = metadataLock.lockWithRetries();
-            if (lockStatus) {
-                LOG.info("Successfully able to get the table metadata file lock");
-            }
-            else {
-                throw new Exception("Table is locked for updation. Please try after some time");
-            }
-
-            if (updateLock.lockWithRetries() &&
-                    compactionLock.lockWithRetries()) {
-                LOG.info("Successfully able to get update and compaction locks");
-            }
-            else {
-                throw new RuntimeException("Unable to get update and compaction locks");
+            switch (state) {
+                case UPDATE:
+                case DELETE: {
+                    takeMetadataLock();
+                    takeUpdateCompactionLock();
+                    break;
+                }
+                case DROP_TABLE: {
+                    takeDropTableLock();
+                    break;
+                }
+                case VACUUM: {
+                    takeUpdateCompactionLock();
+                    break;
+                }
+                default: {
+                    LOG.error("Should not take locks for " + state + " state.");
+                    throw new PrestoException(GENERIC_INTERNAL_ERROR, "Should not take locks in " + state + " state");
+                }
             }
         }
         catch (Exception e) {
-            LOG.error("Exception in update operation", e);
+            LOG.error("Exception in " + state + " operation.", e);
             releaseLocks();
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while taking locks", e);
+        }
+    }
+
+    private void takeMetadataLock() throws RuntimeException
+    {
+        boolean lockStatus = metadataLock.lockWithRetries();
+        if (lockStatus) {
+            LOG.info("Successfully able to get the table metadata file lock");
+        }
+        else {
+            throw new RuntimeException("Unable to get metadata lock. Please try after some time");
+        }
+    }
+
+    private void takeDropTableLock() throws RuntimeException
+    {
+        //first take metadata lock and then take drop table lock
+        takeMetadataLock();
+        boolean lockStatus = carbonDropTableLock.lockWithRetries();
+        if (lockStatus) {
+            LOG.info("Successfully able to get the drop table lock");
+        }
+        else {
+            throw new RuntimeException("Unable to get Drop Table lock. Please try after some time");
+        }
+    }
+
+    private void takeUpdateCompactionLock() throws RuntimeException
+    {
+        if (updateLock.lockWithRetries() &&
+                compactionLock.lockWithRetries()) {
+            LOG.info("Successfully able to get update and compaction locks");
+        }
+        else {
+            throw new RuntimeException("Unable to get update and compaction locks");
         }
     }
 
@@ -1147,10 +1377,8 @@ public class CarbondataMetadata
                 schema.setProperty("tablePath", this.tableStorageLocation.get());
                 this.carbonTable = getCarbonTable(handle.getSchemaName(), handle.getTableName(),
                         schema, initialConfiguration);
-
+                takeLocks(State.DROP_TABLE);
                 AbsoluteTableIdentifier identifier = this.carbonTable.getAbsoluteTableIdentifier();
-                this.metadataLock = CarbonLockUtil.getLockObject(identifier, LockUsage.METADATA_LOCK);
-                this.carbonDropTableLock = CarbonLockUtil.getLockObject(identifier, LockUsage.DROP_TABLE_LOCK);
                 if (SegmentStatusManager.isLoadInProgressInTable(carbonTable)) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, "Table insert or overwrite in Progress");
                 }
@@ -1195,5 +1423,39 @@ public class CarbondataMetadata
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error in write segment ", e);
             }
         });
+    }
+
+    private void commitVacuum() throws PrestoException
+    {
+        try {
+            if (segmentsMerged.size() != 0) {
+                /*
+                * this conditional check ensures that if two vacuums are called one after the other,
+                * the second one will not throw any exception and just fall through
+                * */
+                String mergedLoadNumber = CarbonDataMergerUtil.getMergedLoadName(segmentsMerged).split("_")[1];
+                String segmentFileName = SegmentFileStore.writeSegmentFile(
+                        carbonTable,
+                        mergedLoadNumber,
+                        String.valueOf(carbonLoadModel.getFactTimeStamp()));
+
+                boolean updateMergeStatus = CarbonDataMergerUtil.updateLoadMetadataWithMergeStatus(
+                        segmentsMerged,
+                        carbonTable.getMetadataPath(),
+                        mergedLoadNumber,
+                        carbonLoadModel,
+                        compactionType.equals(CarbondataConstants.MajorCompaction) ? CompactionType.MAJOR : CompactionType.MINOR,
+                        segmentFileName,
+                        null);
+
+                if (!updateMergeStatus) {
+                    throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error in updating load metadata with merge status");
+                }
+            }
+        }
+        catch (IOException | NoSuchMVException e) {
+            LOG.error("Error in updating table status file after compaction");
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error in updating table status file after compaction");
+        }
     }
 }
