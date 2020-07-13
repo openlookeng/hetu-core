@@ -46,8 +46,8 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static io.prestosql.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
-public class FloatColumnReader
-        implements ColumnReader
+public class FloatColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(FloatColumnReader.class).instanceSize();
 

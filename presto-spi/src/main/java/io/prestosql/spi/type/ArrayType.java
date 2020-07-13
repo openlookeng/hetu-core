@@ -31,19 +31,19 @@ import static io.prestosql.spi.type.TypeUtils.hashPosition;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
-public class ArrayType
+public class ArrayType<T extends Type>
         extends AbstractType
 {
-    private final Type elementType;
+    private final T elementType;
     public static final String ARRAY_NULL_ELEMENT_MSG = "ARRAY comparison not supported for arrays with null elements";
 
-    public ArrayType(Type elementType)
+    public ArrayType(T elementType)
     {
         super(new TypeSignature(ARRAY, TypeSignatureParameter.of(elementType.getTypeSignature())), Block.class);
         this.elementType = requireNonNull(elementType, "elementType is null");
     }
 
-    public Type getElementType()
+    public T getElementType()
     {
         return elementType;
     }
@@ -61,7 +61,7 @@ public class ArrayType
     }
 
     @Override
-    public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
+    public <T> boolean equalTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
     {
         Block leftArray = leftBlock.getObject(leftPosition, Block.class);
         Block rightArray = rightBlock.getObject(rightPosition, Block.class);
@@ -93,7 +93,7 @@ public class ArrayType
     }
 
     @Override
-    public int compareTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
+    public <T> int compareTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
     {
         if (!elementType.isOrderable()) {
             throw new UnsupportedOperationException(getTypeSignature() + " type is not orderable");
@@ -122,7 +122,7 @@ public class ArrayType
     }
 
     @Override
-    public Object getObjectValue(ConnectorSession session, Block block, int position)
+    public <T> Object getObjectValue(ConnectorSession session, Block<T> block, int position)
     {
         if (block.isNull(position)) {
             return null;
@@ -178,7 +178,7 @@ public class ArrayType
     }
 
     @Override
-    public Block getObject(Block block, int position)
+    public <T> Block getObject(Block<T> block, int position)
     {
         return block.getObject(position, Block.class);
     }

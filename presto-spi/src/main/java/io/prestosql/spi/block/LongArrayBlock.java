@@ -13,6 +13,7 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -28,15 +29,18 @@ import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 import static java.lang.Math.toIntExact;
 
 public class LongArrayBlock
-        implements Block
+        implements Block<Long>
 {
+    //can we add block index to speed up operations?
+    //statistics?
+    //can we intro operations at block level?, for example join of blocks?
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongArrayBlock.class).instanceSize();
 
     private final int arrayOffset;
     private final int positionCount;
     @Nullable
     private final boolean[] valueIsNull;
-    private final long[] values;
+    private final long[] values; //change to use offheap --> accessible by RDMA
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
@@ -124,6 +128,11 @@ public class LongArrayBlock
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
+        return values[position + arrayOffset];
+    }
+
+    public Long get(int position)
+    {
         return values[position + arrayOffset];
     }
 
@@ -269,5 +278,14 @@ public class LongArrayBlock
         if (position < 0 || position >= getPositionCount()) {
             throw new IllegalArgumentException("position is not valid");
         }
+    }
+
+    @Override
+    public boolean[] filter(BloomFilter filter, boolean[] validPositions)
+    {
+        for (int i = 0; i < values.length; i++) {
+            validPositions[i] = validPositions[i] && filter.test(values[i]);
+        }
+        return validPositions;
     }
 }

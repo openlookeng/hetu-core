@@ -489,8 +489,11 @@ public class PredicatePushDown
                 }
             }
 
+            //extract expression to be pushed down to tablescan and leverage dynamic filter for filtering
             DynamicFiltersResult dynamicFiltersResult = createDynamicFilters(node, equiJoinClauses, session, idAllocator);
             Map<String, Symbol> dynamicFilters = dynamicFiltersResult.getDynamicFilters();
+
+            //the result leftPredicate will have the dynamic filter predicate 'AND' to it.
             leftPredicate = combineConjuncts(leftPredicate, combineConjuncts(dynamicFiltersResult.getPredicates()));
 
             PlanNode leftSource;

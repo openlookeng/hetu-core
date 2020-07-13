@@ -244,7 +244,7 @@ public final class TestingOrcPredicate
             HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
             if (bloomFilter != null) {
                 for (Double value : chunk) {
-                    if (value != null && !bloomFilter.testDouble(value)) {
+                    if (value != null && !bloomFilter.test(value)) {
                         return false;
                     }
                 }
@@ -335,7 +335,7 @@ public final class TestingOrcPredicate
                 HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
                 if (testBloomFilter && bloomFilter != null) {
                     for (Long value : chunk) {
-                        if (value != null && !bloomFilter.testLong(value)) {
+                        if (value != null && !bloomFilter.test(value)) {
                             return false;
                         }
                     }
@@ -375,7 +375,7 @@ public final class TestingOrcPredicate
             HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
             if (bloomFilter != null) {
                 for (Slice slice : slices) {
-                    if (!bloomFilter.testSlice(slice)) {
+                    if (!bloomFilter.test(slice)) {
                         return false;
                     }
                 }
@@ -512,7 +512,7 @@ public final class TestingOrcPredicate
                     HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
                     if (bloomFilter != null) {
                         for (Long value : chunk) {
-                            if (value != null && !bloomFilter.testLong(value)) {
+                            if (value != null && !bloomFilter.test(value)) {
                                 return false;
                             }
                         }

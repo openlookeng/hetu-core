@@ -32,7 +32,7 @@ public class ListEncoding
     }
 
     @Override
-    public void encodeValueInto(int depth, Block block, int position, SliceOutput output)
+    public <T> void encodeValueInto(int depth, Block<T> block, int position, SliceOutput output)
             throws RcFileCorruptionException
     {
         byte separator = getSeparator(depth);

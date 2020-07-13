@@ -16,8 +16,8 @@ package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
 
-public abstract class AbstractSingleRowBlock
-        implements Block
+public abstract class AbstractSingleRowBlock<T>
+        implements Block<T>
 {
     protected final int rowIndex;
 
@@ -137,7 +137,7 @@ public abstract class AbstractSingleRowBlock
     public <T> T getObject(int position, Class<T> clazz)
     {
         checkFieldIndex(position);
-        return getRawFieldBlock(position).getObject(rowIndex, clazz);
+        return (T) getRawFieldBlock(position).getObject(rowIndex, clazz);
     }
 
     @Override

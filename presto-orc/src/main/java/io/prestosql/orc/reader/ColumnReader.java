@@ -21,9 +21,9 @@ import io.prestosql.spi.block.Block;
 import java.io.IOException;
 import java.time.ZoneId;
 
-public interface ColumnReader
+public interface ColumnReader<T>
 {
-    Block readBlock()
+    Block<T> readBlock()
             throws IOException;
 
     void prepareNextRead(int batchSize);

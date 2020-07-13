@@ -52,8 +52,8 @@ import static java.lang.Math.toIntExact;
 import static java.util.Arrays.fill;
 import static java.util.Objects.requireNonNull;
 
-public class SliceDictionaryColumnReader
-        implements ColumnReader
+public class SliceDictionaryColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceDictionaryColumnReader.class).instanceSize();
 

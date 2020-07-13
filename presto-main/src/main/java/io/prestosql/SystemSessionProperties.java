@@ -38,6 +38,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
 import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.dataSizeProperty;
+import static io.prestosql.spi.session.PropertyMetadata.doubleProperty;
 import static io.prestosql.spi.session.PropertyMetadata.durationProperty;
 import static io.prestosql.spi.session.PropertyMetadata.enumProperty;
 import static io.prestosql.spi.session.PropertyMetadata.integerProperty;
@@ -137,6 +138,7 @@ public final class SystemSessionProperties
     public static final String DYNAMIC_FILTERING_WAIT_TIME = "dynamic_filtering_wait_time";
     public static final String DYNAMIC_FILTERING_DATA_TYPE = "dynamic_filtering_data_type";
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE = "dynamic_filtering_max_per_driver_size";
+    public static final String DYNAMIC_FILTERING_BLOOM_FILTER_FPP = "dynamic_filtering_bloom_filter_fpp";
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
     public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
 
@@ -610,19 +612,24 @@ public final class SystemSessionProperties
                         false),
                 integerProperty(
                         DYNAMIC_FILTERING_MAX_PER_DRIVER_VALUE_COUNT,
-                        "Experimental: maximum number of build-side rows to be collected for dynamic filtering per-driver",
+                        "Maximum number of build-side rows to be collected for dynamic filtering per-driver",
                         featuresConfig.getDynamicFilteringMaxPerDriverRowCount(),
                         false),
                 enumProperty(
                         DYNAMIC_FILTERING_DATA_TYPE,
-                        "Experimental: Data structure for choosing the datastructure of the dynamic filter (0 for BloomFilter, 1 for HashSet)",
+                        "Data type for the dynamic filter (BLOOM_FILTER or HASHSET)",
                         DynamicFilterDataType.class,
                         featuresConfig.getDynamicFilteringDataType(),
                         false),
                 dataSizeProperty(
                         DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE,
-                        "Experimental: maximum number of bytes to be collected for dynamic filtering per-driver",
+                        "Maximum number of bytes to be collected for dynamic filtering per-driver",
                         featuresConfig.getDynamicFilteringMaxPerDriverSize(),
+                        false),
+                doubleProperty(
+                        DYNAMIC_FILTERING_BLOOM_FILTER_FPP,
+                        "Expected FPP for BloomFilter which is used in dynamic filtering",
+                        featuresConfig.getDynamicFilteringBloomFilterFpp(),
                         false),
                 booleanProperty(
                         ENABLE_EXECUTION_PLAN_CACHE,
@@ -1105,6 +1112,11 @@ public final class SystemSessionProperties
     public static Duration getDynamicFilteringWaitTime(Session session)
     {
         return session.getSystemProperty(DYNAMIC_FILTERING_WAIT_TIME, Duration.class);
+    }
+
+    public static double getDynamicFilteringBloomFilterFpp(Session session)
+    {
+        return session.getSystemProperty(DYNAMIC_FILTERING_BLOOM_FILTER_FPP, Double.class);
     }
 
     public static boolean isExecutionPlanCacheEnabled(Session session)

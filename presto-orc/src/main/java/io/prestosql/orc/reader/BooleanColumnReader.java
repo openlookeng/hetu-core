@@ -47,7 +47,7 @@ import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.util.Objects.requireNonNull;
 
 public class BooleanColumnReader
-        implements ColumnReader
+        implements ColumnReader<Boolean>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(BooleanColumnReader.class).instanceSize();
 

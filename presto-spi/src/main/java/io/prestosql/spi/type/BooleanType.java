@@ -22,7 +22,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 
-public final class BooleanType
+public class BooleanType
         extends AbstractType
         implements FixedWidthType
 {

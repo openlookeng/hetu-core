@@ -20,9 +20,9 @@ import java.util.function.BiConsumer;
 
 import static java.lang.String.format;
 
-public class SingleArrayBlockWriter
-        extends AbstractSingleArrayBlock
-        implements BlockBuilder
+public class SingleArrayBlockWriter<T>
+        extends AbstractSingleArrayBlock<T>
+        implements BlockBuilder<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleArrayBlockWriter.class).instanceSize();
 

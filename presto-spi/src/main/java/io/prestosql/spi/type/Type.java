@@ -19,6 +19,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.List;
 import java.util.Optional;
@@ -75,11 +76,22 @@ public interface Type
     BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries);
 
     /**
+     * Returns the value in the block with the proper type
+     * @param <T>
+     * @return
+     */
+    default <T> T get(Block<T> block, int position)
+    {
+        //FIXME: KEN: we shouldn't need to pass in the position most of the time
+        return block.get(position);
+    }
+
+    /**
      * Gets an object representation of the type value in the {@code block}
      * {@code position}. This is the value returned to the user via the
      * REST endpoint and therefore must be JSON serializable.
      */
-    Object getObjectValue(ConnectorSession session, Block block, int position);
+    <T> Object getObjectValue(ConnectorSession session, Block<T> block, int position);
 
     /**
      * Gets the value at the {@code block} {@code position} as a boolean.
@@ -104,7 +116,7 @@ public interface Type
     /**
      * Gets the value at the {@code block} {@code position} as an Object.
      */
-    Object getObject(Block block, int position);
+    <T> Object getObject(Block<T> block, int position);
 
     /**
      * Writes the boolean value into the {@code BlockBuilder}.
@@ -144,22 +156,22 @@ public interface Type
     /**
      * Are the values in the specified blocks at the specified positions equal?
      * <p>
-     * This method assumes input is not null.
+     *. This method assumes input is not null.
      */
-    boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition);
+    <T> boolean equalTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition);
 
     /**
      * Calculates the hash code of the value at the specified position in the
      * specified block.
      */
-    long hash(Block block, int position);
+    <T> long hash(Block<T> block, int position);
 
     /**
      * Compare the values in the specified block at the specified positions.
      *
      * @return 0 if the values are equal, negative if left is less than right, and positive, otherwise.
      */
-    int compareTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition);
+    <T> int compareTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition);
 
     /**
      * Return the range of possible values for this type, if available.
@@ -191,5 +203,15 @@ public interface Type
         {
             return max;
         }
+    }
+
+    default <T> T read(RawInput<T> input)
+    {
+        throw new NotImplementedException();
+    }
+
+    default <T> void write(BlockBuilder<T> blockBuilder, T value)
+    {
+        throw new NotImplementedException();
     }
 }

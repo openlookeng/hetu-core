@@ -255,7 +255,7 @@ public class TestDynamicFilterSourceOperator
         StateSet states = ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key));
         for (Object bfSerialized : states.getAll()) {
             BloomFilterDynamicFilter bfdf = new BloomFilterDynamicFilter(filterId, null, (byte[]) bfSerialized, DynamicFilter.Type.GLOBAL);
-            assertEquals(bfdf.contains("101"), true);
+            assertEquals(bfdf.contains(101L), true);
             assertEquals(bfdf.getSize(), 6);
         }
         assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils

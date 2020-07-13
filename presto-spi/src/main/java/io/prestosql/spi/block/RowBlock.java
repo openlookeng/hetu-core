@@ -24,8 +24,8 @@ import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class RowBlock
-        extends AbstractRowBlock
+public class RowBlock<T>
+        extends AbstractRowBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(RowBlock.class).instanceSize();
 
@@ -34,7 +34,7 @@ public class RowBlock
 
     private final boolean[] rowIsNull;
     private final int[] fieldBlockOffsets;
-    private final Block[] fieldBlocks;
+    private final Block<T>[] fieldBlocks;
 
     private volatile long sizeInBytes;
     private final long retainedSizeInBytes;
@@ -42,7 +42,7 @@ public class RowBlock
     /**
      * Create a row block directly from columnar nulls and field blocks.
      */
-    public static Block fromFieldBlocks(int positionCount, Optional<boolean[]> rowIsNull, Block[] fieldBlocks)
+    public static <T> Block<T> fromFieldBlocks(int positionCount, Optional<boolean[]> rowIsNull, Block<T>[] fieldBlocks)
     {
         int[] fieldBlockOffsets = new int[positionCount + 1];
         for (int position = 0; position < positionCount; position++) {

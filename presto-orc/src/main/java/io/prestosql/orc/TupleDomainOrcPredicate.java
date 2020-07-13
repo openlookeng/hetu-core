@@ -155,19 +155,19 @@ public class TupleDomainOrcPredicate
     public static boolean checkInBloomFilter(HashableBloomFilter bloomFilter, Object predicateValue, Type sqlType)
     {
         if (sqlType == TINYINT || sqlType == SMALLINT || sqlType == INTEGER || sqlType == BIGINT || sqlType == DATE || sqlType == TIMESTAMP) {
-            return bloomFilter.testLong(((Number) predicateValue).longValue());
+            return bloomFilter.test(((Number) predicateValue).longValue());
         }
 
         if (sqlType == DOUBLE) {
-            return bloomFilter.testDouble((Double) predicateValue);
+            return bloomFilter.test((Double) predicateValue);
         }
 
         if (sqlType == REAL) {
-            return bloomFilter.testFloat(intBitsToFloat(((Number) predicateValue).intValue()));
+            return bloomFilter.test(intBitsToFloat(((Number) predicateValue).intValue()));
         }
 
         if (sqlType instanceof VarcharType || sqlType instanceof VarbinaryType) {
-            return bloomFilter.testSlice(((Slice) predicateValue));
+            return bloomFilter.test(((Slice) predicateValue));
         }
 
         // todo support DECIMAL, and CHAR

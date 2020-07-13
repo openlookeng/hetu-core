@@ -37,7 +37,7 @@ import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingConnectorSession;
-import io.prestosql.tests.AbstractTestJoinQueries;
+import io.prestosql.tests.AbstractTestQueryFramework;
 import io.prestosql.tests.DistributedQueryRunner;
 import io.prestosql.tests.ResultWithQueryId;
 import org.testng.annotations.Test;
@@ -54,6 +54,7 @@ import java.util.function.Supplier;
 import static io.airlift.testing.Assertions.assertGreaterThan;
 import static io.airlift.testing.Assertions.assertLessThanOrEqual;
 import static io.airlift.tpch.TpchTable.getTables;
+import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_WAIT_TIME;
 import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
@@ -71,7 +72,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 public class TestHiveDistributedJoinQueriesWithDynamicFiltering
-        extends AbstractTestJoinQueries
+        extends AbstractTestQueryFramework
 {
     public TestHiveDistributedJoinQueriesWithDynamicFiltering()
     {
@@ -83,6 +84,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
     {
         return Session.builder(super.getSession())
                 .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
+                .setSystemProperty(DYNAMIC_FILTERING_WAIT_TIME, "2000ms")
                 .build();
     }
 
@@ -113,7 +115,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         ImmutableList<HivePartitionKey> partitionKeys = ImmutableList.of(new HivePartitionKey("p1", "100"), new HivePartitionKey("p2", "101"), new HivePartitionKey("p3", "__HIVE_DEFAULT_PARTITION__"));
         HiveSplitWrapper split = HiveSplitWrapper.wrap(new HiveSplit("db", "table", "partitionId", "path", 0, 50, 50, 0, schema, partitionKeys, ImmutableList.of(), OptionalInt.empty(), false, ImmutableMap.of(), Optional.empty(), false, Optional.empty(), Optional.empty(), false));
 
-        List<String> filterValues = ImmutableList.of("1", "50", "100");
+        List<Long> filterValues = ImmutableList.of(1L, 50L, 100L);
 
         HiveColumnHandle testColumnHandle = new HiveColumnHandle("p1", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter = createDynamicFilterSupplier(filterValues, testColumnHandle, "filter1");
@@ -205,12 +207,12 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         return (Long) result.getOnlyValue();
     }
 
-    private Supplier<Map<ColumnHandle, DynamicFilter>> createDynamicFilterSupplier(List<String> values, ColumnHandle columnHandle, String filterId)
+    private Supplier<Map<ColumnHandle, DynamicFilter>> createDynamicFilterSupplier(List<Long> values, ColumnHandle columnHandle, String filterId)
             throws IOException
     {
         BloomFilter filter = new BloomFilter(values.size(), 0.01);
-        for (String value : values) {
-            filter.add(value.getBytes());
+        for (Long value : values) {
+            filter.add(value);
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         filter.writeTo(out);

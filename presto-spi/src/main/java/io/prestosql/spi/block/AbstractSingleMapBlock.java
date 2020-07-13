@@ -16,8 +16,8 @@ package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
 
-public abstract class AbstractSingleMapBlock
-        implements Block
+public abstract class AbstractSingleMapBlock<T>
+        implements Block<T>
 {
     abstract int getOffset();
 
@@ -208,10 +208,10 @@ public abstract class AbstractSingleMapBlock
     {
         position = getAbsolutePosition(position);
         if (position % 2 == 0) {
-            return getRawKeyBlock().getObject(position / 2, clazz);
+            return (T) getRawKeyBlock().getObject(position / 2, clazz);
         }
         else {
-            return getRawValueBlock().getObject(position / 2, clazz);
+            return (T) getRawValueBlock().getObject(position / 2, clazz);
         }
     }
 

@@ -28,7 +28,7 @@ import static io.prestosql.spi.type.Chars.padSpaces;
 import static java.lang.String.format;
 import static java.util.Collections.singletonList;
 
-public final class CharType
+public class CharType
         extends AbstractVariableWidthType
 {
     public static final int MAX_LENGTH = 65_536;

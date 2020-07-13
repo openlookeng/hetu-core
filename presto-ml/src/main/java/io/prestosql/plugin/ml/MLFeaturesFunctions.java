@@ -205,14 +205,14 @@ public final class MLFeaturesFunctions
         }
     }
 
-    private static Block featuresHelper(PageBuilder pageBuilder, double... features)
+    private static <T> Block<T> featuresHelper(PageBuilder pageBuilder, double... features)
     {
         if (pageBuilder.isFull()) {
             pageBuilder.reset();
         }
 
-        BlockBuilder mapBlockBuilder = pageBuilder.getBlockBuilder(0);
-        BlockBuilder blockBuilder = mapBlockBuilder.beginBlockEntry();
+        BlockBuilder<T> mapBlockBuilder = pageBuilder.getBlockBuilder(0);
+        BlockBuilder<T> blockBuilder = mapBlockBuilder.beginBlockEntry();
 
         for (int i = 0; i < features.length; i++) {
             BigintType.BIGINT.writeLong(blockBuilder, i);

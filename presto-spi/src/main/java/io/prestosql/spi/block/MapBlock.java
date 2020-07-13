@@ -28,8 +28,8 @@ import static io.prestosql.spi.block.MapBlockBuilder.buildHashTable;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class MapBlock
-        extends AbstractMapBlock
+public class MapBlock<T>
+        extends AbstractMapBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(MapBlock.class).instanceSize();
 
@@ -38,8 +38,8 @@ public class MapBlock
 
     private final boolean[] mapIsNull;
     private final int[] offsets;
-    private final Block keyBlock;
-    private final Block valueBlock;
+    private final Block<T> keyBlock;
+    private final Block<T> valueBlock;
     private final int[] hashTables; // hash to location in map;
 
     private volatile long sizeInBytes;

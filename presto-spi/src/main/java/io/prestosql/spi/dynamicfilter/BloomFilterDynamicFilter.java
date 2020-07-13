@@ -28,13 +28,10 @@ public class BloomFilterDynamicFilter
         extends DynamicFilter
 {
     public static final Logger log = Logger.get(BloomFilterDynamicFilter.class);
-
-    private static final float DEFAULT_BLOOM_FILTER_FPP = 0.1F;
-
+    public static final int DEFAULT_DYNAMIC_FILTER_SIZE = 1024 * 1024;
+    public static final double DEFAULT_BLOOM_FILTER_FPP = 0.1D;
     private byte[] bloomFilterSerialized;
     private BloomFilter bloomFilterDeserialized;
-
-    public static final int DEFAULT_DYNAMIC_FILTER_SIZE = 1024 * 1024;
 
     public BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, byte[] bloomFilterSerialized, Type type)
     {
@@ -42,7 +39,7 @@ public class BloomFilterDynamicFilter
         this.columnHandle = columnHandle;
         this.bloomFilterSerialized = bloomFilterSerialized;
         this.type = type;
-        createDeserializedBloomFilter();
+        bloomFilterDeserialized = deserializeBloomFilter(bloomFilterSerialized);
     }
 
     public BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, BloomFilter bloomFilterDeserialized, Type type)
@@ -53,11 +50,60 @@ public class BloomFilterDynamicFilter
         this.bloomFilterDeserialized = bloomFilterDeserialized;
     }
 
+    public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter)
+    {
+        return fromHashSetDynamicFilter(hashSetDynamicFilter, DEFAULT_BLOOM_FILTER_FPP);
+    }
+
+    public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter, double bloomFilterFpp)
+    {
+        BloomFilter bloomFilter = BloomFilterDynamicFilter.createBloomFilterFromSet(hashSetDynamicFilter.getSetValues(), bloomFilterFpp);
+        return new BloomFilterDynamicFilter(hashSetDynamicFilter.getFilterId(), hashSetDynamicFilter.getColumnHandle(), bloomFilter, hashSetDynamicFilter.getType());
+    }
+
+    public static BloomFilter createBloomFilterFromSet(Set valueSet, double bloomFilterFpp)
+    {
+        BloomFilter bloomFilter = new BloomFilter(DEFAULT_DYNAMIC_FILTER_SIZE, bloomFilterFpp);
+        for (Object value : valueSet) {
+            if (value instanceof Long) {
+                bloomFilter.addLong((Long) value);
+            }
+            else if (value instanceof Slice) {
+                bloomFilter.add((Slice) value);
+            }
+            else {
+                bloomFilter.add(String.valueOf(value).getBytes());
+            }
+        }
+        return bloomFilter;
+    }
+
+    public static byte[] convertBloomFilterToByteArray(BloomFilter bloomFilter)
+    {
+        byte[] finalOutput = null;
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            bloomFilter.writeTo(out);
+            finalOutput = out.toByteArray();
+        }
+        catch (IOException e) {
+            log.error("could not  finish filter, Exception happened:" + e.getMessage());
+        }
+        return finalOutput;
+    }
+
     @Override
     public boolean contains(Object value)
     {
-        // TODO: Only support String value for now, fix this and use original value type
-        return bloomFilterDeserialized.test(((String) value).getBytes());
+        // TODO: Only support Long and Slice value for now, fix this and use original value type
+        if (value instanceof Long) {
+            return bloomFilterDeserialized.test((Long) value);
+        }
+        else if (value instanceof Slice) {
+            return bloomFilterDeserialized.test((Slice) value);
+        }
+        else {
+            return bloomFilterDeserialized.test(((String) value).getBytes());
+        }
     }
 
     @Override
@@ -75,10 +121,10 @@ public class BloomFilterDynamicFilter
         return clone;
     }
 
-    public void createDeserializedBloomFilter()
+    private BloomFilter deserializeBloomFilter(byte[] bloomFilterSerialized)
     {
         try (ByteArrayInputStream bis = new ByteArrayInputStream(bloomFilterSerialized)) {
-            bloomFilterDeserialized = BloomFilter.readFrom(bis);
+            return BloomFilter.readFrom(bis);
         }
         catch (IOException e) {
             throw new RuntimeException("Unable to deserialize dynamic filter: " + columnHandle.toString());
@@ -95,40 +141,14 @@ public class BloomFilterDynamicFilter
         return bloomFilterSerialized;
     }
 
-    public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter)
-    {
-        BloomFilter bloomFilter = BloomFilterDynamicFilter.createBloomFilterFromSet(hashSetDynamicFilter.getSetValues());
-        return new BloomFilterDynamicFilter(hashSetDynamicFilter.getFilterId(), hashSetDynamicFilter.getColumnHandle(), bloomFilter, hashSetDynamicFilter.getType());
-    }
-
     public byte[] createSerializedBloomFilter()
     {
         this.bloomFilterSerialized = convertBloomFilterToByteArray(this.bloomFilterDeserialized);
         return this.bloomFilterSerialized;
     }
 
-    public static BloomFilter createBloomFilterFromSet(Set stringValueSet)
+    public BloomFilter getBloomFilterDeserialized()
     {
-        BloomFilter bloomFilter = new BloomFilter(DEFAULT_DYNAMIC_FILTER_SIZE, DEFAULT_BLOOM_FILTER_FPP);
-        for (Object value : stringValueSet) {
-            if (value instanceof Slice) {
-                value = new String(((Slice) value).getBytes());
-            }
-            bloomFilter.add(String.valueOf(value).getBytes());
-        }
-        return bloomFilter;
-    }
-
-    public static byte[] convertBloomFilterToByteArray(BloomFilter bloomFilter)
-    {
-        byte[] finalOutput = null;
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            bloomFilter.writeTo(out);
-            finalOutput = out.toByteArray();
-        }
-        catch (IOException e) {
-            log.error("could not  finish filter, Exception happened:" + e.getMessage());
-        }
-        return finalOutput;
+        return bloomFilterDeserialized;
     }
 }

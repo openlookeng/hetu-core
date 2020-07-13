@@ -64,7 +64,7 @@ import java.util.function.Supplier;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
-import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
+import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
 import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
 import static io.prestosql.spi.type.Decimals.encodeScaledValue;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -216,13 +216,13 @@ public final class HiveTestUtils
         }
     }
 
-    public static Supplier<Set<DynamicFilter>> createTestDynamicFilterSupplier(String filterKey, List<Object> filterValues)
+    public static Supplier<Set<DynamicFilter>> createTestDynamicFilterSupplier(String filterKey, List<Long> filterValues)
     {
         Supplier<Set<DynamicFilter>> dynamicFilterSupplier = () -> {
             Set<DynamicFilter> dynamicFilters = new HashSet<>();
-            ColumnHandle columnHandle = new HiveColumnHandle(filterKey, HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
+            ColumnHandle columnHandle = new HiveColumnHandle(filterKey, HIVE_LONG, parseTypeSignature(StandardTypes.BIGINT), 0, PARTITION_KEY, Optional.empty());
             BloomFilter filter = new BloomFilter(1024 * 1024, 0.01);
-            filterValues.stream().forEach(value -> filter.add(((String) value).getBytes()));
+            filterValues.stream().forEach(value -> filter.add(value));
 
             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 filter.writeTo(out);

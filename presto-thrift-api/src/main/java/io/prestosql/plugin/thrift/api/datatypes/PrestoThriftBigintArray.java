@@ -142,10 +142,10 @@ public final class PrestoThriftBigintArray
                 .toString();
     }
 
-    public static PrestoThriftBlock fromBlock(Block block)
+    public static <T> PrestoThriftBlock fromBlock(Block<T> block)
     {
         checkArgument(block instanceof AbstractArrayBlock, "block is not of an array type");
-        AbstractArrayBlock arrayBlock = (AbstractArrayBlock) block;
+        AbstractArrayBlock<T> arrayBlock = (AbstractArrayBlock) block;
         int positions = arrayBlock.getPositionCount();
         if (positions == 0) {
             return bigintArrayData(new PrestoThriftBigintArray(null, null, null));

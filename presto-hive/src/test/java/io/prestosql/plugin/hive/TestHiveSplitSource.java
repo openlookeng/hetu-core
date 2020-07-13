@@ -22,6 +22,8 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
+import io.prestosql.spi.type.TestingTypeManager;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.testing.TestingConnectorSession;
 import org.testng.annotations.Test;
 
@@ -268,6 +270,7 @@ public class TestHiveSplitSource
     @Test
     public void testHiveSplitSourceWithDynamicFilter()
     {
+        TypeManager typeManager = new TestingTypeManager();
         ConnectorSession session = new TestingConnectorSession(
                 new HiveSessionProperties(new HiveConfig().setDynamicFilterPartitionFilteringEnabled(true), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
 
@@ -282,8 +285,10 @@ public class TestHiveSplitSource
                 new TestingHiveSplitLoader(),
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
-                createTestDynamicFilterSupplier("pt_d", ImmutableList.of("0")),
-                null, null, new HiveConfig());
+                createTestDynamicFilterSupplier("pt_d", ImmutableList.of(1L)),
+                null,
+                typeManager,
+                new HiveConfig());
 
         for (int i = 0; i < 5; i++) {
             hiveSplitSource.addToQueue(new TestPartitionSplit(2 * i, ImmutableList.of(new HivePartitionKey("pt_d", "0")), "pt_d=0"));
