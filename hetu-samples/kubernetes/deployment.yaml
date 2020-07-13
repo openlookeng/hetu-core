@@ -1,0 +1,180 @@
+#### Hetu namespace ####
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hetu
+
+#### Hetu service ####
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hetu
+  namespace: hetu
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30321
+  selector:
+    app: hetu-coordinator
+
+#### coordinator ####
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hetu-coordinator
+  namespace: hetu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hetu-coordinator
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0%
+  template:
+    metadata:
+      labels:
+        app: hetu-coordinator
+    spec:
+      # TODO: enable if graceful shutdown is needed
+      # terminationGracePeriodSeconds: 3600
+      containers:
+      - name: hetu-coordinator
+        image: hetu:{{ imageTag }}
+        imagePullPolicy: IfNotPresent
+        # Update "jvmXmx" value according to memory allocation below. Suggest 75~80% of total memory limit.
+        args: ["-t", "coordinator", "-configDir", "/custom-configs", "-jvmXmx", "1500M"]
+        resources:
+          requests:
+            cpu: 1
+            memory: 2G
+          limits:
+            cpu: 1
+            memory: 2G
+        # TODO: enable if graceful shutdown is needed
+        # lifecycle:
+        #   preStop:
+        #     exec:
+        #       command:
+        #       - /usr/lib/hetu/bin/shutdown-hetu
+        volumeMounts:
+        - mountPath: /custom-configs
+          name: custom-configs-volume
+      volumes:
+      - name: custom-configs-volume
+        hostPath:
+          # TODO: update to point to additional configuration and catalog folder
+          path: /hetu/hetu-core/hetu-samples/kubernetes/config-coordinator
+
+#### worker ####
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hetu-worker
+  namespace: hetu
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hetu-worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0%
+  template:
+    metadata:
+      labels:
+        app: hetu-worker
+    spec:
+      # TODO: enable if graceful shutdown is needed
+      # terminationGracePeriodSeconds: 600
+      containers:
+      - name: hetu-worker
+        image: hetu:{{ imageTag }}
+        imagePullPolicy: IfNotPresent
+        # Update "jvmXmx" value according to memory allocation below. Suggest 75~80% of total memory limit.
+        args: ["-t", "worker", "-discoveryURI", "http://hetu:8080", "-configDir", "/custom-configs", "-jvmXmx", "1500M"]
+        resources:
+          requests:
+            cpu: 1
+            memory: 2G
+          limits:
+            cpu: 1
+            memory: 2G
+        # TODO: enable if graceful shutdown is needed
+        # lifecycle:
+        #   preStop:
+        #     exec:
+        #       command:
+        #       - /usr/lib/hetu/bin/shutdown-hetu
+        volumeMounts:
+        - mountPath: /custom-configs
+          name: custom-configs-volume
+      volumes:
+      - name: custom-configs-volume
+        hostPath:
+          # TODO: update to point to additional configuration and catalog folder
+          path: /hetu/hetu-core/hetu-samples/kubernetes/config-worker
+
+# TODO: enable for coordinator auto-scaling
+#### HPA for coordinator ####
+# ---
+# apiVersion: autoscaling/v2beta2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: hetu-coordinator-scaler
+#   namespace: hetu
+# spec:
+#   scaleTargetRef:
+#     apiVersion: apps/v1
+#     kind: Deployment
+#     name: hetu-coordinator
+#   minReplicas: 1
+#   maxReplicas: 2
+#   metrics:
+#   - type: Resource
+#     resource:
+#       name: cpu
+#       target:
+#         type: Utilization
+#         averageUtilization: 50
+#       # TODO: other scaling conditions, e.g. memory
+#   behavior:
+#     scaleDown:
+#       stabilizationWindowSeconds: 300
+
+# TODO: enable for worker auto-scaling
+#### HPA for worker ####
+# ---
+# apiVersion: autoscaling/v2beta2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: hetu-worker-scaler
+#   namespace: hetu
+# spec:
+#   scaleTargetRef:
+#     apiVersion: apps/v1
+#     kind: Deployment
+#     name: hetu-worker
+#   minReplicas: 1
+#   maxReplicas: 5
+#   metrics:
+#   - type: Resource
+#     resource:
+#       name: cpu
+#       target:
+#         type: Utilization
+#         averageUtilization: 50
+#       # TODO: other scaling conditions, e.g. memory
+#   behavior:
+#     scaleDown:
+#       stabilizationWindowSeconds: 300

@@ -561,7 +561,7 @@ export class StageDetail extends React.Component {
             }
         }
 
-        $.get('/v1/query/' + queryId, query => {
+        $.get('../v1/query/' + queryId, query => {
             this.setState({
                 initialized: true,
                 ended: query.finalQueryInfo,

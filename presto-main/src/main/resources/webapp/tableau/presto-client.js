@@ -47,7 +47,7 @@ StatementClient.prototype.submitQuery = function(lastRecordNumber) {
     var statementClient = this;
     $.ajax({
         type: "POST",
-        url: '/v1/statement',
+        url: '../v1/statement',
         headers: this.headers,
         data: this.query,
         dataType: 'json',
