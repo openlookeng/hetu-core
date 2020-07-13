@@ -1,7 +1,6 @@
 +++
 weight = 25
-title = "Teradata Functions
-"
+title = "Teradata Functions"
 +++
 
 Teradata Functions

@@ -1,7 +1,6 @@
 +++
 weight = 20
-title = "HyperLogLog Functions
-"
+title = "HyperLogLog Functions"
 +++
 
 HyperLogLog Functions

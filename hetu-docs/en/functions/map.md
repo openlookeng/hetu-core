@@ -1,7 +1,6 @@
 +++
 weight = 17
-title = "Map Functions and Operators
-"
+title = "Map Functions and Operators"
 +++
 
 Map Functions and Operators

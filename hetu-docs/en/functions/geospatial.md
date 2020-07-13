@@ -1,7 +1,6 @@
 +++
 weight = 19
-title = "Geospatial Functions
-"
+title = "Geospatial Functions"
 +++
 
 Geospatial Functions
