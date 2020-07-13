@@ -1,7 +1,6 @@
 +++
 weight = 9
-title = "String Functions and Operators
-"
+title = "String Functions and Operators"
 +++
 
 String Functions and Operators

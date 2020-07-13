@@ -1,7 +1,6 @@
 +++
 weight = 24
-title = "Session Information
-"
+title = "Session Information"
 +++
 
 Session Information

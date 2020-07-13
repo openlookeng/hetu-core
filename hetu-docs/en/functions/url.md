@@ -1,7 +1,6 @@
 +++
 weight = 18
-title = "URL Functions
-"
+title = "URL Functions"
 +++
 
 URL Functions

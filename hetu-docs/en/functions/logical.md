@@ -1,7 +1,6 @@
 +++
 weight = 1
-title = "Logical Operators
-"
+title = "Logical Operators"
 +++
 
 Logical Operators

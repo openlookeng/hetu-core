@@ -1,7 +1,6 @@
 +++
 weight = 15
-title = "Window Functions
-"
+title = "Window Functions"
 +++
 
 Window Functions
