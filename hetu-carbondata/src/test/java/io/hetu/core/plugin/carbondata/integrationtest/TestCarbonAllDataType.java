@@ -90,6 +90,7 @@ public class TestCarbonAllDataType
         hetuServer.execute("drop table if exists testdb.testtable");
         hetuServer.execute("drop table if exists testdb.testtable2");
         hetuServer.execute("drop table if exists testdb.testtable3");
+        hetuServer.execute("drop table if exists testdb.testtable4");
         hetuServer.execute("drop schema if exists testdb");
         hetuServer.execute("drop schema if exists default");
         hetuServer.execute("create schema testdb");
@@ -556,6 +557,45 @@ public class TestCarbonAllDataType
         hetuServer.execute("drop table testdb.testtable2");
     }
 
+    @Test
+    public void testReadWriteRealDatatype()
+            throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtable4");
+        hetuServer.execute("CREATE TABLE testdb.testtable4(a int, b real)");
+        hetuServer.execute("INSERT INTO testdb.testtable4 VALUES (10, 2),(11, 3),(12, 4)");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select b as RESULT from testdb.testtable4 where a = 11");
+
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{ put("RESULT", 3.0); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable4");
+    }
+
+
+    @Test(dependsOnMethods = {"testReadWriteRealDatatype"})
+    public void testReadWriteTinyintDatatype()
+            throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.testtable4(a int, b tinyint)");
+        hetuServer.execute("INSERT INTO testdb.testtable4 VALUES (10, tinyint '1'),(11, tinyint '2'),(12, tinyint '3')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select b as RESULT from testdb.testtable4 where a = 10");
+
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{ put("RESULT", 49); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table if exists testdb.testtable4");
+    }
 
     private String carbondatastorecreator(String data, int i, String[] dataTypes)
     {

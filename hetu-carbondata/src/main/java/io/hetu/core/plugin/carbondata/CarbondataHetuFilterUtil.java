@@ -87,6 +87,9 @@ public class CarbondataHetuFilterUtil
         else if (colType.equals(HiveType.HIVE_LONG)) {
             return DataTypes.LONG;
         }
+        else if (colType.equals(HiveType.HIVE_FLOAT)) {
+            return DataTypes.FLOAT;
+        }
         else if (colType.equals(HiveType.HIVE_DOUBLE)) {
             return DataTypes.DOUBLE;
         }
