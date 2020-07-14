@@ -29,7 +29,7 @@ wget -O - https://download.openlookeng.io/install.sh|bash
 
 当用户看到如下日志，便可以认为openLooKeng 部署成功了。
 
-<img src="./images/BE670A8C-9EA4-461D-AD22-AF12849D72F0.png" >
+![](../images/BE670A8C-9EA4-461D-AD22-AF12849D72F0.png)
 
 
 
@@ -61,7 +61,7 @@ wget -O - https://download.openlookeng.io/install.sh|bash
 bash /opt/openlookeng/bin/openlk-cli 
 ```
 
-<img src="./images/cli.png" >
+![](../images/cli.png)
 
 
 在cli 中用户可以输入标准SQL 与openLooKeng 服务器端进行交互。
@@ -72,7 +72,7 @@ bash /opt/openlookeng/bin/openlk-cli
 show catalogs;
 ```
 
-<img src="./images/catalogs.png" >
+![](../images/catalogs.png)
 
 查看有tpcds 有包含哪些[schema](../overview/concepts.md)：
 
@@ -102,7 +102,7 @@ tiny
 show tables from tpcds.sf1;
 ```
 
-<img src="./images/image-20200629140454598.png" >
+![](../images/image-20200629140454598.png)
 
 
 用户可以选择表进行数据检索：
@@ -111,7 +111,7 @@ show tables from tpcds.sf1;
 select c_customer_id, c_first_name, c_last_name from tpcds.sf1.customer limit 10;
 ```
 
-<img src="./images/image-20200629141214172.png" >
+![](../images/image-20200629141214172.png)
 
 或者运行更加复杂的多表联合查询：
 
@@ -128,7 +128,7 @@ SELECT
    GROUP BY "sr_customer_sk", "sr_store_sk"
 ```
 
-<img src="./images//image-20200629141757336.png" >
+![](../images/image-20200629141757336.png)
 
 用户可以查阅 [openLooKeng语法文档](../sql/_index.md)，了解更多语法规则。
 
