@@ -14,14 +14,17 @@
 package io.prestosql.plugin.hive.metastore;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.plugin.hive.HiveACIDWriteType;
 import io.prestosql.plugin.hive.HiveTableHandle;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.connector.SchemaTableName;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 
@@ -31,6 +34,7 @@ public class HiveTransaction
     private final String queryId;
     private final long transactionId;
     private final ScheduledFuture<?> heartbeatTask;
+    private final Map<HiveTableHandle, AtomicBoolean> locksMap = new HashMap<>();
 
     private final Map<SchemaTableName, ValidTxnWriteIdList> validHiveTransactionsForTable = new HashMap<>();
 
@@ -54,13 +58,16 @@ public class HiveTransaction
 
     public ValidTxnWriteIdList getValidWriteIds(HiveMetastore metastore, HiveTableHandle tableHandle)
     {
-        // Different calls for same table might need to lock different partitions so acquire locks every time
-        metastore.acquireSharedReadLock(
-                identity,
-                queryId,
-                transactionId,
-                !tableHandle.getPartitions().isPresent() ? ImmutableList.of(tableHandle.getSchemaTableName()) : ImmutableList.of(),
-                tableHandle.getPartitions().orElse(ImmutableList.of()));
+        //If the update or delete would have locked exclusive lock, then there is no need to lock again.
+        if (isSharedLockNeeded(tableHandle)) {
+            // Different calls for same table might need to lock different partitions so acquire locks every time
+            metastore.acquireSharedReadLock(
+                    identity,
+                    queryId,
+                    transactionId,
+                    !tableHandle.getPartitions().isPresent() ? ImmutableList.of(tableHandle.getSchemaTableName()) : ImmutableList.of(),
+                    tableHandle.getPartitions().orElse(ImmutableList.of()));
+        }
 
         // For repeatable reads within a query, use the same list of valid transactions for a table which have once been used
         return validHiveTransactionsForTable.computeIfAbsent(tableHandle.getSchemaTableName(), schemaTableName -> new ValidTxnWriteIdList(
@@ -70,8 +77,56 @@ public class HiveTransaction
                         transactionId)));
     }
 
-    public Long getTableWriteId(HiveMetastore delegate, HiveTableHandle tableHandle)
+    //If the query is on the same table, on which update/delete happening separate lock not required.
+    private boolean isSharedLockNeeded(HiveTableHandle tableHandle)
     {
-        return delegate.getTableWriteId(tableHandle.getSchemaName(), tableHandle.getTableName(), transactionId);
+        AtomicBoolean lockFlag = locksMap.get(tableHandle);
+        if (lockFlag == null || !lockFlag.get()) {
+            return true;
+        }
+        return false;
+    }
+
+    private void setLockFlagForTable(HiveTableHandle tableHandle)
+    {
+        AtomicBoolean flag = locksMap.get(tableHandle);
+        if (flag == null) {
+            flag = new AtomicBoolean(true);
+            locksMap.put(tableHandle, flag);
+        }
+        else {
+            flag.set(true);
+        }
+    }
+
+    public Long getTableWriteId(HiveMetastore metastore, HiveTableHandle tableHandle, HiveACIDWriteType writeType)
+    {
+        DataOperationType operationType = DataOperationType.INSERT;
+        boolean semiSharedLock = false;
+        switch (writeType) {
+            case VACUUM:
+            case INSERT:
+                operationType = DataOperationType.INSERT;
+                break;
+            case INSERT_OVERWRITE:
+            case UPDATE:
+                operationType = DataOperationType.UPDATE;
+                semiSharedLock = true;
+                break;
+            case DELETE:
+                operationType = DataOperationType.DELETE;
+                semiSharedLock = true;
+        }
+        metastore.acquireLock(
+                identity,
+                queryId,
+                transactionId,
+                !tableHandle.getPartitions().isPresent() ? ImmutableList.of(tableHandle.getSchemaTableName()) : ImmutableList.of(),
+                tableHandle.getPartitions().orElse(ImmutableList.of()),
+                operationType);
+        if (semiSharedLock) {
+            setLockFlagForTable(tableHandle);
+        }
+        return metastore.getTableWriteId(tableHandle.getSchemaName(), tableHandle.getTableName(), transactionId);
     }
 }

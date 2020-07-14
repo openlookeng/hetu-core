@@ -60,6 +60,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
@@ -1004,6 +1005,12 @@ public class FileHiveMetastore
 
     @Override
     public void acquireSharedReadLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions)
+    {
+        /* doNothing */
+    }
+
+    @Override
+    public void acquireLock(HiveIdentity identity, String queryId, long transactionId, List<SchemaTableName> fullTables, List<HivePartition> partitions, DataOperationType operationType)
     {
         /* doNothing */
     }

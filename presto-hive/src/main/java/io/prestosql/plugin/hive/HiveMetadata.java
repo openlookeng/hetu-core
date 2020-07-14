@@ -1175,7 +1175,7 @@ public class HiveMetadata
                     .collect(toList());
             HiveTableHandle tableHandle = new HiveTableHandle(schemaName,
                     tableName, tableProperties, partitionColumnHandles, Optional.empty());
-            Optional<Long> writeId = metastore.getTableWriteId(session, tableHandle);
+            Optional<Long> writeId = metastore.getTableWriteId(session, tableHandle, HiveACIDWriteType.INSERT);
             if (!writeId.isPresent()) {
                 throw new IllegalStateException("No validWriteIds present");
             }
@@ -1402,17 +1402,17 @@ public class HiveMetadata
     @Override
     public HiveInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return beginInsertUpdateInternal(session, tableHandle, false, false, false, Optional.empty());
+        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT);
     }
 
     @Override
     public HiveInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite)
     {
-        return beginInsertUpdateInternal(session, tableHandle, false, false, isOverwrite, Optional.empty());
+        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT_OVERWRITE);
     }
 
     private HiveInsertTableHandle beginInsertUpdateInternal(ConnectorSession session, ConnectorTableHandle tableHandle,
-                                                            boolean isUpdate, boolean isVacuum, boolean isOverwrite, Optional<String> partition)
+                                                            Optional<String> partition, HiveACIDWriteType writeType)
     {
         verifyJvmTimeZone();
 
@@ -1420,7 +1420,7 @@ public class HiveMetadata
         Table table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
 
-        HiveWriteUtils.checkTableIsWritable(table, writesToNonManagedTablesEnabled, isUpdate, isVacuum);
+        HiveWriteUtils.checkTableIsWritable(table, writesToNonManagedTablesEnabled, writeType);
 
         for (Column column : table.getDataColumns()) {
             if (!HiveWriteUtils.isWritableType(column.getType())) {
@@ -1449,7 +1449,7 @@ public class HiveMetadata
         Optional<WriteIdInfo> writeIdInfo = Optional.empty();
         if (AcidUtils.isTransactionalTable(((HiveTableHandle) tableHandle)
                 .getTableParameters().orElseThrow(() -> new IllegalStateException("tableParameters missing")))) {
-            Optional<Long> writeId = metastore.getTableWriteId(session, (HiveTableHandle) tableHandle);
+            Optional<Long> writeId = metastore.getTableWriteId(session, (HiveTableHandle) tableHandle, writeType);
             if (!writeId.isPresent()) {
                 throw new IllegalStateException("No validWriteIds present");
             }
@@ -1467,7 +1467,7 @@ public class HiveMetadata
                 tableStorageFormat,
                 HiveSessionProperties.isRespectTableFormat(session) ? tableStorageFormat :
                         HiveSessionProperties.getHiveStorageFormat(session),
-                isOverwrite);
+                writeType == HiveACIDWriteType.INSERT_OVERWRITE);
 
         LocationService.WriteInfo writeInfo = locationService.getQueryWriteInfo(locationHandle);
         metastore.declareIntentionToWrite(session, writeInfo.getWriteMode(), writeInfo.getWritePath(), tableName);
@@ -1590,7 +1590,7 @@ public class HiveMetadata
     @Override
     public HiveUpdateTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, true, false, false, Optional.empty());
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.UPDATE);
         return new HiveUpdateTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
@@ -1599,7 +1599,7 @@ public class HiveMetadata
 
     public HiveDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsert(session, tableHandle);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.DELETE);
         return new HiveDeleteAsInsertTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
@@ -1631,7 +1631,7 @@ public class HiveMetadata
     @Override
     public HiveVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, false, true, false, partition);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, HiveACIDWriteType.VACUUM);
         return new HiveVacuumTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
