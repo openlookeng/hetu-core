@@ -16,16 +16,25 @@ package io.prestosql.spi.dynamicfilter;
 
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
+import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 import io.prestosql.spi.connector.ColumnHandle;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.Set;
 
 public class BloomFilterDynamicFilter
         extends DynamicFilter
 {
+    public static final Logger log = Logger.get(BloomFilterDynamicFilter.class);
+
     private byte[] bloomFilterSerialized;
     private BloomFilter bloomFilterDeserialized;
+
+    public static final double BLOOMFILTER_CREAETIONFPP = 0.1;
+    public static final int DEFAULT_DYNAMIC_FILTER_SIZE = 1024 * 1024;
 
     public BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, byte[] bloomFilterSerialized, Type type)
     {
@@ -88,5 +97,42 @@ public class BloomFilterDynamicFilter
     public BloomFilter getBloomFilterDeserialized()
     {
         return bloomFilterDeserialized;
+    }
+
+    public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter)
+    {
+        BloomFilter bloomFilter = BloomFilterDynamicFilter.createBloomFilterFromSet(hashSetDynamicFilter.getSetValues());
+        return new BloomFilterDynamicFilter(hashSetDynamicFilter.getFilterId(), hashSetDynamicFilter.getColumnHandle(), bloomFilter, hashSetDynamicFilter.getType());
+    }
+
+    public byte[] createSerializedBloomFilter()
+    {
+        this.bloomFilterSerialized = convertBloomFilterToByteArray(this.bloomFilterDeserialized);
+        return this.bloomFilterSerialized;
+    }
+
+    public static BloomFilter createBloomFilterFromSet(Set stringValueSet)
+    {
+        BloomFilter bloomFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), DEFAULT_DYNAMIC_FILTER_SIZE, BLOOMFILTER_CREAETIONFPP);
+        for (Object value : stringValueSet) {
+            if (value instanceof Slice) {
+                value = new String(((Slice) value).getBytes());
+            }
+            bloomFilter.put(String.valueOf(value));
+        }
+        return bloomFilter;
+    }
+
+    public static byte[] convertBloomFilterToByteArray(BloomFilter bloomFilter)
+    {
+        byte[] finalOutput = null;
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            bloomFilter.writeTo(out);
+            finalOutput = out.toByteArray();
+        }
+        catch (IOException e) {
+            log.error("could not  finish filter, Exception happened:" + e.getMessage());
+        }
+        return finalOutput;
     }
 }

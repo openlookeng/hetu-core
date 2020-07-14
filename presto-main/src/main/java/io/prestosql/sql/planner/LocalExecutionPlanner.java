@@ -2072,7 +2072,7 @@ public class LocalExecutionPlanner
                     .map(filter -> {
                         // Intersect dynamic filters' predicates when they become ready,
                         // in order to support multiple join nodes in the same plan fragment.
-                        addSuccessCallback(filter.getBloomFilterResultFuture(), collector::intersectBloomFilter);
+                        addSuccessCallback(filter.getDynamicFilterResultFuture(), collector::intersectDynamicFilter);
                         return filter;
                     });
         }

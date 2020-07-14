@@ -66,7 +66,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null);
+                null, null);
 
         // add 10 splits
         for (int i = 0; i < 10; i++) {
@@ -102,7 +102,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null);
+                null, null);
 
         // add some splits
         for (int i = 0; i < 5; i++) {
@@ -162,7 +162,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null);
+                null, null);
 
         final SettableFuture<ConnectorSplit> splits = SettableFuture.create();
 
@@ -223,7 +223,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null);
+                null, null);
         int testSplitSizeInBytes = new TestSplit(0).getEstimatedSizeInBytes();
 
         int maxSplitCount = toIntExact(maxOutstandingSplitsSize.toBytes()) / testSplitSizeInBytes;
@@ -262,7 +262,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null);
+                null, null);
         hiveSplitSource.addToQueue(new TestSplit(0, OptionalInt.of(2)));
         hiveSplitSource.noMoreSplits();
         assertEquals(getSplits(hiveSplitSource, OptionalInt.of(0), 10).size(), 0);
@@ -289,7 +289,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 createTestDynamicFilterSupplier("pt_d", ImmutableList.of("0")),
-                null);
+                null, null);
 
         for (int i = 0; i < 5; i++) {
             hiveSplitSource.addToQueue(new TestPartitionSplit(2 * i, ImmutableList.of(new HivePartitionKey("pt_d", "0")), "pt_d=0"));
@@ -322,7 +322,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                cachePredicates);
+                cachePredicates, null);
 
         int[] idPrefix = new int[] {1};
         ImmutableMap

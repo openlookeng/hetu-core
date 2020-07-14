@@ -32,6 +32,7 @@ public class DynamicFilterUtils
     public static final String HASHSETTYPEGLOBAL = "HASHSETTYPEGLOBAL";
     public static final String BLOOMFILTERTYPEGLOBAL = "BLOOMFILTERTYPEGLOBAL";
     public static final String DFTYPEMAP = "dftypemap";
+    public static final double BLOOMFILTER_EXPECTEDFPP = 0.25;
 
     private DynamicFilterUtils()
     {

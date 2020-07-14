@@ -22,7 +22,9 @@ import io.prestosql.client.DataCenterStatementClient;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import okhttp3.OkHttpClient;
 
 import java.io.IOException;
@@ -121,7 +123,12 @@ public class DataCenterPageSource
         ImmutableMap.Builder<String, DynamicFilter> builder = new ImmutableMap.Builder();
         for (Map.Entry<ColumnHandle, DynamicFilter> entry : dynamicFilters.entrySet()) {
             if (!appliedDynamicFilters.contains(entry.getKey().getColumnName())) {
-                builder.put(entry.getKey().getColumnName(), entry.getValue());
+                DynamicFilter df = entry.getValue();
+                if (df instanceof HashSetDynamicFilter) {
+                    df = BloomFilterDynamicFilter.fromHashSetDynamicFilter((HashSetDynamicFilter) df);
+                    ((BloomFilterDynamicFilter) df).createSerializedBloomFilter();
+                }
+                builder.put(entry.getKey().getColumnName(), df);
             }
         }
 

@@ -13,10 +13,7 @@
  */
 package io.prestosql.operator;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.DataSize;
@@ -24,6 +21,7 @@ import io.prestosql.operator.aggregation.TypedSet;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -38,9 +36,6 @@ import io.prestosql.utils.DynamicFilterUtils;
 
 import javax.annotation.Nullable;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -50,7 +45,6 @@ import java.util.function.Consumer;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.spi.type.TypeUtils.readNativeValue;
-import static io.prestosql.spi.type.TypeUtils.readNativeValueForDynamicFilter;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 
@@ -63,7 +57,6 @@ public class DynamicFilterSourceOperator
         implements Operator
 {
     private static final int EXPECTED_BLOCK_BUILDER_SIZE = 8;
-    private static final int DEFAULT_DYNAMIC_FILTER_SIZE = 1024 * 1024;
     public static final Logger log = Logger.get(DynamicFilterSourceOperator.class);
 
     public static class Channel
@@ -192,7 +185,7 @@ public class DynamicFilterSourceOperator
     private final StateStoreProvider stateStoreProvider;
     private long driverId;
     private boolean haveRegistered;
-    private Set<String>[] stringValueSets;
+    private Set[] objectValueSets;
 
     /**
      * Constructor for the Dynamic Filter Source Operator
@@ -221,9 +214,9 @@ public class DynamicFilterSourceOperator
 
         this.blockBuilders = new BlockBuilder[channels.size()];
         this.valueSets = new TypedSet[channels.size()];
-        this.stringValueSets = new Set[channels.size()];
-        for (int i = 0; i < stringValueSets.length; i++) {
-            stringValueSets[i] = new HashSet<>();
+        this.objectValueSets = new Set[channels.size()];
+        for (int i = 0; i < objectValueSets.length; i++) {
+            objectValueSets[i] = new HashSet<>();
         }
 
         for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
@@ -276,25 +269,13 @@ public class DynamicFilterSourceOperator
             Block block = page.getBlock(channels.get(channelIndex).index);
             TypedSet valueSet = valueSets[channelIndex];
             Type columnType = channels.get(channelIndex).type;
+
             for (int position = 0; position < block.getPositionCount(); ++position) {
-                String value = readNativeValueForDynamicFilter(columnType, block, position);
-                if (value == null) {
-                    handleTooLargePredicate();  // TODO: 1/7/20 rename this method as reset bloom filter etc
-                    break outer;
-                }
-                stringValueSets[channelIndex].add(value);
-                if (filterType == DynamicFilter.Type.LOCAL) {
-                    valueSet.add(block, position);
-                }
+                valueSet.add(block, position);
             }
 
-            if (filterType == DynamicFilter.Type.LOCAL) {
-                filterSizeInBytes += valueSet.getRetainedSizeInBytes();
-                filterPositionsCount += valueSet.size();
-            }
-            else {
-                filterPositionsCount += stringValueSets[channelIndex].size();
-            }
+            filterSizeInBytes += valueSet.getRetainedSizeInBytes();
+            filterPositionsCount += valueSet.size();
         }
         if (filterPositionsCount > maxFilterPositionsCount || filterSizeInBytes > maxFilterSizeInBytes) {
             // The whole filter (summed over all columns) contains too much values or exceeds maxFilterSizeInBytes.
@@ -305,7 +286,7 @@ public class DynamicFilterSourceOperator
 
     private void handleTooLargePredicate()
     {
-        stringValueSets = null;
+        objectValueSets = null;
         // The resulting predicate is too large, allow all probe-side values to be read.
         dynamicPredicateConsumer.accept(TupleDomain.all());
 
@@ -334,6 +315,12 @@ public class DynamicFilterSourceOperator
             return; // the predicate became too large.
         }
 
+        ImmutableMap.Builder<String, Domain> domainsBuilder = new ImmutableMap.Builder<>();
+        for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
+            Block block = blockBuilders[channelIndex].build();
+            Type type = channels.get(channelIndex).type;
+            domainsBuilder.put(channels.get(channelIndex).filterId, convertToDomain(type, channelIndex, block));
+        }
         finishDynamicFilterTask();
         if (filterType == DynamicFilter.Type.GLOBAL) {
             valueSets = null;
@@ -341,31 +328,21 @@ public class DynamicFilterSourceOperator
             dynamicPredicateConsumer.accept(TupleDomain.all());
             return;
         }
-
-        ImmutableMap.Builder<String, Domain> domainsBuilder = new ImmutableMap.Builder<>();
-        if (filterType != DynamicFilter.Type.GLOBAL) {
-            for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
-                Block block = blockBuilders[channelIndex].build();
-                Type type = channels.get(channelIndex).type;
-                domainsBuilder.put(channels.get(channelIndex).filterId, convertToDomain(type, block));
-            }
-        }
         valueSets = null;
         blockBuilders = null;
         dynamicPredicateConsumer.accept(TupleDomain.withColumnDomains(domainsBuilder.build()));
     }
 
-    private Domain convertToDomain(Type type, Block block)
+    private Domain convertToDomain(Type type, int channelIndex, Block block)
     {
-        ImmutableList.Builder<Object> values = ImmutableList.builder();
         for (int position = 0; position < block.getPositionCount(); ++position) {
             Object value = readNativeValue(type, block, position);
             if (value != null) {
-                values.add(value);
+                objectValueSets[channelIndex].add(value);
             }
         }
         // Inner and right join doesn't match rows with null key column values.
-        return Domain.create(ValueSet.copyOf(type, values.build()), false);
+        return Domain.create(ValueSet.copyOf(type, objectValueSets[channelIndex]), false);
     }
 
     @Override
@@ -407,37 +384,20 @@ public class DynamicFilterSourceOperator
             dynamicFilterType = getSetType(typeKey);
 
             if (dynamicFilterType.equals(DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL) || dynamicFilterType.equals(DynamicFilterUtils.BLOOMFILTERTYPELOCAL)) {
-                log.debug("creating new bloomfilter dynamic filter for size of: " + stringValueSets[channelIndex].size() + key + "     " + driverId);
-                byte[] finalOutput = createBloomFilter(stringValueSets[channelIndex]);
+                log.debug("creating new bloomfilter dynamic filter for size of: " + objectValueSets[channelIndex].size() + key + "     " + driverId);
+                byte[] finalOutput = BloomFilterDynamicFilter.convertBloomFilterToByteArray(BloomFilterDynamicFilter.createBloomFilterFromSet(objectValueSets[channelIndex]));
                 if (finalOutput != null) {
                     ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key)).add(finalOutput);
                 }
             }
             else {
-                log.debug("creating new string set dynamic filter for size of: " + stringValueSets[channelIndex].size() + key + "     " + driverId);
+                log.debug("creating new string set dynamic filter" + key + "     " + driverId);
                 ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key))
-                        .add(stringValueSets[channelIndex]);
+                        .add(objectValueSets[channelIndex]);
             }
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, channel.filterId, channel.queryId))).add(driverId);
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, channel.filterId, channel.queryId))).add(nodeInfo.getNodeId());
         }
-    }
-
-    public byte[] createBloomFilter(Set<String> stringValueSet)
-    {
-        byte[] finalOutput = null;
-        BloomFilter bloomFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), DEFAULT_DYNAMIC_FILTER_SIZE, 0.1);
-        for (String value : stringValueSet) {
-            bloomFilter.put(value);
-        }
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            bloomFilter.writeTo(out);
-            finalOutput = out.toByteArray();
-        }
-        catch (IOException e) {
-            log.error("could not  finish filter, Exception happened:" + e.getMessage());
-        }
-        return finalOutput;
     }
 
     public String getSetType(String key)

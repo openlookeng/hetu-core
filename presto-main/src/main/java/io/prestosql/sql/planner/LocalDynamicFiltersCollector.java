@@ -14,7 +14,6 @@
 package io.prestosql.sql.planner;
 
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
@@ -41,7 +40,7 @@ public class LocalDynamicFiltersCollector
      */
     private TupleDomain<Symbol> predicate;
     private Map<Symbol, DynamicFilter> localFilters = new HashMap<>();
-    private Map<Symbol, Set<String>> predicates = new HashMap<>();
+    private Map<Symbol, Set> predicates = new HashMap<>();
     private Set<Symbol> globalFilters = new HashSet<>();
     private StateStoreProvider stateStoreProvider;
     private static final Logger LOG = Logger.get(LocalDynamicFiltersCollector.class);
@@ -56,9 +55,9 @@ public class LocalDynamicFiltersCollector
         this.predicate = TupleDomain.all();
     }
 
-    synchronized void intersectBloomFilter(Map<Symbol, Set<String>> predicate)
+    synchronized void intersectDynamicFilter(Map<Symbol, Set> predicate)
     {
-        for (Map.Entry<Symbol, Set<String>> entry : predicate.entrySet()) {
+        for (Map.Entry<Symbol, Set> entry : predicate.entrySet()) {
             if (entry.getValue().size() == 1 && entry.getValue().contains("GLOBAL")) {
                 globalFilters.add(entry.getKey());
                 continue;
@@ -69,9 +68,9 @@ public class LocalDynamicFiltersCollector
                 continue;
             }
 
-            Set<String> predicateSet = predicates.get(entry.getKey());
-            Set<String> newValues = entry.getValue();
-            for (String value : newValues) {
+            Set predicateSet = predicates.get(entry.getKey());
+            Set newValues = entry.getValue();
+            for (Object value : newValues) {
                 predicateSet.add(value);
             }
         }
@@ -144,18 +143,7 @@ public class LocalDynamicFiltersCollector
                 }
                 if (!readFromStateStore) {
                     if (!localFilters.containsKey(entry.getKey()) && predicates.containsKey(entry.getKey())) {
-                        HashSet<String> valueSet = new HashSet<>();
-                        for (Object value : predicates.get(entry.getKey())) {
-                            String val;
-                            if (value instanceof Slice) {
-                                val = new String(((Slice) value).getBytes());
-                            }
-                            else {
-                                val = String.valueOf(value);
-                            }
-                            valueSet.add(val);
-                        }
-                        DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, entry.getValue(), valueSet, DynamicFilter.Type.LOCAL);
+                        DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, entry.getValue(), predicates.get(entry.getKey()), DynamicFilter.Type.LOCAL);
                         localFilters.put(entry.getKey(), dynamicFilter);
                     }
 

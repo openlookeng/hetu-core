@@ -119,7 +119,7 @@ public class HivePageSourceProvider
         Path path = new Path(hiveSplit.getPath());
 
         // Filter out splits using partition values and dynamic filters
-        if (dynamicFilters != null && !dynamicFilters.isEmpty() && isPartitionFiltered(hiveSplit.getPartitionKeys(), new HashSet(dynamicFilters.values()))) {
+        if (dynamicFilters != null && !dynamicFilters.isEmpty() && isPartitionFiltered(hiveSplit.getPartitionKeys(), new HashSet(dynamicFilters.values()), typeManager)) {
             return new FixedPageSource(ImmutableList.of());
         }
 

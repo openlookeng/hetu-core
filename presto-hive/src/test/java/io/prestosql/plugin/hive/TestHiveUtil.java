@@ -98,30 +98,30 @@ public class TestHiveUtil
     @Test
     public void testIsPartitionFiltered()
     {
-        assertFalse(isPartitionFiltered(null, null), "Should not filter partition if either partitions or dynamicFilters is null");
+        assertFalse(isPartitionFiltered(null, null, null), "Should not filter partition if either partitions or dynamicFilters is null");
 
         Set<DynamicFilter> dynamicFilters = new HashSet<>();
         List<HivePartitionKey> partitions = new ArrayList<>();
 
-        assertFalse(isPartitionFiltered(partitions, null), "Should not filter partition if either partitions or dynamicFilters is null");
-        assertFalse(isPartitionFiltered(null, dynamicFilters), "Should not filter partition if either partitions or dynamicFilters is null");
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters), "Should not filter partition if partitions and dynamicFilters are empty");
+        assertFalse(isPartitionFiltered(partitions, null, null), "Should not filter partition if either partitions or dynamicFilters is null");
+        assertFalse(isPartitionFiltered(null, dynamicFilters, null), "Should not filter partition if either partitions or dynamicFilters is null");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if partitions and dynamicFilters are empty");
 
         partitions.add(new HivePartitionKey("pt_d", "0"));
         partitions.add(new HivePartitionKey("app_id", "10000"));
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters), "Should not filter partition if dynamicFilters is empty");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if dynamicFilters is empty");
 
         ColumnHandle dayColumn = new HiveColumnHandle("pt_d", HIVE_INT, parseTypeSignature(INTEGER), 0, PARTITION_KEY, Optional.empty());
         BloomFilter dayFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), 1024 * 1024, 0.01);
         dynamicFilters.add(new BloomFilterDynamicFilter("1", dayColumn, dayFilter, DynamicFilter.Type.GLOBAL));
-        assertTrue(isPartitionFiltered(partitions, dynamicFilters), "Should filter partition if any dynamicFilter has 0 element count");
-        assertTrue(isPartitionFiltered(ImmutableList.of(), dynamicFilters), "Should filter partition if any dynamicFilter has 0 element count");
+        assertTrue(isPartitionFiltered(partitions, dynamicFilters, null), "Should filter partition if any dynamicFilter has 0 element count");
+        assertTrue(isPartitionFiltered(ImmutableList.of(), dynamicFilters, null), "Should filter partition if any dynamicFilter has 0 element count");
 
         dayFilter.put("1");
-        assertTrue(isPartitionFiltered(partitions, dynamicFilters), "Should filter partition if partition value not in dynamicFilter");
+        assertTrue(isPartitionFiltered(partitions, dynamicFilters, null), "Should filter partition if partition value not in dynamicFilter");
 
         dayFilter.put("0");
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters), "Should not filter partition if partition value is in dynamicFilter");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if partition value is in dynamicFilter");
     }
 
     @Test
@@ -138,7 +138,7 @@ public class TestHiveUtil
         Set nameFilter = new HashSet();
         nameFilter.add("Alice");
         dynamicFilters.add(new HashSetDynamicFilter("1", nameColumn, nameFilter, DynamicFilter.Type.GLOBAL));
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters), "Should not filter partition if dynamicFilter is on non-partition column");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if dynamicFilter is on non-partition column");
     }
 
     private static void assertToPartitionValues(String partitionName)

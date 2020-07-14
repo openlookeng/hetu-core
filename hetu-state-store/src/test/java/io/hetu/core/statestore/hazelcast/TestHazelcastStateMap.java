@@ -18,8 +18,10 @@ package io.hetu.core.statestore.hazelcast;
 import com.google.common.collect.ImmutableSet;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.NetworkConfig;
+import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import io.airlift.slice.Slice;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.listener.EntryAddedListener;
@@ -36,6 +38,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.statestore.StateCollection.Type;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -67,6 +70,8 @@ public class TestHazelcastStateMap
     private void setup()
     {
         Config config = new Config();
+        SerializerConfig sc = new SerializerConfig().setImplementation(new HazelCastSliceSerializer()).setTypeClass(Slice.class);
+        config.getSerializationConfig().addSerializerConfig(sc);
         config.setClusterName("cluster-test-map-" + UUID.randomUUID());
         // Specify ports to make sure different test cases won't connect to same cluster
         NetworkConfig network = config.getNetworkConfig();
@@ -162,6 +167,21 @@ public class TestHazelcastStateMap
         assertEquals(stateMap.get(TEST_KEY1), TEST_VALUE1);
         assertEquals(stateMap.get(TEST_KEY2), TEST_VALUE2);
         assertNull(stateMap.get(NOT_EXIST));
+    }
+
+    /**
+     * Test Hazelcast Slice serializer
+     */
+    @Test
+    public void testSliceSerializer()
+    {
+        Slice s3 = utf8Slice("test3");
+
+        Slice s1 = utf8Slice("test1");
+        StateMap<String, Slice> ss = (StateMap<String, Slice>) stateStore.createStateCollection("slicecheck", STATE_COLLECTION_TYPE);
+        ss.put("s1", s1);
+        Slice s2 = ss.get("s1");
+        assertEquals(s1, s2);
     }
 
     /**

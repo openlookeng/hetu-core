@@ -42,6 +42,7 @@ import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.resourcegroups.QueryType;
+import io.prestosql.spi.type.TypeManager;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 
@@ -94,6 +95,7 @@ public class HiveSplitManager
     private final int maxSplitsPerSecond;
     private final boolean recursiveDfsWalkerEnabled;
     private final CounterStat highMemorySplitSourceCounter;
+    private final TypeManager typeManager;
 
     @Inject
     public HiveSplitManager(
@@ -105,6 +107,7 @@ public class HiveSplitManager
             DirectoryLister directoryLister,
             @ForHive ExecutorService executorService,
             VersionEmbedder versionEmbedder,
+            TypeManager typeManager,
             CoercionPolicy coercionPolicy)
     {
         this(
@@ -123,7 +126,8 @@ public class HiveSplitManager
                 hiveConfig.getMaxInitialSplits(),
                 hiveConfig.getSplitLoaderConcurrency(),
                 hiveConfig.getMaxSplitsPerSecond(),
-                hiveConfig.getRecursiveDirWalkerEnabled());
+                hiveConfig.getRecursiveDirWalkerEnabled(),
+                typeManager);
     }
 
     public HiveSplitManager(
@@ -142,7 +146,8 @@ public class HiveSplitManager
             int maxInitialSplits,
             int splitLoaderConcurrency,
             @Nullable Integer maxSplitsPerSecond,
-            boolean recursiveDfsWalkerEnabled)
+            boolean recursiveDfsWalkerEnabled,
+            TypeManager typeManager)
     {
         this.metastoreProvider = requireNonNull(metastoreProvider, "metastore is null");
         this.partitionManager = requireNonNull(partitionManager, "partitionManager is null");
@@ -161,6 +166,7 @@ public class HiveSplitManager
         this.splitLoaderConcurrency = splitLoaderConcurrency;
         this.maxSplitsPerSecond = firstNonNull(maxSplitsPerSecond, Integer.MAX_VALUE);
         this.recursiveDfsWalkerEnabled = recursiveDfsWalkerEnabled;
+        this.typeManager = typeManager;
     }
 
     @Override
@@ -235,7 +241,8 @@ public class HiveSplitManager
                         .map(validTxnWriteIdList -> validTxnWriteIdList.getTableValidWriteIdList(table.getDatabaseName() + "." + table.getTableName())),
                 dynamicFilterSupplier,
                 queryType,
-                queryInfo);
+                queryInfo,
+                typeManager);
 
         HiveSplitSource splitSource;
         switch (splitSchedulingStrategy) {
@@ -252,7 +259,8 @@ public class HiveSplitManager
                         executor,
                         new CounterStat(),
                         dynamicFilterSupplier,
-                        userDefinedCachePredicates);
+                        userDefinedCachePredicates,
+                        typeManager);
                 break;
             case GROUPED_SCHEDULING:
                 splitSource = HiveSplitSource.bucketed(
@@ -267,7 +275,8 @@ public class HiveSplitManager
                         executor,
                         new CounterStat(),
                         dynamicFilterSupplier,
-                        userDefinedCachePredicates);
+                        userDefinedCachePredicates,
+                        typeManager);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown splitSchedulingStrategy: " + splitSchedulingStrategy);

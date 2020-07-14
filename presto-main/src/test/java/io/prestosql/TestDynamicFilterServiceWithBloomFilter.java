@@ -111,7 +111,7 @@ public class TestDynamicFilterServiceWithBloomFilter
         Assert.assertEquals(stateStoreProvider.getStateStore()
                 .getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, session.getQueryId().toString())).size(), 4);
 
-        Thread.sleep(2000);
+        Thread.sleep(3000);
         BloomFilter bf = fetchDynamicFilter(filterId, session.getQueryId().toString());
         for (int i = 1; i < 9; i++) {
             Assert.assertEquals(true, bf.mightContain(i + ""));
