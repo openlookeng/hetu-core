@@ -285,8 +285,7 @@ public class PlanOptimizers
                         .addAll(new CanonicalizeExpressions(metadata, typeAnalyzer).rules())
                         .build());
 
-        PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer));
-
+        PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, true));
         builder.add(
                 // Clean up all the sugar in expressions, e.g. AtTimeZone, must be run before all the other optimizers
                 new IterativeOptimizer(
@@ -410,7 +409,9 @@ public class PlanOptimizers
                                 new TransformCorrelatedSingleRowSubqueryToProject(),
                                 new RemoveAggregationInSemiJoin())),
                 new CheckSubqueryNodesAreRewritten(),
-                predicatePushDown,
+                new StatsRecordingPlanOptimizer(
+                        optimizerStats,
+                        new PredicatePushDown(metadata, typeAnalyzer, false)),
                 new PruneUnreferencedOutputs(), // Prune unreferenced outputs to make the sub-query simple
                 inlineProjections,              // Remove redundant projects to make the sub-query simple
                 new SubQueryPushDown(metadata), // SubQueryPushDown is introduced in Hetu. It must run before AddExchanges
