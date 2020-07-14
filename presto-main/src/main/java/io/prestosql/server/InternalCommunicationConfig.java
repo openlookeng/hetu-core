@@ -27,6 +27,7 @@ public class InternalCommunicationConfig
     private String trustStorePassword;
     private boolean kerberosEnabled;
     private boolean kerberosUseCanonicalHostname = true;
+    private boolean isBinaryEncoding;
 
     public boolean isHttpsRequired()
     {
@@ -37,6 +38,18 @@ public class InternalCommunicationConfig
     public InternalCommunicationConfig setHttpsRequired(boolean httpsRequired)
     {
         this.httpsRequired = httpsRequired;
+        return this;
+    }
+
+    public boolean isBinaryEncoding()
+    {
+        return isBinaryEncoding;
+    }
+
+    @Config("internal-communication.wire.isBinaryEncoding")
+    public InternalCommunicationConfig setBinaryEncoding(boolean isBinaryEncoding)
+    {
+        this.isBinaryEncoding = isBinaryEncoding;
         return this;
     }
 

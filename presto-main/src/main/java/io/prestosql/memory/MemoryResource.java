@@ -28,6 +28,7 @@ import javax.ws.rs.core.Response;
 
 import static io.prestosql.memory.LocalMemoryManager.GENERAL_POOL;
 import static io.prestosql.memory.LocalMemoryManager.RESERVED_POOL;
+import static io.prestosql.protocol.SmileHeader.APPLICATION_JACKSON_SMILE;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
@@ -48,8 +49,8 @@ public class MemoryResource
     }
 
     @POST
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    @Consumes({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public MemoryInfo getMemoryInfo(MemoryPoolAssignmentsRequest request)
     {
         taskManager.updateMemoryPoolAssignments(request);

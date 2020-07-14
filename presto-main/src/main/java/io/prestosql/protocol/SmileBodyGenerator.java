@@ -11,24 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.server;
+package io.prestosql.protocol;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import io.airlift.slice.Slice;
+import com.google.common.annotations.Beta;
+import io.airlift.http.client.StaticBodyGenerator;
 
-import java.io.IOException;
-
-import static io.airlift.slice.Slices.utf8Slice;
-
-public class SliceDeserializer
-        extends JsonDeserializer<Slice>
+@Beta
+public class SmileBodyGenerator<T>
+        extends StaticBodyGenerator
 {
-    @Override
-    public Slice deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
-            throws IOException
+    public static <T> SmileBodyGenerator<T> smileBodyGenerator(SmileCodec<T> smileCodec, T instance)
     {
-        return utf8Slice(jsonParser.getText());
+        return new SmileBodyGenerator<>(smileCodec, instance);
+    }
+
+    private SmileBodyGenerator(SmileCodec<T> smileCodec, T instance)
+    {
+        super(smileCodec.toBytes(instance));
     }
 }

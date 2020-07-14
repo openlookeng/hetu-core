@@ -1386,7 +1386,9 @@
                     <version>2.3</version>
                     <configuration>
                         <validHeaders>
-                            ${air.main.basedir}/src/main/resource/license/license-header.txt
+                            <item> ${air.main.basedir}/src/main/resource/license/license-header.txt</item>
+                            <item> ${air.main.basedir}/src/main/resource/license/license-header-alternate-2010.txt</item>
+                            <item> ${air.main.basedir}/src/main/resource/license/license-header-alternate-2012.txt</item>
                         </validHeaders>
                     </configuration>
                 </plugin>

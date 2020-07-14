@@ -73,6 +73,7 @@ import static io.prestosql.client.PrestoHeaders.PRESTO_MAX_WAIT;
 import static io.prestosql.client.PrestoHeaders.PRESTO_PAGE_NEXT_TOKEN;
 import static io.prestosql.client.PrestoHeaders.PRESTO_PAGE_TOKEN;
 import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
+import static io.prestosql.protocol.SmileHeader.APPLICATION_JACKSON_SMILE;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -107,7 +108,7 @@ public class TaskResource
     }
 
     @GET
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public List<TaskInfo> getAllTaskInfo(@Context UriInfo uriInfo)
     {
         List<TaskInfo> allTaskInfo = taskManager.getAllTaskInfo();
@@ -119,8 +120,8 @@ public class TaskResource
 
     @POST
     @Path("{taskId}")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    @Consumes({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public Response createOrUpdateTask(@PathParam("taskId") TaskId taskId, TaskUpdateRequest taskUpdateRequest, @Context UriInfo uriInfo)
     {
         requireNonNull(taskUpdateRequest, "taskUpdateRequest is null");
@@ -142,7 +143,7 @@ public class TaskResource
 
     @GET
     @Path("{taskId}")
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public void getTaskInfo(
             @PathParam("taskId") final TaskId taskId,
             @HeaderParam(PRESTO_CURRENT_STATE) TaskState currentState,
@@ -180,7 +181,7 @@ public class TaskResource
 
     @GET
     @Path("{taskId}/status")
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public void getTaskStatus(
             @PathParam("taskId") TaskId taskId,
             @HeaderParam(PRESTO_CURRENT_STATE) TaskState currentState,
@@ -214,7 +215,7 @@ public class TaskResource
 
     @DELETE
     @Path("{taskId}")
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public TaskInfo deleteTask(
             @PathParam("taskId") TaskId taskId,
             @QueryParam("abort") @DefaultValue("true") boolean abort,

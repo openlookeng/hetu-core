@@ -14,18 +14,21 @@
 package io.prestosql.server.remotetask;
 
 import com.google.common.util.concurrent.FutureCallback;
-import io.airlift.http.client.FullJsonResponseHandler;
 import io.airlift.http.client.HttpStatus;
+import io.prestosql.protocol.BaseResponse;
+import io.prestosql.protocol.JsonResponseWrapper;
 import io.prestosql.spi.PrestoException;
 
 import java.net.URI;
 
+import static io.airlift.http.client.HttpStatus.OK;
+import static io.prestosql.protocol.JsonResponseWrapper.unwrapJsonResponse;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class SimpleHttpResponseHandler<T>
-        implements FutureCallback<FullJsonResponseHandler.JsonResponse<T>>
+        implements FutureCallback<BaseResponse<T>>
 {
     private final SimpleHttpResponseCallback<T> callback;
 
@@ -40,7 +43,7 @@ public class SimpleHttpResponseHandler<T>
     }
 
     @Override
-    public void onSuccess(FullJsonResponseHandler.JsonResponse<T> response)
+    public void onSuccess(BaseResponse<T> response)
     {
         stats.updateSuccess();
         stats.responseSize(response.getResponseSize());
@@ -64,7 +67,7 @@ public class SimpleHttpResponseHandler<T>
                                 HttpStatus.OK.code(),
                                 response.getStatusCode(),
                                 response.getStatusMessage(),
-                                response.getResponseBody()));
+                                createErrorMessage(response)));
                     }
                 }
                 else {
@@ -77,6 +80,24 @@ public class SimpleHttpResponseHandler<T>
             // this should never happen
             callback.fatal(t);
         }
+    }
+
+    private String createErrorMessage(BaseResponse<T> response)
+    {
+        if (response instanceof JsonResponseWrapper) {
+            return format("Expected response code from %s to be %s, but was %s: %s%n%s",
+                    uri,
+                    OK.code(),
+                    response.getStatusCode(),
+                    response.getStatusMessage(),
+                    unwrapJsonResponse(response).getResponseBody());
+        }
+        return format("Expected response code from %s to be %s, but was %s: %s",
+                uri,
+                OK.code(),
+                response.getStatusCode(),
+                response.getStatusMessage(),
+                new String(response.getResponseBytes()));
     }
 
     @Override

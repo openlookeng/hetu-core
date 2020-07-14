@@ -1,4 +1,6 @@
 /*
+ * Copyright 2012 Proofpoint, Inc.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,24 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.server;
-
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import io.airlift.slice.Slice;
+package io.prestosql.protocol;
 
 import java.io.IOException;
 
-import static io.airlift.slice.Slices.utf8Slice;
-
-public class SliceDeserializer
-        extends JsonDeserializer<Slice>
+/**
+ * Exceptions that extend this class will be caught by the ParsingExceptionMapper and returned with a
+ * 400 response status code.
+ */
+public class ParsingException
+        extends IOException
 {
-    @Override
-    public Slice deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
-            throws IOException
+    public ParsingException(String message)
     {
-        return utf8Slice(jsonParser.getText());
+        super(message);
+    }
+
+    public ParsingException(String message, Throwable cause)
+    {
+        super(message, cause);
     }
 }

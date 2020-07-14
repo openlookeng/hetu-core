@@ -32,7 +32,10 @@ import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.memory.LowMemoryKiller.QueryMemoryInfo;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.protocol.Codec;
+import io.prestosql.protocol.SmileCodec;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -87,6 +90,7 @@ import static io.prestosql.metadata.NodeState.ACTIVE;
 import static io.prestosql.metadata.NodeState.ISOLATED;
 import static io.prestosql.metadata.NodeState.ISOLATING;
 import static io.prestosql.metadata.NodeState.SHUTTING_DOWN;
+import static io.prestosql.protocol.JsonCodecWrapper.wrapJsonCodec;
 import static io.prestosql.spi.StandardErrorCode.CLUSTER_OUT_OF_MEMORY;
 import static java.lang.Math.min;
 import static java.lang.String.format;
@@ -104,8 +108,8 @@ public class ClusterMemoryManager
     private final LocationFactory locationFactory;
     private final HttpClient httpClient;
     private final MBeanExporter exporter;
-    private final JsonCodec<MemoryInfo> memoryInfoCodec;
-    private final JsonCodec<MemoryPoolAssignmentsRequest> assignmentsRequestJsonCodec;
+    private final Codec<MemoryInfo> memoryInfoCodec;
+    private final Codec<MemoryPoolAssignmentsRequest> assignmentsRequestCodec;
     private final DataSize maxQueryMemory;
     private final DataSize maxQueryTotalMemory;
     private final boolean enabled;
@@ -122,6 +126,7 @@ public class ClusterMemoryManager
     // LocalStateProvider
     private final StateStoreProvider stateStoreProvider;
     private final HetuConfig hetuConfig;
+    private final boolean isBinaryEncoding;
 
     @GuardedBy("this")
     private final Map<String, RemoteNodeMemory> nodes = new HashMap<>();
@@ -144,8 +149,10 @@ public class ClusterMemoryManager
             InternalNodeManager nodeManager,
             LocationFactory locationFactory,
             MBeanExporter exporter,
-            JsonCodec<MemoryInfo> memoryInfoCodec,
+            JsonCodec<MemoryInfo> memoryInfoJsonCodec,
+            SmileCodec<MemoryInfo> memoryInfoSmileCodec,
             JsonCodec<MemoryPoolAssignmentsRequest> assignmentsRequestJsonCodec,
+            SmileCodec<MemoryPoolAssignmentsRequest> assignmentsRequestSmileCodec,
             QueryIdGenerator queryIdGenerator,
             LowMemoryKiller lowMemoryKiller,
             ServerConfig serverConfig,
@@ -153,7 +160,8 @@ public class ClusterMemoryManager
             NodeMemoryConfig nodeMemoryConfig,
             NodeSchedulerConfig schedulerConfig,
             StateStoreProvider stateStoreProvider,
-            HetuConfig hetuConfig)
+            HetuConfig hetuConfig,
+            InternalCommunicationConfig internalCommunicationConfig)
     {
         requireNonNull(config, "config is null");
         requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null");
@@ -163,8 +171,6 @@ public class ClusterMemoryManager
         this.locationFactory = requireNonNull(locationFactory, "locationFactory is null");
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.exporter = requireNonNull(exporter, "exporter is null");
-        this.memoryInfoCodec = requireNonNull(memoryInfoCodec, "memoryInfoCodec is null");
-        this.assignmentsRequestJsonCodec = requireNonNull(assignmentsRequestJsonCodec, "assignmentsRequestJsonCodec is null");
         this.lowMemoryKiller = requireNonNull(lowMemoryKiller, "lowMemoryKiller is null");
         this.maxQueryMemory = config.getMaxQueryMemory();
         this.maxQueryTotalMemory = config.getMaxQueryTotalMemory();
@@ -175,6 +181,16 @@ public class ClusterMemoryManager
 
         verify(maxQueryMemory.toBytes() <= maxQueryTotalMemory.toBytes(),
                 "maxQueryMemory cannot be greater than maxQueryTotalMemory");
+
+        this.isBinaryEncoding = internalCommunicationConfig.isBinaryEncoding();
+        if (internalCommunicationConfig.isBinaryEncoding()) {
+            this.memoryInfoCodec = requireNonNull(memoryInfoSmileCodec, "memoryInfoSmileCodec is null");
+            this.assignmentsRequestCodec = requireNonNull(assignmentsRequestSmileCodec, "AssignmentRequestSmileCodec is null");
+        }
+        else {
+            this.memoryInfoCodec = wrapJsonCodec(requireNonNull(memoryInfoJsonCodec, "memoryInfoJsonCodec is null"));
+            this.assignmentsRequestCodec = wrapJsonCodec(requireNonNull(assignmentsRequestJsonCodec, "assignmentsRequestJsonCodec is null"));
+        }
 
         this.pools = createClusterMemoryPools(nodeMemoryConfig.isReservedPoolEnabled());
         // Inject LocalStateProvider
@@ -516,7 +532,7 @@ public class ClusterMemoryManager
         // Add new nodes
         for (InternalNode node : aliveNodes) {
             if (!nodes.containsKey(node.getNodeIdentifier())) {
-                nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestJsonCodec, locationFactory.createMemoryInfoLocation(node)));
+                nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
             }
         }
 

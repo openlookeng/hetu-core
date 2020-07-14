@@ -46,7 +46,10 @@ import io.prestosql.metadata.HandleResolver;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
+import io.prestosql.protocol.SmileCodec;
+import io.prestosql.protocol.SmileModule;
 import io.prestosql.server.HttpRemoteTaskFactory;
+import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.TaskUpdateRequest;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.type.Type;
@@ -88,8 +91,10 @@ import static io.prestosql.client.PrestoHeaders.PRESTO_MAX_WAIT;
 import static io.prestosql.execution.TaskTestUtils.TABLE_SCAN_NODE_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.protocol.SmileCodecBinder.smileCodecBinder;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_MISMATCH;
+import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.lang.Math.min;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -217,6 +222,7 @@ public class TestHttpRemoteTask
     {
         Bootstrap app = new Bootstrap(
                 new JsonModule(),
+                new SmileModule(),
                 new HandleJsonModule(),
                 new Module()
                 {
@@ -229,14 +235,20 @@ public class TestHttpRemoteTask
                         jsonCodecBinder(binder).bindJsonCodec(TaskStatus.class);
                         jsonCodecBinder(binder).bindJsonCodec(TaskInfo.class);
                         jsonCodecBinder(binder).bindJsonCodec(TaskUpdateRequest.class);
+                        smileCodecBinder(binder).bindSmileCodec(TaskStatus.class);
+                        smileCodecBinder(binder).bindSmileCodec(TaskInfo.class);
+                        smileCodecBinder(binder).bindSmileCodec(TaskUpdateRequest.class);
                     }
 
                     @Provides
                     private HttpRemoteTaskFactory createHttpRemoteTaskFactory(
                             JsonMapper jsonMapper,
-                            JsonCodec<TaskStatus> taskStatusCodec,
-                            JsonCodec<TaskInfo> taskInfoCodec,
-                            JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec)
+                            JsonCodec<TaskStatus> taskStatusJsonCodec,
+                            SmileCodec<TaskStatus> taskStatusSmileCodec,
+                            JsonCodec<TaskInfo> taskInfoJsonCodec,
+                            SmileCodec<TaskInfo> taskInfoSmileCodec,
+                            JsonCodec<TaskUpdateRequest> taskUpdateRequestJsonCodec,
+                            SmileCodec<TaskUpdateRequest> taskUpdateRequestSmileCodec)
                     {
                         JaxrsTestingHttpProcessor jaxrsTestingHttpProcessor = new JaxrsTestingHttpProcessor(URI.create("http://fake.invalid/"), testingTaskResource, jsonMapper);
                         TestingHttpClient testingHttpClient = new TestingHttpClient(jaxrsTestingHttpProcessor.setTrace(TRACE_HTTP));
@@ -246,10 +258,14 @@ public class TestHttpRemoteTask
                                 TASK_MANAGER_CONFIG,
                                 testingHttpClient,
                                 new TestSqlTaskManager.MockLocationFactory(),
-                                taskStatusCodec,
-                                taskInfoCodec,
-                                taskUpdateRequestCodec,
-                                new RemoteTaskStats());
+                                taskStatusJsonCodec,
+                                taskStatusSmileCodec,
+                                taskInfoJsonCodec,
+                                taskInfoSmileCodec,
+                                taskUpdateRequestJsonCodec,
+                                taskUpdateRequestSmileCodec,
+                                new RemoteTaskStats(),
+                                new InternalCommunicationConfig());
                     }
                 });
         Injector injector = app

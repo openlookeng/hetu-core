@@ -133,6 +133,7 @@ import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.sql.planner.CompilerConfig;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
 import io.prestosql.sql.planner.NodePartitioningManager;
+import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
@@ -165,6 +166,7 @@ import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.FLAT;
 import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.LEGACY;
+import static io.prestosql.protocol.SmileCodecBinder.smileCodecBinder;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -354,6 +356,8 @@ public class ServerMainModule
         jsonCodecBinder(binder).bindJsonCodec(TaskStatus.class);
         jsonCodecBinder(binder).bindJsonCodec(StageInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(TaskInfo.class);
+        smileCodecBinder(binder).bindSmileCodec(TaskStatus.class);
+        smileCodecBinder(binder).bindSmileCodec(TaskInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(OperatorStats.class);
         jsonCodecBinder(binder).bindJsonCodec(ExecutionFailureInfo.class);
         jaxrsBinder(binder).bind(PagesResponseWriter.class);
@@ -382,6 +386,8 @@ public class ServerMainModule
 
         jsonCodecBinder(binder).bindJsonCodec(MemoryInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(MemoryPoolAssignmentsRequest.class);
+        smileCodecBinder(binder).bindSmileCodec(MemoryInfo.class);
+        smileCodecBinder(binder).bindSmileCodec(MemoryPoolAssignmentsRequest.class);
 
         // transaction manager
         configBinder(binder).bindConfig(TransactionManagerConfig.class);
@@ -431,6 +437,9 @@ public class ServerMainModule
         // splits
         jsonCodecBinder(binder).bindJsonCodec(TaskUpdateRequest.class);
         jsonCodecBinder(binder).bindJsonCodec(ConnectorSplit.class);
+        smileCodecBinder(binder).bindSmileCodec(TaskUpdateRequest.class);
+        smileCodecBinder(binder).bindSmileCodec(ConnectorSplit.class);
+        smileCodecBinder(binder).bindSmileCodec(PlanFragment.class);
         jsonBinder(binder).addSerializerBinding(Slice.class).to(SliceSerializer.class);
         jsonBinder(binder).addDeserializerBinding(Slice.class).to(SliceDeserializer.class);
         jsonBinder(binder).addSerializerBinding(Expression.class).to(ExpressionSerializer.class);
@@ -459,6 +468,7 @@ public class ServerMainModule
 
         // dynamic catalog resource
         jsonCodecBinder(binder).bindJsonCodec(CatalogInfo.class);
+
         binder.bind(DynamicCatalogStore.class).in(Scopes.SINGLETON);
         binder.bind(DynamicCatalogScanner.class).in(Scopes.SINGLETON);
         binder.bind(CatalogStoreUtil.class).in(Scopes.SINGLETON);
