@@ -17,14 +17,14 @@ package io.hetu.core.plugin.datacenter.pagesource;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
+import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.client.DataCenterClientSession;
 import io.prestosql.client.DataCenterStatementClient;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import okhttp3.OkHttpClient;
 
 import java.io.IOException;
@@ -120,19 +120,22 @@ public class DataCenterPageSource
 
     private void applyDynamicFilters(Map<ColumnHandle, DynamicFilter> dynamicFilters)
     {
-        ImmutableMap.Builder<String, DynamicFilter> builder = new ImmutableMap.Builder();
+        ImmutableMap.Builder<String, byte[]> builder = new ImmutableMap.Builder();
         for (Map.Entry<ColumnHandle, DynamicFilter> entry : dynamicFilters.entrySet()) {
             if (!appliedDynamicFilters.contains(entry.getKey().getColumnName())) {
                 DynamicFilter df = entry.getValue();
+                String columnName = entry.getKey().getColumnName();
                 if (df instanceof HashSetDynamicFilter) {
-                    df = BloomFilterDynamicFilter.fromHashSetDynamicFilter((HashSetDynamicFilter) df);
-                    ((BloomFilterDynamicFilter) df).createSerializedBloomFilter();
+                    BloomFilterDynamicFilter bloomFilterDynamicFilter = BloomFilterDynamicFilter.fromHashSetDynamicFilter((HashSetDynamicFilter) df);
+                    builder.put(columnName, bloomFilterDynamicFilter.createSerializedBloomFilter());
                 }
-                builder.put(entry.getKey().getColumnName(), df);
+                else {
+                    builder.put(columnName, ((BloomFilterDynamicFilter) df).getBloomFilterSerialized());
+                }
             }
         }
 
-        Map<String, DynamicFilter> newDynamicFilters = builder.build();
+        Map<String, byte[]> newDynamicFilters = builder.build();
         if (!newDynamicFilters.isEmpty()) {
             if (client.applyDynamicFilters(newDynamicFilters)) {
                 appliedDynamicFilters.addAll(newDynamicFilters.keySet());

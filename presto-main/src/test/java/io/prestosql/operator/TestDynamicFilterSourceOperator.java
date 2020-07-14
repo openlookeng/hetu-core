@@ -17,14 +17,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.node.NodeInfo;
+import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
+import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStoreBootstrapper;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStoreFactory;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
@@ -103,13 +103,10 @@ public class TestDynamicFilterSourceOperator
             throws Exception
     {
         File launcherConfigFile = new File(STATE_STORE_CONFIGURATION_PATH);
-        if (!launcherConfigFile.exists()) {
-            launcherConfigFile.createNewFile();
-        }
-        else {
+        if (launcherConfigFile.exists()) {
             launcherConfigFile.delete();
-            launcherConfigFile.createNewFile();
         }
+        launcherConfigFile.createNewFile();
         FileWriter configWriter = new FileWriter(STATE_STORE_CONFIGURATION_PATH);
         configWriter.write("state-store.type=hazelcast\n" +
                 "state-store.name=test\n" +
@@ -136,7 +133,8 @@ public class TestDynamicFilterSourceOperator
     }
 
     @BeforeMethod
-    public void setUp() throws Exception
+    public void setUp()
+            throws Exception
     {
         executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
         scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
@@ -238,7 +236,8 @@ public class TestDynamicFilterSourceOperator
     }
 
     @Test
-    public void testGlobalDynamicFilterSourceOperatorBloomFilter() throws IOException
+    public void testGlobalDynamicFilterSourceOperatorBloomFilter()
+            throws IOException
     {
         String filterId = "99";
         DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
@@ -270,7 +269,8 @@ public class TestDynamicFilterSourceOperator
     }
 
     @Test
-    public void testGlobalDynamicFilterSourceOperatorBloomFilterSlice() throws IOException
+    public void testGlobalDynamicFilterSourceOperatorBloomFilterSlice()
+            throws IOException
     {
         String filterId = "909";
         DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
@@ -303,7 +303,8 @@ public class TestDynamicFilterSourceOperator
     }
 
     @Test
-    public void testGlobalDynamicFilterSourceOperatorHashSet() throws IOException
+    public void testGlobalDynamicFilterSourceOperatorHashSet()
+            throws IOException
     {
         String filterId = "22";
         DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory

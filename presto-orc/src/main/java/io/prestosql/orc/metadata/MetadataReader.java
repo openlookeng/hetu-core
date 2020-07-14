@@ -14,7 +14,7 @@
 package io.prestosql.orc.metadata;
 
 import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,6 +37,6 @@ public interface MetadataReader
     List<RowGroupIndex> readRowIndexes(HiveWriterVersion hiveWriterVersion, InputStream inputStream)
             throws IOException;
 
-    List<BloomFilter> readBloomFilterIndexes(InputStream inputStream)
+    List<HashableBloomFilter> readBloomFilterIndexes(InputStream inputStream)
             throws IOException;
 }

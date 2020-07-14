@@ -11,13 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.orc.metadata.statistics;
+package io.hetu.core.common.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.math.DoubleMath;
 import io.airlift.slice.ByteArrays;
 import io.airlift.slice.Slice;
 import io.airlift.slice.UnsafeSlice;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.math.RoundingMode;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -46,7 +54,6 @@ import static java.lang.Double.doubleToLongBits;
  * This class was forked from {@code org.apache.orc.util.BloomFilter}.
  */
 public class BloomFilter
-        implements StatisticsHasher.Hashable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(BloomFilter.class).instanceSize() + ClassLayout.parseClass(BitSet.class).instanceSize();
 
@@ -54,7 +61,7 @@ public class BloomFilter
     private static final long NULL_HASHCODE = 2862933555777941757L;
 
     private final BitSet bitSet;
-    private final int numBits;
+    private int numBits;
     private final int numHashFunctions;
 
     public BloomFilter(long expectedEntries, double fpp)
@@ -81,6 +88,29 @@ public class BloomFilter
         numHashFunctions = numFuncs;
     }
 
+    /**
+     * Merge in another BloomFilter if it's compatible
+     *
+     * @param that BloomFilter to merge
+     */
+    public void merge(BloomFilter that)
+    {
+        if (that == null) {
+            throw new IllegalArgumentException("BloomFilter to merge is null");
+        }
+
+        if (this == that) {
+            return;
+        }
+
+        if (numHashFunctions != that.getNumHashFunctions()) {
+            throw new IllegalArgumentException("BloomFilter to merge must have same number of hash functions");
+        }
+
+        bitSet.merge(that.bitSet);
+        this.numBits = (int) bitSet.bitSize();
+    }
+
     static int optimalNumOfHashFunctions(long n, long m)
     {
         return Math.max(1, (int) Math.round((double) m / n * Math.log(2)));
@@ -94,14 +124,6 @@ public class BloomFilter
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + sizeOf(getBitSet());
-    }
-
-    @Override
-    public void addHash(StatisticsHasher hasher)
-    {
-        hasher.putInt(getNumBits())
-                .putInt(getNumHashFunctions())
-                .putLongs(getBitSet());
     }
 
     @Override
@@ -238,6 +260,87 @@ public class BloomFilter
         return bitSet.getData();
     }
 
+    /**
+     * Returns the probability that test() method return true for an object
+     * that has not actually been put in the BloomFilter.
+     * Ideally, this number should be close to the fpp parameter passed in constructor or smaller.
+     * If it is significantly higher, it is usually the case that too many items (more than expected)
+     * have been put in the BloomFilter.
+     *
+     * @return Expected fpp value
+     */
+    public double expectedFpp()
+    {
+        return Math.pow((double) bitSet.bitCount() / bitSet.bitSize(), numHashFunctions);
+    }
+
+    public long approximateElementCount()
+    {
+        long bitSize = bitSet.bitSize();
+        long bitCount = bitSet.bitCount();
+
+        /**
+         * Each insertion is expected to reduce the # of clear bits by a factor of
+         * `numHashFunctions/bitSize`. So, after n insertions, expected bitCount is `bitSize * (1 - (1 -
+         * numHashFunctions/bitSize)^n)`. Solving that for n, and approximating `ln x` as `x - 1` when x
+         * is close to 1 (why?), gives the following formula.
+         */
+        double fractionOfBitsSet = (double) bitCount / bitSize;
+        return DoubleMath.roundToLong(
+                -Math.log1p(-fractionOfBitsSet) * bitSize / numHashFunctions, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Serialize current BloomFilter into an OutputStream
+     *
+     * @param out OutputStream the BloomFilter is serialized to
+     * @throws IOException Exception writing values into the OutputStream
+     */
+    public void writeTo(OutputStream out)
+            throws IOException
+    {
+        DataOutputStream dataOutputStream = new DataOutputStream(out);
+        long[] bits = bitSet.getData();
+        dataOutputStream.writeInt(numHashFunctions);
+        dataOutputStream.writeInt(bits.length);
+        for (int i = 0; i < bits.length; i++) {
+            dataOutputStream.writeLong(bits[i]);
+        }
+    }
+
+    /**
+     * De-serialize a BloomFilter from a given InputStream
+     *
+     * @param in InputStream that contains serialized value of a BloomFilter
+     * @return De-serialized BloomFilter
+     * @throws IOException Exception reading values from the InputStream
+     */
+    public static BloomFilter readFrom(InputStream in)
+            throws IOException
+    {
+        int numHashFunctions = 0;
+        int numBits = 0;
+        try {
+            DataInputStream dataInputStream = new DataInputStream(in);
+            numHashFunctions = dataInputStream.readInt();
+            numBits = dataInputStream.readInt();
+
+            long[] bits = new long[numBits];
+            for (int i = 0; i < numBits; i++) {
+                bits[i] = dataInputStream.readLong();
+            }
+            return new BloomFilter(bits, numHashFunctions);
+        }
+        catch (IOException e) {
+            throw new IOException("Failed to deserialize BloomFilter, numHashFunctions: "
+                    + numHashFunctions
+                    + ", numBits: "
+                    + numBits
+                    + ", cause: "
+                    + e.getLocalizedMessage());
+        }
+    }
+
     @Override
     public String toString()
     {
@@ -254,6 +357,7 @@ public class BloomFilter
     public static class BitSet
     {
         private final long[] data;
+        private long bitCount;
 
         public BitSet(long bits)
         {
@@ -269,6 +373,26 @@ public class BloomFilter
         {
             checkArgument(data.length > 0, "data length is zero");
             this.data = data;
+            for (long value : data) {
+                bitCount += Long.bitCount(value);
+            }
+        }
+
+        /**
+         * Merge bitsets
+         *
+         * @param that BitSet to merge
+         */
+        public void merge(BitSet that)
+        {
+            if (this.data.length != that.data.length) {
+                throw new IllegalArgumentException("BitSet to merge must have same length");
+            }
+            for (int i = 0; i < data.length; i++) {
+                long oldBitCount = Long.bitCount(this.data[i]);
+                this.data[i] = this.data[i] | that.data[i];
+                bitCount += (Long.bitCount(this.data[i]) - oldBitCount);
+            }
         }
 
         /**
@@ -279,6 +403,7 @@ public class BloomFilter
         public void set(int index)
         {
             data[index >>> 6] |= (1L << index);
+            bitCount++;
         }
 
         /**
@@ -298,6 +423,11 @@ public class BloomFilter
         public long bitSize()
         {
             return (long) data.length * Long.SIZE;
+        }
+
+        public long bitCount()
+        {
+            return bitCount;
         }
 
         public long[] getData()

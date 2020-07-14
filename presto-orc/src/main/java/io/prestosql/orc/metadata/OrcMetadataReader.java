@@ -25,12 +25,12 @@ import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
 import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
 import io.prestosql.orc.metadata.Stream.StreamKind;
 import io.prestosql.orc.metadata.statistics.BinaryStatistics;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
 import io.prestosql.orc.metadata.statistics.BooleanStatistics;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 import io.prestosql.orc.metadata.statistics.DateStatistics;
 import io.prestosql.orc.metadata.statistics.DecimalStatistics;
 import io.prestosql.orc.metadata.statistics.DoubleStatistics;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 import io.prestosql.orc.metadata.statistics.IntegerStatistics;
 import io.prestosql.orc.metadata.statistics.StringStatistics;
 import io.prestosql.orc.metadata.statistics.StripeStatistics;
@@ -207,22 +207,22 @@ public class OrcMetadataReader
     }
 
     @Override
-    public List<BloomFilter> readBloomFilterIndexes(InputStream inputStream)
+    public List<HashableBloomFilter> readBloomFilterIndexes(InputStream inputStream)
             throws IOException
     {
         CodedInputStream input = CodedInputStream.newInstance(inputStream);
         OrcProto.BloomFilterIndex bloomFilter = OrcProto.BloomFilterIndex.parseFrom(input);
         List<OrcProto.BloomFilter> bloomFilterList = bloomFilter.getBloomFilterList();
-        ImmutableList.Builder<BloomFilter> builder = ImmutableList.builder();
+        ImmutableList.Builder<HashableBloomFilter> builder = ImmutableList.builder();
         for (OrcProto.BloomFilter orcBloomFilter : bloomFilterList) {
             if (orcBloomFilter.hasUtf8Bitset()) {
                 ByteString utf8Bitset = orcBloomFilter.getUtf8Bitset();
                 long[] bits = new long[utf8Bitset.size() / 8];
                 utf8Bitset.asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asLongBuffer().get(bits);
-                builder.add(new BloomFilter(bits, orcBloomFilter.getNumHashFunctions()));
+                builder.add(new HashableBloomFilter(bits, orcBloomFilter.getNumHashFunctions()));
             }
             else {
-                builder.add(new BloomFilter(Longs.toArray(orcBloomFilter.getBitsetList()), orcBloomFilter.getNumHashFunctions()));
+                builder.add(new HashableBloomFilter(Longs.toArray(orcBloomFilter.getBitsetList()), orcBloomFilter.getNumHashFunctions()));
             }
         }
         return builder.build();

@@ -16,6 +16,7 @@ package io.prestosql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
@@ -23,7 +24,6 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;

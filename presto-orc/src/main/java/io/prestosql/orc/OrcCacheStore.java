@@ -20,7 +20,7 @@ import com.google.common.cache.Weigher;
 import io.airlift.units.DataSize;
 import io.prestosql.orc.metadata.RowGroupIndex;
 import io.prestosql.orc.metadata.StripeFooter;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 import io.prestosql.spi.block.Block;
 
 import java.time.Duration;
@@ -37,7 +37,7 @@ public class OrcCacheStore
     private Cache<OrcDataSourceId, OrcFileTail> fileTailCache;
     private Cache<OrcStripeFooterCacheKey, StripeFooter> stripeFooterCache;
     private Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> rowIndexCache;
-    private Cache<OrcBloomFilterCacheKey, List<BloomFilter>> bloomFiltersCache;
+    private Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> bloomFiltersCache;
     private Cache<OrcRowDataCacheKey, Block> rowDataCache;
 
     private OrcCacheStore()
@@ -48,7 +48,7 @@ public class OrcCacheStore
     private OrcCacheStore(Cache<OrcDataSourceId, OrcFileTail> fileTailCache,
                           Cache<OrcStripeFooterCacheKey, StripeFooter> stripeFooterCache,
                           Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> rowIndexCache,
-                          Cache<OrcBloomFilterCacheKey, List<BloomFilter>> bloomFiltersCache,
+                          Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> bloomFiltersCache,
                           Cache<OrcRowDataCacheKey, Block> rowDataCache)
     {
         this.fileTailCache = fileTailCache;
@@ -73,7 +73,7 @@ public class OrcCacheStore
         return rowIndexCache;
     }
 
-    public Cache<OrcBloomFilterCacheKey, List<BloomFilter>> getBloomFiltersCache()
+    public Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> getBloomFiltersCache()
     {
         return bloomFiltersCache;
     }
@@ -136,7 +136,7 @@ public class OrcCacheStore
                     .build();
         }
 
-        private Cache<OrcBloomFilterCacheKey, List<BloomFilter>> buildOrcBloomFilterCache(long maximumSize,
+        private Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> buildOrcBloomFilterCache(long maximumSize,
                                                                                           Duration ttl)
         {
             return CacheBuilder.newBuilder()

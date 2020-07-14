@@ -1280,7 +1280,7 @@ public class LocalExecutionPlanner
                 if (sourceNode instanceof TableScanNode) {
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-                    dynamicFilterSupplier = () -> collector.getBloomFilters(tableScanNode, dynamicFilters.get(), queryId);
+                    dynamicFilterSupplier = () -> collector.getDynamicFilters(tableScanNode, dynamicFilters.get(), queryId);
                 }
             }
 

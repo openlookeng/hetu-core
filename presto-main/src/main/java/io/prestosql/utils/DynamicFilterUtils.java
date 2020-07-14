@@ -32,7 +32,7 @@ public class DynamicFilterUtils
     public static final String HASHSETTYPEGLOBAL = "HASHSETTYPEGLOBAL";
     public static final String BLOOMFILTERTYPEGLOBAL = "BLOOMFILTERTYPEGLOBAL";
     public static final String DFTYPEMAP = "dftypemap";
-    public static final double BLOOMFILTER_EXPECTEDFPP = 0.25;
+    public static final double BLOOM_FILTER_EXPECTED_FPP = 0.25F;
 
     private DynamicFilterUtils()
     {
@@ -43,8 +43,8 @@ public class DynamicFilterUtils
         return prefix + "-" + key;
     }
 
-    public static String createKey(String prefix, String filterkey, String queryId)
+    public static String createKey(String prefix, String filterKey, String queryId)
     {
-        return prefix + filterkey + "-" + queryId;
+        return prefix + filterKey + "-" + queryId;
     }
 }

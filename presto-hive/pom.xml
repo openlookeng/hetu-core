@@ -273,6 +273,11 @@
 
         <dependency>
             <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <scope>test</scope>
             <exclusions>
