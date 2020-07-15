@@ -52,6 +52,8 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
+import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertReference;
+import io.prestosql.sql.planner.plan.TableWriterNode.UpdateReference;
 import io.prestosql.sql.planner.plan.TopNNode;
 import io.prestosql.sql.planner.plan.TopNRowNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
@@ -489,6 +491,13 @@ public class AddLocalExchanges
             else {
                 requiredProperties = singleStream();
                 preferredProperties = defaultParallelism(session);
+            }
+            if (node.getTarget() instanceof UpdateReference
+                    || node.getTarget() instanceof DeleteAsInsertReference) {
+                //Update and DeleteAsInsert requires fixed number parallelism
+                // avoid change in order of data.
+                requiredProperties = fixedParallelism();
+                preferredProperties = fixedParallelism();
             }
             return planAndEnforceChildren(node, requiredProperties, preferredProperties);
         }
