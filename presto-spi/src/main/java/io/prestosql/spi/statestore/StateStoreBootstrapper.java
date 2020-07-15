@@ -27,9 +27,9 @@ public interface StateStoreBootstrapper
     /**
      * Bootstraps a state store and initializations
      *
-     * @param ips seed ips to bootstrap the state store
+     * @param locations locations a collection of host:port to bootstrap the state store
      * @param config the state store configs
      * @return bootstrapped StateStore instance
      */
-    StateStore bootstrap(Collection<String> ips, Map<String, String> config);
+    StateStore bootstrap(Collection<String> locations, Map<String, String> config);
 }

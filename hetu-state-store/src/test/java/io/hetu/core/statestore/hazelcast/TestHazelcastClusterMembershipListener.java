@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -56,7 +57,7 @@ public class TestHazelcastClusterMembershipListener
         final long timeout3000 = 3000L;
         StateStore member1 = setupHazelcastInstance(PORT1);
         member1.registerNodeFailureHandler(node -> {
-            assertEquals((String) node, LOCALHOST);
+            assertEquals((String) node, MEMBER_2_ADDRESS);
             isNotified = true;
         });
         StateStore member2 = setupHazelcastInstance(PORT2);
@@ -78,7 +79,7 @@ public class TestHazelcastClusterMembershipListener
         Map<String, String> config = new HashMap<>(0);
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", TEST_CLUSTER_NAME);
-        config.put("hazelcast.tcp-ip.port", port);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, port);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         return bootstrapper.bootstrap(ImmutableSet.of(MEMBER_1_ADDRESS, MEMBER_2_ADDRESS), config);

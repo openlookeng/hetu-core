@@ -60,6 +60,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import static com.google.common.base.Strings.repeat;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static io.prestosql.SequencePageBuilder.createSequencePage;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
@@ -113,7 +114,7 @@ public class TestDynamicFilterSourceOperator
                 "state-store.name=test\n" +
                 "state-store.cluster=test-cluster\n" +
                 "hazelcast.discovery.mode=tcp-ip\n" +
-                "hazelcast.tcp-ip.port=7980\n");
+                "hazelcast.discovery.port=7980\n");
         configWriter.close();
         Set<Seed> seeds = new HashSet<>();
         SeedStore mockSeedStore = mock(SeedStore.class);
@@ -150,7 +151,7 @@ public class TestDynamicFilterSourceOperator
         Map<String, String> config = new HashMap<>();
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", "test-cluster");
-        config.put("hazelcast.tcp-ip.port", port);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, port);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         return bootstrapper.bootstrap(ImmutableSet.of("127.0.0.1:" + port), config);

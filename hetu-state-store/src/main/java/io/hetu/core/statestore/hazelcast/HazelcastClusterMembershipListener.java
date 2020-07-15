@@ -56,6 +56,9 @@ public class HazelcastClusterMembershipListener
                 membershipEvent.getMember().getAddress().getHost(),
                 membershipEvent.getMember().getAddress().getPort());
 
-        memberRemovedHandler.accept(membershipEvent.getMember().getAddress().getHost());
+        memberRemovedHandler.accept(
+                membershipEvent.getMember().getAddress().getHost()
+                + ":"
+                + membershipEvent.getMember().getAddress().getPort());
     }
 }
