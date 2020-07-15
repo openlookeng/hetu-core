@@ -245,6 +245,10 @@ public class MetastoreUtil
         if (table.getDataColumns().size() <= 1) {
             throw new PrestoException(NOT_SUPPORTED, "Cannot drop the only non-partition column in a table");
         }
+        if (table.getStorage().getBucketProperty().isPresent() && table.getStorage().getBucketProperty().get()
+                .getBucketedBy().stream().anyMatch(column -> column.equals(columnName))) {
+            throw new PrestoException(NOT_SUPPORTED, "Cannot drop bucketing columns");
+        }
     }
 
     public static PrincipalPrivileges buildInitialPrivilegeSet(String tableOwner)
