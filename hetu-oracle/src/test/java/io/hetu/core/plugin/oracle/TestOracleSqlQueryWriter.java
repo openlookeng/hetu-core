@@ -378,7 +378,7 @@ public class TestOracleSqlQueryWriter
     /**
      * testRenameTableException
      */
-    @Test
+    @Test(expectedExceptions = RuntimeException.class)
     public void testRenameTableException()
     {
         JdbcIdentity identity = JdbcIdentity.from(SESSION);
@@ -388,14 +388,9 @@ public class TestOracleSqlQueryWriter
         try {
             oracleClient.renameTable(identity, tableHandle.get(), newTableName);
         }
-        catch (PrestoException e) {
-            // do nothing
-            // CHECKSTYLE:OFF:IllegalCatch
-            throw new PrestoException(JDBC_ERROR, e);
-        }
+        // CHECKSTYLE:OFF:IllegalCatch
         catch (Exception e) {
             // CHECKSTYLE:ON:IllegalCatch
-            // do nothing
             throw new RuntimeException(e);
         }
         assertEquals(oracleClient.getTableNames(identity, Optional.of(Constants.ORACLE)).size(), NUMBER_13);
