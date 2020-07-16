@@ -11,14 +11,11 @@ For example, `<path to installtion directory>/bin/index` and must be executed fr
 Usage: index [-v] [--debug] [--disableLocking] --table=<table>
          [-c=<configDirPath>] [--column=<columns>[,<columns>...]]...
          [--partition=<partitions>[,<partitions>...]]...
-         [--type=<indexTypes>[,<indexTypes>...]]... [-p=<plugins>[,
-         <plugins>...]]... <command>
+         [--type=<indexTypes>[,<indexTypes>...]]... <command>
 
 Using this index tool, you can CREATE, SHOW and DELETE indexes.
 
 Supported index types: BITMAP, BLOOM, MINMAX
-
-Supported index stores: LOCAL, HDFS (must be configured in {--config}/config.properties
 
 Supported data sources: HIVE using ORC files (must be configured in {--config}/catalog/catalog_name.properties
 

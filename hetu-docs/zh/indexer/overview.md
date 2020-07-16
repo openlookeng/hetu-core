@@ -12,7 +12,9 @@
   - 可以创建底层数据源不支持的新索引类型
   - 索引数据不占用数据源存储空间
 
-## 示例
+## 使用场景
+
+当前，启发式索引支持ORC存储格式的hive数据源，帮助减少读取的分段或行数。
 
 ### 1.查询过程中过滤预定分段
 
@@ -28,3 +30,50 @@
 
 通过为谓词列保留外部位图索引，启发式索引器甚至可以在应用Filter运算符之前筛选出与谓词不匹配的行。
 
+## 示例教程
+
+这一教程将通过一个示例查询语句来展示索引的用法。
+
+### 确定索引建立的列
+
+对于这样的语句：
+
+    SELECT * FROM table1 WHERE id="abcd1234";
+   
+如果id比较唯一，bloom索引可以大大较少读取的分段数量。
+
+在本教程中我们将以这个语句为例。
+
+### 配置索引
+
+在 `etc/config.properties` 中加入这些行：
+
+    hetu.heuristicindex.filter.enabled=true
+    hetu.heuristicindex.filter.cache.max-indices-number=2000000
+    hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
+    hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
+    
+然后在`etc/filesystem/index-store-profile.properties`中创建一个HDFS描述文件, 其中`index-store-profile`是上面使用的名字：
+
+    fs.client.type=hdfs
+    hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
+    hdfs.authentication.type=NONE
+    fs.hdfs.impl.disable.cache=true
+    
+如果HDFS集群开启了KERBEROS验证，还需要配置`hdfs.krb5.conf.path, hdfs.krb5.keytab.path, hdfs.krb5.principal`. 
+
+在上面这个例子中使用了HDFS作为存储索引文件的位置，这使得索引可以在多个Hetu服务器间共享。如果要使用本地磁盘来存储索引，只要将 `index-store-profile.properties` 的内容改为:
+
+    fs.client.type=local
+    
+注意：可以在`etc/filesystem`中配置多个不同名字的描述文件, 例如多个HDFS和一个Local，这样就可以通过改变`hetu.heuristicindex.indexstore.filesystem.profile`来在他们之中快速切换。
+
+### 创建索引
+
+要创建索引，首先将工作目录cd至安装目录的`bin`文件夹，然后运行：
+
+    ./index -c <your-etc-folder-directory> --table table1 --column id --type bloom create
+    
+### 运行语句
+
+完成上面的操作后，再次在Hetu服务器运行这个语句，服务器将在后台自动加载索引。在此期间如果反复执行同一语句，应该观察到分段的数量不断降低，最后降至一个很小的值。

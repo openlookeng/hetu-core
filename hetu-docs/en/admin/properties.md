@@ -427,52 +427,55 @@ The following properties allow tuning the [regexp](../functions/regexp.md).
 
 Heuristic index is external index module that which can be used to filter to out rows at the connector level. Bitmap, Bloom, MinMaxIndex are list of indexes provided by openLooKeng. As of now, bitmap index supports supports hive connector for tables with ORC storage format.
  
-### `hetu.filter.enabled`
+### `hetu.heuristicindex.filter.enabled`
  
 > -   **Type:** `boolean`
 > -   **Default value:** `false`
 >
 > This property enables heuristic index.
  
-### `hetu.filter.cache.max-indices-number`
+### `hetu.heuristicindex.filter.cache.max-indices-number`
  
 > -   **Type:** `integer`
 > -   **Default value:** `10,000,000`
 >
 > Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from index store. Cache in part of This property controls maximum number of index files that can be cached. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
+
+### `hetu.heuristicindex.filter.cache.ttl`
  
-### `hetu.filter.plugins`
- 
-> -   **Type:** `string`
+> -   **Type:** `Duration`
+> -   **Default value:** `10m`
 >
-> This property is used to defined the location of the plugins required to support heuristic index. Property accepts multiple plugins separated by comma.
+> The time period after which index cache expires.
+
+### `hetu.heuristicindex.filter.cache.loading-threads`
  
-### `hetu.filter.indexstore.uri`
+> -   **Type:** `integer`
+> -   **Default value:** `2`
+>
+> The number of threads used to load indices in parallel.
+
+### `hetu.heuristicindex.filter.cache.loading-delay`
+ 
+> -   **Type:** `Duration`
+> -   **Default value:** `5000ms`
+>
+> The delay to wait before async loading task starts to load index cache from indexstore.
+ 
+### `hetu.heuristicindex.indexstore.uri`
  
 > -   **Type:** `string`
 > -   **Default value:** `/opt/hetu/indices/`
 > 
 > Directory under which all index files are stored. Each index will be stored in its own subdirectory. 
  
-### `hetu.filter.indexstore.type`
+### `hetu.heuristicindex.indexstore.filesystem.profile`
  
 > -   **Type** `string` 
-> -   **Allowed values:** `hdfs, local`
-> -   **Default value:** `local`
 >
-> This property defines the persistence store for the index files. Additional properties must be provider for HDFS index store.
->
-#### Properties for HDFS indexstore 
-  
- | Property Name                                              | Mandatory                        | Description                                                       |
- | ---------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
- | `hetu.filter.indexstore.hdfs.config.resources`             | YES                              | Path to hdfs resource files (e.g. core-site.xml, hdfs-site.xml)   |
- | `hetu.filter.indexstore.hdfs.authentication.type`          | YES                              | hdfs authentication Accepted values: `KERBEROS`, `NONE`           |
- | `hetu.filter.indexstore.hdfs.krb5.conf.path`               | YES if auth type set to KERBEROS | Path to the krb5 config file                                      |
- | `hetu.filter.indexstore.hdfs.krb5.keytab.path`             | YES if auth type set to KERBEROS | Path to the kerberos keytab file                                  |
- | `hetu.filter.indexstore.hdfs.krb5.principal`               | YES if auth type set to KERBEROS | Principal of kerberos authentication                              |
- 
-## Execution Plan Cache Properties
+> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
+
+##Execution Plan Cache Properties
 
 Execution plan cache feature allows the coordinator to reuse execution plans between identical queries, instead
 of constructing another execution plan, thus reducing the amount of query pre-processing required.
