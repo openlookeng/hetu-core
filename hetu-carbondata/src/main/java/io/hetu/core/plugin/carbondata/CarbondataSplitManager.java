@@ -74,6 +74,7 @@ import java.util.function.Supplier;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -127,7 +128,7 @@ public class CarbondataSplitManager
                 metastore.getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName())
                         .orElseThrow(() -> new TableNotFoundException(schemaTableName));
         if (!table.getStorage().getStorageFormat().getInputFormat().contains("carbon")) {
-            return super.getSplits(transactionHandle, session, tableHandle, splitSchedulingStrategy);
+            throw new PrestoException(NOT_SUPPORTED, "Carbondata connector can only read carbondata tables");
         }
 
         return hdfsEnvironment.doAs(session.getUser(), () -> {

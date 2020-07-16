@@ -67,6 +67,7 @@ import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Iterables.transform;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.GROUPED_SCHEDULING;
 import static java.lang.Math.min;
@@ -196,6 +197,9 @@ public class HiveSplitManager
         SemiTransactionalHiveMetastore metastore = metastoreProvider.apply((HiveTransactionHandle) transaction);
         Table table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
+        if (table.getStorage().getStorageFormat().getInputFormat().contains("carbon")) {
+            throw new PrestoException(NOT_SUPPORTED, "Hive connector can't read carbondata tables");
+        }
 
         // verify table is not marked as non-readable
         String tableNotReadable = table.getParameters().get(OBJECT_NOT_READABLE);

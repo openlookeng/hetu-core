@@ -54,6 +54,7 @@ import io.prestosql.plugin.hive.metastore.Partition;
 import io.prestosql.plugin.hive.metastore.PrincipalPrivileges;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.SortingColumn;
+import io.prestosql.plugin.hive.metastore.StorageFormat;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.security.AccessControlMetadata;
 import io.prestosql.plugin.hive.statistics.HiveStatisticsProvider;
@@ -1164,6 +1165,18 @@ public class CarbondataMetadata
         catch (RuntimeException ex) {
             releaseLocks();
             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error in drop table %s", ex.getMessage()), ex);
+        }
+    }
+
+    @Override
+    protected void verifyStorageFormatForCatalog(StorageFormat storageFormat)
+    {
+        requireNonNull(storageFormat, "Storage format is null");
+
+        if (!storageFormat.getInputFormat().contains("CarbonInputFormat")) {
+            String sf = storageFormat.getInputFormat();
+            throw new PrestoException(NOT_SUPPORTED,
+                    String.format("Tables with %s are not supported by Carbondata connector", sf.substring(sf.lastIndexOf(".") + 1)));
         }
     }
 
