@@ -22,10 +22,12 @@ import io.prestosql.spi.sql.expression.Selection;
 import io.prestosql.spi.sql.expression.Time;
 import io.prestosql.sql.builder.BaseSqlQueryWriter;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.StringJoiner;
 
 import static io.prestosql.spi.type.StandardTypes.BIGINT;
@@ -217,7 +219,7 @@ public class OracleSqlQueryWriter
         String functionName = name.toString();
         final int noOfArgs = argumentsList.size();
         final boolean isDecorated = window.isPresent() || filter.isPresent() || orderBy.isPresent();
-        if (noOfArgs == 1 && !isDecorated && !isDistinct) {
+        if (noOfArgs == 1 && !isDecorated && !isDistinct && getExtractFieldMap().contains(functionName.toUpperCase(Locale.ENGLISH))) {
             try {
                 Time.ExtractField field = Time.ExtractField.valueOf(functionName.toUpperCase(Locale.ENGLISH));
                 return extract(argumentsList.get(0), field);
@@ -230,6 +232,16 @@ public class OracleSqlQueryWriter
             return this.atTimeZone(argumentsList.get(0), argumentsList.get(1));
         }
         return super.functionCall(name, isDistinct, argumentsList, orderBy, filter, window);
+    }
+
+    private Set<String> getExtractFieldMap()
+    {
+        Set<String> set = new HashSet<>();
+        Time.ExtractField[] fields = Time.ExtractField.values();
+        for (Time.ExtractField field : fields) {
+            set.add(field.name());
+        }
+        return set;
     }
 
     /**
