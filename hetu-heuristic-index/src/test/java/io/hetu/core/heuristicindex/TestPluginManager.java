@@ -14,7 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
-import io.prestosql.spi.filesystem.TempFolder;
+import io.hetu.core.common.filesystem.TempFolder;
 import org.testng.annotations.Test;
 
 import java.io.IOException;

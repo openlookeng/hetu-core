@@ -14,13 +14,13 @@
  */
 package io.hetu.core.heuristicindex;
 
+import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.heuristicindex.base.BloomIndex;
 import io.hetu.core.heuristicindex.base.LocalIndexStore;
 import io.hetu.core.heuristicindex.base.MinMaxIndex;
 import io.hetu.core.spi.heuristicindex.DataSource;
 import io.hetu.core.spi.heuristicindex.Index;
 import io.hetu.core.spi.heuristicindex.IndexStore;
-import io.prestosql.spi.filesystem.TempFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;

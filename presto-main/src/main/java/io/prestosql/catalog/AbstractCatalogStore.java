@@ -18,7 +18,7 @@ package io.prestosql.catalog;
 import com.google.common.io.ByteStreams;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
-import io.prestosql.spi.filesystem.FileBasedLock;
+import io.hetu.core.common.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.io.IOException;

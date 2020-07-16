@@ -14,7 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
-import io.prestosql.spi.filesystem.TempFolder;
+import io.hetu.core.common.filesystem.TempFolder;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.testng.PowerMockTestCase;
 import org.slf4j.LoggerFactory;
