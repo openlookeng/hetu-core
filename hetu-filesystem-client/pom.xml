@@ -25,6 +25,10 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.prestosql.hadoop</groupId>
             <artifactId>hadoop-apache</artifactId>
         </dependency>

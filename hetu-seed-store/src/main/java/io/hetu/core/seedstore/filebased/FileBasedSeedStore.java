@@ -16,7 +16,7 @@
 package io.hetu.core.seedstore.filebased;
 
 import io.airlift.log.Logger;
-import io.prestosql.spi.filesystem.FileBasedLock;
+import io.hetu.core.common.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;

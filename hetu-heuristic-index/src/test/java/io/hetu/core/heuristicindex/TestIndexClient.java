@@ -14,10 +14,10 @@
  */
 package io.hetu.core.heuristicindex;
 
+import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.heuristicindex.base.LocalIndexStore;
 import io.hetu.core.spi.heuristicindex.Index;
 import io.hetu.core.spi.heuristicindex.IndexStore;
-import io.prestosql.spi.filesystem.TempFolder;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 

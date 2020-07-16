@@ -142,6 +142,7 @@
         <module>hetu-transport</module>
         <module>hetu-server</module>
         <module>hetu-server-rpm</module>
+        <module>hetu-common</module>
     </modules>
 
     <dependencyManagement>
@@ -156,6 +157,19 @@
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-metastore</artifactId>
                 <version>${dep.hetu.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-common</artifactId>
+                <version>${dep.prestosql.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-common</artifactId>
+                <version>${dep.prestosql.version}</version>
+                <type>test-jar</type>
             </dependency>
 
             <dependency>

@@ -14,7 +14,7 @@
  */
 package io.hetu.core.heuristicindex.util;
 
-import io.prestosql.spi.filesystem.TempFolder;
+import io.hetu.core.common.filesystem.TempFolder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

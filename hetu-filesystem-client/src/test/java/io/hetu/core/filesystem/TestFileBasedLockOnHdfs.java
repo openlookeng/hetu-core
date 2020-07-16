@@ -14,7 +14,7 @@
  */
 package io.hetu.core.filesystem;
 
-import io.prestosql.spi.filesystem.FileBasedLock;
+import io.hetu.core.common.filesystem.FileBasedLock;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
