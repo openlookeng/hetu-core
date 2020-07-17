@@ -250,6 +250,12 @@ public class HBaseTableHandle
     }
 
     @Override
+    public String getTableName()
+    {
+        return String.format("%s.%s", schema, table);
+    }
+
+    @Override
     public int hashCode()
     {
         return Objects.hash(schema, table, rowId, external, serializerClassName);
