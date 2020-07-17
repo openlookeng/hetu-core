@@ -1,7 +1,3 @@
-+++
-weight = 14
-title = "Aggregate Functions"
-+++
 
 Aggregate Functions
 ===================

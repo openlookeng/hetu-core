@@ -1,12 +1,7 @@
-+++
-
-weight = 3
-title = "命令行接口"
-+++
 
 # 命令行接口
 
-openLooKeng CLI提供了一个基于终端的交互shell，用于运行查询。CLI是一个[自动执行](http://skife.org/java/unix/2011/06/20/really_executable_jars.md )的JAR文件，这意味着它就像一个普通的UNIX可执行文件。
+openLooKeng CLI提供了一个基于终端的交互shell，用于运行查询。CLI是一个[自动执行](http://skife.org/java/unix/2011/06/20/really_executable_jars.html)的JAR文件，这意味着它就像一个普通的UNIX可执行文件。
 
 下载：`hetu-cli-010-executable.jar`，重命名为`openlk-cli`后，通过`chmod +x`使其执行，然后运行：
 

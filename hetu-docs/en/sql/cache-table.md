@@ -1,7 +1,3 @@
-+++
-
-title = "CACHE TABLE"
-+++
 
 CACHE TABLE
 ===========

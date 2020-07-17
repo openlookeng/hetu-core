@@ -1,7 +1,3 @@
-+++
-
-title = "VACUUM"
-+++
 
 VACUUM
 ======

@@ -1,7 +1,3 @@
-+++
-weight = 2
-title = "Query Resource"
-+++
 
 Query Resource
 ==============

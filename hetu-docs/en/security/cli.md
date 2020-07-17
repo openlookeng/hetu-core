@@ -1,7 +1,3 @@
-+++
-weight = 2
-title = "CLI Kerberos Authentication"
-+++
 
 CLI Kerberos Authentication
 ===========================

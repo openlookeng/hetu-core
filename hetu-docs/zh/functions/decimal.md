@@ -1,7 +1,3 @@
-+++
-weight = 8
-title = "decimal 函数和运算符"
-+++
 
 # decimal 函数和运算符
 

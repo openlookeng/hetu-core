@@ -1,9 +1,3 @@
-+++
-bookCollapseSection = "true"
-weight = 9
-bookToc = false
-title = "Connectors"
-+++
 
 
 Connectors

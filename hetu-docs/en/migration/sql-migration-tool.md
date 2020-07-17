@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-titile = "SQL Migration Tool"
-+++
 
 # SQL Migration Tool
 

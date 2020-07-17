@@ -1,7 +1,3 @@
-+++
-
-title = "DESCRIBE INPUT"
-+++
 
 # DESCRIBE INPUT
 

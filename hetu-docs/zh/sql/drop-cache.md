@@ -1,7 +1,3 @@
-+++
-
-title = "DROP CACHE"
-+++
 
 # DROP CACHE
 

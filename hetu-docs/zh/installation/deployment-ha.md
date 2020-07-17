@@ -1,8 +1,3 @@
-+++
-
-weight = 8
-title = "部署具有高可用（HA）的openLooKeng"
-+++
 
 # 部署具有高可用（HA）的openLooKeng
 

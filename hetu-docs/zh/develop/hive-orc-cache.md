@@ -1,51 +1,40 @@
-ORC Cache
-=========
-ORC Cache feature improves the query performance by caching frequently accessed data. ORC Cache reduces time spent on TableScan operation because 
-the network IO This in turn reduces the query latency.   
+# ORC Cache
 
-This feature is most beneficial for caching raw data from tables that are most frequently accessed and not co-located with
-the openLooKeng deployment. If enabled, workers automatically cache file tail, stripe footer, row index, bloom index 
-of all ORC files because they are small. However, row group data tends to be huge and caching row group data for all 
-files in not practically feasible because of the limitation with cache size.
+ORC Cache功能可以通过缓存频繁访问的数据来提高查询性能。ORC Cache减少了TableScan操作所花费的时间，因为减少了网络IO所花费的时间。这又相应地降低了查询延迟。
 
-Check this [link](https://orc.apache.org/specification/ORCv1/) to know about ORC specification.
+在缓存访问频率最高且与openLooKeng部署不在同一位置的表中的原始数据时，该功能最有用。启用该功能后，工作节点会自动缓存所有ORC文件的文件尾(file tail)、条带页脚(stripe footer)、行索引、bloom索引，因为它们很小。不过，行组数据往往非常庞大，并且由于缓存大小的限制，为所有文件缓存行组数据实际上并不可行。
 
-``CACHE TABLE`` SQL command can be used to configure the table and partition for which row data should be cached by the Worker. 
+单击该[链接](https://orc.apache.org/specification/ORCv1/)以了解ORC规范。
 
-The following sections briefly explains how the entire row data cache implementation works.
+可以使用`CACHE TABLE` SQL命令来配置工作节点应为其缓存行数据的表和分区。
 
-SplitCacheMap
--------------
-Users can use `CACHE TABLE` sql statement to configure which table and data must be cached by Hive connector. The partitions to cache are defined 
-as predicates and are stored in `SplitCacheMap`. SplitCacheMap is stored in local memory of the coordinator.
+以下各节简要说明了整个行数据缓存实现的工作方式。
 
-Sample query to cache sales table data for days between 2020-01-04 and 2020-01-11.
+## SplitCacheMap
 
-  `cache table hive.default.sales where sales_date BETWEEN date '2020-01-04' AND date'2020-01-11'`
+用户可以使用`CACHE TABLE` SQL语句来配置Hive连接器必须缓存的表和数据。要缓存的分区被定义为谓词，并存储在`SplitCacheMap`中。SplitCacheMap存储在协调节点的本地内存中。
 
-Check `CACHE TABLE`, `SHOW CACHE`, and `DROP CACHE` commands for more information.
+以下是用于缓存2020年1月4日至2020年1月11期间每天的sales表数据的示例查询。
 
-SplitCacheMap stores two kinds of information
-  1. Table name along with predicates provided via `CACHE TABLE` command.
-  2. Split to Worker mapping
+`cache table hive.default.sales where sales_date BETWEEN date '2020-01-04' AND date'2020-01-11'`
 
-Connector
----------
-When caching is enabled and a predicate is provided through ``CACHE TABLE`` SQL command, HiveSplits will be flagged by the connector 
-as cacheable if the corresponding partitioned ORC file matches the predicate. 
+有关更多信息，请查看`CACHE TABLE`、`SHOW CACHE`和`DROP CACHE`命令。
 
-SplitCacheAwareNodeSelector
----------------------------
- SplitCacheAwareNodeSelector is implemented to support cache affinity scheduling.  SplitCacheAwareNodeSelector is like any other node selector 
- responsible for assigning splits to workers. When a split is scheduled for first time, the node selector stores the split and worker on which 
- the split was scheduled. For subsequent scheduling, this information is used to determine whether split has already been processed by a worker.
- If so, the node selector schedules the split on the worker that previously processed it. If not, SplitCacheAwareNodeSelector falls back to default 
- node selector to schedule the split.  Workers which process the splits will cache the data mapped by the split in local memory.
- 
-Workers
--------
-Workers rely on `ConnectorSplit.isCacheable` method to determine whether split data must be cached. If property is set
-to true, the HiveConnector tries to retrieve the data from Cache. In case of cache miss, the data is read from HDFS and stored in Cache for future
-use. Workers will purge their caches by expiry time or by reaching size limit, independently of the coordinator.
+SplitCacheMap存储以下两类信息：
 
-Check `ORC Cache Configuration` under Hive connector to know more about cache config.
+1. 通过`CACHE TABLE`命令提供的表名和谓词。
+2. 分段到工作节点的映射。
+
+## 连接器
+
+启用缓存并通过`CACHE TABLE` SQL命令提供谓词后，如果相应的分区ORC文件与谓词匹配，则连接器会将Hive分段标记为可缓存。
+
+## SplitCacheAwareNodeSelector
+
+通过实现SplitCacheAwareNodeSelector来支持Cache相关性调度。  SplitCacheAwareNodeSelector与负责将分段分配给工作节点的任何其他节点选择器相同。当第一次调度某个分段时，节点选择器会存储该分段以及为其调度了该分段的工作节点。对于后续调度，会使用该信息来确定是否已经有工作节点处理过该分段。如果已经有工作节点处理过该分段，则节点选择器将该分段调度到先前处理过该分段的工作节点上。如果没有工作节点处理过该分段，SplitCacheAwareNodeSelector将转而使用默认节点选择器来调度分段。  处理分段的工作节点会将分段映射的数据缓存到本地内存中。
+
+## 工作节点
+
+工作节点依赖`ConnectorSplit.isCacheable`方法来确定是否必须缓存分段数据。如果属性设置为true，则HiveConnector会尝试从缓存中检索数据。如果缓存未命中，则从HDFS中读取数据并将其存储在缓存中，以供将来使用。工作节点会根据到期时间和是否达到大小限制来清除其缓存，与协调节点无关。
+
+请查看Hive连接器下的`ORC Cache Configuration`，以了解有关缓存配置的更多信息。

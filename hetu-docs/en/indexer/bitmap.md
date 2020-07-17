@@ -1,7 +1,3 @@
-+++
-weight = 3
-title = "Bitmap Index"
-+++
 
 # Bitmap Index
 

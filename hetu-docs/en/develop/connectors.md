@@ -1,9 +1,3 @@
-+++
-
-weight = 2
-
-title = "Connectors"
-+++
 
 # Connectors
 

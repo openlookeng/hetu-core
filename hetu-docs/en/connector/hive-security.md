@@ -1,7 +1,3 @@
-+++
-weight = 8
-title = "Hive Security Configuration"
-+++
 
 # Hive Security Configuration
 
@@ -39,7 +35,7 @@ Since openLooKeng\'s `ROLE` syntax support matches the SQL standard, and Hive do
 The default security configuration of the `/connector/hive` does not use
 authentication when connecting to a Hadoop cluster. All queries are executed as the user who runs the openLooKeng process, regardless of which user submits the query.
 
-The Hive connector provides additional security options to support Hadoop clusters that have been configured to use [Kerberos](./hive-security.md/#kerberos-support).
+The Hive connector provides additional security options to support Hadoop clusters that have been configured to use [Kerberos](#kerberos-support).
 
 When accessing `HDFS (Hadoop Distributed File System)`, openLooKeng can [impersonate](./hive-security.md#end-user-impersonation) the end user who is running the query. This can be used with HDFS permissions and `ACLs (Access Control Lists)` to provide additional security for data.
 

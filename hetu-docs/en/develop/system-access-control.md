@@ -1,9 +1,3 @@
-+++
-
-weight = 6
-
-title = "System Access Control"
-+++
 
 # System Access Control
 

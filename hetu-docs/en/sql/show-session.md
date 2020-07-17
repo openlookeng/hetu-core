@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW SESSION"
-+++
 
 SHOW SESSION
 ============

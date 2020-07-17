@@ -1,7 +1,3 @@
-+++
-weight = 4
-title = "Minmax索引"
-+++
 
 # Minmax索引
 

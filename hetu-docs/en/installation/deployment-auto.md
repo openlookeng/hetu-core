@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "Deploying openLooKeng Automatically"
-+++
 
 # Deploying openLooKeng Automatically
 

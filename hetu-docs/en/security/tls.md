@@ -1,7 +1,3 @@
-+++
-weight = 4
-title = "Java Keystores and Truststores"
-+++
 
 Java Keystores and Truststores
 ==============================

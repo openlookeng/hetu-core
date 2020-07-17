@@ -1,7 +1,3 @@
-+++
-weight = 1
-title = "openLooKeng启发式索引器"
-+++
 
 # openLooKeng启发式索引器
 

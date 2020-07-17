@@ -1,7 +1,3 @@
-+++
-weight = 20
-title = "TPCH"
-+++
 
 # TPCH连接器
 

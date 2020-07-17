@@ -1,8 +1,3 @@
-+++
-
-weight = 1
-title = "Web Interface"
-+++
 
 # Web Interface
 

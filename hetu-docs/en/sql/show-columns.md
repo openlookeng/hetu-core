@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW COLUMNS"
-+++
 
 SHOW COLUMNS
 ============

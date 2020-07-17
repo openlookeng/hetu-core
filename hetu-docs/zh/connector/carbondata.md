@@ -1,7 +1,3 @@
-+++
-weight = 1
-title = "CarbonData"
-+++
 
 # CarbonData连接器
 
@@ -15,7 +11,7 @@ CarbonData连接器支持查询存储在CarbonData仓库中的数据。CarbonDat
 
 openLooKeng只使用前两个组件：数据和元数据。它不使用HiveQL/SparkSQL或Hive的任何部分执行环境。
 
-**说明：***openLooKeng支持CarbonData 2.0.1。*
+**说明：** *openLooKeng支持CarbonData 2.0.1。*
 
 ## 配置
 
@@ -64,7 +60,7 @@ CarbonData连接器安全需要的属性在[CarbonData配置属性](./carbondata
 
 | 属性名称| 说明| 默认值|
 |----------|:----------|----------|
-| carbondata.store-location| CarbonData仓库的存储位置。如果不指定，则使用默认的Hive仓库路径，即*/user/hive/warehouse/**carbon.store***。| `${hive.metastore.warehouse.dir} /carbon.store`|
+| carbondata.store-location| CarbonData仓库的存储位置。如果不指定，则使用默认的Hive仓库路径，即 */user/hive/warehouse/**carbon.store*** | `${hive.metastore.warehouse.dir} /carbon.store`|
 | `hive.metastore`| 要使用的Hive元存储的类型。openLooKeng目前支持默认的Hive Thrift元存储（`thrift`）。| `thrift`|
 | `hive.config.resources`| 以逗号分隔的HDFS配置文件列表。这些文件必须存在于运行openLooKeng的机器上。示例：`/etc/hdfs-site.xml`| 
 | `hive.hdfs.authentication.type`| HDFS身份验证类型。取值为`NONE`或`KERBEROS`。| `NONE`|
@@ -217,7 +213,7 @@ DELETE FROM orders WHERE orderstatus = 'Not Available';
 DROP TABLE orders;
 ```
 
-## <a name="">Carbondata连接器限制</a>
+## Carbondata连接器限制
 
 CarbonData连接器暂不支持如下操作：
 

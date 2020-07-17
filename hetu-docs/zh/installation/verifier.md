@@ -1,8 +1,3 @@
-+++
-
-weight = 5
-title = "openLooKeng验证器"
-+++
 
 
 # openLooKeng验证器

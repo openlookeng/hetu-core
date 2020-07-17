@@ -1,7 +1,3 @@
-+++
-weight = 16
-title = "Array Functions and Operators"
-+++
 
 Array Functions and Operators
 =============================

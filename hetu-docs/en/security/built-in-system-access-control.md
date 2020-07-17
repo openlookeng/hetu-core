@@ -1,7 +1,3 @@
-+++
-weight = 5
-title = "Built-in System Access Control"
-+++
 
 Built-in System Access Control
 ==============================

@@ -1,9 +1,3 @@
-+++
-
-weight = 1
-
-title = "Getting Started"
-+++
 
 # 入门指南
 

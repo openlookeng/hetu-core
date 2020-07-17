@@ -1,7 +1,3 @@
-+++
-weight = 6
-title = "Hive"
-+++
 
 # Hive连接器
 
@@ -107,9 +103,9 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `security.config-file`| `hive.security=file`时使用的配置文件的路径。有关详细信息，请参阅[基于文件的授权](./hive-security.md#基于文件的授权)。| |
 | `hive.non-managed-table-writes-enabled`| 允许对非托管（外部）Hive表的写入。| `false`|
 | `hive.non-managed-table-creates-enabled`| 允许创建非托管（外部）Hive表。| `true`|
-| `hive.collect-column-statistics-on-write`| 启用写入时自动收集列级统计信息。详见[表统计](./hive.md#表统计信息)。| `true`|
+| `hive.collect-column-statistics-on-write`| 启用写入时自动收集列级统计信息。详见[表统计信息](./hive.md#表统计信息)。| `true`|
 | `hive.s3select-pushdown.enabled`| 允许向AWS S3 Select服务的查询下推。| `false`|
-| `hive.s3select-pushdown.max-connections`| [S3 Select下推](./hive.md#开启S3 Select下推)同时打开到S3的最大连接数。| 500|
+| `hive.s3select-pushdown.max-connections`| [S3 Select下推](#s3-select下推)同时打开到S3的最大连接数。| 500|
 | `hive.orc.use-column-names`| 为了支持alter表drop列，建议在Hive属性中添加`hive.orc.use-column-names=true`，否则drop列可能无法正常工作。| false|
 
 ## Hive Thrift 元存储配置属性说明
@@ -313,7 +309,7 @@ openLooKeng支持Hive事务表上的ACID事务（INSERT，UPDATE，DELETE）。
 要支持ACID事务，必须满足以下前提条件：
 
 1. 创建表应启用了“事务性”属性。
-2. 格式为ORC。参见[限制](./hive.md#Hive连接器限制)
+2. 格式为ORC。参见[限制](#hive连接器限制)
 
 示例：
 
@@ -431,7 +427,7 @@ VACUUM TABLE hive_acid_table;
 -----
 
 
-**说明：**目前没有命令来获取异步VACUUM的结果，但是可以从UI监视。
+**说明：** 目前没有命令来获取异步VACUUM的结果，但是可以从UI监视。
 
 -----
 

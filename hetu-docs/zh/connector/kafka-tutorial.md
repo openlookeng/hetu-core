@@ -1,7 +1,3 @@
-+++
-weight = 11
-title = "Kafka连接器教程"
-+++
 
 # Kafka连接器教程
 
@@ -19,7 +15,7 @@ title = "Kafka连接器教程"
 
 **说明**
 
-*本教程使用Apache Kafka 0.8.1进行了测试。***教程应适用于任何0.8.x版本的Apache Kafka。
+*本教程使用Apache Kafka 0.8.1进行了测试。教程应适用于任何0.8.x版本的Apache Kafka。*
 
 启动ZooKeeper和Kafka服务器：
 

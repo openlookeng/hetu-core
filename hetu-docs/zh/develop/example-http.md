@@ -1,9 +1,3 @@
-+++
-
-weight = 3
-
-title = "Example HTTP 连接器"
-+++
 
 # Example HTTP 连接器
 

@@ -1,8 +1,3 @@
-+++
-
-weight = 7
-title = "Distributed sort"
-+++
 
 # Distributed sort
 

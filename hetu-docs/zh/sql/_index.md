@@ -1,10 +1,3 @@
-+++
-bookCollapseSection = "true"
-weight = 12
-bookToc = false
-title = "SQL语法介绍"
-
-+++
 
 # SQL语法介绍
 

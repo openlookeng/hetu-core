@@ -1,8 +1,3 @@
-+++
-
-weight = 7
-title = "Tableau的Web连接器"
-+++
 
 
 # Tableau的Web连接器
@@ -21,4 +16,4 @@ http://example.net:8080/tableau/presto-connector.md
 
 *使用openLooKeng Web连接器，你只能创建Tableau摘录，因为Web连接器API目前不支持实时模式。*
 
-*Web连接器API只支持openLooKeng中可用的数据类型的一个子集。***具体而言，Tableau Web连接器API目前支持以下Tableau数据类型：***`bool`、`date`、`datetime`、`float`*、*`int`和`string`。****openLooKeng `boolean`和`date`类型将分别转换为Tableau客户端上的Tableau数据类型`bool`和`date`。***任何其他Presto类型，如*`array`、`map`、`row`*、*`double`、`bigint`*等，将转换为Tableau `string`，因为它们未映射到任何Tableau类型。
+*Web连接器API只支持openLooKeng中可用的数据类型的一个子集。具体而言，Tableau Web连接器API目前支持以下Tableau数据类型：`bool`、`date`、`datetime`、`float`*、*`int`和`string`。openLooKeng `boolean`和`date`类型将分别转换为Tableau客户端上的Tableau数据类型`bool`和`date`。任何其他Presto类型，如`array`、`map`、`row`*、*`double`、`bigint`等，将转换为Tableau `string`，因为它们未映射到任何Tableau类型。*

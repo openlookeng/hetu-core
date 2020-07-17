@@ -1,8 +1,3 @@
-+++
-
-weight = 1
-title = "从Hive迁移"
-+++
 
 # 从Hive迁移
 

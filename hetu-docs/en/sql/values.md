@@ -1,7 +1,3 @@
-+++
-
-title = "VALUES"
-+++
 
 VALUES
 ======

@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW SCHEMAS"
-+++
 
 SHOW SCHEMAS
 ============

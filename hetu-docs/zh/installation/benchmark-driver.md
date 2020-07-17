@@ -1,8 +1,3 @@
-+++
-
-weight = 6
-title = "基准驱动"
-+++
 
 # 基准驱动
 
@@ -54,7 +49,7 @@ file_formats single_bigint  zlib        orc    100   282         269          23
 
 请注意，上面的输出已重新格式化，以提高驱动输出的标准TSV的可读性。
 
-驱动可以通过从模式名或SQL文件中提取值来向输出中添加额外的列。在上述套件文件中，架构名称包含`compression`、`format`和`scale`的命名正则表达式捕获组，因此如果我们在一个包含模式tpch\_sf100\_orc\_none`,`tpch\_sf100\_orc\_snappy`, and`tpch\_sf100\_orc\_zlib\`的目录中运行查询，我们得到上面的输出。
+驱动可以通过从模式名或SQL文件中提取值来向输出中添加额外的列。在上述套件文件中，架构名称包含`compression`、`format`和`scale`的命名正则表达式捕获组，因此如果我们在一个包含模式 `tpch_sf100_orc_none`、 `tpch_sf100_orc_snappy`、 和 `tpch_sf100_orc_zlib` 的目录中运行查询，我们得到上面的输出。
 
 创建其他输出列的另一种方法是向SQL文件添加标记。例如，下面的SQL文件中声明了两个标签`projection`和`filter`：
 

@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "openLooKeng Concepts"
-+++
 
 # openLooKeng Concepts
 

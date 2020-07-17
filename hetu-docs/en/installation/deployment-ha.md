@@ -1,8 +1,3 @@
-+++
-
-weight = 8
-title = "Deploying openLooKeng with High Availability(HA)"
-+++
 
 # Deploying openLooKeng with High Availability(HA)
 

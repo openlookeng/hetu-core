@@ -1,8 +1,3 @@
-+++
-
-weight = 1
-title = "手动部署openLooKeng"
-+++
 
 # 手动部署openLooKeng
 
@@ -142,7 +137,7 @@ openLooKeng通过*连接器*访问数据，这些连接器安装在目录中。�
 connector.name=jmx
 ```
 
-有关配置连接器的详细信息，请参阅[连接器]((../connector/_index))。
+有关配置连接器的详细信息，请参阅[连接器](../connector/_index.md)。
 
 ## 运行openLooKeng
 

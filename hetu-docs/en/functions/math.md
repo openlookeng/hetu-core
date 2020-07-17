@@ -1,7 +1,3 @@
-+++
-weight = 6
-title = "Mathematical Functions and Operators"
-+++
 
 Mathematical Functions and Operators
 ====================================

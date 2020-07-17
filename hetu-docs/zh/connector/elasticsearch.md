@@ -1,7 +1,3 @@
-+++
-weight = 3
-title = "Elasticsearch"
-+++
 
 # Elasticsearch连接器
 
@@ -16,7 +12,7 @@ Elasticsearch连接器允许从openLooKeng访问Elasticsearch数据。本文档�
 
 要配置Elasticsearch连接器，请创建具有以下内容的目录属性文件`etc/catalog/elasticsearch.properties`，并适当替换以下属性：
 
-```{.none}
+``` properties
 connector.name=elasticsearch
 elasticsearch.default-schema-name=default
 elasticsearch.table-description-directory=etc/elasticsearch/
@@ -174,7 +170,7 @@ Elasticsearch将数据存储在多个节点中，并构建索引以进行快速�
 
 表定义文件以JSON格式描述一个表。
 
-```{.none}
+``` json
 {
     "tableName": ...,
     "schemaName": ...,
@@ -215,7 +211,7 @@ Elasticsearch将数据存储在多个节点中，并构建索引以进行快速�
 | 字段| 是否必填| 类型| 说明|
 |:----------|:----------|:----------|:----------|
 | `name`| 可选| string| Elasticsearch字段的列名。|
-| `type`| 可选| string| Elasticsearch字段的列类型。|
+| `type`| 可选| string| Elasticsearch[字段](https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html)的列类型。|
 | `jsonPath`| 可选| string| Elasticsearch字段的JSON路径。|
 | `jsonType`| 可选| string| Elasticsearch字段的JSON类型。|
 | `ordinalPosition`| 可选| integer| 列的序数位置。|

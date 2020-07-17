@@ -1,8 +1,3 @@
-+++
-
-weight = 7
-title = "Web Connector for Tableau"
-+++
 
 # Web Connector for Tableau
 

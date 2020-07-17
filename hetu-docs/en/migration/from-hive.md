@@ -1,9 +1,3 @@
-+++
-
-weight = 1
-title = "Migrating From Hive"
-
-+++
 
 # Migrating From Hive
 

@@ -1,7 +1,3 @@
-+++
-weight = 4
-title = "Lambda表达式"
-+++
 
 # Lambda表达式
 

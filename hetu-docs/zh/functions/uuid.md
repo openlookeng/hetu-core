@@ -1,7 +1,3 @@
-+++
-weight = 22
-title = "UUID函数"
-+++
 
 # UUID函数
 

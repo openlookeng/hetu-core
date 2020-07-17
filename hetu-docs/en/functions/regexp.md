@@ -1,7 +1,3 @@
-+++
-weight = 10
-title = "Regular Expression Functions"
-+++
 
 Regular Expression Functions
 ============================

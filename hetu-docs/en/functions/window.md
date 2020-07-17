@@ -1,7 +1,3 @@
-+++
-weight = 15
-title = "Window Functions"
-+++
 
 Window Functions
 ================

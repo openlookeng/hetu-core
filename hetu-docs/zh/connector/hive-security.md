@@ -1,7 +1,3 @@
-+++
-weight = 8
-title = "Hive安全配置"
-+++
 
 # Hive安全配置
 
@@ -35,7 +31,7 @@ title = "Hive安全配置"
 
 `/connector/hive`默认的安全配置在连接Hadoop集群时不使用身份验证。无论哪个用户提交查询，所有查询都以运行openLooKeng进程的用户执行。
 
-Hive连接器提供了额外的安全选项来支持配置为使用[Kerberos](./hive-security.md#Kerberos支持)的Hadoop集群。
+Hive连接器提供了额外的安全选项来支持配置为使用[Kerberos](#kerberos支持)的Hadoop集群。
 
 访问`HDFS (Hadoop Distributed File System)`时，openLooKeng可以[模拟](./hive-security.md#终端用户模拟)运行查询的最终用户。这可以与HDFS权限和`ACLs (Access Control Lists)`一起使用，为数据提供进一步的安全性。
 

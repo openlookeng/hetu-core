@@ -1,9 +1,3 @@
-+++
-
-weight = 8
-
-title = "Event Listener"
-+++
 
 # Event Listener
 

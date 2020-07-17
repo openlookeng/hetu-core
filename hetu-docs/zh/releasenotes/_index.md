@@ -1,9 +1,3 @@
-+++
-
-weight = 100
-bookToc = false
-title = "发行说明"
-+++
 
 # Release 0.1.0
 

@@ -1,9 +1,3 @@
-+++
-
-weight = 10
-
-title = "Heuristic indexer"
-+++
 
 # Heuristic indexer
 

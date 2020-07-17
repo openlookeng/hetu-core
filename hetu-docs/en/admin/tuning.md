@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "Tuning openLooKeng"
-+++
 
 # Tuning openLooKeng
 

@@ -1,7 +1,3 @@
-+++
-weight = 5
-title = "Bloom索引"
-+++
 
 # Bloom索引
 
