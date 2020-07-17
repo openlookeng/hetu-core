@@ -178,7 +178,7 @@ public class PredicateExtractor
     }
 
     private static void processComparisonExpression(List<Predicate> predicateList, ComparisonExpression comparisonExpression,
-                                                    String fullQualifiedTableName)
+            String fullQualifiedTableName)
     {
         switch (comparisonExpression.getOperator()) {
             case EQUAL:
@@ -202,7 +202,7 @@ public class PredicateExtractor
         Predicate predicate = new Predicate();
         predicate.setTableName(fullQualifiedTableName);
 
-        Expression leftExpression = expression.getLeft();
+        Expression leftExpression = extractExpression(expression.getLeft());
 
         // if not SymbolReference, return null or throw PrestoException
         // skip the predicate
@@ -225,6 +225,17 @@ public class PredicateExtractor
         predicate.setOperator(expression.getOperator());
 
         return predicate;
+    }
+
+    private static Expression extractExpression(Expression expression)
+    {
+        if (expression instanceof Cast) {
+            // extract the inner expression for CAST expressions
+            return extractExpression(((Cast) expression).getExpression());
+        }
+        else {
+            return expression;
+        }
     }
 
     private static Object extract(Expression expression)
