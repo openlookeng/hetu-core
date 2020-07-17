@@ -1,7 +1,3 @@
-+++
-weight = 3
-title = "Legacy and New Timestamp"
-+++
 
 Legacy and New Timestamp
 ========================

@@ -1,7 +1,3 @@
-+++
-weight = 16
-title = "SQL Server"
-+++
 
 SQL Server Connector
 ====================

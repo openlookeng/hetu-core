@@ -1,7 +1,3 @@
-+++
-weight = 2
-title = "CLI接口的Kerberos认证"
-+++
 
 CLI接口的Kerberos认证
 ===========================

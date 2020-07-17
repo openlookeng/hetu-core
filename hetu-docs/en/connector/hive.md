@@ -1,7 +1,3 @@
-+++
-weight = 6
-title = "Hive"
-+++
 
 Hive Connector
 ==============
@@ -351,7 +347,7 @@ openLooKeng supports ACID transactions (INSERT,UPDATE,DELETE) on a transactional
 To support ACID transactions, following prerequisites must be met:
 
 1. Table should be created with 'transactional' property enabled.
-2. Format as ORC. Refer #Limitations
+2. Format as ORC. Refer [Hive Connector Limitations](#hive-connector-limitations)
 
 Example:
 

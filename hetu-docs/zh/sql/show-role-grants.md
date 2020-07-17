@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW ROLE GRANTS"
-+++
 
 # SHOW ROLE GRANTS
 

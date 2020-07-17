@@ -1,7 +1,3 @@
-+++
-weight = 20
-title = "HyperLogLog 函数"
-+++
 
 # HyperLogLog 函数
 

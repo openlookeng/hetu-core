@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "openLooKeng调优"
-+++
 
 # PopenLooKeng调优
 

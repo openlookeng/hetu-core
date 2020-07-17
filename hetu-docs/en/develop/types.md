@@ -1,9 +1,3 @@
-+++
-
-weight = 4
-
-title = "Types"
-+++
 
 # Types
 

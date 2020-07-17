@@ -1,10 +1,4 @@
-+++
-bookCollapseSection = "true"
-weight = 4
-bookToc = false
-title = "安装"
-+++
 
 # 安装
 
-本章节提供了安装openLooKeng服务的指导手册，包括手动和自动化部署，以及JDBC 和ODBC的安装等。
+本章包含openLooKeng服务、命令行界面、jdbc、odbc等的安装指南。

@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "SQL迁移工具"
-+++
 
 # SQL迁移工具
 

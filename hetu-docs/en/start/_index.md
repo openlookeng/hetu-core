@@ -1,13 +1,7 @@
-+++
-
-weight = 2
-bookToc = false
-title = "Get Started"
-+++
 
 # Get Started
 
-This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation Guide](../installation/deployment.md).
+This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation](../installation/_index.md).
 
 ## Preparing the Environment
 

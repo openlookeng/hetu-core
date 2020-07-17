@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW CREATE TABLE"
-+++
 
 # SHOW CREATE TABLE
 

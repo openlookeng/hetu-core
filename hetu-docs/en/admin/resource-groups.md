@@ -1,8 +1,3 @@
-+++
-
-weight = 5
-title = "Resource Groups"
-+++
 
 # Resource Groups
 

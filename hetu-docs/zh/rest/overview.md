@@ -1,18 +1,6 @@
-+++
-bookCollapseSection = "true"
-weight = 15
-bookToc = false
-title = "openLooKeng REST接口说明"
-+++
-
-
-# openLooKeng REST接口说明
-
+# REST接口概述
 
 本章介绍openLooKeng REST API的定义。openLooKeng使用REST进行openLooKeng安装中的所有通信。基于JSON的REST服务可以促进客户机与openLooKeng协调器之间的通信，也可以用于openLooKeng协调器与多个openLooKeng工作节点之间的通信。在本章中，您将找到openLooKeng提供的API的详细描述以及请求和响应的示例。
-
-
-## REST接口简介
 
 
 在openLooKeng中，所有内容都以RESTAPI的形式公开在openLooKeng中，HTTP是所有组件相互通信的方法。

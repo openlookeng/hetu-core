@@ -1,7 +1,3 @@
-+++
-weight = 13
-title = "Date and Time Functions and Operators"
-+++
 
 Date and Time Functions and Operators
 =====================================

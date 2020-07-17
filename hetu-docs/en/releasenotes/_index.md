@@ -1,9 +1,3 @@
-+++
-
-weight = 100
-bookToc = false
-title = "Release Notes"
-+++
 
 # Release 0.1.0
 

@@ -1,7 +1,3 @@
-+++
-weight = 11
-title = "Kafka Connector Tutorial"
-+++
 
 Kafka Connector Tutorial
 ========================

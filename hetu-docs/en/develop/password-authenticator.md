@@ -1,9 +1,3 @@
-+++
-
-weight = 7
-
-title = "Password Authenticator"
-+++
 
 # Password Authenticator
 

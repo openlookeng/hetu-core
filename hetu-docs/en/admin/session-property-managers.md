@@ -1,8 +1,3 @@
-+++
-
-weight = 6
-title = "Session Property Managers"
-+++
 
 
 # Session Property Managers

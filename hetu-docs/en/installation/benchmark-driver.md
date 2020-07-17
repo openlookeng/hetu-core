@@ -1,8 +1,3 @@
-+++
-
-weight = 6
-title = "Benchmark Driver"
-+++
 
 # Benchmark Driver
 
@@ -60,7 +55,7 @@ file_formats single_bigint  zlib        orc    100   282         269          23
 Note that the above output has been reformatted for readability from the standard TSV that the driver outputs.
 
 The driver can add additional columns to the output by extracting values from the schema name or SQL files. In the suite file above, the schema names contain named regular expression capturing groups for
-`compression`, `format`, and `scale`, so if we ran the queries in a catalog containing the schemas  tpch_sf100_orc_none`, `tpch_sf100_orc_snappy`, and `tpch_sf100_orc_zlib`, we get the above
+`compression`, `format`, and `scale`, so if we ran the queries in a catalog containing the schemas  `tpch_sf100_orc_none`, `tpch_sf100_orc_snappy`, and `tpch_sf100_orc_zlib`, we get the above
 output.
 
 Another way to create additional output columns is by adding tags to the SQL files. For example, the following SQL file declares two tags, `projection` and `filter`:

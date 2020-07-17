@@ -1,7 +1,3 @@
-+++
-weight = 14
-title = "MySQL"
-+++
 
 MySQL Connector
 ===============

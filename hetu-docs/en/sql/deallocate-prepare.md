@@ -1,7 +1,3 @@
-+++
-
-title = "DEALLOCATE PREPARE"
-+++
 
 DEALLOCATE PREPARE
 ==================

@@ -1,12 +1,6 @@
-+++
-
-weight = 2
-bookToc = false
-title = "快速入门"
-+++
 
 # 快速入门
-本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装指南](../installation/_index.md)
+本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装](../installation/_index.md)。
 
 ## 环境准备
 

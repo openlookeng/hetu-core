@@ -1,7 +1,3 @@
-+++
-weight = 3
-title = "Cost based optimizations"
-+++
 
 Cost based optimizations
 ========================

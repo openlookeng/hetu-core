@@ -1,7 +1,3 @@
-+++
-weight = 23
-title = "Color Functions"
-+++
 
 Color Functions
 ===============

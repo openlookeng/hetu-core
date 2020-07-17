@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "自动部署openLooKeng"
-+++
 
 # 自动部署openLooKeng
 
@@ -177,7 +172,7 @@ bash /opt/openlookeng/bin/uninstall.sh --all
 
 ## 将openLooKeng离线部署到集群
 
-如果您无法从要安装openLooKeng的机器上访问下载URL，可以下载离线tarball并解压缩到\*\*/opt\*\*目录。
+如果您无法从要安装openLooKeng的机器上访问下载URL，可以下载离线tarball并解压缩到/opt目录。
 
 执行以下命令部署单节点集群：
 

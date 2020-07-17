@@ -1,7 +1,3 @@
-+++
-weight = 5
-title = "Task Resource"
-+++
 
 Task Resource
 =============

@@ -1,7 +1,3 @@
-+++
-weight = 22
-title = "UUID Functions"
-+++
 
 UUID Functions
 ==============

@@ -1,7 +1,3 @@
-+++
-weight = 1
-title = "Carbondata"
-+++
 
 
 

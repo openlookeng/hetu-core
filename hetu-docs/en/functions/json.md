@@ -1,7 +1,3 @@
-+++
-weight = 12
-title = "JSON Functions and Operators"
-+++
 
 JSON Functions and Operators
 ============================

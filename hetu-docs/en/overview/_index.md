@@ -1,9 +1,3 @@
-+++
-bookCollapseSection = "true"
-weight = 3
-bookToc = false
-title = "Overview"
-+++
 
 # Overview
 

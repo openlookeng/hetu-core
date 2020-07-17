@@ -1,7 +1,3 @@
-+++
-weight = 4
-title = "Hana"
-+++
 
 # Hana连接器
 
@@ -30,7 +26,7 @@ Hana连接器允许在外部Hana数据库中查询和创建表。这可用于在
 
 - 添加SAP HANA驱动
 
-SAP HANA JDBC驱动不在普通存储库中提供，因此需要从SAP HANA下载并手动安装到存储库中。SAP HANA JDBC驱动（**ngdbc.jar**）可能会作为SAP HANA客户端安装的一部分进行安装，或者从SAP HANA办公网站下载。获取了SAP HANA JDBC驱动后，就可以将**jdbc jar**文件部署到协调节点和工作节点上的openLooKeng插件文件夹中。例如，jdbc驱动文件为**ngdbc.jar**，openLooKeng插件包文件夹为**/usr/lib/presto/lib/plugin**，则拷贝命令如下：**cp ngdbc.jar /usr/lib/presto/lib/plugin/hana**。重启协调节点和工作节点进程，hana连接器即可正常工作。
+SAP HANA JDBC驱动不在普通存储库中提供，因此需要从SAP HANA下载并手动安装到存储库中。SAP HANA JDBC驱动（**ngdbc.jar**）可能会作为SAP HANA客户端安装的一部分进行安装，或者从SAP HANA办公网站下载。获取了SAP HANA JDBC驱动后，就可以将**jdbc jar**文件部署到协调节点和工作节点上的openLooKeng插件文件夹中。例如，jdbc驱动文件为**ngdbc.jar**，openLooKeng插件包文件夹为 **/usr/lib/presto/lib/plugin**，则拷贝命令如下： **cp ngdbc.jar /usr/lib/presto/lib/plugin/hana**。重启协调节点和工作节点进程，hana连接器即可正常工作。
 
 - 是否开启查询下推功能。
 
@@ -42,7 +38,7 @@ SAP HANA JDBC驱动不在普通存储库中提供，因此需要从SAP HANA下�
 
 ### 多套Hana数据库或服务器
 
-如果要连接到多个Hana数据库，请将Hana插件的另一个实例配置为一个单独的目录。如需添加其他SAP HANA目录，请在**../conf/catalog**下添加不同名称的另一属性文件（注意结尾为**.properties**）。例如，在**../conf/catalog**目录下新增一个名称为**hana2.properties**的文件，则新增一个名称为hana2的连接器。
+如果要连接到多个Hana数据库，请将Hana插件的另一个实例配置为一个单独的目录。如需添加其他SAP HANA目录，请在 **../conf/catalog** 下添加不同名称的另一属性文件（注意结尾为 **.properties** ）。例如，在 **../conf/catalog** 目录下新增一个名称为 **hana2.properties** 的文件，则新增一个名称为hana2的连接器。
 
 ## 通过openLooKeng查询Hana
 
@@ -199,7 +195,7 @@ DATE\_ADD(单位, $1, $2)单位是秒、分钟、小时时，映射到ADD\_SECON
 
 ### Hana和openLooKeng的SQL语法差异
 
-例如，在hana SQL中，将行数据转换为列数据的’map’函数是openLooKeng SQL所不支持的。但是可以使用‘case’作为替代实现。
+例如，在hana SQL中，将行数据转换为列数据的`map`函数是openLooKeng SQL所不支持的。但是可以使用`case`作为替代实现。
 
 例如，如果有一个名为**SCORES**的表：
 
@@ -215,17 +211,19 @@ DATE\_ADD(单位, $1, $2)单位是秒、分钟、小时时，映射到ADD\_SECON
 | ww| 数学| 80|
 | ww| 英语| 90|
 
-在hana中，可以使用'map'函数将行数据转换为列数据：
+在hana中，可以使用`map`函数将行数据转换为列数据：
 
-    SELECT
-      NAME,
-      SUM(MAP(SUBJECT,'English',SCORE,0)) AS "English",
-      SUM(MAP(SUBJECT,'Math',SCORE,0)) AS "Math",
-      SUM(MAP(SUBJECT,'Science',SCORE,0)) AS "Science"
-    FROM SCORES
-    GROUP BY NAME
+```sql
+SELECT
+  NAME,
+  SUM(MAP(SUBJECT,'English',SCORE,0)) AS "English",
+  SUM(MAP(SUBJECT,'Math',SCORE,0)) AS "Math",
+  SUM(MAP(SUBJECT,'Science',SCORE,0)) AS "Science"
+FROM SCORES
+GROUP BY NAME
+```
 
-在Prersto中，可以使用'case’作为替代实现：
+在Prersto中，可以使用`case`作为替代实现：
 
 Hana与openLooKeng SQL语法的其他差异，请参考以下官方文档列表：
 
@@ -243,43 +241,51 @@ Hana与openLooKeng SQL语法的其他差异，请参考以下官方文档列表�
 
 当处理时间和时间戳依赖类型时，openlk-cli将显示带有时区的时间依赖类型：
 
-    onequery> select current_time;
-                      _col0
-              -------------------------
-               21:19:49.122 Asia/Tokyo
-    onequery> select current_timezone();
+```sql
+lk> select current_time;
                   _col0
-               ------------
-                Asia/Tokyo
-                 (1 row)
+          -------------------------
+           21:19:49.122 Asia/Tokyo
+lk> select current_timezone();
+              _col0
+           ------------
+            Asia/Tokyo
+             (1 row)
+```
 
 如果带用户时区启动openlk-cli，如下所示：
 
-    java -jar ./onequery-cli-316-executable.jar
-    --client-request-timeout 30m --server ip:8080
-    --session legacy_timestamp=false --catalog hana2
+```shell
+java -jar ./hetu-cli-010-executable.jar
+--client-request-timeout 30m --server ip:8080
+--session legacy_timestamp=false --catalog hana2
+```
 
 当处理时间和时间戳依赖类型时，openlk-cli将显示不带时区的时间依赖类型：取而代之的是显示UTC/GMT时区：
 
-    onequery> select current_timezone();
-              _col0
-            --------
-             +08:00
-             (1 row)
-    onequery> select current_time;
-              _col0
-              ---------------------
-              20:20:45.659 +08:00
-              (1 row)
+```sql
+lk> select current_timezone();
+          _col0
+        --------
+         +08:00
+         (1 row)
+lk> select current_time;
+          _col0
+          ---------------------
+          20:20:45.659 +08:00
+          (1 row)
+```
 
 但在hana中，时间依赖类型的行为取决于hana服务器。例如，我们直接通过jdbc启动hana客户端：
 
-    java -jar -Duser.timezone=Asia/Tokyo ngdbc.jar -u
-    database,passwd -n ip:34215 -c "SELECT CURRENT_TIME FROM DUMMY"
-           Connected.
-           |          |
-           ------------
-           | 20:38:57 |
+```shell
+java -jar -Duser.timezone=Asia/Tokyo ngdbc.jar -u
+database,passwd -n ip:34215 -c "SELECT CURRENT_TIME FROM DUMMY"
+       Connected.
+       |          |
+       ------------
+       | 20:38:57 |
+```
 
 ## Hana连接器的限制
 

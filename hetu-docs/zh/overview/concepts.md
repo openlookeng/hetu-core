@@ -1,8 +1,3 @@
-+++
-
-weight = 2
-title = "openLooKeng概念"
-+++
 
 
 # openLooKeng概念

@@ -1,7 +1,3 @@
-+++
-weight = 2
-title = "索引命令行接口"
-+++
 
 # 索引命令行接口
 
@@ -63,7 +59,7 @@ $ ./index -v -c ../etc --table hive.schema.table show
 
 ### 删除索引
 
-*注意：*索引只能在表或列级别删除，即所有索引类型都将被删除。
+*注意：* 索引只能在表或列级别删除，即所有索引类型都将被删除。
 
 ``` shell
 $ ./index -v -c ../etc --table hive.schema.table --column column1 delete
@@ -82,7 +78,7 @@ export JAVA_TOOL_OPTIONS="-Xmx100G"
 
 在此示例中，MaxHeapSize被设置为100 GB。
 
-###并行索引
+### 并行索引
 
 如果在一台机器上为一个大表创建索引的速度太慢，则可以在不同的机器上并行为不同的分区创建索引。这需要设置--disableLocking标志并指定分区。例如：
 

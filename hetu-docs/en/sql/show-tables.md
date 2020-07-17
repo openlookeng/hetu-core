@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW TABLES"
-+++
 
 SHOW TABLES
 ===========

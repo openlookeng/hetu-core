@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW GRANTS"
-+++
 
 SHOW GRANTS
 ===========

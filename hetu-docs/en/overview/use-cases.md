@@ -1,8 +1,3 @@
-+++
-
-weight = 1
-title = "Use Cases"
-+++
 
 # Use Cases
 

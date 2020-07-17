@@ -1,9 +1,3 @@
-+++
-
-weight = 5
-
-title = "Functions"
-+++
 
 # Functions
 

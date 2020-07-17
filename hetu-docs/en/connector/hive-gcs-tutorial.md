@@ -1,7 +1,3 @@
-+++
-weight = 7
-title = "Hive Connector GCS Tutorial"
-+++
 
 Hive Connector GCS Tutorial
 ===========================

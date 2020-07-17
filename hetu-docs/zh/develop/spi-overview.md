@@ -1,8 +1,3 @@
-+++
-
-weight = 1
-title = "SPI 概述"
-+++
 
 # SPI 概述
 

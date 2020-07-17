@@ -1,8 +1,3 @@
-+++
-
-weight = 4
-title = "JDBC Driver"
-+++
 
 # JDBC Driver
 

@@ -1,7 +1,3 @@
-+++
-weight = 4
-title = "Minmax Index"
-+++
 
 # Minmax Index
 

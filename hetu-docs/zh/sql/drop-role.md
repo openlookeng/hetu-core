@@ -1,7 +1,3 @@
-+++
-
-title = "DROP ROLE"
-+++
 
 # DROP ROLE
 

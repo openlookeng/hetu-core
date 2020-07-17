@@ -1,8 +1,3 @@
-+++
-
-weight = 9
-title = "openLooKeng ODBC User Manual"
-+++
 
 # openLooKeng ODBC User Manual
 

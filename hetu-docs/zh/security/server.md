@@ -1,7 +1,3 @@
-+++
-weight = 1
-title = "协调节点Kerberos认证"
-+++
 
 协调节点Kerberos认证
 ===================================
@@ -179,7 +175,7 @@ Kerberos调试输出发送到日志的信息量和有用性因身份验证失败
 
 ### 更多资源
 
-[Kerberos常见错误信息(A-M)](http://docs.oracle.com/cd/E19253-01/816-4557/trouble-6/index.html)
+[常见的Kerberos错误信息(A-M)](http://docs.oracle.com/cd/E19253-01/816-4557/trouble-6/index.html)
 
 [常见的Kerberos错误信息(N-Z)](http://docs.oracle.com/cd/E19253-01/816-4557/trouble-27/index.html)
 

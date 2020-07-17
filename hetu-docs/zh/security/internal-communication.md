@@ -1,7 +1,3 @@
-+++
-weight = 6
-title = "内部通信安全"
-+++
 
 内部通信安全
 =============================
@@ -16,30 +12,31 @@ openLooKeng集群可以通过配置使用安全通信。  可使用SSL/TLS确保
 
 为openLooKeng内部通信启用SSL/TLS功能，执行以下步骤：
 
-1.   禁用HTTP端点。
+1.  禁用HTTP端点。
 
     > ``` properties
     > http-server.http.enabled=false
     > ```
-    >
+    > 
     > 
     > **警告**
     > 
-    >可以在不禁用HTTP的情况下，开启HTTPS。但在大多数情况下，这会有安全风险。
-    如果您确定要使用此配置，则应考虑使用防火墙来确保HTTP端点不被非法的主机访问。
+    > 可以在不禁用HTTP的情况下，开启HTTPS。但在大多数情况下，这会有安全风险。
+    > 如果您确定要使用此配置，则应考虑使用防火墙来确保HTTP端点不被非法的主机访问。
+    > 
     
 2.  配置集群使用集群节点的FQDN（全量域名）进行通信。可通过以下两种方式实现：
     
     -   如果DNS服务配置正常，可以让节点使用从系统配置获得的主机名（`hostname --fqdn`）向协调节点介绍自己。
     
         ``` properties
-    node.internal-address-source=FQDN
+        node.internal-address-source=FQDN
         ```
     
     -   手动指定每个节点的完全限定主机名。每台主机的主机名应该不同。主机应该在同一个域中，以便创建正确的SSL/TLS证书。如：`coordinator.example.com`, `worker1.example.com`, `worker2.example.com`.
         
         ``` properties
-    node.internal-address=<node fqdn>
+        node.internal-address=<node fqdn>
         ```
     
 3.  生成Java 密钥库文件。每个openLooKeng节点必须能够连接到同一集群中的任何其他节点。可以使用每台主机的完全限定主机名为每个节点创建唯一的证书，创建包含所有主机的所有公钥的密钥库，并为客户端指定密钥库（见下面的步骤\#8）。在大多数情况下，在证书中使用通配符会更简单，如下所示。

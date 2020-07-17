@@ -1,7 +1,3 @@
-+++
-weight = 3
-title = "Elasticsearch"
-+++
 
 Elasticsearch Connector
 =======================

@@ -1,8 +1,3 @@
-+++
-
-weight = 9
-title = "Cluster Node Management"
-+++
 
 
 # Cluster Node Management

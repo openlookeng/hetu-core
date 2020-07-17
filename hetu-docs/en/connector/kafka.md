@@ -1,7 +1,3 @@
-+++
-weight = 10
-title = "Kafka"
-+++
 
 Kafka Connector
 ===============

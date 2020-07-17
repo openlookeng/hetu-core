@@ -1,7 +1,3 @@
-+++
-weight = 21
-title = "VDM"
-+++
 
 # VDM连接器
 

@@ -1,7 +1,3 @@
-+++
-weight = 7
-title = "Hive连接器GCS教程"
-+++
 
 # Hive连接器GCS教程
 

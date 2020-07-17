@@ -1,7 +1,3 @@
-+++
-weight = 6
-title = "Secure Internal Communication"
-+++
 
 Secure Internal Communication
 =============================
@@ -21,12 +17,12 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
     > ``` properties
     > http-server.http.enabled=false
     > ```
-    >
+    > 
     > 
     > **Warning**
     > 
     > You can enable HTTPS while leaving HTTP enabled. In most cases
-    >this is a security hole. If you are certain you want to use this
+    > this is a security hole. If you are certain you want to use this
     > configuration, you should consider using an firewall to limit
     > access to the HTTP endpoint to only those hosts that should be
     > allowed to use it.
@@ -37,7 +33,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
     -   If the DNS service is configured properly, we can just let the nodes to introduce themselves to the coordinator using the hostname taken from the system configuration (`hostname --fqdn`)
     
         ``` properties
-    node.internal-address-source=FQDN
+        node.internal-address-source=FQDN
         ```
     
     -   It is also possible to specify each node\'s fully-qualified hostname manually. This will be different for every host. Hosts should be in the same domain to make it easy to create the
@@ -45,7 +41,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
         `worker1.example.com`, `worker2.example.com`.
     
         ``` properties
-    node.internal-address=<node fqdn>
+        node.internal-address=<node fqdn>
         ```
     
 3.  Generate a Java Keystore File. Every openLooKeng node must be able to connect to any other node within the same cluster. It is possible to create unique certificates for every node using the fully-qualified hostname of each host, create a keystore that contains all the public keys for all of the hosts, and specify it for the client (see step \#8 below). In most cases it will be simpler to use a wildcard in the certificate as shown below.

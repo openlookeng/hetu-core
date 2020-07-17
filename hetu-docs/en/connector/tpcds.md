@@ -1,7 +1,3 @@
-+++
-weight = 19
-title = "TPCDS"
-+++
 
 TPCDS Connector
 ===============

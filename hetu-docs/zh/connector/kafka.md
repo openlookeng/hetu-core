@@ -1,7 +1,3 @@
-+++
-weight = 10
-title = "Kafka"
-+++
 
 # Kafka连接器
 
@@ -19,7 +15,7 @@ title = "Kafka"
 
 要配置Kafka连接器，创建具有以下内容的目录属性文件`etc/catalog/kafka.properties`，并适当替换以下属性：
 
-```{.none}
+``` properties
 connector.name=kafka
 kafka.table-names=table1,table2
 kafka.nodes=host1:port,host2:port
@@ -117,11 +113,11 @@ Kafka仅以字节消息的形式维护主题，并让生产者和消费者定义
 
 **说明**
 
-对于包含JSON数据的文本主题，完全可以使用openLooKeng `/functions/json`{.interpreted-text role="doc"}来解析包含映射到UTF-8字符串中的字节的`_message`列，而不用任何表定义文件。但是这相当麻烦，并且使得编写SQL查询变得很困难。
+对于包含JSON数据的文本主题，完全可以使用openLooKeng `/functions/json`来解析包含映射到UTF-8字符串中的字节的`_message`列，而不用任何表定义文件。但是这相当麻烦，并且使得编写SQL查询变得很困难。
 
 表定义文件由一个表的JSON定义组成。文件名可以任意，但必须以`.json`结尾。
 
-```{.none}
+``` json
 {
     "tableName": ...,
     "schemaName": ...,
@@ -162,7 +158,7 @@ Kafka仅以字节消息的形式维护主题，并让生产者和消费者定义
 
 每个字段定义都是一个JSON对象：
 
-```{.none}
+``` json
 {
     "name": ...,
     "type": ...,
@@ -278,7 +274,7 @@ CSV解码器将代表消息或键的字节转换为UTF-8编码的字符串，然
 
 ### `json`解码器
 
-JSON解码器根据`4627`{.interpreted-text role="rfc"}将代表消息或键的字节转换为JSON。请注意，消息或键*必须*转换为JSON对象，而不是数组或简单类型。
+JSON解码器根据`4627`将代表消息或键的字节转换为JSON。请注意，消息或键*必须*转换为JSON对象，而不是数组或简单类型。
 
 对于字段，支持如下属性：
 
@@ -307,7 +303,7 @@ JSON解码器支持多个字段解码器，`_default`用于标准表列和许多
 
 - `iso8601` - 基于文本，将文本字段解析为ISO8601时间戳。
 
-- `rfc2822` - 基于文本，将文本字段解析为`2822`{.interpreted-text role="rfc"}时间戳。
+- `rfc2822` - 基于文本，将文本字段解析为`2822`时间戳。
 
 - `custom-date-time` - 基于文本，根据通过`formatHint`属性指定的Joda格式模式解析一个文本字段。格式模式应符合<https://www.joda.org/joda-time/apidocs/org/joda/time/format/DateTimeFormat.html>。
 

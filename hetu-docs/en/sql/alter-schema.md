@@ -1,7 +1,3 @@
-+++
-
-title = "ALTER SCHEMA"
-+++
 
 ALTER SCHEMA
 ============

@@ -1,8 +1,3 @@
-+++
-
-weight = 4
-title = "Spill to Disk"
-+++
 
 # Spill to Disk
 

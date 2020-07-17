@@ -1,7 +1,3 @@
-+++
-weight = 2
-title = "Comparison Functions and Operators"
-+++
 
 Comparison Functions and Operators
 ==================================

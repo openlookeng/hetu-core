@@ -1,7 +1,3 @@
-+++
-weight = 9
-title = "JMX"
-+++
 
 JMX Connector
 =============

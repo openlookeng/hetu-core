@@ -1,8 +1,3 @@
-+++
-
-weight = 3
-title = "Properties Reference"
-+++
 
 # Properties Reference
 

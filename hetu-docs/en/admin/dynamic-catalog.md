@@ -1,8 +1,3 @@
-+++
-
-weight = 8
-title = "Dynamic Catalog"
-+++
 
 # Dynamic Catalog
 

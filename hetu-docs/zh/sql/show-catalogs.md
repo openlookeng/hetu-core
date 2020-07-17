@@ -1,7 +1,3 @@
-+++
-
-title = "SHOW CATALOGS"
-+++
 
 # SHOW CATALOGS
 

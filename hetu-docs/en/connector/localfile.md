@@ -1,7 +1,3 @@
-+++
-weight = 12
-title = "Local File"
-+++
 
 Local File Connector
 ====================

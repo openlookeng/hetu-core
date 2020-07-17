@@ -1,7 +1,3 @@
-+++
-
-title = "DROP TABLE"
-+++
 
 DROP TABLE
 ==========

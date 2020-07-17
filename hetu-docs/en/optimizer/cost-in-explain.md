@@ -1,7 +1,3 @@
-+++
-weight = 2
-title = "Cost in EXPLAIN"
-+++
 
 Cost in EXPLAIN
 ===============
