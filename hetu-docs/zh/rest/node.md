@@ -27,7 +27,7 @@ title = "节点资源"
 >
 > [
 > {
->     "uri":"http://10.209.57.156:8080",
+>     "uri":"http://192.168.1.1:8080",
 > "recentRequests":25.181940555111073,
 > "recentFailures":0.0,
 > "recentSuccesses":25.195472984170983,
