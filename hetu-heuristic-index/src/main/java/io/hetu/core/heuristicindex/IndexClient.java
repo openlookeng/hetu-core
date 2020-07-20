@@ -215,9 +215,9 @@ public class IndexClient
                         | NoSuchMethodException e) {
                     throw new IOException(e);
                 }
-                try (InputStream is = indexStore.read(child)) {
-                    index.load(is);
-                }
+                InputStream is = indexStore.read(child);
+                index.load(is);
+                is.close();
                 LOG.debug("Loaded {} index from {}.", index.getId(), child);
                 result.put(child, index);
             }
