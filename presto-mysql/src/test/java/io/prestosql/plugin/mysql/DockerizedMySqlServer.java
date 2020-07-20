@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.testing.docker.DockerContainer;
 import io.prestosql.testing.docker.DockerContainer.HostPortProvider;
+import org.testng.SkipException;
 
 import java.io.Closeable;
 import java.sql.Connection;
@@ -40,15 +41,23 @@ public class DockerizedMySqlServer
 
     public DockerizedMySqlServer()
     {
-        this.dockerContainer = new DockerContainer(
-                "mysql:8.0.15",
-                ImmutableList.of(MYSQL_PORT),
-                ImmutableMap.of(
-                        "MYSQL_ROOT_PASSWORD", MYSQL_ROOT_PASSWORD,
-                        "MYSQL_USER", MYSQL_USER,
-                        "MYSQL_PASSWORD", MYSQL_PASSWORD,
-                        "MYSQL_DATABASE", "tpch"),
-                DockerizedMySqlServer::healthCheck);
+        try {
+            this.dockerContainer = new DockerContainer(
+                    "mysql:8.0.15",
+                    ImmutableList.of(MYSQL_PORT),
+                    ImmutableMap.of(
+                            "MYSQL_ROOT_PASSWORD", MYSQL_ROOT_PASSWORD,
+                            "MYSQL_USER", MYSQL_USER,
+                            "MYSQL_PASSWORD", MYSQL_PASSWORD,
+                            "MYSQL_DATABASE", "tpch"),
+                    DockerizedMySqlServer::healthCheck);
+        }
+        catch (Exception e) {
+            System.out.println("## Docker environment not properly set up. Skip test. ##");
+            System.out.println("Error message:");
+            e.printStackTrace();
+            throw new SkipException("Docker environment not initialized for tests");
+        }
     }
 
     private static void healthCheck(HostPortProvider hostPortProvider)

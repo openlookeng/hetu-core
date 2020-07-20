@@ -15,15 +15,17 @@
 package io.hetu.core.filesystem;
 
 import io.hetu.core.common.filesystem.FileBasedLock;
+import io.hetu.core.filesystem.utils.DockerizedHive;
+import org.apache.hadoop.conf.Configuration;
+import org.testng.SkipException;
 import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static org.testng.Assert.assertFalse;
@@ -34,27 +36,31 @@ import static org.testng.Assert.assertTrue;
  *
  * @since 2020-04-01
  */
+@Test(singleThreaded = true)
 public class TestFileBasedLockOnHdfs
 {
     private HetuHdfsFileSystemClient fs;
     private String testLockRoot;
 
-    private Properties getLocalHdfs()
-    {
-        Properties properties = new Properties();
-        properties.setProperty("fs.client.type", "hdfs");
-        properties.setProperty("hdfs.config.resources", "");
-        properties.setProperty("hdfs.authentication.type", "NONE");
-        properties.setProperty("fs.hdfs.impl.disable.cache", "true");
-        return properties;
-    }
-
-    @BeforeTest
+    @BeforeClass
     public void prepare()
             throws IOException
     {
-        fs = new HetuHdfsFileSystemClient(new HdfsConfig(getLocalHdfs()));
+        // Will skip the test if exception occurs in this process
+        Configuration config = null;
+        int trialCount = 0;
 
+        while (config == null && trialCount < 3) {
+            config = DockerizedHive.getContainerConfig(this.getClass().getName());
+            trialCount++;
+        }
+
+        if (config == null) {
+            throw new SkipException("Docker environment for this test not setup");
+        }
+
+        config.setBoolean("fs.hdfs.impl.disable.cache", true);
+        fs = new HetuHdfsFileSystemClient(new HdfsConfig(config));
         testLockRoot = "/tmp/test-hdfs-lock";
     }
 
