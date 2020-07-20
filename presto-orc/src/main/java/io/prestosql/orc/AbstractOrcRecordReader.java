@@ -21,11 +21,10 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 import com.google.common.collect.PeekingIterator;
 import com.google.common.io.Closer;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
-import io.hetu.core.spi.heuristicindex.Index;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
@@ -37,10 +36,13 @@ import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 import io.prestosql.orc.metadata.statistics.StripeStatistics;
 import io.prestosql.orc.reader.AbstractColumnReader;
 import io.prestosql.orc.reader.CachingColumnReader;
+import io.prestosql.orc.reader.SelectiveCachingColumnReader;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.StreamSourceMeta;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.FixedWidthType;
 import io.prestosql.spi.type.Type;
@@ -77,6 +79,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         implements Closeable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(AbstractOrcRecordReader.class).instanceSize();
+    private static final Logger log = Logger.get(AbstractOrcRecordReader.class);
     private final OrcDataSource orcDataSource;
 
     private T[] columnReaders;
@@ -108,7 +111,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     private long currentGroupRowCount;
     private int nextRowInGroup;
 
-    private final Map<String, Slice> userMetadata;
+    protected final Map<String, Slice> userMetadata;
 
     private final AggregatedMemoryContext systemMemoryUsage;
 
@@ -147,7 +150,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             Optional<OrcWriteValidation> writeValidation,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform,
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties)
@@ -198,16 +201,16 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         // 2. the index split offset corresponds to the stripe offset
 
         // each stripe could have an index for multiple columns
-        Map<Long, List<SplitIndexMetadata>> stripeOffsetToIndex = new HashMap<>();
+        Map<Long, List<IndexMetadata>> stripeOffsetToIndex = new HashMap<>();
         if (indexes.isPresent() && !indexes.get().isEmpty()
                 // check there is only one type of index
                 && indexes.get().stream().map(i -> i.getIndex().getId()).collect(Collectors.toSet()).size() == 1) {
-            for (SplitIndexMetadata i : indexes.get()) {
+            for (IndexMetadata i : indexes.get()) {
                 long offset = i.getSplitStart();
 
                 stripeOffsetToIndex.putIfAbsent(offset, new LinkedList<>());
 
-                List<SplitIndexMetadata> stripeIndexes = stripeOffsetToIndex.get(offset);
+                List<IndexMetadata> stripeIndexes = stripeOffsetToIndex.get(offset);
                 stripeIndexes.add(i);
             }
         }
@@ -215,7 +218,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         long totalRowCount = 0;
         long fileRowCount = 0;
         ImmutableList.Builder<StripeInformation> stripes = ImmutableList.builder();
-        Map<StripeInformation, List<SplitIndexMetadata>> stripeIndexes = new HashMap<>();
+        Map<StripeInformation, List<IndexMetadata>> stripeIndexes = new HashMap<>();
         ImmutableList.Builder<Long> stripeFilePositions = ImmutableList.builder();
         if (!fileStats.isPresent() || predicate.matches(numberOfRows, fileStats.get())) {
             // select stripes that start within the specified split
@@ -250,12 +253,12 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                 Domain columnDomain = domainEntry.getValue();
 
                 // if the index exists, there should only be one index for this column within this stripe
-                List<SplitIndexMetadata> splitIndexMetadatas = stripeIndex.getValue().stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
-                if (splitIndexMetadatas.isEmpty() || splitIndexMetadatas.size() > 1) {
+                List<IndexMetadata> indexMetadata = stripeIndex.getValue().stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
+                if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
                     continue;
                 }
 
-                Index index = splitIndexMetadatas.get(0).getIndex();
+                Index index = indexMetadata.get(0).getIndex();
                 indexDomainMap.put(index, columnDomain);
             }
 
@@ -563,7 +566,8 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                 if (columnReader != null) {
                     ZoneId fileTimeZone = stripe.getFileTimeZone();
                     ZoneId storageTimeZone = stripe.getStorageTimeZone();
-                    columnReader.startStripe(fileTimeZone, storageTimeZone, dictionaryStreamSources, columnEncodings);
+                    columnReader.startStripe(fileTimeZone, storageTimeZone,
+                            dictionaryStreamSources, columnEncodings);
                 }
             }
 
@@ -582,49 +586,6 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     private void validateWriteStripe(int rowCount)
     {
         writeChecksumBuilder.ifPresent(builder -> builder.addStripe(rowCount));
-    }
-
-    /**
-     * @return The size of memory retained by all the stream readers (local buffers + object overhead)
-     */
-    @VisibleForTesting
-    long getStreamReaderRetainedSizeInBytes()
-    {
-        long totalRetainedSizeInBytes = 0;
-        for (AbstractColumnReader columnReader : columnReaders) {
-            if (columnReader != null) {
-                totalRetainedSizeInBytes += columnReader.getRetainedSizeInBytes();
-            }
-        }
-        return totalRetainedSizeInBytes;
-    }
-
-    /**
-     * @return The size of memory retained by the current stripe (excludes object overheads)
-     */
-    @VisibleForTesting
-    long getCurrentStripeRetainedSizeInBytes()
-    {
-        return currentStripeSystemMemoryContext.getBytes();
-    }
-
-    /**
-     * @return The total size of memory retained by this OrcRecordReader
-     */
-    @VisibleForTesting
-    long getRetainedSizeInBytes()
-    {
-        return INSTANCE_SIZE + getStreamReaderRetainedSizeInBytes() + getCurrentStripeRetainedSizeInBytes();
-    }
-
-    /**
-     * @return The system memory reserved by this OrcRecordReader. It does not include non-leaf level StreamReaders'
-     * instance sizes.
-     */
-    @VisibleForTesting
-    long getSystemMemoryUsage()
-    {
-        return systemMemoryUsage.getBytes();
     }
 
     protected void validateWritePageChecksum(Page page)
@@ -681,7 +642,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         InputStreamSources rowGroupStreamSources = currentRowGroup.getStreamSources();
         for (AbstractColumnReader columnReader : columnReaders) {
             if (columnReader != null) {
-                if (columnReader instanceof CachingColumnReader) {
+                if (columnReader instanceof CachingColumnReader || columnReader instanceof SelectiveCachingColumnReader) {
                     StreamSourceMeta streamSourceMeta = new StreamSourceMeta();
                     streamSourceMeta.setDataSourceId(orcDataSource.getId());
                     streamSourceMeta.setStripeOffset(stripes.get(currentStripe).getOffset());
@@ -694,6 +655,49 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
 
         return true;
+    }
+
+    /**
+     * @return The size of memory retained by all the stream readers (local buffers + object overhead)
+     */
+    @VisibleForTesting
+    long getStreamReaderRetainedSizeInBytes()
+    {
+        long totalRetainedSizeInBytes = 0;
+        for (AbstractColumnReader columnReader : columnReaders) {
+            if (columnReader != null) {
+                totalRetainedSizeInBytes += columnReader.getRetainedSizeInBytes();
+            }
+        }
+        return totalRetainedSizeInBytes;
+    }
+
+    /**
+     * @return The size of memory retained by the current stripe (excludes object overheads)
+     */
+    @VisibleForTesting
+    long getCurrentStripeRetainedSizeInBytes()
+    {
+        return currentStripeSystemMemoryContext.getBytes();
+    }
+
+    /**
+     * @return The total size of memory retained by this OrcRecordReader
+     */
+    @VisibleForTesting
+    long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE + getStreamReaderRetainedSizeInBytes() + getCurrentStripeRetainedSizeInBytes();
+    }
+
+    /**
+     * @return The system memory reserved by this OrcRecordReader. It does not include non-leaf level StreamReaders'
+     * instance sizes.
+     */
+    @VisibleForTesting
+    long getSystemMemoryUsage()
+    {
+        return systemMemoryUsage.getBytes();
     }
 
     private static class StripeInfo

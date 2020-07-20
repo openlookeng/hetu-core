@@ -15,12 +15,16 @@ package io.prestosql.orc.reader;
 
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.IntArrayBlock;
+import io.prestosql.spi.block.IntArrayBlockBuilder;
 import io.prestosql.spi.block.LongArrayBlock;
+import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.block.ShortArrayBlock;
+import io.prestosql.spi.block.ShortArrayBlockBuilder;
 import io.prestosql.spi.type.Type;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
 import java.util.Optional;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -56,6 +60,60 @@ abstract class AbstractLongSelectiveColumnReader
     public int[] getReadPositions()
     {
         return outputPositions;
+    }
+
+    @Override
+    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    {
+        if (outputType == BIGINT) {
+            LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);
+            blocks.stream().forEach(block -> {
+                for (int i = 0; i < block.getPositionCount(); i++) {
+                    if (block.isNull(i)) {
+                        blockBuilder.appendNull();
+                    }
+                    else {
+                        blockBuilder.writeLong(block.getLong(i, 0));
+                    }
+                }
+            });
+
+            return blockBuilder.build();
+        }
+
+        if (outputType == INTEGER) {
+            IntArrayBlockBuilder blockBuilder = new IntArrayBlockBuilder(null, positionCount);
+            blocks.stream().forEach(block -> {
+                for (int i = 0; i < block.getPositionCount(); i++) {
+                    if (block.isNull(i)) {
+                        blockBuilder.appendNull();
+                    }
+                    else {
+                        blockBuilder.writeInt(block.getInt(i, 0));
+                    }
+                }
+            });
+
+            return blockBuilder.build();
+        }
+
+        if (outputType == SMALLINT) {
+            ShortArrayBlockBuilder blockBuilder = new ShortArrayBlockBuilder(null, positionCount);
+            blocks.stream().forEach(block -> {
+                for (int i = 0; i < block.getPositionCount(); i++) {
+                    if (block.isNull(i)) {
+                        blockBuilder.appendNull();
+                    }
+                    else {
+                        blockBuilder.writeShort(block.getShort(i, 0));
+                    }
+                }
+            });
+
+            return blockBuilder.build();
+        }
+
+        throw new UnsupportedOperationException("Unsupported type: " + outputType);
     }
 
     protected Block buildOutputBlock(int[] positions, int positionCount, boolean includeNulls)

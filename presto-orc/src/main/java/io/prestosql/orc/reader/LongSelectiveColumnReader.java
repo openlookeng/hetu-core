@@ -31,6 +31,8 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -150,11 +152,96 @@ public class LongSelectiveColumnReader
                                 nulls[outputPositionCount] = false;
                             }
                         }
-                        if (filter != null) {
+
+                        outputPositions[outputPositionCount] = position;
+                        outputPositionCount++;
+                    }
+                }
+                streamPosition++;
+            }
+        }
+
+        // At the end, streamPosition may be different from  outputPositionCount as not all element would have
+        // qualified the filter.
+        readOffset = offset + streamPosition;
+
+        return outputPositionCount;
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
+        if (!rowGroupOpen) {
+            openRowGroup();
+        }
+
+        allNulls = false;
+
+        // If this column is not part of projection, then value will not be stored.
+        if (outputRequired) {
+            ensureValuesCapacity(positionCount, nullsAllowed && presentStream != null);
+        }
+
+        // If there is filter on this column then require space to store position. Number of position can not be more
+        // positionCount
+        if (filters != null) {
+            ensureOutputPositionsCapacity(positionCount);
+        }
+        else {
+            // If no filter means no rows will be filtered and hence positions will remains same as input.
+            outputPositions = positions;
+        }
+
+        // account memory used by values, nulls and outputPositions
+        systemMemoryContext.setBytes(getRetainedSizeInBytes());
+
+        if (readOffset < offset) {
+            skip(offset - readOffset);
+        }
+
+        outputPositionCount = 0;
+        int streamPosition = 0;
+        if (dataStream == null && presentStream != null) {
+            streamPosition = readAllNulls(positions, positionCount);
+        }
+        else {
+            for (int i = 0; i < positionCount; i++) {
+                int position = positions[i];
+                if (position > streamPosition) {
+                    // If current streamPosition is behind the first element to be read, then skip difference.
+                    skip(position - streamPosition);
+                    streamPosition = position;
+                }
+
+                if (presentStream != null && !presentStream.nextBit()) {
+                    if (nullsAllowed) {
+                        if (outputRequired) {
+                            nulls[outputPositionCount] = true;
+                        }
+                        if (filters != null) {
                             outputPositions[outputPositionCount] = position;
                         }
                         outputPositionCount++;
                     }
+                }
+                else {
+                    long value = dataStream.next();
+                    if ((accumulator != null && accumulator.get(position))
+                            || filters == null || filters.size() <= 0 || filters.get(0).testLong(value)) {
+                        if (accumulator != null) {
+                            accumulator.set(position);
+                        }
+                    }
+
+                    if (outputRequired) {
+                        values[outputPositionCount] = value;
+                        if (nullsAllowed && presentStream != null) {
+                            nulls[outputPositionCount] = false;
+                        }
+                    }
+
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
                 }
                 streamPosition++;
             }

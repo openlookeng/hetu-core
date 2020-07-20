@@ -309,12 +309,13 @@ public class OrcReader
             AggregatedMemoryContext systemMemoryUsage,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform, //TODO: Revisit below argument for caching and index
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
-            Optional<OrcWriteValidation> writeValidation)
-            throws OrcCorruptionException
+            Optional<OrcWriteValidation> writeValidation,
+            Map<Integer, List<TupleDomainFilter>> additionalFilters,
+            List<Integer> positions) throws OrcCorruptionException
     {
         return new OrcSelectiveRecordReader(
                 outputColumns,
@@ -349,7 +350,9 @@ public class OrcReader
                 indexes,
                 domains,
                 orcCacheStore,
-                orcCacheProperties);
+                orcCacheProperties,
+                additionalFilters,
+                positions);
     }
 
     public static OrcDataSource wrapWithCacheIfTiny(OrcDataSource dataSource, DataSize maxCacheSize)

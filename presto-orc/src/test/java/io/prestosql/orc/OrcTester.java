@@ -557,7 +557,9 @@ public class OrcTester
                 null,
                 OrcCacheStore.CACHE_NOTHING,
                 new OrcCacheProperties(),
-                Optional.empty());
+                Optional.empty(),
+                new HashMap<>(),
+                null);
     }
 
     private static List<String> makeColumnNames(int columns)

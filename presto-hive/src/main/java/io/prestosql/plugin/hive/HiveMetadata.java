@@ -1971,6 +1971,15 @@ public class HiveMetadata
 
         TupleDomain<ColumnHandle> predicate = createPredicate(partitionColumns, partitions);
 
+        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+            Table hmsTable = metastore.getTable(hiveTable.getSchemaName(), hiveTable.getTableName())
+                    .orElseThrow(() -> new TableNotFoundException(hiveTable.getSchemaTableName()));
+
+            if (hmsTable.getStorage().getStorageFormat().getSerDe().equalsIgnoreCase(HiveStorageFormat.ORC.getSerDe())) {
+                predicate = hiveTable.getEnforcedConstraint();
+            }
+        }
+
         Optional<DiscretePredicates> discretePredicates = Optional.empty();
         if (!partitionColumns.isEmpty()) {
             // Do not create tuple domains for every partition at the same time!
@@ -2006,10 +2015,17 @@ public class HiveMetadata
     @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
     {
+        return applyFilter(session, tableHandle, constraint, ImmutableList.of());
+    }
+
+    @Override
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint, List<Constraint> additional)
+    {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         checkArgument(!handle.getAnalyzePartitionValues().isPresent() || constraint.getSummary().isAll(), "Analyze should not have a constraint");
 
         HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, handle, constraint);
+
         HiveTableHandle newHandle = partitionManager.applyPartitionResult(handle, partitionResult);
 
         // the goal here is to pushdown all the constraints/predicates to HivePageSourceProvider
@@ -2025,11 +2041,32 @@ public class HiveMetadata
                 .intersect(handle.getCompactEffectivePredicate())
                 .intersect(withColumnDomains(pushedDown.build()));
 
+        ImmutableList.Builder<TupleDomain<HiveColumnHandle>> builder = ImmutableList.builder();
+        additional.stream().forEach(c -> {
+            TupleDomain<HiveColumnHandle> newSubDomain = withColumnDomains(c.getSummary()
+                            .getDomains().get().entrySet()
+                            .stream().collect(toMap(e -> (HiveColumnHandle) e.getKey(), e -> e.getValue())))
+                    .subtract(newEffectivePredicate);
+            if (!newSubDomain.isNone()) {
+                builder.add(newSubDomain);
+            }
+        });
+
         // Get list of all columns involved in predicate
         Set<String> predicateColumnNames = new HashSet<>();
         newEffectivePredicate.getDomains().get().keySet().stream()
                 .map(HiveColumnHandle::getColumnName)
                 .forEach(predicateColumnNames::add);
+
+        List<TupleDomain<HiveColumnHandle>> newEffectivePredicates = null;
+        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+            newEffectivePredicates = builder.build();
+
+            newEffectivePredicates.stream().forEach(nfp ->
+                    nfp.getDomains().get().keySet().stream()
+                            .map(HiveColumnHandle::getColumnName)
+                            .forEach(predicateColumnNames::add));
+        }
 
         // Get column handle
         Map<String, ColumnHandle> columnHandles = getColumnHandles(session, handle);
@@ -2053,12 +2090,21 @@ public class HiveMetadata
                 newHandle.getBucketFilter(),
                 newHandle.getAnalyzePartitionValues(),
                 predicateColumns,
-                constraint.isPushDownEnabled());
+                Optional.ofNullable(newEffectivePredicates));
 
         if (handle.getPartitions().equals(newHandle.getPartitions()) &&
                 handle.getCompactEffectivePredicate().equals(newHandle.getCompactEffectivePredicate()) &&
                 handle.getBucketFilter().equals(newHandle.getBucketFilter())) {
             return Optional.empty();
+        }
+
+        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+            Table table = metastore.getTable(handle.getSchemaName(), handle.getTableName())
+                    .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
+
+            if (table.getStorage().getStorageFormat().getSerDe().equalsIgnoreCase(HiveStorageFormat.ORC.getSerDe())) {
+                return Optional.of(new ConstraintApplicationResult<>(newHandle, TupleDomain.all()));
+            }
         }
 
         // note here that all unenforced constraints will still be applied using the filter operator
@@ -2156,7 +2202,7 @@ public class HiveMetadata
                 hiveTable.getBucketFilter(),
                 hiveTable.getAnalyzePartitionValues(),
                 hiveTable.getPredicateColumns(),
-                hiveTable.isPushdownFilterEnabled());
+                hiveTable.getAdditionalCompactEffectivePredicate());
     }
 
     @VisibleForTesting

@@ -838,6 +838,10 @@ public class PlanPrinter
                 nodeOutput.appendDetailsLine(":: NONE");
             }
             else {
+                if (predicate.isAll() && (!node.getEnforcedConstraint().isAll() || !node.getEnforcedConstraint().isNone())) {
+                    predicate = node.getEnforcedConstraint();
+                }
+
                 // first, print output columns and their constraints
                 for (Map.Entry<Symbol, ColumnHandle> assignment : node.getAssignments().entrySet()) {
                     ColumnHandle column = assignment.getValue();
@@ -849,13 +853,14 @@ public class PlanPrinter
                 if (!predicate.isAll()) {
                     Set<ColumnHandle> outputs = ImmutableSet.copyOf(node.getAssignments().values());
 
+                    TupleDomain<ColumnHandle> finalPredicate = predicate;
                     predicate.getDomains().get()
                             .entrySet().stream()
                             .filter(entry -> !outputs.contains(entry.getKey()))
                             .forEach(entry -> {
                                 ColumnHandle column = entry.getKey();
                                 nodeOutput.appendDetailsLine("%s", column);
-                                printConstraint(nodeOutput, column, predicate);
+                                printConstraint(nodeOutput, column, finalPredicate);
                             });
                 }
             }

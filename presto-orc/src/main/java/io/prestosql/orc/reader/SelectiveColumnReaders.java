@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import com.google.common.cache.Cache;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.OrcColumn;
+import io.prestosql.orc.OrcPredicate;
 import io.prestosql.orc.OrcRowDataCacheKey;
 import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.OrcType;
@@ -70,10 +71,11 @@ public final class SelectiveColumnReaders
         }
     }
 
-    public static SelectiveColumnReader wrapWithCachingStreamReader(SelectiveColumnReader original, int columnId,
-            Cache<OrcRowDataCacheKey, Block> cache)
+    public static SelectiveColumnReader wrapWithCachingStreamReader(SelectiveColumnReader original,
+                                                                    OrcColumn column,
+                                                                    OrcPredicate predicate,
+                                                                    Cache<OrcRowDataCacheKey, Block> cache)
     {
-        //TODO: Rajeev, check how caching can be supported incase of selective reader.
-        return null;
+        return new SelectiveCachingColumnReader(cache, original, column, predicate);
     }
 }

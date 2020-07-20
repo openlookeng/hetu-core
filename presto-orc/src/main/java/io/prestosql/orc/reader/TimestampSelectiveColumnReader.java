@@ -13,6 +13,7 @@
  */
 package io.prestosql.orc.reader;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.TupleDomainFilter;
@@ -24,6 +25,7 @@ import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.LongInputStream;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
+import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -33,6 +35,8 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -140,6 +144,14 @@ public class TimestampSelectiveColumnReader
     public int read(int offset, int[] positions, int positionCount)
             throws IOException
     {
+        return readOr(offset, positions, positionCount,
+                (filter == null) ? null : ImmutableList.of(filter),
+                null);
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
         checkState(!valuesInUse, "BlockLease hasn't been closed yet");
 
         if (!rowGroupOpen) {
@@ -152,7 +164,7 @@ public class TimestampSelectiveColumnReader
             ensureValuesCapacity(positionCount, nullsAllowed && presentStream != null);
         }
 
-        if (filter != null) {
+        if (filters != null) {
             if (outputPositions == null || outputPositions.length < positionCount) {
                 outputPositions = new int[positionCount];
             }
@@ -172,18 +184,21 @@ public class TimestampSelectiveColumnReader
         if (secondsStream == null && nanosStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
         }
-        else if (filter == null) {
+        else if (filters == null) {
             streamPosition = readNoFilter(positions, positionCount);
         }
+        else if (accumulator == null) {
+            streamPosition = readWithFilter(positions, positionCount, filters);
+        }
         else {
-            streamPosition = readWithFilter(positions, positionCount);
+            streamPosition = readWithOrFilter(positions, positionCount, filters, accumulator);
         }
 
         readOffset = offset + streamPosition;
         return outputPositionCount;
     }
 
-    private int readWithFilter(int[] positions, int positionCount)
+    private int readWithOrFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator)
             throws IOException
     {
         int streamPosition = 0;
@@ -206,7 +221,51 @@ public class TimestampSelectiveColumnReader
             }
             else {
                 long value = decodeTimestamp(secondsStream.next(), nanosStream.next(), baseTimestampInSeconds);
-                if (filter.testLong(value)) {
+                if ((accumulator != null && accumulator.get(position))
+                        || filters == null || filters.stream().anyMatch(f -> f.testLong(value))) {
+                    if (accumulator != null) {
+                        accumulator.set(position);
+                    }
+                }
+
+                if (outputRequired) {
+                    values[outputPositionCount] = value;
+                    if (nullsAllowed && presentStream != null) {
+                        nulls[outputPositionCount] = false;
+                    }
+                }
+                outputPositions[outputPositionCount] = position;
+                outputPositionCount++;
+            }
+            streamPosition++;
+        }
+        return streamPosition;
+    }
+
+    private int readWithFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters)
+            throws IOException
+    {
+        int streamPosition = 0;
+        outputPositionCount = 0;
+        for (int i = 0; i < positionCount; i++) {
+            int position = positions[i];
+            if (position > streamPosition) {
+                skip(position - streamPosition);
+                streamPosition = position;
+            }
+
+            if (presentStream != null && !presentStream.nextBit()) {
+                if (nullsAllowed) {
+                    if (outputRequired) {
+                        nulls[outputPositionCount] = true;
+                    }
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
+                }
+            }
+            else {
+                long value = decodeTimestamp(secondsStream.next(), nanosStream.next(), baseTimestampInSeconds);
+                if (filters == null || filters.get(0).testLong(value)) {
                     if (outputRequired) {
                         values[outputPositionCount] = value;
                         if (nullsAllowed && presentStream != null) {
@@ -364,5 +423,23 @@ public class TimestampSelectiveColumnReader
         nanosStreamSource = null;
 
         systemMemoryContext.close();
+    }
+
+    @Override
+    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    {
+        LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);
+        blocks.stream().forEach(block -> {
+            for (int i = 0; i < block.getPositionCount(); i++) {
+                if (block.isNull(i)) {
+                    blockBuilder.appendNull();
+                }
+                else {
+                    blockBuilder.writeLong(block.getLong(i, 0));
+                }
+            }
+        });
+
+        return blockBuilder.build();
     }
 }

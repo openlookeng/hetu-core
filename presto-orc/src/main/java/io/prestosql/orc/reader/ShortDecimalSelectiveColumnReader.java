@@ -19,10 +19,13 @@ import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.OrcType;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
+import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.Type;
 
 import java.io.IOException;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 public class ShortDecimalSelectiveColumnReader
@@ -67,7 +70,7 @@ public class ShortDecimalSelectiveColumnReader
     }
 
     @Override
-    protected int readWithFilter(int[] positions, int positionCount)
+    protected int readWithFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters)
             throws IOException
     {
         int streamPosition = 0;
@@ -92,16 +95,65 @@ public class ShortDecimalSelectiveColumnReader
             else {
                 dataStream.nextShortDecimal(data, 1);
                 long rescale = Decimals.rescale(data[0], (int) scaleStream.next(), this.scale);
-                if (filter.testLong(rescale)) {
+                if (filters == null || filters.get(0).testLong(rescale)) {
                     if (outputRequired) {
                         values[outputPositionCount] = rescale;
                         if (nullsAllowed && presentStream != null) {
                             nulls[outputPositionCount] = false;
                         }
                     }
+
                     outputPositions[outputPositionCount] = position;
                     outputPositionCount++;
                 }
+            }
+            streamPosition++;
+        }
+        return streamPosition;
+    }
+
+    @Override
+    protected int readWithOrFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator)
+            throws IOException
+    {
+        int streamPosition = 0;
+        outputPositionCount = 0;
+        long[] data = new long[1];
+        for (int i = 0; i < positionCount; i++) {
+            int position = positions[i];
+            if (position > streamPosition) {
+                skip(position - streamPosition);
+                streamPosition = position;
+            }
+
+            if (presentStream != null && !presentStream.nextBit()) {
+                if (nullsAllowed) {
+                    if (outputRequired) {
+                        nulls[outputPositionCount] = true;
+                    }
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
+                }
+            }
+            else {
+                dataStream.nextShortDecimal(data, 1);
+                long rescale = Decimals.rescale(data[0], (int) scaleStream.next(), this.scale);
+                if ((accumulator != null && accumulator.get(position))
+                        || filters == null || filters.get(0).testLong(rescale)) {
+                    if (accumulator != null) {
+                        accumulator.set(position);
+                    }
+                }
+
+                if (outputRequired) {
+                    values[outputPositionCount] = rescale;
+                    if (nullsAllowed && presentStream != null) {
+                        nulls[outputPositionCount] = false;
+                    }
+                }
+
+                outputPositions[outputPositionCount] = position;
+                outputPositionCount++;
             }
             streamPosition++;
         }
@@ -161,5 +213,23 @@ public class ShortDecimalSelectiveColumnReader
     protected Block makeBlock(int positionCount, boolean includeNulls, boolean[] nulls, long[] values)
     {
         return new LongArrayBlock(positionCount, Optional.ofNullable(includeNulls ? nulls : null), values);
+    }
+
+    @Override
+    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    {
+        LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);
+        blocks.stream().forEach(block -> {
+            for (int i = 0; i < block.getPositionCount(); i++) {
+                if (block.isNull(i)) {
+                    blockBuilder.appendNull();
+                }
+                else {
+                    blockBuilder.writeLong(block.getLong(i, 0));
+                }
+            }
+        });
+
+        return blockBuilder.build();
     }
 }

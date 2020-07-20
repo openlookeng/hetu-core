@@ -45,7 +45,7 @@ public class HiveTableHandle
     private final Optional<HiveBucketing.HiveBucketFilter> bucketFilter;
     private final Optional<List<List<String>>> analyzePartitionValues;
     private final Map<String, HiveColumnHandle> predicateColumns;
-    private final boolean pushdownFilterEnabled;
+    private final Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate;
 //    private final RowExpression remainingPredicate; //For Complex Expression.
 
     @JsonCreator
@@ -59,7 +59,7 @@ public class HiveTableHandle
             @JsonProperty("bucketFilter") Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
             @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues,
             @JsonProperty("predicateColumns") Map<String, HiveColumnHandle> predicateColumns,
-            @JsonProperty("pushdownFilterEnabled") boolean pushdownFilterEnabled)
+            @JsonProperty("additionaPredicates") Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate)
     {
         this(
                 schemaName,
@@ -73,7 +73,7 @@ public class HiveTableHandle
                 bucketFilter,
                 analyzePartitionValues,
                 predicateColumns,
-                pushdownFilterEnabled);
+                additionalCompactEffectivePredicate);
     }
 
     public HiveTableHandle(
@@ -95,7 +95,7 @@ public class HiveTableHandle
                 Optional.empty(),
                 Optional.empty(),
                 null,
-                false);
+                Optional.empty());
     }
 
     public HiveTableHandle(
@@ -110,7 +110,7 @@ public class HiveTableHandle
             Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
             Optional<List<List<String>>> analyzePartitionValues,
             Map<String, HiveColumnHandle> predicateColumns,
-            boolean pushdownFilterEnabled)
+            Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -123,7 +123,7 @@ public class HiveTableHandle
         this.bucketFilter = requireNonNull(bucketFilter, "bucketFilter is null");
         this.analyzePartitionValues = requireNonNull(analyzePartitionValues, "analyzePartitionValues is null");
         this.predicateColumns = predicateColumns;
-        this.pushdownFilterEnabled = pushdownFilterEnabled;
+        this.additionalCompactEffectivePredicate = requireNonNull(additionalCompactEffectivePredicate, "additionalPredicates is null");
     }
 
     public HiveTableHandle withAnalyzePartitionValues(Optional<List<List<String>>> analyzePartitionValues)
@@ -140,7 +140,7 @@ public class HiveTableHandle
                 bucketFilter,
                 analyzePartitionValues,
                 predicateColumns,
-                pushdownFilterEnabled);
+                Optional.empty());
     }
 
     @JsonProperty
@@ -225,15 +225,15 @@ public class HiveTableHandle
         return analyzePartitionValues;
     }
 
-    @JsonProperty
-    public boolean isPushdownFilterEnabled()
-    {
-        return pushdownFilterEnabled;
-    }
-
     public SchemaTableName getSchemaTableName()
     {
         return new SchemaTableName(schemaName, tableName);
+    }
+
+    @JsonProperty
+    public Optional<List<TupleDomain<HiveColumnHandle>>> getAdditionalCompactEffectivePredicate()
+    {
+        return additionalCompactEffectivePredicate;
     }
 
     /**
@@ -264,7 +264,14 @@ public class HiveTableHandle
                 oldHiveConnectorTableHandle.getBucketFilter(),
                 oldHiveConnectorTableHandle.getAnalyzePartitionValues(),
                 oldHiveConnectorTableHandle.getPredicateColumns(),
-                oldHiveConnectorTableHandle.isPushdownFilterEnabled());
+                oldHiveConnectorTableHandle.getAdditionalCompactEffectivePredicate());
+    }
+
+    @Override
+    public boolean hasAdditionalFiltersPushdown()
+    {
+        return additionalCompactEffectivePredicate.isPresent()
+                && additionalCompactEffectivePredicate.get().size() > 0;
     }
 
     @Override

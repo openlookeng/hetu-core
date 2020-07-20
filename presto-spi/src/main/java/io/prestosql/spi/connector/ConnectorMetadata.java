@@ -770,6 +770,25 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Attempt to push down the provided constraint into the table. This method is provided as replacement to
+     * {@link ConnectorMetadata#getTableLayouts(ConnectorSession, ConnectorTableHandle, Constraint, Optional)} to ease
+     * migration for the legacy API.
+     * <p>
+     * Connectors can indicate whether they don't support predicate pushdown or that the action had no effect
+     * by returning {@link Optional#empty()}. Connectors should expect this method to be called multiple times
+     * during the optimization of a given query.
+     * <p>
+     * <b>Note</b>: it's critical for connectors to return Optional.empty() if calling this method has no effect for that
+     * invocation, even if the connector generally supports pushdown. Doing otherwise can cause the optimizer
+     * to loop indefinitely.
+     * </p>
+     */
+    default Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint, List<Constraint> additionalConstrainsts)
+    {
+        return applyFilter(session, handle, constraint);
+    }
+
+    /**
      * Attempt to push down the provided projections into the table.
      * <p>
      * Connectors can indicate whether they don't support projection pushdown or that the action had no effect

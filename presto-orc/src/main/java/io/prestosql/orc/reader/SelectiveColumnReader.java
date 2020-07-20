@@ -13,9 +13,12 @@
  */
 package io.prestosql.orc.reader;
 
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 
 import java.io.IOException;
+import java.util.BitSet;
+import java.util.List;
 
 public interface SelectiveColumnReader
         extends AbstractColumnReader
@@ -41,11 +44,21 @@ public interface SelectiveColumnReader
 
     /**
      ** Return a subset of the values extracted during most recent read() for the specified positions
-     ** @param positions Monotonically increasing positions to return; must be a strict subset of both
+     * @param positions Monotonically increasing positions to return; must be a strict subset of both
      **                  the list of positions passed into read() and the list of positions returned
      **                  from getReadPositions()
      ** @param positionCount Number of valid positions in the positions array; may be less than the
-     **                      size of the array
      **/
     Block getBlock(int[] positions, int positionCount);
+
+    default int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filter, BitSet accumulator)
+            throws IOException
+    {
+        return read(offset, positions, positionCount);
+    }
+
+    default Block mergeBlocks(List<Block> blocks, int positionCount)
+    {
+        return blocks.get(0);
+    }
 }

@@ -13,6 +13,7 @@
  */
 package io.prestosql.orc.reader;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.TupleDomainFilter;
@@ -31,6 +32,8 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
 import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -135,6 +138,14 @@ public abstract class AbstractDecimalSelectiveColumnReader
     public int read(int offset, int[] positions, int positionCount)
             throws IOException
     {
+        return readOr(offset, positions, positionCount,
+                (filter == null) ? null : ImmutableList.of(filter),
+                null);
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
         if (!rowGroupOpen) {
             openRowGroup();
         }
@@ -145,7 +156,7 @@ public abstract class AbstractDecimalSelectiveColumnReader
             ensureValuesCapacity(positionCount, nullsAllowed && presentStream != null);
         }
 
-        if (filter != null) {
+        if (filters != null) {
             if (outputPositions == null || outputPositions.length < positionCount) {
                 outputPositions = new int[positionCount];
             }
@@ -166,11 +177,14 @@ public abstract class AbstractDecimalSelectiveColumnReader
         if (dataStream == null && scaleStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
         }
-        else if (filter == null) {
+        else if (filters == null) {
             streamPosition = readNoFilter(positions, positionCount);
         }
+        else if (accumulator == null) {
+            streamPosition = readWithFilter(positions, positionCount, filters);
+        }
         else {
-            streamPosition = readWithFilter(positions, positionCount);
+            streamPosition = readWithOrFilter(positions, positionCount, filters, accumulator);
         }
 
         readOffset = offset + streamPosition;
@@ -271,7 +285,10 @@ public abstract class AbstractDecimalSelectiveColumnReader
     abstract int readNoFilter(int[] positions, int position)
             throws IOException;
 
-    abstract int readWithFilter(int[] positions, int position)
+    abstract int readWithFilter(int[] positions, int position, List<TupleDomainFilter> filters)
+            throws IOException;
+
+    abstract int readWithOrFilter(int[] positions, int position, List<TupleDomainFilter> filters, BitSet accumulator)
             throws IOException;
 
     @Override

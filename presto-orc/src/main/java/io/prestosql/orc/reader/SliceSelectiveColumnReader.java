@@ -31,6 +31,8 @@ import org.openjdk.jol.info.ClassLayout;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -113,6 +115,12 @@ public class SliceSelectiveColumnReader
             throws IOException
     {
         return currentReader.read(offset, positions, positionCount);
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
+        return currentReader.readOr(offset, positions, positionCount, filters, accumulator);
     }
 
     @Override

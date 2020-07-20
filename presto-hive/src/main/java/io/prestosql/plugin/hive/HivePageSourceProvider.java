@@ -140,8 +140,7 @@ public class HivePageSourceProvider
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
-        //TODO: Rajeev: to pass actual configuration.
-        if (hiveTable.isPushdownFilterEnabled()) {
+        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
             //TODO: Rajeev: To check if index and dynamic filter required for selective orc
             return createSelectivePageSource(selectivePageSourceFactories, configuration,
                     session, hiveSplit, hiveColumns, hiveStorageTimeZone,
@@ -149,7 +148,8 @@ public class HivePageSourceProvider
                     hiveSplit.getStartRowOffsetOfFile(),
                     indexOptional, hiveSplit.isCacheable(),
                     hiveTable.getCompactEffectivePredicate(),
-                    hiveTable.getPredicateColumns());
+                    hiveTable.getPredicateColumns(),
+                    hiveTable.getAdditionalCompactEffectivePredicate());
         }
 
         Optional<ConnectorPageSource> pageSource = createHivePageSource(
@@ -192,10 +192,11 @@ public class HivePageSourceProvider
             Map<ColumnHandle, DynamicFilter> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             boolean splitCacheable,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            Map<String, HiveColumnHandle> predicateColumns)
+            Map<String, HiveColumnHandle> predicateColumns,
+            Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates)
     {
         Set<HiveColumnHandle> interimColumns = ImmutableSet.<HiveColumnHandle>builder()
                 .addAll(predicateColumns.values())
@@ -233,6 +234,7 @@ public class HivePageSourceProvider
                     prefilledValues,
                     outputColumns,
                     effectivePredicate,
+                    additionPredicates,
                     hiveStorageTimeZone,
                     dynamicFilters,
                     deleteDeltaLocations,

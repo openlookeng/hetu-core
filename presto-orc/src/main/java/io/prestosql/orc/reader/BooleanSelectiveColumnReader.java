@@ -30,7 +30,10 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -208,7 +211,7 @@ public class BooleanSelectiveColumnReader
                 }
                 else {
                     boolean value = dataStream.nextBit();
-                    if (filter.testBoolean(value)) {
+                    if (filter == null || filter.testBoolean(value)) {
                         if (outputRequired) {
                             values[outputPositionCount] = (byte) (value ? 1 : 0);
                             if (nullsAllowed && presentStream != null) {
@@ -218,6 +221,84 @@ public class BooleanSelectiveColumnReader
                         outputPositions[outputPositionCount] = position;
                         outputPositionCount++;
                     }
+                }
+                streamPosition++;
+            }
+        }
+
+        readOffset = offset + streamPosition;
+        return outputPositionCount;
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
+        if (!rowGroupOpen) {
+            openRowGroup();
+        }
+
+        allNulls = false;
+
+        if (outputRequired) {
+            ensureValuesCapacity(positionCount, nullsAllowed && presentStream != null);
+        }
+
+        if (filters != null) {
+            ensureOutputPositionsCapacity(positionCount);
+        }
+        else {
+            outputPositions = positions;
+        }
+
+        systemMemoryContext.setBytes(getRetainedSizeInBytes());
+
+        if (readOffset < offset) {
+            skip(offset - readOffset);
+        }
+
+        int streamPosition = 0;
+        if (dataStream == null && presentStream != null) {
+            streamPosition = readAllNulls(positions, positionCount);
+        }
+        else if (filters == null) {
+            streamPosition = readNoFilter(positions, positionCount);
+        }
+        else {
+            outputPositionCount = 0;
+            for (int i = 0; i < positionCount; i++) {
+                int position = positions[i];
+                if (position > streamPosition) {
+                    skip(position - streamPosition);
+                    streamPosition = position;
+                }
+
+                if (presentStream != null && !presentStream.nextBit()) {
+                    if (nullsAllowed) {
+                        if (outputRequired) {
+                            nulls[outputPositionCount] = true;
+                        }
+                        outputPositions[outputPositionCount] = position;
+                        outputPositionCount++;
+                    }
+                }
+                else {
+                    boolean value = dataStream.nextBit();
+                    if ((accumulator != null && accumulator.get(position))
+                            || filters == null || filters.stream().anyMatch(f -> f.testBoolean(value))) {
+                        if (accumulator != null) {
+                            accumulator.set(position);
+                        }
+                    }
+
+                    if (outputRequired) {
+                        values[outputPositionCount] = (byte) (value ? 1 : 0);
+                        if (nullsAllowed && presentStream != null) {
+                            nulls[outputPositionCount] = false;
+                        }
+                    }
+
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
                 }
                 streamPosition++;
             }
@@ -356,5 +437,21 @@ public class BooleanSelectiveColumnReader
         }
 
         return new ByteArrayBlock(positionCount, Optional.ofNullable(nullsCopy), valuesCopy);
+    }
+
+    @Override
+    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    {
+        byte[] valuesCopy = new byte[positionCount];
+        boolean[] nullsCopy = new boolean[positionCount];
+        AtomicInteger index = new AtomicInteger(0);
+        blocks.stream().forEach(block -> {
+            for (int i = 0; i < block.getPositionCount(); i++) {
+                nullsCopy[index.get()] = block.isNull(i);
+                valuesCopy[index.getAndIncrement()] = block.getByte(i, 0);
+            }
+        });
+
+        return new ByteArrayBlock(positionCount, Optional.empty(), valuesCopy);
     }
 }

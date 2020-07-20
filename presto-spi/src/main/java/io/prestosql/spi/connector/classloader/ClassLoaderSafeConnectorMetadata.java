@@ -690,6 +690,14 @@ public class ClassLoaderSafeConnectorMetadata
         }
     }
 
+    @Override
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle table, Constraint constraint, List<Constraint> additionalConstraints)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.applyFilter(session, table, constraint, additionalConstraints);
+        }
+    }
+
     /**
      * This method decides if the sub-query can be pushed down to the connector based on the connector.
      * <p>

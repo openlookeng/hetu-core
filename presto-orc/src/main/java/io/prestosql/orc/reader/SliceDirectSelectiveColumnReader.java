@@ -13,6 +13,7 @@
  */
 package io.prestosql.orc.reader;
 
+import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
@@ -37,6 +38,8 @@ import org.openjdk.jol.info.ClassLayout;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -113,13 +116,21 @@ public class SliceDirectSelectiveColumnReader
     public int read(int offset, int[] positions, int positionCount)
             throws IOException
     {
+        return readOr(offset, positions, positionCount,
+                (filter == null) ? null : ImmutableList.of(filter),
+                null);
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
         if (!rowGroupOpen) {
             openRowGroup();
         }
 
         checkState(!valuesInUse, "BlockLease hasn't been closed yet");
 
-        if (filter != null) {
+        if (filters != null) {
             if (outputPositions == null || outputPositions.length < positionCount) {
                 outputPositions = new int[positionCount];
             }
@@ -142,11 +153,14 @@ public class SliceDirectSelectiveColumnReader
         if (lengthStream == null) {
             streamPosition = readAllNulls(positions, positionCount);
         }
-        else if (filter == null) {
+        else if (filters == null) {
             streamPosition = readNoFilter(positions, positionCount);
         }
+        else if (accumulator == null) {
+            streamPosition = readWithFilter(positions, positionCount, filters);
+        }
         else {
-            streamPosition = readWithFilter(positions, positionCount);
+            streamPosition = readWithOrFilter(positions, positionCount, filters, accumulator);
         }
 
         readOffset = offset + streamPosition;
@@ -192,7 +206,7 @@ public class SliceDirectSelectiveColumnReader
         return streamPosition;
     }
 
-    private int readWithFilter(int[] positions, int positionCount)
+    private int readWithOrFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator)
             throws IOException
     {
         allNulls = false;
@@ -222,12 +236,93 @@ public class SliceDirectSelectiveColumnReader
             else {
                 int length = lengthVector[lengthIndex];
                 int dataOffset = outputRequired ? offset : 0;
-                if (filter != null) {
+                if (true) { /* Fixme(Nitin): Why this check is needed? */
                     if (dataStream != null) {
                         dataStream.skip(dataToSkip);
                         dataToSkip = 0;
                         dataStream.next(data, dataOffset, dataOffset + length);
-                        if (filter.testBytes(data, dataOffset, length)) {
+
+                        if ((accumulator != null && accumulator.get(position))
+                                || filters == null || filters.get(0).testBytes(data, dataOffset, length)) {
+                            if (accumulator != null) {
+                                accumulator.set(position);
+                            }
+                        }
+
+                        if (outputRequired) {
+                            int truncatedLength = computeTruncatedLength(dataAsSlice, dataOffset, length, maxCodePointCount, isCharType);
+                            offsets[outputPositionCount + 1] = offset + truncatedLength;
+                            if (nullsAllowed && isNullVector != null) {
+                                nulls[outputPositionCount] = false;
+                            }
+                        }
+                        outputPositions[outputPositionCount] = position;
+                        outputPositionCount++;
+                    }
+                    else {
+                        if (outputRequired) {
+                            offsets[outputPositionCount + 1] = offset;
+                            if (nullsAllowed && isNullVector != null) {
+                                nulls[outputPositionCount] = false;
+                            }
+                        }
+
+                        /* Fixme(Rajeev): This may also need to evaluate filter condition? */
+                        outputPositions[outputPositionCount] = position;
+                        outputPositionCount++;
+                    }
+                }
+                else {
+                    dataToSkip += length;
+                }
+                lengthIndex++;
+            }
+
+            streamPosition++;
+        }
+        if (dataToSkip > 0) {
+            dataStream.skip(dataToSkip);
+        }
+        return streamPosition;
+    }
+
+    private int readWithFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters)
+            throws IOException
+    {
+        allNulls = false;
+        int streamPosition = 0;
+        int dataToSkip = 0;
+
+        for (int i = 0; i < positionCount; i++) {
+            int position = positions[i];
+            if (position > streamPosition) {
+                skipData(streamPosition, position - streamPosition);
+                streamPosition = position;
+            }
+
+            // offset required to stored multiple position data in the same buffer.
+            // Actually offset is the point from where next applied filtered data will be stored.
+            int offset = outputRequired ? offsets[outputPositionCount] : 0;
+            if (isNullVector != null && isNullVector[position]) {
+                if (nullsAllowed) {
+                    if (outputRequired) {
+                        offsets[outputPositionCount + 1] = offset;
+                        nulls[outputPositionCount] = true;
+                    }
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
+                }
+            }
+            else {
+                int length = lengthVector[lengthIndex];
+                int dataOffset = outputRequired ? offset : 0;
+                if (true) { /* Fixme(Nitin): Why this check is needed? */
+                    if (dataStream != null) {
+                        dataStream.skip(dataToSkip);
+                        dataToSkip = 0;
+                        dataStream.next(data, dataOffset, dataOffset + length);
+
+                        if (filters == null || filters.get(0).testBytes(data, dataOffset, length)) {
                             if (outputRequired) {
                                 int truncatedLength = computeTruncatedLength(dataAsSlice, dataOffset, length, maxCodePointCount, isCharType);
                                 offsets[outputPositionCount + 1] = offset + truncatedLength;
@@ -246,6 +341,8 @@ public class SliceDirectSelectiveColumnReader
                                 nulls[outputPositionCount] = false;
                             }
                         }
+
+                        /* Fixme(Rajeev): This may also need to evaluate filter condition? */
                         outputPositions[outputPositionCount] = position;
                         outputPositionCount++;
                     }

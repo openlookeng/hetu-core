@@ -85,4 +85,9 @@ public interface ConnectorTableHandle
     {
         return false;
     }
+
+    default boolean hasAdditionalFiltersPushdown()
+    {
+        return false;
+    }
 }

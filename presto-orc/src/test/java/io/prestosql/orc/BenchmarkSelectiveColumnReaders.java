@@ -41,6 +41,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -178,7 +179,9 @@ public class BenchmarkSelectiveColumnReaders
                     Collections.emptyMap(),
                     OrcCacheStore.CACHE_NOTHING,
                     new OrcCacheProperties(),
-                    Optional.empty());
+                    Optional.empty(),
+                    new HashMap<>(),
+                    new ArrayList<>());
         }
     }
 

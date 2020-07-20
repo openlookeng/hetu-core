@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.airlift.units.DataSize;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.OrcCacheProperties;
 import io.prestosql.orc.OrcCacheStore;
@@ -48,6 +47,7 @@ import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.RowType;
@@ -69,7 +69,6 @@ import javax.inject.Inject;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -131,25 +130,16 @@ public class OrcSelectivePageSourceFactory
     private final HdfsEnvironment hdfsEnvironment;
     private final FileFormatDataSourceStats stats;
     private final OrcCacheStore orcCacheStore;
-    private final int domainCompactionThreshold;
 
     @Inject
-    public OrcSelectivePageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats)
+    public OrcSelectivePageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         requireNonNull(config, "config is null");
         this.useOrcColumnNames = config.isUseOrcColumnNames();
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
-        this.orcCacheStore = OrcCacheStore.builder().newCacheStore(
-                config.getOrcFileTailCacheLimit(), Duration.ofMillis(config.getOrcFileTailCacheTtl().toMillis()),
-                config.getOrcStripeFooterCacheLimit(),
-                Duration.ofMillis(config.getOrcStripeFooterCacheTtl().toMillis()),
-                config.getOrcRowIndexCacheLimit(), Duration.ofMillis(config.getOrcRowIndexCacheTtl().toMillis()),
-                config.getOrcBloomFiltersCacheLimit(),
-                Duration.ofMillis(config.getOrcBloomFiltersCacheTtl().toMillis()),
-                config.getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(config.getOrcRowDataCacheTtl().toMillis()));
-        this.domainCompactionThreshold = config.getDomainCompactionThreshold();
+        this.orcCacheStore = orcCacheStore;
     }
 
     @Override
@@ -165,11 +155,12 @@ public class OrcSelectivePageSourceFactory
             Map<Integer, String> prefilledValues,
             List<Integer> outputColumns,
             TupleDomain<HiveColumnHandle> domainPredicate,
+            Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates,
             DateTimeZone hiveStorageTimeZone,
             Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             boolean splitCacheable)
     {
         if (!HiveUtil.isDeserializerClass(schema, OrcSerde.class)) {
@@ -186,6 +177,85 @@ public class OrcSelectivePageSourceFactory
                 isOrcRowIndexCacheEnabled(session),
                 isOrcBloomFiltersCacheEnabled(session),
                 isOrcRowDataCacheEnabled(session) && splitCacheable);
+        if (additionPredicates.isPresent()
+                && additionPredicates.get().size() > 0
+                && !additionPredicates.get().get(0).isAll()) {
+            List<ConnectorPageSource> pageSources = new ArrayList<>();
+            List<Integer> positions = new ArrayList<>(10);
+
+            return Optional.of(createOrcPageSource(
+                    hdfsEnvironment,
+                    session.getUser(),
+                    configuration,
+                    path,
+                    start,
+                    length,
+                    fileSize,
+                    columns,
+                    useOrcColumnNames,
+                    isFullAcidTable(Maps.fromProperties(schema)),
+                    prefilledValues,
+                    outputColumns,
+                    domainPredicate,
+                    hiveStorageTimeZone,
+                    typeManager,
+                    getOrcMaxMergeDistance(session),
+                    getOrcMaxBufferSize(session),
+                    getOrcStreamBufferSize(session),
+                    getOrcTinyStripeThreshold(session),
+                    getOrcMaxReadBlockSize(session),
+                    getOrcLazyReadSmallRanges(session),
+                    isOrcBloomFiltersEnabled(session),
+                    stats,
+                    dynamicFilter,
+                    deleteDeltaLocations,
+                    startRowOffsetOfFile,
+                    indexes,
+                    orcCacheStore,
+                    orcCacheProperties,
+                    additionPredicates.orElseGet(() -> ImmutableList.of()),
+                    positions));
+
+            /* Todo(Nitin): For Append Pattern
+            appendPredicates.get().stream().forEach(newDomainPredicate ->
+                    pageSources.add(createOrcPageSource(
+                            hdfsEnvironment,
+                            session.getUser(),
+                            configuration,
+                            path,
+                            start,
+                            length,
+                            fileSize,
+                            columns,
+                            useOrcColumnNames,
+                            isFullAcidTable(Maps.fromProperties(schema)),
+                            prefilledValues,
+                            outputColumns,
+                            newDomainPredicate,
+                            hiveStorageTimeZone,
+                            typeManager,
+                            getOrcMaxMergeDistance(session),
+                            getOrcMaxBufferSize(session),
+                            getOrcStreamBufferSize(session),
+                            getOrcTinyStripeThreshold(session),
+                            getOrcMaxReadBlockSize(session),
+                            getOrcLazyReadSmallRanges(session),
+                            isOrcBloomFiltersEnabled(session),
+                            stats,
+                            dynamicFilter,
+                            deleteDeltaLocations,
+                            startRowOffsetOfFile,
+                            indexes,
+                            orcCacheStore,
+                            orcCacheProperties,
+                            additionPredicates.orElseGet(() -> ImmutableList.of()),
+                            positions)));
+
+            // Create a Concatenating Page Source
+            return Optional.of(new OrcConcatPageSource(pageSources));
+            */
+        }
+
         return Optional.of(createOrcPageSource(
                 hdfsEnvironment,
                 session.getUser(),
@@ -215,7 +285,9 @@ public class OrcSelectivePageSourceFactory
                 startRowOffsetOfFile,
                 indexes,
                 orcCacheStore,
-                orcCacheProperties));
+                orcCacheProperties,
+                ImmutableList.of(),
+                null));
     }
 
     public static OrcSelectivePageSource createOrcPageSource(
@@ -245,9 +317,11 @@ public class OrcSelectivePageSourceFactory
             Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             OrcCacheStore orcCacheStore,
-            OrcCacheProperties orcCacheProperties)
+            OrcCacheProperties orcCacheProperties,
+            List<TupleDomain<HiveColumnHandle>> additionalDomainPredicates,
+            List<Integer> positions)
     {
         checkArgument(!domainPredicate.isNone(), "Unexpected NONE domain");
 
@@ -322,6 +396,11 @@ public class OrcSelectivePageSourceFactory
             Map<HiveColumnHandle, Domain> effectivePredicateDomains = domainPredicate.getDomains()
                     .orElseThrow(() -> new IllegalArgumentException("Effective predicate is none"));
 
+            /* Fixme(Nitin): If same-columns or conditions can be merged as TreeMap in optimization step; below code can be spared */
+            Map<HiveColumnHandle, Domain> additionalPredicateDomains = new HashMap<>();
+            additionalDomainPredicates.stream()
+                    .forEach(ap -> ap.getDomains().get().forEach((k, v) -> additionalPredicateDomains.merge(k, v, (v1, v2) -> v1.union(v2))));
+
             for (HiveColumnHandle column : columns) {
                 OrcColumn orcColumn = null;
                 if (useOrcColumnNames || isFullAcid) {
@@ -341,6 +420,11 @@ public class OrcSelectivePageSourceFactory
                     Domain domain = effectivePredicateDomains.get(column);
                     if (domain != null) {
                         predicateBuilder.addColumn(orcColumn.getColumnId(), domain); //TODO: Rajeev: need to see if this index is 0-based or 1-based.
+                    }
+
+                    domain = additionalPredicateDomains.get(column);
+                    if (domain != null) {
+                        predicateBuilder.addOrColumn(orcColumn.getColumnId(), domain);
                     }
                 }
                 else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase("row__id")) {
@@ -373,9 +457,14 @@ public class OrcSelectivePageSourceFactory
 
             // Convert the predicate to each column id wise. Will be used to associate as filter with each column reader
             Map<Integer, TupleDomainFilter> tupleDomainFilters = toTupleDomainFilters(domainPredicate, ImmutableBiMap.copyOf(columnNames).inverse());
+            Map<Integer, List<TupleDomainFilter>> orFilters = new HashMap<>();
+
+            additionalDomainPredicates.stream()
+                    .forEach(ap -> toTupleDomainFilters(ap, ImmutableBiMap.copyOf(columnNames).inverse()).entrySet().stream()
+                            .forEach(td -> orFilters.computeIfAbsent(td.getKey(), list -> new ArrayList<>()).add(td.getValue())));
 
             // domains still required by index (refer AbstractOrcRecordReader).
-            Map<String, Domain> domains = domainPredicate.getDomains().get().entrySet().stream().collect(toMap(e -> e.getKey().getName(), Map.Entry::getValue));
+            Map<String, Domain> domainMap = effectivePredicateDomains.entrySet().stream().collect(toMap(e -> e.getKey().getName(), Map.Entry::getValue));
             OrcSelectiveRecordReader recordReader = reader.createSelectiveRecordReader(
                     fileColumns,
                     fileReadColumns,
@@ -392,10 +481,12 @@ public class OrcSelectivePageSourceFactory
                     INITIAL_BATCH_SIZE,
                     exception -> handleException(orcDataSource.getId(), exception),
                     indexes,
-                    domains,
+                    domainMap,
                     orcCacheStore,
                     orcCacheProperties,
-                    Optional.empty());
+                    Optional.empty(),
+                    orFilters,
+                    positions);
 
             OrcDeletedRows deletedRows = new OrcDeletedRows(
                     path.getName(),
@@ -407,6 +498,9 @@ public class OrcSelectivePageSourceFactory
                     configuration,
                     hdfsEnvironment,
                     startRowOffsetOfFile);
+
+            /* Todo(Nitin): Create a Separate OrcSelectivePageSource and Use MergingPageIterator
+             *   to progressively scan and yeild pages. */
 
             return new OrcSelectivePageSource(
                     recordReader,

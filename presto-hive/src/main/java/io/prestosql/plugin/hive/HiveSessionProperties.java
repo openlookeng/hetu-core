@@ -85,6 +85,7 @@ public final class HiveSessionProperties
     private static final String TEMPORARY_STAGING_DIRECTORY_ENABLED = "temporary_staging_directory_enabled";
     private static final String TEMPORARY_STAGING_DIRECTORY_PATH = "temporary_staging_directory_path";
     private static final String DYNAMIC_FILTERING_SPLIT_FILTERING = "dynamic_filtering_partition_filtering";
+    private static final String ORC_PREDICATE_PUSHDOWN = "orc_predicate_pushdown_enabled";
     private static final String DYNAMIC_FILTERING_ROW_FILTERING_THRESHOLD = "dynamic_filtering_filter_rows_threshold";
 
     private final List<PropertyMetadata<?>> sessionProperties;
@@ -361,6 +362,11 @@ public final class HiveSessionProperties
                         DYNAMIC_FILTERING_SPLIT_FILTERING,
                         "Filter out hive splits early based on partition value using dynamic filter",
                         hiveConfig.isDynamicFilterPartitionFilteringEnabled(),
+                        false),
+                booleanProperty(
+                        ORC_PREDICATE_PUSHDOWN,
+                        "Experimental: Consume deterministic predicates for ORC scan.",
+                        false,
                         false));
     }
 
@@ -609,5 +615,10 @@ public final class HiveSessionProperties
     public static boolean isDynamicFilteringSplitFilteringEnabled(ConnectorSession session)
     {
         return session.getProperty(DYNAMIC_FILTERING_SPLIT_FILTERING, Boolean.class);
+    }
+
+    public static boolean isOrcPredicatePushdownEnabled(ConnectorSession session)
+    {
+        return session.getProperty(ORC_PREDICATE_PUSHDOWN, Boolean.class);
     }
 }

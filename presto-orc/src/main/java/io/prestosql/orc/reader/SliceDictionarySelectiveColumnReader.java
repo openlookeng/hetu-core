@@ -13,6 +13,7 @@
  */
 package io.prestosql.orc.reader;
 
+import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
@@ -38,6 +39,8 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -124,6 +127,14 @@ public class SliceDictionarySelectiveColumnReader
     public int read(int offset, int[] positions, int positionCount)
             throws IOException
     {
+        return readOr(offset, positions, positionCount,
+                (filter == null) ? null : ImmutableList.of(filter),
+                null);
+    }
+
+    @Override
+    public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator) throws IOException
+    {
         if (!rowGroupOpen) {
             openRowGroup();
         }
@@ -136,7 +147,7 @@ public class SliceDictionarySelectiveColumnReader
             }
         }
 
-        if (filter != null) {
+        if (filters != null) {
             if (outputPositions == null || outputPositions.length < positionCount) {
                 outputPositions = new int[positionCount];
             }
@@ -158,11 +169,14 @@ public class SliceDictionarySelectiveColumnReader
         if (dataStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
         }
-        else if (filter == null) {
+        else if (filters == null) {
             streamPosition = readNoFilter(positions, positionCount);
         }
+        else if (accumulator == null) {
+            streamPosition = readWithFilter(positions, positionCount, filters);
+        }
         else {
-            streamPosition = readWithFilter(positions, positionCount);
+            streamPosition = readWithOrFilter(positions, positionCount, filters, accumulator);
         }
 
         readOffset = offset + streamPosition;
@@ -193,7 +207,7 @@ public class SliceDictionarySelectiveColumnReader
         return streamPosition;
     }
 
-    private int readWithFilter(int[] positions, int positionCount)
+    private int readWithFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters)
             throws IOException
     {
         int streamPosition = 0;
@@ -217,19 +231,75 @@ public class SliceDictionarySelectiveColumnReader
                 int index = toIntExact(dataStream.next());
                 int length = stripeDictionaryLength[index];
 
-                if (filter != null) {
+                if (true) { /* Fixme(Nitin): Why this condition here?
+                                (accumulator != null && accumulator.get(position)) || filters == null
+                             */
                     int currentPosLength = dictionaryBlock.getSliceLength(index);
                     Slice data = dictionaryBlock.getSlice(index, 0, currentPosLength);
                     if (isCharType) {
                         data = Chars.padSpaces(data, maxCodePointCount);
                     }
-                    if (filter.testBytes(data.getBytes(), 0, length)) {
+                    Slice finalData = data;
+                    if (filters == null || filters.get(0).testBytes(finalData.getBytes(), 0, length)) {
                         if (outputRequired) {
                             values[outputPositionCount] = index;
                         }
                         outputPositions[outputPositionCount] = position;
                         outputPositionCount++;
                     }
+                }
+            }
+
+            streamPosition++;
+        }
+        return streamPosition;
+    }
+
+    private int readWithOrFilter(int[] positions, int positionCount, List<TupleDomainFilter> filters, BitSet accumulator)
+            throws IOException
+    {
+        int streamPosition = 0;
+        for (int i = 0; i < positionCount; i++) {
+            int position = positions[i];
+            if (position > streamPosition) {
+                skip(position - streamPosition);
+                streamPosition = position;
+            }
+
+            if (presentStream != null && !presentStream.nextBit()) {
+                if (nullsAllowed) {
+                    if (outputRequired) {
+                        values[outputPositionCount] = dictionaryBlock.getPositionCount() - 1;
+                    }
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
+                }
+            }
+            else {
+                int index = toIntExact(dataStream.next());
+                int length = stripeDictionaryLength[index];
+
+                if (true) { /* Fixme(Nitin): Why this condition here?
+                                (accumulator != null && accumulator.get(position)) || filters == null
+                             */
+                    int currentPosLength = dictionaryBlock.getSliceLength(index);
+                    Slice data = dictionaryBlock.getSlice(index, 0, currentPosLength);
+                    if (isCharType) {
+                        data = Chars.padSpaces(data, maxCodePointCount);
+                    }
+                    Slice finalData = data;
+                    if ((accumulator != null && accumulator.get(position))
+                            || filters == null || filters.get(0).testBytes(finalData.getBytes(), 0, length)) {
+                        if (accumulator != null) {
+                            accumulator.set(position);
+                        }
+                    }
+
+                    if (outputRequired) {
+                        values[outputPositionCount] = index;
+                    }
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
                 }
             }
 

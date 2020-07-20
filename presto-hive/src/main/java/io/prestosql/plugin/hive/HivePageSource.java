@@ -83,6 +83,7 @@ import static io.prestosql.plugin.hive.HiveType.HIVE_SHORT;
 import static io.prestosql.plugin.hive.HiveUtil.extractStructFieldTypes;
 import static io.prestosql.plugin.hive.HiveUtil.floatPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.integerPartitionKey;
+import static io.prestosql.plugin.hive.HiveUtil.filterRows;
 import static io.prestosql.plugin.hive.HiveUtil.isArrayType;
 import static io.prestosql.plugin.hive.HiveUtil.isMapType;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;

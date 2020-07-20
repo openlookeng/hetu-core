@@ -15,6 +15,7 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
@@ -46,10 +47,13 @@ import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NullLiteral;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.intersection;
@@ -57,6 +61,7 @@ import static io.prestosql.SystemSessionProperties.isPushTableWriteThroughUnion;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.metadata.TableLayoutResult.computeEnforced;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
+import static io.prestosql.sql.ExpressionUtils.extractDisjuncts;
 import static io.prestosql.sql.ExpressionUtils.filterDeterministicConjuncts;
 import static io.prestosql.sql.ExpressionUtils.filterNonDeterministicConjuncts;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
@@ -73,6 +78,7 @@ public class PushPredicateIntoTableScan
         implements Rule<FilterNode>
 {
     private static final Capture<TableScanNode> TABLE_SCAN = newCapture();
+    private static final Logger log = Logger.get(PushPredicateIntoTableScan.class);
 
     private static final Pattern<FilterNode> PATTERN = filter().with(source().matching(
             tableScan().capturedAs(TABLE_SCAN)));
@@ -157,15 +163,33 @@ public class PushPredicateIntoTableScan
                 deterministicPredicate,
                 types);
 
+        List<Expression> orSet = extractDisjuncts(decomposedPredicate.getRemainingExpression());
+        List<DomainTranslator.ExtractionResult> additionalPredicates = orSet.stream()
+                .map(e -> DomainTranslator.fromPredicate(metadata, session, e, types))
+                .collect(Collectors.toList());
+
+        AtomicInteger i = new AtomicInteger(0);
+        additionalPredicates.stream().forEach(er -> {
+            log.warn("[%d]- Enforced [%s]\n\tRemaining [%s]", i.getAndIncrement(),
+                    er.getTupleDomain(), er.getRemainingExpression());
+        });
+
         TupleDomain<ColumnHandle> newDomain = decomposedPredicate.getTupleDomain()
                 .transform(node.getAssignments()::get)
                 .intersect(node.getEnforcedConstraint());
+
+        List<TupleDomain<ColumnHandle>> orDomains = additionalPredicates.stream()
+                .map(er -> er.getTupleDomain().transform(node.getAssignments()::get))
+                .collect(Collectors.toList());
 
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
         Boolean isPushDownEnabled = isPushTableWriteThroughUnion(session);
 
         Constraint constraint;
+        List<Constraint> additionalConstraints = orDomains.stream().map(d -> new Constraint(d))
+                .collect(Collectors.toList());
+
         if (pruneWithPredicateExpression) {
             LayoutConstraintEvaluator evaluator = new LayoutConstraintEvaluator(
                     metadata,
@@ -197,7 +221,7 @@ public class PushPredicateIntoTableScan
             }
 
             constraint.setPushDownEnabled(isPushDownEnabled);
-            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint);
+            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints);
 
             if (!result.isPresent()) {
                 return Optional.empty();
@@ -243,15 +267,21 @@ public class PushPredicateIntoTableScan
         // * Short of implementing the previous bullet point, the current order of non-deterministic expressions
         //   and non-TupleDomain-expressible expressions should be retained. Changing the order can lead
         //   to failures of previously successful queries.
-        if (!isPushDownEnabled) {  //TODO: Rajeev: Add actual session config
-            Expression resultingPredicate = combineConjuncts(
+        Expression resultingPredicate;
+        if (remainingFilter.isAll() && newTable.getConnectorHandle().hasAdditionalFiltersPushdown()) {
+            resultingPredicate = combineConjuncts(
+                    domainTranslator.toPredicate(remainingFilter.transform(assignments::get)),
+                    filterNonDeterministicConjuncts(predicate));
+        }
+        else {
+            resultingPredicate = combineConjuncts(
                     domainTranslator.toPredicate(remainingFilter.transform(assignments::get)),
                     filterNonDeterministicConjuncts(predicate),
                     decomposedPredicate.getRemainingExpression());
+        }
 
-            if (!TRUE_LITERAL.equals(resultingPredicate)) {
-                return Optional.of(new FilterNode(idAllocator.getNextId(), tableScan, resultingPredicate));
-            }
+        if (!TRUE_LITERAL.equals(resultingPredicate)) {
+            return Optional.of(new FilterNode(idAllocator.getNextId(), tableScan, resultingPredicate));
         }
 
         return Optional.of(tableScan);
