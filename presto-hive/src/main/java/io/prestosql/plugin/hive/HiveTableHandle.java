@@ -44,6 +44,9 @@ public class HiveTableHandle
     private final Optional<HiveBucketHandle> bucketHandle;
     private final Optional<HiveBucketing.HiveBucketFilter> bucketFilter;
     private final Optional<List<List<String>>> analyzePartitionValues;
+    private final Map<String, HiveColumnHandle> predicateColumns;
+    private final boolean pushdownFilterEnabled;
+//    private final RowExpression remainingPredicate; //For Complex Expression.
 
     @JsonCreator
     public HiveTableHandle(
@@ -54,7 +57,9 @@ public class HiveTableHandle
             @JsonProperty("enforcedConstraint") TupleDomain<ColumnHandle> enforcedConstraint,
             @JsonProperty("bucketHandle") Optional<HiveBucketHandle> bucketHandle,
             @JsonProperty("bucketFilter") Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
-            @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues)
+            @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues,
+            @JsonProperty("predicateColumns") Map<String, HiveColumnHandle> predicateColumns,
+            @JsonProperty("pushdownFilterEnabled") boolean pushdownFilterEnabled)
     {
         this(
                 schemaName,
@@ -66,7 +71,9 @@ public class HiveTableHandle
                 enforcedConstraint,
                 bucketHandle,
                 bucketFilter,
-                analyzePartitionValues);
+                analyzePartitionValues,
+                predicateColumns,
+                pushdownFilterEnabled);
     }
 
     public HiveTableHandle(
@@ -86,7 +93,9 @@ public class HiveTableHandle
                 TupleDomain.all(),
                 bucketHandle,
                 Optional.empty(),
-                Optional.empty());
+                Optional.empty(),
+                null,
+                false);
     }
 
     public HiveTableHandle(
@@ -99,7 +108,9 @@ public class HiveTableHandle
             TupleDomain<ColumnHandle> enforcedConstraint,
             Optional<HiveBucketHandle> bucketHandle,
             Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
-            Optional<List<List<String>>> analyzePartitionValues)
+            Optional<List<List<String>>> analyzePartitionValues,
+            Map<String, HiveColumnHandle> predicateColumns,
+            boolean pushdownFilterEnabled)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -111,6 +122,8 @@ public class HiveTableHandle
         this.bucketHandle = requireNonNull(bucketHandle, "bucketHandle is null");
         this.bucketFilter = requireNonNull(bucketFilter, "bucketFilter is null");
         this.analyzePartitionValues = requireNonNull(analyzePartitionValues, "analyzePartitionValues is null");
+        this.predicateColumns = predicateColumns;
+        this.pushdownFilterEnabled = pushdownFilterEnabled;
     }
 
     public HiveTableHandle withAnalyzePartitionValues(Optional<List<List<String>>> analyzePartitionValues)
@@ -125,7 +138,9 @@ public class HiveTableHandle
                 enforcedConstraint,
                 bucketHandle,
                 bucketFilter,
-                analyzePartitionValues);
+                analyzePartitionValues,
+                predicateColumns,
+                pushdownFilterEnabled);
     }
 
     @JsonProperty
@@ -181,6 +196,12 @@ public class HiveTableHandle
     }
 
     @JsonProperty
+    public Map<String, HiveColumnHandle> getPredicateColumns()
+    {
+        return predicateColumns;
+    }
+
+    @JsonProperty
     public TupleDomain<ColumnHandle> getEnforcedConstraint()
     {
         return enforcedConstraint;
@@ -202,6 +223,12 @@ public class HiveTableHandle
     public Optional<List<List<String>>> getAnalyzePartitionValues()
     {
         return analyzePartitionValues;
+    }
+
+    @JsonProperty
+    public boolean isPushdownFilterEnabled()
+    {
+        return pushdownFilterEnabled;
     }
 
     public SchemaTableName getSchemaTableName()
@@ -235,7 +262,9 @@ public class HiveTableHandle
                 oldHiveConnectorTableHandle.getEnforcedConstraint(),
                 oldHiveConnectorTableHandle.getBucketHandle(),
                 oldHiveConnectorTableHandle.getBucketFilter(),
-                oldHiveConnectorTableHandle.getAnalyzePartitionValues());
+                oldHiveConnectorTableHandle.getAnalyzePartitionValues(),
+                oldHiveConnectorTableHandle.getPredicateColumns(),
+                oldHiveConnectorTableHandle.isPushdownFilterEnabled());
     }
 
     @Override

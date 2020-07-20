@@ -63,7 +63,7 @@ public class CarbondataPageSourceProvider
             TypeManager typeManager,
             CarbondataTableReader carbonTableReader)
     {
-        super(hiveConfig, hdfsEnvironment, cursorProviders, pageSourceFactories, typeManager, null);
+        super(hiveConfig, hdfsEnvironment, cursorProviders, pageSourceFactories, typeManager, null, null);
         this.carbonTableReader = requireNonNull(carbonTableReader, "carbonTableReader is null");
         this.hdfsEnvironment = hdfsEnvironment;
     }

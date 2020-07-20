@@ -134,7 +134,6 @@ class HiveSplitSource
         this.maxSplitSize = getMaxSplitSize(session);
         this.maxInitialSplitSize = getMaxInitialSplitSize(session);
         this.remainingInitialSplits = new AtomicInteger(maxInitialSplits);
-
         this.dynamicFilterSupplier = dynamicFilterSupplier;
         this.isSplitFilteringEnabled = isDynamicFilteringSplitFilteringEnabled(session);
         this.userDefinedCachePredicates = userDefinedCachedPredicates;

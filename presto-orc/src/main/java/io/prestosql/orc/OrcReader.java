@@ -294,6 +294,64 @@ public class OrcReader
                 orcCacheProperties);
     }
 
+    public OrcSelectiveRecordReader createSelectiveRecordReader(
+            List<OrcColumn> fileColumns,
+            List<OrcColumn> fileReadColumns,
+            List<Type> readTypes,
+            List<Integer> outputColumns,
+            Map<Integer, Type> includedColumns,
+            Map<Integer, TupleDomainFilter> filters,
+            Map<Integer, Object> constantValues,
+            OrcPredicate predicate,
+            long offset,
+            long length,
+            DateTimeZone hiveStorageTimeZone,
+            AggregatedMemoryContext systemMemoryUsage,
+            int initialBatchSize,
+            Function<Exception, RuntimeException> exceptionTransform, //TODO: Revisit below argument for caching and index
+            Optional<List<SplitIndexMetadata>> indexes,
+            Map<String, Domain> domains,
+            OrcCacheStore orcCacheStore,
+            OrcCacheProperties orcCacheProperties,
+            Optional<OrcWriteValidation> writeValidation)
+            throws OrcCorruptionException
+    {
+        return new OrcSelectiveRecordReader(
+                outputColumns,
+                includedColumns,
+                requireNonNull(fileColumns, "readColumns is null"),
+                requireNonNull(fileReadColumns, "readColumns is null"),
+                requireNonNull(readTypes, "readTypes is null"),
+                filters,
+                constantValues,
+                requireNonNull(predicate, "predicate is null"),
+                footer.getNumberOfRows(),
+                footer.getStripes(),
+                footer.getFileStats(),
+                metadata.getStripeStatsList(),
+                orcDataSource,
+                offset,
+                length,
+                footer.getTypes(),
+                decompressor,
+                footer.getRowsInRowGroup(),
+                requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null"),
+                hiveWriterVersion,
+                metadataReader,
+                maxMergeDistance,
+                tinyStripeThreshold,
+                maxBlockSize,
+                footer.getUserMetadata(),
+                systemMemoryUsage,
+                writeValidation,
+                initialBatchSize,
+                exceptionTransform,
+                indexes,
+                domains,
+                orcCacheStore,
+                orcCacheProperties);
+    }
+
     public static OrcDataSource wrapWithCacheIfTiny(OrcDataSource dataSource, DataSize maxCacheSize)
     {
         if (dataSource instanceof CachingOrcDataSource) {

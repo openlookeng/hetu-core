@@ -82,6 +82,7 @@ import org.joda.time.DateTimeZone;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Date;
 import java.sql.Timestamp;
@@ -100,7 +101,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterators.advance;
 import static com.google.common.collect.Lists.newArrayList;
 import static io.airlift.slice.Slices.utf8Slice;
@@ -130,6 +133,7 @@ import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.Varchars.truncateToLength;
 import static io.prestosql.testing.DateTimeTestingUtils.sqlTimestampOf;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
@@ -158,6 +162,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.FileAssert.fail;
 
 public class OrcTester
 {
@@ -183,6 +188,7 @@ public class OrcTester
     private boolean skipStripeTestsEnabled;
     private Set<Format> formats = ImmutableSet.of();
     private Set<CompressionKind> compressions = ImmutableSet.of();
+    private boolean useSelectiveOrcReader;
 
     public static OrcTester quickOrcTester()
     {
@@ -193,7 +199,7 @@ public class OrcTester
         orcTester.nullTestsEnabled = true;
         orcTester.missingStructFieldsTestsEnabled = true;
         orcTester.skipBatchTestsEnabled = true;
-        orcTester.formats = ImmutableSet.of(ORC_12, ORC_11);
+        orcTester.formats = ImmutableSet.of(ORC_12);
         orcTester.compressions = ImmutableSet.of(ZLIB);
         return orcTester;
     }
@@ -216,11 +222,32 @@ public class OrcTester
         return orcTester;
     }
 
+    public static OrcTester quickSelectiveOrcTester()
+    {
+        OrcTester orcTester = new OrcTester();
+        orcTester.listTestsEnabled = true;
+        orcTester.structTestsEnabled = false;
+        orcTester.nullTestsEnabled = true;
+        orcTester.skipBatchTestsEnabled = true;
+        orcTester.formats = ImmutableSet.of(ORC_12, ORC_11);
+        orcTester.compressions = ImmutableSet.of(ZLIB, ZSTD);
+        orcTester.useSelectiveOrcReader = true;
+        orcTester.listTestsEnabled = false;
+
+        return orcTester;
+    }
+
     public void testRoundTrip(Type type, List<?> readValues)
             throws Exception
     {
+        testRoundTrip(type, readValues, ImmutableList.of());
+    }
+
+    public void testRoundTrip(Type type, List<?> readValues, List<Map<Integer, TupleDomainFilter>> filters)
+            throws Exception
+    {
         // just the values
-        testRoundTripType(type, readValues);
+        testRoundTripType(type, readValues, filters);
 
         // all nulls
         if (nullTestsEnabled) {
@@ -228,7 +255,8 @@ public class OrcTester
                     type,
                     readValues.stream()
                             .map(value -> null)
-                            .collect(toList()));
+                            .collect(toList()),
+                            filters);
         }
 
         // values wrapped in struct
@@ -304,7 +332,7 @@ public class OrcTester
                     .map(OrcTester::toHiveStructWithNull)
                     .collect(toList());
 
-            assertRoundTrip(writeType, readType, writeValues, readValues);
+            assertRoundTrip(writeType, readType, writeValues, readValues, ImmutableList.of());
         }
     }
 
@@ -371,32 +399,44 @@ public class OrcTester
     private void testRoundTripType(Type type, List<?> readValues)
             throws Exception
     {
+        testRoundTripType(type, readValues, ImmutableList.of());
+    }
+
+    private void testRoundTripType(Type type, List<?> readValues, List<Map<Integer, TupleDomainFilter>> filters)
+            throws Exception
+    {
         // forward order
-        assertRoundTrip(type, readValues);
+        assertRoundTrip(type, readValues, filters);
 
         // reverse order
         if (reverseTestsEnabled) {
-            assertRoundTrip(type, reverse(readValues));
+            assertRoundTrip(type, reverse(readValues), filters);
         }
 
         if (nullTestsEnabled) {
             // forward order with nulls
-            assertRoundTrip(type, insertNullEvery(5, readValues));
+            assertRoundTrip(type, insertNullEvery(5, readValues), filters);
 
             // reverse order with nulls
             if (reverseTestsEnabled) {
-                assertRoundTrip(type, insertNullEvery(5, reverse(readValues)));
+                assertRoundTrip(type, insertNullEvery(5, reverse(readValues)), filters);
             }
         }
     }
 
-    private void assertRoundTrip(Type type, List<?> readValues)
+    public void assertRoundTrip(Type type, List<?> readValues)
             throws Exception
     {
-        assertRoundTrip(type, type, readValues, readValues);
+        assertRoundTrip(type, type, readValues, readValues, ImmutableList.of());
     }
 
-    private void assertRoundTrip(Type writeType, Type readType, List<?> writeValues, List<?> readValues)
+    private void assertRoundTrip(Type type, List<?> readValues, List<Map<Integer, TupleDomainFilter>> filters)
+            throws Exception
+    {
+        assertRoundTrip(type, type, readValues, readValues, filters);
+    }
+
+    private void assertRoundTrip(Type writeType, Type readType, List<?> writeValues, List<?> readValues, List<Map<Integer, TupleDomainFilter>> filters)
             throws Exception
     {
         OrcWriterStats stats = new OrcWriterStats();
@@ -408,7 +448,7 @@ public class OrcTester
                 if (hiveSupported) {
                     try (TempFile tempFile = new TempFile()) {
                         writeOrcColumnHive(tempFile.getFile(), format, compression, writeType, writeValues.iterator());
-                        assertFileContentsPresto(readType, tempFile, readValues, false, false);
+                        assertFileContentsPresto(readType, tempFile, readValues, false, false, useSelectiveOrcReader, filters);
                     }
                 }
             }
@@ -421,14 +461,14 @@ public class OrcTester
                     assertFileContentsHive(readType, tempFile, readValues);
                 }
 
-                assertFileContentsPresto(readType, tempFile, readValues, false, false);
+                assertFileContentsPresto(readType, tempFile, readValues, false, false, useSelectiveOrcReader, filters);
 
                 if (skipBatchTestsEnabled) {
-                    assertFileContentsPresto(readType, tempFile, readValues, true, false);
+                    assertFileContentsPresto(readType, tempFile, readValues, true, false, useSelectiveOrcReader, filters);
                 }
 
                 if (skipStripeTestsEnabled) {
-                    assertFileContentsPresto(readType, tempFile, readValues, false, true);
+                    assertFileContentsPresto(readType, tempFile, readValues, false, true, useSelectiveOrcReader, filters);
                 }
             }
         }
@@ -437,13 +477,186 @@ public class OrcTester
     }
 
     private static void assertFileContentsPresto(
+            List<Type> types,
+            TempFile tempFile,
+            List<?> expectedValues,
+            OrcPredicate orcPredicate,
+            Optional<Map<Integer, TupleDomainFilter>> filters)
+            throws IOException
+    {
+        try (OrcSelectiveRecordReader recordReader = createCustomOrcSelectiveRecordReader(tempFile, orcPredicate, types, MAX_BATCH_SIZE, filters.orElse(ImmutableMap.of()))) {
+            assertEquals(recordReader.getReaderPosition(), 0);
+            assertEquals(recordReader.getFilePosition(), 0);
+
+            int rowsProcessed = 0;
+            while (true) {
+                Page page = recordReader.getNextPage();
+                if (page == null) {
+                    break;
+                }
+
+                if (page.getPositionCount() == 0) {
+                    continue;
+                }
+
+                for (int i = 0; i < types.size(); i++) {
+                    Type type = types.get(i);
+                    Block block = page.getBlock(i);
+
+                    List<Object> data = new ArrayList<>(block.getPositionCount());
+                    for (int position = 0; position < block.getPositionCount(); position++) {
+                        data.add(type.getObjectValue(SESSION, block, position));
+                    }
+
+                    for (int j = 0; j < block.getPositionCount(); j++) {
+                        assertColumnValueEquals(type, data.get(j), expectedValues.get(rowsProcessed + j));
+                    }
+                }
+
+                rowsProcessed += page.getPositionCount();
+            }
+
+            assertEquals(rowsProcessed, expectedValues.size());
+        }
+    }
+
+    static OrcSelectiveRecordReader createCustomOrcSelectiveRecordReader(
+            TempFile tempFile,
+            OrcPredicate predicate,
+            List<Type> types,
+            int initialBatchSize,
+            Map<Integer, TupleDomainFilter> filters)
+            throws IOException
+    {
+        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true);
+        OrcReader orcReader = new OrcReader(orcDataSource, OrcFileTail.readFrom(orcDataSource, Optional.empty()), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE));
+
+        assertEquals(orcReader.getColumnNames(), makeColumnNames(types.size()));
+        assertEquals(orcReader.getFooter().getRowsInRowGroup(), 10_000);
+
+        Map<Integer, Type> columnTypes = IntStream.range(0, types.size())
+                .boxed()
+                .collect(toImmutableMap(Function.identity(), types::get));
+
+        return orcReader.createSelectiveRecordReader(
+                orcReader.getRootColumn().getNestedColumns(),
+                orcReader.getRootColumn().getNestedColumns(),
+                types,
+                ImmutableList.of(0),
+                columnTypes,
+                filters,
+                ImmutableMap.of(),
+                predicate,
+                0,
+                orcDataSource.getSize(),
+                HIVE_STORAGE_TIME_ZONE,
+                newSimpleAggregatedMemoryContext(),
+                initialBatchSize,
+                RuntimeException::new,
+                Optional.empty(),
+                null,
+                OrcCacheStore.CACHE_NOTHING,
+                new OrcCacheProperties(),
+                Optional.empty());
+    }
+
+    private static List<String> makeColumnNames(int columns)
+    {
+        return IntStream.range(0, columns)
+                .mapToObj(i -> i == 0 ? "test" : "test" + (i + 1))
+                .collect(toList());
+    }
+
+    private static List<?> filterRows(List<Type> types, List<?> values, Map<Integer, TupleDomainFilter> columnFilters)
+    {
+        List<Integer> passingRows = IntStream.range(0, values.size())
+                .filter(row -> testRow(types, values, row, columnFilters))
+                .boxed()
+                .collect(toList());
+        return IntStream.range(0, values.size())
+                .mapToObj(column -> passingRows.stream().map(values::get).collect(toList())).collect(toList()).get(0);
+    }
+
+    //later we can extend for multiple columns
+    private static boolean testRow(List<Type> types, List<?> values, int row, Map<Integer, TupleDomainFilter> columnFilters)
+    {
+        for (int column = 0; column < types.size(); column++) {
+            TupleDomainFilter filter = columnFilters.get(column);
+            if (filter == null) {
+                continue;
+            }
+
+            Object value = values.get(row);
+            if (value == null) {
+                if (!filter.testNull()) {
+                    return false;
+                }
+            }
+            else {
+                Type type = types.get(column);
+                if (type == BOOLEAN) {
+                    if (!filter.testBoolean((Boolean) value)) {
+                        return false;
+                    }
+                }
+                else if (type == BIGINT || type == INTEGER || type == SMALLINT) {
+                    if (!filter.testLong(((Number) value).longValue())) {
+                        return false;
+                    }
+                }
+                else if (type == DATE) {
+                    if (!filter.testLong(((SqlDate) value).getDays())) {
+                        return false;
+                    }
+                }
+                else if (type == VARCHAR) {
+                    return filter.testBytes(((String) value).getBytes(), 0, ((String) value).length());
+                }
+                else if (type instanceof CharType) {
+                    String charString = String.valueOf(value);
+                    return filter.testBytes(charString.getBytes(), 0, charString.length());
+                }
+                else if (type == VARBINARY) {
+                    byte[] binary = ((SqlVarbinary) value).getBytes();
+                    return filter.testBytes(binary, 0, binary.length);
+                }
+                else if (type instanceof DecimalType) {
+                    DecimalType decimalType = (DecimalType) type;
+                    BigDecimal bigDecimal = ((SqlDecimal) value).toBigDecimal();
+                    if (decimalType.isShort()) {
+                        return filter.testLong(bigDecimal.unscaledValue().longValue());
+                    }
+                }
+                else {
+                    fail("Unsupported type: " + type);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static void assertFileContentsPresto(
             Type type,
             TempFile tempFile,
             List<?> expectedValues,
             boolean skipFirstBatch,
-            boolean skipStripe)
+            boolean skipStripe,
+            boolean useSelectiveOrcReader,
+            List<Map<Integer, TupleDomainFilter>> filters)
             throws IOException
     {
+        OrcPredicate orcPredicate = createOrcPredicate(type, expectedValues);
+        if (useSelectiveOrcReader) {
+            assertFileContentsPresto(ImmutableList.of(type), tempFile, expectedValues, orcPredicate, Optional.empty());
+
+            for (Map<Integer, TupleDomainFilter> columnFilters : filters) {
+                assertFileContentsPresto(ImmutableList.of(type), tempFile, filterRows(ImmutableList.of(type), expectedValues, columnFilters), orcPredicate, Optional.of(columnFilters));
+            }
+
+            return;
+        }
+
         try (OrcRecordReader recordReader = createCustomOrcRecordReader(tempFile, createOrcPredicate(type, expectedValues), type, MAX_BATCH_SIZE)) {
             assertEquals(recordReader.getReaderPosition(), 0);
             assertEquals(recordReader.getFilePosition(), 0);
@@ -1177,4 +1390,20 @@ public class OrcTester
         }
         return METADATA.getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
     }
+
+//    static RecordWriter createOrcRecordWriter(File outputFile, Format format, CompressionKind compression, List<Type> types)
+//            throws IOException
+//    {
+//        JobConf jobConf = new JobConf();
+//        jobConf.set("hive.exec.orc.write.format", format == ORC_12 ? "0.12" : "0.11");
+//        jobConf.set("hive.exec.orc.default.compress", compression.name());
+//
+//        return new OrcOutputFormat().getHiveRecordWriter(
+//                jobConf,
+//                new Path(outputFile.toURI()),
+//                Text.class,
+//                compression != NONE,
+//                createTableProperties("test", getJavaObjectInspector(types).getTypeName()),
+//                () -> {});
+//    }
 }

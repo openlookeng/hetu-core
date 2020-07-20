@@ -126,6 +126,8 @@ import static io.prestosql.spi.type.Chars.isCharType;
 import static io.prestosql.spi.type.Chars.trimTrailingSpaces;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DecimalType.createDecimalType;
+import static io.prestosql.spi.type.Decimals.isLongDecimal;
+import static io.prestosql.spi.type.Decimals.isShortDecimal;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
@@ -142,6 +144,7 @@ import static java.lang.Long.parseLong;
 import static java.lang.Short.parseShort;
 import static java.lang.String.format;
 import static java.math.BigDecimal.ROUND_UNNECESSARY;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -976,6 +979,57 @@ public final class HiveUtil
         }
         catch (NumberFormatException e) {
             throw new PrestoException(HiveErrorCode.HIVE_INVALID_METADATA, format("Invalid value for %s property: %s", key, value));
+        }
+    }
+
+    public static Object typedPartitionKey(String value, Type type, String name, DateTimeZone hiveStorageTimeZone)
+    {
+        byte[] bytes = value.getBytes(UTF_8);
+
+        if (isHiveNull(bytes)) {
+            return null;
+        }
+        else if (type.equals(BOOLEAN)) {
+            return booleanPartitionKey(value, name);
+        }
+        else if (type.equals(BIGINT)) {
+            return bigintPartitionKey(value, name);
+        }
+        else if (type.equals(INTEGER)) {
+            return integerPartitionKey(value, name);
+        }
+        else if (type.equals(SMALLINT)) {
+            return smallintPartitionKey(value, name);
+        }
+        else if (type.equals(TINYINT)) {
+            return tinyintPartitionKey(value, name);
+        }
+        else if (type.equals(REAL)) {
+            return floatPartitionKey(value, name);
+        }
+        else if (type.equals(DOUBLE)) {
+            return doublePartitionKey(value, name);
+        }
+        else if (isVarcharType(type)) {
+            return varcharPartitionKey(value, name, type);
+        }
+        else if (isCharType(type)) {
+            return charPartitionKey(value, name, type);
+        }
+        else if (type.equals(DATE)) {
+            return datePartitionKey(value, name);
+        }
+        else if (type.equals(TIMESTAMP)) {
+            return timestampPartitionKey(value, hiveStorageTimeZone, name);
+        }
+        else if (isShortDecimal(type)) {
+            return shortDecimalPartitionKey(value, (DecimalType) type, name);
+        }
+        else if (isLongDecimal(type)) {
+            return longDecimalPartitionKey(value, (DecimalType) type, name);
+        }
+        else {
+            throw new PrestoException(NOT_SUPPORTED, format("Unsupported column type %s for partition column: %s", type.getDisplayName(), name));
         }
     }
 

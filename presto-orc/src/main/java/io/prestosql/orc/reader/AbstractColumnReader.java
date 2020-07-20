@@ -13,15 +13,22 @@
  */
 package io.prestosql.orc.reader;
 
-import io.prestosql.spi.block.Block;
+import io.prestosql.orc.metadata.ColumnEncoding;
+import io.prestosql.orc.metadata.ColumnMetadata;
+import io.prestosql.orc.stream.InputStreamSources;
 
 import java.io.IOException;
+import java.time.ZoneId;
 
-public interface ColumnReader<T>
-            extends AbstractColumnReader
+public interface AbstractColumnReader
 {
-    Block<T> readBlock()
+    void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
             throws IOException;
 
-    void prepareNextRead(int batchSize);
+    void startRowGroup(InputStreamSources dataStreamSources)
+            throws IOException;
+
+    void close();
+
+    long getRetainedSizeInBytes();
 }

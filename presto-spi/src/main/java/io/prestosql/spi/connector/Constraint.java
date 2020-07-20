@@ -24,6 +24,7 @@ import static java.util.Objects.requireNonNull;
 
 public class Constraint
 {
+    boolean isPushDownEnabled;  //TODO: Rajeev: Temp,needs to be removed.
     private final TupleDomain<ColumnHandle> summary;
     private final Optional<Predicate<Map<ColumnHandle, NullableValue>>> predicate;
 
@@ -54,6 +55,7 @@ public class Constraint
 
         this.summary = summary;
         this.predicate = predicate;
+        this.isPushDownEnabled = false;
     }
 
     public TupleDomain<ColumnHandle> getSummary()
@@ -64,5 +66,15 @@ public class Constraint
     public Optional<Predicate<Map<ColumnHandle, NullableValue>>> predicate()
     {
         return predicate;
+    }
+
+    public boolean isPushDownEnabled()
+    {
+        return isPushDownEnabled;
+    }
+
+    public void setPushDownEnabled(boolean pushDownEnabled)
+    {
+        isPushDownEnabled = pushDownEnabled;
     }
 }

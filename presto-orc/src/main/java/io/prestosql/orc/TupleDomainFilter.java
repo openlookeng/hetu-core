@@ -1,0 +1,639 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.prestosql.orc;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.orc.ByteArrayUtils.compareRanges;
+import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.compare;
+import static java.util.Objects.requireNonNull;
+
+/**
+ * A simple filter (e.g. comparison with literal) that can be applied efficiently
+ * while extracting values from an ORC stream.
+ */
+public interface TupleDomainFilter
+{
+    TupleDomainFilter ALWAYS_FALSE = new AlwaysFalse();
+    TupleDomainFilter IS_NULL = new IsNull();
+    TupleDomainFilter IS_NOT_NULL = new IsNotNull();
+
+    boolean testNull();
+
+    boolean testLong(long value);
+
+    boolean testBoolean(boolean value);
+
+    boolean testBytes(byte[] buffer, int offset, int length);
+
+    abstract class AbstractTupleDomainFilter
+            implements TupleDomainFilter
+    {
+        protected final boolean nullAllowed;
+
+        private AbstractTupleDomainFilter(boolean nullAllowed)
+        {
+            this.nullAllowed = nullAllowed;
+        }
+
+        public boolean testNull()
+        {
+            return nullAllowed;
+        }
+
+        public boolean testLong(long value)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean testBoolean(boolean value)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    class AlwaysFalse
+            extends AbstractTupleDomainFilter
+    {
+        private AlwaysFalse()
+        {
+            super(false);
+        }
+
+        @Override
+        public boolean testLong(long value)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testBoolean(boolean value)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            return false;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this).toString();
+        }
+    }
+
+    class IsNull
+            extends AbstractTupleDomainFilter
+    {
+        private IsNull()
+        {
+            super(true);
+        }
+
+        @Override
+        public boolean testLong(long value)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testBoolean(boolean value)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            return false;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this).toString();
+        }
+    }
+
+    class IsNotNull
+            extends AbstractTupleDomainFilter
+    {
+        private IsNotNull()
+        {
+            super(false);
+        }
+
+        @Override
+        public boolean testLong(long value)
+        {
+            return true;
+        }
+
+        @Override
+        public boolean testBoolean(boolean value)
+        {
+            return true;
+        }
+
+        @Override
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            return true;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this).toString();
+        }
+    }
+
+    class BooleanValue
+            extends AbstractTupleDomainFilter
+    {
+        private final boolean value;
+
+        private BooleanValue(boolean value, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            this.value = value;
+        }
+
+        public static BooleanValue of(boolean value, boolean nullAllowed)
+        {
+            return new BooleanValue(value, nullAllowed);
+        }
+
+        @Override
+        public boolean testBoolean(boolean value)
+        {
+            return this.value == value;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(value, nullAllowed);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+
+            BooleanValue other = (BooleanValue) obj;
+            return this.value == other.value &&
+                    this.nullAllowed == other.nullAllowed;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("value", value)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class BigintRange
+            extends AbstractTupleDomainFilter
+    {
+        private final long lower;
+        private final long upper;
+
+        private BigintRange(long lower, long upper, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            checkArgument(lower <= upper, "lower must be less than or equal to upper");
+            this.lower = lower;
+            this.upper = upper;
+        }
+
+        public static BigintRange of(long lower, long upper, boolean nullAllowed)
+        {
+            return new BigintRange(lower, upper, nullAllowed);
+        }
+
+        @Override
+        public boolean testLong(long value)
+        {
+            return value >= lower && value <= upper;
+        }
+
+        public long getLower()
+        {
+            return lower;
+        }
+
+        public long getUpper()
+        {
+            return upper;
+        }
+
+        public boolean isSingleValue()
+        {
+            return upper == lower;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            BigintRange that = (BigintRange) o;
+            return lower == that.lower &&
+                    upper == that.upper &&
+                    nullAllowed == that.nullAllowed;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(lower, upper, nullAllowed);
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("lower", lower)
+                    .add("upper", upper)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class BigintValues
+            extends AbstractTupleDomainFilter
+    {
+        private static final long EMPTY_MARKER = 0xdeadbeefbadefeedL;
+        // from Murmur hash
+        private static final long M = 0xc6a4a7935bd1e995L;
+
+        private final long[] values;
+        private final long[] hashTable;
+        private final int size;
+        private boolean containsEmptyMarker;
+
+        private BigintValues(long[] values, boolean nullAllowed)
+        {
+            super(nullAllowed);
+
+            requireNonNull(values, "values is null");
+            checkArgument(values.length > 1, "values must contain at least 2 entries");
+
+            // Create a hash table (using Murmur hash)  and store all values.
+            this.values = values;
+            this.size = Integer.highestOneBit(values.length * 3);
+            this.hashTable = new long[size];
+            Arrays.fill(hashTable, EMPTY_MARKER);
+            for (long value : values) {
+                if (value == EMPTY_MARKER) {
+                    containsEmptyMarker = true;
+                }
+                else {
+                    int position = (int) ((value * M) & (size - 1));
+                    for (int i = position; i < position + size; i++) {
+                        int index = i & (size - 1);
+                        if (hashTable[index] == EMPTY_MARKER) {
+                            hashTable[index] = value;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        public static BigintValues of(long[] values, boolean nullAllowed)
+        {
+            return new BigintValues(values, nullAllowed);
+        }
+
+        @Override
+        public boolean testLong(long value)
+        {
+            if (containsEmptyMarker && value == EMPTY_MARKER) {
+                return true;
+            }
+            int pos = (int) ((value * M) & (size - 1));
+            for (int i = pos; i < pos + size; i++) {
+                int idx = i & (size - 1);
+                long l = hashTable[idx];
+                if (l == EMPTY_MARKER) {
+                    return false;
+                }
+                if (l == value) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            BigintValues that = (BigintValues) o;
+            return size == that.size &&
+                    containsEmptyMarker == that.containsEmptyMarker &&
+                    Arrays.equals(hashTable, that.hashTable) &&
+                    nullAllowed == that.nullAllowed;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(size, containsEmptyMarker, hashTable, nullAllowed);
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("values", values)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class BytesRange
+            extends AbstractTupleDomainFilter
+    {
+        private final byte[] lower;
+        private final byte[] upper;
+        private final boolean lowerExclusive;
+        private final boolean upperExclusive;
+        private final boolean singleValue;
+
+        private BytesRange(byte[] lower, boolean lowerExclusive, byte[] upper, boolean upperExclusive, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            this.lower = lower;
+            this.upper = upper;
+            this.lowerExclusive = lowerExclusive;
+            this.upperExclusive = upperExclusive;
+            this.singleValue = !lowerExclusive && !upperExclusive && Arrays.equals(upper, lower);
+        }
+
+        public static BytesRange of(byte[] lower, boolean lowerExclusive, byte[] upper, boolean upperExclusive, boolean nullAllowed)
+        {
+            return new BytesRange(lower, lowerExclusive, upper, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            if (singleValue) {
+                if (length != lower.length) {
+                    return false;
+                }
+
+                for (int i = 0; i < length; i++) {
+                    if (buffer[i + offset] != lower[i]) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            if (lower != null) {
+                int compare = compareRanges(buffer, offset, length, lower, 0, lower.length);
+                if (compare < 0 || (lowerExclusive && compare == 0)) {
+                    return false;
+                }
+            }
+
+            if (upper != null) {
+                int compare = compareRanges(buffer, offset, length, upper, 0, upper.length);
+                return compare < 0 || (!upperExclusive && compare == 0);
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(lower, lowerExclusive, upper, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+
+            BytesRange other = (BytesRange) obj;
+            return Arrays.equals(this.lower, other.lower) &&
+                    this.lowerExclusive == other.lowerExclusive &&
+                    Arrays.equals(this.upper, other.upper) &&
+                    this.upperExclusive == other.upperExclusive &&
+                    this.nullAllowed == other.nullAllowed;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("lower", lower)
+                    .add("lowerExclusive", lowerExclusive)
+                    .add("upper", upper)
+                    .add("upperExclusive", upperExclusive)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class BigintMultiRange
+            extends AbstractTupleDomainFilter
+    {
+        private final BigintRange[] ranges;
+        private final long[] longLowerBounds;
+
+        private BigintMultiRange(List<BigintRange> ranges, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            requireNonNull(ranges, "ranges is null");
+            checkArgument(!ranges.isEmpty(), "ranges is empty");
+
+            this.ranges = ranges.toArray(new BigintRange[0]);
+            this.longLowerBounds = ranges.stream()
+                    .mapToLong(BigintRange::getLower)
+                    .toArray();
+
+            for (int i = 1; i < longLowerBounds.length; i++) {
+                checkArgument(longLowerBounds[i] >= ranges.get(i - 1).getUpper(), "bigint ranges must not overlap");
+            }
+        }
+
+        public static BigintMultiRange of(List<BigintRange> ranges, boolean nullAllowed)
+        {
+            return new BigintMultiRange(ranges, nullAllowed);
+        }
+
+        @Override
+        public boolean testLong(long value)
+        {
+            // check each range in BST format to check if filter qualifies.
+            int i = Arrays.binarySearch(longLowerBounds, value);
+            if (i >= 0) {
+                return true;
+            }
+            int place = (-i) - 1;
+            if (place == 0) {
+                // Below first
+                return false;
+            }
+            // We are here as did not match the lower bound of any of the ranges.
+            // But we have found the possible range in which it may match.
+            // Call the simple BigIntRange to check for value.
+            return ranges[place - 1].testLong(value);
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            BigintMultiRange that = (BigintMultiRange) o;
+            return Arrays.equals(ranges, that.ranges) &&
+                    nullAllowed == that.nullAllowed;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(ranges, nullAllowed);
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("ranges", ranges)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class MultiRange
+            extends AbstractTupleDomainFilter
+    {
+        private final TupleDomainFilter[] filters;
+
+        private MultiRange(List<TupleDomainFilter> filters, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            requireNonNull(filters, "filters is null");
+            checkArgument(filters.size() > 1, "filters must contain at least 2 entries");
+
+            this.filters = filters.toArray(new TupleDomainFilter[0]);
+        }
+
+        public static MultiRange of(List<TupleDomainFilter> filters, boolean nullAllowed)
+        {
+            return new MultiRange(filters, nullAllowed);
+        }
+
+        @Override
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            // Currently very basic implementation to handle multiple possible
+            // value filter. For each value there is separate ByteRange filter
+            // which would get invoked to compare current value.
+            // So its like buffer will be compared with all IN clause possible
+            // values till it matches.
+            for (TupleDomainFilter filter : filters) {
+                if (filter.testBytes(buffer, offset, length)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            MultiRange that = (MultiRange) o;
+            return Arrays.equals(filters, that.filters) &&
+                    nullAllowed == that.nullAllowed;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(filters, nullAllowed);
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("filters", filters)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+}

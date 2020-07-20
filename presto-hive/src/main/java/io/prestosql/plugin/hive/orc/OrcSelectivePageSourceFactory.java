@@ -13,10 +13,12 @@
  */
 package io.prestosql.plugin.hive.orc;
 
+import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.airlift.units.DataSize;
+import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.OrcCacheProperties;
 import io.prestosql.orc.OrcCacheStore;
@@ -25,7 +27,9 @@ import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcDataSourceId;
 import io.prestosql.orc.OrcFileTail;
 import io.prestosql.orc.OrcReader;
-import io.prestosql.orc.OrcRecordReader;
+import io.prestosql.orc.OrcSelectiveRecordReader;
+import io.prestosql.orc.TupleDomainFilter;
+import io.prestosql.orc.TupleDomainFilterUtils;
 import io.prestosql.orc.TupleDomainOrcPredicate;
 import io.prestosql.orc.TupleDomainOrcPredicate.TupleDomainOrcPredicateBuilder;
 import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
@@ -34,7 +38,7 @@ import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveConfig;
-import io.prestosql.plugin.hive.HivePageSourceFactory;
+import io.prestosql.plugin.hive.HiveSelectivePageSourceFactory;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveUtil;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
@@ -44,7 +48,6 @@ import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.RowType;
@@ -57,7 +60,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdfs.BlockMissingException;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.joda.time.DateTimeZone;
@@ -67,17 +69,19 @@ import javax.inject.Inject;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
@@ -100,6 +104,7 @@ import static io.prestosql.plugin.hive.HiveSessionProperties.isOrcFileTailCacheE
 import static io.prestosql.plugin.hive.HiveSessionProperties.isOrcRowDataCacheEnabled;
 import static io.prestosql.plugin.hive.HiveSessionProperties.isOrcRowIndexCacheEnabled;
 import static io.prestosql.plugin.hive.HiveSessionProperties.isOrcStripeFooterCacheEnabled;
+import static io.prestosql.plugin.hive.HiveUtil.typedPartitionKey;
 import static io.prestosql.plugin.hive.orc.OrcPageSource.handleException;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
@@ -109,8 +114,8 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.apache.hadoop.hive.ql.io.AcidUtils.isFullAcidTable;
 
-public class OrcPageSourceFactory
-        implements HivePageSourceFactory
+public class OrcSelectivePageSourceFactory
+        implements HiveSelectivePageSourceFactory
 {
     // ACID format column names
     public static final String ACID_COLUMN_OPERATION = "operation";
@@ -129,14 +134,21 @@ public class OrcPageSourceFactory
     private final int domainCompactionThreshold;
 
     @Inject
-    public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
+    public OrcSelectivePageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         requireNonNull(config, "config is null");
         this.useOrcColumnNames = config.isUseOrcColumnNames();
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
-        this.orcCacheStore = orcCacheStore;
+        this.orcCacheStore = OrcCacheStore.builder().newCacheStore(
+                config.getOrcFileTailCacheLimit(), Duration.ofMillis(config.getOrcFileTailCacheTtl().toMillis()),
+                config.getOrcStripeFooterCacheLimit(),
+                Duration.ofMillis(config.getOrcStripeFooterCacheTtl().toMillis()),
+                config.getOrcRowIndexCacheLimit(), Duration.ofMillis(config.getOrcRowIndexCacheTtl().toMillis()),
+                config.getOrcBloomFiltersCacheLimit(),
+                Duration.ofMillis(config.getOrcBloomFiltersCacheTtl().toMillis()),
+                config.getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(config.getOrcRowDataCacheTtl().toMillis()));
         this.domainCompactionThreshold = config.getDomainCompactionThreshold();
     }
 
@@ -150,12 +162,14 @@ public class OrcPageSourceFactory
             long fileSize,
             Properties schema,
             List<HiveColumnHandle> columns,
-            TupleDomain<HiveColumnHandle> effectivePredicate,
+            Map<Integer, String> prefilledValues,
+            List<Integer> outputColumns,
+            TupleDomain<HiveColumnHandle> domainPredicate,
             DateTimeZone hiveStorageTimeZone,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
+            Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
-            Optional<List<IndexMetadata>> indexes,
+            Optional<List<SplitIndexMetadata>> indexes,
             boolean splitCacheable)
     {
         if (!HiveUtil.isDeserializerClass(schema, OrcSerde.class)) {
@@ -183,7 +197,9 @@ public class OrcPageSourceFactory
                 columns,
                 useOrcColumnNames,
                 isFullAcidTable(Maps.fromProperties(schema)),
-                effectivePredicate,
+                prefilledValues,
+                outputColumns,
+                domainPredicate,
                 hiveStorageTimeZone,
                 typeManager,
                 getOrcMaxMergeDistance(session),
@@ -194,16 +210,15 @@ public class OrcPageSourceFactory
                 getOrcLazyReadSmallRanges(session),
                 isOrcBloomFiltersEnabled(session),
                 stats,
-                dynamicFilters,
+                dynamicFilter,
                 deleteDeltaLocations,
                 startRowOffsetOfFile,
                 indexes,
                 orcCacheStore,
-                orcCacheProperties,
-                domainCompactionThreshold));
+                orcCacheProperties));
     }
 
-    public static OrcPageSource createOrcPageSource(
+    public static OrcSelectivePageSource createOrcPageSource(
             HdfsEnvironment hdfsEnvironment,
             String sessionUser,
             Configuration configuration,
@@ -214,7 +229,9 @@ public class OrcPageSourceFactory
             List<HiveColumnHandle> columns,
             boolean useOrcColumnNames,
             boolean isFullAcid,
-            TupleDomain<HiveColumnHandle> effectivePredicate,
+            Map<Integer, String> prefilledValues,
+            List<Integer> outputColumns,
+            TupleDomain<HiveColumnHandle> domainPredicate,
             DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             DataSize maxMergeDistance,
@@ -225,20 +242,14 @@ public class OrcPageSourceFactory
             boolean lazyReadSmallRanges,
             boolean orcBloomFiltersEnabled,
             FileFormatDataSourceStats stats,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
+            Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
-            Optional<List<IndexMetadata>> indexes,
+            Optional<List<SplitIndexMetadata>> indexes,
             OrcCacheStore orcCacheStore,
-            OrcCacheProperties orcCacheProperties,
-            int domainCompactionThreshold)
+            OrcCacheProperties orcCacheProperties)
     {
-        for (HiveColumnHandle column : columns) {
-            checkArgument(
-                    column.getColumnType() == HiveColumnHandle.ColumnType.REGULAR || column.getHiveColumnIndex() == HiveColumnHandle.ROW_ID__COLUMN_INDEX,
-                    "column type must be regular: %s", column);
-        }
-        checkArgument(!effectivePredicate.isNone());
+        checkArgument(!domainPredicate.isNone(), "Unexpected NONE domain");
 
         OrcDataSource orcDataSource;
         try {
@@ -270,36 +281,25 @@ public class OrcPageSourceFactory
             OrcDataSource readerLocalDataSource = OrcReader.wrapWithCacheIfTiny(orcDataSource, tinyStripeThreshold);
             OrcFileTail fileTail;
             if (orcCacheProperties.isFileTailCacheEnabled()) {
-                fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcPageSourceFactory.createFileTail(orcDataSource));
+                fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcSelectivePageSourceFactory.createFileTail(orcDataSource));
             }
             else {
-                fileTail = OrcPageSourceFactory.createFileTail(orcDataSource);
+                fileTail = OrcSelectivePageSourceFactory.createFileTail(orcDataSource);
             }
             OrcReader reader = new OrcReader(readerLocalDataSource, fileTail, maxMergeDistance, tinyStripeThreshold, maxReadBlockSize);
 
             List<OrcColumn> fileColumns = reader.getRootColumn().getNestedColumns();
-            List<OrcColumn> fileReadColumns = isFullAcid ? new ArrayList<>(columns.size() + 5) : new ArrayList<>(columns.size());
-            List<Type> fileReadTypes = isFullAcid ? new ArrayList<>(columns.size() + 5) : new ArrayList<>(columns.size());
+            List<OrcColumn> fileReadColumns = isFullAcid ? new ArrayList<>(columns.size() + 3) : new ArrayList<>(columns.size());
+            List<Type> fileReadTypes = isFullAcid ? new ArrayList<>(columns.size() + 3) : new ArrayList<>(columns.size());
             ImmutableList<String> acidColumnNames = null;
             List<ColumnAdaptation> columnAdaptations = new ArrayList<>(columns.size());
-            // Only Hive ACID files will begin with bucket_
-            boolean fileNameContainsBucket = path.getName().contains("bucket");
-            if (isFullAcid && fileNameContainsBucket) { // Skip the acid schema check in case of non-ACID files
+            if (isFullAcid && fileColumns.size() != columns.size()) { // Skip the acid schema check in case of non-ACID files
                 acidColumnNames = ImmutableList.<String>builder().add(ACID_COLUMN_ORIGINAL_TRANSACTION,
                         ACID_COLUMN_BUCKET,
-                        ACID_COLUMN_ROW_ID,
-                        ACID_COLUMN_CURRENT_TRANSACTION,
-                        ACID_COLUMN_OPERATION).build();
+                        ACID_COLUMN_ROW_ID).build();
                 verifyAcidSchema(reader, path);
                 Map<String, OrcColumn> acidColumnsByName = uniqueIndex(fileColumns, orcColumn -> orcColumn.getColumnName());
-                if (AcidUtils.isDeleteDelta(path.getParent())) {
-                    //Avoid reading column data from delete_delta files.
-                    // Call will come here in case of Minor VACUUM where all delete_delta files are merge together.
-                    fileColumns = ImmutableList.of();
-                }
-                else {
-                    fileColumns = acidColumnsByName.get(ACID_COLUMN_ROW_STRUCT).getNestedColumns();
-                }
+                fileColumns = acidColumnsByName.get(ACID_COLUMN_ROW_STRUCT).getNestedColumns();
 
                 fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ORIGINAL_TRANSACTION));
                 fileReadTypes.add(BIGINT);
@@ -307,10 +307,6 @@ public class OrcPageSourceFactory
                 fileReadTypes.add(INTEGER);
                 fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ROW_ID));
                 fileReadTypes.add(BIGINT);
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_CURRENT_TRANSACTION));
-                fileReadTypes.add(BIGINT);
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_OPERATION));
-                fileReadTypes.add(INTEGER);
             }
 
             Map<String, OrcColumn> fileColumnsByName = ImmutableMap.of();
@@ -323,8 +319,9 @@ public class OrcPageSourceFactory
 
             TupleDomainOrcPredicateBuilder predicateBuilder = TupleDomainOrcPredicate.builder()
                     .setBloomFiltersEnabled(orcBloomFiltersEnabled);
-            Map<HiveColumnHandle, Domain> effectivePredicateDomains = effectivePredicate.getDomains()
+            Map<HiveColumnHandle, Domain> effectivePredicateDomains = domainPredicate.getDomains()
                     .orElseThrow(() -> new IllegalArgumentException("Effective predicate is none"));
+
             for (HiveColumnHandle column : columns) {
                 OrcColumn orcColumn = null;
                 if (useOrcColumnNames || isFullAcid) {
@@ -343,17 +340,17 @@ public class OrcPageSourceFactory
 
                     Domain domain = effectivePredicateDomains.get(column);
                     if (domain != null) {
-                        predicateBuilder.addColumn(orcColumn.getColumnId(), domain);
+                        predicateBuilder.addColumn(orcColumn.getColumnId(), domain); //TODO: Rajeev: need to see if this index is 0-based or 1-based.
                     }
                 }
-                else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME)) {
+                else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase("row__id")) {
                     HiveType hiveType = column.getHiveType();
                     StructTypeInfo structTypeInfo = (StructTypeInfo) hiveType.getTypeInfo();
                     ImmutableList.Builder<ColumnAdaptation> builder = new ImmutableList.Builder<>();
                     ArrayList<String> fieldNames = structTypeInfo.getAllStructFieldNames();
                     List<ColumnAdaptation> adaptations = fieldNames.stream()
                             .map(acidColumnNames::indexOf)
-                            .map(c -> ColumnAdaptation.sourceColumn(c, false))
+                            .map(ColumnAdaptation::sourceColumn)
                             .collect(Collectors.toList());
                     columnAdaptations.add(ColumnAdaptation.structColumn(structTypeInfo, adaptations));
                 }
@@ -362,10 +359,31 @@ public class OrcPageSourceFactory
                 }
             }
 
-            Map<String, Domain> domains = effectivePredicate.getDomains().get().entrySet().stream().collect(toMap(e -> e.getKey().getName(), Map.Entry::getValue));
-            OrcRecordReader recordReader = reader.createRecordReader(
+            Map<Integer, Type> columnTypes = columns.stream()
+                    .collect(toImmutableMap(HiveColumnHandle::getHiveColumnIndex, column -> typeManager.getType(column.getTypeSignature())));
+
+            Map<Integer, String> columnNames = columns.stream()
+                    .collect(toImmutableMap(HiveColumnHandle::getHiveColumnIndex, HiveColumnHandle::getName));
+
+            Map<Integer, Object> typedPrefilledValues = new HashMap<>();
+            for (Map.Entry prefilledValue : prefilledValues.entrySet()) {
+                typedPrefilledValues.put(Integer.valueOf(prefilledValue.getKey().toString()),
+                        typedPartitionKey(prefilledValue.getValue().toString(), columnTypes.get(prefilledValue.getKey()), columnNames.get(prefilledValue.getKey()), hiveStorageTimeZone));
+            }
+
+            // Convert the predicate to each column id wise. Will be used to associate as filter with each column reader
+            Map<Integer, TupleDomainFilter> tupleDomainFilters = toTupleDomainFilters(domainPredicate, ImmutableBiMap.copyOf(columnNames).inverse());
+
+            // domains still required by index (refer AbstractOrcRecordReader).
+            Map<String, Domain> domains = domainPredicate.getDomains().get().entrySet().stream().collect(toMap(e -> e.getKey().getName(), Map.Entry::getValue));
+            OrcSelectiveRecordReader recordReader = reader.createSelectiveRecordReader(
+                    fileColumns,
                     fileReadColumns,
                     fileReadTypes,
+                    outputColumns,
+                    columnTypes,
+                    tupleDomainFilters,
+                    typedPrefilledValues,
                     predicateBuilder.build(),
                     start,
                     length,
@@ -376,7 +394,8 @@ public class OrcPageSourceFactory
                     indexes,
                     domains,
                     orcCacheStore,
-                    orcCacheProperties);
+                    orcCacheProperties,
+                    Optional.empty());
 
             OrcDeletedRows deletedRows = new OrcDeletedRows(
                     path.getName(),
@@ -389,12 +408,11 @@ public class OrcPageSourceFactory
                     hdfsEnvironment,
                     startRowOffsetOfFile);
 
-            return new OrcPageSource(
+            return new OrcSelectivePageSource(
                     recordReader,
-                    columnAdaptations,
-                    orcDataSource,
-                    deletedRows,
-                    indexes.isPresent(),
+                    orcDataSource,      //TODO- Rajeev: Do we need to pass deleted rows here?
+//                    deletedRows,
+//                    isFullAcid && indexes.isPresent(),
                     systemMemoryUsage,
                     stats);
         }
@@ -415,10 +433,21 @@ public class OrcPageSourceFactory
         }
     }
 
+    private static Map<Integer, TupleDomainFilter> toTupleDomainFilters(TupleDomain<HiveColumnHandle> domainPredicate, Map<String, Integer> columnIndices)
+    {
+        // convert the predicate from column name based map to column id based map.
+        // toFilter is the function which actually will convert o corresponding Comparator.
+        // toFilter will be called lazily during initialization of corresponding column reader (createColumnReaders).
+        return Maps.transformValues(
+                domainPredicate.transform(columnHandle -> columnIndices.get(columnHandle.getColumnName()))
+                        .getDomains()
+            .get(),
+            TupleDomainFilterUtils::toFilter);
+    }
+
     interface FSDataInputStreamProvider
     {
-        FSDataInputStream provide()
-                throws IOException;
+        FSDataInputStream provide() throws IOException;
     }
 
     static class LazyFSInputStream
@@ -435,64 +464,56 @@ public class OrcPageSourceFactory
         }
 
         @Override
-        public int read(long position, byte[] buffer, int offset, int length)
-                throws IOException
+        public int read(long position, byte[] buffer, int offset, int length) throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.read(position, buffer, offset, length);
         }
 
         @Override
-        public void readFully(long position, byte[] buffer, int offset, int length)
-                throws IOException
+        public void readFully(long position, byte[] buffer, int offset, int length) throws IOException
         {
             ensureActualStream();
             fsDataInputStream.readFully(position, buffer, offset, length);
         }
 
         @Override
-        public void readFully(long position, byte[] buffer)
-                throws IOException
+        public void readFully(long position, byte[] buffer) throws IOException
         {
             ensureActualStream();
             fsDataInputStream.readFully(position, buffer);
         }
 
         @Override
-        public void seek(long pos)
-                throws IOException
+        public void seek(long pos) throws IOException
         {
             ensureActualStream();
             fsDataInputStream.seek(pos);
         }
 
         @Override
-        public long getPos()
-                throws IOException
+        public long getPos() throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.getPos();
         }
 
         @Override
-        public boolean seekToNewSource(long targetPos)
-                throws IOException
+        public boolean seekToNewSource(long targetPos) throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.seekToNewSource(targetPos);
         }
 
         @Override
-        public int read()
-                throws IOException
+        public int read() throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.read();
         }
 
         @Override
-        public void close()
-                throws IOException
+        public void close() throws IOException
         {
             if (isStreamAvailable) {
                 fsDataInputStream.close();
@@ -500,8 +521,7 @@ public class OrcPageSourceFactory
             }
         }
 
-        private void ensureActualStream()
-                throws IOException
+        private void ensureActualStream() throws IOException
         {
             if (isStreamAvailable) {
                 return;
@@ -515,8 +535,7 @@ public class OrcPageSourceFactory
         }
     }
 
-    private static OrcFileTail createFileTail(OrcDataSource orcDataSource)
-            throws IOException
+    private static OrcFileTail createFileTail(OrcDataSource orcDataSource) throws IOException
     {
         return OrcFileTail.readFrom(orcDataSource, Optional.empty());
     }

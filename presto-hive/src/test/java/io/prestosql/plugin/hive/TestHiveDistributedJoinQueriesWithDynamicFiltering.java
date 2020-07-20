@@ -112,6 +112,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         Properties schema = new Properties();
 
         ImmutableList<HivePartitionKey> partitionKeys = ImmutableList.of(new HivePartitionKey("p1", "100"), new HivePartitionKey("p2", "101"), new HivePartitionKey("p3", "__HIVE_DEFAULT_PARTITION__"));
+
         HiveSplitWrapper split = HiveSplitWrapper.wrap(new HiveSplit("db", "table", "partitionId", "path", 0, 50, 50, 0, schema, partitionKeys, ImmutableList.of(), OptionalInt.empty(), false, ImmutableMap.of(), Optional.empty(), false, Optional.empty(), Optional.empty(), false));
 
         List<Long> filterValues = ImmutableList.of(1L, 50L, 100L);
@@ -126,7 +127,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter3 = createDynamicFilterSupplier(filterValues, testColumnHandle3, "filter3");
 
         HiveConfig config = new HiveConfig();
-        HivePageSourceProvider provider = new HivePageSourceProvider(config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache());
+        HivePageSourceProvider provider = new HivePageSourceProvider(config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache(), null);
 
         TestingConnectorSession session = new TestingConnectorSession(new HiveSessionProperties(config, new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
         ConnectorTableHandle table = new HiveTableHandle("db", "table", ImmutableMap.of(), ImmutableList.of(), Optional.empty());

@@ -108,6 +108,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -2024,6 +2025,22 @@ public class HiveMetadata
                 .intersect(handle.getCompactEffectivePredicate())
                 .intersect(withColumnDomains(pushedDown.build()));
 
+        // Get list of all columns involved in predicate
+        Set<String> predicateColumnNames = new HashSet<>();
+        newEffectivePredicate.getDomains().get().keySet().stream()
+                .map(HiveColumnHandle::getColumnName)
+                .forEach(predicateColumnNames::add);
+
+        // Get column handle
+        Map<String, ColumnHandle> columnHandles = getColumnHandles(session, handle);
+
+        // map predicate columns to hive column handles
+        Map<String, HiveColumnHandle> predicateColumns = predicateColumnNames.stream()
+                .map(columnHandles::get)
+                .map(HiveColumnHandle.class::cast)
+                .filter(HiveColumnHandle::isRegular)
+                .collect(toImmutableMap(HiveColumnHandle::getName, identity()));
+
         newHandle = new HiveTableHandle(
                 newHandle.getSchemaName(),
                 newHandle.getTableName(),
@@ -2034,7 +2051,9 @@ public class HiveMetadata
                 newHandle.getEnforcedConstraint(),
                 newHandle.getBucketHandle(),
                 newHandle.getBucketFilter(),
-                newHandle.getAnalyzePartitionValues());
+                newHandle.getAnalyzePartitionValues(),
+                predicateColumns,
+                constraint.isPushDownEnabled());
 
         if (handle.getPartitions().equals(newHandle.getPartitions()) &&
                 handle.getCompactEffectivePredicate().equals(newHandle.getCompactEffectivePredicate()) &&
@@ -2135,7 +2154,9 @@ public class HiveMetadata
                         bucketHandle.getTableBucketCount(),
                         hivePartitioningHandle.getBucketCount())),
                 hiveTable.getBucketFilter(),
-                hiveTable.getAnalyzePartitionValues());
+                hiveTable.getAnalyzePartitionValues(),
+                hiveTable.getPredicateColumns(),
+                hiveTable.isPushdownFilterEnabled());
     }
 
     @VisibleForTesting

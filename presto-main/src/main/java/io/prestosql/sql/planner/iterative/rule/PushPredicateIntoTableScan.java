@@ -53,6 +53,7 @@ import java.util.Set;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.intersection;
+import static io.prestosql.SystemSessionProperties.isPushTableWriteThroughUnion;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.metadata.TableLayoutResult.computeEnforced;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
@@ -162,6 +163,8 @@ public class PushPredicateIntoTableScan
 
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
+        Boolean isPushDownEnabled = isPushTableWriteThroughUnion(session);
+
         Constraint constraint;
         if (pruneWithPredicateExpression) {
             LayoutConstraintEvaluator evaluator = new LayoutConstraintEvaluator(
@@ -193,6 +196,7 @@ public class PushPredicateIntoTableScan
                 return Optional.of(new ValuesNode(idAllocator.getNextId(), node.getOutputSymbols(), ImmutableList.of()));
             }
 
+            constraint.setPushDownEnabled(isPushDownEnabled);
             Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint);
 
             if (!result.isPresent()) {
@@ -239,13 +243,15 @@ public class PushPredicateIntoTableScan
         // * Short of implementing the previous bullet point, the current order of non-deterministic expressions
         //   and non-TupleDomain-expressible expressions should be retained. Changing the order can lead
         //   to failures of previously successful queries.
-        Expression resultingPredicate = combineConjuncts(
-                domainTranslator.toPredicate(remainingFilter.transform(assignments::get)),
-                filterNonDeterministicConjuncts(predicate),
-                decomposedPredicate.getRemainingExpression());
+        if (!isPushDownEnabled) {  //TODO: Rajeev: Add actual session config
+            Expression resultingPredicate = combineConjuncts(
+                    domainTranslator.toPredicate(remainingFilter.transform(assignments::get)),
+                    filterNonDeterministicConjuncts(predicate),
+                    decomposedPredicate.getRemainingExpression());
 
-        if (!TRUE_LITERAL.equals(resultingPredicate)) {
-            return Optional.of(new FilterNode(idAllocator.getNextId(), tableScan, resultingPredicate));
+            if (!TRUE_LITERAL.equals(resultingPredicate)) {
+                return Optional.of(new FilterNode(idAllocator.getNextId(), tableScan, resultingPredicate));
+            }
         }
 
         return Optional.of(tableScan);
