@@ -71,7 +71,7 @@ additional results from the query.
 >
 >     "id":"20140108_110629_00011_dk5x2",
 >     "infoUri":"<http://localhost:8001/v1/query/20140108_110629_00011_dk5x2>",
->     "partialCancelUri":"<http://10.193.207.128:8080/v1/stage/20140108_110629_00011_dk5x2.1>",
+>     "partialCancelUri":"<http://192.168.1.1:8080/v1/stage/20140108_110629_00011_dk5x2.1>",
 >     "nextUri":"<http://localhost:8001/v1/statement/20140108_110629_00011_dk5x2/1>",
 >     "columns": [ { "name":"name", "type":"varchar" } ],
 >     "stats": { "state":"RUNNING", "scheduled":false,

@@ -95,7 +95,7 @@ particular query. This is call is used by openLooKeng to coordinate a queries.
 "taskId" : "20140115_170528_00004_dk5x2.0.0",
 "version" : 42,
 "state" : "FINISHED",
-"self" : "http://10.193.207.128:8080/v1/task/20140115_170528_00004_dk5x2.0.0",
+"self" : "http://192.168.1.1:8080/v1/task/20140115_170528_00004_dk5x2.0.0",
 "lastHeartbeat" : "2014-01-15T12:12:12.518-05:00",
 "outputBuffers" : {
 "state" : "FINISHED",
@@ -204,7 +204,7 @@ particular query. This is call is used by openLooKeng to coordinate a queries.
   "averageBytesPerRequest" : 11158,
   "bufferedPages" : 0,
   "pageBufferClientStatuses" : [ {
-    "uri" : "http://10.193.207.128:8080/v1/task/20140115_170528_00004_dk5x2.1.0/results/ab68e201-3878-4b21-b6b9-f6658ddc408b",
+    "uri" : "http://192.168.1.1:8080/v1/task/20140115_170528_00004_dk5x2.1.0/results/ab68e201-3878-4b21-b6b9-f6658ddc408b",
     "state" : "closed",
     "lastUpdate" : "2014-01-15T12:12:08.562-05:00",
     "pagesReceived" : 1,
