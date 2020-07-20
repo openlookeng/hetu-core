@@ -15,7 +15,6 @@
 package io.prestosql.client;
 
 import io.prestosql.spi.Page;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import okhttp3.OkHttpClient;
 
 import java.util.List;
@@ -26,7 +25,14 @@ public interface DataCenterStatementClient
 {
     List<Page> getPages();
 
-    boolean applyDynamicFilters(Map<String, DynamicFilter> dynamicFilters);
+    /**
+     * Apply dynamic filters to the DataCenterStatementClient
+     * so values can be filtered in the remote cluster
+     *
+     * @param dynamicFilters Column name to serialized Dynamic Filter mapping
+     * @return if DynamicFilters have been applied successfully
+     */
+    boolean applyDynamicFilters(Map<String, byte[]> dynamicFilters);
 
     /**
      * Create a new HTTP DataCenterStatementClient based on the given parameters.

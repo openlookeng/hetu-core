@@ -24,8 +24,6 @@ import io.prestosql.client.DataCenterClientSession;
 import io.prestosql.client.DataCenterRequest;
 import io.prestosql.client.DataCenterResponseType;
 import io.prestosql.client.PrestoHeaders;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -34,7 +32,6 @@ import okhttp3.RequestBody;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.net.HttpHeaders.USER_AGENT;
@@ -146,7 +143,7 @@ public class HttpUtil
         return builder.build();
     }
 
-    public static Request buildDynamicFilterRequest(String clientId, DataCenterClientSession session, String queryId, Map<String, DynamicFilter> dynamicFilters)
+    public static Request buildDynamicFilterRequest(String clientId, DataCenterClientSession session, String queryId, Map<String, byte[]> dynamicFilters)
     {
         HttpUrl url = HttpUrl.get(session.getServer());
         if (url == null) {
@@ -154,10 +151,7 @@ public class HttpUtil
         }
         url = url.newBuilder().encodedPath(DYNAMIC_FILTER_URL + queryId).build();
 
-        Map<String, byte[]> bloomFilters = dynamicFilters.entrySet().stream().filter(entry -> entry.getValue() instanceof BloomFilterDynamicFilter)
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> ((BloomFilterDynamicFilter) entry.getValue()).getBloomFilterSerialized()));
-
-        CrossRegionDynamicFilterRequest request = new CrossRegionDynamicFilterRequest(queryId, clientId, bloomFilters);
+        CrossRegionDynamicFilterRequest request = new CrossRegionDynamicFilterRequest(queryId, clientId, dynamicFilters);
 
         Request.Builder builder = prepareRequest(url, session)
                 .post(RequestBody.create(MEDIA_TYPE_JSON, CRDF_REQUEST_CODEC.toJsonBytes(request)));

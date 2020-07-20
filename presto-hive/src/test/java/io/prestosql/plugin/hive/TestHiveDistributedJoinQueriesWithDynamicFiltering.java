@@ -16,8 +16,8 @@ package io.prestosql.plugin.hive;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.MoreCollectors;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
+import io.hetu.core.common.dynamicfilter.DynamicFilterFactory;
+import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.Session;
 import io.prestosql.operator.OperatorStats;
 import io.prestosql.spi.PrestoException;
@@ -27,7 +27,6 @@ import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.Plan;
@@ -45,7 +44,6 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -210,9 +208,9 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
     private Supplier<Map<ColumnHandle, DynamicFilter>> createDynamicFilterSupplier(List<String> values, ColumnHandle columnHandle, String filterId)
             throws IOException
     {
-        BloomFilter<String> filter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), values.size(), 0.01);
+        BloomFilter filter = new BloomFilter(values.size(), 0.01);
         for (String value : values) {
-            filter.put(value);
+            filter.add(value.getBytes());
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         filter.writeTo(out);

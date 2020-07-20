@@ -18,9 +18,9 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.metadata.OrcColumnId;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
 import io.prestosql.orc.metadata.statistics.BooleanStatistics;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 import io.prestosql.orc.metadata.statistics.RangeStatistics;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
@@ -119,7 +119,7 @@ public class TupleDomainOrcPredicate
             return true;
         }
 
-        BloomFilter bloomFilter = columnStatistics.getBloomFilter();
+        HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
         if (bloomFilter == null) {
             // no bloom filter so we can't exclude this section
             return true;
@@ -152,7 +152,7 @@ public class TupleDomainOrcPredicate
 
     // checks whether a value part of the effective predicate is likely to be part of this bloom filter
     @VisibleForTesting
-    public static boolean checkInBloomFilter(BloomFilter bloomFilter, Object predicateValue, Type sqlType)
+    public static boolean checkInBloomFilter(HashableBloomFilter bloomFilter, Object predicateValue, Type sqlType)
     {
         if (sqlType == TINYINT || sqlType == SMALLINT || sqlType == INTEGER || sqlType == BIGINT || sqlType == DATE || sqlType == TIMESTAMP) {
             return bloomFilter.testLong(((Number) predicateValue).longValue());

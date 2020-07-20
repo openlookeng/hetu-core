@@ -15,9 +15,9 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import io.airlift.slice.Slice;
+import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
+import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.PagesIndex;
@@ -34,7 +34,6 @@ import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.ArrayType;
@@ -52,7 +51,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.math.BigDecimal;
-import java.nio.charset.Charset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -203,8 +201,8 @@ public final class HiveTestUtils
         Supplier<Set<DynamicFilter>> dynamicFilterSupplier = () -> {
             Set<DynamicFilter> dynamicFilters = new HashSet<>();
             ColumnHandle columnHandle = new HiveColumnHandle(filterKey, HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
-            BloomFilter filter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), 1024 * 1024, 0.01);
-            filterValues.stream().forEach(value -> filter.put(value));
+            BloomFilter filter = new BloomFilter(1024 * 1024, 0.01);
+            filterValues.stream().forEach(value -> filter.add(((String) value).getBytes()));
 
             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 filter.writeTo(out);

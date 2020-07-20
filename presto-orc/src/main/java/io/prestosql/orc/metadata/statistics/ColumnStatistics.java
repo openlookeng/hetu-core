@@ -43,7 +43,7 @@ public class ColumnStatistics
     private final DateStatistics dateStatistics;
     private final DecimalStatistics decimalStatistics;
     private final BinaryStatistics binaryStatistics;
-    private final BloomFilter bloomFilter;
+    private final HashableBloomFilter bloomFilter;
 
     public ColumnStatistics(
             Long numberOfValues,
@@ -55,7 +55,7 @@ public class ColumnStatistics
             DateStatistics dateStatistics,
             DecimalStatistics decimalStatistics,
             BinaryStatistics binaryStatistics,
-            BloomFilter bloomFilter)
+            HashableBloomFilter bloomFilter)
     {
         this.hasNumberOfValues = numberOfValues != null;
         this.numberOfValues = hasNumberOfValues ? numberOfValues : 0;
@@ -131,12 +131,12 @@ public class ColumnStatistics
         return binaryStatistics;
     }
 
-    public BloomFilter getBloomFilter()
+    public HashableBloomFilter getBloomFilter()
     {
         return bloomFilter;
     }
 
-    public ColumnStatistics withBloomFilter(BloomFilter bloomFilter)
+    public ColumnStatistics withBloomFilter(HashableBloomFilter bloomFilter)
     {
         return new ColumnStatistics(
                 getNumberOfValues(),

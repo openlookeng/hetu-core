@@ -12,17 +12,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi.dynamicfilter;
+package io.hetu.core.common.dynamicfilter;
 
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Set;
 
 public class BloomFilterDynamicFilter
@@ -30,10 +30,11 @@ public class BloomFilterDynamicFilter
 {
     public static final Logger log = Logger.get(BloomFilterDynamicFilter.class);
 
+    private static final float DEFAULT_BLOOM_FILTER_FPP = 0.1F;
+
     private byte[] bloomFilterSerialized;
     private BloomFilter bloomFilterDeserialized;
 
-    public static final double BLOOMFILTER_CREAETIONFPP = 0.1;
     public static final int DEFAULT_DYNAMIC_FILTER_SIZE = 1024 * 1024;
 
     public BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, byte[] bloomFilterSerialized, Type type)
@@ -56,7 +57,8 @@ public class BloomFilterDynamicFilter
     @Override
     public boolean contains(Object value)
     {
-        return bloomFilterDeserialized.mightContain(value);
+        // TODO: Only support String value for now, fix this and use original value type
+        return bloomFilterDeserialized.test(((String) value).getBytes());
     }
 
     @Override
@@ -76,11 +78,11 @@ public class BloomFilterDynamicFilter
 
     public void createDeserializedBloomFilter()
     {
-        try (java.io.ByteArrayInputStream bis = new java.io.ByteArrayInputStream(this.getBloomFilterSerialized())) {
-            bloomFilterDeserialized = BloomFilter.readFrom(bis, Funnels.stringFunnel(Charset.defaultCharset()));
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(bloomFilterSerialized)) {
+            bloomFilterDeserialized = BloomFilter.readFrom(bis);
         }
         catch (IOException e) {
-            throw new RuntimeException("Unable to deserialize dynamic filter: " + this.getColumnHandle().toString());
+            throw new RuntimeException("Unable to deserialize dynamic filter: " + columnHandle.toString());
         }
     }
 
@@ -92,11 +94,6 @@ public class BloomFilterDynamicFilter
     public byte[] getBloomFilterSerialized()
     {
         return bloomFilterSerialized;
-    }
-
-    public BloomFilter getBloomFilterDeserialized()
-    {
-        return bloomFilterDeserialized;
     }
 
     public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter)
@@ -113,12 +110,12 @@ public class BloomFilterDynamicFilter
 
     public static BloomFilter createBloomFilterFromSet(Set stringValueSet)
     {
-        BloomFilter bloomFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), DEFAULT_DYNAMIC_FILTER_SIZE, BLOOMFILTER_CREAETIONFPP);
+        BloomFilter bloomFilter = new BloomFilter(DEFAULT_DYNAMIC_FILTER_SIZE, DEFAULT_BLOOM_FILTER_FPP);
         for (Object value : stringValueSet) {
             if (value instanceof Slice) {
                 value = new String(((Slice) value).getBytes());
             }
-            bloomFilter.put(String.valueOf(value));
+            bloomFilter.add(String.valueOf(value).getBytes());
         }
         return bloomFilter;
     }

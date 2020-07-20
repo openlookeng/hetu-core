@@ -17,11 +17,11 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.DataSize;
+import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.operator.aggregation.TypedSet;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -124,6 +124,7 @@ public class DynamicFilterSourceOperator
 
         /**
          * creating the Dynamic Filter Source Operator using the driver context
+         *
          * @param driverContext
          * @return Operator
          */

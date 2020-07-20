@@ -128,10 +128,8 @@ public class LocalDynamicFilter
 
         // NOTE: may result in a bit more relaxed constraint if there are multiple columns and multiple rows.
         // See the comment at TupleDomain::columnWiseUnion() for more details.
-//        result = TupleDomain.columnWiseUnion(result, tupleDomain);
         if (partitionsLeft == 0) {
             // No more partitions are left to be processed.
-//            verify(resultFuture.set(convertTupleDomain(result)), "dynamic filter result is provided more than once");
             Map<Symbol, Set> bloomFilterResult = new HashMap<>();
             if (isIncomplete) {
                 hashSetResultFuture.set(bloomFilterResult);

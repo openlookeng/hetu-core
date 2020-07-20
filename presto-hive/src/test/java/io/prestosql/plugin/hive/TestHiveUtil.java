@@ -14,12 +14,17 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
+import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
+import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
+import io.hetu.core.common.util.BloomFilter;
+import io.prestosql.spi.Page;
+import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.Type;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -31,11 +36,12 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.annotations.Test;
 
-import java.nio.charset.Charset;
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -45,6 +51,7 @@ import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
 import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
+import static io.prestosql.plugin.hive.HiveUtil.filterRows;
 import static io.prestosql.plugin.hive.HiveUtil.getDeserializer;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.plugin.hive.HiveUtil.parseHiveTimestamp;
@@ -112,15 +119,15 @@ public class TestHiveUtil
         assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if dynamicFilters is empty");
 
         ColumnHandle dayColumn = new HiveColumnHandle("pt_d", HIVE_INT, parseTypeSignature(INTEGER), 0, PARTITION_KEY, Optional.empty());
-        BloomFilter dayFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), 1024 * 1024, 0.01);
+        BloomFilter dayFilter = new BloomFilter(1024 * 1024, 0.01);
         dynamicFilters.add(new BloomFilterDynamicFilter("1", dayColumn, dayFilter, DynamicFilter.Type.GLOBAL));
         assertTrue(isPartitionFiltered(partitions, dynamicFilters, null), "Should filter partition if any dynamicFilter has 0 element count");
         assertTrue(isPartitionFiltered(ImmutableList.of(), dynamicFilters, null), "Should filter partition if any dynamicFilter has 0 element count");
 
-        dayFilter.put("1");
+        dayFilter.add(new byte[] {'1'});
         assertTrue(isPartitionFiltered(partitions, dynamicFilters, null), "Should filter partition if partition value not in dynamicFilter");
 
-        dayFilter.put("0");
+        dayFilter.add(new byte[] {'0'});
         assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if partition value is in dynamicFilter");
     }
 
@@ -139,6 +146,27 @@ public class TestHiveUtil
         nameFilter.add("Alice");
         dynamicFilters.add(new HashSetDynamicFilter("1", nameColumn, nameFilter, DynamicFilter.Type.GLOBAL));
         assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if dynamicFilter is on non-partition column");
+    }
+
+    @Test
+    public void testFilterRows()
+    {
+        final int numValues = 1024;
+        BlockBuilder builder = new LongArrayBlockBuilder(null, numValues);
+        for (int i = 0; i < numValues; i++) {
+            builder.writeLong(i);
+        }
+        Page page = new Page(builder.build());
+
+        Map<Integer, DynamicFilter> dynamicFilters = new HashMap<>();
+        ColumnHandle dayColumn = new HiveColumnHandle("pt_d", HIVE_INT, parseTypeSignature(INTEGER), 0, REGULAR, Optional.empty());
+        BloomFilter dayFilter = new BloomFilter(1024 * 1024, 0.01);
+        dayFilter.add("1024".getBytes());
+        dynamicFilters.put(0, new BloomFilterDynamicFilter("1", dayColumn, dayFilter, DynamicFilter.Type.GLOBAL));
+
+        IntArrayList rowsToKeep = filterRows(page, dynamicFilters, new Type[] {BigintType.BIGINT});
+
+        assertEquals(rowsToKeep.size(), 0);
     }
 
     private static void assertToPartitionValues(String partitionName)

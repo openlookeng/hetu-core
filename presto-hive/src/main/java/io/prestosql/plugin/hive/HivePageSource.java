@@ -40,12 +40,10 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
@@ -80,6 +78,7 @@ import static io.prestosql.plugin.hive.HiveUtil.charPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.datePartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.doublePartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.extractStructFieldTypes;
+import static io.prestosql.plugin.hive.HiveUtil.filterRows;
 import static io.prestosql.plugin.hive.HiveUtil.floatPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.integerPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.isArrayType;
@@ -128,12 +127,11 @@ public class HivePageSource
     private final Object[] prefilledValues;
     private final Type[] types;
     private final List<Optional<Function<Block, Block>>> coercers;
-    private int numberOfGlobalDynamicFilters;
-    private int numberOfLocalDynamicFilters;
+    private boolean eligibleForRowFiltering;
 
     private final ConnectorPageSource delegate;
 
-    private final Map<String, DynamicFilter> dynamicFilter = new HashMap<>();
+    private final Map<Integer, DynamicFilter> dynamicFilters = new HashMap<>();
 
     private final ConnectorSession session;
 
@@ -143,7 +141,7 @@ public class HivePageSource
             DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             ConnectorPageSource delegate,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
+            Map<ColumnHandle, DynamicFilter> dynamicFilters,
             ConnectorSession session)
     {
         requireNonNull(columnMappings, "columnMappings is null");
@@ -156,20 +154,27 @@ public class HivePageSource
 
         this.session = session;
 
-        // The local map for column to bloom filter is created here
-        if (dynamicFilter != null) {
-            dynamicFilter.entrySet().stream().forEach(entry -> {
-                this.dynamicFilter.put(((HiveColumnHandle) entry.getKey()).getName(), entry.getValue());
-                if (entry.getValue().getType() == DynamicFilter.Type.GLOBAL) {
-                    this.numberOfGlobalDynamicFilters += 1;
-                }
-                else {
-                    this.numberOfLocalDynamicFilters += 1;
-                }
-            });
-        }
-
         int size = columnMappings.size();
+
+        // The local map for column index to dynamic filter is created here
+        if (dynamicFilters != null && !dynamicFilters.isEmpty()) {
+            int numberOfGlobalDynamicFilters = 0;
+            int numberOfLocalDynamicFilters = 0;
+            for (int columnIndex = 0; columnIndex < size; columnIndex++) {
+                HiveColumnHandle columnHandle = columnMappings.get(columnIndex).getHiveColumnHandle();
+                if (dynamicFilters.containsKey(columnHandle)) {
+                    DynamicFilter dynamicFilter = dynamicFilters.get(columnHandle);
+                    this.dynamicFilters.put(columnIndex, dynamicFilter);
+                    if (dynamicFilter.getType() == DynamicFilter.Type.GLOBAL) {
+                        numberOfGlobalDynamicFilters += 1;
+                    }
+                    else {
+                        numberOfLocalDynamicFilters += 1;
+                    }
+                }
+            }
+            eligibleForRowFiltering = isEligibleForRowFiltering(numberOfGlobalDynamicFilters, numberOfLocalDynamicFilters);
+        }
 
         prefilledValues = new Object[size];
         types = new Type[size];
@@ -277,36 +282,14 @@ public class HivePageSource
             // This part is for filtering using the bloom filter
             // we filter out rows that are not in the bloom filter
             // using the filter rows function
-            if ((numberOfGlobalDynamicFilters > 0 && numberOfLocalDynamicFilters == 0) || isDynamicFilteringFilterRows(session)) {
-                if (dynamicFilter != null && dynamicFilter.size() > 0) {
-                    IntArrayList rowsToKeep = filterRows(dataPage);
-                    Block[] adaptedBlocks = new Block[dataPage.getChannelCount()];
-                    for (int i = 0; i < adaptedBlocks.length; i++) {
-                        Block block = dataPage.getBlock(i);
-                        if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
-                            adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(dataPage.getBlock(i), rowsToKeep));
-                        }
-                        else {
-                            adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
-                        }
-                    }
-                    dataPage = new Page(rowsToKeep.size(), adaptedBlocks);
-                }
+            if (eligibleForRowFiltering) {
+                IntArrayList rowsToKeep = filterRows(dataPage, dynamicFilters, types);
+                dataPage = createFilteredPage(dataPage, rowsToKeep);
             }
 
             if (bucketAdapter.isPresent()) {
                 IntArrayList rowsToKeep = bucketAdapter.get().computeEligibleRowIds(dataPage);
-                Block[] adaptedBlocks = new Block[dataPage.getChannelCount()];
-                for (int i = 0; i < adaptedBlocks.length; i++) {
-                    Block block = dataPage.getBlock(i);
-                    if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
-                        adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(dataPage.getBlock(i), rowsToKeep));
-                    }
-                    else {
-                        adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
-                    }
-                }
-                dataPage = new Page(rowsToKeep.size(), adaptedBlocks);
+                dataPage = createFilteredPage(dataPage, rowsToKeep);
             }
 
             int batchSize = dataPage.getPositionCount();
@@ -631,44 +614,39 @@ public class HivePageSource
         return new Page(page.getPositionCount(), blocks);
     }
 
-    // This function filters rows based on the bloom filter,
-    // it does a row by row comparison, sees
-    // if the row is contained in the Dynamic Filter,
-    // and if not, it would filter the row out
-    private IntArrayList filterRows(Page page)
+    private boolean isEligibleForRowFiltering(int numberOfGlobalDynamicFilters, int numberOfLocalDynamicFilters)
     {
-        Map<Integer, String> eligibleColumns = new HashMap<>();
-        for (int channel = 0; channel < page.getChannelCount(); channel++) {
-            HiveColumnHandle columnHandle = columnMappings.get(channel).getHiveColumnHandle();
-            if (dynamicFilter.containsKey(columnHandle.getName())) {
-                eligibleColumns.put(channel, columnHandle.getName());
-            }
+        if (numberOfGlobalDynamicFilters > 0 && numberOfLocalDynamicFilters == 0) {
+            return true;
         }
 
-        IntArrayList ids = new IntArrayList(page.getPositionCount());
-        for (int position = 0; position < page.getPositionCount(); position++) {
-            boolean shouldKeep = true;
-            for (Map.Entry<Integer, String> column : eligibleColumns.entrySet()) {
-                Block block = page.getBlock(column.getKey()).getLoadedBlock();
+        if (isDynamicFilteringFilterRows(session)) {
+            return true;
+        }
 
-                Object nativeValue;
-                if (dynamicFilter.get(column.getValue()) instanceof HashSetDynamicFilter) {
-                    nativeValue = TypeUtils.readNativeValue(types[column.getKey()], block, position);
-                }
-                else {
-                    nativeValue = TypeUtils.readNativeValueForDynamicFilter(types[column.getKey()], block, position);
-                }
+        return false;
+    }
 
-                if (nativeValue != null && dynamicFilter.get(column.getValue()) != null && !dynamicFilter.get(column.getValue()).contains(nativeValue)) {
-                    shouldKeep = false;
-                    break;
-                }
+    /**
+     * Create a new page containing some rows from original page
+     *
+     * @param dataPage original page
+     * @param rowsToKeep rows to keep in the new page
+     * @return the new page containing filtered rows
+     */
+    private static Page createFilteredPage(Page dataPage, IntArrayList rowsToKeep)
+    {
+        Block[] adaptedBlocks = new Block[dataPage.getChannelCount()];
+        for (int i = 0; i < adaptedBlocks.length; i++) {
+            Block block = dataPage.getBlock(i);
+            if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
+                adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(dataPage.getBlock(i), rowsToKeep));
             }
-            if (shouldKeep) {
-                ids.add(position);
+            else {
+                adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
             }
         }
-        return ids;
+        return new Page(rowsToKeep.size(), adaptedBlocks);
     }
 
     public static class BucketAdapter

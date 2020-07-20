@@ -16,18 +16,17 @@ package io.prestosql.dynamicfilter;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
+import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
+import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
+import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
@@ -43,13 +42,12 @@ import io.prestosql.utils.DynamicFilterUtils;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -77,7 +75,7 @@ public class DynamicFilterService
     private static final Logger log = Logger.get(DynamicFilterService.class);
     private final ScheduledExecutorService filterMergeExecutor;
     private static final int THREAD_POOL_SIZE = 3;
-    private static final int updateInterval = 20;
+    private static final int UPDATE_INTERVAL = 20;
     private ScheduledFuture<?> backgroundTask;
     private boolean initialized;
 
@@ -116,7 +114,7 @@ public class DynamicFilterService
             catch (NullPointerException e) {
                 log.error("Error updating query states: " + e.getMessage());
             }
-        }, updateInterval, updateInterval, TimeUnit.MILLISECONDS);
+        }, UPDATE_INTERVAL, UPDATE_INTERVAL, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -144,19 +142,18 @@ public class DynamicFilterService
                     Collection<Object> results = ((StateSet) stateStoreProvider.getStateStore()
                             .getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId))).getAll();
 
-                    Iterator filterIterator = results.iterator();
                     String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, entry.getKey(), queryId);
                     String type = (String) ((StateMap) stateStoreProvider.getStateStore()
                             .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).get(typeKey);
                     if (type != null) {
                         if (type.equals(DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL) || type.equals(DynamicFilterUtils.BLOOMFILTERTYPELOCAL)) {
-                            BloomFilter mergedFilter = mergeBloomFilters(filterIterator);
-                            if (mergedFilter == null || mergedFilter.expectedFpp() > DynamicFilterUtils.BLOOMFILTER_EXPECTEDFPP) {
+                            BloomFilter mergedFilter = mergeBloomFilters(results);
+                            if (mergedFilter == null || mergedFilter.expectedFpp() > DynamicFilterUtils.BLOOM_FILTER_EXPECTED_FPP) {
                                 if (mergedFilter == null) {
                                     log.error("could not merge dynamic filter");
                                 }
                                 else {
-                                    log.info("FPP too high: " + mergedFilter.expectedFpp());
+                                    log.info("FPP too high: " + mergedFilter.approximateElementCount());
                                 }
                                 clearPartialResults(filterId, queryId);
                                 return;
@@ -173,7 +170,9 @@ public class DynamicFilterService
                                 ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).put(filterKey, filter);
                                 // remove the filter so we don't need to monitor it anymore
                                 outerEntry.getValue().remove(filterId);
-                                log.info("Merged successfully dynamic filter id: " + filterId + "-" + queryId + " type: " + type + ", column: " + column + ", item count: " + mergedFilter.approximateElementCount() + ", fpp: " + mergedFilter.expectedFpp());
+                                log.debug("Merged successfully dynamic filter id: "
+                                        + filterId + "-" + queryId + " type: " + type + ", column: " + column + ", item count: "
+                                        + mergedFilter.approximateElementCount() + ", fpp: " + mergedFilter.expectedFpp());
                             }
                             catch (IOException e) {
                                 log.error(e);
@@ -205,21 +204,17 @@ public class DynamicFilterService
         }
     }
 
-    private BloomFilter mergeBloomFilters(Iterator filterIterator)
+    private BloomFilter mergeBloomFilters(Collection partialBloomFilters)
     {
         BloomFilter mergedFilter = null;
-        while (filterIterator.hasNext()) {
-            try (java.io.ByteArrayInputStream bis = new java.io.ByteArrayInputStream((byte[]) filterIterator.next())) {
-                BloomFilter filter = BloomFilter.readFrom(bis, Funnels.stringFunnel(Charset.defaultCharset()));
+        for (Object partialBloomFilter : partialBloomFilters) {
+            try {
+                BloomFilter deserializedBloomFilter = BloomFilter.readFrom(new ByteArrayInputStream((byte[]) partialBloomFilter));
                 if (mergedFilter == null) {
-                    mergedFilter = filter;
+                    mergedFilter = deserializedBloomFilter;
                 }
                 else {
-                    if (!mergedFilter.isCompatible(filter)) {
-                        log.warn("Bloomfilters not compatible");
-                        break;
-                    }
-                    mergedFilter.putAll(filter);
+                    mergedFilter.merge(deserializedBloomFilter);
                 }
             }
             catch (IOException e) {

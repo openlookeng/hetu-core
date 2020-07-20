@@ -19,8 +19,8 @@ import com.google.common.primitives.Longs;
 import io.airlift.slice.Slice;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.metadata.OrcMetadataReader;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 import io.prestosql.orc.metadata.statistics.IntegerStatistics;
 import io.prestosql.orc.proto.OrcProto;
 import io.prestosql.orc.protobuf.CodedInputStream;
@@ -90,7 +90,7 @@ public class TestOrcBloomFilters
     @Test
     public void testHiveBloomFilterSerde()
     {
-        BloomFilter bloomFilter = new BloomFilter(1_000_000L, 0.05);
+        HashableBloomFilter bloomFilter = new HashableBloomFilter(1_000_000L, 0.05);
 
         // String
         bloomFilter.add(TEST_STRING);
@@ -105,7 +105,7 @@ public class TestOrcBloomFilters
         assertFalse(bloomFilter.testLong(TEST_INTEGER + 1));
 
         // Re-construct
-        BloomFilter newBloomFilter = new BloomFilter(bloomFilter.getBitSet(), bloomFilter.getNumHashFunctions());
+        HashableBloomFilter newBloomFilter = new HashableBloomFilter(bloomFilter.getBitSet(), bloomFilter.getNumHashFunctions());
 
         // String
         assertTrue(newBloomFilter.test(TEST_STRING));
@@ -122,7 +122,7 @@ public class TestOrcBloomFilters
     public void testOrcHiveBloomFilterSerde()
             throws Exception
     {
-        BloomFilter bloomFilterWrite = new BloomFilter(1000L, 0.05);
+        HashableBloomFilter bloomFilterWrite = new HashableBloomFilter(1000L, 0.05);
 
         bloomFilterWrite.add(TEST_STRING);
         assertTrue(bloomFilterWrite.test(TEST_STRING));
@@ -139,7 +139,7 @@ public class TestOrcBloomFilters
         // Read through method
         InputStream inputStream = new ByteArrayInputStream(bytes);
         OrcMetadataReader metadataReader = new OrcMetadataReader();
-        List<BloomFilter> bloomFilters = metadataReader.readBloomFilterIndexes(inputStream);
+        List<HashableBloomFilter> bloomFilters = metadataReader.readBloomFilterIndexes(inputStream);
 
         assertEquals(bloomFilters.size(), 1);
 
@@ -190,7 +190,7 @@ public class TestOrcBloomFilters
         return os.toByteArray();
     }
 
-    private static OrcProto.BloomFilter toOrcBloomFilter(BloomFilter bloomFilter)
+    private static OrcProto.BloomFilter toOrcBloomFilter(HashableBloomFilter bloomFilter)
     {
         OrcProto.BloomFilter.Builder builder = OrcProto.BloomFilter.newBuilder();
         builder.addAllBitset(Longs.asList(bloomFilter.getBitSet()));
@@ -201,7 +201,7 @@ public class TestOrcBloomFilters
     @Test
     public void testBloomFilterPredicateValuesExisting()
     {
-        BloomFilter bloomFilter = new BloomFilter(TEST_VALUES.size() * 10, 0.01);
+        HashableBloomFilter bloomFilter = new HashableBloomFilter(TEST_VALUES.size() * 10, 0.01);
 
         for (Map.Entry<Object, Type> testValue : TEST_VALUES.entrySet()) {
             Object o = testValue.getKey();
@@ -245,7 +245,7 @@ public class TestOrcBloomFilters
     @Test
     public void testBloomFilterPredicateValuesNonExisting()
     {
-        BloomFilter bloomFilter = new BloomFilter(TEST_VALUES.size() * 10, 0.01);
+        HashableBloomFilter bloomFilter = new HashableBloomFilter(TEST_VALUES.size() * 10, 0.01);
 
         for (Map.Entry<Object, Type> testValue : TEST_VALUES.entrySet()) {
             boolean matched = checkInBloomFilter(bloomFilter, testValue.getKey(), testValue.getValue());
@@ -290,7 +290,7 @@ public class TestOrcBloomFilters
         TupleDomainOrcPredicate emptyPredicate = TupleDomainOrcPredicate.builder().build();
 
         // assemble a matching and a non-matching bloom filter
-        BloomFilter bloomFilter = new BloomFilter(1000, 0.01);
+        HashableBloomFilter bloomFilter = new HashableBloomFilter(1000, 0.01);
         OrcProto.BloomFilter emptyOrcBloomFilter = toOrcBloomFilter(bloomFilter);
         bloomFilter.addLong(1234);
         OrcProto.BloomFilter orcBloomFilter = toOrcBloomFilter(bloomFilter);
@@ -337,9 +337,9 @@ public class TestOrcBloomFilters
         assertTrue(emptyPredicate.matches(1L, matchingStatisticsByColumnIndex));
     }
 
-    private static BloomFilter toBloomFilter(OrcProto.BloomFilter orcBloomFilter)
+    private static HashableBloomFilter toBloomFilter(OrcProto.BloomFilter orcBloomFilter)
     {
-        return new BloomFilter(Longs.toArray(orcBloomFilter.getBitsetList()), orcBloomFilter.getNumHashFunctions());
+        return new HashableBloomFilter(Longs.toArray(orcBloomFilter.getBitsetList()), orcBloomFilter.getNumHashFunctions());
     }
 
     @Test
@@ -350,7 +350,7 @@ public class TestOrcBloomFilters
             int size = ThreadLocalRandom.current().nextInt(100, 10000);
             int entries = ThreadLocalRandom.current().nextInt(size / 2, size);
 
-            BloomFilter actual = new BloomFilter(size, fpp);
+            HashableBloomFilter actual = new HashableBloomFilter(size, fpp);
             org.apache.orc.util.BloomFilter expected = new org.apache.orc.util.BloomFilter(size, fpp);
 
             assertFalse(actual.test(null));
@@ -423,7 +423,7 @@ public class TestOrcBloomFilters
         for (int length = 0; length < 1000; length++) {
             for (int i = 0; i < 100; i++) {
                 byte[] bytes = randomBytes(length);
-                assertEquals(BloomFilter.OrcMurmur3.hash64(bytes), Murmur3.hash64(bytes));
+                assertEquals(HashableBloomFilter.OrcMurmur3.hash64(bytes), Murmur3.hash64(bytes));
             }
         }
     }

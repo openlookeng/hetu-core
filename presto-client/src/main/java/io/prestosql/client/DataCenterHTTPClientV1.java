@@ -30,7 +30,6 @@ import io.prestosql.client.block.ExternalBlockEncodingSerde;
 import io.prestosql.client.protocol.DataCenterRowIterable;
 import io.prestosql.client.util.HttpUtil;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.type.TypeManager;
 import okhttp3.Headers;
 import okhttp3.HttpUrl;
@@ -497,7 +496,7 @@ public class DataCenterHTTPClientV1
     }
 
     @Override
-    public boolean applyDynamicFilters(Map<String, DynamicFilter> dynamicFilters)
+    public boolean applyDynamicFilters(Map<String, byte[]> dynamicFilters)
     {
         Request request = buildDynamicFilterRequest(this.clientId, session, queryId, dynamicFilters);
         JsonResponse<CrossRegionDynamicFilterResponse> response = JsonResponse.execute(CRDF_RESPONSE_JSON_CODEC, httpClient, request);

@@ -34,8 +34,8 @@ import io.prestosql.orc.metadata.RowGroupIndex;
 import io.prestosql.orc.metadata.Stream;
 import io.prestosql.orc.metadata.StripeFooter;
 import io.prestosql.orc.metadata.StripeInformation;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 import io.prestosql.orc.stream.InputStreamSource;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.OrcChunkLoader;
@@ -92,17 +92,17 @@ public class StripeReader
     private final OrcCacheProperties orcCacheProperties;
 
     public StripeReader(OrcDataSource orcDataSource,
-                        ZoneId storageTimeZone,
-                        Optional<OrcDecompressor> decompressor,
-                        ColumnMetadata<OrcType> types,
-                        Set<OrcColumn> readColumns,
-                        int rowsInRowGroup,
-                        OrcPredicate predicate,
-                        HiveWriterVersion hiveWriterVersion,
-                        MetadataReader metadataReader,
-                        Optional<OrcWriteValidation> writeValidation,
-                        OrcCacheStore orcCacheStore,
-                        OrcCacheProperties orcCacheProperties)
+            ZoneId storageTimeZone,
+            Optional<OrcDecompressor> decompressor,
+            ColumnMetadata<OrcType> types,
+            Set<OrcColumn> readColumns,
+            int rowsInRowGroup,
+            OrcPredicate predicate,
+            HiveWriterVersion hiveWriterVersion,
+            MetadataReader metadataReader,
+            Optional<OrcWriteValidation> writeValidation,
+            OrcCacheStore orcCacheStore,
+            OrcCacheProperties orcCacheProperties)
     {
         this.orcDataSource = requireNonNull(orcDataSource, "orcDataSource is null");
         this.storageTimeZone = requireNonNull(storageTimeZone, "storageTimeZone is null");
@@ -163,7 +163,7 @@ public class StripeReader
             Map<StreamId, OrcChunkLoader> streamsData = readDiskRanges(stripe.getOffset(), diskRanges, systemMemoryUsage);
 
             // read the bloom filter for each column
-            Map<OrcColumnId, List<BloomFilter>> bloomFilterIndexes = readBloomFilterIndexes(streams, streamsData, stripe);
+            Map<OrcColumnId, List<HashableBloomFilter>> bloomFilterIndexes = readBloomFilterIndexes(streams, streamsData, stripe);
 
             // read the row index for each column
             Map<StreamId, List<RowGroupIndex>> columnIndexes = readColumnIndexes(streams, streamsData, bloomFilterIndexes, stripe);
@@ -425,10 +425,10 @@ public class StripeReader
         return stream.getStreamKind() == ROW_INDEX || stream.getStreamKind() == DICTIONARY_COUNT || stream.getStreamKind() == BLOOM_FILTER || stream.getStreamKind() == BLOOM_FILTER_UTF8;
     }
 
-    private Map<OrcColumnId, List<BloomFilter>> readBloomFilterIndexes(Map<StreamId, Stream> streams, Map<StreamId, OrcChunkLoader> streamsData, StripeInformation stripe)
+    private Map<OrcColumnId, List<HashableBloomFilter>> readBloomFilterIndexes(Map<StreamId, Stream> streams, Map<StreamId, OrcChunkLoader> streamsData, StripeInformation stripe)
             throws IOException
     {
-        HashMap<OrcColumnId, List<BloomFilter>> bloomFilters = new HashMap<>();
+        HashMap<OrcColumnId, List<HashableBloomFilter>> bloomFilters = new HashMap<>();
         for (Entry<StreamId, Stream> entry : streams.entrySet()) {
             Stream stream = entry.getValue();
             if (stream.getStreamKind() == BLOOM_FILTER_UTF8) {
@@ -474,7 +474,7 @@ public class StripeReader
         return ImmutableMap.copyOf(bloomFilters);
     }
 
-    private Map<StreamId, List<RowGroupIndex>> readColumnIndexes(Map<StreamId, Stream> streams, Map<StreamId, OrcChunkLoader> streamsData, Map<OrcColumnId, List<BloomFilter>> bloomFilterIndexes, StripeInformation stripe)
+    private Map<StreamId, List<RowGroupIndex>> readColumnIndexes(Map<StreamId, Stream> streams, Map<StreamId, OrcChunkLoader> streamsData, Map<OrcColumnId, List<HashableBloomFilter>> bloomFilterIndexes, StripeInformation stripe)
             throws IOException
     {
         ImmutableMap.Builder<StreamId, List<RowGroupIndex>> columnIndexes = ImmutableMap.builder();
@@ -482,7 +482,7 @@ public class StripeReader
             Stream stream = entry.getValue();
             if (stream.getStreamKind() == ROW_INDEX) {
                 OrcInputStream inputStream = new OrcInputStream(streamsData.get(entry.getKey()));
-                List<BloomFilter> bloomFilters = bloomFilterIndexes.get(entry.getKey().getColumnId());
+                List<HashableBloomFilter> bloomFilters = bloomFilterIndexes.get(entry.getKey().getColumnId());
                 List<RowGroupIndex> rowGroupIndexes;
                 if (orcCacheProperties.isRowIndexCacheEnabled()) {
                     OrcRowIndexCacheKey indexCacheKey = new OrcRowIndexCacheKey();

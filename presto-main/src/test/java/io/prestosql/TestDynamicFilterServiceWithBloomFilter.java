@@ -16,15 +16,13 @@ package io.prestosql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
+import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
@@ -43,7 +41,6 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -114,9 +111,9 @@ public class TestDynamicFilterServiceWithBloomFilter
         Thread.sleep(3000);
         BloomFilter bf = fetchDynamicFilter(filterId, session.getQueryId().toString());
         for (int i = 1; i < 9; i++) {
-            Assert.assertEquals(true, bf.mightContain(i + ""));
+            assertTrue(bf.test((String.valueOf(i).getBytes())));
         }
-        Assert.assertEquals(false, bf.mightContain("10"));
+        assertFalse(bf.test("10".getBytes()));
 
         // Test getDynamicFilterSupplier
         dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(),
@@ -126,8 +123,11 @@ public class TestDynamicFilterServiceWithBloomFilter
         assertFalse(dynamicFilters == null, "dynamic filters should be ready");
         assertEquals(dynamicFilters.size(), 1, "there should be 1 dynamic filter in supplier");
 
-        BloomFilter bloomFilter = ((BloomFilterDynamicFilter) dynamicFilters.toArray()[0]).getBloomFilterDeserialized();
-        assertEquals(bf, bloomFilter, "dynamic filter in supplier should be the same as the one merged");
+        DynamicFilter dynamicFilter = dynamicFilters.iterator().next();
+        for (int i = 1; i < 9; i++) {
+            assertTrue(dynamicFilter.contains(String.valueOf(i)));
+        }
+        assertFalse(dynamicFilter.contains("10"));
 
         dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(new QueryId("invalid"),
                 ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression)),
@@ -182,7 +182,7 @@ public class TestDynamicFilterServiceWithBloomFilter
     private BloomFilter deserializeBloomFilter(byte[] serializedBloomFilter)
     {
         try (java.io.ByteArrayInputStream bis = new java.io.ByteArrayInputStream(serializedBloomFilter)) {
-            return BloomFilter.readFrom(bis, Funnels.stringFunnel(Charset.defaultCharset()));
+            return BloomFilter.readFrom(bis);
         }
         catch (IOException e) {
             Assert.fail("Dynamic Filter cannot be created from byte array");
@@ -194,9 +194,9 @@ public class TestDynamicFilterServiceWithBloomFilter
     {
         ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId))).add(driverId);
 
-        BloomFilter bloomFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), 1024 * 1024, 0.1);
+        BloomFilter bloomFilter = new BloomFilter(1024 * 1024, 0.1);
         for (String val : values) {
-            bloomFilter.put(val);
+            bloomFilter.add(val.getBytes());
         }
 
         String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId);

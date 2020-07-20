@@ -64,7 +64,6 @@ public abstract class DynamicFilter
 
     /**
      * Set column information of current dynamic filter
-     *
      */
     public void setColumnHandle(ColumnHandle columnHandle)
     {
@@ -72,7 +71,7 @@ public abstract class DynamicFilter
     }
 
     /**
-     *  Contains for the current dynamic filter
+     * Contains for the current dynamic filter
      *
      * @return boolean whether or not the object is in the DynamicFilter
      */

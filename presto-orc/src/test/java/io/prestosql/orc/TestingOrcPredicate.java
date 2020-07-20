@@ -18,8 +18,8 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.metadata.OrcColumnId;
-import io.prestosql.orc.metadata.statistics.BloomFilter;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.SqlDate;
@@ -241,7 +241,7 @@ public final class TestingOrcPredicate
                 return false;
             }
 
-            BloomFilter bloomFilter = columnStatistics.getBloomFilter();
+            HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
             if (bloomFilter != null) {
                 for (Double value : chunk) {
                     if (value != null && !bloomFilter.testDouble(value)) {
@@ -332,7 +332,7 @@ public final class TestingOrcPredicate
                     return false;
                 }
 
-                BloomFilter bloomFilter = columnStatistics.getBloomFilter();
+                HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
                 if (testBloomFilter && bloomFilter != null) {
                     for (Long value : chunk) {
                         if (value != null && !bloomFilter.testLong(value)) {
@@ -372,7 +372,7 @@ public final class TestingOrcPredicate
                     .map(Slices::utf8Slice)
                     .collect(toList());
 
-            BloomFilter bloomFilter = columnStatistics.getBloomFilter();
+            HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
             if (bloomFilter != null) {
                 for (Slice slice : slices) {
                     if (!bloomFilter.testSlice(slice)) {
@@ -509,7 +509,7 @@ public final class TestingOrcPredicate
                         return false;
                     }
 
-                    BloomFilter bloomFilter = columnStatistics.getBloomFilter();
+                    HashableBloomFilter bloomFilter = columnStatistics.getBloomFilter();
                     if (bloomFilter != null) {
                         for (Long value : chunk) {
                             if (value != null && !bloomFilter.testLong(value)) {
