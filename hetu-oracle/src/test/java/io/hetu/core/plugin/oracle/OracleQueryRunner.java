@@ -82,8 +82,8 @@ public class OracleQueryRunner
             queryRunner.createCatalog(TPCH_CATALOG, TPCH_CATALOG);
             connectorProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
             connectorProperties.putIfAbsent("connection-url", testingOracleServer.getJdbcUrl());
-            connectorProperties.putIfAbsent("connection-user", testingOracleServer.USER);
-            connectorProperties.putIfAbsent("connection-password", testingOracleServer.PASSWORD);
+            connectorProperties.putIfAbsent("connection-user", testingOracleServer.getUser());
+            connectorProperties.putIfAbsent("connection-password", testingOracleServer.getPassWd());
             connectorProperties.putIfAbsent("allow-drop-table", "true");
 
             queryRunner.installPlugin(new OraclePlugin());

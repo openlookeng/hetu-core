@@ -240,6 +240,49 @@ public class TestOracleDistributedQueries
         // delete is not supported
     }
 
+    @Test
+    public void testCreateTable()
+    {
+        // for now oracle do not support NCLOB(4000, 0) with jdbc type 2011
+        // when create a table, the hetu type 'varchar' will be translate into oracle type 'NCLOB(4000, 0)'
+        // we reconstruct the related test case in io.prestosql.tests.AbstractTestDistributedQueries.testCreateTable
+        assertUpdate("CREATE TABLE test_create (a bigint, b double, c char)");
+        assertTrue(getQueryRunner().tableExists(getSession(), "test_create"));
+        assertTableColumnNames("test_create", "a", "b", "c");
+
+        assertUpdate("DROP TABLE test_create");
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_create"));
+
+        assertQueryFails("CREATE TABLE test_create (a bad_type)", ".* Unknown type 'bad_type' for column 'a'");
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_create"));
+
+        assertUpdate("CREATE TABLE test_create_table_if_not_exists (a bigint, b char, c double)");
+        assertTrue(getQueryRunner().tableExists(getSession(), "test_create_table_if_not_exists"));
+        assertTableColumnNames("test_create_table_if_not_exists", "a", "b", "c");
+
+        assertUpdate("CREATE TABLE IF NOT EXISTS test_create_table_if_not_exists (d bigint, e char)");
+        assertTrue(getQueryRunner().tableExists(getSession(), "test_create_table_if_not_exists"));
+        assertTableColumnNames("test_create_table_if_not_exists", "a", "b", "c");
+
+        assertUpdate("DROP TABLE test_create_table_if_not_exists");
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_create_table_if_not_exists"));
+
+        // Test CREATE TABLE LIKE
+        assertUpdate("CREATE TABLE test_create_original (a bigint, b double, c char)");
+        assertTrue(getQueryRunner().tableExists(getSession(), "test_create_original"));
+        assertTableColumnNames("test_create_original", "a", "b", "c");
+
+        assertUpdate("CREATE TABLE test_create_like (LIKE test_create_original, d boolean, e char)");
+        assertTrue(getQueryRunner().tableExists(getSession(), "test_create_like"));
+        assertTableColumnNames("test_create_like", "a", "b", "c", "d", "e");
+
+        assertUpdate("DROP TABLE test_create_original");
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_create_original"));
+
+        assertUpdate("DROP TABLE test_create_like");
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_create_like"));
+    }
+
     /**
      * testSetSession
      */

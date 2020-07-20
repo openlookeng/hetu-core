@@ -17,13 +17,20 @@ package io.hetu.core.plugin.oracle;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 import io.prestosql.testing.docker.DockerContainer;
 
 import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Map;
 
+import static io.hetu.core.plugin.oracle.TestOracleConstants.ORACLE_UT_CONFIG_FILE_PATH;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 
 /**
@@ -35,20 +42,33 @@ import static java.lang.String.format;
 public class TestingOracleServer
         implements Closeable
 {
-    /**
-     * user
-     */
-    public static final String USER = "test";
+    private static final Logger LOG = Logger.get(TestingOracleServer.class);
 
-    /**
-     * password
-     */
-    public static final String PASSWORD = "test";
-
-    private static final int ORACLE_SERVER_PORT = 1521;
+    private static String user;
+    private static String passWd;
+    private static String connectionUrl;
+    private static String dockerImage;
+    private static int port = 1521;
     private static final long MEMORY_SIZE = 15 * 1024 * 1024 * 1024L;
     private static final String SQL_STATEMENT = "select 1 from dual";
     private final DockerContainer dockerContainer;
+
+    static {
+        File file = new File(ORACLE_UT_CONFIG_FILE_PATH);
+
+        try {
+            Map<String, String> properties = new HashMap<>(loadProperties(file));
+            connectionUrl = properties.get("connection.url");
+            user = properties.get("connection.user");
+            passWd = properties.get("connection.password");
+            dockerImage = properties.get("docker.image");
+            port = Integer.parseInt(properties.get("connection.port"));
+            LOG.info("configurations:\n" + connectionUrl + "\n" + user + "\n" + passWd + "\n" + dockerImage + "\n" + port);
+        }
+        catch (IOException e) {
+            LOG.warn("Failed to load properties for file %s", file);
+        }
+    }
 
     /**
      * constructor
@@ -56,21 +76,22 @@ public class TestingOracleServer
     public TestingOracleServer()
     {
         this.dockerContainer = new DockerContainer(
-                "oracle-12c:latest",
-                ImmutableList.of(ORACLE_SERVER_PORT),
+                dockerImage,
+                ImmutableList.of(port),
                 ImmutableMap.of(
-                        "USER", USER,
-                        "PASSWORD", PASSWORD),
-                portProvider -> TestingOracleServer.helthCheck(portProvider), MEMORY_SIZE);
+                        "USER", user,
+                        "PASSWORD", passWd),
+                TestingOracleServer::helthCheck, MEMORY_SIZE);
     }
 
     private static void helthCheck(DockerContainer.HostPortProvider hostPortProvider)
             throws Exception
     {
         String jdbcUrl = getJdbcUrl(hostPortProvider);
+        LOG.info("connection jdbcurl: " + jdbcUrl);
         try {
             Class.forName(Constants.ORACLE_JDBC_DRIVER_CLASS_NAME);
-            Connection conn = DriverManager.getConnection(jdbcUrl, USER, PASSWORD);
+            Connection conn = DriverManager.getConnection(jdbcUrl, user, passWd);
             if (conn != null) {
                 Statement stmt = conn.createStatement();
                 stmt.execute(SQL_STATEMENT);
@@ -86,7 +107,7 @@ public class TestingOracleServer
 
     private static String getJdbcUrl(DockerContainer.HostPortProvider hostPortProvider)
     {
-        return format("jdbc:oracle:thin:@//localhost:%s/orcl", hostPortProvider.getHostPort(ORACLE_SERVER_PORT));
+        return format(connectionUrl, hostPortProvider.getHostPort(port));
     }
 
     /**
@@ -97,6 +118,26 @@ public class TestingOracleServer
     public String getJdbcUrl()
     {
         return getJdbcUrl(dockerContainer::getHostPort);
+    }
+
+    /**
+     * get connection user name
+     *
+     * @return String
+     */
+    public String getUser()
+    {
+        return user;
+    }
+
+    /**
+     * get connection pass word
+     *
+     * @return String
+     */
+    public String getPassWd()
+    {
+        return passWd;
     }
 
     @Override
