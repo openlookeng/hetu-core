@@ -61,12 +61,13 @@ import static java.util.Objects.requireNonNull;
 public final class SessionPropertyManager
 {
     private static final JsonCodecFactory JSON_CODEC_FACTORY = new JsonCodecFactory();
+    private static HetuConfig hetuConfig = new HetuConfig();
     private final ConcurrentMap<String, PropertyMetadata<?>> systemSessionProperties = new ConcurrentHashMap<>();
     private final ConcurrentMap<CatalogName, Map<String, PropertyMetadata<?>>> connectorSessionProperties = new ConcurrentHashMap<>();
 
     public SessionPropertyManager()
     {
-        this(new SystemSessionProperties(), new HetuConfig());
+        this(new SystemSessionProperties(), hetuConfig);
     }
 
     @Inject
@@ -77,12 +78,13 @@ public final class SessionPropertyManager
 
     public SessionPropertyManager(SystemSessionProperties systemSessionProperties)
     {
-        this(systemSessionProperties, new HetuConfig());
+        this(systemSessionProperties, hetuConfig);
     }
 
     public SessionPropertyManager(List<PropertyMetadata<?>> systemSessionProperties, HetuConfig hetuConfig)
     {
-        addSystemSessionProperties(systemSessionProperties);
+        SessionPropertyManager.hetuConfig = hetuConfig;
+        this.addSystemSessionProperties(systemSessionProperties);
         this.loadConfigToService(hetuConfig);
     }
 
