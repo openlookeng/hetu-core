@@ -275,7 +275,7 @@ public class DataCenterClient
         }
         catch (SQLException ex) {
             throw new PrestoTransportException(REMOTE_TASK_ERROR, HostAddress.fromUri(this.serverUri),
-                    "could not connect to the data center", ex);
+                    "could not connect to the remote data center");
         }
         TableStatistics.Builder builder = TableStatistics.builder();
         List<Object> lastRow = null;
