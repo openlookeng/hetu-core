@@ -42,4 +42,4 @@ Some connectors do not support role management. See connector documentation for 
 See Also
 --------
 
-[CREATE ROLE](./create-role.md), [DROP ROLE](./drop-role).md, [SET ROLE](./set-role.md), [REVOKE ROLES](./revoke-roles.md)
+[CREATE ROLE](./create-role.md), [DROP ROLE](./drop-role.md), [SET ROLE](./set-role.md), [REVOKE ROLES](./revoke-roles.md)

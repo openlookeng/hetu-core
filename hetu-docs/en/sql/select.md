@@ -86,7 +86,7 @@ Additionally, the relations within a `WITH` clause can chain:
 
 **Warning**
 
-*Currently, the SQL for the `WITH` clause will be inlined anywhere the* *named relation is used. This means that if the relation is used more* *than once and the query is non-deterministic, the results may be* *different each time.*
+*Currently, the SQL for the `WITH` clause will be inlined anywhere the named relation is used. This means that if the relation is used more than once and the query is non-deterministic, the results may be different each time.*
 
 SELECT Clause
 -------------

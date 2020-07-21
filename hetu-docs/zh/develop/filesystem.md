@@ -11,7 +11,7 @@ SPI 中的实用程序类 `FileBasedLock` 可以提供对给定的文件系统�
 
 ## 文件系统配置文件
 
-文件系统配置文件必须包含一个类型字段::
+文件系统配置文件必须包含一个类型字段：
 
     fs.client.type=<filesystem type>
 

@@ -472,7 +472,7 @@ Heuristic index is external index module that which can be used to filter to out
  | `hetu.filter.indexstore.hdfs.krb5.keytab.path`             | YES if auth type set to KERBEROS | Path to the kerberos keytab file                                  |
  | `hetu.filter.indexstore.hdfs.krb5.principal`               | YES if auth type set to KERBEROS | Principal of kerberos authentication                              |
  
-##Execution Plan Cache Properties
+## Execution Plan Cache Properties
 
 Execution plan cache feature allows the coordinator to reuse execution plans between identical queries, instead
 of constructing another execution plan, thus reducing the amount of query pre-processing required.

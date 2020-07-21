@@ -229,7 +229,7 @@ or:
 bash /opt/openlookeng/bin/add_cluster_node.sh --file <add_nodes_file_path>
 ```
 
-If there are multiple nodes,separated by commas(,).
+If there are multiple nodes, separated by commas(,).
 
 ## Removing Node to Cluster 
 

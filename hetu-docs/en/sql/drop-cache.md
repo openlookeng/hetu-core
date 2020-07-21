@@ -18,7 +18,7 @@ or by reaching size limit but recurring splits will not reuse any cached node as
 Examples
 --------
 
-Drop cache metadata for `sales' table
+Drop cache metadata for 'sales' table
  
 ```sql 
     DROP CACHE sales
