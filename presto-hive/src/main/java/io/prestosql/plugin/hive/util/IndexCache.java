@@ -14,16 +14,16 @@
  */
 package io.prestosql.plugin.hive.util;
 
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.List;
 
 public interface IndexCache
 {
-    List<SplitIndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit,
+    List<IndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit,
                                         TupleDomain<HiveColumnHandle> effectivePredicate,
                                         List<HiveColumnHandle> partitions);
 }

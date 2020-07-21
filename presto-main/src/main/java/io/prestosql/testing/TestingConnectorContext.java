@@ -26,6 +26,7 @@ import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.connector.ConnectorContext;
+import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.gen.JoinCompiler;
 import io.prestosql.type.InternalTypeManager;
@@ -41,6 +42,7 @@ public class TestingConnectorContext
     private final TypeManager typeManager;
     private final PageSorter pageSorter = new PagesIndexPageSorter(new PagesIndex.TestingFactory(false));
     private final PageIndexerFactory pageIndexerFactory;
+    private final IndexClient indexClient = new NoOpIndexClient();
 
     public TestingConnectorContext()
     {
@@ -77,5 +79,11 @@ public class TestingConnectorContext
     public PageIndexerFactory getPageIndexerFactory()
     {
         return pageIndexerFactory;
+    }
+
+    @Override
+    public IndexClient getIndexClient()
+    {
+        return indexClient;
     }
 }

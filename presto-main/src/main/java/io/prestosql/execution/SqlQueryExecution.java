@@ -37,6 +37,7 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.execution.scheduler.SqlQueryScheduler;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.failuredetector.FailureDetector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
@@ -45,6 +46,7 @@ import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.service.PropertyService;
@@ -70,7 +72,6 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.utils.HetuConfig;
-import io.prestosql.utils.HetuConstant;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -131,6 +132,7 @@ public class SqlQueryExecution
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final DynamicFilterService dynamicFilterService;
+    private final HeuristicIndexerManager heuristicIndexerManager;
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -157,7 +159,8 @@ public class SqlQueryExecution
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
             WarningCollector warningCollector,
-            DynamicFilterService dynamicFilterService)
+            DynamicFilterService dynamicFilterService,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -178,6 +181,7 @@ public class SqlQueryExecution
             this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
             this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
+            this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
 
             checkArgument(scheduleSplitBatchSize > 0, "scheduleSplitBatchSize must be greater than 0");
             this.scheduleSplitBatchSize = scheduleSplitBatchSize;
@@ -500,7 +504,8 @@ public class SqlQueryExecution
                 nodeTaskMap,
                 executionPolicy,
                 schedulerStats,
-                dynamicFilterService);
+                dynamicFilterService,
+                heuristicIndexerManager);
 
         queryScheduler.set(scheduler);
 
@@ -692,6 +697,7 @@ public class SqlQueryExecution
         private final CostCalculator costCalculator;
         private final DynamicFilterService dynamicFilterService;
         private final Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache;
+        private final HeuristicIndexerManager heuristicIndexerManager;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -715,7 +721,8 @@ public class SqlQueryExecution
                 SplitSchedulerStats schedulerStats,
                 StatsCalculator statsCalculator,
                 CostCalculator costCalculator,
-                DynamicFilterService dynamicFilterService)
+                DynamicFilterService dynamicFilterService,
+                HeuristicIndexerManager heuristicIndexerManager)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -739,6 +746,7 @@ public class SqlQueryExecution
             this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
             this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
+            this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -760,64 +768,13 @@ public class SqlQueryExecution
                         "%s is required when %s is true", HetuConstant.FILTER_MAX_INDICES_IN_CACHE, HetuConstant.FILTER_ENABLED));
                 PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, hetuConfig.getMaxIndicesInCache());
 
-                requireNonNull(hetuConfig.getFilterPlugins(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is true", HetuConstant.FILTER_PLUGINS, HetuConstant.FILTER_ENABLED));
-                PropertyService.setProperty(HetuConstant.FILTER_PLUGINS, hetuConfig.getFilterPlugins());
-
                 requireNonNull(hetuConfig.getIndexStoreUri(), String.format(Locale.ENGLISH,
                         "%s is required when %s is true", HetuConstant.INDEXSTORE_URI, HetuConstant.FILTER_ENABLED));
                 PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, hetuConfig.getIndexStoreUri());
 
-                requireNonNull(hetuConfig.getIndexStoreType(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is true", HetuConstant.INDEXSTORE_TYPE, HetuConstant.FILTER_ENABLED));
-                PropertyService.setProperty(HetuConstant.INDEXSTORE_TYPE, hetuConfig.getIndexStoreType());
-
-                if (hetuConfig.getIndexStoreType().equalsIgnoreCase(HetuConstant.INDEXSTORE_TYPE_HDFS)) {
-                    // hdfs indexstore
-                    requireNonNull(hetuConfig.getIndexStoreHdfsConfigResources(), String.format(Locale.ENGLISH,
-                            "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES,
-                            HetuConstant.INDEXSTORE_TYPE, HetuConstant.INDEXSTORE_TYPE_HDFS));
-                    PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES, hetuConfig.getIndexStoreHdfsConfigResources());
-
-                    // hdfs auth type
-                    requireNonNull(hetuConfig.getIndexStoreHdfsAuthenticationType(), String.format(Locale.ENGLISH,
-                            "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE,
-                            HetuConstant.INDEXSTORE_TYPE, HetuConstant.INDEXSTORE_TYPE_HDFS));
-                    PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, hetuConfig.getIndexStoreHdfsAuthenticationType());
-
-                    if (hetuConfig.getIndexStoreHdfsAuthenticationType().equalsIgnoreCase(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS)) {
-                        // kerberos auth
-                        requireNonNull(hetuConfig.getIndexStoreHdfsKrb5ConfigPath(), String.format(Locale.ENGLISH,
-                                "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH,
-                                HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS));
-                        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH, hetuConfig.getIndexStoreHdfsKrb5ConfigPath());
-
-                        requireNonNull(hetuConfig.getIndexStoreHdfsKrb5KeytabPath(), String.format(Locale.ENGLISH,
-                                "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH,
-                                HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS));
-                        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH, hetuConfig.getIndexStoreHdfsKrb5KeytabPath());
-
-                        requireNonNull(hetuConfig.getIndexStoreHdfsKrb5Principal(), String.format(Locale.ENGLISH,
-                                "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL,
-                                HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS));
-                        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL, hetuConfig.getIndexStoreHdfsKrb5Principal());
-                    }
-                    else if (hetuConfig.getIndexStoreHdfsAuthenticationType().equalsIgnoreCase(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_NONE)) {
-                        // no auth
-                    }
-                    else {
-                        requireNonNull(null, String.format(Locale.ENGLISH,
-                                "%s was set to an invalid value: %s", HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE,
-                                hetuConfig.getIndexStoreHdfsAuthenticationType()));
-                    }
-                }
-                else if (hetuConfig.getIndexStoreType().equalsIgnoreCase(HetuConstant.INDEXSTORE_TYPE_LOCAL)) {
-                    // local indexstore
-                }
-                else {
-                    requireNonNull(null, String.format(Locale.ENGLISH,
-                            "%s was set to an invalid value: %s", HetuConstant.INDEXSTORE_TYPE, hetuConfig.getIndexStoreType()));
-                }
+                requireNonNull(hetuConfig.getIndexStoreFileSystemProfile(), String.format(Locale.ENGLISH,
+                        "%s is required when %s is true", HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, HetuConstant.FILTER_ENABLED));
+                PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, hetuConfig.getIndexStoreFileSystemProfile());
             }
             PropertyService.setProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED, hetuConfig.isSplitCacheMapEnabled());
             PropertyService.setProperty(HetuConstant.SPLIT_CACHE_STATE_UPDATE_INTERVAL, hetuConfig.getSplitCacheStateUpdateInterval());
@@ -860,7 +817,8 @@ public class SqlQueryExecution
                     costCalculator,
                     warningCollector,
                     dynamicFilterService,
-                    this.cache);
+                    this.cache,
+                    heuristicIndexerManager);
         }
     }
 }

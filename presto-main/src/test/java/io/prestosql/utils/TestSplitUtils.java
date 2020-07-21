@@ -17,7 +17,10 @@ package io.prestosql.utils;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -42,14 +45,8 @@ public class TestSplitUtils
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
         PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, Long.valueOf(100));
-        PropertyService.setProperty(HetuConstant.FILTER_PLUGINS, "");
         PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, "/tmp/hetu/indices");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_TYPE, "local");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES, "/tmp/core-site.xml,/tmp/hdfs-site.xml");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, "KERBEROS");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH, "/tmp/krb5.conf");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH, "/tmp/user.keytab");
-        PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL, "user");
+        PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
 
         ComparisonExpression expr = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new StringLiteral("test_value"));
 
@@ -67,7 +64,7 @@ public class TestSplitUtils
         mockSplits.add(new Split(new CatalogName("bogus_catalog"), mock3, Lifespan.taskWide()));
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
-        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.buildPredicates(stage), nextSplits);
+        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.buildPredicates(stage), nextSplits, new HeuristicIndexerManager(new FileSystemClientManager()));
         assertNotNull(filteredSplits);
         assertEquals(filteredSplits.size(), 4);
     }

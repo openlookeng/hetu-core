@@ -20,6 +20,7 @@ import io.airlift.json.JsonCodecFactory;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.connector.CatalogName;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.service.PropertyService;
@@ -36,7 +37,6 @@ import io.prestosql.sql.planner.ParameterRewriter;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
 import io.prestosql.utils.HetuConfig;
-import io.prestosql.utils.HetuConstant;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -359,64 +359,13 @@ public final class SessionPropertyManager
                     "%s is required when %s is true", HetuConstant.FILTER_MAX_INDICES_IN_CACHE, HetuConstant.FILTER_ENABLED));
             PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, hetuConfig.getMaxIndicesInCache());
 
-            requireNonNull(hetuConfig.getFilterPlugins(), String.format(Locale.ENGLISH,
-                    "%s is required when %s is true", HetuConstant.FILTER_PLUGINS, HetuConstant.FILTER_ENABLED));
-            PropertyService.setProperty(HetuConstant.FILTER_PLUGINS, hetuConfig.getFilterPlugins());
-
             requireNonNull(hetuConfig.getIndexStoreUri(), String.format(Locale.ENGLISH,
                     "%s is required when %s is true", HetuConstant.INDEXSTORE_URI, HetuConstant.FILTER_ENABLED));
             PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, hetuConfig.getIndexStoreUri());
 
-            requireNonNull(hetuConfig.getIndexStoreType(), String.format(Locale.ENGLISH,
-                    "%s is required when %s is true", HetuConstant.INDEXSTORE_TYPE, HetuConstant.FILTER_ENABLED));
-            PropertyService.setProperty(HetuConstant.INDEXSTORE_TYPE, hetuConfig.getIndexStoreType());
-
-            if (hetuConfig.getIndexStoreType().equalsIgnoreCase(HetuConstant.INDEXSTORE_TYPE_HDFS)) {
-                // hdfs indexstore
-                requireNonNull(hetuConfig.getIndexStoreHdfsConfigResources(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES,
-                        HetuConstant.INDEXSTORE_TYPE, HetuConstant.INDEXSTORE_TYPE_HDFS));
-                PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_CONFIG_RESOURCES, hetuConfig.getIndexStoreHdfsConfigResources());
-
-                // hdfs auth type
-                requireNonNull(hetuConfig.getIndexStoreHdfsAuthenticationType(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE,
-                        HetuConstant.INDEXSTORE_TYPE, HetuConstant.INDEXSTORE_TYPE_HDFS));
-                PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, hetuConfig.getIndexStoreHdfsAuthenticationType());
-
-                if (hetuConfig.getIndexStoreHdfsAuthenticationType().equalsIgnoreCase(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS)) {
-                    // kerberos auth
-                    requireNonNull(hetuConfig.getIndexStoreHdfsKrb5ConfigPath(), String.format(Locale.ENGLISH,
-                            "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH,
-                            HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS));
-                    PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_CONFIG_PATH, hetuConfig.getIndexStoreHdfsKrb5ConfigPath());
-
-                    requireNonNull(hetuConfig.getIndexStoreHdfsKrb5KeytabPath(), String.format(Locale.ENGLISH,
-                            "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH,
-                            HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS));
-                    PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_KEYTAB_PATH, hetuConfig.getIndexStoreHdfsKrb5KeytabPath());
-
-                    requireNonNull(hetuConfig.getIndexStoreHdfsKrb5Principal(), String.format(Locale.ENGLISH,
-                            "%s is required when %s is %s", HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL,
-                            HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE, HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_KERBEROS));
-                    PropertyService.setProperty(HetuConstant.INDEXSTORE_HDFS_KRB5_PRINCIPAL, hetuConfig.getIndexStoreHdfsKrb5Principal());
-                }
-                else if (hetuConfig.getIndexStoreHdfsAuthenticationType().equalsIgnoreCase(HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE_NONE)) {
-                    // no auth
-                }
-                else {
-                    requireNonNull(null, String.format(Locale.ENGLISH,
-                            "%s was set to an invalid value: %s", HetuConstant.INDEXSTORE_HDFS_AUTHENTICATION_TYPE,
-                            hetuConfig.getIndexStoreHdfsAuthenticationType()));
-                }
-            }
-            else if (hetuConfig.getIndexStoreType().equalsIgnoreCase(HetuConstant.INDEXSTORE_TYPE_LOCAL)) {
-                // local indexstore
-            }
-            else {
-                requireNonNull(null, String.format(Locale.ENGLISH,
-                        "%s was set to an invalid value: %s", HetuConstant.INDEXSTORE_TYPE, hetuConfig.getIndexStoreType()));
-            }
+            requireNonNull(hetuConfig.getIndexStoreFileSystemProfile(), String.format(Locale.ENGLISH,
+                    "%s is required when %s is true", HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, HetuConstant.FILTER_ENABLED));
+            PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, hetuConfig.getIndexStoreFileSystemProfile());
         }
     }
 

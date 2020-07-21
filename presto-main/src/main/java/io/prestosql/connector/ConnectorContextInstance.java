@@ -18,6 +18,7 @@ import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.connector.ConnectorContext;
+import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.type.TypeManager;
 
@@ -32,6 +33,7 @@ public class ConnectorContextInstance
     private final PageSorter pageSorter;
     private final PageIndexerFactory pageIndexerFactory;
     private final HetuMetastore hetuMetastore;
+    private final IndexClient indexClient;
 
     public ConnectorContextInstance(
             NodeManager nodeManager,
@@ -39,7 +41,8 @@ public class ConnectorContextInstance
             TypeManager typeManager,
             PageSorter pageSorter,
             PageIndexerFactory pageIndexerFactory,
-            HetuMetastore hetuMetastore)
+            HetuMetastore hetuMetastore,
+            IndexClient indexClient)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.versionEmbedder = requireNonNull(versionEmbedder, "versionEmbedder is null");
@@ -47,6 +50,7 @@ public class ConnectorContextInstance
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.pageIndexerFactory = requireNonNull(pageIndexerFactory, "pageIndexerFactory is null");
         this.hetuMetastore = hetuMetastore;
+        this.indexClient = indexClient;
     }
 
     @Override
@@ -77,6 +81,12 @@ public class ConnectorContextInstance
     public PageIndexerFactory getPageIndexerFactory()
     {
         return pageIndexerFactory;
+    }
+
+    @Override
+    public IndexClient getIndexClient()
+    {
+        return indexClient;
     }
 
     @Override

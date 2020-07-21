@@ -14,7 +14,7 @@
  */
 package io.prestosql.utils;
 
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ public class RangeUtil
     private RangeUtil() {}
 
     //returns all of the elements in a sorted array where the first element value <= start and last element >= end
-    public static List<SplitIndexMetadata> subArray(List<SplitIndexMetadata> arr, long start, long end)
+    public static List<IndexMetadata> subArray(List<IndexMetadata> arr, long start, long end)
     {
         try {
             int first = floorSearch(arr, 0, arr.size() - 1, start);
@@ -45,7 +45,7 @@ public class RangeUtil
         }
     }
 
-    public static int ceilSearch(List<SplitIndexMetadata> arr, int low, int high, long x)
+    public static int ceilSearch(List<IndexMetadata> arr, int low, int high, long x)
             throws Exception
     {
         int mid;
@@ -99,7 +99,7 @@ public class RangeUtil
 
     /* Function to get index of floor of x in
     arr[low..high] */
-    public static int floorSearch(List<SplitIndexMetadata> arr, int low, int high, long x)
+    public static int floorSearch(List<IndexMetadata> arr, int low, int high, long x)
             throws Exception
     {
         // If low and high cross each other
@@ -136,7 +136,7 @@ public class RangeUtil
         return floorSearch(arr, mid + 1, high, x);
     }
 
-    public static long getOrder(SplitIndexMetadata index)
+    public static long getOrder(IndexMetadata index)
             throws Exception
 
     {

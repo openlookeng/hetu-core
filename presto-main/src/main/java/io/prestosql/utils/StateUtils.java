@@ -15,6 +15,7 @@
 package io.prestosql.utils;
 
 import io.airlift.log.Logger;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.statestore.StateCollection;

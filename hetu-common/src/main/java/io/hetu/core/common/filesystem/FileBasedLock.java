@@ -277,17 +277,17 @@ public class FileBasedLock
                 failedDeletions.remove(lockInfoPath);
             }
             if (!failedDeletions.isEmpty()) {
-                throw new IllegalStateException("File lock failed to delete, manual deletion seedStore required: "
+                throw new IllegalStateException("File lock failed to delete, manual deletion is required: "
                         + failedDeletions.toString());
             }
         }
         catch (IOException e) {
             if (!failedDeletions.isEmpty()) {
-                throw new IllegalStateException("File lock failed to delete, manual deletion seedStore required: "
+                throw new IllegalStateException("File lock failed to delete, manual deletion is required: "
                         + failedDeletions.toString(), e);
             }
             LOG.warn("{} {}", "Exception thrown during lock release, but lock files are deleted successfully.",
-                    "No manual deletion seedStore required.");
+                    "No manual deletion is required.");
             LOG.debug("Exception thrown during lock.release(): %s", e.getMessage());
         }
         catch (InterruptedException e) {

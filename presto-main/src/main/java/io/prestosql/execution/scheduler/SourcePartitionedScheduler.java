@@ -24,15 +24,16 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.scheduler.FixedSourcePartitionedScheduler.BucketedSplitPlacementPolicy;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.SplitSource;
 import io.prestosql.split.SplitSource.SplitBatch;
 import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.utils.HetuConstant;
 import io.prestosql.utils.PredicateExtractor;
 import io.prestosql.utils.SplitUtils;
 
@@ -94,6 +95,7 @@ public class SourcePartitionedScheduler
     private final int splitBatchSize;
     private final PlanNodeId partitionedNode;
     private final boolean groupedExecution;
+    private final HeuristicIndexerManager heuristicIndexerManager;
 
     private final Map<Lifespan, ScheduleGroup> scheduleGroups = new HashMap<>();
     private boolean noMoreScheduleGroups;
@@ -107,12 +109,14 @@ public class SourcePartitionedScheduler
             SplitSource splitSource,
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
-            boolean groupedExecution)
+            boolean groupedExecution,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         this.stage = requireNonNull(stage, "stage is null");
         this.partitionedNode = requireNonNull(partitionedNode, "partitionedNode is null");
         this.splitSource = requireNonNull(splitSource, "splitSource is null");
         this.splitPlacementPolicy = requireNonNull(splitPlacementPolicy, "splitPlacementPolicy is null");
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
 
         checkArgument(splitBatchSize > 0, "splitBatchSize must be at least one");
         this.splitBatchSize = splitBatchSize;
@@ -136,9 +140,11 @@ public class SourcePartitionedScheduler
             PlanNodeId partitionedNode,
             SplitSource splitSource,
             SplitPlacementPolicy splitPlacementPolicy,
-            int splitBatchSize)
+            int splitBatchSize,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
-        SourcePartitionedScheduler sourcePartitionedScheduler = new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy, splitBatchSize, false);
+        SourcePartitionedScheduler sourcePartitionedScheduler = new SourcePartitionedScheduler(stage, partitionedNode, splitSource,
+                splitPlacementPolicy, splitBatchSize, false, heuristicIndexerManager);
         sourcePartitionedScheduler.startLifespan(Lifespan.taskWide(), NOT_PARTITIONED);
         sourcePartitionedScheduler.noMoreLifespans();
 
@@ -177,9 +183,11 @@ public class SourcePartitionedScheduler
             SplitSource splitSource,
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
-            boolean groupedExecution)
+            boolean groupedExecution,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
-        return new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy, splitBatchSize, groupedExecution);
+        return new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy,
+                splitBatchSize, groupedExecution, heuristicIndexerManager);
     }
 
     @Override
@@ -240,7 +248,8 @@ public class SourcePartitionedScheduler
                     scheduleGroup.nextSplitBatchFuture = null;
 
                     //add split filter to filter out split has no valid rows
-                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(PredicateExtractor.buildPredicates(stage), nextSplits) : nextSplits.getSplits();
+                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(
+                            PredicateExtractor.buildPredicates(stage), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
                     pendingSplits.addAll(filteredSplit);
                     if (nextSplits.isLastBatch()) {

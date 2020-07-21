@@ -14,7 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
-import io.hetu.core.spi.heuristicindex.DataSource;
+import io.prestosql.spi.heuristicindex.DataSource;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;

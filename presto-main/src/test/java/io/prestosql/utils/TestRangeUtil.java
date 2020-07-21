@@ -14,8 +14,7 @@
  */
 package io.prestosql.utils;
 
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
-import io.hetu.core.spi.heuristicindex.SplitMetadata;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
@@ -66,8 +65,8 @@ public class TestRangeUtil
     public void testSubArrayOutOfStartRange()
             throws Exception
     {
-        List<SplitIndexMetadata> indices = createIndexList(new long[] {1, 2, 8, 10, 10, 12, 19});
-        List<SplitIndexMetadata> result = RangeUtil.subArray(indices, 0, 19);
+        List<IndexMetadata> indices = createIndexList(new long[] {1, 2, 8, 10, 10, 12, 19});
+        List<IndexMetadata> result = RangeUtil.subArray(indices, 0, 19);
         assertEquals(7, result.size());
         assertTrue(compareIndexLists(indices, result));
     }
@@ -76,8 +75,8 @@ public class TestRangeUtil
     public void testSubArrayOutOfEndRange()
             throws Exception
     {
-        List<SplitIndexMetadata> indices = createIndexList(new long[] {1, 2, 8, 10, 10, 12, 19});
-        List<SplitIndexMetadata> result = RangeUtil.subArray(indices, 1, 20);
+        List<IndexMetadata> indices = createIndexList(new long[] {1, 2, 8, 10, 10, 12, 19});
+        List<IndexMetadata> result = RangeUtil.subArray(indices, 1, 20);
         assertEquals(7, result.size());
         assertTrue(compareIndexLists(indices, result));
     }
@@ -90,7 +89,7 @@ public class TestRangeUtil
 
         long[] arr = {1, 2, 8, 10, 10, 12, 19};
         int n = arr.length;
-        List<SplitIndexMetadata> indices = createIndexList(arr);
+        List<IndexMetadata> indices = createIndexList(arr);
 
         assertEquals(0, RangeUtil.ceilSearch(indices, 0, n - 1, 0));
         assertEquals(0, RangeUtil.ceilSearch(indices, 0, n - 1, -1));
@@ -108,7 +107,7 @@ public class TestRangeUtil
 
         long[] arr = {1, 2, 8, 10, 10, 12, 19};
         int n = arr.length;
-        List<SplitIndexMetadata> indices = createIndexList(arr);
+        List<IndexMetadata> indices = createIndexList(arr);
 
         assertEquals(-1, RangeUtil.floorSearch(indices, 0, n - 1, 0));
         assertEquals(-1, RangeUtil.floorSearch(indices, 0, n - 1, -1));
@@ -119,18 +118,18 @@ public class TestRangeUtil
     }
 
     // Create fake ExternalIndex list given the array of start offsets
-    private List<SplitIndexMetadata> createIndexList(long[] arr)
+    private List<IndexMetadata> createIndexList(long[] arr)
     {
-        List<SplitIndexMetadata> list = new ArrayList<>();
+        List<IndexMetadata> list = new ArrayList<>();
         for (long i : arr) {
-            SplitIndexMetadata index = new SplitIndexMetadata(null, new SplitMetadata(null, null, null, null, i), 0);
+            IndexMetadata index = new IndexMetadata(null, null, null, null, null, i, 0);
             list.add(index);
         }
         return list;
     }
 
     // Compare 2 ExternalIndex lists
-    private boolean compareIndexLists(List<SplitIndexMetadata> expected, List<SplitIndexMetadata> actual)
+    private boolean compareIndexLists(List<IndexMetadata> expected, List<IndexMetadata> actual)
             throws Exception
     {
         for (int i = 0; i < expected.size(); i++) {

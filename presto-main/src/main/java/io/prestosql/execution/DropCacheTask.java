@@ -19,6 +19,7 @@ import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.sql.analyzer.SemanticException;
@@ -26,7 +27,6 @@ import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.transaction.TransactionManager;
-import io.prestosql.utils.HetuConstant;
 
 import java.util.List;
 

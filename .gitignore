@@ -27,3 +27,4 @@ node_modules
 */*.iml
 */.idea
 */.gitignore
+*/dependency-reduced-pom.xml

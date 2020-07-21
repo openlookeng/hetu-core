@@ -20,9 +20,11 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
+import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
+import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
 import org.apache.hadoop.fs.Path;
@@ -45,7 +47,7 @@ public class LocalIndexCache
 
     protected static final long DEFAULT_LOAD_DELAY = 5000;
 
-    private LoadingCache<IndexCacheKey, List<SplitIndexMetadata>> cache;
+    private LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
 
     private ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Hive-LocalIndexCache-pool-%d").setDaemon(true).build();
     private ScheduledExecutorService executor = Executors.newScheduledThreadPool(2, threadFactory);
@@ -69,7 +71,7 @@ public class LocalIndexCache
         this(loader, DEFAULT_LOAD_DELAY);
     }
 
-    public List<SplitIndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit, TupleDomain<HiveColumnHandle> effectivePredicate, List<HiveColumnHandle> partitions)
+    public List<IndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit, TupleDomain<HiveColumnHandle> effectivePredicate, List<HiveColumnHandle> partitions)
     {
         if (cache == null || catalog == null || table == null || hiveSplit == null || effectivePredicate == null) {
             return Collections.emptyList();
@@ -82,7 +84,7 @@ public class LocalIndexCache
         String tableFqn = String.format("%s.%s", catalog, table);
 
         // for each split, load indexes for each predicate (if the predicate contains an indexed column)
-        List<SplitIndexMetadata> splitIndexes = new LinkedList<>();
+        List<IndexMetadata> splitIndexes = new LinkedList<>();
         effectivePredicate.getDomains().get().keySet().stream()
                     // if the domain column is a partition column, skip it
                     .filter(key -> partitions == null || !partitions.contains(key))
@@ -91,7 +93,7 @@ public class LocalIndexCache
                         String indexCacheKeyPath = Paths.get(tableFqn, column, pathUri.getPath()).toString();
                         IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime, "bitmap");
                         // check if cache contains the key
-                        List<SplitIndexMetadata> predicateIndexes = cache.getIfPresent(indexCacheKey);
+                        List<IndexMetadata> predicateIndexes = cache.getIfPresent(indexCacheKey);
 
                         // if cache didn't contain the key, it has not been loaded, load it asynchronously
                         if (predicateIndexes == null) {
@@ -110,7 +112,7 @@ public class LocalIndexCache
                         else {
                             // if key was present in cache, we still need to check if the index is validate based on the lastModifiedTime
                             // the index is only valid if the lastModifiedTime of the split matches the index's lastModifiedTime
-                            for (SplitIndexMetadata index : predicateIndexes) {
+                            for (IndexMetadata index : predicateIndexes) {
                                 if (index.getLastUpdated() != lastModifiedTime) {
                                     cache.invalidate(indexCacheKey);
                                     predicateIndexes = Collections.emptyList();

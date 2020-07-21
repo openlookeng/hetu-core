@@ -14,11 +14,15 @@
  */
 package io.prestosql.utils;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
+import com.google.common.cache.CacheLoader;
+import io.hetu.core.common.heuristicindex.IndexCacheKey;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
+import io.prestosql.heuristicindex.LocalIndexCache;
+import io.prestosql.heuristicindex.LocalIndexCacheLoader;
 import io.prestosql.heuristicindex.SplitFilter;
 import io.prestosql.heuristicindex.SplitFilterFactory;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.split.SplitSource;
 
 import java.util.List;
@@ -29,18 +33,21 @@ public class SplitUtils
     {
     }
 
-    public static List<Split> getFilteredSplit(List<Predicate> predicateList, SplitSource.SplitBatch nextSplits)
+    public static List<Split> getFilteredSplit(List<Predicate> predicateList, SplitSource.SplitBatch nextSplits, HeuristicIndexerManager heuristicIndexerManager)
     {
         if (predicateList.isEmpty()) {
             return nextSplits.getSplits();
         }
 
-        //hetu: apply filtering
+        // hetu: apply filtering
         List<Split> filteredSplits = nextSplits.getSplits();
-        //hetu: build splitFilter according to the predicate
-        //hetu: careful! the same thread that injects the module should load the plugins
-        Injector injector = Guice.createInjector(new FilterModule());
-        SplitFilterFactory splitFilterFactory = injector.getInstance(SplitFilterFactory.class);
+
+        // Use a filesystem access client to initialize cache loader, then the IndexCache
+        CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new LocalIndexCacheLoader(heuristicIndexerManager.getIndexClient());
+        LocalIndexCache indexCache = new LocalIndexCache(cacheLoader);
+
+        SplitFilterFactory splitFilterFactory = new SplitFilterFactory(indexCache);
+
         for (Predicate predicate : predicateList) {
             //hetu: get filter for each predicate
             // the SplitFilterFactory will return a SplitFilter that has the applicable indexes

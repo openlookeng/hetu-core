@@ -125,10 +125,7 @@
         <module>hetu-oracle</module>
         <module>hetu-vdm</module>
         <module>hetu-heuristic-index</module>
-        <module>hetu-heuristic-index-bitmap</module>
-        <module>hetu-heuristic-index-hdfs-store</module>
-        <module>hetu-heuristic-index-hive</module>
-        <module>hetu-heuristic-index-spi</module>
+        <module>hetu-heuristic-index-cli</module>
         <module>hetu-datacenter</module>
         <module>hetu-hana</module>
         <module>hetu-listener</module>
@@ -274,6 +271,12 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-listener</artifactId>
+                <version>${dep.hetu.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-filesystem-client</artifactId>
                 <version>${dep.hetu.version}</version>
             </dependency>
 
@@ -470,12 +473,6 @@
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-sqlserver</artifactId>
                 <version>${dep.prestosql.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.hetu.core</groupId>
-                <artifactId>hetu-heuristic-index-spi</artifactId>
-                <version>${dep.hetu.version}</version>
             </dependency>
 
             <dependency>
@@ -753,7 +750,19 @@
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm</artifactId>
-                <version>6.2.1</version>
+                <version>7.1</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-analysis</artifactId>
+                <version>7.1</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-tree</artifactId>
+                <version>7.1</version>
             </dependency>
 
             <dependency>
@@ -834,6 +843,12 @@
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>42.2.5</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-artifact</artifactId>
+                <version>3.6.0</version>
             </dependency>
 
             <dependency>
@@ -925,9 +940,21 @@
             </dependency>
 
             <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.8.1</version>
+            </dependency>
+
+            <dependency>
                 <groupId>net.sf.opencsv</groupId>
                 <artifactId>opencsv</artifactId>
                 <version>2.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_annotations</artifactId>
+                <version>2.3.2</version>
             </dependency>
 
             <dependency>

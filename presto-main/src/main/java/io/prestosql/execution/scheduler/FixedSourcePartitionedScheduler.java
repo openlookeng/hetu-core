@@ -25,6 +25,7 @@ import io.prestosql.execution.scheduler.ScheduleResult.BlockedReason;
 import io.prestosql.execution.scheduler.group.DynamicLifespanScheduler;
 import io.prestosql.execution.scheduler.group.FixedLifespanScheduler;
 import io.prestosql.execution.scheduler.group.LifespanScheduler;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.StageExecutionDescriptor;
@@ -73,7 +74,8 @@ public class FixedSourcePartitionedScheduler
             int splitBatchSize,
             OptionalInt concurrentLifespansPerTask,
             NodeSelector nodeSelector,
-            List<ConnectorPartitionHandle> partitionHandles)
+            List<ConnectorPartitionHandle> partitionHandles,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         requireNonNull(stage, "stage is null");
         requireNonNull(splitSources, "splitSources is null");
@@ -113,7 +115,8 @@ public class FixedSourcePartitionedScheduler
                     splitSource,
                     splitPlacementPolicy,
                     Math.max(splitBatchSize / concurrentLifespans, 1),
-                    groupedExecutionForScanNode);
+                    groupedExecutionForScanNode,
+                    heuristicIndexerManager);
 
             if (stageExecutionDescriptor.isStageGroupedExecution() && !groupedExecutionForScanNode) {
                 sourceScheduler = new AsGroupedSourceScheduler(sourceScheduler);

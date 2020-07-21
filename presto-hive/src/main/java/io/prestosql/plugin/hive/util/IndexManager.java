@@ -15,9 +15,9 @@
 package io.prestosql.plugin.hive.util;
 
 import com.google.inject.Inject;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.List;
@@ -32,7 +32,7 @@ public class IndexManager
         this.indexCache = indexCache;
     }
 
-    public List<SplitIndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit,
+    public List<IndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit,
                                                TupleDomain<HiveColumnHandle> effectivePredicate,
                                                List<HiveColumnHandle> partitions)
     {

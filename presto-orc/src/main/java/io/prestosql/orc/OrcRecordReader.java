@@ -25,8 +25,6 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
-import io.hetu.core.spi.heuristicindex.Index;
-import io.hetu.core.spi.heuristicindex.SplitIndexMetadata;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.OrcWriteValidation.StatisticsValidation;
 import io.prestosql.orc.OrcWriteValidation.WriteChecksum;
@@ -46,6 +44,8 @@ import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.StreamSourceMeta;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
 import org.joda.time.DateTimeZone;
@@ -156,7 +156,7 @@ public class OrcRecordReader
             Optional<OrcWriteValidation> writeValidation,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform,
-            Optional<List<SplitIndexMetadata>> indexes,
+            Optional<List<IndexMetadata>> indexes,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties)
@@ -207,16 +207,16 @@ public class OrcRecordReader
         // 2. the index split offset corresponds to the stripe offset
 
         // each stripe could have an index for multiple columns
-        Map<Long, List<SplitIndexMetadata>> stripeOffsetToIndex = new HashMap<>();
+        Map<Long, List<IndexMetadata>> stripeOffsetToIndex = new HashMap<>();
         if (indexes.isPresent() && !indexes.get().isEmpty()
                 // check there is only one type of index
                 && indexes.get().stream().map(i -> i.getIndex().getId()).collect(Collectors.toSet()).size() == 1) {
-            for (SplitIndexMetadata i : indexes.get()) {
+            for (IndexMetadata i : indexes.get()) {
                 long offset = i.getSplitStart();
 
                 stripeOffsetToIndex.putIfAbsent(offset, new LinkedList<>());
 
-                List<SplitIndexMetadata> stripeIndexes = stripeOffsetToIndex.get(offset);
+                List<IndexMetadata> stripeIndexes = stripeOffsetToIndex.get(offset);
                 stripeIndexes.add(i);
             }
         }
@@ -224,7 +224,7 @@ public class OrcRecordReader
         long totalRowCount = 0;
         long fileRowCount = 0;
         ImmutableList.Builder<StripeInformation> stripes = ImmutableList.builder();
-        Map<StripeInformation, List<SplitIndexMetadata>> stripeIndexes = new HashMap<>();
+        Map<StripeInformation, List<IndexMetadata>> stripeIndexes = new HashMap<>();
         ImmutableList.Builder<Long> stripeFilePositions = ImmutableList.builder();
         if (!fileStats.isPresent() || predicate.matches(numberOfRows, fileStats.get())) {
             // select stripes that start within the specified split
@@ -259,12 +259,12 @@ public class OrcRecordReader
                 Domain columnDomain = domainEntry.getValue();
 
                 // if the index exists, there should only be one index for this column within this stripe
-                List<SplitIndexMetadata> splitIndexMetadatas = stripeIndex.getValue().stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
-                if (splitIndexMetadatas.isEmpty() || splitIndexMetadatas.size() > 1) {
+                List<IndexMetadata> indexMetadata = stripeIndex.getValue().stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
+                if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
                     continue;
                 }
 
-                Index index = splitIndexMetadatas.get(0).getIndex();
+                Index index = indexMetadata.get(0).getIndex();
                 indexDomainMap.put(index, columnDomain);
             }
 

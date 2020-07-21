@@ -84,11 +84,6 @@
 
         <dependency>
             <groupId>io.hetu.core</groupId>
-            <artifactId>hetu-heuristic-index-spi</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.hetu.core</groupId>
             <artifactId>hetu-common</artifactId>
         </dependency>
 
