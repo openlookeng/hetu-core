@@ -13,7 +13,7 @@
  */
 package io.prestosql.orc.metadata.statistics;
 
-import io.hetu.core.common.util.BloomFilter;
+import io.prestosql.spi.util.BloomFilter;
 
 public class HashableBloomFilter
         extends BloomFilter

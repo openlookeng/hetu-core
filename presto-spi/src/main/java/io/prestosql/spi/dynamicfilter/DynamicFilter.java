@@ -32,6 +32,12 @@ public abstract class DynamicFilter
         GLOBAL
     }
 
+    public enum DataType
+    {
+        HASHSET,
+        BLOOM_FILTER
+    }
+
     protected String filterId;
     protected ColumnHandle columnHandle;
     protected Object min;

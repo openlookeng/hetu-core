@@ -112,15 +112,25 @@ public class TestHazelcastStateStore
     @Test
     public void testGetStateCollections()
     {
-        final int size = 2;
         Map<String, StateCollection> collections = stateStore.getStateCollections();
-        assertEquals(collections.size(), size);
         StateCollection resourceGroupCollection = collections.get(STATE_COLLECTION_RESOURCE_GROUP);
         assertEquals(resourceGroupCollection.getName(), STATE_COLLECTION_RESOURCE_GROUP);
         assertEquals(resourceGroupCollection.getType(), STATE_COLLECTION_TYPE);
         StateCollection queryCollection = collections.get(STATE_COLLECTION_QUERY);
         assertEquals(queryCollection.getName(), STATE_COLLECTION_QUERY);
         assertEquals(queryCollection.getType(), STATE_COLLECTION_TYPE);
+    }
+
+    @Test
+    public void testGetOrCreateCollection()
+    {
+        String newStateCollection = "new-collection";
+        assertNull(stateStore.getStateCollection(newStateCollection));
+        StateCollection collection = stateStore.getOrCreateStateCollection(newStateCollection, StateCollection.Type.MAP);
+        assertEquals(collection.getName(), newStateCollection);
+        assertEquals(collection.getType(), StateCollection.Type.MAP);
+        assertEquals(collection, stateStore.getStateCollection(newStateCollection));
+        assertEquals(collection, stateStore.getOrCreateStateCollection(newStateCollection, StateCollection.Type.MAP));
     }
 
     /**

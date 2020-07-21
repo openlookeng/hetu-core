@@ -30,6 +30,8 @@ import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDe
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
+import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.HASHSET;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
@@ -113,7 +115,7 @@ public class TestFeaturesConfig
                 .setPredicatePushdownUseTableProperties(true)
                 .setEnableDynamicFiltering(false)
                 .setDynamicFilteringMaxPerDriverRowCount(100)
-                .setDynamicFilteringDataStructure(0)
+                .setDynamicFilteringDataType(BLOOM_FILTER)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(10, KILOBYTE))
                 .setQueryPushDown(true)
                 .setPushLimitDown(true)
@@ -199,7 +201,7 @@ public class TestFeaturesConfig
                 .put("optimizer.push-limit-through-semi-join", "false")
                 .put("optimizer.push-limit-through-outer-join", "false")
                 .put("experimental.dynamic-filtering-max-per-driver-row-count", "256")
-                .put("experimental.dynamic_filtering_data_structure", "1")
+                .put("experimental.dynamic-filtering-data-type", "HASHSET")
                 .put("experimental.dynamic-filtering-max-per-driver-size", "64kB")
                 .put("implicit-conversion", "true")
                 .build();
@@ -277,7 +279,7 @@ public class TestFeaturesConfig
                 .setPushLimitThroughOuterJoin(false)
                 .setEnableExecutionPlanCache(true)
                 .setDynamicFilteringMaxPerDriverRowCount(256)
-                .setDynamicFilteringDataStructure(1)
+                .setDynamicFilteringDataType(HASHSET)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE));
         assertFullMapping(properties, expected);
     }

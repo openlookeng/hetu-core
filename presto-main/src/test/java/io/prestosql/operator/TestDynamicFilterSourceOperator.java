@@ -17,25 +17,25 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.node.NodeInfo;
-import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
-import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStoreBootstrapper;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStoreFactory;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
-import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
 import io.prestosql.spi.statestore.StateStoreFactory;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.statestore.StateStoreProvider;
@@ -48,7 +48,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,6 +77,8 @@ import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
+import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.HASHSET;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
@@ -171,7 +172,7 @@ public class TestDynamicFilterSourceOperator
         assertEquals(actual, expected);
     }
 
-    private DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory createOperatorFactory(DynamicFilter.Type dfType, int dataStructure, DynamicFilterSourceOperator.Channel... buildChannels)
+    private DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory createOperatorFactory(DynamicFilter.Type dfType, FeaturesConfig.DynamicFilterDataType dataType, DynamicFilterSourceOperator.Channel... buildChannels)
     {
         NodeInfo nodeInfo = new NodeInfo("test");
 
@@ -182,7 +183,7 @@ public class TestDynamicFilterSourceOperator
                 Arrays.stream(buildChannels).collect(toList()),
                 getDynamicFilteringMaxPerDriverValueCount(TEST_SESSION),
                 getDynamicFilteringMaxPerDriverSize(TEST_SESSION),
-                dataStructure,
+                dataType,
                 dfType,
                 nodeInfo, stateStoreProvider);
     }
@@ -209,7 +210,7 @@ public class TestDynamicFilterSourceOperator
     @Test
     public void testCollectMultipleOperators()
     {
-        DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, BIGINT, "0"));
+        DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, BIGINT, "0"));
 
         DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
         verifyPassthrough(op1,
@@ -237,11 +238,10 @@ public class TestDynamicFilterSourceOperator
 
     @Test
     public void testGlobalDynamicFilterSourceOperatorBloomFilter()
-            throws IOException
     {
         String filterId = "99";
         DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
-                (DynamicFilter.Type.GLOBAL, 0, channel(0, BIGINT, filterId));
+                (DynamicFilter.Type.GLOBAL, BLOOM_FILTER, channel(0, BIGINT, filterId));
 
         DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
 
@@ -252,29 +252,24 @@ public class TestDynamicFilterSourceOperator
                 new Page(createLongsBlock(3, 5)));
 
         String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, TEST_SESSION.getQueryId().toString());
-        String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, filterId, TEST_SESSION.getQueryId().toString());
-        String resultType = (String) ((StateMap) stateStoreProvider.getStateStore()
-                .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).get(typeKey);
         StateSet states = ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key));
         for (Object bfSerialized : states.getAll()) {
             BloomFilterDynamicFilter bfdf = new BloomFilterDynamicFilter(filterId, null, (byte[]) bfSerialized, DynamicFilter.Type.GLOBAL);
             assertEquals(bfdf.contains("101"), true);
             assertEquals(bfdf.getSize(), 6);
         }
-        assertEquals(resultType, DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL);
         assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
-                .createKey(DynamicFilterUtils.FINISHREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
+                .createKey(DynamicFilterUtils.FINISHPREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
         assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
                 .createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
     }
 
     @Test
     public void testGlobalDynamicFilterSourceOperatorBloomFilterSlice()
-            throws IOException
     {
         String filterId = "909";
         DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
-                (DynamicFilter.Type.GLOBAL, 0, channel(0, VARCHAR, filterId));
+                (DynamicFilter.Type.GLOBAL, BLOOM_FILTER, channel(0, VARCHAR, filterId));
 
         DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
 
@@ -285,9 +280,6 @@ public class TestDynamicFilterSourceOperator
                 new Page(createSlicesBlock(utf8Slice("test3"))));
 
         String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, TEST_SESSION.getQueryId().toString());
-        String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, filterId, TEST_SESSION.getQueryId().toString());
-        String resultType = (String) ((StateMap) stateStoreProvider.getStateStore()
-                .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).get(typeKey);
         StateSet states = ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key));
         for (Object bfSerialized : states.getAll()) {
             BloomFilterDynamicFilter bfdf = new BloomFilterDynamicFilter(filterId, null, (byte[]) bfSerialized, DynamicFilter.Type.GLOBAL);
@@ -295,20 +287,18 @@ public class TestDynamicFilterSourceOperator
             assertEquals(bfdf.getSize(), 3);
             assertEquals(bfdf.contains(value), true);
         }
-        assertEquals(resultType, DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL);
-        assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
-                .createKey(DynamicFilterUtils.FINISHREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
-        assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
-                .createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
+                .createKey(DynamicFilterUtils.FINISHPREFIX, filterId, TEST_SESSION.getQueryId().toString())).size(), 1);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
+                .createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, TEST_SESSION.getQueryId().toString())).size(), 1);
     }
 
     @Test
     public void testGlobalDynamicFilterSourceOperatorHashSet()
-            throws IOException
     {
         String filterId = "22";
         DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
-                (DynamicFilter.Type.GLOBAL, 1, channel(0, BIGINT, filterId));
+                (DynamicFilter.Type.GLOBAL, HASHSET, channel(0, BIGINT, filterId));
 
         DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
 
@@ -320,26 +310,23 @@ public class TestDynamicFilterSourceOperator
                 new Page(createLongsBlock(3, 5)));
 
         String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, TEST_SESSION.getQueryId().toString());
-        String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, filterId, TEST_SESSION.getQueryId().toString());
-        String resultType = (String) ((StateMap) stateStoreProvider.getStateStore()
-                .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).get(typeKey);
+
         StateSet states = ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key));
         for (Object bfSerialized : states.getAll()) {
             HashSetDynamicFilter bfdf = new HashSetDynamicFilter(filterId, null, (Set) bfSerialized, DynamicFilter.Type.GLOBAL);
             assertEquals(bfdf.contains(22L), true);
             assertEquals(bfdf.getSize(), 8);
         }
-        assertEquals(resultType, DynamicFilterUtils.HASHSETTYPEGLOBAL);
-        assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
-                .createKey(DynamicFilterUtils.FINISHREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
-        assertEquals(((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
-                .createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, TEST_SESSION.getQueryId().toString()))).size(), 1);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
+                .createKey(DynamicFilterUtils.FINISHPREFIX, filterId, TEST_SESSION.getQueryId().toString())).size(), 1);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils
+                .createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, TEST_SESSION.getQueryId().toString())).size(), 1);
     }
 
     @Test
     public void testCollectMultipleColumns()
     {
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, BOOLEAN, "0"), channel(1, DOUBLE, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, BOOLEAN, "0"), channel(1, DOUBLE, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BOOLEAN, DOUBLE),
                 new Page(createBooleansBlock(true, 2), createDoublesBlock(1.5, 3.0)),
@@ -355,7 +342,7 @@ public class TestDynamicFilterSourceOperator
     @Test
     public void testCollectOnlyFirstColumn()
     {
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, BOOLEAN, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, BOOLEAN, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BOOLEAN, DOUBLE),
                 new Page(createBooleansBlock(true, 2), createDoublesBlock(1.5, 3.0)),
@@ -370,7 +357,7 @@ public class TestDynamicFilterSourceOperator
     @Test
     public void testCollectOnlyLastColumn()
     {
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(1, DOUBLE, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(1, DOUBLE, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BOOLEAN, DOUBLE),
                 new Page(createBooleansBlock(true, 2), createDoublesBlock(1.5, 3.0)),
@@ -392,7 +379,7 @@ public class TestDynamicFilterSourceOperator
                 .writeInt(4)
                 .build();
 
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, INTEGER, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, INTEGER, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(INTEGER),
                 new Page(createLongsBlock(1, 2, 3)),
@@ -408,7 +395,7 @@ public class TestDynamicFilterSourceOperator
     @Test
     public void testCollectNoFilters()
     {
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0);
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER);
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BIGINT),
                 new Page(createLongsBlock(1, 2, 3)));
@@ -419,7 +406,7 @@ public class TestDynamicFilterSourceOperator
     @Test
     public void testCollectEmptyBuildSide()
     {
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, BIGINT, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, BIGINT, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BIGINT));
         operatorFactory.noMoreOperators();
@@ -432,7 +419,7 @@ public class TestDynamicFilterSourceOperator
         final int maxRowCount = getDynamicFilteringMaxPerDriverValueCount(pipelineContext.getSession());
         Page largePage = createSequencePage(ImmutableList.of(BIGINT), maxRowCount + 1);
 
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, BIGINT, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, BIGINT, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BIGINT),
                 largePage);
@@ -446,7 +433,7 @@ public class TestDynamicFilterSourceOperator
         final long maxByteSize = getDynamicFilteringMaxPerDriverSize(pipelineContext.getSession()).toBytes();
         Page largePage = new Page(createStringsBlock(repeat("A", (int) maxByteSize + 1)));
 
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, VARCHAR, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, VARCHAR, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(VARCHAR),
                 largePage);
@@ -461,7 +448,7 @@ public class TestDynamicFilterSourceOperator
         Page largePage = new Page(createStringsBlock(repeat("A", (int) (maxByteSize / 2) + 1)),
                 createStringsBlock(repeat("B", (int) (maxByteSize / 2) + 1)));
 
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, VARCHAR, "0"),
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, VARCHAR, "0"),
                 channel(1, VARCHAR, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(VARCHAR, VARCHAR),
@@ -477,7 +464,7 @@ public class TestDynamicFilterSourceOperator
         Page largePage = new Page(createLongRepeatBlock(7, maxRowCount * 10)); // lots of zeros
         Page nullsPage = new Page(createLongsBlock(Arrays.asList(new Long[maxRowCount * 10]))); // lots of nulls
 
-        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, 0, channel(0, BIGINT, "0"));
+        OperatorFactory operatorFactory = createOperatorFactory(DynamicFilter.Type.LOCAL, BLOOM_FILTER, channel(0, BIGINT, "0"));
         verifyPassthrough(createOperator((DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory) operatorFactory),
                 ImmutableList.of(BIGINT),
                 largePage, nullsPage);

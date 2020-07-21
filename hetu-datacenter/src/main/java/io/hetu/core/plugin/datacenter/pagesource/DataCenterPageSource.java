@@ -17,14 +17,14 @@ package io.hetu.core.plugin.datacenter.pagesource;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
-import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.client.DataCenterClientSession;
 import io.prestosql.client.DataCenterStatementClient;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import okhttp3.OkHttpClient;
 
 import java.io.IOException;

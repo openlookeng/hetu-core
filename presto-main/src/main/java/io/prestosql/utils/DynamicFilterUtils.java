@@ -14,24 +14,34 @@
  */
 package io.prestosql.utils;
 
+import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
+import io.prestosql.spi.dynamicfilter.DynamicFilter.Type;
+import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
+import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
+
+import java.util.List;
+
+import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
+import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.HASHSET;
+import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.LOCAL;
+
 /**
  * DynamicFilterUtils contains global Dynamic Filter configurations and helper functions
+ *
  * @since 2020-04-02
  */
 public class DynamicFilterUtils
 {
     public static final String REGISTERPREFIX = "register-";
     public static final String FILTERPREFIX = "filter-";
-    public static final String FINISHREFIX = "finish-";
+    public static final String FINISHPREFIX = "finish-";
     public static final String PARTIALPREFIX = "partial-";
     public static final String WORKERSPREFIX = "workers-";
     public static final String MERGEMAP = "merged";
-    public static final String TYPEPREFIX = "type-";
-    public static final String HASHSETTYPELOCAL = "HASHSETTYPELOCAL";
-    public static final String BLOOMFILTERTYPELOCAL = "BLOOMFILTERTYPELOCAL";
-    public static final String HASHSETTYPEGLOBAL = "HASHSETTYPEGLOBAL";
-    public static final String BLOOMFILTERTYPEGLOBAL = "BLOOMFILTERTYPEGLOBAL";
-    public static final String DFTYPEMAP = "dftypemap";
     public static final double BLOOM_FILTER_EXPECTED_FPP = 0.25F;
 
     private DynamicFilterUtils()
@@ -46,5 +56,38 @@ public class DynamicFilterUtils
     public static String createKey(String prefix, String filterKey, String queryId)
     {
         return prefix + filterKey + "-" + queryId;
+    }
+
+    /**
+     * Util function to find all FilterNodes in the same stage as the JoinNode
+     *
+     * @param node the current visiting JoinNode
+     * @return FilterNodes within the same stage and is above a TableScanNode
+     */
+    public static List<FilterNode> findFilterNodeInStage(JoinNode node)
+    {
+        List<FilterNode> filterNodes = PlanNodeSearcher
+                .searchFrom(node.getLeft())
+                .where(DynamicFilterUtils::isFilterAboveTableScan)
+                .findAll();
+        return filterNodes;
+    }
+
+    private static boolean isFilterAboveTableScan(PlanNode node)
+    {
+        if (node instanceof FilterNode) {
+            return ((FilterNode) node).getSource() instanceof TableScanNode;
+        }
+        return false;
+    }
+
+    public static DataType getDynamicFilterDataType(Type type, DynamicFilterDataType dataType)
+    {
+        if (type == LOCAL || dataType == DynamicFilterDataType.HASHSET) {
+            return HASHSET;
+        }
+        else {
+            return BLOOM_FILTER;
+        }
     }
 }
