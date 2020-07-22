@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import io.airlift.compress.lzo.LzoCodec;
 import io.airlift.compress.lzo.LzopCodec;
 import io.airlift.slice.Slices;
+import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.orc.OrcWriterOptions;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
 import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
@@ -50,6 +51,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -293,7 +295,15 @@ public class TestHiveFileFormats
         assertThatFileFormat(ORC)
                 .withColumns(TEST_COLUMNS)
                 .withRowsCount(rowCount)
-                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS));
+                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())));
     }
 
     @Test(dataProvider = "rowCount")
@@ -318,7 +328,15 @@ public class TestHiveFileFormats
                 .withSession(session)
                 .withFileWriterFactory(new OrcFileWriterFactory(HiveTestUtils.HDFS_ENVIRONMENT, HiveTestUtils.TYPE_MANAGER, new NodeVersion("test"), HIVE_STORAGE_TIME_ZONE, false, STATS, new OrcWriterOptions()))
                 .isReadableByRecordCursor(new GenericHiveRecordCursorProvider(HiveTestUtils.HDFS_ENVIRONMENT))
-                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS));
+                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())));
     }
 
     @Test(dataProvider = "rowCount")
@@ -332,7 +350,15 @@ public class TestHiveFileFormats
                 .withRowsCount(rowCount)
                 .withReadColumns(Lists.reverse(TEST_COLUMNS))
                 .withSession(session)
-                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(true), HiveTestUtils.HDFS_ENVIRONMENT, STATS));
+                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(true), HiveTestUtils.HDFS_ENVIRONMENT, STATS, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())));
     }
 
     @Test(dataProvider = "rowCount")
@@ -453,7 +479,15 @@ public class TestHiveFileFormats
         assertThatFileFormat(ORC)
                 .withWriteColumns(ImmutableList.of(writeColumn))
                 .withReadColumns(ImmutableList.of(readColumn))
-                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS));
+                .isReadableByPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())));
 
         assertThatFileFormat(PARQUET)
                 .withWriteColumns(ImmutableList.of(writeColumn))
@@ -501,7 +535,15 @@ public class TestHiveFileFormats
 
         assertThatFileFormat(ORC)
                 .withColumns(columns)
-                .isFailingForPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS), expectedErrorCode, expectedMessage);
+                .isFailingForPageSource(new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HiveTestUtils.HDFS_ENVIRONMENT, STATS, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())), expectedErrorCode, expectedMessage);
 
         assertThatFileFormat(PARQUET)
                 .withColumns(columns)

@@ -15,6 +15,7 @@ package io.prestosql.plugin.hive.benchmark;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.OutputStreamSliceOutput;
+import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.orc.OrcWriter;
 import io.prestosql.orc.OrcWriterOptions;
 import io.prestosql.orc.OrcWriterStats;
@@ -59,6 +60,7 @@ import org.joda.time.DateTimeZone;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -131,7 +133,15 @@ public enum FileFormat
         @Override
         public ConnectorPageSource createFileFormatReader(ConnectorSession session, HdfsEnvironment hdfsEnvironment, File targetFile, List<String> columnNames, List<Type> columnTypes)
         {
-            HivePageSourceFactory pageSourceFactory = new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), hdfsEnvironment, new FileFormatDataSourceStats());
+            HivePageSourceFactory pageSourceFactory = new OrcPageSourceFactory(HiveTestUtils.TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), hdfsEnvironment, new FileFormatDataSourceStats(), OrcCacheStore.builder().newCacheStore(
+                    new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                    new HiveConfig().getOrcStripeFooterCacheLimit(),
+                    Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                    new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                    new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                    Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                    new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                    new HiveConfig().isOrcCacheStatsMetricCollectionEnabled()));
             return createPageSource(pageSourceFactory, session, targetFile, columnNames, columnTypes, HiveStorageFormat.ORC);
         }
 
@@ -356,11 +366,11 @@ public enum FileFormat
         private final RecordFileWriter recordWriter;
 
         public RecordFormatWriter(File targetFile,
-                                  List<String> columnNames,
-                                  List<Type> columnTypes,
-                                  HiveCompressionCodec compressionCodec,
-                                  HiveStorageFormat format,
-                                  ConnectorSession session)
+                List<String> columnNames,
+                List<Type> columnTypes,
+                HiveCompressionCodec compressionCodec,
+                HiveStorageFormat format,
+                ConnectorSession session)
         {
             JobConf config = new JobConf(conf);
             configureCompression(config, compressionCodec);

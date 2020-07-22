@@ -175,7 +175,7 @@ public class HiveConfig
     private boolean s3SelectPushdownEnabled;
     private int s3SelectPushdownMaxConnections = 500;
 
-    private boolean isTemporaryStagingDirectoryEnabled = true;
+    private boolean temporaryStagingDirectoryEnabled = true;
     private String temporaryStagingDirectoryPath = "/tmp/presto-${USER}";
 
     private Duration fileStatusCacheExpireAfterWrite = new Duration(1, TimeUnit.MINUTES);
@@ -187,7 +187,9 @@ public class HiveConfig
 
     private boolean tableCreatesWithLocationAllowed = true;
 
-    private boolean isDynamicFilterPartitionFilteringEnabled;
+    private boolean dynamicFilterPartitionFilteringEnabled;
+
+    private boolean orcCacheStatsMetricCollectionEnabled;
 
     public int getMaxInitialSplits()
     {
@@ -1329,13 +1331,13 @@ public class HiveConfig
     @ConfigDescription("Should use (if possible) temporary staging directory for write operations")
     public HiveConfig setTemporaryStagingDirectoryEnabled(boolean temporaryStagingDirectoryEnabled)
     {
-        this.isTemporaryStagingDirectoryEnabled = temporaryStagingDirectoryEnabled;
+        this.temporaryStagingDirectoryEnabled = temporaryStagingDirectoryEnabled;
         return this;
     }
 
     public boolean isTemporaryStagingDirectoryEnabled()
     {
-        return isTemporaryStagingDirectoryEnabled;
+        return temporaryStagingDirectoryEnabled;
     }
 
     @Config("hive.temporary-staging-directory-path")
@@ -1609,14 +1611,27 @@ public class HiveConfig
 
     @Config("hive.dynamic-filter-partition-filtering")
     @ConfigDescription("Filter out hive splits early based on partition value using dynamic filter")
-    public HiveConfig setDynamicFilterPartitionFilteringEnabled(boolean isDynamicFilterPartitionFilteringEnabled)
+    public HiveConfig setDynamicFilterPartitionFilteringEnabled(boolean dynamicFilterPartitionFilteringEnabled)
     {
-        this.isDynamicFilterPartitionFilteringEnabled = isDynamicFilterPartitionFilteringEnabled;
+        this.dynamicFilterPartitionFilteringEnabled = dynamicFilterPartitionFilteringEnabled;
         return this;
     }
 
     public boolean isDynamicFilterPartitionFilteringEnabled()
     {
-        return isDynamicFilterPartitionFilteringEnabled;
+        return dynamicFilterPartitionFilteringEnabled;
+    }
+
+    public boolean isOrcCacheStatsMetricCollectionEnabled()
+    {
+        return orcCacheStatsMetricCollectionEnabled;
+    }
+
+    @Config("hive.orc-cache-stats-metric-collection.enabled")
+    @ConfigDescription("Whether orc cache stats metric collection is enabled")
+    public HiveConfig setOrcCacheStatsMetricCollectionEnabled(boolean orcCacheStatsMetricCollectionEnabled)
+    {
+        this.orcCacheStatsMetricCollectionEnabled = orcCacheStatsMetricCollectionEnabled;
+        return this;
     }
 }

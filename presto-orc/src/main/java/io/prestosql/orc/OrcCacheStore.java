@@ -46,10 +46,10 @@ public class OrcCacheStore
     }
 
     private OrcCacheStore(Cache<OrcDataSourceId, OrcFileTail> fileTailCache,
-                          Cache<OrcStripeFooterCacheKey, StripeFooter> stripeFooterCache,
-                          Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> rowIndexCache,
-                          Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> bloomFiltersCache,
-                          Cache<OrcRowDataCacheKey, Block> rowDataCache)
+            Cache<OrcStripeFooterCacheKey, StripeFooter> stripeFooterCache,
+            Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> rowIndexCache,
+            Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> bloomFiltersCache,
+            Cache<OrcRowDataCacheKey, Block> rowDataCache)
     {
         this.fileTailCache = fileTailCache;
         this.stripeFooterCache = stripeFooterCache;
@@ -96,63 +96,70 @@ public class OrcCacheStore
         }
 
         public OrcCacheStore newCacheStore(long fileTailMaximumSize, Duration fileTailTtl,
-                                           long stripeFooterMaximumSize, Duration stripeFooterTtl,
-                                           long rowIndexMaximumSize, Duration rowIndexTtl,
-                                           long bloomFiltersMaximumSize, Duration bloomFiltersTtl,
-                                           DataSize rowDataMaximumWeight, Duration rowDataTtl)
+                long stripeFooterMaximumSize, Duration stripeFooterTtl,
+                long rowIndexMaximumSize, Duration rowIndexTtl,
+                long bloomFiltersMaximumSize, Duration bloomFiltersTtl,
+                DataSize rowDataMaximumWeight, Duration rowDataTtl,
+                boolean isOrcCacheStatsMetricCollectionEnabled)
         {
             OrcCacheStore store = new OrcCacheStore();
-            store.fileTailCache = buildOrcFileTailCache(fileTailMaximumSize, fileTailTtl);
-            store.stripeFooterCache = buildOrcStripeFooterCache(stripeFooterMaximumSize, stripeFooterTtl);
-            store.rowIndexCache = buildOrcRowGroupIndexCache(rowIndexMaximumSize, rowIndexTtl);
-            store.bloomFiltersCache = buildOrcBloomFilterCache(bloomFiltersMaximumSize, bloomFiltersTtl);
-            store.rowDataCache = buildOrcRowDataCache(rowDataMaximumWeight, rowDataTtl);
+            store.fileTailCache = buildOrcFileTailCache(fileTailMaximumSize, fileTailTtl, isOrcCacheStatsMetricCollectionEnabled);
+            store.stripeFooterCache = buildOrcStripeFooterCache(stripeFooterMaximumSize, stripeFooterTtl, isOrcCacheStatsMetricCollectionEnabled);
+            store.rowIndexCache = buildOrcRowGroupIndexCache(rowIndexMaximumSize, rowIndexTtl, isOrcCacheStatsMetricCollectionEnabled);
+            store.bloomFiltersCache = buildOrcBloomFilterCache(bloomFiltersMaximumSize, bloomFiltersTtl, isOrcCacheStatsMetricCollectionEnabled);
+            store.rowDataCache = buildOrcRowDataCache(rowDataMaximumWeight, rowDataTtl, isOrcCacheStatsMetricCollectionEnabled);
             return store;
         }
 
-        private Cache<OrcDataSourceId, OrcFileTail> buildOrcFileTailCache(long maximumSize, Duration ttl)
+        private Cache<OrcDataSourceId, OrcFileTail> buildOrcFileTailCache(long maximumSize, Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
         {
-            return CacheBuilder.newBuilder()
-                    .maximumSize(maximumSize)
-                    .expireAfterAccess(ttl)
-                    .build();
+            CacheBuilder cacheBuilder = CacheBuilder.newBuilder().maximumSize(maximumSize).expireAfterAccess(ttl);
+            if (isOrcCacheStatsMetricCollectionEnabled) {
+                cacheBuilder.recordStats();
+            }
+            return cacheBuilder.build();
         }
 
-        private Cache<OrcStripeFooterCacheKey, StripeFooter> buildOrcStripeFooterCache(long maximumSize, Duration ttl)
+        private Cache<OrcStripeFooterCacheKey, StripeFooter> buildOrcStripeFooterCache(long maximumSize, Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
         {
-            return CacheBuilder.newBuilder()
-                    .maximumSize(maximumSize)
-                    .expireAfterAccess(ttl)
-                    .build();
+            CacheBuilder cacheBuilder = CacheBuilder.newBuilder().maximumSize(maximumSize).expireAfterAccess(ttl);
+            if (isOrcCacheStatsMetricCollectionEnabled) {
+                cacheBuilder.recordStats();
+            }
+            return cacheBuilder.build();
         }
 
         private Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> buildOrcRowGroupIndexCache(long maximumSize,
-                                                                                           Duration ttl)
+                Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
         {
-            return CacheBuilder.newBuilder()
-                    .maximumSize(maximumSize)
-                    .expireAfterAccess(ttl)
-                    .recordStats()
-                    .build();
+            CacheBuilder cacheBuilder = CacheBuilder.newBuilder().maximumSize(maximumSize).expireAfterAccess(ttl);
+            if (isOrcCacheStatsMetricCollectionEnabled) {
+                cacheBuilder.recordStats();
+            }
+            return cacheBuilder.build();
         }
 
         private Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> buildOrcBloomFilterCache(long maximumSize,
-                                                                                          Duration ttl)
+                Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
         {
-            return CacheBuilder.newBuilder()
-                    .maximumSize(maximumSize)
-                    .expireAfterAccess(ttl)
-                    .build();
+            CacheBuilder cacheBuilder = CacheBuilder.newBuilder().maximumSize(maximumSize).expireAfterAccess(ttl);
+            if (isOrcCacheStatsMetricCollectionEnabled) {
+                cacheBuilder.recordStats();
+            }
+            return cacheBuilder.build();
         }
 
-        private Cache<OrcRowDataCacheKey, Block> buildOrcRowDataCache(DataSize maximumWeight, Duration ttl)
+        private Cache<OrcRowDataCacheKey, Block> buildOrcRowDataCache(DataSize maximumWeight, Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
         {
-            return CacheBuilder.newBuilder()
+            CacheBuilder cacheBuilder = CacheBuilder.newBuilder()
                     .maximumWeight(maximumWeight.toBytes())
                     .weigher(
                             (Weigher<OrcRowDataCacheKey, Block>) (orcRowDataCacheKey, block) -> (int) block.getSizeInBytes())
-                    .expireAfterAccess(ttl)
-                    .build();
+                    .expireAfterAccess(ttl);
+            if (isOrcCacheStatsMetricCollectionEnabled) {
+                cacheBuilder.recordStats();
+            }
+            return cacheBuilder.build();
         }
     }
 }

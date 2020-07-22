@@ -132,7 +132,8 @@ public class TestHiveConfig
                 .setHiveTransactionHeartbeatThreads(5)
                 .setTableCreatesWithLocationAllowed(true)
                 .setTlsEnabled(false)
-                .setDynamicFilterPartitionFilteringEnabled(false));
+                .setDynamicFilterPartitionFilteringEnabled(false)
+                .setOrcCacheStatsMetricCollectionEnabled(false));
     }
 
     @Test
@@ -245,6 +246,7 @@ public class TestHiveConfig
                 .put("hive.transaction-heartbeat-threads", "10")
                 .put("hive.metastore.thrift.client.ssl.enabled", "true")
                 .put("hive.table-creates-with-location-allowed", "false")
+                .put("hive.orc-cache-stats-metric-collection.enabled", "true")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -343,7 +345,8 @@ public class TestHiveConfig
                 .setHiveTransactionHeartbeatThreads(10)
                 .setTableCreatesWithLocationAllowed(false)
                 .setTlsEnabled(true)
-                .setDynamicFilterPartitionFilteringEnabled(true);
+                .setDynamicFilterPartitionFilteringEnabled(true)
+                .setOrcCacheStatsMetricCollectionEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

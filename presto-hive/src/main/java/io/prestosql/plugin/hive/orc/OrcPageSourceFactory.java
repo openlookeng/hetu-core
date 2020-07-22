@@ -67,7 +67,6 @@ import javax.inject.Inject;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -128,21 +127,14 @@ public class OrcPageSourceFactory
     private final OrcCacheStore orcCacheStore;
 
     @Inject
-    public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats)
+    public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         requireNonNull(config, "config is null");
         this.useOrcColumnNames = config.isUseOrcColumnNames();
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
-        this.orcCacheStore = OrcCacheStore.builder().newCacheStore(
-                config.getOrcFileTailCacheLimit(), Duration.ofMillis(config.getOrcFileTailCacheTtl().toMillis()),
-                config.getOrcStripeFooterCacheLimit(),
-                Duration.ofMillis(config.getOrcStripeFooterCacheTtl().toMillis()),
-                config.getOrcRowIndexCacheLimit(), Duration.ofMillis(config.getOrcRowIndexCacheTtl().toMillis()),
-                config.getOrcBloomFiltersCacheLimit(),
-                Duration.ofMillis(config.getOrcBloomFiltersCacheTtl().toMillis()),
-                config.getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(config.getOrcRowDataCacheTtl().toMillis()));
+        this.orcCacheStore = orcCacheStore;
     }
 
     @Override
@@ -420,7 +412,8 @@ public class OrcPageSourceFactory
 
     interface FSDataInputStreamProvider
     {
-        FSDataInputStream provide() throws IOException;
+        FSDataInputStream provide()
+                throws IOException;
     }
 
     static class LazyFSInputStream
@@ -437,56 +430,64 @@ public class OrcPageSourceFactory
         }
 
         @Override
-        public int read(long position, byte[] buffer, int offset, int length) throws IOException
+        public int read(long position, byte[] buffer, int offset, int length)
+                throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.read(position, buffer, offset, length);
         }
 
         @Override
-        public void readFully(long position, byte[] buffer, int offset, int length) throws IOException
+        public void readFully(long position, byte[] buffer, int offset, int length)
+                throws IOException
         {
             ensureActualStream();
             fsDataInputStream.readFully(position, buffer, offset, length);
         }
 
         @Override
-        public void readFully(long position, byte[] buffer) throws IOException
+        public void readFully(long position, byte[] buffer)
+                throws IOException
         {
             ensureActualStream();
             fsDataInputStream.readFully(position, buffer);
         }
 
         @Override
-        public void seek(long pos) throws IOException
+        public void seek(long pos)
+                throws IOException
         {
             ensureActualStream();
             fsDataInputStream.seek(pos);
         }
 
         @Override
-        public long getPos() throws IOException
+        public long getPos()
+                throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.getPos();
         }
 
         @Override
-        public boolean seekToNewSource(long targetPos) throws IOException
+        public boolean seekToNewSource(long targetPos)
+                throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.seekToNewSource(targetPos);
         }
 
         @Override
-        public int read() throws IOException
+        public int read()
+                throws IOException
         {
             ensureActualStream();
             return fsDataInputStream.read();
         }
 
         @Override
-        public void close() throws IOException
+        public void close()
+                throws IOException
         {
             if (isStreamAvailable) {
                 fsDataInputStream.close();
@@ -494,7 +495,8 @@ public class OrcPageSourceFactory
             }
         }
 
-        private void ensureActualStream() throws IOException
+        private void ensureActualStream()
+                throws IOException
         {
             if (isStreamAvailable) {
                 return;
@@ -508,7 +510,8 @@ public class OrcPageSourceFactory
         }
     }
 
-    private static OrcFileTail createFileTail(OrcDataSource orcDataSource) throws IOException
+    private static OrcFileTail createFileTail(OrcDataSource orcDataSource)
+            throws IOException
     {
         return OrcFileTail.readFrom(orcDataSource, Optional.empty());
     }

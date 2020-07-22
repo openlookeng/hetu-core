@@ -22,6 +22,12 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.event.client.EventClient;
+import io.prestosql.orc.BloomFilterCacheStatsLister;
+import io.prestosql.orc.FileTailCacheStatsLister;
+import io.prestosql.orc.OrcCacheStore;
+import io.prestosql.orc.RowDataCacheStatsLister;
+import io.prestosql.orc.RowIndexCacheStatsLister;
+import io.prestosql.orc.StripeFooterCacheStatsLister;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
 import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
@@ -38,6 +44,7 @@ import io.prestosql.spi.connector.ConnectorSplitManager;
 
 import javax.inject.Singleton;
 
+import java.time.Duration;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -121,6 +128,17 @@ public class HiveModule
         binder.bind(IndexManager.class).in(Scopes.SINGLETON);
         binder.bind(CacheLoader.class).to(LocalIndexCacheLoader.class).in(Scopes.SINGLETON);
         binder.bind(IndexCache.class).to(LocalIndexCache.class).in(Scopes.SINGLETON);
+
+        binder.bind(FileTailCacheStatsLister.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(FileTailCacheStatsLister.class).withGeneratedName();
+        binder.bind(StripeFooterCacheStatsLister.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(StripeFooterCacheStatsLister.class).withGeneratedName();
+        binder.bind(RowIndexCacheStatsLister.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(RowIndexCacheStatsLister.class).withGeneratedName();
+        binder.bind(BloomFilterCacheStatsLister.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(BloomFilterCacheStatsLister.class).withGeneratedName();
+        binder.bind(RowDataCacheStatsLister.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(RowDataCacheStatsLister.class).withGeneratedName();
     }
 
     @ForHive
@@ -156,5 +174,20 @@ public class HiveModule
     public Function<HiveTransactionHandle, SemiTransactionalHiveMetastore> createMetastoreGetter(HiveTransactionManager transactionManager)
     {
         return transactionHandle -> ((HiveMetadata) transactionManager.get(transactionHandle)).getMetastore();
+    }
+
+    @Provides
+    @Singleton
+    public static OrcCacheStore getCacheStore(HiveConfig config)
+    {
+        return OrcCacheStore.builder().newCacheStore(
+                config.getOrcFileTailCacheLimit(), Duration.ofMillis(config.getOrcFileTailCacheTtl().toMillis()),
+                config.getOrcStripeFooterCacheLimit(),
+                Duration.ofMillis(config.getOrcStripeFooterCacheTtl().toMillis()),
+                config.getOrcRowIndexCacheLimit(), Duration.ofMillis(config.getOrcRowIndexCacheTtl().toMillis()),
+                config.getOrcBloomFiltersCacheLimit(),
+                Duration.ofMillis(config.getOrcBloomFiltersCacheTtl().toMillis()),
+                config.getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(config.getOrcRowDataCacheTtl().toMillis()),
+                config.isOrcCacheStatsMetricCollectionEnabled());
     }
 }
