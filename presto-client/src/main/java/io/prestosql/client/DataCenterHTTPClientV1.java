@@ -372,8 +372,13 @@ public class DataCenterHTTPClientV1
             return false;
         }
 
-        URI nextUri = currentStatusInfo().getNextUri();
-        if (nextUri == null) {
+        QueryStatusInfo queryStatusInfo = currentStatusInfo();
+        if (queryStatusInfo.getNextUri() == null) {
+            if (queryStatusInfo.getStats().getState().equals("FAILED")) {
+                state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
+                log.error("fetching next result failed.");
+                throw new RuntimeException("fetching next result failed.");
+            }
             state.compareAndSet(State.RUNNING, State.FINISHED);
             return false;
         }

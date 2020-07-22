@@ -278,19 +278,22 @@ public class PagePublisherQueryRunner
 
     public synchronized void add(String clientId, PageSubscriber subscriber)
     {
-        PageConsumer consumer = this.consumers.get(clientId);
-        if (consumer != null) {
-            if (this.query == null) {
-                this.executor.execute(this::start);
-            }
-            consumer.add(subscriber);
-        }
-        else if (this.error.get()) {
+        // if this query already failed, then return failed result.
+        if (this.error.get()) {
             subscriber.send(this.query, FAILED_RESULTS);
         }
         else {
-            // let client to close this split
-            subscriber.send(this.query, FINISHED_RESULTS);
+            PageConsumer consumer = this.consumers.get(clientId);
+            if (consumer != null) {
+                if (this.query == null) {
+                    this.executor.execute(this::start);
+                }
+                consumer.add(subscriber);
+            }
+            else {
+                // let client to close this split
+                subscriber.send(this.query, FINISHED_RESULTS);
+            }
         }
     }
 
