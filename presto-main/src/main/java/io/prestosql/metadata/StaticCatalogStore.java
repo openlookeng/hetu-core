@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.catalog.CatalogFilePath.getCatalogBasePath;
 import static io.prestosql.util.PropertiesUtil.loadProperties;
 
 public class StaticCatalogStore
@@ -64,6 +65,15 @@ public class StaticCatalogStore
         }
 
         for (File file : listFiles(catalogConfigurationDir)) {
+            if (file.isFile() && file.getName().endsWith(".properties")) {
+                loadCatalog(file);
+            }
+        }
+
+        // For dynamic catalog, we will put the catalog properties files in the dynamic directory.
+        // when setup, we need to load these files.
+        File dynamicCatalogsDir = getCatalogBasePath(catalogConfigurationDir.getPath()).toFile();
+        for (File file : listFiles(dynamicCatalogsDir)) {
             if (file.isFile() && file.getName().endsWith(".properties")) {
                 loadCatalog(file);
             }

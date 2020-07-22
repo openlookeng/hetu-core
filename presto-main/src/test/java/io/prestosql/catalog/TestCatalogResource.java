@@ -60,7 +60,7 @@ public class TestCatalogResource
         executeAddCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of());
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration. cause by No factory for connector \\[tpch1\\].  Available factories: \\[system, tpch\\]")
     public void testAddCatalogWithInvalidPropertiesFile()
             throws Exception
     {
@@ -110,7 +110,7 @@ public class TestCatalogResource
         assertTrue(executeUpdateCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration. cause by No factory for connector \\[tpch1\\].  Available factories: \\[system, tpch\\]")
     public void testUpdateCatalogWithInvalidPropertiesFile()
             throws Exception
     {
@@ -119,7 +119,7 @@ public class TestCatalogResource
         assertTrue(executeUpdateCatalogCall(catalogName, "tpch1", ImmutableMap.of(), ImmutableList.of(), ImmutableList.of()));
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration. cause by No factory for connector \\[hive-hadoop2\\].  Available factories: \\[system, tpch\\]")
     public void testAddHiveCatalogFail()
             throws Exception
     {

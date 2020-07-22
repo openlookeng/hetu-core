@@ -143,7 +143,7 @@ public class NodeScheduler
             ImmutableSetMultimap.Builder<NetworkLocation, InternalNode> workersByNetworkPath = ImmutableSetMultimap.builder();
 
             Set<InternalNode> nodes;
-            if (catalogName != null && !catalogName.getCatalogName().contains(".")) {
+            if (catalogName != null) {
                 nodes = nodeManager.getActiveConnectorNodes(catalogName);
             }
             else {

@@ -20,6 +20,8 @@ import io.prestosql.filesystem.FileSystemClientManager;
 
 import java.io.IOException;
 
+import static java.util.Objects.requireNonNull;
+
 public class CatalogStoreUtil
 {
     private static final String LOCAL_FS_CLIENT_CONFIG_NAME = "local-config-catalog";
@@ -32,7 +34,8 @@ public class CatalogStoreUtil
     @Inject
     private CatalogStoreUtil(FileSystemClientManager fileSystemClientManager, DynamicCatalogConfig dynamicCatalogConfig)
     {
-        this.fileSystemClientManager = fileSystemClientManager;
+        requireNonNull(dynamicCatalogConfig, "dynamicCatalogConfig is null");
+        this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClientManager is null");
         this.localConfigurationDir = dynamicCatalogConfig.getCatalogConfigurationDir();
         this.shareConfigurationDir = dynamicCatalogConfig.getCatalogShareConfigurationDir();
         this.maxCatalogFileSize = (int) dynamicCatalogConfig.getCatalogMaxFileSize().toBytes();

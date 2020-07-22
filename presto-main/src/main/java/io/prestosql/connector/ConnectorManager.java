@@ -429,6 +429,9 @@ public class ConnectorManager
         // automatically build connectorIds if not configured
         List<Catalog> catalogs = catalogManager.getCatalogs();
 
+        // add data center names to connectorIds, then NodeScheduler can schedule task to this node.
+        List<String> dataCenterNames = catalogConnectorStore.getDataCenterNames();
+
         // if this is a dedicated coordinator, only add jmx
         if (serverConfig.isCoordinator() && !schedulerConfig.isIncludeCoordinator()) {
             catalogs.stream()
@@ -442,11 +445,15 @@ public class ConnectorManager
                     .map(Catalog::getConnectorCatalogName)
                     .map(Object::toString)
                     .forEach(connectorIds::add);
+            dataCenterNames.stream()
+                    .forEach(connectorIds::add);
         }
 
         catalogs.stream()
                 .map(Catalog::getConnectorCatalogName)
                 .map(Object::toString)
+                .forEach(allConnectorIds::add);
+        dataCenterNames.stream()
                 .forEach(allConnectorIds::add);
 
         // build announcement with updated sources

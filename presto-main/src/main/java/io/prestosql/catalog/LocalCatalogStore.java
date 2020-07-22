@@ -47,6 +47,7 @@ public class LocalCatalogStore
                     Set<String> formatValue = new HashSet<>();
                     boolean replace = false;
                     for (String subValue : subValues) {
+                        subValue = subValue.trim();
                         if (catalogFileNames.contains(subValue)) {
                             subValue = Paths.get(catalogPath.getCatalogDirPath().toString(), subValue).toString();
                             replace = true;

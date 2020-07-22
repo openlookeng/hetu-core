@@ -43,6 +43,7 @@ import java.util.List;
 import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.CATALOG_FILE;
 import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.GLOBAL_FILE;
 import static io.prestosql.catalog.DynamicCatalogService.badRequest;
+import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 
@@ -57,7 +58,8 @@ public class CatalogResource
     @Inject
     public CatalogResource(DynamicCatalogService service, DynamicCatalogConfig config)
     {
-        this.service = service;
+        requireNonNull(config, "config is null");
+        this.service = requireNonNull(service, "service is null");
         catalogMaxFileSizeInBytes = (int) config.getCatalogMaxFileSize().toBytes();
     }
 
@@ -177,8 +179,8 @@ public class CatalogResource
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response showCatalogs()
+    public Response showCatalogs(@Context HttpServletRequest servletRequest)
     {
-        return service.showCatalogs();
+        return service.showCatalogs(new HttpRequestSessionContext(servletRequest));
     }
 }

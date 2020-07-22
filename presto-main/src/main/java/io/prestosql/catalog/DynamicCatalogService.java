@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
+import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.CONFLICT;
@@ -50,10 +51,10 @@ public class DynamicCatalogService
     @Inject
     public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl, CatalogStoreUtil catalogStoreUtil)
     {
-        this.catalogManager = catalogManager;
-        this.dynamicCatalogStore = dynamicCatalogStore;
-        this.accessControl = accessControl;
-        this.catalogStoreUtil = catalogStoreUtil;
+        this.catalogManager = requireNonNull(catalogManager, "catalogManager is null");
+        this.dynamicCatalogStore = requireNonNull(dynamicCatalogStore, "dynamicCatalogStore is null");
+        this.accessControl = requireNonNull(accessControl, "accessControl is null");
+        this.catalogStoreUtil = requireNonNull(catalogStoreUtil, "catalogStoreUtil is null");
     }
 
     public static WebApplicationException badRequest(Response.Status status, String message)
@@ -118,9 +119,7 @@ public class DynamicCatalogService
                 }
             }
             finally {
-                if (lock != null) {
-                    lock.unlock();
-                }
+                lock.unlock();
             }
         }
         catch (IOException ex) {
@@ -138,7 +137,7 @@ public class DynamicCatalogService
 
         // check the permission.
         try {
-            accessControl.checkCanDropCatalog(sessionContext.getIdentity(), catalogName);
+            accessControl.checkCanUpdateCatalog(sessionContext.getIdentity(), catalogName);
         }
         catch (Exception ex) {
             throw badRequest(UNAUTHORIZED, "No permission");
@@ -174,9 +173,7 @@ public class DynamicCatalogService
                 }
             }
             finally {
-                if (lock != null) {
-                    lock.unlock();
-                }
+                lock.unlock();
             }
         }
         catch (IOException ex) {
@@ -214,13 +211,9 @@ public class DynamicCatalogService
 
                 // delete from share file system.
                 dynamicCatalogStore.deleteCatalogShareFiles(shareCatalogStore, catalogName);
-                // release lock.
-                dynamicCatalogStore.releaseCatalogLock(shareCatalogStore, catalogName);
             }
             finally {
-                if (lock != null) {
-                    lock.unlock();
-                }
+                lock.unlock();
             }
         }
         catch (IOException ex) {
@@ -230,8 +223,16 @@ public class DynamicCatalogService
         return Response.status(NO_CONTENT).build();
     }
 
-    public Response showCatalogs()
+    public Response showCatalogs(HttpRequestSessionContext sessionContext)
     {
+        // check the permission.
+        try {
+            accessControl.checkCanAccessCatalogs(sessionContext.getIdentity());
+        }
+        catch (Exception ex) {
+            throw badRequest(UNAUTHORIZED, "No permission");
+        }
+
         try (CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
             Set<String> catalogNames = dynamicCatalogStore.listCatalogNames(shareCatalogStore);
             return Response.ok(catalogNames).build();

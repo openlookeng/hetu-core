@@ -89,4 +89,14 @@ public class DataCenterUtility
             }
         }
     }
+
+    public static boolean isDCCatalog(Metadata metadata, String catalogName)
+    {
+        MetadataManager metadataManager = (MetadataManager) metadata;
+        DataCenterConnectorManager dataCenterConnectorManager = metadataManager.getDataCenterConnectorManager();
+        if (dataCenterConnectorManager != null) {
+            return dataCenterConnectorManager.isDCCatalog(catalogName);
+        }
+        return false;
+    }
 }
