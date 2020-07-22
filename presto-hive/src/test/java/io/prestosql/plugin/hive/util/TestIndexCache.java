@@ -16,6 +16,7 @@ package io.prestosql.plugin.hive.util;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
 import io.prestosql.spi.HetuConstant;
@@ -30,6 +31,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.predicate.Range.range;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
@@ -38,17 +40,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
-public class TestLocalIndexCache
+public class TestIndexCache
 {
     private void setProperties()
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
         PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
         PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, 10L);
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, new Duration(10, TimeUnit.MINUTES));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(5000, TimeUnit.MILLISECONDS));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
     }
 
     @Test
-    public void testLocalIndexCacheGetIndices() throws Exception
+    public void testIndexCacheGetIndices() throws Exception
     {
         setProperties();
 
@@ -72,20 +77,20 @@ public class TestLocalIndexCache
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
 
-        LocalIndexCacheLoader localIndexCacheLoader = mock(LocalIndexCacheLoader.class);
-        when(localIndexCacheLoader.load(any())).thenReturn(expectedIndices);
-        LocalIndexCache localIndexCache = new LocalIndexCache(localIndexCacheLoader);
-        List<IndexMetadata> actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit,
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
+        IndexCache indexCache = new IndexCache(indexCacheLoader);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
-        Thread.sleep(LocalIndexCache.DEFAULT_LOAD_DELAY + 500);
-        actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+        Thread.sleep(5500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
         assertEquals(actualSplitIndex.size(), 1);
     }
 
     @Test
-    public void testLocalIndexCacheThrowsExecutionException() throws Exception
+    public void testIndexCacheThrowsExecutionException() throws Exception
     {
         setProperties();
 
@@ -109,16 +114,16 @@ public class TestLocalIndexCache
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
 
-        LocalIndexCacheLoader localIndexCacheLoader = mock(LocalIndexCacheLoader.class);
-        when(localIndexCacheLoader.load(any())).thenThrow(ExecutionException.class);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenThrow(ExecutionException.class);
 
         long loadDelay = 1000;
-        LocalIndexCache localIndexCache = new LocalIndexCache(localIndexCacheLoader, loadDelay);
-        List<IndexMetadata> actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit,
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
-        actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
     }
@@ -148,27 +153,27 @@ public class TestLocalIndexCache
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
 
-        LocalIndexCacheLoader localIndexCacheLoader = mock(LocalIndexCacheLoader.class);
-        when(localIndexCacheLoader.load(any())).thenReturn(expectedIndices);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
         long loadDelay = 1000;
-        LocalIndexCache localIndexCache = new LocalIndexCache(localIndexCacheLoader, loadDelay);
-        List<IndexMetadata> actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit,
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
-        actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
         assertEquals(actualSplitIndex.size(), 1);
 
         // now the index is in the cache, but changing the lastmodified date of the split should invalidate it
         when(testHiveSplit.getLastModifiedTime()).thenReturn(++testLastModifiedTime);
-        actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
     }
 
     @Test
-    public void testLocalIndexCacheIWIthPartitions() throws Exception
+    public void testIndexCacheIWIthPartitions() throws Exception
     {
         setProperties();
 
@@ -201,16 +206,16 @@ public class TestLocalIndexCache
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
 
-        LocalIndexCacheLoader localIndexCacheLoader = mock(LocalIndexCacheLoader.class);
-        when(localIndexCacheLoader.load(any())).thenReturn(expectedIndices);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
         long loadDelay = 1000;
-        LocalIndexCache localIndexCache = new LocalIndexCache(localIndexCacheLoader, loadDelay);
-        List<IndexMetadata> actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit,
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, partitionColumns);
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
-        actualSplitIndex = localIndexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 partitionColumns);
 
         assertEquals(actualSplitIndex.size(), 1);

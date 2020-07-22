@@ -30,7 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
-public class TestLocalIndexCacheLoader
+public class TestIndexCacheLoader
 {
     @BeforeTest
     private void setProperties()
@@ -43,63 +43,63 @@ public class TestLocalIndexCacheLoader
     public void testNoLastModifiedTime() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", 1);
 
         // throw exception to produce "no last modified time file found" behaviour
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenThrow(Exception.class);
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoMatchingLastModifiedTime() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", 1L);
 
         // return different last modified time to simulate expired index
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(2L);
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoValidIndexFilesFoundException() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         long lastModifiedTime = 1L;
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", lastModifiedTime);
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenThrow(Exception.class);
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoValidIndexFilesFound() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         long lastModifiedTime = 1L;
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", lastModifiedTime);
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenReturn(Collections.emptyList());
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test
     public void testIndexFound() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         List<IndexMetadata> expectedSplitIndexes = new LinkedList<>();
         expectedSplitIndexes.add(mock(IndexMetadata.class));
@@ -109,7 +109,7 @@ public class TestLocalIndexCacheLoader
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenReturn(expectedSplitIndexes);
 
-        List<IndexMetadata> actualSplitIndexes = localIndexCacheLoader.load(indexCacheKey);
+        List<IndexMetadata> actualSplitIndexes = indexCacheLoader.load(indexCacheKey);
         assertEquals(expectedSplitIndexes.size(), actualSplitIndexes.size());
     }
 }

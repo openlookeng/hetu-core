@@ -18,7 +18,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.metadata.Split;
@@ -35,32 +34,28 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-public class LocalIndexCache
+public class IndexCache
 {
-    private static final Logger LOG = Logger.get(LocalIndexCache.class);
-    private final int loadDelay = 5 * 1000; // ms
+    private static final Logger LOG = Logger.get(IndexCache.class);
+    private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Main-IndexCache-pool-%d").setDaemon(true).build();
 
-    private boolean loadAsync = true;
-    private static LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
+    private static ScheduledExecutorService executor;
 
-    private ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Main-LocalIndexCache-pool-%d").setDaemon(true).build();
-    private ScheduledExecutorService executor = Executors.newScheduledThreadPool(2, threadFactory);
+    private Long loadDelay; // in millisecond
+    private LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
 
-    public LocalIndexCache(CacheLoader loader)
+    public IndexCache(CacheLoader loader)
     {
-        this(loader, true);
-    }
-
-    public LocalIndexCache(CacheLoader loader, boolean loadAsync)
-    {
-        if (cache == null && PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
+        // If the static variables have not been initialized
+        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
+            loadDelay = PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY).toMillis();
+            int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
+            executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
             cache = CacheBuilder.newBuilder()
-                    .expireAfterWrite(10, TimeUnit.MINUTES)
+                    .expireAfterWrite(PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_TTL).toMillis(), TimeUnit.MILLISECONDS)
                     .maximumSize(PropertyService.getLongProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE))
                     .build(loader);
         }
-
-        this.loadAsync = loadAsync;
     }
 
     public List<IndexMetadata> getIndices(String table, String column, Split split)
@@ -77,35 +72,22 @@ public class LocalIndexCache
         //where the split has a wider range than the original splits used for index creation
         // check if cache contains the key
         List<IndexMetadata> indices;
-        if (loadAsync) {
-            // if cache didn't contain the key, it has not been loaded, load it asynchronously
-            indices = cache.getIfPresent(filterKey);
 
-            if (indices == null) {
-                executor.schedule(() -> {
-                    try {
-                        cache.get(filterKey);
-                        LOG.debug("Loaded index for %s.", filterKey);
-                    }
-                    catch (ExecutionException e) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Unable to load index for %s. %s", filterKey, e.getLocalizedMessage());
-                        }
-                    }
-                }, loadDelay, TimeUnit.MILLISECONDS);
-            }
-        }
-        else {
-            try {
-                indices = cache.get(filterKey);
-                LOG.debug("Loaded index for %s.", filterKey);
-            }
-            catch (UncheckedExecutionException | ExecutionException e) {
-                indices = null;
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Unable to load index for %s. %s", filterKey, e.getLocalizedMessage());
+        // if cache didn't contain the key, it has not been loaded, load it asynchronously
+        indices = cache.getIfPresent(filterKey);
+
+        if (indices == null) {
+            executor.schedule(() -> {
+                try {
+                    cache.get(filterKey);
+                    LOG.debug("Loaded index for %s.", filterKey);
                 }
-            }
+                catch (ExecutionException e) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug(e, "Unable to load index for %s. ", filterKey);
+                    }
+                }
+            }, loadDelay, TimeUnit.MILLISECONDS);
         }
 
         if (indices != null) {

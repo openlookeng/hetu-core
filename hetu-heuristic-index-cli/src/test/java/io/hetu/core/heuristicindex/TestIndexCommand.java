@@ -35,7 +35,6 @@ import java.nio.file.Paths;
 import java.util.Properties;
 
 import static io.hetu.core.heuristicindex.IndexCommandUtils.loadDataSourceProperties;
-import static io.hetu.core.heuristicindex.IndexCommandUtils.loadIndexProperties;
 import static io.hetu.core.heuristicindex.IndexCommandUtils.loadIndexStore;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -80,7 +79,6 @@ public class TestIndexCommand
 
             mockStatic(IndexCommandUtils.class);
             when(IndexCommandUtils.loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(IndexCommandUtils.loadIndexProperties(anyString())).thenReturn(new Properties());
             when(IndexCommandUtils.loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
 
             String[] args = {"--config=" + testFolder.getRoot().getAbsolutePath(), "--table=catalog.schema.table", "--column=column", "create"};
@@ -102,7 +100,6 @@ public class TestIndexCommand
 
             mockStatic(IndexCommandUtils.class);
             when(IndexCommandUtils.loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(IndexCommandUtils.loadIndexProperties(anyString())).thenReturn(new Properties());
             when(IndexCommandUtils.loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
             when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
 
@@ -126,7 +123,6 @@ public class TestIndexCommand
 
             mockStatic(IndexCommandUtils.class);
             when(IndexCommandUtils.loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(IndexCommandUtils.loadIndexProperties(anyString())).thenReturn(new Properties());
             when(IndexCommandUtils.loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
             when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
 
@@ -147,10 +143,12 @@ public class TestIndexCommand
         Path root = Paths.get("/tmp");
         dsProps.setProperty("connector.name", "empty");
 
+        Properties ixProps = new Properties();
+        ixProps.setProperty("bloom.fpp", "0.01");
+
         Properties config = new Properties();
         config.setProperty(IndexConstants.INDEXSTORE_URI_KEY, "/tmp");
         config.setProperty(IndexConstants.INDEXSTORE_FILESYSTEM_PROFILE_KEY, "test-fs-config");
-        config.setProperty(IndexConstants.INDEX_KEYS_PREFIX + "bloom.key", "value");
 
         try (TempFolder folder = new TempFolder()) {
             folder.create();
@@ -176,10 +174,9 @@ public class TestIndexCommand
             }
 
             Properties dsPropsRead = loadDataSourceProperties("test.random.stuff", folder.getRoot().getCanonicalPath());
-            Properties ixPropsRead = loadIndexProperties(folder.getRoot().getCanonicalPath());
             IndexCommandUtils.IndexStore is = loadIndexStore(folder.getRoot().getCanonicalPath());
 
-            assertNotNull(factory.getIndexWriter(dsPropsRead, ixPropsRead, is.getFs(), is.getRoot()));
+            assertNotNull(factory.getIndexWriter(dsPropsRead, ixProps, is.getFs(), is.getRoot()));
         }
     }
 

@@ -88,7 +88,7 @@ public class HeuristicIndexFactory
         for (Index index : indices) {
             LOG.debug("Using Index: {}", index);
             index.setProperties(IndexServiceUtils.getPropertiesSubset(
-                    indexProps, index.getId().toLowerCase(Locale.ENGLISH)));
+                    indexProps, index.getId().toLowerCase(Locale.ENGLISH) + "."));
         }
 
         return new HeuristicIndexWriter(dataSource, indices, fs, root);

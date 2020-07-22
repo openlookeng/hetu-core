@@ -12,10 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive.util;
+package io.prestosql.heuristicindex;
 
 import com.google.common.cache.CacheLoader;
-import com.google.inject.Inject;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
@@ -27,15 +26,14 @@ import java.util.stream.Collectors;
 import static java.util.Comparator.comparingLong;
 import static java.util.Objects.requireNonNull;
 
-public class LocalIndexCacheLoader
+public class IndexCacheLoader
         extends CacheLoader<IndexCacheKey, List<IndexMetadata>>
 {
     private static IndexClient indexClient;
 
-    @Inject
-    public LocalIndexCacheLoader(IndexClient indexClient)
+    public IndexCacheLoader(IndexClient client)
     {
-        LocalIndexCacheLoader.indexClient = indexClient;
+        IndexCacheLoader.indexClient = client;
     }
 
     @Override
@@ -53,7 +51,7 @@ public class LocalIndexCacheLoader
         }
         catch (Exception e) {
             // no lastModified file found, i.e. index doesn't exist
-            throw new Exception(String.format("No index file found for key %s.", key), e.getCause());
+            throw new Exception(String.format("No index file found for key %s.", key), e);
         }
 
         if (lastModified != key.getLastModifiedTime()) {
@@ -65,7 +63,7 @@ public class LocalIndexCacheLoader
             indices = indexClient.readSplitIndex(key.getPath(), key.getIndexTypes());
         }
         catch (Exception e) {
-            throw new Exception(String.format("No valid index file found for key %s. %s", key, e.getMessage()), e.getCause());
+            throw new Exception(String.format("No valid index file found for key %s.", key), e);
         }
 
         // lastModified file was valid, but no index files for the given types

@@ -42,7 +42,6 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -357,16 +356,11 @@ public final class SessionPropertyManager
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, hetuConfig.isFilterEnabled());
         if (hetuConfig.isFilterEnabled()) {
-            requireNonNull(hetuConfig.getMaxIndicesInCache(), String.format(Locale.ENGLISH,
-                    "%s is required when %s is true", HetuConstant.FILTER_MAX_INDICES_IN_CACHE, HetuConstant.FILTER_ENABLED));
             PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, hetuConfig.getMaxIndicesInCache());
-
-            requireNonNull(hetuConfig.getIndexStoreUri(), String.format(Locale.ENGLISH,
-                    "%s is required when %s is true", HetuConstant.INDEXSTORE_URI, HetuConstant.FILTER_ENABLED));
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, hetuConfig.getIndexCacheTTLMinutes());
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, hetuConfig.getIndexCacheLoadingDelay());
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, hetuConfig.getIndexCacheLoadingThreads());
             PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, hetuConfig.getIndexStoreUri());
-
-            requireNonNull(hetuConfig.getIndexStoreFileSystemProfile(), String.format(Locale.ENGLISH,
-                    "%s is required when %s is true", HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, HetuConstant.FILTER_ENABLED));
             PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, hetuConfig.getIndexStoreFileSystemProfile());
         }
     }

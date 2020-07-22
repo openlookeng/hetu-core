@@ -123,7 +123,7 @@ public class BloomIndex<T>
     {
         if (getProperties() != null) {
             String fppValue = getProperties().getProperty(FPP_KEY);
-            fpp = fppValue == null ? fpp : Double.valueOf(fppValue);
+            fpp = fppValue == null ? fpp : Double.parseDouble(fppValue);
         }
 
         return fpp;

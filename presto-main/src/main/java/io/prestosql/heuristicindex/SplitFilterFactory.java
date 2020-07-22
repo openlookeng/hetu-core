@@ -28,9 +28,9 @@ import static io.prestosql.utils.SplitUtils.getSplitKey;
 
 public class SplitFilterFactory
 {
-    public static LocalIndexCache indexCache;
+    public static IndexCache indexCache;
 
-    public SplitFilterFactory(LocalIndexCache indexCache)
+    public SplitFilterFactory(IndexCache indexCache)
     {
         SplitFilterFactory.indexCache = indexCache;
     }
@@ -38,7 +38,7 @@ public class SplitFilterFactory
     /**
      * <pre>
      * Retrieves the corresponding indices for the given predicate and splits.
-     * This method uses Cache to improve index loading performance, see {@link LocalIndexCache}
+     * This method uses Cache to improve index loading performance, see {@link IndexCache}
      * </pre>
      *
      * @param predicate Query predicate value
