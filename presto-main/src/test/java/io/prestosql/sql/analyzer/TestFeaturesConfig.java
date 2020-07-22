@@ -124,7 +124,8 @@ public class TestFeaturesConfig
                 .setPushLimitThroughSemiJoin(true)
                 .setPushLimitThroughUnion(true)
                 .setEnableExecutionPlanCache(true)
-                .setImplicitConversionEnabled(false));
+                .setImplicitConversionEnabled(false)
+                .setPushTableThroughSubquery(false));
     }
 
     @Test
@@ -206,6 +207,7 @@ public class TestFeaturesConfig
                 .put("dynamic-filtering-max-per-driver-size", "64kB")
                 .put("dynamic-filtering-bloom-filter-fpp", "0.001")
                 .put("implicit-conversion", "true")
+                .put("optimizer.push-table-through-subquery", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -238,6 +240,7 @@ public class TestFeaturesConfig
                 .setOptimizeMixedDistinctAggregations(true)
                 .setUnwrapCasts(false)
                 .setPushTableWriteThroughUnion(false)
+                .setPushTableThroughSubquery(true)
                 .setDictionaryAggregation(true)
                 .setPushAggregationThroughJoin(false)
                 .setRegexLibrary(RE2J)

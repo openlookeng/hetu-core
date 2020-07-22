@@ -143,6 +143,7 @@ public final class SystemSessionProperties
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
     public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
     public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
+    public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -643,6 +644,11 @@ public final class SystemSessionProperties
                         ENABLE_HEURISTICINDEX_FILTER,
                         "Enable heuristic index filter",
                         hetuConfig.isFilterEnabled(),
+                        false),
+                booleanProperty(
+                        PUSH_TABLE_THROUGH_SUBQUERY,
+                        "Allow pushing outer tables into subqueries if there is a join between the two",
+                        featuresConfig.isPushTableThroughSubquery(),
                         false));
     }
 
@@ -1135,5 +1141,10 @@ public final class SystemSessionProperties
     public static boolean isHeuristicIndexFilterEnabled(Session session)
     {
         return session.getSystemProperty(ENABLE_HEURISTICINDEX_FILTER, Boolean.class);
+    }
+
+    public static boolean shouldEnableTablePushdown(Session session)
+    {
+        return session.getSystemProperty(PUSH_TABLE_THROUGH_SUBQUERY, Boolean.class);
     }
 }

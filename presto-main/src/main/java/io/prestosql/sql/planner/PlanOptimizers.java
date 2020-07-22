@@ -121,6 +121,7 @@ import io.prestosql.sql.planner.iterative.rule.RewriteSpatialPartitioningAggrega
 import io.prestosql.sql.planner.iterative.rule.SimplifyCountOverConstant;
 import io.prestosql.sql.planner.iterative.rule.SimplifyExpressions;
 import io.prestosql.sql.planner.iterative.rule.SingleDistinctAggregationToGroupBy;
+import io.prestosql.sql.planner.iterative.rule.TablePushdown;
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedInPredicateToJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedLateralJoinToJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedScalarAggregationToJoin;
@@ -489,6 +490,11 @@ public class PlanOptimizers
                         statsCalculator,
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())),
+                new IterativeOptimizer(
+                        ruleStats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new TablePushdown(metadata))), //Added in Presto for improving query latency
 
                 // Because ReorderJoins runs only once,
                 // PredicatePushDown, PruneUnreferenedOutputpus and RemoveRedundantIdentityProjections
