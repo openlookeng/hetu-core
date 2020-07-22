@@ -39,7 +39,7 @@
     <scala.binary.version>2.11</scala.binary.version>
     <hadoop.version>3.2.0</hadoop.version>
     <spark.version>2.4.5</spark.version>
-    <version.jackson>2.9.8</version.jackson>
+    <version.jackson>2.11.1</version.jackson>
     <version.maven-dependency-plugin>3.1.1</version.maven-dependency-plugin>
     <version.duplicate-finder-maven-plugin>1.2.1</version.duplicate-finder-maven-plugin>
     <air.test.thread-count>1</air.test.thread-count>
