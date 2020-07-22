@@ -63,7 +63,7 @@ security.refresh-period=1s
 
 **注意**
 
-默认情况下，所有用户都可以访问`system`目录。您可以通过添加规则来改变此行为。
+*默认情况下，所有用户都可以访问`system`目录。您可以通过添加规则来改变此行为。*
 
 
 例如，如果希望仅允许`admin`用户访问`mysql`和`system`目录，允许所有用户访问`hive`目录，拒绝其他用户访问，则可以定义以下规则：
@@ -102,7 +102,7 @@ security.refresh-period=1s
 
 **注意**
 
-一条主体规则中至少要指定一个条件。如果在主体规则中指定了两个条件，当满足其中一个条件时，主体规则将返回期望的结论。
+*一条主体规则中至少要指定一个条件。如果在主体规则中指定了两个条件，当满足其中一个条件时，主体规则将返回期望的结论。*
 
 以下实现LDAP认证和Kerberos认证的主体完整名称的精确匹配：
 
@@ -112,7 +112,7 @@ security.refresh-period=1s
     {
       "allow": true
     }
-  ]，
+  ],
   "principals": [
     {
       "principal": "(.*)",
@@ -136,7 +136,7 @@ security.refresh-period=1s
     {
       "allow": true
     }
-  ]，
+  ],
   "principals": [
     {
       "principal": "([^/]+)/?.*@example.net",

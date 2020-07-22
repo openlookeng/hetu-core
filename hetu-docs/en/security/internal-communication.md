@@ -44,7 +44,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
         node.internal-address=<node fqdn>
         ```
     
-3.  Generate a Java Keystore File. Every openLooKeng node must be able to connect to any other node within the same cluster. It is possible to create unique certificates for every node using the fully-qualified hostname of each host, create a keystore that contains all the public keys for all of the hosts, and specify it for the client (see step \#8 below). In most cases it will be simpler to use a wildcard in the certificate as shown below.
+3.  Generate a Java Keystore File. Every openLooKeng node must be able to connect to any other node within the same cluster. It is possible to create unique certificates for every node using the fully-qualified hostname of each host, create a keystore that contains all the public keys for all of the hosts, and specify it for the client (see step [8](#step08) below). In most cases it will be simpler to use a wildcard in the certificate as shown below.
     
     > ``` shell
     > keytool -genkeypair -alias openLooKeng -keyalg RSA -keystore keystore.jks
@@ -92,7 +92,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
     > internal-communication.https.required=true
     > ```
 
-8.  Configure the internal communication to use the Java keystore file.
+8.  <a name = "step08"></a>Configure the internal communication to use the Java keystore file.
 
     > ``` properties
     > internal-communication.https.keystore.path=<keystore path>

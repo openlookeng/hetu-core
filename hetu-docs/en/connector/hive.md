@@ -455,9 +455,9 @@ Vacuum operation translates to `compaction` in Hive. In Hive there are two types
 
 Following are mapping between VACUUM and Hive compactions.
 
-* VACUUM FULL' translates to Major compaction.
+* `VACUUM FULL` translates to Major compaction.
 
-* VACUUM' translates to Minor compaction.
+* `VACUUM` translates to Minor compaction.
 
 #### VACUUM 
 

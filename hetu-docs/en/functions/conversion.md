@@ -135,7 +135,7 @@ Obviously, not all data types are compatible with each other, below table lists 
 
 (13): VARCHAR-\>TIMESTAMP The VARCHAR can only be formatted like:YYYY-MM-DD HH:MM:SS.XXX
 
-(14): DATE-\>TIMESTAMP will auto padding the time with 0. e.g.\'2010-01-01\' -》 2010-01-01 00:00:00.000
+(14): DATE-\>TIMESTAMP will auto padding the time with 0. e.g.\'2010-01-01\' -> 2010-01-01 00:00:00.000
 
 (15): TIME-\>TIME WITH TIME ZONE will auto padding the default time zone
 

@@ -39,7 +39,7 @@ openLooKeng集群可以通过配置使用安全通信。  可使用SSL/TLS确保
         node.internal-address=<node fqdn>
         ```
     
-3.  生成Java 密钥库文件。每个openLooKeng节点必须能够连接到同一集群中的任何其他节点。可以使用每台主机的完全限定主机名为每个节点创建唯一的证书，创建包含所有主机的所有公钥的密钥库，并为客户端指定密钥库（见下面的步骤\#8）。在大多数情况下，在证书中使用通配符会更简单，如下所示。
+3.  生成Java 密钥库文件。每个openLooKeng节点必须能够连接到同一集群中的任何其他节点。可以使用每台主机的完全限定主机名为每个节点创建唯一的证书，创建包含所有主机的所有公钥的密钥库，并为客户端指定密钥库（见下面的步骤[8](#step08)）。在大多数情况下，在证书中使用通配符会更简单，如下所示。
     
     > ``` shell
     > keytool -genkeypair -alias openLooKeng -keyalg RSA -keystore keystore.jks
@@ -87,7 +87,7 @@ openLooKeng集群可以通过配置使用安全通信。  可使用SSL/TLS确保
     > internal-communication.https.required=true
     > ```
 
-8.  配置内部通信使用Java密钥库文件。
+8.  <a name = "step08"></a>配置内部通信使用Java密钥库文件。
 
     > ``` properties
     > internal-communication.https.keystore.path=<keystore path>

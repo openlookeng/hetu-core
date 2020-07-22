@@ -156,7 +156,7 @@ $ klist
 
 ### Java Keystore File Verification
 
-Verify the password for a keystore file and view its contents using Java Keystore File Verification.
+Verify the password for a keystore file and view its contents using [Java Keystore File Verification](tls.md#java-keystore-file-verification).
 
 ### Additional Kerberos Debugging Information
 

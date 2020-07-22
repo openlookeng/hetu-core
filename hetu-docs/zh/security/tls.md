@@ -50,9 +50,9 @@ $ keytool -import -v -trustcacerts -alias openlookeng_trust -file openlookeng_ce
 异常处理
 ---------------
 
-### Java Keystore File Verification
+### Java密钥库文件验证
 
-使用[keytool](http://docs.oracle.com/javase/8/docs/technotes/tools/windows/keytool.html )验证keystore文件的密码，并查看其内容。
+验证密钥库文件的密码，并使用[keytool](http://docs.oracle.com/javase/8/docs/technotes/tools/windows/keytool.html)查看其内容。
 
 ``` shell
 $ keytool -list -v -keystore /etc/openlookeng/openlookeng.jks
