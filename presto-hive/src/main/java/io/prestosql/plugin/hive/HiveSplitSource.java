@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slices;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.prestosql.plugin.hive.util.AsyncQueue;
@@ -30,9 +29,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.type.AbstractVariableWidthType;
-import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 
 import java.io.FileNotFoundException;
@@ -69,8 +67,6 @@ import static io.prestosql.plugin.hive.HiveSplitSource.StateKind.INITIAL;
 import static io.prestosql.plugin.hive.HiveSplitSource.StateKind.NO_MORE_SPLITS;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
@@ -104,6 +100,8 @@ class HiveSplitSource
     private final Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates;
     private final boolean isSplitFilteringEnabled;
 
+    private final HiveConfig hiveConfig;
+
     private final TypeManager typeManager;
 
     private HiveSplitSource(
@@ -118,7 +116,8 @@ class HiveSplitSource
             CounterStat highMemorySplitSourceCounter,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachedPredicates,
-            TypeManager typeManager)
+            TypeManager typeManager,
+            HiveConfig hiveConfig)
     {
         requireNonNull(session, "session is null");
         this.queryId = session.getQueryId();
@@ -138,6 +137,7 @@ class HiveSplitSource
         this.isSplitFilteringEnabled = isDynamicFilteringSplitFilteringEnabled(session);
         this.userDefinedCachePredicates = userDefinedCachedPredicates;
         this.typeManager = typeManager;
+        this.hiveConfig = hiveConfig;
     }
 
     public static HiveSplitSource allAtOnce(
@@ -153,7 +153,8 @@ class HiveSplitSource
             CounterStat highMemorySplitSourceCounter,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
-            TypeManager typeManager)
+            TypeManager typeManager,
+            HiveConfig hiveConfig)
     {
         AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
@@ -198,7 +199,8 @@ class HiveSplitSource
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,
-                typeManager);
+                typeManager,
+                hiveConfig);
     }
 
     public static HiveSplitSource bucketed(
@@ -214,7 +216,8 @@ class HiveSplitSource
             CounterStat highMemorySplitSourceCounter,
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
-            TypeManager typeManager)
+            TypeManager typeManager,
+            HiveConfig hiveConfig)
     {
         AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
@@ -279,7 +282,8 @@ class HiveSplitSource
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,
-                typeManager);
+                typeManager,
+                hiveConfig);
     }
 
     /**
@@ -467,7 +471,7 @@ class HiveSplitSource
      *
      * @param partitionKeys list of partition key
      * @return true If any of the partition key matches the user defined cache predicates
-     *         false otherwise
+     * false otherwise
      */
     private boolean matchesUserDefinedCachedPredicates(List<HivePartitionKey> partitionKeys)
     {
@@ -485,7 +489,7 @@ class HiveSplitSource
      * determine whether or not that split should be cached.
      *
      * @return true if partition key matches the user defined cache predicates
-     *         false otherwise
+     * false otherwise
      */
     private boolean matchesUserDefinedCachePredicate(HivePartitionKey partitionKey)
     {
@@ -500,7 +504,14 @@ class HiveSplitSource
                     columnMetadataTupleDomain -> columnMetadataTupleDomain.getDomains().get().forEach(
                             (columnMetadata, domain) -> {
                                 if (columnMetadata.getName().equalsIgnoreCase(partitionName)) {
-                                    boolean includesValue = domain.includesNullableValue(getValueAsType(columnMetadata.getType(), partitionStringValue));
+                                    NullableValue nullableValue = null;
+                                    if (partitionStringValue.equals("\\N")) {
+                                        nullableValue = NullableValue.asNull(columnMetadata.getType());
+                                    }
+                                    else {
+                                        nullableValue = HiveUtil.parsePartitionValue(partitionName, partitionStringValue, columnMetadata.getType(), hiveConfig.getDateTimeZone());
+                                    }
+                                    boolean includesValue = domain.includesNullableValue(nullableValue.getValue());
                                     matches.addAndGet(includesValue ? 1 : 0);
                                 }
                             }));
@@ -509,39 +520,6 @@ class HiveSplitSource
         catch (Exception ex) {
             log.warn(ex, "Unable to match partition key %s with cached predicates. Ignoring this partition key. Error = %s", partitionKey, ex.getMessage());
             return false;
-        }
-    }
-
-    private Object getValueAsType(Type type, String value)
-    {
-        // partition value of  "__HIVE_DEFAULT_PARTITION__" or "\N" is returned as null.
-        if (HivePartitionKey.HIVE_DEFAULT_DYNAMIC_PARTITION.equals(value) || "\\N".equals(value)) {
-            return null;
-        }
-
-        Class<?> javaType = type.getJavaType();
-        if (javaType == boolean.class) {
-            return Boolean.valueOf(value);
-        }
-        else if (javaType == long.class) {
-            if (type.equals(BIGINT)) {
-                return Long.valueOf(value);
-            }
-            else if (type.equals(INTEGER)) {
-                return Long.valueOf(value);
-            }
-            else {
-                throw new PrestoException(HiveErrorCode.HIVE_UNKNOWN_ERROR,
-                        "Unhandled type for " + javaType.getSimpleName() + ":" + type.getTypeSignature());
-            }
-        }
-        else if (type instanceof AbstractVariableWidthType) {
-            // Date falls into this category
-            return Slices.utf8Slice(value);
-        }
-        else {
-            throw new PrestoException(HiveErrorCode.HIVE_UNKNOWN_ERROR,
-                    "Unhandled type for " + javaType.getSimpleName() + ":" + type.getTypeSignature());
         }
     }
 

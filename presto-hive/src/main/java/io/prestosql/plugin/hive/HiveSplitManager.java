@@ -96,6 +96,7 @@ public class HiveSplitManager
     private final boolean recursiveDfsWalkerEnabled;
     private final CounterStat highMemorySplitSourceCounter;
     private final TypeManager typeManager;
+    private final HiveConfig hiveConfig;
 
     @Inject
     public HiveSplitManager(
@@ -127,7 +128,8 @@ public class HiveSplitManager
                 hiveConfig.getSplitLoaderConcurrency(),
                 hiveConfig.getMaxSplitsPerSecond(),
                 hiveConfig.getRecursiveDirWalkerEnabled(),
-                typeManager);
+                typeManager,
+                hiveConfig);
     }
 
     public HiveSplitManager(
@@ -147,7 +149,8 @@ public class HiveSplitManager
             int splitLoaderConcurrency,
             @Nullable Integer maxSplitsPerSecond,
             boolean recursiveDfsWalkerEnabled,
-            TypeManager typeManager)
+            TypeManager typeManager,
+            HiveConfig hiveConfig)
     {
         this.metastoreProvider = requireNonNull(metastoreProvider, "metastore is null");
         this.partitionManager = requireNonNull(partitionManager, "partitionManager is null");
@@ -167,6 +170,7 @@ public class HiveSplitManager
         this.maxSplitsPerSecond = firstNonNull(maxSplitsPerSecond, Integer.MAX_VALUE);
         this.recursiveDfsWalkerEnabled = recursiveDfsWalkerEnabled;
         this.typeManager = typeManager;
+        this.hiveConfig = hiveConfig;
     }
 
     @Override
@@ -260,7 +264,8 @@ public class HiveSplitManager
                         new CounterStat(),
                         dynamicFilterSupplier,
                         userDefinedCachePredicates,
-                        typeManager);
+                        typeManager,
+                        hiveConfig);
                 break;
             case GROUPED_SCHEDULING:
                 splitSource = HiveSplitSource.bucketed(
@@ -276,7 +281,8 @@ public class HiveSplitManager
                         new CounterStat(),
                         dynamicFilterSupplier,
                         userDefinedCachePredicates,
-                        typeManager);
+                        typeManager,
+                        hiveConfig);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown splitSchedulingStrategy: " + splitSchedulingStrategy);
