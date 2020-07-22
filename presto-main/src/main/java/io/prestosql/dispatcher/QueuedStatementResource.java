@@ -444,7 +444,7 @@ public class QueuedStatementResource
                     executionFailureInfo.getSemanticErrorCode().map(SemanticErrorCode::name),
                     errorCode.getType().toString(),
                     executionFailureInfo.getErrorLocation(),
-                    executionFailureInfo.toFailureInfo());
+                    executionFailureInfo.toFailureInfoWithoutStack());
         }
     }
 }
