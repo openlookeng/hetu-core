@@ -115,26 +115,28 @@ public class TableCacheInfo
     }
 
     @JsonIgnore
-    public String showCacheResult()
+    public String showPredicates()
     {
-        StringBuilder showCacheResult = new StringBuilder();
-        showCacheResult.append("Cached Predicates:").append(System.lineSeparator());
-        this.predicates.forEach(cachedPredicate -> showCacheResult.append(cachedPredicate.getCachePredicateString()).append(System.lineSeparator()));
-        showCacheResult.append(System.lineSeparator());
+        StringBuilder predicatesToShow = new StringBuilder();
+        this.predicates.forEach(cachePredicate -> predicatesToShow.append(cachePredicate.getCachePredicateString()).append(System.lineSeparator()));
+        predicatesToShow.append(System.lineSeparator());
+        return predicatesToShow.toString();
+    }
+
+    @JsonIgnore
+    public String showNodes()
+    {
+        StringBuilder nodesToShow = new StringBuilder();
         Set<String> cachedNodes = ImmutableSet.copyOf(this.splitWorkersMap.values());
         if (cachedNodes.isEmpty()) {
-            showCacheResult.append("Cached Nodes:").append(System.lineSeparator());
-            showCacheResult.append("Nothing cached yet");
-            showCacheResult.append(System.lineSeparator());
+            nodesToShow.append("Nothing cached yet").append(System.lineSeparator());
         }
         else {
-            showCacheResult.append("Cached Nodes:");
             cachedNodes.forEach(nodeId -> {
-                showCacheResult.append(System.lineSeparator());
-                showCacheResult.append("Node Id: ").append(nodeId).append(System.lineSeparator());
+                nodesToShow.append(nodeId).append(System.lineSeparator());
             });
         }
-        return showCacheResult.toString();
+        return nodesToShow.toString();
     }
 
     @Override

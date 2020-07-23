@@ -98,7 +98,8 @@ public class TestSplitCacheMap
     private final SplitKey table2SplitKey1 = new SplitKey(table2Split1, catalogName.getCatalogName(), table2Schema, table2Name);
 
     @BeforeTest
-    public void setUp() throws SecurityException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException
+    public void setUp()
+            throws SecurityException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException
     {
         PropertyService.setProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED, true);
         mapper = new ObjectMapperProvider().get()
@@ -165,17 +166,17 @@ public class TestSplitCacheMap
 
         assertTrue(splitCacheMap.showCache("a.b.c").isEmpty());
 
-        Map<String, String> showCacheResult = splitCacheMap.showCache(table1QN.toString());
+        Map<String, TableCacheInfo> showCacheResult = splitCacheMap.showCache(table1QN.toString());
         assertEquals(showCacheResult.size(), 1);
         assertTrue(showCacheResult.containsKey(table1QN.toString()));
-        assertTrue(showCacheResult.get(table1QN.toString()).contains(workerNode.getNodeIdentifier()));
+        assertTrue(showCacheResult.get(table1QN.toString()).showNodes().contains(workerNode.getNodeIdentifier()));
 
         splitCacheMap.addCache(table2QN, tupleDomainA, tupleDomainAPredicateString);
         splitCacheMap.addCachedNode(table2SplitKey1, workerNode2.getNodeIdentifier());
         showCacheResult = splitCacheMap.showCache();
         assertEquals(showCacheResult.size(), 2);
         assertTrue(showCacheResult.containsKey(table2QN.toString()));
-        assertTrue(showCacheResult.get(table2QN.toString()).contains(workerNode2.getNodeIdentifier()));
+        assertTrue(showCacheResult.get(table2QN.toString()).showNodes().contains(workerNode2.getNodeIdentifier()));
     }
 
     @Test
@@ -226,7 +227,8 @@ public class TestSplitCacheMap
     }
 
     @Test
-    public void testSerde() throws IOException
+    public void testSerde()
+            throws IOException
     {
         TableCacheInfo table1CacheInfo = new TableCacheInfo(table1QN.toString());
         table1CacheInfo.addCachedPredicate(new CachePredicate(tupleDomainA, tupleDomainAPredicateString));
