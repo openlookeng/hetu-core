@@ -60,6 +60,7 @@ import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -604,6 +605,205 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate(getSession(), "DROP TABLE test_orc_transactional_table");
 
         assertFalse(getQueryRunner().tableExists(getSession(), "test_orc_transactional_table"));
+    }
+
+    @Test
+    public void testVacuum()
+    {
+        String table = "tab1";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                        schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 3);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+
+        assertFilesAfterCleanup(tablePath, 1);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testFullVacuum1()
+    {
+        String table = "tab2";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 3);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+
+        assertFilesAfterCleanup(tablePath, 1);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testFullVacuum2()
+    {
+        String table = "tab3";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 3);
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 3);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+
+        assertFilesAfterCleanup(tablePath, 1);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testVacuumOnDeleteDelta()
+    {
+        String table = "tab4";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+        assertUpdate(String.format("UPDATE %s.%s SET b = -1 WHERE a > 2", schema, table), 2);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 7);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+        assertFilesAfterCleanup(tablePath, 2);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 3);
+
+        assertFilesAfterCleanup(tablePath, 1);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testVacuumOnPartitionedTable1()
+    {
+        String table = "tab5";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        String partitionedColumn = "b";
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc', partitioned_by=Array['%s'])",
+                schema, table, partitionedColumn));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2, 2)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 4);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = (String) tableMetadata.getMetadata().getProperties().get("location");
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1", "2"), 1);
+
+        assertUpdate(String.format("UPDATE %s.%s SET a = -1 WHERE a = 2", schema, table), 2);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 8);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1", "2"), 2);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 4);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1", "2"), 1);
+
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testVacuumOnPartitionedTable2()
+    {
+        String table = "tab6";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        String partitionedColumn = "b";
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc', partitioned_by=Array['%s'])",
+                schema, table, partitionedColumn));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2, 2)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s PARTITION '%s=1' AND WAIT", schema, table, partitionedColumn), 2);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = (String) tableMetadata.getMetadata().getProperties().get("location");
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1"), 1);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("2"), 2);
+    }
+
+    private void assertFilesAfterCleanupOnPartitionTable(String tablePath, String partitionedColumn, ImmutableList<String> partitionValue, int expectedNumberOfDirectories)
+    {
+        partitionValue.forEach(value -> {
+            String partitionPath = tablePath + "/" + partitionedColumn + "=" + value;
+            assertFilesAfterCleanup(partitionPath, expectedNumberOfDirectories);
+        });
+    }
+
+    private void assertFilesAfterCleanup(String tablePath, int expectedNumberOfDirectories)
+    {
+        int loopNumber = 50;
+        if (tablePath.startsWith("file:")) {
+            tablePath = tablePath.replace("file:", "");
+        }
+        String[] otherDirectories;
+        do {
+            try {
+                Thread.sleep(100);
+            }
+            catch (InterruptedException e) {
+                // Ignore
+            }
+            otherDirectories = new File(tablePath).list(new FilenameFilter() {
+                @Override
+                public boolean accept(File file, String s)
+                {
+                    // Ignore hidden directories
+                    return !s.startsWith(".");
+                }
+            });
+            try {
+                assertEquals(otherDirectories.length, expectedNumberOfDirectories);
+                break;
+            }
+            catch (AssertionError e) {
+                // Ignore
+            }
+        } while (loopNumber-- > 0);
+
+        if (loopNumber < 1) {
+            assertEquals(otherDirectories.length, expectedNumberOfDirectories,
+                    String.format("Unexpected directories on path %s", tablePath));
+        }
     }
 
     @Test

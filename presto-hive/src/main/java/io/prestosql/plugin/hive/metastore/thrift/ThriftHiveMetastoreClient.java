@@ -49,6 +49,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
@@ -491,6 +493,13 @@ public class ThriftHiveMetastoreClient
                 currentTransactionId,
                 client.get_valid_write_ids(request).getTblValidWriteIds())
                 .toString();
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+            throws TException
+    {
+        return client.show_locks(rqst);
     }
 
     @Override

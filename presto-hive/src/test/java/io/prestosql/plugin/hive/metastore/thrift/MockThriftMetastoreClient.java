@@ -34,6 +34,8 @@ import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
@@ -446,6 +448,13 @@ public class MockThriftMetastoreClient
 
     @Override
     public long getTableWriteId(String dbName, String tableName, long transactionId)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
             throws TException
     {
         throw new UnsupportedOperationException();

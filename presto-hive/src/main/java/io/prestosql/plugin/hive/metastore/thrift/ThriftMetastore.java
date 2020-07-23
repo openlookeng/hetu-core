@@ -30,6 +30,8 @@ import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
 
 import java.util.List;
@@ -149,6 +151,11 @@ public interface ThriftMetastore
     }
 
     default String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default ShowLocksResponse showLocks(ShowLocksRequest rqst)
     {
         throw new UnsupportedOperationException();
     }

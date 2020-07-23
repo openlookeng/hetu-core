@@ -125,12 +125,14 @@ public abstract class AbstractTestHiveFileSystem
     private ExecutorService executor;
     private HiveConfig config;
     private ScheduledExecutorService heartbeatService;
+    private ScheduledExecutorService vacuumCleanupService;
 
     @BeforeClass
     public void setUp()
     {
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
         heartbeatService = newScheduledThreadPool(1);
+        vacuumCleanupService = newScheduledThreadPool(1);
     }
 
     @AfterClass(alwaysRun = true)
@@ -143,6 +145,10 @@ public abstract class AbstractTestHiveFileSystem
         if (heartbeatService != null) {
             heartbeatService.shutdownNow();
             heartbeatService = null;
+        }
+        if (vacuumCleanupService != null) {
+            vacuumCleanupService.shutdownNow();
+            vacuumCleanupService = null;
         }
     }
 
@@ -184,6 +190,7 @@ public abstract class AbstractTestHiveFileSystem
                 hdfsEnvironment,
                 hivePartitionManager,
                 newDirectExecutorService(),
+                vacuumCleanupService,
                 heartbeatService,
                 TYPE_MANAGER,
                 locationService,

@@ -14,6 +14,7 @@
 package io.hetu.core.plugin.carbondata;
 
 import com.google.inject.Binder;
+import com.google.inject.Provides;
 import com.google.inject.Scopes;
 import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
@@ -29,6 +30,7 @@ import io.prestosql.plugin.hive.HdfsConfiguration;
 import io.prestosql.plugin.hive.HdfsConfigurationInitializer;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveAnalyzeProperties;
+import io.prestosql.plugin.hive.HiveCatalogName;
 import io.prestosql.plugin.hive.HiveCoercionPolicy;
 import io.prestosql.plugin.hive.HiveEventClient;
 import io.prestosql.plugin.hive.HiveFileWriterFactory;
@@ -61,12 +63,17 @@ import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 
+import javax.inject.Singleton;
+
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
+import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
@@ -157,5 +164,15 @@ public class CarbondataModule
         binder.bind(CarbondataTableReader.class).in(Scopes.SINGLETON);
 
         configBinder(binder).bindConfig(ParquetFileWriterConfig.class);
+    }
+
+    @ForCarbonVacuumCleanUp
+    @Singleton
+    @Provides
+    public ScheduledExecutorService createCarbonVacuumCleanUpExecutor(HiveCatalogName catalogName, CarbondataConfig carbonConfig)
+    {
+        return newScheduledThreadPool(
+                carbonConfig.getVacuumCleanupThreads(),
+                daemonThreadsNamed("carbon-vacuum-cleanup-" + catalogName + "-%s"));
     }
 }

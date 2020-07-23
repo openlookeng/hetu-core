@@ -146,6 +146,16 @@ public class HiveModule
         return newCachedThreadPool(daemonThreadsNamed("hive-" + catalogName + "-%s"));
     }
 
+    @ForHiveVacuumCleanUp
+    @Singleton
+    @Provides
+    public ScheduledExecutorService createHiveVacuumCleanUpExecutor(HiveCatalogName catalogName, HiveConfig hiveConfig)
+    {
+        return newScheduledThreadPool(
+                hiveConfig.getVacuumCleanupThreads(),
+                daemonThreadsNamed("hive-vacuum-cleanup-" + catalogName + "-%s"));
+    }
+
     @ForHiveTransactionHeartbeats
     @Singleton
     @Provides
