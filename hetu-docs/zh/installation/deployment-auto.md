@@ -70,7 +70,7 @@ COORDINATOR_IP=<master_node_ipaddress>
 WORKER_NODES=<ip_address_1>[,<ip_address_2>,...,<ip_address_n>]
 ```
 
-openLooKeng的协调节点和工作节点的通用配置从配置文件`/home/openlkadmin/.openlkadmin/cluster\_config\_info`中获取，连接器的配置从目录`/home/openlkadmin/.openlkadmin/catalog`中获取。执行部署脚本时，如果缺少这些目录或者缺少必要的配置文件，则会自动生成默认配置文件，并部署到所有节点。
+openLooKeng的协调节点和工作节点的通用配置从配置文件`/home/openlkadmin/.openlkadmin/cluster_config_info`中获取，连接器的配置从目录`/home/openlkadmin/.openlkadmin/catalog`中获取。执行部署脚本时，如果缺少这些目录或者缺少必要的配置文件，则会自动生成默认配置文件，并部署到所有节点。
 
 这意味着，如果希望自定义部署，也可以在运行此部署脚本之前添加这些配置文件。
 
@@ -142,7 +142,7 @@ bash /opt/openlookeng/bin/configuration_deploy.sh
 
 注意，如果想添加更多配置或自定义配置，可以将属性添加到模板存入到位于`/home/openlkadmin/.openlkadmin/.etc_template/coordinator`或`/home/openlkadmin/.openlkadmin/.etc_template/worker`的文件中。
 
-属性的格式必须是key=\<value>，其中key用'\<'和'>'括起，意味着它是一个动态值。例如：
+属性的格式必须是key=\<value>，其中key用“\<”和“>”括起，意味着它是一个动态值。例如：
 
 ```properties
 http-server.http.port=<http-server.http.port>
@@ -177,7 +177,7 @@ bash /opt/openlookeng/bin/uninstall.sh --all
 执行以下命令部署单节点集群：
 
 ```shell
-bash /opt/openlookeng/bin/install_offline.sh`
+bash /opt/openlookeng/bin/install_offline.sh
 ```
 
 执行以下命令部署多节点集群：

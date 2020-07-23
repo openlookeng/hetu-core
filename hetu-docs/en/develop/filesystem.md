@@ -11,7 +11,7 @@ A utility class ``FileBasedLock`` located in SPI can provide exclusive access on
 The filesystem clients are implemented as openLooKeng Plugins. The implementations are placed in the ``hetu-filesystem-client`` module, where one factory extending ``HetuFileSystemClientFactory`` must be implemented and registered in ``HetuFileSystemClientPlugin``.
 
 ## Filesystem Profiles
-A filesystem profile must contain a type field::
+A filesystem profile must contain a type field:
 
     fs.client.type=<filesystem type>
 

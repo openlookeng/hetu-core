@@ -60,7 +60,7 @@ bash /opt/openlookeng/bin/openlk-cli
 
 Users can enter standard SQL in the CLI to interact with the openLooKeng server.
 
-For example, to view the configured [catalog](../overview/concepts.md), run the following command:
+For example, to view the configured [catalog](../overview/concepts.md#catalog), run the following command:
 
 ```sql
 show catalogs;
@@ -68,7 +68,7 @@ show catalogs;
 
 ![](../images/catalogs.png)
 
-Run the following command to check the [schema](../overview/concepts.md) contained in the tpcds:
+Run the following command to check the [schema](../overview/concepts.md#schema) contained in the tpcds:
 
 ```sql
 show schemas from tpcds;

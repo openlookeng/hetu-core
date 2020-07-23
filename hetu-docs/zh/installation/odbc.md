@@ -43,15 +43,15 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 安装本驱动前请确认当前具有管理员权限。
 
-1. 双击hetu-odbc-win64 .msi安装包，出现安装的欢迎界面，单击"Next"
-2. 第二页为用户协议，勾选接受后单击"Next"
-3. 第三页选择安装方式，建议选择"Complete"完整安装
-4. 第四页选择安装路径，配置后单击"Next"
-5. 完成上述安装设置后在最后一页单击"Install"开始安装
+1. 双击hetu-odbc-win64 .msi安装包，出现安装的欢迎界面，单击“Next”。
+2. 第二页为用户协议，勾选接受后单击“Next”。
+3. 第三页选择安装方式，建议选择“Complete”完整安装。
+4. 第四页选择安装路径，配置后单击“Next”。
+5. 完成上述安装设置后在最后一页单击“Install”开始安装。
 
 > 注意安装过程中会弹出cmd命令行窗口，为安装Driver组件的过程，待其完成后会自动关闭。至此完成了openLooKeng ODBC驱动的全部安装过程
 
-6. 完成后出现弹出窗口，如果以前配置过旧版本驱动的用户DSN可以勾选使DSN用于新安装的版本，点击"Finish"完成安装
+6. 完成后出现弹出窗口，如果以前配置过旧版本驱动的用户DSN可以勾选使DSN用于新安装的版本，点击“Finish”完成安装
 
 
 
@@ -75,7 +75,7 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 2. 在弹出的创建新数据源窗口中找到openLooKeng ODBC Driver,  单击“完成”
 
-3. 此时弹出了openLooKeng ODBC Driver配置的UI界面， 在第1页欢迎页面的Name输入框中输入想要创建的DSN的名字，在Description输入框中输入对该DSN的附加描述，单击"Next"按钮
+3. 此时弹出了openLooKeng ODBC Driver配置的UI界面， 在第1页欢迎页面的Name输入框中输入想要创建的DSN的名字，在Description输入框中输入对该DSN的附加描述，单击“Next”按钮
 
 4. 第2页主要包括如下六个输入框，功能和用法如下：
 
@@ -88,9 +88,9 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
    | Catalog        | 指定DSN要使用的Catalog，可以为空，建议在填好上方输入框单击Test DSN成功后从下拉框中选择 |
    | Schema         | 指定DSN要使用的Schema，可以为空，建议在填好上方输入框单击Test DSN成功后从下拉框中选择 |
 
-   完成第2页各输入框的填写并单击"Test DSN"按钮显示成功信息后，单击"Next"按钮
+   完成第2页各输入框的填写并单击“Test DSN”按钮显示成功信息后，单击“Next”按钮
 
-5. 第3页Statement(s)输入框中可以输入在建立到openLooKeng服务器的连接后发送的初始语句，勾选Debug后驱动会在C:\Users\当前用户\AppData\Local\Temp路径下创建名为MAODBC.LOG的调试日志文件，记录openLooKeng ODBC Driver的调试信息。最后在本页单击"Finishi"按钮完成DSN的配置与添加。
+5. 第3页Statement(s)输入框中可以输入在建立到openLooKeng服务器的连接后发送的初始语句，勾选“Debug”后驱动会在“C:\Users\\*当前用户*\AppData\Local\Temp”路径下创建名为“MAODBC.LOG”的调试日志文件，记录openLooKeng ODBC Driver的调试信息。最后在本页单击“Finishi”按钮完成DSN的配置与添加。
 
 ### DSN配置ODBC连接
 
@@ -103,7 +103,7 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 连接配置文件中需要以文本形式提供一组按行分隔如user=root或SSL=true这样的参数键值，驱动会自动对其解析并完成对连接的配置，下面给出一个示例：
 
 ```
-#文件路径分隔符请使用"\\"或“/”
+#文件路径分隔符请使用“\\”或“/”
 user=root
 
 #password=123456
@@ -136,7 +136,7 @@ KerberosConfigPath=F:/openLooKeng/krb5.conf
 KerberosKeytabPath=F:/openLooKeng/user.keytab
 ```
 
-完成上述配置后单击"Test DSN"，配置正确的话驱动会弹出连接成功建立的对话框，建议用户可以通过检查点击Catalog和Schema的下拉框能否正确显示对应的Catalog和Schema确认连接的正确性，完成数据源DSN的配置后，ODBC应用就可以通过该配置好的DSN连接到openLooKeng
+完成上述配置后单击“Test DSN”，配置正确的话驱动会弹出连接成功建立的对话框，建议用户可以通过检查点击Catalog和Schema的下拉框能否正确显示对应的Catalog和Schema确认连接的正确性，完成数据源DSN的配置后，ODBC应用就可以通过该配置好的DSN连接到openLooKeng
 
 
 

@@ -5,9 +5,9 @@
 
 ### 保证访问GCS
 
-[Hadoop Cloud Storage连接器](https://cloud.google.com/dataproc/docs/concepts/connectors/cloud-storage )使得访问Cloud Storage数据成为可能。
+[Hadoop Cloud Storage连接器](https://cloud.google.com/dataproc/docs/concepts/connectors/cloud-storage)使得访问Cloud Storage数据成为可能。
 
-如果数据是公开的，则无需任何操作。但是在大多数情况下，数据不是公开的，openLooKeng集群需要能够访问这些数据。这通常通过创建具有访问数据权限的服务账号来实现。可以在[GCP中的服务账号页面](https://console.cloud.google.com/projectselector2/iam-admin/serviceaccounts )上进行此操作。创建服务账号后，需要为其创建密钥，并下载JSON格式的密钥。
+如果数据是公开的，则无需任何操作。但是在大多数情况下，数据不是公开的，openLooKeng集群需要能够访问这些数据。这通常通过创建具有访问数据权限的服务账号来实现。可以在[GCP中的服务账号页面](https://console.cloud.google.com/projectselector2/iam-admin/serviceaccounts)上进行此操作。创建服务账号后，需要为其创建密钥，并下载JSON格式的密钥。
 
 ### Hive连接器配置
 

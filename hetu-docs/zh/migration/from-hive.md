@@ -103,7 +103,7 @@ WHERE x = 'foo'
 
 ## 使用UNNEST来扩展数组和映射
 
-openLooKeng支持`unnest`{.interpreted-text role="ref"}用于扩展数组和映射。使用`UNNEST`代替`LATERAL VIEW explode()`。
+openLooKeng支持`unnest`用于扩展数组和映射。使用`UNNEST`代替`LATERAL VIEW explode()`。
 
 Hive查询：
 

@@ -86,7 +86,7 @@ Additionally, the relations within a `WITH` clause can chain:
 
 **Warning**
 
-*Currently, the SQL for the `WITH` clause will be inlined anywhere the* *named relation is used. This means that if the relation is used more* *than once and the query is non-deterministic, the results may be* *different each time.*
+*Currently, the SQL for the `WITH` clause will be inlined anywhere the named relation is used. This means that if the relation is used more than once and the query is non-deterministic, the results may be different each time.*
 
 SELECT Clause
 -------------
@@ -688,7 +688,7 @@ Using sampling with joins:
 UNNEST
 ------
 
-`UNNEST` can be used to expand an [ARRAY](../language/types.md) or [MAP](../language/types.md) into a relation. Arrays are expanded into a single column, and maps are expanded into two columns (key, value). `UNNEST` can also be used with multiple arguments, in which case they are expanded into multiple columns, with as many rows as the highest cardinality argument (the other columns are padded with nulls). `UNNEST` can optionally have a `WITH ORDINALITY` clause, in which case an additional ordinality column is added to the end. `UNNEST` is normally used with a `JOIN` and can reference columns from relations on the left side of the join.
+`UNNEST` can be used to expand an [ARRAY](../language/types.md#array) or [MAP](../language/types.md#map) into a relation. Arrays are expanded into a single column, and maps are expanded into two columns (key, value). `UNNEST` can also be used with multiple arguments, in which case they are expanded into multiple columns, with as many rows as the highest cardinality argument (the other columns are padded with nulls). `UNNEST` can optionally have a `WITH ORDINALITY` clause, in which case an additional ordinality column is added to the end. `UNNEST` is normally used with a `JOIN` and can reference columns from relations on the left side of the join.
 
 Using a single column:
 

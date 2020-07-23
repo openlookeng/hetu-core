@@ -12,13 +12,13 @@ DROP CACHE table
 Description
 -----------
 
-`DROP CACHE` deletes cache metadata of the `table` from coordinator only. Workers' caches purged automatically by expiry time 
+`DROP CACHE` deletes cache metadata of the `table` from coordinator only. Workers\' caches purged automatically by expiry time 
 or by reaching size limit but recurring splits will not reuse any cached node assignments.
 
 Examples
 --------
 
-Drop cache metadata for `sales' table
+Drop cache metadata for \'sales\' table
  
 ```sql 
     DROP CACHE sales

@@ -76,7 +76,7 @@ WORKER_NODES=<ip_address_1>[,<ip_address_2>,...,<ip_address_n>]
 ```
 
 The general configurations for openLooKeng\'s coordinator, workers are taken from the configuration file
-`/home/openlkadmin/.openlkadmin/cluster\_config\_info` and configurations for connectors are taken from the directory `/home/openlkadmin/.openlkadmin/catalog` respectively. If these directories or any required configuration files are absent during the deploy script running, default configuration files will be generated
+`/home/openlkadmin/.openlkadmin/cluster_config_info` and configurations for connectors are taken from the directory `/home/openlkadmin/.openlkadmin/catalog` respectively. If these directories or any required configuration files are absent during the deploy script running, default configuration files will be generated
 automatically and deployed to all nodes.
 
 Which means, alternatively, you can add those configuration files before running this deploy script, if you want to customized the deployment.
@@ -186,7 +186,7 @@ If you can't access the download URL from the machine where you want to install 
 Execute below command to deploy single node cluster:
 
 ```shell
-bash /opt/openlookeng/bin/install_offline.sh`
+bash /opt/openlookeng/bin/install_offline.sh
 ```
 
 Execute below command to deploy multi-node cluster:
@@ -229,7 +229,7 @@ or:
 bash /opt/openlookeng/bin/add_cluster_node.sh --file <add_nodes_file_path>
 ```
 
-If there are multiple nodes,separated by commas(,).
+If there are multiple nodes, separated by commas(,).
 
 ## Removing Node to Cluster 
 

@@ -411,9 +411,9 @@ VACUUM操作在Hive中转换为`compaction`。在Hive中有两种类型的压缩
 
 VACUUM和Hive compaction的映射关系如下：
 
-* VACUUM FULL转换为Major compaction。
+* `VACUUM FULL`转换为Major compaction。
 
-* VACUUM转换为Minor compaction。
+* `VACUUM`转换为Minor compaction。
 
 #### VACUUM
 

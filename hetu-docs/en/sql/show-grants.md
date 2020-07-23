@@ -21,7 +21,7 @@ The command requires the current catalog to be set.
 
 **Note**
 
-*Ensure that authentication has been enabled before running any of the* *authorization commands.*
+*Ensure that authentication has been enabled before running any of the authorization commands.*
 
 Examples
 --------

@@ -229,6 +229,6 @@ javax.naming.CommunicationException: simple bind failed: ldapserver:636
 [Root exception is javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No subject alternative DNS name matching ldapserver found.]
 ```
 
-如果需要暂时关闭端点识别功能，可以在openLooKeng\的`jvm.config`文件中增加`-Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true`属性。 
+如果需要暂时关闭端点识别功能，可以在openLooKeng的`jvm.config`文件中增加`-Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true`属性。 
 
 但是，在生产环境中，我们建议通过重新生成LDAP服务器证书来修复该问题，使证书`SAN (Subject Alternative Name)` 或证书使用者名称与LDAP服务器匹配。
