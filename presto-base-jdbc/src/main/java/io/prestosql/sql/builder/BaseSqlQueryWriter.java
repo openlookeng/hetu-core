@@ -563,7 +563,6 @@ public class BaseSqlQueryWriter
     }
 
     @Override
-    @SuppressWarnings("Duplicates")
     public String formatStringLiteral(String literal)
     {
         return ExpressionFormatter.formatStringLiteral(literal);
