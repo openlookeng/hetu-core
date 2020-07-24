@@ -17,6 +17,7 @@ package io.hetu.core.statestore;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.statestore.CipherService;
 import io.prestosql.spi.statestore.StateMap;
+import io.prestosql.spi.statestore.listener.MapListener;
 
 import java.io.Serializable;
 import java.util.Map;
@@ -132,6 +133,18 @@ public class EncryptedStateMap<K, V extends Serializable>
     public Set<K> keySet()
     {
         return encryptedValues.keySet();
+    }
+
+    @Override
+    public void addEntryListener(MapListener listener)
+    {
+        encryptedValues.addEntryListener(listener);
+    }
+
+    @Override
+    public void removeEntryListener(MapListener listener)
+    {
+        encryptedValues.removeEntryListener(listener);
     }
 
     @Override

@@ -45,6 +45,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -217,6 +218,13 @@ public class TaskContext
             endFullGcCount.compareAndSet(-1, majorGcCount);
             endFullGcTimeNanos.compareAndSet(-1, majorGcTime);
         }
+    }
+
+    public void onTaskFinished(Consumer<Boolean> taskFinishHandler)
+    {
+        taskStateMachine.addStateChangeListener(newState -> {
+            taskFinishHandler.accept(true);
+        });
     }
 
     public void failed(Throwable cause)

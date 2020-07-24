@@ -14,8 +14,10 @@
  */
 package io.hetu.core.statestore.hazelcast;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
+import com.google.common.collect.SetMultimap;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import io.prestosql.spi.statestore.StateMap;
@@ -25,6 +27,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
@@ -41,6 +44,7 @@ public class HazelcastStateMap<K, V>
     private final String name;
 
     private IMap<K, V> hzMap;
+    private SetMultimap<MapListener, UUID> registeredListeners = HashMultimap.create();
 
     /**
      * Create HazelcastStateMap
@@ -179,5 +183,20 @@ public class HazelcastStateMap<K, V>
     public Type getType()
     {
         return Type.MAP;
+    }
+
+    @Override
+    public void addEntryListener(MapListener listener)
+    {
+        ListenerAdapter.toHazelcastListeners(listener).forEach(hzListener -> {
+            UUID listenerId = hzMap.addEntryListener(hzListener, true);
+            registeredListeners.put(listener, listenerId);
+        });
+    }
+
+    @Override
+    public void removeEntryListener(MapListener listener)
+    {
+        registeredListeners.get(listener).forEach(listenerId -> hzMap.removeEntryListener(listenerId));
     }
 }

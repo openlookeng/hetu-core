@@ -57,7 +57,6 @@ public class HazelcastStateStoreBootstrapper
 {
     private HazelcastInstance hzInstance;
     private static final String MERGEMAP = "merged";
-    private static final String DFTYPEMAP = "dftypemap";
     private static final int MAXIDLESECONDS = 30;
     private static final int EVICTIONSIZE = 200;
     private static final int TIMETOLIVESECONDS = 300;
@@ -85,7 +84,6 @@ public class HazelcastStateStoreBootstrapper
 
         // Set eviction rules
         hzConfig = setEvictionConfigs(hzConfig, MERGEMAP);
-        hzConfig = setEvictionConfigs(hzConfig, DFTYPEMAP);
 
         // default discovery_mode = multicast
         if (discoveryMode == null || discoveryMode.equals(DISCOVERY_MODE_MULTICAST)) {

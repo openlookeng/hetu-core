@@ -15,8 +15,13 @@
 
 package io.prestosql.statestore;
 
+import io.prestosql.spi.statestore.Member;
 import io.prestosql.spi.statestore.StateMap;
+import io.prestosql.spi.statestore.listener.EntryAddedListener;
+import io.prestosql.spi.statestore.listener.EntryEvent;
+import io.prestosql.spi.statestore.listener.MapListener;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,6 +30,7 @@ public class MockStateMap<K, V>
 {
     Map<K, V> map;
     String name;
+    Set<MapListener> addedListeners = new HashSet<>();
 
     public MockStateMap(String name, Map<K, V> map)
     {
@@ -53,6 +59,11 @@ public class MockStateMap<K, V>
     @Override
     public V put(K key, V value)
     {
+        for (MapListener listener : addedListeners) {
+            if (listener instanceof EntryAddedListener) {
+                ((EntryAddedListener) listener).entryAdded(new EntryEvent(new Member("localhost", 8080), 1, key, value));
+            }
+        }
         return map.put(key, value);
     }
 
@@ -95,6 +106,18 @@ public class MockStateMap<K, V>
     public Set<K> keySet()
     {
         return map.keySet();
+    }
+
+    @Override
+    public void addEntryListener(MapListener listener)
+    {
+        this.addedListeners.add(listener);
+    }
+
+    @Override
+    public void removeEntryListener(MapListener listener)
+    {
+        this.addedListeners.remove(listener);
     }
 
     @Override

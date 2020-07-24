@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.airlift.slice.Slices.utf8Slice;
@@ -270,7 +271,8 @@ public class TestHazelcastStateMap
     }
 
     @Test
-    public void testListeners() throws InterruptedException
+    public void testListeners()
+            throws InterruptedException
     {
         final CountDownLatch listenersCount = new CountDownLatch(3);
         EntryAddedListener<String, String> addedListener = event -> {
@@ -297,6 +299,30 @@ public class TestHazelcastStateMap
         testMap.remove("Key");
 
         assertTrue(listenersCount.await(500, TimeUnit.MILLISECONDS), "Events were not triggered or values did not match");
+    }
+
+    @Test
+    public void testAddAndRemoveListeners()
+            throws InterruptedException
+    {
+        AtomicInteger count = new AtomicInteger();
+        EntryAddedListener<String, String> addedListener = event -> {
+            if (event.getKey().equals("Key") && event.getValue().equals("Created")) {
+                count.getAndIncrement();
+            }
+        };
+
+        StateMap<String, String> testMap = stateStore.createStateMap("Test_Add_Remove_Listeners_Map");
+        testMap.addEntryListener(addedListener);
+        testMap.put("Key", "Created");
+        TimeUnit.MILLISECONDS.sleep(500);
+        assertEquals(count.get(), 1, "Events were not triggered or values did not match");
+
+        testMap.remove("Key");
+        testMap.removeEntryListener(addedListener);
+        testMap.put("Key", "Created");
+        TimeUnit.MILLISECONDS.sleep(500);
+        assertEquals(count.get(), 1, "Events triggered again when listener removed");
     }
 
     /**

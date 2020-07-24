@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.statestore;
 
+import io.prestosql.spi.statestore.listener.MapListener;
+
 import java.util.Map;
 import java.util.Set;
 
@@ -113,4 +115,19 @@ public interface StateMap<K, V>
      * @return set contains all the keys
      */
     Set<K> keySet();
+
+    /**
+     * Add an entry listener to the StateMap
+     *
+     * @param listener MapListener to be added
+     */
+    void addEntryListener(MapListener listener);
+
+    /**
+     * Remove an added listener from the StateMap
+     * if the listener hasn't been added before this will return silently
+     *
+     * @param listener MapListener to be removed
+     */
+    void removeEntryListener(MapListener listener);
 }
