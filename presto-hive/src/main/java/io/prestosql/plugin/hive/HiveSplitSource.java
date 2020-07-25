@@ -29,11 +29,13 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
 
 import java.io.FileNotFoundException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
@@ -466,11 +468,10 @@ class HiveSplitSource
     }
 
     /**
-     * Compares each partition key against user define cache predicates to
-     * determine whether or not that split should be cached.
+     * Validate the partitions key against all the user defined predicates
+     * to determine whether or not that split should be cached.
      *
-     * @param partitionKeys list of partition key
-     * @return true If any of the partition key matches the user defined cache predicates
+     * @return true if partition key matches the user defined cache predicates
      * false otherwise
      */
     private boolean matchesUserDefinedCachedPredicates(List<HivePartitionKey> partitionKeys)
@@ -479,48 +480,42 @@ class HiveSplitSource
             return false;
         }
 
-        return partitionKeys
-                .stream()
-                .anyMatch(this::matchesUserDefinedCachePredicate);
-    }
-
-    /**
-     * Compares the partition key against user define cache predicates to
-     * determine whether or not that split should be cached.
-     *
-     * @return true if partition key matches the user defined cache predicates
-     * false otherwise
-     */
-    private boolean matchesUserDefinedCachePredicate(HivePartitionKey partitionKey)
-    {
         try {
-            final AtomicLong matches = new AtomicLong();
-            String partitionName = partitionKey.getName();
-            String partitionStringValue = partitionKey.getValue();
-            // then use column name to get the corresponding Domain from tuple domain, then ask Domain if partition value
-            // for each domain, check if the partition and value (from pathString) is contained
-            // ensure exact match
-            userDefinedCachePredicates.forEach(
-                    columnMetadataTupleDomain -> columnMetadataTupleDomain.getDomains().get().forEach(
-                            (columnMetadata, domain) -> {
-                                if (columnMetadata.getName().equalsIgnoreCase(partitionName)) {
-                                    NullableValue nullableValue = null;
-                                    if (partitionStringValue.equals("\\N")) {
-                                        nullableValue = NullableValue.asNull(columnMetadata.getType());
-                                    }
-                                    else {
-                                        nullableValue = HiveUtil.parsePartitionValue(partitionName, partitionStringValue, columnMetadata.getType(), hiveConfig.getDateTimeZone());
-                                    }
-                                    boolean includesValue = domain.includesNullableValue(nullableValue.getValue());
-                                    matches.addAndGet(includesValue ? 1 : 0);
-                                }
-                            }));
-            return matches.get() > 0;
+            Map<String, HivePartitionKey> hivePartitionKeyMap = partitionKeys.stream().collect(Collectors.toMap(HivePartitionKey::getName, Function.identity()));
+            for (TupleDomain<ColumnMetadata> tupleDomain : userDefinedCachePredicates) {
+                if (!tupleDomain.getDomains().isPresent()) {
+                    continue;
+                }
+
+                Map<ColumnMetadata, Domain> domainMap = tupleDomain.getDomains().get();
+                Collection<String> columnsDefinedInPredicate = domainMap.keySet().stream().map(ColumnMetadata::getName).collect(Collectors.toList());
+                if (!hivePartitionKeyMap.keySet().containsAll(columnsDefinedInPredicate)) {
+                    continue;
+                }
+
+                boolean allMatches = domainMap.entrySet().stream().allMatch(entry -> {
+                    ColumnMetadata columnMetadata = entry.getKey();
+                    Domain domain = entry.getValue();
+                    String partitionStringValue = hivePartitionKeyMap.get(columnMetadata.getName()).getValue();
+                    NullableValue nullableValue;
+                    if (partitionStringValue.equals("\\N")) {
+                        nullableValue = NullableValue.asNull(columnMetadata.getType());
+                    }
+                    else {
+                        nullableValue = HiveUtil.parsePartitionValue(columnMetadata.getName(), partitionStringValue, columnMetadata.getType(), hiveConfig.getDateTimeZone());
+                    }
+                    return domain.includesNullableValue(nullableValue.getValue());
+                });
+
+                if (allMatches) {
+                    return true;
+                }
+            }
         }
         catch (Exception ex) {
-            log.warn(ex, "Unable to match partition key %s with cached predicates. Ignoring this partition key. Error = %s", partitionKey, ex.getMessage());
-            return false;
+            log.warn(ex, "Unable to match partition keys %s with cached predicates. Ignoring this partition key. Error = %s", partitionKeys, ex.getMessage());
         }
+        return false;
     }
 
     @Override

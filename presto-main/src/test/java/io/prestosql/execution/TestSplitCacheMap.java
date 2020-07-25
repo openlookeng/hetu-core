@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -189,13 +190,27 @@ public class TestSplitCacheMap
         assertEquals(splitCacheMap.getCachePredicateTupleDomains(table1QN).size(), 2);
         assertEquals(splitCacheMap.getCachePredicateTupleDomains(table2QN).size(), 1);
 
-        splitCacheMap.dropCache(table1QN);
+        splitCacheMap.dropCache(table1QN, Optional.empty());
         assertFalse(splitCacheMap.cacheExists(table1QN));
         assertTrue(splitCacheMap.cacheExists(table2QN));
         assertEquals(splitCacheMap.getCachePredicateTupleDomains(table2QN).size(), 1);
 
         splitCacheMap.dropCache();
         assertFalse(splitCacheMap.cacheExists(table2QN));
+    }
+
+    @Test
+    public void testDropCacheWithWhere()
+    {
+        SplitCacheMap splitCacheMap = createNew();
+        splitCacheMap.addCache(table1QN, tupleDomainA, tupleDomainAPredicateString);
+        splitCacheMap.addCache(table1QN, tupleDomainB, tupleDomainBPredicateString);
+
+        splitCacheMap.dropCache(table1QN, Optional.of(tupleDomainAPredicateString));
+        assertEquals(splitCacheMap.getCachePredicateTupleDomains(table1QN).size(), 1);
+
+        splitCacheMap.dropCache(table1QN, Optional.of(tupleDomainBPredicateString));
+        assertFalse(splitCacheMap.cacheExists(table1QN));
     }
 
     @Test

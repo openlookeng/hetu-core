@@ -22,18 +22,25 @@ Examples
 Cache all sales data for stores located in 'CA':
 
 ``` sql
-    CACHE TABLE store_sales where location = 'CA';
+    CACHE TABLE store_sales WHERE location = 'CA';
 ```
-Cache all sales data from stores sold after 20 Feb 2020.
+Cache all sales data from stores sold after 20 Feb 2020:
  
 ``` sql 
-    CACHE TABLE store_sales where ss_sold_date_sk > 20200220;
+    CACHE TABLE store_sales WHERE ss_sold_date_sk > 20200220;
 ```
- 
+Cache data with complex predicate string: 
+
+```sql
+    CACHE TABLE store_sales WHERE location = 'CA' AND ss_sold_date_sk > 20200220;
+```
+
 Limitations
 -----------
 
-Only Hive connector support this functionality at this time. See connector documentation for more details.
+- Only Hive connector support this functionality at this time. See connector documentation for more details.
+- Does not support `LIKE` in `WHERE` clause.
+- Does not support 'OR' operator in complex predicate.
 
 See Also
 --------

@@ -58,7 +58,7 @@ public class DropCacheTask
         if (!splitCacheMap.cacheExists(tableName)) {
             throw new SemanticException(MISSING_CACHE, statement, "Cache for table '%s' does not exist", tableName.toString());
         }
-        splitCacheMap.dropCache(tableName);
+        splitCacheMap.dropCache(tableName, statement.getWhere().map(Expression::toString));
         return immediateFuture(null);
     }
 }

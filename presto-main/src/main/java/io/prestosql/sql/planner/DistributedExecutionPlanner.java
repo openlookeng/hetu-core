@@ -75,6 +75,7 @@ import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.planner.plan.WindowNode;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.inject.Inject;
 
@@ -219,11 +220,20 @@ public class DistributedExecutionPlanner
                 dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(), dynamicFilters, assignments);
             }
 
-            //TODO: Find a better to wrap the Cache Predicates
             //How would this change when we add support to cache  small tables entirely without the need to provide predicates
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates = ImmutableSet.of();
-            if (PropertyService.getBooleanProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED)) {
-                userDefinedCachePredicates = SplitCacheMap.getInstance().getCachePredicateTupleDomains(tableHandle.getFullyQualifiedName());
+            Optional<String> fqTableName;
+            try {
+                fqTableName = Optional.ofNullable(tableHandle.getFullyQualifiedName());
+            }
+            catch (NotImplementedException ignored) {
+                //TODO: Need to revisit as part of Affinity Scheduling
+                //Exception is thrown for Memory connector. We can ignore exception as ORC Cache supported only by Hive connector.
+                fqTableName = Optional.empty();
+            }
+
+            if (PropertyService.getBooleanProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED) && fqTableName.isPresent()) {
+                userDefinedCachePredicates = SplitCacheMap.getInstance().getCachePredicateTupleDomains(fqTableName.get());
             }
 
             // get dataSource for table
