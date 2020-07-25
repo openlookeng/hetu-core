@@ -22,7 +22,9 @@ import io.prestosql.client.QueryStatusInfo;
 import io.prestosql.client.StageStats;
 import io.prestosql.client.StatementClient;
 import io.prestosql.client.StatementStats;
+import org.jline.terminal.Terminal;
 
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.List;
 import java.util.OptionalInt;
@@ -82,7 +84,7 @@ Spilled: 20GB
 
  */
 
-    public void printInitialStatusUpdates()
+    public void printInitialStatusUpdates(Terminal terminal)
     {
         long lastPrint = System.nanoTime();
         try {
@@ -98,7 +100,7 @@ Spilled: 20GB
                     boolean update = nanosSince(lastPrint).getValue(SECONDS) >= 0.5;
 
                     // check for keyboard input
-                    int key = KeyReader.readKey();
+                    int key = readKey(terminal);
                     if (key == CTRL_P) {
                         client.cancelLeafStage();
                     }
@@ -450,6 +452,23 @@ Spilled: 20GB
             return 0;
         }
         return min(100, (count * 100.0) / total);
+    }
+
+    private static int readKey(Terminal terminal)
+    {
+        try {
+            return terminal.reader().read(1L);
+        }
+        catch (IOException e) {
+            return -1;
+        }
+    }
+
+    private static void discardKeys(Terminal terminal)
+    {
+        while (readKey(terminal) >= 0) {
+            // discard input
+        }
     }
 
     private static class ConsoleWarningsPrinter

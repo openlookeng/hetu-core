@@ -15,6 +15,7 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <main-class>io.prestosql.cli.Presto</main-class>
+        <dep.jline.version>3.12.1</dep.jline.version>
     </properties>
 
     <dependencies>
@@ -28,6 +29,11 @@
             <artifactId>presto-parser</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+        </dependency>
+        
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>airline</artifactId>
@@ -69,9 +75,27 @@
             <artifactId>guava</artifactId>
         </dependency>
 
+<!--        <dependency>-->
+<!--            <groupId>jline</groupId>-->
+<!--            <artifactId>jline</artifactId>-->
+<!--        </dependency>-->
         <dependency>
-            <groupId>jline</groupId>
-            <artifactId>jline</artifactId>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-reader</artifactId>
+            <version>${dep.jline.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal</artifactId>
+            <version>${dep.jline.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal-jna</artifactId>
+            <version>${dep.jline.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
