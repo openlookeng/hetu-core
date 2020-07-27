@@ -146,8 +146,8 @@ public class HeuristicIndexWriter
                     (column, values, uri, splitStart, lastModified) -> {
                         LOG.debug("split read: column={}; uri={}; splitOffset={}", column, uri, splitStart);
 
-                        if (values == null) {
-                            LOG.debug("values were null, skipping column={}; uri={}; splitOffset={}", column, uri, splitStart);
+                        if (values == null || values.length == 0) {
+                            LOG.debug("values were null or empty, skipping column={}; uri={}; splitOffset={}", column, uri, splitStart);
                             return;
                         }
 
@@ -197,6 +197,7 @@ public class HeuristicIndexWriter
                                 Constructor<? extends Index> constructor = indexTypeBaseObj.getClass().getConstructor();
                                 splitIndex = constructor.newInstance();
                                 splitIndex.setProperties(indexTypeBaseObj.getProperties());
+                                splitIndex.setExpectedNumOfEntries(values.length);
                                 LOG.debug("creating split index: {}", splitIndex.getId());
                             }
                             catch (InstantiationException

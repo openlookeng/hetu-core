@@ -23,7 +23,6 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -93,7 +92,7 @@ public class MinMaxIndex<T>
     public boolean matches(T value, Operator operator) throws IllegalArgumentException
     {
         if (operator == null) {
-            throw new IllegalArgumentException(String.format("No operator provided."));
+            throw new IllegalArgumentException("No operator provided.");
         }
 
         Comparable v = (Comparable) value;
@@ -111,7 +110,7 @@ public class MinMaxIndex<T>
             case GREATER_THAN_OR_EQUAL:
                 return v.compareTo(max) < 0 || v.compareTo(max) == 0;
             default:
-                throw new IllegalArgumentException(String.format(Locale.ENGLISH, "Unsupported operator %s.", operator));
+                throw new IllegalArgumentException("Unsupported operator " + operator);
         }
     }
 
@@ -225,6 +224,18 @@ public class MinMaxIndex<T>
         catch (ClassNotFoundException e) {
             throw new IOException(e);
         }
+    }
+
+    @Override
+    public void setExpectedNumOfEntries(int expectedNumOfEntries)
+    {
+        // ignore
+    }
+
+    @Override
+    public int getExpectedNumOfEntries()
+    {
+        return 0;
     }
 
     @Override

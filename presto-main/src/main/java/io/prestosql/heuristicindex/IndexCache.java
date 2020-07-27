@@ -107,6 +107,6 @@ public class IndexCache
 
     private String getCacheKey(String tableName, String columnName, String filePath)
     {
-        return String.format("%s/%s%s", tableName, columnName, filePath);
+        return tableName + "/" + columnName + filePath;
     }
 }

@@ -28,6 +28,7 @@ import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.GenericLiteral;
+import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.StringLiteral;
@@ -38,10 +39,7 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 
@@ -106,7 +104,8 @@ public class PredicateExtractor
     {
         if (predicate instanceof LogicalBinaryExpression) {
             LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) predicate;
-            if (lbExpression.getOperator() == LogicalBinaryExpression.Operator.AND) {
+            if ((lbExpression.getOperator() == LogicalBinaryExpression.Operator.AND) ||
+                    (lbExpression.getOperator() == LogicalBinaryExpression.Operator.OR)) {
                 return isSupportedExpression(lbExpression.getRight()) && isSupportedExpression(lbExpression.getLeft());
             }
         }
@@ -123,78 +122,58 @@ public class PredicateExtractor
                     return false;
             }
         }
+        if (predicate instanceof InPredicate) {
+            return true;
+        }
+
         return false;
     }
 
-    private static List<ComparisonExpression> getComparisonExpressions(LogicalBinaryExpression logicalBinaryExpression)
-    {
-        List<ComparisonExpression> comparisonExpressions = new ArrayList<>();
-        Expression left = logicalBinaryExpression.getLeft();
-        Expression right = logicalBinaryExpression.getRight();
-        if (left instanceof ComparisonExpression) {
-            comparisonExpressions.add((ComparisonExpression) left);
-        }
-        else {
-            comparisonExpressions.addAll(getComparisonExpressions((LogicalBinaryExpression) left));
-        }
-
-        if (right instanceof ComparisonExpression) {
-            comparisonExpressions.add((ComparisonExpression) right);
-        }
-        else {
-            comparisonExpressions.addAll(getComparisonExpressions((LogicalBinaryExpression) right));
-        }
-        return comparisonExpressions;
-    }
-
-    public static List<Predicate> buildPredicates(SqlStageExecution stage)
+    public static Optional<Expression> getExpression(SqlStageExecution stage)
     {
         Optional<FilterNode> filterNodeOptional = getFilterNode(stage);
 
         if (!filterNodeOptional.isPresent()) {
-            return Collections.emptyList();
+            return Optional.empty();
+        }
+
+        FilterNode filterNode = filterNodeOptional.get();
+        Expression predicate = filterNode.getPredicate();
+
+        return Optional.of(predicate);
+    }
+
+    public static Optional<String> getFullyQualifiedName(SqlStageExecution stage)
+    {
+        Optional<FilterNode> filterNodeOptional = getFilterNode(stage);
+
+        if (!filterNodeOptional.isPresent()) {
+            return Optional.empty();
         }
 
         FilterNode filterNode = filterNodeOptional.get();
         TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
         String fullQualifiedTableName = tableScanNode.getTable().getFullyQualifiedName();
 
-        List<Predicate> predicateList = new ArrayList<>();
-        Expression predicate = filterNode.getPredicate();
-        if (predicate instanceof ComparisonExpression) {
-            ComparisonExpression comparisonExpression = (ComparisonExpression) predicate;
-            processComparisonExpression(predicateList, comparisonExpression, fullQualifiedTableName);
-        }
-        else if (predicate instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) predicate;
-            if (lbExpression.getOperator() == LogicalBinaryExpression.Operator.AND) {
-                List<ComparisonExpression> comparisonExpressions = getComparisonExpressions(lbExpression);
-                for (ComparisonExpression comparisonExpression : comparisonExpressions) {
-                    processComparisonExpression(predicateList, comparisonExpression, fullQualifiedTableName);
-                }
-            }
-        }
-        return predicateList;
+        return Optional.of(fullQualifiedTableName);
     }
 
-    private static void processComparisonExpression(List<Predicate> predicateList, ComparisonExpression comparisonExpression,
-            String fullQualifiedTableName)
+    public static Predicate processComparisonExpression(ComparisonExpression comparisonExpression, String fullQualifiedTableName)
     {
+        Predicate pred = null;
         switch (comparisonExpression.getOperator()) {
             case EQUAL:
             case GREATER_THAN:
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
-                Predicate pred = buildPredicate(comparisonExpression, fullQualifiedTableName);
-                if (pred != null) {
-                    predicateList.add(pred);
-                }
+                pred = buildPredicate(comparisonExpression, fullQualifiedTableName);
                 break;
             default:
                 LOG.warn("ComparisonExpression %s, not supported", comparisonExpression.getOperator().toString());
                 break;
         }
+        return pred;
     }
 
     private static Predicate buildPredicate(ComparisonExpression expression, String fullQualifiedTableName)

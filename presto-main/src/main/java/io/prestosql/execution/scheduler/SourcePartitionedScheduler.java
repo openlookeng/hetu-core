@@ -248,8 +248,8 @@ public class SourcePartitionedScheduler
                     scheduleGroup.nextSplitBatchFuture = null;
 
                     //add split filter to filter out split has no valid rows
-                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(
-                            PredicateExtractor.buildPredicates(stage), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
+                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(PredicateExtractor.getExpression(stage),
+                            PredicateExtractor.getFullyQualifiedName(stage), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
                     pendingSplits.addAll(filteredSplit);
                     if (nextSplits.isLastBatch()) {

@@ -53,11 +53,11 @@ public class IndexCacheLoader
         }
         catch (Exception e) {
             // no lastModified file found, i.e. index doesn't exist
-            throw new Exception(String.format("No index file found for key %s.", key), e);
+            throw new Exception("No index files found for key " + key, e);
         }
 
         if (lastModified != key.getLastModifiedTime()) {
-            throw new Exception(String.format("Index file(s) are expired for key %s.", key));
+            throw new Exception("Index files are expired for key " + key);
         }
 
         List<IndexMetadata> indices;
@@ -65,12 +65,12 @@ public class IndexCacheLoader
             indices = indexClient.readSplitIndex(key.getPath(), key.getIndexTypes());
         }
         catch (Exception e) {
-            throw new Exception(String.format("No valid index file found for key %s.", key), e);
+            throw new Exception("No valid index files found for key " + key, e);
         }
 
         // lastModified file was valid, but no index files for the given types
         if (indices.isEmpty()) {
-            throw new Exception(String.format("No %s index files found for key %s.", Arrays.toString(key.getIndexTypes()), key));
+            throw new Exception("No index files found for key " + key + " of type(s) " + Arrays.toString(key.getIndexTypes()));
         }
 
         // Sort the indices based on split starting position

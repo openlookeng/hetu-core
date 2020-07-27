@@ -18,8 +18,6 @@ package io.hetu.core.plugin.heuristicindex.index.bitmap;
 import com.fasterxml.jackson.databind.InjectableValues;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.airlift.slice.Slice;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Operator;
 import io.prestosql.spi.predicate.Domain;
@@ -57,7 +55,6 @@ import org.apache.druid.segment.filter.AndFilter;
 import org.apache.druid.segment.filter.TrueFilter;
 import org.apache.druid.segment.incremental.IncrementalIndex;
 import org.apache.druid.segment.incremental.IncrementalIndexSchema;
-import org.apache.druid.segment.incremental.IndexSizeExceededException;
 import org.apache.druid.segment.writeout.OffHeapMemorySegmentWriteOutMediumFactory;
 import org.roaringbitmap.IntIterator;
 import org.slf4j.Logger;
@@ -104,8 +101,8 @@ import static java.util.stream.Collectors.toMap;
 public class BitMapIndex<T>
         implements Index<T>
 {
+    static final int DEFAULT_EXPECTED_NUM_OF_SIZE = 200000;
     private static final Logger LOG = LoggerFactory.getLogger(BitMapIndex.class);
-
     private static final String COLUMN_NAME = "column";
     private static final String ID = "BITMAP";
     private static final Charset CHARSET = StandardCharsets.ISO_8859_1;
@@ -118,71 +115,95 @@ public class BitMapIndex<T>
             " \t},\n" +
             " \t\"dimensionCompression\": \"lz4\",\n" +
             " \t\"metricCompression\": \"lz4\",\n" +
-            " \t\"longEncoding\": \"longs\"\n" +
+            " \t\"longEncoding\": \"auto\"\n" +
             " }";
 
-    private IndexSpec indexSpec;
+    // when the index is initialized an IncrementalIndex is created
+    // and values can be added to it
+    // this IncrementalIndex can then be persisted to disk.
+    // until the index is persisted to disk, it only provides write operation
+    // it cannot be queried!
+    // i.e. only values can be added to it, to query the index, it must
+    // be written to disk then read so a QueryableIndex can be obtained
+    //
+    // when the persisted index is loaded from disk a QueryableIndex
+    // is returned, this only provides the ability to read and query the index
+    // i.e.an existing index can't be modified
+    // if new values need to be added, a new index must be created
+    // via IncrementalIndex and all values must be added again
+    // therefore the flow should be:
+    // 1. initialize IncrementalIndex
+    // 2. add values
+    // 3. write IncrementalIndex to disk
+    // 4. load index from disk and get QueryableIndex
+    // 5. query the QueryableIndex
     private IncrementalIndex incrementalIndex;
-    private QueryableIndex queryIndex;
-    private IndexIO indexIo;
-    private IndexMergerV9 indexMergerV9;
+    private QueryableIndex queryableIndex;
+
     private AtomicLong rows = new AtomicLong();
+    private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
 
     public BitMapIndex()
+    {
+    }
+
+    /**
+     * Loads index that was previously persisted to this dir.
+     * The return QueryableIndex can then be queried.
+     *
+     * @param indexDir
+     * @return
+     * @throws IOException
+     */
+    private static QueryableIndex load(File indexDir) throws IOException
     {
         ObjectMapper jsonMapper = new DefaultObjectMapper();
         InjectableValues.Std injectableValues = new InjectableValues.Std();
         injectableValues.addValue(ExprMacroTable.class, ExprMacroTable.nil());
         jsonMapper.setInjectableValues(injectableValues);
 
-        indexIo = new IndexIO(jsonMapper, () -> 0);
-        indexMergerV9 = new IndexMergerV9(jsonMapper, indexIo, OffHeapMemorySegmentWriteOutMediumFactory.instance());
+        IndexIO indexIo = new IndexIO(jsonMapper, () -> 0);
 
-        /*initial incrementalIndex*/
-        initIncrementalIndex();
+        QueryableIndex queryIndex = indexIo.loadIndex(indexDir);
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            indexSpec = objectMapper.readValue(SETTINGS, IndexSpec.class);
-        }
-        catch (IOException e) {
-            throw new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, "Unable to initialize BitMap Index");
-        }
+        return queryIndex;
     }
 
     /**
-     * 1. get the type of the column
-     * 2. initialize dimensionSchemas
-     * 3. initialize the IncrementalIndex for this segment
-     * TODO: try to remove it while in the first time bitmap
-     * construction
+     * Persist the given IncrementalIndex to disk, it can then be loaded
+     * to get a QueryableIndex
+     *
+     * @param incrementalIndex
+     * @param outputDir
+     * @throws IOException
      */
-    private void initIncrementalIndex()
+    private static void persist(IncrementalIndex incrementalIndex, File outputDir) throws IOException
     {
-        incrementalIndex = new IncrementalIndex.Builder()
-                .setIndexSchema(
-                        new IncrementalIndexSchema.Builder()
-                                .withTimestampSpec(new TimestampSpec("timestamp", "iso", null))
-                                .withQueryGranularity(Granularities.NONE)
-                                .withDimensionsSpec(new DimensionsSpec(Collections.singletonList(new StringDimensionSchema(COLUMN_NAME))))
-                                .withRollup(false)
-                                .build())
-                .setMaxRowCount(1000000000)
-                .buildOnheap();
+        ObjectMapper jsonMapper = new DefaultObjectMapper();
+        InjectableValues.Std injectableValues = new InjectableValues.Std();
+        injectableValues.addValue(ExprMacroTable.class, ExprMacroTable.nil());
+        jsonMapper.setInjectableValues(injectableValues);
+
+        IndexIO indexIo = new IndexIO(jsonMapper, () -> 0);
+        IndexMergerV9 indexMergerV9 = new IndexMergerV9(jsonMapper, indexIo, OffHeapMemorySegmentWriteOutMediumFactory.instance());
+        ObjectMapper objectMapper = new ObjectMapper();
+        IndexSpec indexSpec = objectMapper.readValue(SETTINGS, IndexSpec.class);
+
+        indexMergerV9.persist(incrementalIndex,
+                outputDir,
+                indexSpec,
+                null);
     }
 
-    @Override
-    public <I> Iterator<I> getMatches(Object filter)
-    {
-        Map<Index, Object> self = new HashMap<>();
-        self.put(this, filter);
-
-        return getMatches(self);
-    }
-
-    // Multiple predicates only support AND operation
-    // operator support IN, Between……And, >=, >, <=, <, !=, Not IN
-    private List<DimFilter> predicateToFilter(Domain predicate)
+    /**
+     * Given a Domain, extract the DimFilters
+     * <p>
+     * Supported operators: IN, Between, >=, >, <=, <, !=, Not IN
+     *
+     * @param predicate
+     * @return
+     */
+    private static List<DimFilter> predicateToFilter(Domain predicate)
     {
         List<String> in = new ArrayList<>();
         List<DimFilter> orFilters = new ArrayList<>();
@@ -203,15 +224,15 @@ public class BitMapIndex<T>
             // unique value(for example: id=1, id in (1,2)), bound: EXACTLY
             if (range.isSingleValue()) {
                 String dimensionValue;
-                dimensionValue = String.valueOf(getRangeValue(range.getSingleValue(), javaType));
+                dimensionValue = String.valueOf(rangeValueToString(range.getSingleValue(), javaType));
                 in.add(dimensionValue);
             }
             // with upper/lower value, bound: ABOVE/BELOW
             else {
                 lower = (range.getLow().getValueBlock().isPresent()) ?
-                        String.valueOf(getRangeValue(range.getLow().getValue(), javaType)) : null;
+                        String.valueOf(rangeValueToString(range.getLow().getValue(), javaType)) : null;
                 upper = (range.getHigh().getValueBlock().isPresent()) ?
-                        String.valueOf(getRangeValue(range.getHigh().getValue(), javaType)) : null;
+                        String.valueOf(rangeValueToString(range.getHigh().getValue(), javaType)) : null;
                 lowerStrict = (lower != null) ? range.getLow().getBound() == Marker.Bound.ABOVE : null;
                 upperStrict = (upper != null) ? range.getHigh().getBound() == Marker.Bound.BELOW : null;
 
@@ -251,9 +272,27 @@ public class BitMapIndex<T>
         return filterList;
     }
 
-    private String getRangeValue(Object object, Class<?> javaType)
+    /**
+     * <pre>
+     *  get range value, if it is slice, we should change it to string
+     * </pre>
+     *
+     * @param object   value
+     * @param javaType value java type
+     * @return string
+     */
+    private static String rangeValueToString(Object object, Class<?> javaType)
     {
         return javaType == Slice.class ? ((Slice) object).toStringUtf8() : object.toString();
+    }
+
+    @Override
+    public <I> Iterator<I> getMatches(Object filter)
+    {
+        Map<Index, Object> self = new HashMap<>();
+        self.put(this, filter);
+
+        return getMatches(self);
     }
 
     @Override
@@ -275,9 +314,9 @@ public class BitMapIndex<T>
             events.put(COLUMN_NAME, value);
             MapBasedInputRow mapBasedInputRow = new MapBasedInputRow(rows.get(), Collections.singletonList(COLUMN_NAME), events);
             try {
-                incrementalIndex.add(mapBasedInputRow);
+                getOrInitIncrementalIndex().add(mapBasedInputRow);
             }
-            catch (IndexSizeExceededException e) {
+            catch (IOException e) {
                 throw new RuntimeException(e);
             }
             rows.incrementAndGet();
@@ -296,13 +335,13 @@ public class BitMapIndex<T>
             throws IllegalArgumentException
     {
         if (!(value instanceof Domain)) {
-            throw new IllegalArgumentException(String.format("Value must be a Domain."));
+            throw new IllegalArgumentException("Value must be a Domain.");
         }
 
         Iterator iterator = getMatches(value);
 
         if (iterator == null) {
-            throw new IllegalArgumentException(String.format("Operation not supported."));
+            throw new IllegalArgumentException("Operation not supported.");
         }
 
         return iterator.hasNext();
@@ -333,7 +372,7 @@ public class BitMapIndex<T>
                 indexOutDir.mkdirs();
             }
             // write index files to directory
-            indexMergerV9.persist(incrementalIndex, indexOutDir, indexSpec, null);
+            persist(getOrInitIncrementalIndex(), indexOutDir);
 
             // convert the files in the directory into a single stream
             combineDirIntoStream(out, indexOutDir);
@@ -353,11 +392,23 @@ public class BitMapIndex<T>
                 indexExtractDir.mkdirs();
             }
             extractInputStreamToDir(in, indexExtractDir);
-            queryIndex = indexIo.loadIndex(indexExtractDir);
+            queryableIndex = load(indexExtractDir);
         }
         finally {
             FileUtils.deleteDirectory(tmpDir);
         }
+    }
+
+    @Override
+    public int getExpectedNumOfEntries()
+    {
+        return expectedNumOfEntries;
+    }
+
+    @Override
+    public void setExpectedNumOfEntries(int expectedNumOfEntries)
+    {
+        this.expectedNumOfEntries = expectedNumOfEntries;
     }
 
     @Override
@@ -377,15 +428,23 @@ public class BitMapIndex<T>
         for (Map.Entry<BitMapIndex, Domain> entry : bitMapIndexDomainMap.entrySet()) {
             BitMapIndex bitMapIndex = entry.getKey();
             Domain predicate = entry.getValue();
-            List<DimFilter> dimFilters = bitMapIndex.predicateToFilter(predicate);
+            List<DimFilter> dimFilters = predicateToFilter(predicate);
 
             List<Filter> filters = dimFilters.stream()
                     .map(filter -> filter.toFilter()).collect(toList());
 
+            QueryableIndex queryableIndex = bitMapIndex.getQueryableIndex();
+
+            // if queryableIndex is null, it means the index has not been loaded from disk
+            // so it cannot be queried
+            if (queryableIndex == null) {
+                continue;
+            }
+
             ColumnSelectorBitmapIndexSelector bitmapIndexSelector = new ColumnSelectorBitmapIndexSelector(
-                    bitMapIndex.queryIndex.getBitmapFactoryForDimensions(),
+                    queryableIndex.getBitmapFactoryForDimensions(),
                     VirtualColumns.nullToEmpty(null),
-                    bitMapIndex.queryIndex);
+                    queryableIndex);
             BitmapResultFactory<?> bitmapResultFactory = new DefaultBitmapResultFactory(bitmapIndexSelector.getBitmapFactory());
 
             if (filters.size() == 0) {
@@ -426,12 +485,13 @@ public class BitMapIndex<T>
 
     /**
      * Reads the files from the provided dir and writes them to the output stream
-     *
+     * <p>
      * A header is added at the start to provide file info
-     *
+     * <p>
      * file1Name:file1Length,file2Name:file2Length#
      * file1Content
      * file2Content
+     *
      * @param outputStream
      * @param dir
      * @throws IOException
@@ -469,8 +529,9 @@ public class BitMapIndex<T>
 
     /**
      * Corresponding method to combineDirIntoStream()
-     *
+     * <p>
      * Extracts the files from the stream and write them to the output dir
+     *
      * @param inputStream
      * @param outputDir
      * @throws IOException
@@ -501,5 +562,35 @@ public class BitMapIndex<T>
                 }
             }
         }
+    }
+
+    /**
+     * Gets or initializes an IncrementalIndex to which values to should added
+     * Note: the IncrementalIndex can't be queried until it is first persisted
+     * to disk
+     *
+     * @return
+     */
+    private IncrementalIndex getOrInitIncrementalIndex()
+    {
+        if (incrementalIndex == null) {
+            incrementalIndex = new IncrementalIndex.Builder()
+                    .setIndexSchema(
+                            new IncrementalIndexSchema.Builder()
+                                    .withTimestampSpec(new TimestampSpec("timestamp", "iso", null))
+                                    .withQueryGranularity(Granularities.NONE)
+                                    .withDimensionsSpec(new DimensionsSpec(Collections.singletonList(new StringDimensionSchema(COLUMN_NAME))))
+                                    .withRollup(false)
+                                    .build())
+                    .setMaxRowCount(getExpectedNumOfEntries())
+                    .buildOnheap();
+        }
+
+        return incrementalIndex;
+    }
+
+    QueryableIndex getQueryableIndex()
+    {
+        return this.queryableIndex;
     }
 }

@@ -69,7 +69,9 @@ public class TestSplitUtils
         mockSplits.add(new Split(new CatalogName("bogus_catalog"), mock3, Lifespan.taskWide()));
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
-        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.buildPredicates(stage), nextSplits, new HeuristicIndexerManager(new FileSystemClientManager()));
+        HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
+        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.getExpression(stage),
+                PredicateExtractor.getFullyQualifiedName(stage), nextSplits, indexerManager);
         assertNotNull(filteredSplits);
         assertEquals(filteredSplits.size(), 4);
     }

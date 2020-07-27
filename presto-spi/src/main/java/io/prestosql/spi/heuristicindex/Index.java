@@ -163,4 +163,8 @@ public interface Index<T>
     default void setProperties(Properties properties)
     {
     }
+
+    int getExpectedNumOfEntries();
+
+    void setExpectedNumOfEntries(int expectedNumOfEntries);
 }
