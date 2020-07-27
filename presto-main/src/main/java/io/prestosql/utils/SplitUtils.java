@@ -17,11 +17,12 @@ package io.prestosql.utils;
 import com.google.common.cache.CacheLoader;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
-import io.prestosql.heuristicindex.LocalIndexCache;
-import io.prestosql.heuristicindex.LocalIndexCacheLoader;
+import io.prestosql.heuristicindex.IndexCache;
+import io.prestosql.heuristicindex.IndexCacheLoader;
 import io.prestosql.heuristicindex.SplitFilter;
 import io.prestosql.heuristicindex.SplitFilterFactory;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.split.SplitSource;
 
@@ -29,6 +30,25 @@ import java.util.List;
 
 public class SplitUtils
 {
+    private static CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader;
+    private static IndexCache indexCache;
+    private static SplitFilterFactory splitFilterFactory;
+
+    private static synchronized void initCache(IndexClient indexClient)
+    {
+        if (cacheLoader == null) {
+            cacheLoader = new IndexCacheLoader(indexClient);
+        }
+
+        if (indexCache == null) {
+            indexCache = new IndexCache(cacheLoader);
+        }
+
+        if (splitFilterFactory == null) {
+            splitFilterFactory = new SplitFilterFactory(indexCache);
+        }
+    }
+
     private SplitUtils()
     {
     }
@@ -42,11 +62,9 @@ public class SplitUtils
         // hetu: apply filtering
         List<Split> filteredSplits = nextSplits.getSplits();
 
-        // Use a filesystem access client to initialize cache loader, then the IndexCache
-        CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new LocalIndexCacheLoader(heuristicIndexerManager.getIndexClient());
-        LocalIndexCache indexCache = new LocalIndexCache(cacheLoader);
-
-        SplitFilterFactory splitFilterFactory = new SplitFilterFactory(indexCache);
+        if (splitFilterFactory == null) {
+            initCache(heuristicIndexerManager.getIndexClient());
+        }
 
         for (Predicate predicate : predicateList) {
             //hetu: get filter for each predicate

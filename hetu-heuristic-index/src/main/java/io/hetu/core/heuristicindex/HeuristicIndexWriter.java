@@ -185,7 +185,7 @@ public class HeuristicIndexWriter
                             // the indexTypesMap contains all the supported index types
                             // the instances in the map are the "base" instances bc they have their properties set
                             // we need to create a new Index instance for each split and copy the properties the base has
-                            Index indexTypeBaseObj = indexTypesMap.get(indexType);
+                            Index indexTypeBaseObj = indexTypesMap.get(indexType.toLowerCase(Locale.ENGLISH));
                             if (indexTypeBaseObj == null) {
                                 String msg = String.format(Locale.ENGLISH, "Index type %s not supported.", indexType);
                                 LOG.error(msg);

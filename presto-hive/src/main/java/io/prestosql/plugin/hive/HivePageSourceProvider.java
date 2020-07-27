@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
-import io.prestosql.plugin.hive.util.IndexManager;
+import io.prestosql.plugin.hive.util.IndexCache;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
@@ -71,7 +71,7 @@ public class HivePageSourceProvider
     private final Set<HivePageSourceFactory> pageSourceFactories;
 
     private static final String HIVE_DEFAULT_PARTITION_VALUE = "\\N";
-    private final IndexManager indexManager;
+    private final IndexCache indexCache;
 
     @Inject
     public HivePageSourceProvider(
@@ -80,7 +80,7 @@ public class HivePageSourceProvider
             Set<HiveRecordCursorProvider> cursorProviders,
             Set<HivePageSourceFactory> pageSourceFactories,
             TypeManager typeManager,
-            IndexManager indexManager)
+            IndexCache indexCache)
     {
         requireNonNull(hiveConfig, "hiveConfig is null");
         this.hiveStorageTimeZone = hiveConfig.getDateTimeZone();
@@ -89,7 +89,7 @@ public class HivePageSourceProvider
         this.pageSourceFactories = ImmutableSet.copyOf(
                 requireNonNull(pageSourceFactories, "pageSourceFactories is null"));
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
-        this.indexManager = indexManager;
+        this.indexCache = indexCache;
     }
 
     @Override
@@ -127,8 +127,8 @@ public class HivePageSourceProvider
                 new HdfsEnvironment.HdfsContext(session, hiveSplit.getDatabase(), hiveSplit.getTable()), path);
 
         List<IndexMetadata> indexes = null;
-        if (indexManager != null) {
-            indexes = indexManager.getIndices(
+        if (indexCache != null) {
+            indexes = indexCache.getIndices(
                     session.getCatalog().orElse(null),
                     hiveTable.getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
                     hiveTable.getPartitionColumns());

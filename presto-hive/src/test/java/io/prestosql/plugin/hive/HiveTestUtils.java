@@ -28,7 +28,8 @@ import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
 import io.prestosql.plugin.hive.rcfile.RcFilePageSourceFactory;
 import io.prestosql.plugin.hive.s3.HiveS3Config;
 import io.prestosql.plugin.hive.s3.PrestoS3ConfigurationInitializer;
-import io.prestosql.plugin.hive.util.IndexManager;
+import io.prestosql.plugin.hive.util.IndexCache;
+import io.prestosql.plugin.hive.util.IndexCacheLoader;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -36,6 +37,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.NamedTypeSignature;
@@ -102,9 +105,16 @@ public final class HiveTestUtils
                 .build();
     }
 
-    public static IndexManager getDefaultIndexManager()
+    public static IndexCache getNoOpIndexCache()
     {
-        return new IndexManager((catalog, hiveTable, hiveSplit, effectivePredicate, partitions) -> ImmutableList.of());
+        return new IndexCache(new IndexCacheLoader(null))
+        {
+            @Override
+            public List<IndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit, TupleDomain<HiveColumnHandle> effectivePredicate, List<HiveColumnHandle> partitions)
+            {
+                return ImmutableList.of();
+            }
+        };
     }
 
     public static Set<HiveRecordCursorProvider> getDefaultHiveRecordCursorProvider(HiveConfig hiveConfig)

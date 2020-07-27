@@ -78,7 +78,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -762,20 +761,6 @@ public class SqlQueryExecution
         // Loading properties into PropertyService for later reference
         private void loadConfigToService(HetuConfig hetuConfig)
         {
-            PropertyService.setProperty(HetuConstant.FILTER_ENABLED, hetuConfig.isFilterEnabled());
-            if (hetuConfig.isFilterEnabled()) {
-                requireNonNull(hetuConfig.getMaxIndicesInCache(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is true", HetuConstant.FILTER_MAX_INDICES_IN_CACHE, HetuConstant.FILTER_ENABLED));
-                PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, hetuConfig.getMaxIndicesInCache());
-
-                requireNonNull(hetuConfig.getIndexStoreUri(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is true", HetuConstant.INDEXSTORE_URI, HetuConstant.FILTER_ENABLED));
-                PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, hetuConfig.getIndexStoreUri());
-
-                requireNonNull(hetuConfig.getIndexStoreFileSystemProfile(), String.format(Locale.ENGLISH,
-                        "%s is required when %s is true", HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, HetuConstant.FILTER_ENABLED));
-                PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, hetuConfig.getIndexStoreFileSystemProfile());
-            }
             PropertyService.setProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED, hetuConfig.isSplitCacheMapEnabled());
             PropertyService.setProperty(HetuConstant.SPLIT_CACHE_STATE_UPDATE_INTERVAL, hetuConfig.getSplitCacheStateUpdateInterval());
         }

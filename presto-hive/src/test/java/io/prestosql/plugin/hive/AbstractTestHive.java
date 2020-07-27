@@ -202,8 +202,8 @@ import static io.prestosql.plugin.hive.HiveTestUtils.arrayType;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveDataStreamFactories;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveFileWriterFactories;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveRecordCursorProvider;
-import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultIndexManager;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultOrcFileWriterFactory;
+import static io.prestosql.plugin.hive.HiveTestUtils.getNoOpIndexCache;
 import static io.prestosql.plugin.hive.HiveTestUtils.getTypes;
 import static io.prestosql.plugin.hive.HiveTestUtils.mapType;
 import static io.prestosql.plugin.hive.HiveTestUtils.rowType;
@@ -776,7 +776,7 @@ public abstract class AbstractTestHive
                 new HiveSessionProperties(hiveConfig, new OrcFileWriterConfig(), new ParquetFileWriterConfig()),
                 new HiveWriterStats(),
                 getDefaultOrcFileWriterFactory(hiveConfig));
-        pageSourceProvider = new HivePageSourceProvider(hiveConfig, hdfsEnvironment, getDefaultHiveRecordCursorProvider(hiveConfig), getDefaultHiveDataStreamFactories(hiveConfig), TYPE_MANAGER, getDefaultIndexManager());
+        pageSourceProvider = new HivePageSourceProvider(hiveConfig, hdfsEnvironment, getDefaultHiveRecordCursorProvider(hiveConfig), getDefaultHiveDataStreamFactories(hiveConfig), TYPE_MANAGER, getNoOpIndexCache());
     }
 
     /**
