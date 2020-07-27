@@ -15,6 +15,7 @@
 package io.prestosql.utils;
 
 import com.google.common.cache.CacheLoader;
+import io.airlift.log.Logger;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.heuristicindex.IndexCache;
@@ -25,60 +26,130 @@ import io.prestosql.metadata.Split;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.split.SplitSource;
+import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.InListExpression;
+import io.prestosql.sql.tree.InPredicate;
+import io.prestosql.sql.tree.LogicalBinaryExpression;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class SplitUtils
 {
-    private static CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader;
-    private static IndexCache indexCache;
+    private static final Logger log = Logger.get(SplitUtils.class);
+    private static final AtomicLong totalSplitsProcessed = new AtomicLong();
+    private static final AtomicLong splitsFiltered = new AtomicLong();
     private static SplitFilterFactory splitFilterFactory;
-
-    private static synchronized void initCache(IndexClient indexClient)
-    {
-        if (cacheLoader == null) {
-            cacheLoader = new IndexCacheLoader(indexClient);
-        }
-
-        if (indexCache == null) {
-            indexCache = new IndexCache(cacheLoader);
-        }
-
-        if (splitFilterFactory == null) {
-            splitFilterFactory = new SplitFilterFactory(indexCache);
-        }
-    }
 
     private SplitUtils()
     {
     }
 
-    public static List<Split> getFilteredSplit(List<Predicate> predicateList, SplitSource.SplitBatch nextSplits, HeuristicIndexerManager heuristicIndexerManager)
+    private static synchronized void initCache(IndexClient indexClient)
     {
-        if (predicateList.isEmpty()) {
+        if (splitFilterFactory == null) {
+            CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new IndexCacheLoader(indexClient);
+            IndexCache indexCache = new IndexCache(cacheLoader);
+            splitFilterFactory = new SplitFilterFactory(indexCache);
+        }
+    }
+
+    public static List<Split> getFilteredSplit(Optional<Expression> expression, Optional<String> tableName,
+                                               SplitSource.SplitBatch nextSplits, HeuristicIndexerManager heuristicIndexerManager)
+    {
+        if (!expression.isPresent() || !tableName.isPresent()) {
             return nextSplits.getSplits();
         }
-
-        // hetu: apply filtering
-        List<Split> filteredSplits = nextSplits.getSplits();
 
         if (splitFilterFactory == null) {
             initCache(heuristicIndexerManager.getIndexClient());
         }
 
-        for (Predicate predicate : predicateList) {
-            //hetu: get filter for each predicate
+        List<Split> allSplits = nextSplits.getSplits();
+        String fullQualifiedTableName = tableName.get();
+        long initialSplitsSize = allSplits.size();
+
+        // apply filtering use heuristic indexes
+        List<Split> splitsToReturn = splitFilter(expression.get(), allSplits, fullQualifiedTableName);
+
+        if (log.isDebugEnabled()) {
+            log.debug("totalSplitsProcessed: " + totalSplitsProcessed.addAndGet(initialSplitsSize));
+            log.debug("splitsFiltered: " + splitsFiltered.addAndGet(initialSplitsSize - splitsToReturn.size()));
+        }
+
+        return splitsToReturn;
+    }
+
+    private static List<Split> splitFilter(Expression expression, List<Split> splitsToReturn, String fullQualifiedTableName)
+    {
+        if (expression instanceof ComparisonExpression) {
+            // get filter for each predicate
             // the SplitFilterFactory will return a SplitFilter that has the applicable indexes
             // based on the predicate, but no filtering has been performed yet
-            SplitFilter splitFilter = splitFilterFactory.getFilter(predicate, filteredSplits);
-            //oneqeury: do filter on splits to remove invalid splits from filteredSplits
-            filteredSplits = splitFilter.filter(filteredSplits, predicate.getValue());
+            Predicate predicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) expression, fullQualifiedTableName);
+            SplitFilter splitFilter = splitFilterFactory.getFilter(predicate, splitsToReturn);
+            // do filter on splits to remove invalid splits from filteredSplits
+            splitsToReturn = splitFilter.filter(splitsToReturn, predicate.getValue());
         }
-        return filteredSplits;
+
+        if (expression instanceof LogicalBinaryExpression) {
+            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) expression;
+            LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
+
+            // select * from hive.tpch.nation where nationKey = 24 and name = 'CANADA';
+            // if is an AND operator, the splits are first filtered using the index on nationKey,
+            // the remaining splits are then filtered using the index on name column
+            if ((operator == LogicalBinaryExpression.Operator.AND)) {
+                List<Split> splitsRemain = splitFilter(lbExpression.getLeft(), splitsToReturn, fullQualifiedTableName);
+                splitsToReturn = splitFilter(lbExpression.getRight(), splitsRemain, fullQualifiedTableName);
+            }
+            // select * from hive.tpch.nation where nationKey = 24 or name = 'CANADA';
+            // if is an OR operator, apply filtering on nationKey, the splits that match are to be returned,
+            // for splits that didn’t match the nationKey filter, the name column filter is applied, if any splits match, they will also be returned.
+            else if ((operator == LogicalBinaryExpression.Operator.OR)) {
+                List<Split> splitsNotMatched = splitsToReturn;
+                splitsToReturn = splitFilter(lbExpression.getLeft(), splitsToReturn, fullQualifiedTableName);
+
+                splitsNotMatched.removeAll(splitsToReturn);
+                List<Split> splitsMatched = splitFilter(lbExpression.getRight(), splitsNotMatched, fullQualifiedTableName);
+
+                splitsToReturn.addAll(splitsMatched);
+            }
+            else {
+                throw new IllegalArgumentException("Unsupported logical expression type: " + operator);
+            }
+        }
+
+        if (expression instanceof InPredicate) {
+            Expression valueList = ((InPredicate) expression).getValueList();
+            if (valueList instanceof InListExpression) {
+                InListExpression inListExpression = (InListExpression) valueList;
+                List<Split> splitsNotMatched = splitsToReturn;
+                List<Split> splitsPrepareToReturn = new ArrayList<>();
+
+                for (Expression expr : inListExpression.getValues()) {
+                    ComparisonExpression comparisonExpression = new ComparisonExpression(
+                            ComparisonExpression.Operator.EQUAL, ((InPredicate) expression).getValue(), expr);
+
+                    List<Split> splitsMatched = splitFilter(comparisonExpression, splitsNotMatched, fullQualifiedTableName);
+                    splitsNotMatched.removeAll(splitsMatched);
+                    splitsPrepareToReturn.addAll(splitsMatched);
+                }
+
+                if (inListExpression != null) {
+                    splitsToReturn = splitsPrepareToReturn;
+                }
+            }
+        }
+
+        return splitsToReturn;
     }
 
     public static String getSplitKey(Split split)
     {
-        return String.format("%s:%s", split.getCatalogName(), split.getConnectorSplit().getFilePath());
+        return split.getCatalogName() + ":" + split.getConnectorSplit().getFilePath();
     }
 }

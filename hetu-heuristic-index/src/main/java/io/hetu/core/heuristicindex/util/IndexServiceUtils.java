@@ -19,7 +19,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Locale;
 import java.util.Properties;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -69,7 +68,7 @@ public class IndexServiceUtils
      */
     public static void isFileExisting(File file) throws IOException
     {
-        checkArgument(file.exists(), String.format(Locale.ROOT, "%s is not found", file.getCanonicalPath()));
+        checkArgument(file.exists(), file.getCanonicalPath() + " not found");
     }
 
     /**

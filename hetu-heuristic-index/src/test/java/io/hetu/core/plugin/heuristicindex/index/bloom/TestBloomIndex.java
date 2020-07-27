@@ -46,6 +46,7 @@ public class TestBloomIndex
         // Test String bloom indexer
         BloomIndex<String> stringBloomIndex = new BloomIndex<>();
         String[] testValues = new String[]{"a", "ab", "测试", "\n", "%#!", ":dfs"};
+        stringBloomIndex.setExpectedNumOfEntries(testValues.length);
         stringBloomIndex.addValues(testValues);
 
         assertTrue(stringBloomIndex.mightContain("a"));
@@ -98,7 +99,7 @@ public class TestBloomIndex
             File testFile = folder.newFile();
 
             BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-            String[] testValues = new String[] {"%#!", ":dfs", "测试", "\n", "ab", "a"};
+            String[] testValues = new String[]{"%#!", ":dfs", "测试", "\n", "ab", "a"};
             objectBloomIndex.addValues(testValues);
 
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
@@ -133,7 +134,7 @@ public class TestBloomIndex
 
             // Persist it using one object
             BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-            String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+            String[] testValues = new String[]{"a", "ab", "测试", "\n", "%#!", ":dfs"};
             objectBloomIndex.addValues(testValues);
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
                 objectBloomIndex.persist(fo);
@@ -204,5 +205,26 @@ public class TestBloomIndex
         Integer[] testValues = new Integer[]{1, 2, 3};
         index.addValues(testValues);
         assertThrows(IllegalArgumentException.class, () -> index.matches(1, Operator.NOT_EQUAL));
+    }
+
+    @Test
+    public void testSize()
+    {
+        // adding 3 values to default size should pass
+        BloomIndex defaultSizedIndex = new BloomIndex();
+        assertEquals(defaultSizedIndex.getExpectedNumOfEntries(), BloomIndex.DEFAULT_EXPECTED_NUM_OF_SIZE);
+        defaultSizedIndex.addValues(new Float[]{1f, 2f, 3f});
+
+        // adding 2 values to an index of size 2 should pass
+        BloomIndex equalSizedIndex = new BloomIndex();
+        equalSizedIndex.setExpectedNumOfEntries(2);
+        assertEquals(equalSizedIndex.getExpectedNumOfEntries(), 2);
+        equalSizedIndex.addValues(new Float[]{1f, 2f});
+
+        // adding 3 values to an index of size 2 should pass (bloom doesn't have strict size limit)
+        BloomIndex smallSizedIndex = new BloomIndex();
+        smallSizedIndex.setExpectedNumOfEntries(2);
+        assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
+        smallSizedIndex.addValues(new Float[]{1f, 2f, 3f});
     }
 }

@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static io.airlift.slice.Slices.utf8Slice;
@@ -62,7 +63,7 @@ public class TestBitMapIndex
 
         bitMapIndex.addValues(values);
 
-        File tmp = new File("tmp.bitmap1");
+        File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
             bitMapIndex.persist(outputStream);
@@ -97,7 +98,7 @@ public class TestBitMapIndex
 
         bitMapIndex.addValues(values);
 
-        File tmp = new File("tmp.bitmap2");
+        File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
             bitMapIndex.persist(outputStream);
@@ -132,7 +133,7 @@ public class TestBitMapIndex
 
         bitMapIndex.addValues(values);
 
-        File tmp = new File("tmp.bitmap3");
+        File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
             bitMapIndex.persist(outputStream);
@@ -159,6 +160,7 @@ public class TestBitMapIndex
             throws IOException
     {
         BitMapIndex bitMapIndex = new BitMapIndex();
+        bitMapIndex.setExpectedNumOfEntries(1000000);
 
         Object[] values = new Object[1000000];
         Random r = new Random();
@@ -168,7 +170,7 @@ public class TestBitMapIndex
         }
         bitMapIndex.addValues(values);
 
-        File tmp = new File("tmp.bitmap4");
+        File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
             bitMapIndex.persist(outputStream);
@@ -200,7 +202,7 @@ public class TestBitMapIndex
 
         bitMapIndex.addValues(values);
 
-        File tmp = new File("tmp.bitmap5");
+        File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
             bitMapIndex.persist(outputStream);
@@ -285,5 +287,45 @@ public class TestBitMapIndex
 
         assertEquals(grtOrEqResultSet.size(), 6);
         assertTrue(grtOrEqResultSet.containsAll(Arrays.asList(0, 3, 4, 6, 8, 11)));
+    }
+
+    @Test
+    public void testSize()
+    {
+        // adding 3 values to default size should pass
+        BitMapIndex defaultSizedIndex = new BitMapIndex();
+        assertEquals(defaultSizedIndex.getExpectedNumOfEntries(), BitMapIndex.DEFAULT_EXPECTED_NUM_OF_SIZE);
+        defaultSizedIndex.addValues(Stream.of(new Float[]{1f, 2f, 3f}).map(floatValue -> {
+            if (floatValue == null) {
+                return floatValue;
+            }
+            return Float.floatToRawIntBits(floatValue);
+        }).toArray());
+
+        // adding 2 values to an index of size 2 should pass
+        BitMapIndex equalSizedIndex = new BitMapIndex();
+        equalSizedIndex.setExpectedNumOfEntries(2);
+        assertEquals(equalSizedIndex.getExpectedNumOfEntries(), 2);
+        equalSizedIndex.addValues(Stream.of(new Float[]{1f, 2f}).map(floatValue -> {
+            if (floatValue == null) {
+                return floatValue;
+            }
+            return Float.floatToRawIntBits(floatValue);
+        }).toArray());
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testFailSize()
+    {
+         // adding 3 values to an index of size 2 should fail
+        BitMapIndex smallSizedIndex = new BitMapIndex();
+        smallSizedIndex.setExpectedNumOfEntries(2);
+        assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
+        smallSizedIndex.addValues(Stream.of(new Float[] {1f, 2f, 3f}).map(floatValue -> {
+            if (floatValue == null) {
+                return floatValue;
+            }
+            return Float.floatToRawIntBits(floatValue);
+        }).toArray());
     }
 }

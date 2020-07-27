@@ -82,7 +82,7 @@ public class IndexCache
         Path path = new Path(hiveSplit.getPath());
 
         URI pathUri = URI.create(path.toString());
-        String tableFqn = String.format("%s.%s", catalog, table);
+        String tableFqn = catalog + "." + table;
 
         // for each split, load indexes for each predicate (if the predicate contains an indexed column)
         List<IndexMetadata> splitIndexes = new LinkedList<>();

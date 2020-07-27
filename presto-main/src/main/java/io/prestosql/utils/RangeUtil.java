@@ -30,7 +30,7 @@ public class RangeUtil
             int last = ceilSearch(arr, 0, arr.size() - 1, end);
 
             if (first == -1) {
-                throw new RuntimeException(String.format("The range [%d, %d], if not fully covered by the array [%d, %d]", start, end, arr.get(0), arr.get(arr.size() - 1)));
+                return arr;
             }
 
             // If end is greater than the last index, set last to the last index
