@@ -128,6 +128,15 @@ public class HazelcastStateStore
     }
 
     @Override
+    public StateCollection getOrCreateStateCollection(String collectionName, Type type)
+    {
+        if (!collections.containsKey(collectionName)) {
+            return createStateCollection(collectionName, type);
+        }
+        return collections.get(collectionName);
+    }
+
+    @Override
     public <K, V> StateMap<K, V> createStateMap(String name, MapListener... listeners)
     {
         StateMap<K, V> collection = new HazelcastStateMap<K, V>(hzInstance, name, listeners);

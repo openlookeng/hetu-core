@@ -49,7 +49,7 @@ import java.util.concurrent.TimeUnit;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
-import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataStructure;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -93,7 +93,7 @@ public class BenchmarkDynamicFilterSourceOperator
                     ImmutableList.of(new DynamicFilterSourceOperator.Channel("0", BIGINT, 0, "--")),
                     getDynamicFilteringMaxPerDriverValueCount(TEST_SESSION),
                     getDynamicFilteringMaxPerDriverSize(TEST_SESSION),
-                    getDynamicFilteringDataStructure(TEST_SESSION), DynamicFilter.Type.LOCAL,
+                    getDynamicFilteringDataType(TEST_SESSION), DynamicFilter.Type.LOCAL,
                     nodeInfo, null);
         }
 

@@ -14,16 +14,16 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
-import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
-import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
-import io.hetu.core.common.util.BloomFilter;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.Warehouse;

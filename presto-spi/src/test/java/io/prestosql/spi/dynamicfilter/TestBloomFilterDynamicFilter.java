@@ -12,10 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.common.dynamicfilter;
+package io.prestosql.spi.dynamicfilter;
 
 import io.airlift.slice.Slice;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import org.testng.annotations.Test;
 
 import java.util.HashSet;

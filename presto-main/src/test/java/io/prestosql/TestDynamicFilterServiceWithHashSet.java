@@ -16,21 +16,16 @@ package io.prestosql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.dynamicfilter.DynamicFilterService;
-import io.prestosql.execution.StageStateMachine;
-import io.prestosql.execution.TaskId;
-import io.prestosql.metadata.InternalNode;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.statestore.StateCollection;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.testing.assertions.Assert;
@@ -38,20 +33,18 @@ import io.prestosql.utils.DynamicFilterUtils;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
+import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_DATA_TYPE;
 import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
+import static io.prestosql.utils.TestDynamicFilterUtil.registerDf;
+import static io.prestosql.utils.TestDynamicFilterUtil.setupMockStateStore;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -69,9 +62,12 @@ public class TestDynamicFilterServiceWithHashSet
     private void setUpHashSet()
     {
         filterId = "df2";
-        session = testSessionBuilder().setQueryId(QueryId.valueOf("qq1")).build();
+        session = testSessionBuilder()
+                .setQueryId(QueryId.valueOf("qq1"))
+                .setSystemProperty(DYNAMIC_FILTERING_DATA_TYPE, "HASHSET")
+                .build();
 
-        StateStore stateStore = setupMockStateStoreHashSet(new HashMap<>(), new HashMap<>(), new HashSet<>(), new HashSet<>(),
+        StateStore stateStore = setupMockStateStore(new HashMap<>(), new HashMap<>(), new HashSet<>(), new HashSet<>(),
                 new HashSet<>(), new HashSet<>(), session.getQueryId().toString(), filterId);
 
         stateStoreProvider = mock(StateStoreProvider.class);
@@ -87,7 +83,7 @@ public class TestDynamicFilterServiceWithHashSet
     {
         setUpHashSet();
         filterId = "df2";
-        registerDf(filterId, session);
+        registerDf(filterId, session, PARTITIONED, dynamicFilterService);
 
         // Test getDynamicFilterSupplier
         SymbolReference mockExpression = mock(SymbolReference.class);
@@ -130,41 +126,6 @@ public class TestDynamicFilterServiceWithHashSet
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set for invalid or non-existing queryId");
     }
 
-    private void registerDf(String filterId, Session session)
-    {
-        JoinNode node = mock(JoinNode.class);
-        HashMap<String, Symbol> dfs = new HashMap<>();
-
-        List<JoinNode.EquiJoinClause> criteria = new ArrayList<JoinNode.EquiJoinClause>();
-        Symbol right = new Symbol("rightCol");
-        Symbol left = new Symbol("leftCol");
-        JoinNode.EquiJoinClause clause = new JoinNode.EquiJoinClause(left, right);
-        criteria.add(clause);
-        dfs.put(filterId, right);
-
-        when(node.getCriteria()).thenReturn(criteria);
-        when(node.getDynamicFilters()).thenReturn(dfs);
-        when(node.getDistributionType()).thenReturn(Optional.of(PARTITIONED));
-
-        TaskId taskid = mock(TaskId.class);
-        HashSet<TaskId> tasks = new HashSet<>();
-        tasks.add(taskid);
-        StageStateMachine stateMachine = mock(StageStateMachine.class);
-
-        when(stateMachine.getSession()).thenReturn(session);
-
-        InternalNode worker = mock(InternalNode.class);
-        InternalNode worker2 = mock(InternalNode.class);
-        HashSet<InternalNode> workers = new HashSet<>();
-        when(worker.getNodeIdentifier()).thenReturn("w1");
-        when(worker2.getNodeIdentifier()).thenReturn("w2");
-
-        workers.add(worker);
-        workers.add(worker2);
-
-        dynamicFilterService.registerTasks(node, tasks, workers, stateMachine);
-    }
-
     private Set fetchDynamicFilterHashSet(String filterId, String queryId)
     {
         Set hashSet = (Set) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP))
@@ -184,68 +145,15 @@ public class TestDynamicFilterServiceWithHashSet
         }
 
         String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId);
-        String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, filterId, queryId);
-        ((StateMap) stateStoreProvider.getStateStore()
-                .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).put(typeKey, DynamicFilterUtils.HASHSETTYPEGLOBAL);
 
         try {
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key)).add(filter);
-            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, filterId, queryId))).add(driverId);
+            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId))).add(driverId);
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId))).add(workerId);
         }
 
         catch (Exception e) {
             Assert.fail("could not register finish filter, Exception happened:" + e.getMessage());
         }
-    }
-
-    private StateStore setupMockStateStoreHashSet(Map<String, Set> mergeMap, Map<String, String> dfTypeMap, Set<String> registerSet, Set<String> finishSet, Set<String> workers, Set<Set> partial, String queryId, String filterId)
-    {
-        StateMap mockMergeMap = mock(StateMap.class);
-        StateMap mockDFTypeMap = mock(StateMap.class);
-        StateSet mockPartialSet = mock(StateSet.class);
-        StateSet mockRegisterSet = mock(StateSet.class);
-        StateSet mockWorkersSet = mock(StateSet.class);
-        StateSet mockFinishSet = mock(StateSet.class);
-        StateStore stateStore = mock(StateStore.class);
-
-        when(mockMergeMap.put(anyString(), any(Set.class))).thenAnswer(i -> mergeMap.put((String) i.getArguments()[0], (Set) i.getArguments()[1]));
-        when(mockDFTypeMap.put(anyString(), anyString())).thenAnswer(i -> dfTypeMap.put((String) i.getArguments()[0], (String) i.getArguments()[1]));
-        when(mockWorkersSet.add(anyString())).thenAnswer(i -> workers.add((String) i.getArguments()[0]));
-        when(mockRegisterSet.add(anyString())).thenAnswer(i -> registerSet.add((String) i.getArguments()[0]));
-        when(mockFinishSet.add(anyString())).thenAnswer(i -> finishSet.add((String) i.getArguments()[0]));
-        when(mockPartialSet.add(any(Set.class))).thenAnswer(i -> partial.add((Set) i.getArguments()[0]));
-
-        when(mockMergeMap.get(anyString())).thenAnswer(i -> mergeMap.get(i.getArguments()[0]));
-        when(mockDFTypeMap.get(anyString())).thenAnswer(i -> dfTypeMap.get(i.getArguments()[0]));
-
-        when(mockMergeMap.getAll()).thenReturn(mergeMap);
-        when(mockDFTypeMap.getAll()).thenReturn(dfTypeMap);
-
-        when(mockPartialSet.getAll()).thenReturn(partial);
-        when(mockRegisterSet.size()).thenAnswer(i -> registerSet.size());
-        when(mockPartialSet.size()).thenAnswer(i -> partial.size());
-        when(mockWorkersSet.size()).thenAnswer(i -> workers.size());
-        when(mockFinishSet.size()).thenAnswer(i -> finishSet.size());
-
-        when(stateStore.getStateCollection(DynamicFilterUtils.MERGEMAP)).thenReturn(mockMergeMap);
-        when(stateStore.createStateCollection(DynamicFilterUtils.MERGEMAP, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
-
-        when(stateStore.getStateCollection(DynamicFilterUtils.DFTYPEMAP)).thenReturn(mockDFTypeMap);
-        when(stateStore.createStateCollection(DynamicFilterUtils.DFTYPEMAP, StateCollection.Type.MAP)).thenReturn(mockDFTypeMap);
-
-        when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId))).thenReturn(mockWorkersSet);
-        when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockWorkersSet);
-
-        when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, filterId, queryId))).thenReturn(mockFinishSet);
-        when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockFinishSet);
-
-        when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId))).thenReturn(mockPartialSet);
-        when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockPartialSet);
-
-        when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId))).thenReturn(mockRegisterSet);
-        when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockRegisterSet);
-
-        return stateStore;
     }
 }

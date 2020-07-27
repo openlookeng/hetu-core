@@ -18,22 +18,27 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
-import io.hetu.core.common.dynamicfilter.BloomFilterDynamicFilter;
-import io.hetu.core.common.dynamicfilter.HashSetDynamicFilter;
-import io.hetu.core.common.util.BloomFilter;
+import io.prestosql.Session;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
+import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
@@ -63,11 +68,18 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.threadsNamed;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
+import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.HASHSET;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.GLOBAL;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.LOCAL;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.spi.statestore.StateCollection.Type.MAP;
+import static io.prestosql.spi.statestore.StateCollection.Type.SET;
+import static io.prestosql.utils.DynamicFilterUtils.createKey;
+import static io.prestosql.utils.DynamicFilterUtils.findFilterNodeInStage;
+import static io.prestosql.utils.DynamicFilterUtils.getDynamicFilterDataType;
 import static java.util.Objects.requireNonNull;
 
 public class DynamicFilterService
@@ -75,9 +87,8 @@ public class DynamicFilterService
     private static final Logger log = Logger.get(DynamicFilterService.class);
     private final ScheduledExecutorService filterMergeExecutor;
     private static final int THREAD_POOL_SIZE = 3;
-    private static final int UPDATE_INTERVAL = 20;
+    private static final int MERGE_DYNAMIC_FILTER_INTERVAL = 20;
     private ScheduledFuture<?> backgroundTask;
-    private boolean initialized;
 
     private Map<String, Map<String, DynamicFilterRegistryInfo>> dynamicFilters = new ConcurrentHashMap<>();
     private Map<String, CopyOnWriteArrayList<String>> dynamicFiltersToWorker = new ConcurrentHashMap<>();
@@ -93,8 +104,7 @@ public class DynamicFilterService
     @Inject
     public DynamicFilterService(StateStoreProvider stateStoreProvider)
     {
-        requireNonNull(stateStoreProvider, "State store is null");
-        this.stateStoreProvider = stateStoreProvider;
+        this.stateStoreProvider = requireNonNull(stateStoreProvider, "StateStoreProvider is null");
         this.filterMergeExecutor = Executors.newScheduledThreadPool(THREAD_POOL_SIZE, threadsNamed("dynamic-filter-service-%s"));
     }
 
@@ -111,10 +121,10 @@ public class DynamicFilterService
                     mergeDynamicFilters();
                 }
             }
-            catch (NullPointerException e) {
-                log.error("Error updating query states: " + e.getMessage());
+            catch (Exception e) {
+                log.error("Error merging Dynamic Filters: " + e.getMessage());
             }
-        }, UPDATE_INTERVAL, UPDATE_INTERVAL, TimeUnit.MILLISECONDS);
+        }, 0, MERGE_DYNAMIC_FILTER_INTERVAL, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -131,132 +141,122 @@ public class DynamicFilterService
      */
     private void mergeDynamicFilters()
     {
-        for (Map.Entry<String, Map<String, DynamicFilterRegistryInfo>> outerEntry : dynamicFilters.entrySet()) {
-            String queryId = outerEntry.getKey();
-            for (Map.Entry<String, DynamicFilterRegistryInfo> entry : outerEntry.getValue().entrySet()) {
-                String filterId = entry.getKey();
-                Symbol column = entry.getValue().getSymbol();
-                String filterKey = DynamicFilterUtils.createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
+        final StateStore stateStore = stateStoreProvider.getStateStore();
+        for (Map.Entry<String, Map<String, DynamicFilterRegistryInfo>> queryToDynamicFiltersEntry : dynamicFilters.entrySet()) {
+            final String queryId = queryToDynamicFiltersEntry.getKey();
+            if (!cachedDynamicFilters.containsKey(queryId)) {
+                cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
+            }
+            Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId);
+
+            for (Map.Entry<String, DynamicFilterRegistryInfo> columnToDynamicFilterEntry : queryToDynamicFiltersEntry.getValue().entrySet()) {
+                final String filterId = columnToDynamicFilterEntry.getKey();
+                final Type filterType = columnToDynamicFilterEntry.getValue().getType();
+                final DataType filterDataType = columnToDynamicFilterEntry.getValue().getDataType();
+                final Symbol column = columnToDynamicFilterEntry.getValue().getSymbol();
+                final String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
 
                 if (hasMergeCondition(filterId, queryId)) {
-                    Collection<Object> results = ((StateSet) stateStoreProvider.getStateStore()
-                            .getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId))).getAll();
+                    Collection<Object> results = ((StateSet) stateStore.getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId))).getAll();
 
-                    String typeKey = DynamicFilterUtils.createKey(DynamicFilterUtils.TYPEPREFIX, entry.getKey(), queryId);
-                    String type = (String) ((StateMap) stateStoreProvider.getStateStore()
-                            .getStateCollection(DynamicFilterUtils.DFTYPEMAP)).get(typeKey);
-                    if (type != null) {
-                        if (type.equals(DynamicFilterUtils.BLOOMFILTERTYPEGLOBAL) || type.equals(DynamicFilterUtils.BLOOMFILTERTYPELOCAL)) {
-                            BloomFilter mergedFilter = mergeBloomFilters(results);
-                            if (mergedFilter == null || mergedFilter.expectedFpp() > DynamicFilterUtils.BLOOM_FILTER_EXPECTED_FPP) {
-                                if (mergedFilter == null) {
-                                    log.error("could not merge dynamic filter");
+                    try {
+                        DynamicFilter mergedFilter;
+                        if (filterDataType == BLOOM_FILTER) {
+                            BloomFilter mergedBloomFilter = mergeBloomFilters(results);
+                            if (mergedBloomFilter.expectedFpp() > DynamicFilterUtils.BLOOM_FILTER_EXPECTED_FPP) {
+                                throw new PrestoException(GENERIC_INTERNAL_ERROR, "FPP too high: " + mergedBloomFilter.approximateElementCount());
+                            }
+                            mergedFilter = new BloomFilterDynamicFilter(filterKey, null, mergedBloomFilter, filterType);
+
+                            if (filterType == GLOBAL) {
+                                try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                                    mergedBloomFilter.writeTo(out);
+                                    byte[] filter = out.toByteArray();
+                                    ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, filter);
                                 }
-                                else {
-                                    log.info("FPP too high: " + mergedFilter.approximateElementCount());
-                                }
-                                clearPartialResults(filterId, queryId);
-                                return;
-                            }
-
-                            if (!cachedDynamicFilters.containsKey(queryId)) {
-                                cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
-                            }
-
-                            try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                                mergedFilter.writeTo(out);
-                                byte[] filter = out.toByteArray();
-                                cachedDynamicFilters.get(queryId).put(filterId, new BloomFilterDynamicFilter(filterKey, null, filter, DynamicFilter.Type.GLOBAL));
-                                ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).put(filterKey, filter);
-                                // remove the filter so we don't need to monitor it anymore
-                                outerEntry.getValue().remove(filterId);
-                                log.debug("Merged successfully dynamic filter id: "
-                                        + filterId + "-" + queryId + " type: " + type + ", column: " + column + ", item count: "
-                                        + mergedFilter.approximateElementCount() + ", fpp: " + mergedFilter.expectedFpp());
-                            }
-                            catch (IOException e) {
-                                log.error(e);
-                            }
-                            finally {
-                                clearPartialResults(filterId, queryId);
                             }
                         }
-                        else if (type.equals(DynamicFilterUtils.HASHSETTYPEGLOBAL) || type.equals(DynamicFilterUtils.HASHSETTYPELOCAL)) {
-                            Set merged = mergeHashSets(results);
-                            if (merged == null) {
-                                log.error("could not merge dynamic filter");
-                                clearPartialResults(filterId, queryId);
-                                return;
+                        else if (filterDataType == HASHSET) {
+                            Set mergedSet = mergeHashSets(results);
+                            mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
+
+                            if (filterType == GLOBAL) {
+                                ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, mergedSet);
                             }
-                            if (!cachedDynamicFilters.containsKey(queryId)) {
-                                cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
-                            }
-                            cachedDynamicFilters.get(queryId).put(filterId, new HashSetDynamicFilter(filterKey, null, merged, DynamicFilter.Type.GLOBAL));
-                            ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).put(filterKey, merged);
-                            // remove the filter so we don't need to monitor it anymore
-                            outerEntry.getValue().remove(filterId);
-                            log.info("Merged successfully dynamic filter id using stringsets: " + entry.getKey() + "-" + queryId + " type: " + type + ", column: " + entry.getValue() + ", item count: " + merged.size());
-                            clearPartialResults(filterId, queryId);
                         }
+                        else {
+                            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unsupported filter data type: " + filterDataType);
+                        }
+
+                        log.debug("Merged successfully dynamic filter id: "
+                                + filterId + "-" + queryId + " type: " + filterDataType
+                                + ", column: " + column + ", item count: " + mergedFilter.getSize());
+                        cachedDynamicFiltersForQuery.put(filterId, mergedFilter);
+                    }
+                    catch (IOException | PrestoException e) {
+                        log.error("Could not merge dynamic filter: " + e.getLocalizedMessage());
+                    }
+                    finally {
+                        // remove the filter so we don't need to monitor it anymore
+                        queryToDynamicFiltersEntry.getValue().remove(filterId);
                     }
                 }
             }
         }
     }
 
-    private BloomFilter mergeBloomFilters(Collection partialBloomFilters)
+    private static BloomFilter mergeBloomFilters(Collection partialBloomFilters)
+            throws IOException
     {
         BloomFilter mergedFilter = null;
         for (Object partialBloomFilter : partialBloomFilters) {
-            try {
-                BloomFilter deserializedBloomFilter = BloomFilter.readFrom(new ByteArrayInputStream((byte[]) partialBloomFilter));
-                if (mergedFilter == null) {
-                    mergedFilter = deserializedBloomFilter;
-                }
-                else {
-                    mergedFilter.merge(deserializedBloomFilter);
-                }
+            BloomFilter deserializedBloomFilter = BloomFilter.readFrom(new ByteArrayInputStream((byte[]) partialBloomFilter));
+            if (mergedFilter == null) {
+                mergedFilter = deserializedBloomFilter;
             }
-            catch (IOException e) {
-                mergedFilter = null;
-                log.error(e);
-                break;
+            else {
+                mergedFilter.merge(deserializedBloomFilter);
             }
         }
         return mergedFilter;
     }
 
-    private Set mergeHashSets(Collection<Object> results)
+    private static Set mergeHashSets(Collection results)
+            throws IOException
     {
         Set merged = new HashSet<>();
         for (Object o : results) {
+            if (!(o instanceof Set)) {
+                throw new IOException("Partial HashSet DynamicFilter is invalid.");
+            }
             Set s = (Set) o;
             merged.addAll(s);
         }
         return merged;
     }
 
-    private boolean hasMergeCondition(String filterkey, String queryId)
+    private boolean hasMergeCondition(String filterKey, String queryId)
     {
         int registeredNum = 0;
         int workersNum = 0;
         int finishedNum = 0;
+        final StateStore stateStore = stateStoreProvider.getStateStore();
 
-        StateCollection temp = stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterkey, queryId));
+        StateCollection temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterKey, queryId));
         if (temp != null) {
             registeredNum = temp.size();
         }
-        temp = stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, filterkey, queryId));
+        temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterKey, queryId));
         if (temp != null) {
             finishedNum = temp.size();
         }
-        temp = stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterkey, queryId));
+        temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterKey, queryId));
         if (temp != null) {
             workersNum = temp.size();
         }
 
         if (registeredNum > 0 &&
-                registeredNum == finishedNum && workersNum > 0 && workersNum == dynamicFiltersToWorker.get(filterkey + "-" + queryId).size()) {
+                registeredNum == finishedNum && workersNum > 0 && workersNum == dynamicFiltersToWorker.get(filterKey + "-" + queryId).size()) {
             return true;
         }
         return false;
@@ -272,34 +272,31 @@ public class DynamicFilterService
      */
     public void registerTasks(JoinNode node, Set<TaskId> taskIds, Set<InternalNode> workers, StageStateMachine stateMachine)
     {
-        if (taskIds.isEmpty() || stateStoreProvider.getStateStore() == null) {
+        final StateStore stateStore = stateStoreProvider.getStateStore();
+        if (taskIds.isEmpty() || stateStore == null) {
             return;
         }
         String queryId = stateMachine.getSession().getQueryId().toString();
-        if (!initialized) {
-            stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.MERGEMAP, StateCollection.Type.MAP);
-            stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.DFTYPEMAP, StateCollection.Type.MAP);
-            initialized = true;
-        }
 
         for (Map.Entry<String, Symbol> entry : node.getDynamicFilters().entrySet()) {
             Symbol buildSymbol = node.getCriteria().get(0).getRight();
             if (entry.getValue().getName().equals(buildSymbol.getName())) {
                 String filterId = entry.getKey();
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId), StateCollection.Type.SET);
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId), StateCollection.Type.SET);
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId), StateCollection.Type.SET);
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, filterId, queryId), StateCollection.Type.SET);
+                stateStore.createStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId), SET);
 
                 dynamicFilters.putIfAbsent(queryId, new ConcurrentHashMap<>());
                 Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
-                filters.put(filterId, extractDynamicFilterRegistryInfo(node));
+                filters.put(filterId, extractDynamicFilterRegistryInfo(node, stateMachine.getSession()));
 
                 dynamicFiltersToWorker.putIfAbsent(filterId + "-" + queryId, new CopyOnWriteArrayList<>());
                 CopyOnWriteArrayList workersSet = dynamicFiltersToWorker.get(filterId + "-" + queryId);
                 workersSet.addAll(workers.stream().map(x -> x.getNodeIdentifier()).collect(Collectors.toSet()));
 
-                log.debug("registerTasks source " + filterId + " filters:" + filters + ", workers: " + workers.stream().map(x -> x.getNodeIdentifier()).collect(Collectors.joining(",")) +
+                log.debug("registerTasks source " + filterId + " filters:" + filters + ", workers: "
+                        + workers.stream().map(x -> x.getNodeIdentifier()).collect(Collectors.joining(",")) +
                         ", taskIds: " + taskIds.stream().map(TaskId::toString).collect(Collectors.joining(",")));
             }
         }
@@ -321,8 +318,8 @@ public class DynamicFilterService
                 dynamicFiltersToWorker.remove(filterId + "-" + queryId);
 
                 // Clear cached dynamic filters in state store
-                String filterKey = DynamicFilterUtils.createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
-                ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP)).remove(filterKey);
+                String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
+                ((StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).remove(filterKey);
             }
         }
         dynamicFilters.remove(queryId);
@@ -341,11 +338,10 @@ public class DynamicFilterService
     {
         StateStore stateStore = stateStoreProvider.getStateStore();
         if (stateStore != null) {
-            // Todo: also remove the state store collections
-            clearStatesInStateStore(stateStore, DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId));
-            clearStatesInStateStore(stateStore, DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHREFIX, filterId, queryId));
-            clearStatesInStateStore(stateStore, DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId));
-            clearStatesInStateStore(stateStore, DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId));
+            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId));
+            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId));
+            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId));
+            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId));
         }
     }
 
@@ -403,6 +399,12 @@ public class DynamicFilterService
         ImmutableMap.Builder<String, Symbol> resultBuilder = ImmutableMap.builder();
         for (DynamicFilters.Descriptor descriptor : dynamicFilters) {
             Expression expression = descriptor.getInput();
+
+            // Extract the column symbols from CAST expressions
+            while (expression instanceof Cast) {
+                expression = ((Cast) expression).getExpression();
+            }
+
             if (!(expression instanceof SymbolReference)) {
                 continue;
             }
@@ -411,28 +413,30 @@ public class DynamicFilterService
         return resultBuilder.build();
     }
 
-    private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(JoinNode node)
+    private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(JoinNode node, Session session)
     {
         Symbol symbol = node.getCriteria().get(0).getLeft();
-        DistributionType joinType = node.getDistributionType().orElse(PARTITIONED);
+        List<FilterNode> filterNodes = findFilterNodeInStage(node);
 
-        if (joinType == PARTITIONED) {
-            return new DynamicFilterRegistryInfo(symbol, GLOBAL);
+        if (filterNodes.isEmpty()) {
+            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session);
         }
         else {
-            return new DynamicFilterRegistryInfo(symbol, LOCAL);
+            return new DynamicFilterRegistryInfo(symbol, LOCAL, session);
         }
     }
 
-    static class DynamicFilterRegistryInfo
+    private static class DynamicFilterRegistryInfo
     {
         private Symbol symbol;
         private Type type;
+        private DataType dataType;
 
-        public DynamicFilterRegistryInfo(Symbol symbol, Type type)
+        public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session)
         {
             this.symbol = symbol;
             this.type = type;
+            this.dataType = getDynamicFilterDataType(type, getDynamicFilteringDataType(session));
         }
 
         public Symbol getSymbol()
@@ -443,6 +447,11 @@ public class DynamicFilterService
         public Type getType()
         {
             return type;
+        }
+
+        public DataType getDataType()
+        {
+            return dataType;
         }
     }
 }

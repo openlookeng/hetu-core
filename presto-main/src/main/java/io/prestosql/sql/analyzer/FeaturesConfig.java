@@ -38,6 +38,7 @@ import java.util.List;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
+import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
@@ -136,7 +137,7 @@ public class FeaturesConfig
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering;
     private int dynamicFilteringMaxPerDriverRowCount = 100;
-    private int dynamicFilteringDataStructure;
+    private DynamicFilterDataType dynamicFilteringDataType = BLOOM_FILTER;
     private DataSize dynamicFilteringMaxPerDriverSize = new DataSize(10, KILOBYTE);
     // enable or disable execution plan cache functionality via Session properties
     private boolean enableExecutionPlanCache;
@@ -174,6 +175,12 @@ public class FeaturesConfig
     {
         RANDOM,
         PARTITIONED,
+    }
+
+    public enum DynamicFilterDataType
+    {
+        BLOOM_FILTER,
+        HASHSET,
     }
 
     public double getCpuCostWeight()
@@ -820,15 +827,15 @@ public class FeaturesConfig
         return this;
     }
 
-    public int getDynamicFilteringDataStructure()
+    public DynamicFilterDataType getDynamicFilteringDataType()
     {
-        return dynamicFilteringDataStructure;
+        return dynamicFilteringDataType;
     }
 
-    @Config("experimental.dynamic_filtering_data_structure")
-    public FeaturesConfig setDynamicFilteringDataStructure(int dynamicFilteringDataStructure)
+    @Config("experimental.dynamic-filtering-data-type")
+    public FeaturesConfig setDynamicFilteringDataType(DynamicFilterDataType dynamicFilteringDataType)
     {
-        this.dynamicFilteringDataStructure = dynamicFilteringDataStructure;
+        this.dynamicFilteringDataType = dynamicFilteringDataType;
         return this;
     }
 
@@ -860,7 +867,6 @@ public class FeaturesConfig
     /**
      * Presto can only cache execution plans for supported connectors.
      * This method checks if the session property for enabled execution plan caching
-     *
      */
     public boolean isEnableExecutionPlanCache()
     {

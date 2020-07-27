@@ -66,6 +66,15 @@ public interface StateStore
     StateCollection createStateCollection(String name, StateCollection.Type type);
 
     /**
+     * Get a state collection and it if not exist
+     *
+     * @param name state collection name
+     * @param type state collection type
+     * @return existing or created state collection
+     */
+    StateCollection getOrCreateStateCollection(String name, StateCollection.Type type);
+
+    /**
      * Create state map
      *
      * @param name state map name

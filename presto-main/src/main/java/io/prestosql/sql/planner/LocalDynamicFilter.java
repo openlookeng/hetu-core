@@ -24,16 +24,11 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
-import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.RemoteSourceNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
-import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,6 +40,7 @@ import java.util.function.Consumer;
 
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.sql.DynamicFilters.Descriptor;
+import static io.prestosql.utils.DynamicFilterUtils.findFilterNodeInStage;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 
@@ -71,10 +67,9 @@ public class LocalDynamicFilter
 
     private Map<String, Set> domainResult = new HashMap<>();
 
-    private final StateStoreProvider stateStoreProvider;
     private final DynamicFilter.Type type;
 
-    public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount, StateStoreProvider stateStoreProvider, DynamicFilter.Type type)
+    public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount, DynamicFilter.Type type)
     {
         this.probeSymbols = requireNonNull(probeSymbols, "probeSymbols is null");
         this.buildChannels = requireNonNull(buildChannels, "buildChannels is null");
@@ -86,7 +81,6 @@ public class LocalDynamicFilter
         this.result = TupleDomain.none();
         this.partitionsLeft = partitionCount;
 
-        this.stateStoreProvider = stateStoreProvider;
         this.type = type;
 
         this.isIncomplete = false;
@@ -165,26 +159,22 @@ public class LocalDynamicFilter
         return TupleDomain.withColumnDomains(builder.build());
     }
 
-    public static Optional<LocalDynamicFilter> create(JoinNode planNode, int partitionCount, StateStoreProvider stateStoreProvider)
+    public static Optional<LocalDynamicFilter> create(JoinNode planNode, int partitionCount)
     {
         Set<String> joinDynamicFilters = planNode.getDynamicFilters().keySet();
         // Mapping from probe-side dynamic filters' IDs to their matching probe symbols.
         Multimap<String, Symbol> probeSymbols = MultimapBuilder.treeKeys().arrayListValues().build();
         PlanNode buildNode;
         DynamicFilter.Type type = DynamicFilter.Type.LOCAL;
-        List<PlanNode> remoteSourceNodes = PlanNodeSearcher.searchFrom(planNode.getLeft()).where(LocalDynamicFilter::isRemoteSource).findAll();
-        if (!remoteSourceNodes.isEmpty()) {
+
+        List<FilterNode> filterNodes = findFilterNodeInStage(planNode);
+        if (filterNodes.isEmpty()) {
             buildNode = planNode.getRight();
             mapProbeSymbolsFromCriteria(planNode.getDynamicFilters(), probeSymbols, planNode.getCriteria());
             type = DynamicFilter.Type.GLOBAL;
         }
         else {
             buildNode = planNode.getRight();
-            List<FilterNode> filterNodes = PlanNodeSearcher
-                    .searchFrom(planNode.getLeft())
-                    .where(LocalDynamicFilter::isFilterAboveTableScan)
-                    .findAll();
-
             for (FilterNode filterNode : filterNodes) {
                 mapProbeSymbols(filterNode.getPredicate(), joinDynamicFilters, probeSymbols);
             }
@@ -212,7 +202,7 @@ public class LocalDynamicFilter
         if (buildChannels.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, partitionCount, stateStoreProvider, type));
+        return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, partitionCount, type));
     }
 
     private static void mapProbeSymbols(Expression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
@@ -240,22 +230,6 @@ public class LocalDynamicFilter
                 }
             }
         }
-    }
-
-    private static boolean isFilterAboveTableScan(PlanNode node)
-    {
-        if (node instanceof FilterNode) {
-            return ((FilterNode) node).getSource() instanceof TableScanNode;
-        }
-        return false;
-    }
-
-    private static boolean isRemoteSource(PlanNode node)
-    {
-        if (node instanceof RemoteSourceNode && ((RemoteSourceNode) node).getExchangeType().equals(ExchangeNode.Type.REPARTITION)) {
-            return true;
-        }
-        return false;
     }
 
     public Map<String, Integer> getBuildChannels()

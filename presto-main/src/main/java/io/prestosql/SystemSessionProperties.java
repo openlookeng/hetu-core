@@ -22,6 +22,7 @@ import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.sql.analyzer.FeaturesConfig;
+import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
@@ -134,7 +135,7 @@ public final class SystemSessionProperties
     public static final String PUSH_LIMIT_DOWN = "push_limit_down";
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_VALUE_COUNT = "dynamic_filtering_max_per_driver_value_count";
     public static final String DYNAMIC_FILTERING_WAIT_TIME = "dynamic_filtering_wait_time";
-    public static final String DYNAMIC_FILTERING_DATA_STRUCTURE = "dynamic_filtering_data_structure";
+    public static final String DYNAMIC_FILTERING_DATA_TYPE = "dynamic_filtering_data_type";
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE = "dynamic_filtering_max_per_driver_size";
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
     public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
@@ -612,10 +613,11 @@ public final class SystemSessionProperties
                         "Experimental: maximum number of build-side rows to be collected for dynamic filtering per-driver",
                         featuresConfig.getDynamicFilteringMaxPerDriverRowCount(),
                         false),
-                integerProperty(
-                        DYNAMIC_FILTERING_DATA_STRUCTURE,
+                enumProperty(
+                        DYNAMIC_FILTERING_DATA_TYPE,
                         "Experimental: Data structure for choosing the datastructure of the dynamic filter (0 for BloomFilter, 1 for HashSet)",
-                        featuresConfig.getDynamicFilteringDataStructure(),
+                        DynamicFilterDataType.class,
+                        featuresConfig.getDynamicFilteringDataType(),
                         false),
                 dataSizeProperty(
                         DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE,
@@ -1090,9 +1092,9 @@ public final class SystemSessionProperties
         return session.getSystemProperty(DYNAMIC_FILTERING_MAX_PER_DRIVER_VALUE_COUNT, Integer.class);
     }
 
-    public static Integer getDynamicFilteringDataStructure(Session session)
+    public static DynamicFilterDataType getDynamicFilteringDataType(Session session)
     {
-        return session.getSystemProperty(DYNAMIC_FILTERING_DATA_STRUCTURE, Integer.class);
+        return session.getSystemProperty(DYNAMIC_FILTERING_DATA_TYPE, DynamicFilterDataType.class);
     }
 
     public static DataSize getDynamicFilteringMaxPerDriverSize(Session session)
