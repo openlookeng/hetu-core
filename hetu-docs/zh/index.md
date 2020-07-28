@@ -165,8 +165,7 @@ headless: true
     - [从Hive迁移]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL迁移工具]({{< relref "./docs/migration/sql-migration-tool.md" >}})
 
-- [开发者指南]("#")
-    - [前言]({{< relref "./docs/develop/preface.md" >}})
+- [开发者指南]({{< relref "./docs/develop/_index.md" >}})
     - [入门指南]({{< relref "./docs/develop/getting-started.md" >}})
     - [SPI概述]({{< relref "./docs/develop/spi-overview.md" >}})
     - [连接器]({{< relref "./docs/develop/connectors.md" >}})
@@ -180,8 +179,7 @@ headless: true
     - [启发式索引器 - 开发人员]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
 
-- [openLooKeng REST接口说明]("#")
-    - [REST接口概述]({{< relref "./docs/rest/overview.md" >}})
+- [openLooKeng REST接口说明]({{< relref "./docs/rest/_index.md" >}})
     - [节点资源]({{< relref "./docs/rest/node.md" >}})
     - [查询资源]({{< relref "./docs/rest/query.md" >}})
     - [阶段资源]({{< relref "./docs/rest/stage.md" >}})

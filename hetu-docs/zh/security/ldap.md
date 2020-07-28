@@ -190,9 +190,9 @@ openLooKeng命令行接口
 异常处理
 ---------------
 
-### Java密钥库文件校验
+### Java密钥库文件验证
 
-使用[troubleshooting_keystore](./tls.md#java-keystore-file-verification)验证keystore文件的密码，并查看其内容。
+使用[Java密钥库文件验证](tls.md#java密钥库文件验证)中的方法验证密钥库文件的密码并查看其内容。
 
 ### openLooKeng命令行的SSL调试
 
