@@ -396,52 +396,55 @@
 
 启发式索引是外部索引模块，可用于过滤连接器级别的行。 位图，Bloom和MinMaxIndex是openLooKeng提供的索引列表。 到目前为止，位图索引支持使用ORC存储格式的表支持蜂巢连接器。
 
-### `hetu.filter.enabled`
+### `hetu.heuristicindex.filter.enabled`
  
 > -   **类型：** `boolean`
 > -   **默认值：** `false`
 >
 > 此属性启用启发式索引.
  
-### `hetu.filter.cache.max-indices-number`
+### `hetu.heuristicindex.filter.cache.max-indices-number`
  
 > -   **类型：** `integer`
 > -   **默认值：** `10,000,000`
 >
 > 缓存索引文件可提供更好的性能，索引文件是只读的，很少修改。 缓存节省了从索引存储读取文件所花费的时间。 部分缓存该属性控制可以缓存的索引文件的最大数量。 当超过限制时，将基于LRU从缓存中删除现有条目，并将新条目添加到缓存中。
+
+### `hetu.heuristicindex.filter.cache.ttl`
  
-### `hetu.filter.plugins`
- 
-> -   **类型：** `string`
+> -   **类型：** `Duration`
+> -   **默认值：** `10m`
 >
-> 此属性用于定义支持启发式索引所需的插件的位置。 属性接受多个用逗号分隔的插件。
+> 索引缓存的有效时间。
+
+### `hetu.heuristicindex.filter.cache.loading-threads`
  
-### `hetu.filter.indexstore.uri`
+> -   **类型：** `integer`
+> -   **默认值：** `2`
+>
+> 从索引存储文件系统并行加载索引时使用的线程数量。
+
+### `hetu.heuristicindex.filter.cache.loading-delay`
+ 
+> -   **类型：** `Duration`
+> -   **默认值：** `5000ms`
+>
+> 在异步加载索引到缓存前等待的时长。
+ 
+### `hetu.heuristicindex.indexstore.uri`
  
 > -   **类型：** `string`
 > -   **默认值：** `/opt/hetu/indices/`
 > 
 > 所有索引文件存储在的目录。 每个索引将存储在其自己的子目录中。
  
-### `hetu.filter.indexstore.type`
+### `hetu.heuristicindex.indexstore.filesystem.profile`
  
-> -   **类型：** `string` 
-> -   **允许值：** `hdfs, local`
-> -   **默认值：** `local`
+> -   **类型** `string` 
 >
-> 此属性定义索引文件的持久性存储。 其他属性必须是HDFS索引存储的提供者。
->
-#### HDFS索引存储的属性
+> 此属性定义用于存储索引文件的文件系统属性描述文件名称，该名称对应的属性文件应该存在于`etc/filesystem/`中。
 
- | 属性名称                                                    | 是否必填                           | 描述                                                               |
- | ---------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
- | `hetu.filter.indexstore.hdfs.config.resources`             | 是                               | hdfs资源文件的路径 (e.g. core-site.xml, hdfs-site.xml)               |
- | `hetu.filter.indexstore.hdfs.authentication.type`          | 是                               | hdfs身份验证接受的值：`KERBEROS`, `NONE`                              |
- | `hetu.filter.indexstore.hdfs.krb5.conf.path`               | 如果身份验证类型设置为KERBEROS则是   | krb5配置文件的路径                                                   |
- | `hetu.filter.indexstore.hdfs.krb5.keytab.path`             | 如果身份验证类型设置为KERBEROS则是   | kerberos keytab文件的路径                                           |
- | `hetu.filter.indexstore.hdfs.krb5.principal`               | 如果身份验证类型设置为KERBEROS则是   | Kerberos认证主体                                                    |
- 
-## 执行计划缓存属性
+##执行计划缓存属性
 
 执行计划缓存功能允许协调器在相同的查询之间重用执行计划，
 构建另一个执行计划的过程，从而减少了所需的查询预处理量。
