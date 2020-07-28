@@ -32,6 +32,7 @@ public class CatalogInfo
     Map<String, String> properties;
     private String catalogName; // data source instance name
     private String connectorName; // data source type,for example:mysql,oracle
+    private String securityKey;  // the key to decrypt the encrypted property
     private String submitter;
     private String version;
     private long createdTime;
@@ -40,6 +41,7 @@ public class CatalogInfo
     public CatalogInfo(
             @JsonProperty("catalogName") String catalogName,
             @JsonProperty("connectorName") String connectorName,
+            @JsonProperty("securityKey") String securityKey,
             @JsonProperty("submitter") String submitter,
             @JsonProperty("createdTime") long createdTime,
             @JsonProperty("version") String version,
@@ -47,6 +49,7 @@ public class CatalogInfo
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.connectorName = requireNonNull(connectorName, "connectorName is null");
+        this.securityKey = securityKey;
         this.submitter = submitter;
         this.createdTime = createdTime;
         this.version = version == null || version.isEmpty() ? UUID.randomUUID().toString() : version;
@@ -96,6 +99,17 @@ public class CatalogInfo
     public void setVersion(String version)
     {
         this.version = version;
+    }
+
+    @JsonProperty
+    public String getSecurityKey()
+    {
+        return securityKey;
+    }
+
+    public void setSecurityKey(String securityKey)
+    {
+        this.securityKey = securityKey;
     }
 
     @JsonProperty

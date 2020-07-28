@@ -222,9 +222,10 @@ public abstract class AbstractCatalogStore
         }
 
         Map<String, String> catalogProperties = new HashMap<>(fromProperties(properties));
+
         String connectorName = catalogProperties.remove(CATALOG_NAME_PROPERTY);
         checkState(connectorName != null, "Catalog configuration does not contain connector.name");
-        return new CatalogInfo(catalogName, connectorName, submitter, createdTime, version, catalogProperties);
+        return new CatalogInfo(catalogName, connectorName, null, submitter, createdTime, version, catalogProperties);
     }
 
     public CatalogFileInputStream getCatalogFiles(String catalogName)

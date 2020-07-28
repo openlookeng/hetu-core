@@ -21,6 +21,8 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.security.SecurityKeyException;
+import io.prestosql.spi.security.SecurityKeyManager;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -47,14 +49,16 @@ public class DynamicCatalogService
     private final DynamicCatalogStore dynamicCatalogStore;
     private final AccessControl accessControl;
     private final CatalogStoreUtil catalogStoreUtil;
+    private final SecurityKeyManager securityKeyManager;
 
     @Inject
-    public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl, CatalogStoreUtil catalogStoreUtil)
+    public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl, CatalogStoreUtil catalogStoreUtil, SecurityKeyManager securityKeyManager)
     {
         this.catalogManager = requireNonNull(catalogManager, "catalogManager is null");
         this.dynamicCatalogStore = requireNonNull(dynamicCatalogStore, "dynamicCatalogStore is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.catalogStoreUtil = requireNonNull(catalogStoreUtil, "catalogStoreUtil is null");
+        this.securityKeyManager = securityKeyManager;
     }
 
     public static WebApplicationException badRequest(Response.Status status, String message)
@@ -75,6 +79,17 @@ public class DynamicCatalogService
             throw badRequest(CONFLICT, "There are other requests operating this catalog");
         }
         return lock;
+    }
+
+    private void deleteSecurityKey(String catalogName)
+    {
+        try {
+            securityKeyManager.deleteKey(catalogName);
+        }
+        catch (SecurityKeyException e) {
+            // if error happen, just log it. the alias can be rewrite when create a same key, so we can ignore this kind error
+            log.warn("Delete security key of %s failed, cause: %s.", catalogName, e.getMessage());
+        }
     }
 
     public synchronized Response createCatalog(CatalogInfo catalogInfo,
@@ -107,14 +122,25 @@ public class DynamicCatalogService
                     throw badRequest(FOUND, "The catalog [" + catalogName + "] already exists");
                 }
 
+                // save security key
+                try {
+                    securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
+                }
+                catch (SecurityKeyException e) {
+                    throw badRequest(INTERNAL_SERVER_ERROR, e.getMessage());
+                }
+
+                // create catalog
                 try {
                     // load catalog and store related configuration files to share file system.
                     dynamicCatalogStore.loadCatalogAndCreateShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
                 }
                 catch (PrestoException ex) {
+                    deleteSecurityKey(catalogName);
                     throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
                 }
                 catch (IllegalArgumentException ex) {
+                    deleteSecurityKey(catalogName);
                     throw badRequest(BAD_REQUEST, ex.getMessage());
                 }
             }
@@ -127,6 +153,20 @@ public class DynamicCatalogService
         }
 
         return Response.status(CREATED).build();
+    }
+
+    private void rollbackKey(String catalogName, String key)
+            throws IOException
+    {
+        try {
+            securityKeyManager.deleteKey(catalogName);
+            securityKeyManager.saveKey(key, catalogName);
+        }
+        catch (SecurityKeyException e) {
+            String message = String.format("Update %s failed and rollback key failed.", catalogName);
+            log.error(message);
+            throw new IOException(message);
+        }
     }
 
     public synchronized Response updateCatalog(CatalogInfo catalogInfo,
@@ -160,15 +200,34 @@ public class DynamicCatalogService
                     throw badRequest(NOT_FOUND, "The catalog [" + catalogName + "] does not exist");
                 }
 
+                // update security key
+                boolean updateKey = (catalogInfo.getSecurityKey() == null);
+                String preSecurityKey = "";
+                if (updateKey) {
+                    try {
+                        preSecurityKey = securityKeyManager.loadKey(catalogName);
+                        securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
+                    }
+                    catch (SecurityKeyException e) {
+                        throw badRequest(INTERNAL_SERVER_ERROR, e.getMessage());
+                    }
+                }
+
                 // update catalog
                 try {
                     // update the catalog and update related configuration files in the share file system.
                     dynamicCatalogStore.updateCatalogAndShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
                 }
                 catch (PrestoException ex) {
+                    if (updateKey) {
+                        rollbackKey(catalogName, preSecurityKey);
+                    }
                     throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
                 }
                 catch (IllegalArgumentException ex) {
+                    if (updateKey) {
+                        rollbackKey(catalogName, preSecurityKey);
+                    }
                     throw badRequest(BAD_REQUEST, ex.getMessage());
                 }
             }
@@ -208,6 +267,9 @@ public class DynamicCatalogService
                 if (!isExistInRemoteStore) {
                     throw badRequest(NOT_FOUND, "The catalog [" + catalogName + "] does not exist");
                 }
+
+                // delete security key
+                deleteSecurityKey(catalogName);
 
                 // delete from share file system.
                 dynamicCatalogStore.deleteCatalogShareFiles(shareCatalogStore, catalogName);

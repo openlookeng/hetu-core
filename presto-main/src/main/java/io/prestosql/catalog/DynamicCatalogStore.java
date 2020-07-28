@@ -55,6 +55,8 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 public class DynamicCatalogStore
 {
     private static final Logger log = Logger.get(DynamicCatalogStore.class);
+    private static final String CATALOG_NAME = "connector.name";
+
     private final ConnectorManager connectorManager;
     private final DataCenterConnectorManager dataCenterConnectorManager;
     private final CatalogManager catalogManager;
@@ -63,6 +65,7 @@ public class DynamicCatalogStore
     private final ExecutorService executorService;
     private final Duration scanInterval;
     private final DynamicCatalogConfig dynamicCatalogConfig;
+    private final CatalogStoreUtil catalogStoreUtil;
 
     @Inject
     public DynamicCatalogStore(ConnectorManager connectorManager,
@@ -70,7 +73,8 @@ public class DynamicCatalogStore
             DynamicCatalogConfig dynamicCatalogConfig,
             CatalogManager catalogManager,
             InternalNodeManager nodeManager,
-            ServiceSelectorManager selectorManager)
+            ServiceSelectorManager selectorManager,
+            CatalogStoreUtil catalogStoreUtil)
     {
         this.connectorManager = connectorManager;
         this.dataCenterConnectorManager = dataCenterConnectorManager;
@@ -80,6 +84,7 @@ public class DynamicCatalogStore
         this.executorService = newFixedThreadPool(1, daemonThreadsNamed("dynamic-catalog-wait-%s"));
         this.scanInterval = dynamicCatalogConfig.getCatalogScannerInterval();
         this.selectorManager = selectorManager;
+        this.catalogStoreUtil = catalogStoreUtil;
     }
 
     public synchronized Set<String> listCatalogNames(CatalogStore catalogStore)
@@ -106,7 +111,8 @@ public class DynamicCatalogStore
             CatalogFilePath catalogPath = new CatalogFilePath(dynamicCatalogConfig.getCatalogConfigurationDir(), catalogName);
             File propertiesFile = catalogPath.getPropertiesPath().toFile();
             Map<String, String> properties = new HashMap<>(loadProperties(propertiesFile));
-            properties.remove("connector.name");
+            catalogStoreUtil.decryptEncryptedProperties(catalogName, properties);
+            properties.remove(CATALOG_NAME);
             connectorManager.createConnection(catalogName, catalogInfo.getConnectorName(), ImmutableMap.copyOf(properties));
 
             // add catalog to announcer, then each node knows current node has this catalog.
