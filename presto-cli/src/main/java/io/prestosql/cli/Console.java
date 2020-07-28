@@ -240,7 +240,6 @@ public class Console
                         System.out.println(getHelpText());
                         continue;
                 }
-
                 // execute any complete statements
                 StatementSplitter splitter = new StatementSplitter(line, STATEMENT_DELIMITERS);
                 for (Statement split : splitter.getCompleteStatements()) {
@@ -248,7 +247,6 @@ public class Console
                     if (split.terminator().equals("\\G")) {
                         outputFormat = ClientOptions.OutputFormat.VERTICAL;
                     }
-
                     process(queryRunner, split.statement(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
                 }
 
@@ -324,7 +322,6 @@ public class Console
 
         try (Query query = queryRunner.startQuery(finalSql)) {
             boolean success = query.renderOutput(terminal, out, errorChannel, outputFormat, usePager, showProgress);
-
             ClientSession session = queryRunner.getSession();
 
             // update catalog and schema if present

@@ -143,7 +143,6 @@ public class Query
     {
         StatusPrinter statusPrinter = null;
         WarningsPrinter warningsPrinter = new PrintStreamWarningsPrinter(errorChannel);
-
         if (showProgress) {
             statusPrinter = new StatusPrinter(client, errorChannel, debug);
             statusPrinter.printInitialStatusUpdates(terminal);

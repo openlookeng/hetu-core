@@ -24,7 +24,10 @@ import io.prestosql.client.StatementClient;
 import io.prestosql.client.StatementStats;
 import org.jline.terminal.Terminal;
 
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.List;
 import java.util.OptionalInt;
@@ -98,7 +101,6 @@ Spilled: 20GB
 
                     // check if time to update screen
                     boolean update = nanosSince(lastPrint).getValue(SECONDS) >= 0.5;
-
                     // check for keyboard input
                     int key = readKey(terminal);
                     if (key == CTRL_P) {
@@ -457,11 +459,15 @@ Spilled: 20GB
     private static int readKey(Terminal terminal)
     {
         try {
-            return terminal.reader().read(1L);
+            InputStream in = new FileInputStream(FileDescriptor.in);
+            if (in.available() > 0) {
+                return in.read();
+            }
         }
         catch (IOException e) {
-            return -1;
+            // ignore errors reading keyboard input
         }
+        return -1;
     }
 
     private static void discardKeys(Terminal terminal)

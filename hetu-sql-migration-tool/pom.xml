@@ -60,9 +60,14 @@
             </exclusions>
         </dependency>
 
+<!--        <dependency>-->
+<!--            <groupId>jline</groupId>-->
+<!--            <artifactId>jline</artifactId>-->
+<!--        </dependency>-->
         <dependency>
-            <groupId>jline</groupId>
-            <artifactId>jline</artifactId>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-reader</artifactId>
+            <version>${dep.jline.version}</version>
         </dependency>
 
         <dependency>

@@ -24,16 +24,15 @@ import io.hetu.core.sql.migration.SqlMigrationException;
 import io.hetu.core.sql.migration.SqlSyntaxType;
 import io.hetu.core.sql.migration.parser.Constants;
 import io.prestosql.cli.CsvPrinter;
-import io.prestosql.cli.LineReader;
+import io.prestosql.cli.InputReader;
 import io.prestosql.cli.ThreadInterruptor;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.StatementSplitter;
-import jline.console.history.FileHistory;
-import jline.console.history.History;
-import jline.console.history.MemoryHistory;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.jline.reader.History;
+import org.jline.reader.UserInterruptException;
 
 import javax.inject.Inject;
 
@@ -43,6 +42,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -52,9 +53,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.io.Files.asCharSource;
-import static com.google.common.io.Files.createParentDirs;
 import static com.google.common.util.concurrent.Uninterruptibles.awaitUninterruptibly;
 import static io.prestosql.cli.Completion.commandCompleter;
 import static io.prestosql.cli.CsvPrinter.CsvOutputFormat.NO_HEADER;
@@ -65,7 +67,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ENGLISH;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static jline.internal.Configuration.getUserHome;
 
 @Command(name = "SqlMigration", description = "Presto sql migration tool")
 public class Console
@@ -184,7 +185,7 @@ public class Console
 
     private void runConsole(SqlSyntaxType sourceType, AtomicBoolean exiting, MigrationConfig migrationConfig)
     {
-        try (LineReader reader = new LineReader(getHistory(), commandCompleter())) {
+        try (InputReader reader = new InputReader(getHistoryFile(), commandCompleter())) {
             StringBuilder buffer = new StringBuilder();
             while (!exiting.get()) {
                 // setup prompt
@@ -200,10 +201,12 @@ public class Console
                 else {
                     commandPrompt += ">";
                 }
-                String line = reader.readLine(commandPrompt);
-
-                // add buffer to history and clear on user interrupt
-                if (reader.interrupted()) {
+                String line;
+                try {
+                    line = reader.readLine(commandPrompt, buffer.toString());
+                }
+                catch (UserInterruptException e) {
+                    // add buffer to history and clear on user interrupt
                     if (!squeezeStatement(buffer.toString()).isEmpty()) {
                         reader.getHistory().add(squeezeStatement(buffer.toString()));
                     }
@@ -244,7 +247,7 @@ public class Console
                             return;
                         case COMMAND_HISTORY:
                             for (History.Entry entry : reader.getHistory()) {
-                                System.out.printf("%5d  %s%n", entry.index() + 1, entry.value());
+                                System.out.printf("%5d  %s%n", entry.index() + 1, entry.line());
                             }
                             System.out.println();
                             System.out.printf("Choose and run the history command by index number. e.g. !10");
@@ -307,35 +310,13 @@ public class Console
         }
     }
 
-    private static MemoryHistory getHistory()
+    private static Path getHistoryFile()
     {
-        String historyFilePath = System.getenv("HETU_HISTORY_FILE");
-        File historyFile;
-        if (isNullOrEmpty(historyFilePath)) {
-            historyFile = new File(getUserHome(), ".hetu_history");
+        String path = System.getenv("PRESTO_HISTORY_FILE");
+        if (!isNullOrEmpty(path)) {
+            return Paths.get(path);
         }
-        else {
-            historyFile = new File(historyFilePath);
-        }
-        return getHistory(historyFile);
-    }
-
-    private static MemoryHistory getHistory(File historyFile)
-    {
-        MemoryHistory history;
-        try {
-            createParentDirs(historyFile.getParentFile());
-            historyFile.createNewFile();
-            history = new FileHistory(historyFile);
-            history.setMaxSize(HISTORY_SIZE);
-        }
-        catch (IOException e) {
-            System.err.printf("Failed to load History file (%s): %s. ", historyFile, e.getMessage());
-            System.out.printf("History will not be available during this session.%n");
-            history = new MemoryHistory();
-        }
-        history.setAutoTrim(true);
-        return history;
+        return Paths.get(nullToEmpty(USER_HOME.value()), ".presto_history");
     }
 
     private boolean executeCommand(String query, SqlSyntaxType sourceType, String outputFile, MigrationConfig migrationConfig, boolean isConsolePrintEnable)
@@ -429,7 +410,8 @@ public class Console
         return true;
     }
 
-    private static List<List<String>> jsonToCsv(JSONArray jsonArray, boolean isWithHeader) throws JSONException
+    private static List<List<String>> jsonToCsv(JSONArray jsonArray, boolean isWithHeader)
+            throws JSONException
     {
         List<List<String>> csvRows = new ArrayList<>(jsonArray.length());
         for (int i = 0; i < jsonArray.length(); i++) {
