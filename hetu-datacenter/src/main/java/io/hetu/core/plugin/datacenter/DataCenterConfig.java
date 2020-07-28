@@ -117,10 +117,24 @@ public class DataCenterConfig
 
     private int maxIdleConnections = DEFAULT_MAX_IDLE_CONNECTIONS;
 
+    private String updateThreshold = "1m";
+
     @NotNull
     public URI getConnectionUrl()
     {
         return connectionUrl;
+    }
+
+    public String getUpdateThreshold()
+    {
+        return updateThreshold;
+    }
+
+    @Config("hetu.dc.catalog.update.threshold")
+    public DataCenterConfig setUpdateThreshold(String updateThreshold)
+    {
+        this.updateThreshold = updateThreshold;
+        return this;
     }
 
     /**
