@@ -14,7 +14,6 @@
  */
 package io.prestosql.sql.builder;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.block.SortOrder;
@@ -25,6 +24,7 @@ import io.prestosql.spi.sql.expression.QualifiedName;
 import io.prestosql.spi.sql.expression.Selection;
 import io.prestosql.spi.sql.expression.Time;
 import io.prestosql.spi.sql.expression.Types;
+import io.prestosql.sql.ExpressionFormatter;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -34,11 +34,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.PrimitiveIterator;
 import java.util.StringJoiner;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
@@ -565,38 +563,9 @@ public class BaseSqlQueryWriter
     }
 
     @Override
-    @SuppressWarnings("Duplicates")
     public String formatStringLiteral(String literal)
     {
-        literal = literal.replace("'", "''");
-        if (CharMatcher.inRange((char) 0x20, (char) 0x7E).matchesAllOf(literal)) {
-            return "'" + literal + "'";
-        }
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("U&'");
-        PrimitiveIterator.OfInt iterator = literal.codePoints().iterator();
-        while (iterator.hasNext()) {
-            int codePoint = iterator.nextInt();
-            checkArgument(codePoint >= 0, "Invalid UTF-8 encoding in characters: %s", literal);
-            if (isAsciiPrintable(codePoint)) {
-                char ch = (char) codePoint;
-                if (ch == '\\') {
-                    builder.append(ch);
-                }
-                builder.append(ch);
-            }
-            else if (codePoint <= 0xFFFF) {
-                builder.append('\\');
-                builder.append(format("%04X", codePoint));
-            }
-            else {
-                builder.append("\\+");
-                builder.append(format("%06X", codePoint));
-            }
-        }
-        builder.append("'");
-        return builder.toString();
+        return ExpressionFormatter.formatStringLiteral(literal);
     }
 
     @Override
