@@ -23,6 +23,7 @@ import io.prestosql.Session;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.SplitCacheMap;
+import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
@@ -590,7 +591,7 @@ final class ShowQueriesRewrite
                 throw new PrestoException(GENERIC_USER_ERROR, "Cache table feature is not enabled");
             }
             SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
-            Map<String, String> cacheInfoByTableMap;
+            Map<String, TableCacheInfo> cacheInfoByTableMap;
             if (node.getTableName() != null) {
                 QualifiedObjectName fullObjectName = createQualifiedObjectName(session, node, node.getTableName());
                 QualifiedName tableName = QualifiedName.of(fullObjectName.getCatalogName(), fullObjectName.getSchemaName(), fullObjectName.getObjectName());
@@ -605,11 +606,12 @@ final class ShowQueriesRewrite
             }
             ImmutableList.Builder<Expression> rows = ImmutableList.builder();
             //bogus row to support empty cache
-            rows.add(row(new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
+            rows.add(row(new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
             cacheInfoByTableMap.forEach((tableName, cacheInfo) -> {
                 rows.add(row(
                         new StringLiteral(tableName.toString()),
-                        new StringLiteral(cacheInfo),
+                        new StringLiteral(cacheInfo.showPredicates()),
+                        new StringLiteral(cacheInfo.showNodes()),
                         TRUE_LITERAL));
             });
 
@@ -617,11 +619,12 @@ final class ShowQueriesRewrite
             return simpleQuery(
                     selectList(
                             aliasedName("table_name", "Table"),
-                            aliasedName("cache_info", "Cache Info")),
+                            aliasedName("cached_predicates", "Cached Predicates"),
+                            aliasedName("cached_nodes", "Cached Nodes")),
                     aliased(
                             new Values(expressions),
                             "Cache Result",
-                            ImmutableList.of("table_name", "cache_info", "include")),
+                            ImmutableList.of("table_name", "cached_predicates", "cached_nodes", "include")),
                     identifier("include"),
                     ordering(ascending("table_name")));
         }
