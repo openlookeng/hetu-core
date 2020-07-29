@@ -83,6 +83,13 @@ public final class DataCenterTableHandle
         this.subQuery = subQuery;
     }
 
+    @Override
+    public ConnectorTableHandle createFrom(ConnectorTableHandle connectorTableHandle)
+    {
+        DataCenterTableHandle dataCenterTableHandle = (DataCenterTableHandle) connectorTableHandle;
+        return new DataCenterTableHandle(catalogName, schemaName, dataCenterTableHandle.tableName, dataCenterTableHandle.getLimit(), dataCenterTableHandle.getSubQuery());
+    }
+
     @JsonProperty
     public String getCatalogName()
     {

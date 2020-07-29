@@ -279,7 +279,27 @@ public class CachedConnectorMetadata
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle,
             ColumnHandle columnHandle)
     {
-        return delegate.getColumnMetadata(session, tableHandle, columnHandle);
+        Optional<MetadataCache> cacheOpt = getOrCreateCache(session);
+
+        if (!cacheOpt.isPresent() || tableHandle.getSchemaPrefixedTableName() == null) {
+            return logAndDelegate("getColumnMetadata", () -> delegate.getColumnMetadata(session, tableHandle, columnHandle));
+        }
+
+        try {
+            return cacheOpt.get().getColumnMetadata().get(tableHandle.getSchemaPrefixedTableName(), () -> {
+                ColumnMetadata columnMetadata =
+                        logAndDelegate("getColumnMetadata", () -> delegate.getColumnMetadata(session, tableHandle, columnHandle));
+
+                if (columnMetadata == null) {
+                    throw new Exception();
+                }
+
+                return columnMetadata;
+            });
+        }
+        catch (Exception e) {
+            return logAndDelegate("getColumnMetadata", () -> delegate.getColumnMetadata(session, tableHandle, columnHandle));
+        }
     }
 
     @Override
@@ -313,7 +333,27 @@ public class CachedConnectorMetadata
     public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle,
             Constraint constraint)
     {
-        return delegate.getTableStatistics(session, tableHandle, constraint);
+        Optional<MetadataCache> cacheOpt = getOrCreateCache(session);
+
+        if (!cacheOpt.isPresent()) {
+            return logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint));
+        }
+
+        try {
+            return cacheOpt.get().getTableStatistics().get(tableHandle.getSchemaPrefixedTableName(), () -> {
+                TableStatistics tableStatistics =
+                        logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint));
+
+                if (tableStatistics == null) {
+                    throw new Exception();
+                }
+
+                return tableStatistics;
+            });
+        }
+        catch (Exception e) {
+            return logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint));
+        }
     }
 
     @Override
@@ -783,6 +823,12 @@ public class CachedConnectorMetadata
         return Optional.of(cache.get(catalogOpt.get()));
     }
 
+    @Override
+    public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return this.delegate.isExecutionPlanCacheSupported(session, handle);
+    }
+
     class MetadataCache
     {
         private long ttl;
@@ -796,6 +842,8 @@ public class CachedConnectorMetadata
         private final Cache<String, Map<SchemaTableName, ConnectorViewDefinition>> views; // schemaName -> views
         private final Cache<String, Optional<ConnectorViewDefinition>> view; // viewName -> view
         private final Cache<String, List<String>> schemas; // catalog -> schemas
+        private final Cache<String, TableStatistics> tableStatistics;  // table -> tableStatistics
+        private final Cache<String, ColumnMetadata> columnMetadata;    // table -> columnMetadata
 
         public MetadataCache(long ttl, long maximumSize)
         {
@@ -811,6 +859,8 @@ public class CachedConnectorMetadata
             views = newCacheBuilder().build();
             view = newCacheBuilder().build();
             schemas = newCacheBuilder().build();
+            tableStatistics = newCacheBuilder().build();
+            columnMetadata = newCacheBuilder().build();
         }
 
         private CacheBuilder<Object, Object> newCacheBuilder()
@@ -866,6 +916,16 @@ public class CachedConnectorMetadata
             return schemas;
         }
 
+        public Cache<String, TableStatistics> getTableStatistics()
+        {
+            return tableStatistics;
+        }
+
+        public Cache<String, ColumnMetadata> getColumnMetadata()
+        {
+            return columnMetadata;
+        }
+
         public void invalidateAll()
         {
             tables.invalidateAll();
@@ -877,6 +937,8 @@ public class CachedConnectorMetadata
             views.invalidateAll();
             view.invalidateAll();
             schemas.invalidateAll();
+            tableStatistics.invalidateAll();
+            columnMetadata.invalidateAll();
         }
     }
 }
