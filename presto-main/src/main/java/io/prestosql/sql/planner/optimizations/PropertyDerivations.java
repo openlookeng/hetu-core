@@ -529,16 +529,21 @@ public class PropertyDerivations
         {
             checkArgument(node.getScope() != REMOTE || inputProperties.stream().noneMatch(ActualProperties::isNullsAndAnyReplicated), "Null-and-any replicated inputs should not be remotely exchanged");
 
-            Set<Map.Entry<Symbol, NullableValue>> entries = null;
+            Optional<Set<Map.Entry<Symbol, NullableValue>>> entriesOp = Optional.empty();
             for (int sourceIndex = 0; sourceIndex < node.getSources().size(); sourceIndex++) {
                 Map<Symbol, Symbol> inputToOutput = exchangeInputToOutput(node, sourceIndex);
                 ActualProperties translated = inputProperties.get(sourceIndex).translate(symbol -> Optional.ofNullable(inputToOutput.get(symbol)));
-
-                entries = (entries == null) ? translated.getConstants().entrySet() : Sets.intersection(entries, translated.getConstants().entrySet());
+                if (entriesOp.isPresent()) {
+                    entriesOp = Optional.of(Sets.intersection(entriesOp.get(), translated.getConstants().entrySet()));
+                }
+                else {
+                    entriesOp = Optional.of(translated.getConstants().entrySet());
+                }
             }
-            checkState(entries != null);
 
-            Map<Symbol, NullableValue> constants = entries.stream()
+            checkState(entriesOp.isPresent());
+
+            Map<Symbol, NullableValue> constants = entriesOp.get().stream()
                     .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             ImmutableList.Builder<SortingProperty<Symbol>> localProperties = ImmutableList.builder();

@@ -130,13 +130,13 @@ public final class QueryAssertions
             Optional<Consumer<Plan>> planAssertion)
     {
         long start = System.nanoTime();
-        MaterializedResult actualResults = null;
+        Optional<MaterializedResult> actualResultsOp = Optional.empty();
         Plan queryPlan = null;
         if (planAssertion.isPresent()) {
             try {
                 MaterializedResultWithPlan resultWithPlan = actualQueryRunner.executeWithPlan(session, actual, WarningCollector.NOOP);
                 queryPlan = resultWithPlan.getQueryPlan();
-                actualResults = resultWithPlan.getMaterializedResult().toTestTypes();
+                actualResultsOp = Optional.of(resultWithPlan.getMaterializedResult().toTestTypes());
             }
             catch (RuntimeException ex) {
                 fail("Execution of 'actual' query failed: " + actual, ex);
@@ -144,7 +144,7 @@ public final class QueryAssertions
         }
         else {
             try {
-                actualResults = actualQueryRunner.execute(session, actual).toTestTypes();
+                actualResultsOp = Optional.of(actualQueryRunner.execute(session, actual).toTestTypes());
             }
             catch (RuntimeException ex) {
                 fail("Execution of 'actual' query failed: " + actual, ex);
@@ -156,9 +156,9 @@ public final class QueryAssertions
         Duration actualTime = nanosSince(start);
 
         long expectedStart = System.nanoTime();
-        MaterializedResult expectedResults = null;
+        Optional<MaterializedResult> expectedResultsOp = Optional.empty();
         try {
-            expectedResults = h2QueryRunner.execute(session, expected, actualResults.getTypes());
+            expectedResultsOp = Optional.of(h2QueryRunner.execute(session, expected, actualResultsOp.get().getTypes()));
         }
         catch (RuntimeException ex) {
             fail("Execution of 'expected' query failed: " + expected, ex);
@@ -168,8 +168,8 @@ public final class QueryAssertions
             log.info("FINISHED in presto: %s, h2: %s, total: %s", actualTime, nanosSince(expectedStart), totalTime);
         }
 
-        if (actualResults.getUpdateType().isPresent() || actualResults.getUpdateCount().isPresent()) {
-            if (!actualResults.getUpdateType().isPresent()) {
+        if (actualResultsOp.get().getUpdateType().isPresent() || actualResultsOp.get().getUpdateCount().isPresent()) {
+            if (!actualResultsOp.get().getUpdateType().isPresent()) {
                 fail("update count present without update type for query: \n" + actual);
             }
             if (!compareUpdate) {
@@ -177,21 +177,21 @@ public final class QueryAssertions
             }
         }
 
-        List<MaterializedRow> actualRows = actualResults.getMaterializedRows();
-        List<MaterializedRow> expectedRows = expectedResults.getMaterializedRows();
+        List<MaterializedRow> actualRows = actualResultsOp.get().getMaterializedRows();
+        List<MaterializedRow> expectedRows = expectedResultsOp.get().getMaterializedRows();
 
         if (compareUpdate) {
-            if (!actualResults.getUpdateType().isPresent()) {
+            if (!actualResultsOp.get().getUpdateType().isPresent()) {
                 fail("update type not present for query: \n" + actual);
             }
-            if (!actualResults.getUpdateCount().isPresent()) {
+            if (!actualResultsOp.get().getUpdateCount().isPresent()) {
                 fail("update count not present for query: \n" + actual);
             }
             assertEquals(actualRows.size(), 1, "For query: \n " + actual + "\n:");
             assertEquals(expectedRows.size(), 1, "For query: \n " + actual + "\n:");
             MaterializedRow row = expectedRows.get(0);
             assertEquals(row.getFieldCount(), 1, "For query: \n " + actual + "\n:");
-            assertEquals(row.getField(0), actualResults.getUpdateCount().getAsLong(), "For query: \n " + actual + "\n:");
+            assertEquals(row.getField(0), actualResultsOp.get().getUpdateCount().getAsLong(), "For query: \n " + actual + "\n:");
         }
 
         if (ensureOrdering) {

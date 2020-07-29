@@ -73,7 +73,7 @@ public class OpenLooKengDriver
             DriverManager.registerDriver(new OpenLooKengDriver());
         }
         catch (SQLException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Fail to register Jdbc driver for openLooKeng.");
         }
     }
 
