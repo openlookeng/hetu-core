@@ -13,15 +13,13 @@
  */
 package io.prestosql.sql.planner;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
+import io.prestosql.operator.DynamicFilterSourceOperator;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.FilterNode;
@@ -50,24 +48,17 @@ public class LocalDynamicFilter
 
     // Mapping from dynamic filter ID to its probe symbols.
     private final Multimap<String, Symbol> probeSymbols;
-
-    private boolean isIncomplete;
     // Mapping from dynamic filter ID to its build channel indices.
     private final Map<String, Integer> buildChannels;
-
     private final SettableFuture<TupleDomain<Symbol>> resultFuture;
-
-    // The resulting predicate for local dynamic filtering.
-    private TupleDomain<String> result;
-
+    private final DynamicFilter.Type type;
+    // If any partial dynamic filter is discarded due to too large
+    private boolean isIncomplete;
     private SettableFuture<Map<Symbol, Set>> hashSetResultFuture;
-
     // Number of partitions left to be processed.
     private int partitionsLeft;
-
-    private Map<String, Set> domainResult = new HashMap<>();
-
-    private final DynamicFilter.Type type;
+    // The resulting predicate for local dynamic filtering.
+    private Map<String, Set> result = new HashMap<>();
 
     public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount, DynamicFilter.Type type)
     {
@@ -78,85 +69,9 @@ public class LocalDynamicFilter
         this.resultFuture = SettableFuture.create();
         this.hashSetResultFuture = SettableFuture.create();
 
-        this.result = TupleDomain.none();
         this.partitionsLeft = partitionCount;
 
         this.type = type;
-
-        this.isIncomplete = false;
-    }
-
-    private synchronized void addPartition(TupleDomain<String> tupleDomain)
-    {
-        if (type == DynamicFilter.Type.GLOBAL) {
-            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
-            if (isIncomplete) {
-                hashSetResultFuture.set(bloomFilterResult);
-                return;
-            }
-        }
-
-        // Called concurrently by each DynamicFilterSourceOperator instance (when collection is over).
-        partitionsLeft -= 1;
-        verify(partitionsLeft >= 0);
-
-        if (!tupleDomain.getDomains().isPresent()) {
-            return;
-        }
-
-        if (tupleDomain.isAll()) {
-            isIncomplete = true;
-        }
-
-        Map<String, Domain> domains = tupleDomain.getDomains().get();
-        domains.forEach((key, value) -> {
-            if (!domainResult.containsKey(key)) {
-                domainResult.put(key, new HashSet<>());
-            }
-            Set set = domainResult.get(key);
-            for (Range range : value.getValues().getRanges().getOrderedRanges()) {
-                Object obj = range.getSingleValue();
-                set.add(obj);
-            }
-        });
-
-        // NOTE: may result in a bit more relaxed constraint if there are multiple columns and multiple rows.
-        // See the comment at TupleDomain::columnWiseUnion() for more details.
-        if (partitionsLeft == 0) {
-            // No more partitions are left to be processed.
-            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
-            if (isIncomplete) {
-                hashSetResultFuture.set(bloomFilterResult);
-                return;
-            }
-            for (Map.Entry<String, Set> entry : domainResult.entrySet()) {
-                for (Symbol probeSymbol : probeSymbols.get(entry.getKey())) {
-                    if (!bloomFilterResult.containsKey(probeSymbol)) {
-                        bloomFilterResult.put(probeSymbol, new HashSet<>());
-                    }
-                    bloomFilterResult.put(probeSymbol, entry.getValue());
-                }
-            }
-            hashSetResultFuture.set(bloomFilterResult);
-        }
-    }
-
-    private TupleDomain<Symbol> convertTupleDomain(TupleDomain<String> result)
-    {
-        if (result.isNone()) {
-            return TupleDomain.none();
-        }
-        // Convert the predicate to use probe symbols (instead dynamic filter IDs).
-        // Note that in case of a probe-side union, a single dynamic filter may match multiple probe symbols.
-        ImmutableMap.Builder<Symbol, Domain> builder = ImmutableMap.builder();
-        for (Map.Entry<String, Domain> entry : result.getDomains().get().entrySet()) {
-            Domain domain = entry.getValue();
-            // Store all matching symbols for each build channel index.
-            for (Symbol probeSymbol : probeSymbols.get(entry.getKey())) {
-                builder.put(probeSymbol, domain);
-            }
-        }
-        return TupleDomain.withColumnDomains(builder.build());
     }
 
     public static Optional<LocalDynamicFilter> create(JoinNode planNode, int partitionCount)
@@ -232,14 +147,55 @@ public class LocalDynamicFilter
         }
     }
 
+    /**
+     * The results from each operator is added to the filters. Each operator should call this only once
+     *
+     * @param values each item in the array represents a column. each column contains a set of values
+     */
+    public synchronized void addOperatorResult(Map<DynamicFilterSourceOperator.Channel, Set> values)
+    {
+        if (type == DynamicFilter.Type.GLOBAL) {
+            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
+            if (isIncomplete) {
+                hashSetResultFuture.set(bloomFilterResult);
+                return;
+            }
+        }
+
+        // Called concurrently by each DynamicFilterSourceOperator instance (when collection is over).
+        partitionsLeft--;
+        verify(partitionsLeft >= 0);
+
+        if (values == null) {
+            isIncomplete = true;
+        }
+        else if (!isIncomplete) {
+            values.forEach((key, value) -> {
+                result.putIfAbsent(key.getFilterId(), new HashSet<>());
+                Set set = result.get(key.getFilterId());
+                set.addAll(value);
+            });
+        }
+
+        // NOTE: may result in a bit more relaxed constraint if there are multiple columns and multiple rows.
+        // See the comment at TupleDomain::columnWiseUnion() for more details.
+        if (partitionsLeft == 0) {
+            // No more partitions are left to be processed.
+            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
+            if (!isIncomplete) {
+                for (Map.Entry<String, Set> entry : result.entrySet()) {
+                    for (Symbol probeSymbol : probeSymbols.get(entry.getKey())) {
+                        bloomFilterResult.put(probeSymbol, entry.getValue());
+                    }
+                }
+            }
+            hashSetResultFuture.set(bloomFilterResult);
+        }
+    }
+
     public Map<String, Integer> getBuildChannels()
     {
         return buildChannels;
-    }
-
-    public ListenableFuture<TupleDomain<Symbol>> getResultFuture()
-    {
-        return resultFuture;
     }
 
     public ListenableFuture<Map<Symbol, Set>> getDynamicFilterResultFuture()
@@ -247,9 +203,9 @@ public class LocalDynamicFilter
         return hashSetResultFuture;
     }
 
-    public Consumer<TupleDomain<String>> getTupleDomainConsumer()
+    public Consumer<Map<DynamicFilterSourceOperator.Channel, Set>> getValueConsumer()
     {
-        return this::addPartition;
+        return this::addOperatorResult;
     }
 
     public DynamicFilter.Type getType()

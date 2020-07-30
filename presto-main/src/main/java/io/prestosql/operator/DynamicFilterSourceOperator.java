@@ -13,41 +13,42 @@
  */
 package io.prestosql.operator;
 
-import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
+import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
-import io.prestosql.operator.aggregation.TypedSet;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.predicate.ValueSet;
-import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateSet;
+import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeUtils;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.statestore.StateStoreProvider;
-import io.prestosql.utils.DynamicFilterUtils;
 
-import javax.annotation.Nullable;
-
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringBloomFilterFpp;
+import static io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter.convertBloomFilterToByteArray;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
-import static io.prestosql.spi.type.TypeUtils.readNativeValue;
+import static io.prestosql.spi.statestore.StateCollection.Type.SET;
+import static io.prestosql.utils.DynamicFilterUtils.FINISHPREFIX;
+import static io.prestosql.utils.DynamicFilterUtils.PARTIALPREFIX;
+import static io.prestosql.utils.DynamicFilterUtils.REGISTERPREFIX;
+import static io.prestosql.utils.DynamicFilterUtils.WORKERSPREFIX;
+import static io.prestosql.utils.DynamicFilterUtils.createKey;
 import static io.prestosql.utils.DynamicFilterUtils.getDynamicFilterDataType;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
@@ -61,34 +62,30 @@ public class DynamicFilterSourceOperator
         implements Operator
 {
     public static final Logger log = Logger.get(DynamicFilterSourceOperator.class);
-    private static final int EXPECTED_BLOCK_BUILDER_SIZE = 8;
     private final OperatorContext context;
     private final double bloomFilterFpp;
-    private final Consumer<TupleDomain<String>> dynamicPredicateConsumer;
+    private final Consumer<Map<Channel, Set>> dynamicPredicateConsumer;
     private final int maxFilterPositionsCount;
     private final long maxFilterSizeInBytes;
-    private final DynamicFilterDataType dynamicFilteringDataType;
+    private final DynamicFilterDataType dynamicFilterDataType;
     private final List<Channel> channels;
     private final DynamicFilter.Type filterType;
     private final NodeInfo nodeInfo;
     private final StateStoreProvider stateStoreProvider;
     private boolean finished;
     private Page current;
-    // May be dropped if the predicate becomes too large.
-    @Nullable
-    private BlockBuilder[] blockBuilders;
-    @Nullable
-    private TypedSet[] valueSets;
+
+    private Map<Channel, Set> values;
+
     private long driverId;
     private boolean haveRegistered;
-    private Set[] objectValueSets;
 
     /**
      * Constructor for the Dynamic Filter Source Operator
      * TODO: no need to collect dynamic filter if it's cached
      */
     public DynamicFilterSourceOperator(OperatorContext context,
-            Consumer<TupleDomain<String>> dynamicPredicateConsumer,
+            Consumer<Map<Channel, Set>> dynamicPredicateConsumer,
             List<Channel> channels,
             PlanNodeId planNodeId,
             int maxFilterPositionsCount,
@@ -102,37 +99,51 @@ public class DynamicFilterSourceOperator
         this.bloomFilterFpp = getDynamicFilteringBloomFilterFpp(this.context.getSession());
         this.maxFilterPositionsCount = maxFilterPositionsCount;
         this.maxFilterSizeInBytes = maxFilterSize.toBytes();
-        this.dynamicFilteringDataType = dynamicFilteringDataType;
+        this.dynamicFilterDataType = dynamicFilteringDataType;
 
         this.dynamicPredicateConsumer = requireNonNull(dynamicPredicateConsumer, "dynamicPredicateConsumer is null");
         this.channels = requireNonNull(channels, "channels is null");
         this.nodeInfo = nodeInfo;
 
-        this.blockBuilders = new BlockBuilder[channels.size()];
-        this.valueSets = new TypedSet[channels.size()];
-        this.objectValueSets = new Set[channels.size()];
-        for (int i = 0; i < objectValueSets.length; i++) {
-            objectValueSets[i] = new HashSet<>();
+        this.values = new HashMap<>();
+        for (Channel channel : channels) {
+            values.put(channel, new HashSet<>());
         }
 
-        for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
-            Type type = channels.get(channelIndex).type;
-            this.blockBuilders[channelIndex] = type.createBlockBuilder(null, EXPECTED_BLOCK_BUILDER_SIZE);
-            this.valueSets[channelIndex] = new TypedSet(
-                    type,
-                    Optional.empty(),
-                    blockBuilders[channelIndex],
-                    EXPECTED_BLOCK_BUILDER_SIZE,
-                    String.format("DynamicFilterSourceOperator_%s_%d", planNodeId, channelIndex),
-                    Optional.empty() /* maxBlockMemory */);
-        }
-        this.stateStoreProvider = stateStoreProvider;
         this.filterType = filterType;
-
-        if (stateStoreProvider != null && stateStoreProvider.getStateStore() != null) {
+        this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
+        if (stateStoreProvider.getStateStore() != null) {
             driverId = stateStoreProvider.getStateStore().generateId();
             registerDynamicFilterTask(context.getSession().getQueryId().toString());
         }
+    }
+
+    private static BloomFilter createBloomFilterFromSet(Channel channel, Set values, double bloomFilterFpp)
+    {
+        BloomFilter bloomFilter = new BloomFilter(BloomFilterDynamicFilter.DEFAULT_DYNAMIC_FILTER_SIZE, bloomFilterFpp);
+        if (channel.type.getJavaType() == long.class) {
+            for (Object value : values) {
+                long lv = (Long) value;
+                bloomFilter.add(lv);
+            }
+        }
+        else if (channel.type.getJavaType() == double.class) {
+            for (Object value : values) {
+                double lv = (Double) value;
+                bloomFilter.add(lv);
+            }
+        }
+        else if (channel.type.getJavaType() == Slice.class) {
+            for (Object value : values) {
+                bloomFilter.add((Slice) value);
+            }
+        }
+        else {
+            for (Object value : values) {
+                bloomFilter.add(String.valueOf(value).getBytes());
+            }
+        }
+        return bloomFilter;
     }
 
     @Override
@@ -152,7 +163,7 @@ public class DynamicFilterSourceOperator
     {
         verify(!finished, "DynamicFilterSourceOperator: addInput() may not be called after finish()");
         current = page;
-        if (valueSets == null) {
+        if (values == null) {
             return;  // the predicate became too large.
         }
 
@@ -160,17 +171,19 @@ public class DynamicFilterSourceOperator
         long filterSizeInBytes = 0;
         int filterPositionsCount = 0;
         // Collect only the columns which are relevant for the JOIN.
-        outer:
-        for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
-            Block block = page.getBlock(channels.get(channelIndex).index);
-            TypedSet valueSet = valueSets[channelIndex];
+        for (Channel channel : channels) {
+            Block block = page.getBlock(channel.index);
 
-            for (int position = 0; position < block.getPositionCount(); ++position) {
-                valueSet.add(block, position);
+            //saving the cloned block, to be processed in the "finish()" to avoid blocking down stream operators
+            for (int i = 0; i < block.getPositionCount(); i++) {
+                Object value = TypeUtils.readNativeValue(channel.type, block, i);
+                if (value != null) { //ignoring null values
+                    values.get(channel).add(value);
+                }
             }
 
-            filterSizeInBytes += valueSet.getRetainedSizeInBytes();
-            filterPositionsCount += valueSet.size();
+            filterSizeInBytes += block.getRetainedSizeInBytes();
+            filterPositionsCount += values.get(channel).size();
         }
         if (filterPositionsCount > maxFilterPositionsCount || filterSizeInBytes > maxFilterSizeInBytes) {
             // The whole filter (summed over all columns) contains too much values or exceeds maxFilterSizeInBytes.
@@ -181,13 +194,8 @@ public class DynamicFilterSourceOperator
 
     private void handleTooLargePredicate()
     {
-        objectValueSets = null;
-        // The resulting predicate is too large, allow all probe-side values to be read.
-        dynamicPredicateConsumer.accept(TupleDomain.all());
-
-        // Drop references to collected values.
-        valueSets = null;
-        blockBuilders = null;
+        values = null;
+        dynamicPredicateConsumer.accept(null);
     }
 
     @Override
@@ -206,38 +214,16 @@ public class DynamicFilterSourceOperator
             return;
         }
         finished = true;
-        if (valueSets == null) {
-            return; // the predicate became too large.
-        }
 
-        ImmutableMap.Builder<String, Domain> domainsBuilder = new ImmutableMap.Builder<>();
-        for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
-            Block block = blockBuilders[channelIndex].build();
-            Type type = channels.get(channelIndex).type;
-            domainsBuilder.put(channels.get(channelIndex).filterId, convertToDomain(type, channelIndex, block));
-        }
-        finishDynamicFilterTask();
-        if (filterType == DynamicFilter.Type.GLOBAL) {
-            valueSets = null;
-            blockBuilders = null;
-            dynamicPredicateConsumer.accept(TupleDomain.all());
+        // Dynamic Filter became too large
+        if (values == null) {
             return;
         }
-        valueSets = null;
-        blockBuilders = null;
-        dynamicPredicateConsumer.accept(TupleDomain.withColumnDomains(domainsBuilder.build()));
-    }
 
-    private Domain convertToDomain(Type type, int channelIndex, Block block)
-    {
-        for (int position = 0; position < block.getPositionCount(); ++position) {
-            Object value = readNativeValue(type, block, position);
-            if (value != null) {
-                objectValueSets[channelIndex].add(value);
-            }
+        finishDynamicFilterTask();
+        if (filterType == DynamicFilter.Type.LOCAL) {
+            dynamicPredicateConsumer.accept(values);
         }
-        // Inner and right join doesn't match rows with null key column values.
-        return Domain.create(ValueSet.copyOf(type, objectValueSets[channelIndex]), false);
     }
 
     @Override
@@ -250,11 +236,12 @@ public class DynamicFilterSourceOperator
     {
         for (Channel channel : channels) {
             try {
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, channel.filterId, queryId), StateCollection.Type.SET);
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, channel.filterId, queryId), StateCollection.Type.SET);
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, channel.filterId, queryId), StateCollection.Type.SET);
-                stateStoreProvider.getStateStore().createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHPREFIX, channel.filterId, queryId), StateCollection.Type.SET);
-                ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, channel.filterId, queryId))).add(driverId);
+                final StateStore stateStore = stateStoreProvider.getStateStore();
+                StateSet<Long> registeredTasks = (StateSet<Long>) stateStore.createStateCollection(createKey(REGISTERPREFIX, channel.filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(WORKERSPREFIX, channel.filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(PARTIALPREFIX, channel.filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(FINISHPREFIX, channel.filterId, queryId), SET);
+                registeredTasks.add(driverId);
                 this.haveRegistered = true;
             }
             catch (Exception e) {
@@ -268,26 +255,27 @@ public class DynamicFilterSourceOperator
         if (!haveRegistered) {
             return;
         }
-        for (int channelIndex = 0; channelIndex < channels.size(); ++channelIndex) {
-            Channel channel = channels.get(channelIndex);
+
+        StateStore stateStore = stateStoreProvider.getStateStore();
+        DataType dataType = getDynamicFilterDataType(filterType, dynamicFilterDataType);
+        for (Map.Entry<Channel, Set> value : values.entrySet()) {
+            Channel channel = value.getKey();
+            Set values = value.getValue();
             String id = channel.filterId;
-            String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, id, channel.queryId);
-            DataType dataType = getDynamicFilterDataType(filterType, dynamicFilteringDataType);
+            String key = createKey(PARTIALPREFIX, id, channel.queryId);
 
             if (dataType == BLOOM_FILTER) {
-                log.debug("creating new bloom filter dynamic filter for size of: " + objectValueSets[channelIndex].size() + ", key: " + key + ", driver: " + driverId);
-                byte[] finalOutput = BloomFilterDynamicFilter.convertBloomFilterToByteArray(BloomFilterDynamicFilter.createBloomFilterFromSet(objectValueSets[channelIndex], bloomFilterFpp));
+                byte[] finalOutput = convertBloomFilterToByteArray(createBloomFilterFromSet(channel, values, bloomFilterFpp));
                 if (finalOutput != null) {
-                    ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key)).add(finalOutput);
+                    ((StateSet) stateStore.getStateCollection(key)).add(finalOutput);
                 }
             }
             else {
-                log.debug("creating new hashset dynamic filter for size of: " + objectValueSets[channelIndex].size() + ", key: " + key + ", driver: " + driverId);
-                ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key))
-                        .add(objectValueSets[channelIndex]);
+                ((StateSet) stateStore.getStateCollection(key)).add(values);
             }
-            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHPREFIX, channel.filterId, channel.queryId))).add(driverId);
-            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, channel.filterId, channel.queryId))).add(nodeInfo.getNodeId());
+            log.debug("creating new " + dataType + " dynamic filter for size of: " + values.size() + ", key: " + key + ", driver: " + driverId);
+            ((StateSet) stateStore.getStateCollection(createKey(FINISHPREFIX, channel.filterId, channel.queryId))).add(driverId);
+            ((StateSet) stateStore.getStateCollection(createKey(WORKERSPREFIX, channel.filterId, channel.queryId))).add(nodeInfo.getNodeId());
         }
     }
 
@@ -305,6 +293,16 @@ public class DynamicFilterSourceOperator
             this.index = index;
             this.queryId = queryId;
         }
+
+        public String getFilterId()
+        {
+            return filterId;
+        }
+
+        public Type getType()
+        {
+            return type;
+        }
     }
 
     public static class DynamicFilterSourceOperatorFactory
@@ -312,7 +310,7 @@ public class DynamicFilterSourceOperator
     {
         private final int operatorId;
         private final PlanNodeId planNodeId;
-        private final Consumer<TupleDomain<String>> dynamicPredicateConsumer;
+        private final Consumer<Map<Channel, Set>> dynamicPredicateConsumer;
         private final List<Channel> channels;
         private final int maxFilterPositionsCount;
         private final DataSize maxFilterSize;
@@ -328,13 +326,14 @@ public class DynamicFilterSourceOperator
         public DynamicFilterSourceOperatorFactory(
                 int operatorId,
                 PlanNodeId planNodeId,
-                Consumer<TupleDomain<String>> dynamicPredicateConsumer,
+                Consumer<Map<Channel, Set>> dynamicPredicateConsumer,
                 List<Channel> channels,
                 int maxFilterPositionsCount,
                 DataSize maxFilterSize,
                 DynamicFilterDataType dynamicFilteringDataType,
                 DynamicFilter.Type filterType,
-                NodeInfo nodeInfo, StateStoreProvider stateStoreProvider)
+                NodeInfo nodeInfo,
+                StateStoreProvider stateStoreProvider)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -349,7 +348,7 @@ public class DynamicFilterSourceOperator
             this.dynamicFilterDataType = dynamicFilteringDataType;
             this.filterType = filterType;
             this.nodeInfo = nodeInfo;
-            this.stateStoreProvider = stateStoreProvider;
+            this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
         }
 
         /**
@@ -359,7 +358,7 @@ public class DynamicFilterSourceOperator
          * @return Operator
          */
         @Override
-        public Operator createOperator(DriverContext driverContext)
+        public DynamicFilterSourceOperator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
             return new DynamicFilterSourceOperator(

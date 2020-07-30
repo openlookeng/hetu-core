@@ -30,12 +30,16 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * This class is responsible for creating the drivers, each representing a thread, based on the OperatorFactories.
+ * It's possible we may need multiple threads in the same SqlTask where there are multiple pipelines
+ */
 public class DriverFactory
 {
     private final int pipelineId;
     private final boolean inputDriver;
     private final boolean outputDriver;
-    private final List<OperatorFactory> operatorFactories;
+    private final List<OperatorFactory> operatorFactories; //essentially a pipeline, which will be running in a thread.
     private final Optional<PlanNodeId> sourceId;
     private final OptionalInt driverInstances;
     private final PipelineExecutionStrategy pipelineExecutionStrategy;

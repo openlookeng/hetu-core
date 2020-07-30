@@ -18,10 +18,13 @@ import io.airlift.node.NodeInfo;
 import io.airlift.tpch.LineItem;
 import io.airlift.tpch.LineItemGenerator;
 import io.airlift.units.DataSize;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.testing.TestingTaskContext;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
@@ -94,7 +97,8 @@ public class BenchmarkDynamicFilterSourceOperator
                     getDynamicFilteringMaxPerDriverValueCount(TEST_SESSION),
                     getDynamicFilteringMaxPerDriverSize(TEST_SESSION),
                     getDynamicFilteringDataType(TEST_SESSION), DynamicFilter.Type.LOCAL,
-                    nodeInfo, null);
+                    nodeInfo,
+                    new LocalStateStoreProvider(new SeedStoreManager(new FileSystemClientManager())));
         }
 
         @TearDown
