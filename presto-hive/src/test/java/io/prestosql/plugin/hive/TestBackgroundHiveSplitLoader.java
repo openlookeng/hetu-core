@@ -770,7 +770,7 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
     }
 
     private static Table table(
