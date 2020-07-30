@@ -1420,6 +1420,8 @@ public class HiveMetadata
         Table table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
 
+        verifyStorageFormatForCatalog(table.getStorage().getStorageFormat());
+
         HiveWriteUtils.checkTableIsWritable(table, writesToNonManagedTablesEnabled, writeType);
 
         for (Column column : table.getDataColumns()) {
@@ -2631,5 +2633,16 @@ public class HiveMetadata
     public void setExternalTable(boolean externalTable)
     {
         this.externalTable = externalTable;
+    }
+
+    protected void verifyStorageFormatForCatalog(StorageFormat storageFormat)
+    {
+        requireNonNull(storageFormat, "Storage format is null");
+
+        if (storageFormat.getInputFormat().contains("CarbonInputFormat")) {
+            String sf = storageFormat.getInputFormat();
+            throw new PrestoException(NOT_SUPPORTED,
+                    String.format("Tables with %s are not supported by Hive connector", sf.substring(sf.lastIndexOf(".") + 1)));
+        }
     }
 }

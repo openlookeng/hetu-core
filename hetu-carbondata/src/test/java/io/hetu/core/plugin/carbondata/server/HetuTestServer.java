@@ -21,6 +21,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.jdbc.PrestoStatement;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.plugin.hive.HivePlugin;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.tests.DistributedQueryRunner;
 import org.apache.commons.lang.StringUtils;
@@ -180,5 +181,11 @@ public class HetuTestServer
         }
 
         return queryRunner;
+    }
+
+    public void addHiveCatalogToQueryRunner(Map<String, String> hiveProperties)
+    {
+        queryRunner.installPlugin(new HivePlugin("hive"));
+        queryRunner.createCatalog("hive", "hive", hiveProperties);
     }
 }
