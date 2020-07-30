@@ -284,7 +284,9 @@ public class CarbondataMetadata
     @Override
     public CarbondataInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return beginInsertUpdateInternal(session, tableHandle, false);
+        boolean isInsertExistingPartitionsOverwrite = HiveSessionProperties.getInsertExistingPartitionsBehavior(session) ==
+                HiveSessionProperties.InsertExistingPartitionsBehavior.OVERWRITE ? true : false;
+        return beginInsertUpdateInternal(session, tableHandle, false || isInsertExistingPartitionsOverwrite);
     }
 
     @Override
