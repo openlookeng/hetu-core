@@ -469,10 +469,7 @@ public class LocalExecutionPlanner
             OutputFactory outputOperatorFactory)
     {
         Session session = taskContext.getSession();
-        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types);
-
-        LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-        collector.setStateStoreProvider(stateStoreProvider);
+        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, stateStoreProvider);
 
         PhysicalOperation physicalOperation = plan.accept(new Visitor(session, stageExecutionDescriptor), context);
 
@@ -558,9 +555,9 @@ public class LocalExecutionPlanner
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
 
-        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types)
+        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, StateStoreProvider stateStoreProvider)
         {
-            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(getDynamicFilteringDataType(taskContext.getSession())), new AtomicInteger(0));
+            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, stateStoreProvider), new AtomicInteger(0));
         }
 
         private LocalExecutionPlanContext(
@@ -1280,7 +1277,7 @@ public class LocalExecutionPlanner
                 if (sourceNode instanceof TableScanNode) {
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-                    dynamicFilterSupplier = () -> collector.getDynamicFilters(tableScanNode, dynamicFilters.get(), queryId);
+                    dynamicFilterSupplier = () -> collector.getDynamicFilters(tableScanNode, dynamicFilters.get());
                 }
             }
 
