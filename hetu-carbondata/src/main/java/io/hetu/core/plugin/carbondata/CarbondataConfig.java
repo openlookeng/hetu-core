@@ -15,6 +15,7 @@ package io.hetu.core.plugin.carbondata;
 
 import io.airlift.configuration.Config;
 import io.prestosql.plugin.hive.HiveConfig;
+import org.apache.carbondata.core.constants.CarbonCommonConstants;
 
 import javax.validation.constraints.NotNull;
 
@@ -22,6 +23,8 @@ public class CarbondataConfig
         extends HiveConfig
 {
     private String storeLocation = "";
+    private long minorVacuumSegCount = Long.parseLong(CarbonCommonConstants.DEFAULT_SEGMENT_LEVEL_THRESHOLD.split(",")[0]);
+    private long majorVacuumSegSize = 1L;
     private CarbondataStorageFormat carbondataStorageFormat = CarbondataStorageFormat.CARBON;
 
     @NotNull
@@ -35,5 +38,31 @@ public class CarbondataConfig
     {
         this.storeLocation = storeLocation;
         return this;
+    }
+
+    @Config("carbondata.minor-compaction-seg-count")
+    public CarbondataConfig setMinorVacuumSegCount(String minorVacuumSegCount)
+    {
+        this.minorVacuumSegCount = Long.parseLong(minorVacuumSegCount);
+        return this;
+    }
+
+    @Config("carbondata.major-compaction-seg-size")
+    public CarbondataConfig setMajorVacuumSegSize(String majorVacuumSegSize)
+    {
+        this.majorVacuumSegSize = Long.parseLong(majorVacuumSegSize);
+        return this;
+    }
+
+    @NotNull
+    public long getMinorVacuumSegCount()
+    {
+        return minorVacuumSegCount;
+    }
+
+    @NotNull
+    public long getMajorVacuumSegSize()
+    {
+        return majorVacuumSegSize;
     }
 }

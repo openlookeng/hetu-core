@@ -138,7 +138,7 @@ public class HiveVacuumTableHandle
     }
 
     @JsonProperty("full")
-    public boolean isFull()
+    public boolean isFullVacuum()
     {
         return full;
     }

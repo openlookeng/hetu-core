@@ -1631,7 +1631,7 @@ public class HiveMetadata
     }
 
     @Override
-    public HiveVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
+    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
     {
         HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, HiveACIDWriteType.VACUUM);
         return new HiveVacuumTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),

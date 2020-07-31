@@ -21,6 +21,8 @@ public class CarbondataConstants
     public static final String NewSegmentId = "hetu.carbondata.states.newSegmentId";
     public static final String TxnBeginTimeStamp = "hetu.carbondata.states.transactionbegintimestamp";
     public static final String TaskId = "mapred.task.id";
+    public static final String MajorCompaction = "MAJOR";
+    public static final String MinorCompaction = "MINOR";
 
     private CarbondataConstants()
     {

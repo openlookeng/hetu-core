@@ -66,10 +66,13 @@ public class CarbondataMetadataFactory
     private final String hetuVersion;
     private final AccessControlMetadataFactory accessControlMetadataFactory;
     private final JsonCodec partitionUpdateCodec;
+    private final JsonCodec segmentInfoCodec;
     private final Optional<Duration> hiveTransactionHeartbeatInterval;
     private final ScheduledExecutorService heartbeatService;
     private final CarbondataTableReader carbondataTableReader;
     private final String carbondataTableStore;
+    private final long carbondataMinorVacuumSegmentCount;
+    private final long carbondataMajorVacuumSegmentSize;
 
     @Inject
     public CarbondataMetadataFactory(CarbondataConfig carbondataConfig, HiveMetastore metastore,
@@ -78,6 +81,7 @@ public class CarbondataMetadataFactory
                                      @ForHiveTransactionHeartbeats ScheduledExecutorService heartbeatService,
                                      TypeManager typeManager, LocationService locationService,
                                      JsonCodec<PartitionUpdate> partitionUpdateCodec,
+                                     JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
                                      TypeTranslator typeTranslator, NodeVersion nodeVersion,
                                      AccessControlMetadataFactory accessControlMetadataFactory,
                                      CarbondataTableReader carbondataTableReader)
@@ -92,9 +96,10 @@ public class CarbondataMetadataFactory
                 carbondataConfig.getTableCreatesWithLocationAllowed(),
                 carbondataConfig.getPerTransactionMetastoreCacheMaximumSize(),
                 carbondataConfig.getHiveTransactionHeartbeatInterval(), typeManager, locationService,
-                partitionUpdateCodec, executorService, heartbeatService, typeTranslator,
+                partitionUpdateCodec, segmentInfoCodec, executorService, heartbeatService, typeTranslator,
                 nodeVersion.toString(),
-                accessControlMetadataFactory, carbondataTableReader, carbondataConfig.getStoreLocation());
+                accessControlMetadataFactory, carbondataTableReader, carbondataConfig.getStoreLocation(),
+                carbondataConfig.getMajorVacuumSegSize(), carbondataConfig.getMinorVacuumSegCount());
     }
 
     public CarbondataMetadataFactory(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment,
@@ -107,10 +112,11 @@ public class CarbondataMetadataFactory
                                      Optional<Duration> hiveTransactionHeartbeatInterval,
                                      TypeManager typeManager, LocationService locationService,
                                      JsonCodec<PartitionUpdate> partitionUpdateCodec,
+                                     JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
                                      ExecutorService executorService, ScheduledExecutorService heartbeatService,
                                      TypeTranslator typeTranslator, String hetuVersion,
                                      AccessControlMetadataFactory accessControlMetadataFactory,
-                                     CarbondataTableReader carbondataTableReader, String storeLocation)
+                                     CarbondataTableReader carbondataTableReader, String storeLocation, long majorVacuumSegSize, long minorVacuumSegCount)
     {
         super(metastore,
                 hdfsEnvironment,
@@ -147,6 +153,7 @@ public class CarbondataMetadataFactory
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.locationService = requireNonNull(locationService, "locationService is null");
         this.partitionUpdateCodec = requireNonNull(partitionUpdateCodec, "partitionUpdateCodec is null");
+        this.segmentInfoCodec = requireNonNull(segmentInfoCodec, "segmentInfoCodec is null");
         this.typeTranslator = requireNonNull(typeTranslator, "typeTranslator is null");
         this.hetuVersion = requireNonNull(hetuVersion, "hetuVersion is null");
         this.accessControlMetadataFactory = requireNonNull(accessControlMetadataFactory,
@@ -165,6 +172,8 @@ public class CarbondataMetadataFactory
         this.heartbeatService = requireNonNull(heartbeatService, "heartbeatService is null");
         this.carbondataTableReader = requireNonNull(carbondataTableReader, "tableReader is null");
         this.carbondataTableStore = storeLocation;
+        this.carbondataMinorVacuumSegmentCount = minorVacuumSegCount;
+        this.carbondataMajorVacuumSegmentSize = majorVacuumSegSize;
     }
 
     @Override
@@ -190,11 +199,14 @@ public class CarbondataMetadataFactory
                 this.typeManager,
                 this.locationService,
                 this.partitionUpdateCodec,
+                this.segmentInfoCodec,
                 this.typeTranslator,
                 this.hetuVersion,
                 new MetastoreHiveStatisticsProvider(metastore),
                 this.accessControlMetadataFactory.create(metastore),
                 carbondataTableReader,
-                this.carbondataTableStore);
+                this.carbondataTableStore,
+                this.carbondataMajorVacuumSegmentSize,
+                this.carbondataMinorVacuumSegmentCount);
     }
 }
