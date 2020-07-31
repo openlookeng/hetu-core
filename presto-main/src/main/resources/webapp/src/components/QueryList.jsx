@@ -130,7 +130,7 @@ export class QueryListItem extends React.Component {
                     <div className="col-xs-4">
                         <div className="row stat-row query-header query-header-queryid">
                             <div className="col-xs-9" data-toggle="tooltip" data-placement="bottom" title="Query ID">
-                                <a href={"" + query.self.replace("v1/query/", "ui/query.html?")} target="_blank">{query.queryId}</a>
+                                <a href={"" + query.self.replace(/.*\/v1\/query\//, "query.html?")} target="_blank">{query.queryId}</a>
                             </div>
                             <div className="col-xs-3 query-header-timestamp" data-toggle="tooltip" data-placement="bottom" title="Submit time">
                                 <span>{formatShortTime(new Date(Date.parse(query.queryStats.createTime)))}</span>
@@ -326,7 +326,7 @@ export class QueryList extends React.Component {
         clearTimeout(this.timeoutId); // to stop multiple series of refreshLoop from going on simultaneously
         clearTimeout(this.searchTimeoutId);
 
-        $.get('/v1/query', function (queryList) {
+        $.get('../v1/query', function (queryList) {
             const queryMap = queryList.reduce(function (map, query) {
                 map[query.queryId] = query;
                 return map;

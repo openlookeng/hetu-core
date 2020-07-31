@@ -108,6 +108,7 @@ public class NodeStateChangeHandler
 
                     synchronized (NodeStateChangeHandler.this) {
                         if (state == NodeState.ISOLATING) {
+                            LOG.info("Updating node state from ISOLATING to ISOLATED");
                             state = NodeState.ISOLATED;
                         }
                         else {
@@ -306,6 +307,7 @@ public class NodeStateChangeHandler
             default:
                 break;
         }
+        LOG.info(String.format("Updating node state from %s to %s", state, newState));
         state = newState;
         return true;
     }

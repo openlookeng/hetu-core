@@ -11,8 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-FROM centos:centos7
-LABEL maintainer="Hetu Community"
+ARG BASE_IMAGE=centos:centos7
+FROM $BASE_IMAGE
+LABEL maintainer="OpenLooKeng Community"
 
 ENV JAVA_HOME /usr/lib/jvm/java-8
 RUN \
@@ -21,23 +22,23 @@ RUN \
     yum -y -q install  java-1.8.0-openjdk-devel sudo less &&\
     yum -q clean all &&\
     rm -rf /var/cache/yum /tmp/* /var/tmp/* && \
-    groupadd hetu --gid 1000 && \
-    useradd hetu --uid 1000 --gid 1000 && \
-    echo 'hetu:admin' | chpasswd &&\
-    gpasswd -a hetu wheel &&\
-    echo 'hetu ALL=(ALL) NOPASSWD:ALL' | tee -a /etc/sudoers > /dev/null &&\
+    groupadd openlkadmin --gid 1000 && \
+    useradd openlkadmin --uid 1000 --gid 1000 && \
+    echo 'openlkadmin:admin' | chpasswd &&\
+    gpasswd -a openlkadmin wheel &&\
+    echo 'openlkadmin ALL=(ALL) NOPASSWD:ALL' | tee -a /etc/sudoers > /dev/null &&\
     mkdir -p /usr/lib/hetu /var/lib/hetu/data /var/log/hetu &&\
-    chown -RL "hetu:hetu" /var/lib/hetu/data /usr/lib/hetu /var/log/hetu
+    chown -RL "openlkadmin:openlkadmin" /var/lib/hetu/data /usr/lib/hetu /var/log/hetu
 
-ARG HETU_VERSION
+ARG OPENLK_VERSION
 ARG PORT=8080
 
-# Install Hetu Engine Executable
-COPY --chown=hetu:hetu hetu-server-${HETU_VERSION} /usr/lib/hetu
+# Install OpenLooKeng Engine Executable
+COPY --chown=openlkadmin:openlkadmin hetu-server-${OPENLK_VERSION} /usr/lib/hetu
 # Install CLI
-COPY hetu-cli-${HETU_VERSION}-executable.jar /usr/bin/hetu
+COPY --chown=openlkadmin:openlkadmin hetu-cli-${OPENLK_VERSION}-executable.jar /usr/bin/openlk
 
 EXPOSE $PORT
-USER hetu:hetu
+USER openlkadmin:openlkadmin
 ENV LANG en_US.UTF-8
 ENTRYPOINT ["/usr/lib/hetu/bin/run-hetu"]
