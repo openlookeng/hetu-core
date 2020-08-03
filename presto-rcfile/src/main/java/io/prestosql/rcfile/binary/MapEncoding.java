@@ -40,7 +40,7 @@ public class MapEncoding
     }
 
     @Override
-    public void encodeValue(Block block, int position, SliceOutput output)
+    public <T> void encodeValue(Block<T> block, int position, SliceOutput output)
     {
         Block map = block.getObject(position, Block.class);
 

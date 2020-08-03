@@ -27,7 +27,7 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
 public class ShortArrayBlock
-        implements Block
+        implements Block<Short>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ShortArrayBlock.class).instanceSize();
 

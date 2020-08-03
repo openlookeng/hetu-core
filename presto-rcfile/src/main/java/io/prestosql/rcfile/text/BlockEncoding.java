@@ -39,7 +39,7 @@ public abstract class BlockEncoding
     }
 
     @Override
-    public final void encodeColumn(Block block, SliceOutput output, EncodeOutput encodeOutput)
+    public final <T> void encodeColumn(Block<T> block, SliceOutput output, EncodeOutput encodeOutput)
             throws RcFileCorruptionException
     {
         for (int position = 0; position < block.getPositionCount(); position++) {

@@ -61,7 +61,7 @@ public final class HiveBucketingV1
         return result;
     }
 
-    static int hash(TypeInfo type, Block block, int position)
+    static <T> int hash(TypeInfo type, Block<T> block, int position)
     {
         // This function mirrors the behavior of function hashCode in
         // HIVE-12025 ba83fd7bff serde/src/java/org/apache/hadoop/hive/serde2/objectinspector/ObjectInspectorUtils.java

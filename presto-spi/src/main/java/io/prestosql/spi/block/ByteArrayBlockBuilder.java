@@ -27,8 +27,8 @@ import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 import static java.lang.Math.max;
 
-public class ByteArrayBlockBuilder
-        implements BlockBuilder
+public class ByteArrayBlockBuilder<T>
+        implements BlockBuilder<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ByteArrayBlockBuilder.class).instanceSize();
     private static final Block NULL_VALUE_BLOCK = new ByteArrayBlock(0, 1, new boolean[] {true}, new byte[1]);

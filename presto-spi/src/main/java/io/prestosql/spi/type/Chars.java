@@ -21,7 +21,7 @@ import static io.prestosql.spi.type.Varchars.byteCount;
 import static io.prestosql.spi.type.Varchars.truncateToLength;
 import static java.util.Objects.requireNonNull;
 
-public final class Chars
+public class Chars
 {
     private Chars() {}
 

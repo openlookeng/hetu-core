@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 public interface HivePageSourceFactory
 {
@@ -41,7 +42,7 @@ public interface HivePageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

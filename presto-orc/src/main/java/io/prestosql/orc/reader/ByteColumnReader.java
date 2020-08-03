@@ -47,7 +47,7 @@ import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static java.util.Objects.requireNonNull;
 
 public class ByteColumnReader
-        implements ColumnReader
+        implements ColumnReader<Byte>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ByteColumnReader.class).instanceSize();
 

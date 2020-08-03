@@ -24,7 +24,7 @@ import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.sql.rewrite.DynamicFilterContext;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.DynamicFilterUtils;
 
@@ -46,6 +46,7 @@ public class LocalDynamicFiltersCollector
     private StateMap mergedDynamicFilters;
     private DynamicFilterStateStoreListener stateStoreListeners;
     private final FeaturesConfig.DynamicFilterDataType dynamicFilterDataType;
+    private DynamicFilterContext context;
 
     /**
      * May contains domains for dynamic filters for different table scans
@@ -74,6 +75,13 @@ public class LocalDynamicFiltersCollector
         }
     }
 
+    void initContext(Map<Symbol, ColumnHandle> columns, List<DynamicFilters.Descriptor> descriptors)
+    {
+        if (context == null) {
+            context = new DynamicFilterContext(columns, descriptors, stateStoreProvider);
+        }
+    }
+
     void intersectDynamicFilter(Map<Symbol, Set> predicate)
     {
         for (Map.Entry<Symbol, Set> entry : predicate.entrySet()) {
@@ -97,7 +105,7 @@ public class LocalDynamicFiltersCollector
      * @param tableScan TableScanNode that has DynamicFilter applied
      * @return ColumnHandle to DynamicFilter mapping that contains any DynamicFilter that are ready for use
      */
-    Map<ColumnHandle, DynamicFilter> getDynamicFilters(TableScanNode tableScan, List<DynamicFilters.Descriptor> dynamicFilters)
+    Map<ColumnHandle, DynamicFilter> getDynamicFilters(TableScanNode tableScan)
     {
         Map<Symbol, ColumnHandle> assignments = tableScan.getAssignments();
         // Skips symbols irrelevant to this table scan node.
@@ -105,7 +113,7 @@ public class LocalDynamicFiltersCollector
         for (Map.Entry<Symbol, ColumnHandle> entry : assignments.entrySet()) {
             final Symbol columnSymbol = entry.getKey();
             final ColumnHandle columnHandle = entry.getValue();
-            final String filterId = getFilterId(columnSymbol, dynamicFilters);
+            final String filterId = context.getId(columnSymbol);
             if (filterId == null) {
                 continue;
             }
@@ -142,25 +150,5 @@ public class LocalDynamicFiltersCollector
             mergedDynamicFilters.removeEntryListener(stateStoreListeners);
             LOG.debug("Removed listener: " + stateStoreListeners);
         }
-    }
-
-    private static String getFilterId(Symbol column, List<DynamicFilters.Descriptor> dynamicFilters)
-    {
-        for (DynamicFilters.Descriptor dynamicFilter : dynamicFilters) {
-            if (dynamicFilter.getInput() instanceof SymbolReference) {
-                if (column.getName().equals(((SymbolReference) dynamicFilter.getInput()).getName())) {
-                    return dynamicFilter.getId();
-                }
-            }
-            else {
-                List<Symbol> symbolList = SymbolsExtractor.extractAll(dynamicFilter.getInput());
-                for (Symbol symbol : symbolList) {
-                    if (column.getName().equals(symbol.getName())) {
-                        return dynamicFilter.getId();
-                    }
-                }
-            }
-        }
-        return null;
     }
 }

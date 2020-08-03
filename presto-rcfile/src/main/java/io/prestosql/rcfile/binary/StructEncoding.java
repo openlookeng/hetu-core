@@ -34,9 +34,9 @@ public class StructEncoding
     }
 
     @Override
-    public void encodeValue(Block block, int position, SliceOutput output)
+    public <T> void encodeValue(Block<T> block, int position, SliceOutput output)
     {
-        Block row = block.getObject(position, Block.class);
+        Block<T> row = block.getObject(position, Block.class);
 
         // write values
         for (int batchStart = 0; batchStart < row.getPositionCount(); batchStart += 8) {

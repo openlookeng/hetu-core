@@ -16,92 +16,40 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
-import io.prestosql.orc.metadata.ColumnEncoding;
-import io.prestosql.orc.metadata.ColumnMetadata;
-import io.prestosql.orc.stream.BooleanInputStream;
-import io.prestosql.orc.stream.InputStreamSource;
-import io.prestosql.orc.stream.InputStreamSources;
-import io.prestosql.orc.stream.LongInputStream;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.block.IntArrayBlock;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
-import io.prestosql.spi.block.ShortArrayBlock;
 import io.prestosql.spi.type.BigintType;
-import io.prestosql.spi.type.DateType;
-import io.prestosql.spi.type.IntegerType;
-import io.prestosql.spi.type.SmallintType;
-import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
-import javax.annotation.Nullable;
-
 import java.io.IOException;
-import java.time.ZoneId;
 import java.util.Optional;
 
-import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Verify.verify;
 import static io.airlift.slice.SizeOf.sizeOf;
-import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
-import static io.prestosql.orc.metadata.Stream.StreamKind.PRESENT;
 import static io.prestosql.orc.reader.ReaderUtils.minNonNullValueSize;
-import static io.prestosql.orc.reader.ReaderUtils.unpackIntNulls;
 import static io.prestosql.orc.reader.ReaderUtils.unpackLongNulls;
-import static io.prestosql.orc.reader.ReaderUtils.unpackShortNulls;
-import static io.prestosql.orc.reader.ReaderUtils.verifyStreamType;
-import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
-import static java.util.Objects.requireNonNull;
 
 public class LongColumnReader
-        implements ColumnReader
+        extends AbstractNumericColumnReader<Long>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongColumnReader.class).instanceSize();
 
-    private final Type type;
-    private final OrcColumn column;
-
-    private int readOffset;
-    private int nextBatchSize;
-
-    private InputStreamSource<BooleanInputStream> presentStreamSource = missingStreamSource(BooleanInputStream.class);
-    @Nullable
-    private BooleanInputStream presentStream;
-    private boolean[] nullVector = new boolean[0];
-
-    private InputStreamSource<LongInputStream> dataStreamSource = missingStreamSource(LongInputStream.class);
-    @Nullable
-    private LongInputStream dataStream;
-
-    private boolean rowGroupOpen;
-
-    // only one of the three arrays will be used
-    private short[] shortNonNullValueTemp = new short[0];
-    private int[] intNonNullValueTemp = new int[0];
     private long[] longNonNullValueTemp = new long[0];
 
-    private final LocalMemoryContext systemMemoryContext;
-
-    public LongColumnReader(Type type, OrcColumn column, LocalMemoryContext systemMemoryContext)
+    /**
+     * @param column
+     * @param systemMemoryContext
+     * @throws OrcCorruptionException
+     */
+    public LongColumnReader(OrcColumn column, LocalMemoryContext systemMemoryContext)
             throws OrcCorruptionException
     {
-        requireNonNull(type, "type is null");
-        verifyStreamType(column, type, t -> t instanceof BigintType || t instanceof IntegerType || t instanceof SmallintType || t instanceof DateType);
-        this.type = type;
-
-        this.column = requireNonNull(column, "column is null");
-        this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
+        super(column, systemMemoryContext);
     }
 
     @Override
-    public void prepareNextRead(int batchSize)
-    {
-        readOffset += nextBatchSize;
-        nextBatchSize = batchSize;
-    }
-
-    @Override
-    public Block readBlock()
+    public Block<Long> readBlock()
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -122,13 +70,13 @@ public class LongColumnReader
             }
         }
 
-        Block block;
+        Block<Long> block;
         if (dataStream == null) {
             if (presentStream == null) {
                 throw new OrcCorruptionException(column.getOrcDataSourceId(), "Value is null but present stream is missing");
             }
             presentStream.skip(nextBatchSize);
-            block = RunLengthEncodedBlock.create(type, null, nextBatchSize);
+            block = RunLengthEncodedBlock.create(BigintType.BIGINT, null, nextBatchSize);
         }
         else if (presentStream == null) {
             block = readNonNullBlock();
@@ -143,7 +91,7 @@ public class LongColumnReader
                 block = readNullBlock(isNull, nextBatchSize - nullCount);
             }
             else {
-                block = RunLengthEncodedBlock.create(type, null, nextBatchSize);
+                block = RunLengthEncodedBlock.create(BigintType.BIGINT, null, nextBatchSize);
             }
         }
 
@@ -157,37 +105,15 @@ public class LongColumnReader
             throws IOException
     {
         verify(dataStream != null);
-        if (type instanceof BigintType) {
-            long[] values = new long[nextBatchSize];
-            dataStream.next(values, nextBatchSize);
-            return new LongArrayBlock(nextBatchSize, Optional.empty(), values);
-        }
-        if (type instanceof IntegerType || type instanceof DateType) {
-            int[] values = new int[nextBatchSize];
-            dataStream.next(values, nextBatchSize);
-            return new IntArrayBlock(nextBatchSize, Optional.empty(), values);
-        }
-        if (type instanceof SmallintType) {
-            short[] values = new short[nextBatchSize];
-            dataStream.next(values, nextBatchSize);
-            return new ShortArrayBlock(nextBatchSize, Optional.empty(), values);
-        }
-        throw new VerifyError("Unsupported type " + type);
+        long[] values = new long[nextBatchSize];
+        dataStream.next(values, nextBatchSize);
+        return new LongArrayBlock(nextBatchSize, Optional.empty(), values);
     }
 
     private Block readNullBlock(boolean[] isNull, int nonNullCount)
             throws IOException
     {
-        if (type instanceof BigintType) {
-            return longReadNullBlock(isNull, nonNullCount);
-        }
-        if (type instanceof IntegerType || type instanceof DateType) {
-            return intReadNullBlock(isNull, nonNullCount);
-        }
-        if (type instanceof SmallintType) {
-            return shortReadNullBlock(isNull, nonNullCount);
-        }
-        throw new VerifyError("Unsupported type " + type);
+        return longReadNullBlock(isNull, nonNullCount);
     }
 
     private Block longReadNullBlock(boolean[] isNull, int nonNullCount)
@@ -205,99 +131,5 @@ public class LongColumnReader
         long[] result = unpackLongNulls(longNonNullValueTemp, isNull);
 
         return new LongArrayBlock(nextBatchSize, Optional.of(isNull), result);
-    }
-
-    private Block intReadNullBlock(boolean[] isNull, int nonNullCount)
-            throws IOException
-    {
-        verify(dataStream != null);
-        int minNonNullValueSize = minNonNullValueSize(nonNullCount);
-        if (intNonNullValueTemp.length < minNonNullValueSize) {
-            intNonNullValueTemp = new int[minNonNullValueSize];
-            systemMemoryContext.setBytes(sizeOf(intNonNullValueTemp));
-        }
-
-        dataStream.next(intNonNullValueTemp, nonNullCount);
-
-        int[] result = unpackIntNulls(intNonNullValueTemp, isNull);
-
-        return new IntArrayBlock(nextBatchSize, Optional.of(isNull), result);
-    }
-
-    private Block shortReadNullBlock(boolean[] isNull, int nonNullCount)
-            throws IOException
-    {
-        verify(dataStream != null);
-        int minNonNullValueSize = minNonNullValueSize(nonNullCount);
-        if (shortNonNullValueTemp.length < minNonNullValueSize) {
-            shortNonNullValueTemp = new short[minNonNullValueSize];
-            systemMemoryContext.setBytes(sizeOf(shortNonNullValueTemp));
-        }
-
-        dataStream.next(shortNonNullValueTemp, nonNullCount);
-
-        short[] result = unpackShortNulls(shortNonNullValueTemp, isNull);
-
-        return new ShortArrayBlock(nextBatchSize, Optional.of(isNull), result);
-    }
-
-    private void openRowGroup()
-            throws IOException
-    {
-        presentStream = presentStreamSource.openStream();
-        dataStream = dataStreamSource.openStream();
-
-        rowGroupOpen = true;
-    }
-
-    @Override
-    public void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
-    {
-        presentStreamSource = missingStreamSource(BooleanInputStream.class);
-        dataStreamSource = missingStreamSource(LongInputStream.class);
-
-        readOffset = 0;
-        nextBatchSize = 0;
-
-        presentStream = null;
-        dataStream = null;
-
-        rowGroupOpen = false;
-    }
-
-    @Override
-    public void startRowGroup(InputStreamSources dataStreamSources)
-    {
-        presentStreamSource = dataStreamSources.getInputStreamSource(column, PRESENT, BooleanInputStream.class);
-        dataStreamSource = dataStreamSources.getInputStreamSource(column, DATA, LongInputStream.class);
-
-        readOffset = 0;
-        nextBatchSize = 0;
-
-        presentStream = null;
-        dataStream = null;
-
-        rowGroupOpen = false;
-    }
-
-    @Override
-    public String toString()
-    {
-        return toStringHelper(this)
-                .addValue(column)
-                .toString();
-    }
-
-    @Override
-    public void close()
-    {
-        systemMemoryContext.close();
-        nullVector = null;
-    }
-
-    @Override
-    public long getRetainedSizeInBytes()
-    {
-        return INSTANCE_SIZE + sizeOf(nullVector);
     }
 }

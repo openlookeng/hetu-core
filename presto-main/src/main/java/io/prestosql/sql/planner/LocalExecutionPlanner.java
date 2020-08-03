@@ -1268,18 +1268,7 @@ public class LocalExecutionPlanner
                     .map(ExpressionUtils::combineConjuncts);
 
             // TODO: Execution must be plugged in here
-            Optional<List<DynamicFilters.Descriptor>> dynamicFilters = extractDynamicFilterResult.map(DynamicFilters.ExtractResult::getDynamicConjuncts);
-
-            String queryId = context.getSession().getQueryId().toString();
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier = null;
-            if (dynamicFilters.isPresent() && !dynamicFilters.get().isEmpty()) {
-                log.debug("[TableScan] Dynamic filters: %s", dynamicFilters);
-                if (sourceNode instanceof TableScanNode) {
-                    TableScanNode tableScanNode = (TableScanNode) sourceNode;
-                    LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-                    dynamicFilterSupplier = () -> collector.getDynamicFilters(tableScanNode, dynamicFilters.get());
-                }
-            }
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier = getDynamicFilterSupplier(extractDynamicFilterResult, sourceNode, context);
 
             List<Expression> projections = new ArrayList<>();
             for (Symbol symbol : outputSymbols) {
@@ -1334,6 +1323,22 @@ public class LocalExecutionPlanner
             catch (RuntimeException e) {
                 throw new PrestoException(COMPILER_ERROR, "Compiler failed", e);
             }
+        }
+
+        private Supplier<Map<ColumnHandle, DynamicFilter>> getDynamicFilterSupplier(Optional<DynamicFilters.ExtractResult> extractDynamicFilterResult, PlanNode sourceNode, LocalExecutionPlanContext context)
+        {
+            Optional<List<DynamicFilters.Descriptor>> dynamicFilters = extractDynamicFilterResult.map(DynamicFilters.ExtractResult::getDynamicConjuncts);
+            if (dynamicFilters.isPresent() && !dynamicFilters.get().isEmpty()) {
+                log.debug("[TableScan] Dynamic filters: %s", dynamicFilters);
+                if (sourceNode instanceof TableScanNode) {
+                    TableScanNode tableScanNode = (TableScanNode) sourceNode;
+                    LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
+                    collector.initContext(tableScanNode.getAssignments(), dynamicFilters.get());
+//                    return Suppliers.memoizeWithExpiration(() -> collector.getDynamicFilters(tableScanNode), 5, TimeUnit.MILLISECONDS);
+                    return () -> collector.getDynamicFilters(tableScanNode);
+                }
+            }
+            return null;
         }
 
         private RowExpression toRowExpression(Expression expression, Map<NodeRef<Expression>, Type> types, Map<Symbol, Integer> layout)

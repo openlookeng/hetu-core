@@ -22,8 +22,8 @@ import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.compactOffsets;
 
-public abstract class AbstractArrayBlock
-        implements Block
+public abstract class AbstractArrayBlock<T>
+        implements Block<T>
 {
     protected abstract Block getRawElementBlock();
 

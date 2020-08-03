@@ -258,7 +258,7 @@ public abstract class AbstractTestBlock
         assertPositionValue(block.copyPositions(new int[] {position}, 0, 1), 0, expectedValue);
     }
 
-    protected <T> void assertPositionValue(Block block, int position, T expectedValue)
+    protected <T> void assertPositionValue(Block<T> block, int position, T expectedValue)
     {
         if (expectedValue == null) {
             assertTrue(block.isNull(position));
@@ -414,9 +414,9 @@ public abstract class AbstractTestBlock
         return blockBuilder.build();
     }
 
-    private static Block copyBlockViaWriteStructure(Block block, Supplier<BlockBuilder> newBlockBuilder)
+    private static <T> Block<T> copyBlockViaWriteStructure(Block<T> block, Supplier<BlockBuilder> newBlockBuilder)
     {
-        BlockBuilder blockBuilder = newBlockBuilder.get();
+        BlockBuilder<T> blockBuilder = newBlockBuilder.get();
         for (int i = 0; i < block.getPositionCount(); i++) {
             if (block.isNull(i)) {
                 blockBuilder.appendNull();

@@ -246,6 +246,7 @@ public class DynamicFilterService
         int finishedNum = 0;
         final StateStore stateStore = stateStoreProvider.getStateStore();
 
+        //FIXME: KEN: can we merge the info into 1 collection?
         StateCollection temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterKey, queryId));
         if (temp != null) {
             registeredNum = temp.size();

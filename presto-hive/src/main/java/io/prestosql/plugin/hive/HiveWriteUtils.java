@@ -275,7 +275,7 @@ public final class HiveWriteUtils
         return partitionValues.build();
     }
 
-    public static Object getField(Type type, Block block, int position)
+    public static <T> Object getField(Type type, Block<T> block, int position)
     {
         if (block.isNull(position)) {
             return null;
@@ -326,7 +326,7 @@ public final class HiveWriteUtils
         if (isArrayType(type)) {
             Type elementType = type.getTypeParameters().get(0);
 
-            Block arrayBlock = block.getObject(position, Block.class);
+            Block<T> arrayBlock = block.getObject(position, Block.class);
 
             List<Object> list = new ArrayList<>(arrayBlock.getPositionCount());
             for (int i = 0; i < arrayBlock.getPositionCount(); i++) {
@@ -794,7 +794,7 @@ public final class HiveWriteUtils
             this.field = requireNonNull(field, "field is null");
         }
 
-        public abstract void setField(Block block, int position);
+        public abstract <T> void setField(Block<T> block, int position);
     }
 
     private static class BooleanFieldSetter
@@ -1063,9 +1063,9 @@ public final class HiveWriteUtils
         }
 
         @Override
-        public void setField(Block block, int position)
+        public <T> void setField(Block<T> block, int position)
         {
-            Block arrayBlock = block.getObject(position, Block.class);
+            Block<T> arrayBlock = block.getObject(position, Block.class);
 
             List<Object> list = new ArrayList<>(arrayBlock.getPositionCount());
             for (int i = 0; i < arrayBlock.getPositionCount(); i++) {
@@ -1091,7 +1091,7 @@ public final class HiveWriteUtils
         }
 
         @Override
-        public void setField(Block block, int position)
+        public <T> void setField(Block<T> block, int position)
         {
             Block mapBlock = block.getObject(position, Block.class);
             Map<Object, Object> map = new HashMap<>(mapBlock.getPositionCount() * 2);
@@ -1117,9 +1117,9 @@ public final class HiveWriteUtils
         }
 
         @Override
-        public void setField(Block block, int position)
+        public <T> void setField(Block<T> block, int position)
         {
-            Block rowBlock = block.getObject(position, Block.class);
+            Block<T> rowBlock = block.getObject(position, Block.class);
 
             // TODO reuse row object and use FieldSetters, like we do at the top level
             // Ideally, we'd use the same recursive structure starting from the top, but

@@ -111,7 +111,7 @@ public final class HiveSessionProperties
 
     @Inject
     public HiveSessionProperties(HiveConfig hiveConfig, OrcFileWriterConfig orcFileWriterConfig,
-                                 ParquetFileWriterConfig parquetFileWriterConfig)
+            ParquetFileWriterConfig parquetFileWriterConfig)
     {
         sessionProperties = ImmutableList.of(
                 booleanProperty(

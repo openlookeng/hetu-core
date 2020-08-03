@@ -223,7 +223,9 @@ public class TaskContext
     public void onTaskFinished(Consumer<Boolean> taskFinishHandler)
     {
         taskStateMachine.addStateChangeListener(newState -> {
-            taskFinishHandler.accept(true);
+            if (newState.isDone()) {
+                taskFinishHandler.accept(true);
+            }
         });
     }
 

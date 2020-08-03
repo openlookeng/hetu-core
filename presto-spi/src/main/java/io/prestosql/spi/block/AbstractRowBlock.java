@@ -21,8 +21,8 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.compactOffsets;
 import static io.prestosql.spi.block.RowBlock.createRowBlockInternal;
 
-public abstract class AbstractRowBlock
-        implements Block
+public abstract class AbstractRowBlock<T>
+        implements Block<Block<T>>
 {
     protected final int numFields;
 

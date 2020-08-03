@@ -13,7 +13,7 @@
  */
 package io.prestosql.spi.block;
 
-public interface LazyBlockLoader<T extends Block>
+public interface LazyBlockLoader<T>
 {
-    void load(T block);
+    void load(LazyBlock<T> block);
 }

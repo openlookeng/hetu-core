@@ -30,8 +30,8 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.util.concurrent.ExecutionException;
 
-public class CachingColumnReader
-        implements ColumnReader
+public class CachingColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final Logger log = Logger.get(CachingColumnReader.class);
 

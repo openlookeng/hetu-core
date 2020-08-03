@@ -288,9 +288,9 @@ public class TestDictionaryAwarePageProjection
                 block -> randomDictionaryId());
     }
 
-    private static LazyBlock lazyWrapper(Block block)
+    private static <T> LazyBlock<T> lazyWrapper(Block<T> block)
     {
-        return new LazyBlock(block.getPositionCount(), lazyBlock -> lazyBlock.setBlock(block));
+        return new LazyBlock<T>(block.getPositionCount(), lazyBlock -> lazyBlock.setBlock(block));
     }
 
     private static class TestPageProjection

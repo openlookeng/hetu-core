@@ -34,11 +34,11 @@ import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
-public class MapType
+public class MapType<K extends Type, V extends Type>
         extends AbstractType
 {
-    private final Type keyType;
-    private final Type valueType;
+    private final K keyType;
+    private final V valueType;
     private static final String MAP_NULL_ELEMENT_MSG = "MAP comparison not supported for null value elements";
     private static final int EXPECTED_BYTES_PER_ENTRY = 32;
 
@@ -48,8 +48,8 @@ public class MapType
     private final MethodHandle keyBlockEquals;
 
     public MapType(
-            Type keyType,
-            Type valueType,
+            K keyType,
+            V valueType,
             MethodHandle keyBlockNativeEquals,
             MethodHandle keyBlockEquals,
             MethodHandle keyNativeHashCode,
@@ -114,7 +114,7 @@ public class MapType
     }
 
     @Override
-    public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
+    public <T> boolean equalTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
     {
         Block leftMapBlock = leftBlock.getObject(leftPosition, Block.class);
         Block rightMapBlock = rightBlock.getObject(rightPosition, Block.class);
@@ -143,6 +143,12 @@ public class MapType
             }
         }
         return true;
+    }
+
+    @Override
+    public <T> int compareTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
+    {
+        throw new UnsupportedOperationException();
     }
 
     private static final class KeyWrapper
@@ -186,7 +192,7 @@ public class MapType
     }
 
     @Override
-    public Object getObjectValue(ConnectorSession session, Block block, int position)
+    public <T> Object getObjectValue(ConnectorSession session, Block<T> block, int position)
     {
         if (block.isNull(position)) {
             return null;
@@ -216,7 +222,7 @@ public class MapType
     }
 
     @Override
-    public Block getObject(Block block, int position)
+    public <T> Block getObject(Block<T> block, int position)
     {
         return block.getObject(position, Block.class);
     }

@@ -20,9 +20,9 @@ import java.util.function.BiConsumer;
 
 import static java.lang.String.format;
 
-public class SingleMapBlockWriter
-        extends AbstractSingleMapBlock
-        implements BlockBuilder
+public class SingleMapBlockWriter<T>
+        extends AbstractSingleMapBlock<T>
+        implements BlockBuilder<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleMapBlockWriter.class).instanceSize();
 

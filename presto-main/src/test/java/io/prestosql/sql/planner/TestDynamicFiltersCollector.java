@@ -80,10 +80,11 @@ public class TestDynamicFiltersCollector
         TableScanNode tableScan = mock(TableScanNode.class);
         when(tableScan.getAssignments()).thenReturn(ImmutableMap.of(new Symbol(columnName), columnHandle));
         List<DynamicFilters.Descriptor> dynamicFilterDescriptors = ImmutableList.of(new DynamicFilters.Descriptor(filterId, new SymbolReference(columnName)));
+        collector.initContext(tableScan.getAssignments(), dynamicFilterDescriptors);
 
-        assertTrue(collector.getDynamicFilters(tableScan, dynamicFilterDescriptors).isEmpty());
+        assertTrue(collector.getDynamicFilters(tableScan).isEmpty());
         stateMap.put(createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId.getId()), valueSet);
-        Map<ColumnHandle, DynamicFilter> dynamicFilters = collector.getDynamicFilters(tableScan, dynamicFilterDescriptors);
+        Map<ColumnHandle, DynamicFilter> dynamicFilters = collector.getDynamicFilters(tableScan);
         assertEquals(dynamicFilters.size(), 1);
         DynamicFilter dynamicFilter = dynamicFilters.get(columnHandle);
         assertTrue(dynamicFilter instanceof HashSetDynamicFilter);

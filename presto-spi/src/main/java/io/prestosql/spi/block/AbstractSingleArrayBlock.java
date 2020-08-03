@@ -15,8 +15,8 @@ package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
 
-public abstract class AbstractSingleArrayBlock
-        implements Block
+public abstract class AbstractSingleArrayBlock<T>
+        implements Block<T>
 {
     protected final int start;
 
@@ -80,7 +80,9 @@ public abstract class AbstractSingleArrayBlock
     public <T> T getObject(int position, Class<T> clazz)
     {
         checkReadablePosition(position);
-        return getBlock().getObject(position + start, clazz);
+
+        //KEN: could be a problem casting
+        return (T) getBlock().getObject(position + start, clazz);
     }
 
     @Override

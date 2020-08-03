@@ -15,8 +15,8 @@ package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
 
-public interface BlockBuilder
-        extends Block
+public interface BlockBuilder<T>
+        extends Block<T>
 {
     /**
      * Write a byte to the current entry;

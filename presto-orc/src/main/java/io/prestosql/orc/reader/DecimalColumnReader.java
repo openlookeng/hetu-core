@@ -55,8 +55,8 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static java.util.Objects.requireNonNull;
 
-public class DecimalColumnReader
-        implements ColumnReader
+public class DecimalColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(DecimalColumnReader.class).instanceSize();
 

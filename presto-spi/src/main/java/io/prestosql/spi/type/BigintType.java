@@ -20,7 +20,7 @@ import java.util.Optional;
 
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 
-public final class BigintType
+public class BigintType
         extends AbstractLongType
 {
     public static final BigintType BIGINT = new BigintType();

@@ -15,8 +15,6 @@
 package io.prestosql.operator.dynamicfilter;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
@@ -26,6 +24,7 @@ import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.PlanNodeId;
@@ -35,7 +34,6 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -193,10 +191,10 @@ public class TestDynamicFilterOperator
         return TypeProvider.viewOf(types);
     }
 
-    private static void addBloomFilter(String column, List<Object> values, StateMap map)
+    private static void addBloomFilter(String column, List<String> values, StateMap map)
     {
-        BloomFilter bloomFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), 1024 * 1024, 0.005);
-        values.forEach(value -> bloomFilter.put(value));
+        BloomFilter bloomFilter = new BloomFilter(1024 * 1024, 0.005);
+        values.forEach(value -> bloomFilter.add(value.getBytes()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             bloomFilter.writeTo(out);

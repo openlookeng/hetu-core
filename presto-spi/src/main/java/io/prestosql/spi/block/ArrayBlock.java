@@ -24,8 +24,8 @@ import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class ArrayBlock
-        extends AbstractArrayBlock
+public class ArrayBlock<T>
+        extends AbstractArrayBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ArrayBlock.class).instanceSize();
 

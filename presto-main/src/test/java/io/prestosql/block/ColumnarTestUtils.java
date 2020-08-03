@@ -54,7 +54,7 @@ public final class ColumnarTestUtils
         assertPositionValue(block.getSingleValueBlock(position), 0, expectedValue);
     }
 
-    private static <T> void assertPositionValue(Block block, int position, T expectedValue)
+    private static <T> void assertPositionValue(Block<T> block, int position, T expectedValue)
     {
         if (expectedValue == null) {
             assertTrue(block.isNull(position));

@@ -35,10 +35,13 @@ public final class ColumnReaders
             case BYTE:
                 return new ByteColumnReader(type, column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
             case SHORT:
+                return new ShortColumnReader(column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
             case INT:
+                return new IntegerColumnReader(column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
             case LONG:
+                return new LongColumnReader(column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
             case DATE:
-                return new LongColumnReader(type, column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
+                return new DateColumnReader(column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
             case FLOAT:
                 return new FloatColumnReader(type, column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
             case DOUBLE:

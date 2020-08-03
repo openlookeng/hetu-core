@@ -22,8 +22,8 @@ import java.nio.charset.Charset;
 import static io.airlift.slice.Slices.EMPTY_SLICE;
 import static io.prestosql.spi.block.BlockUtil.checkValidPosition;
 
-public abstract class AbstractVariableWidthBlock
-        implements Block
+public abstract class AbstractVariableWidthBlock<T>
+        implements Block<T>
 {
     protected abstract Slice getRawSlice(int position);
 

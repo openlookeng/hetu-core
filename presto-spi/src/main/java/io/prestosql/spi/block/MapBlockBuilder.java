@@ -32,9 +32,9 @@ import static java.lang.String.format;
 import static java.lang.System.arraycopy;
 import static java.util.Objects.requireNonNull;
 
-public class MapBlockBuilder
-        extends AbstractMapBlock
-        implements BlockBuilder
+public class MapBlockBuilder<T>
+        extends AbstractMapBlock<T>
+        implements BlockBuilder<Block<T>>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(MapBlockBuilder.class).instanceSize();
 
@@ -44,8 +44,8 @@ public class MapBlockBuilder
     private int positionCount;
     private int[] offsets;
     private boolean[] mapIsNull;
-    private final BlockBuilder keyBlockBuilder;
-    private final BlockBuilder valueBlockBuilder;
+    private final BlockBuilder<Block<T>> keyBlockBuilder;
+    private final BlockBuilder<Block<T>> valueBlockBuilder;
     private int[] hashTables;
 
     private boolean currentEntryOpened;

@@ -30,6 +30,11 @@
 
         <dependency>
             <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
             <artifactId>presto-orc</artifactId>
         </dependency>
 
@@ -247,11 +252,6 @@
             <artifactId>presto-spi</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>hetu-common</artifactId>
         </dependency>
 
         <dependency>

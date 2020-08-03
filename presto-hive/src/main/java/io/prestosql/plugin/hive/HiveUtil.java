@@ -43,6 +43,7 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.RecordCursor;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.predicate.NullableValue;
@@ -1003,9 +1004,10 @@ public final class HiveUtil
 
         for (DynamicFilter dynamicFilter : dynamicFilters) {
             // If the dynamic filter contains no data there can't be any match
-            if (dynamicFilter.getSize() == 0) {
-                return true;
-            }
+            // FIXME: Currently approximate element count is inaccurate after serialization
+            // if (dynamicFilter.getSize() == 0) {
+            //     return true;
+            // }
 
             // No need to check non-partition columns
             if (!((HiveColumnHandle) dynamicFilter.getColumnHandle()).isPartitionKey()) {
@@ -1022,23 +1024,20 @@ public final class HiveUtil
                 continue;
             }
 
-            if (typeManager != null && dynamicFilter instanceof HashSetDynamicFilter) {
-                try {
-                    Object realObjectValue = getValueAsType(((HiveColumnHandle) dynamicFilter.getColumnHandle())
-                            .getColumnMetadata(typeManager).getType(), partitionValue);
-                    if (realObjectValue != null && !dynamicFilter.contains(realObjectValue)) {
-                        return true;
-                    }
+            try {
+                Object realObjectValue = getValueAsType(((HiveColumnHandle) dynamicFilter.getColumnHandle())
+                        .getColumnMetadata(typeManager).getType(), partitionValue);
+                // FIXME: Remove this check once BloomFilter type conversion is removed
+                if (dynamicFilter instanceof BloomFilterDynamicFilter && !(realObjectValue instanceof Long)) {
+                    realObjectValue = partitionValue;
                 }
-                catch (PrestoException | ClassCastException e) {
-                    log.error("cannot cast class" + e.getMessage());
-                    return false;
-                }
-            }
-            else {
-                if (!dynamicFilter.contains(partitionValue)) {
+                if (!dynamicFilter.contains(realObjectValue)) {
                     return true;
                 }
+            }
+            catch (PrestoException | ClassCastException e) {
+                log.error("cannot cast class" + e.getMessage());
+                return false;
             }
         }
         return false;

@@ -24,13 +24,13 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
-public class GroupByIdBlock
-        implements Block
+public class GroupByIdBlock<T>
+        implements Block<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupByIdBlock.class).instanceSize();
 
     private final long groupCount;
-    private final Block block;
+    private final Block<T> block;
 
     public GroupByIdBlock(long groupCount, Block block)
     {

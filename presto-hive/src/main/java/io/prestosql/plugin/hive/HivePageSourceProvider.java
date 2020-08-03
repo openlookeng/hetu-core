@@ -155,7 +155,7 @@ public class HivePageSourceProvider
                 hiveSplit.getColumnCoercions(),
                 hiveSplit.getBucketConversion(),
                 hiveSplit.isS3SelectPushdownEnabled(),
-                dynamicFilters,
+                dynamicFilterSupplier,
                 hiveSplit.getDeleteDeltaLocations(),
                 hiveSplit.getStartRowOffsetOfFile(),
                 indexOptional,
@@ -185,7 +185,7 @@ public class HivePageSourceProvider
             Map<Integer, HiveType> columnCoercions,
             Optional<HiveSplit.BucketConversion> bucketConversion,
             boolean s3SelectPushdownEnabled,
-            Map<ColumnHandle, DynamicFilter> dynamicFilters,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -232,7 +232,7 @@ public class HivePageSourceProvider
                     toColumnHandles(regularAndInterimColumnMappings, true),
                     effectivePredicate,
                     hiveStorageTimeZone,
-                    dynamicFilters,
+                    dynamicFilterSupplier,
                     deleteDeltaLocations,
                     startRowOffsetOfFile,
                     indexes,
@@ -245,8 +245,9 @@ public class HivePageSourceProvider
                                 hiveStorageTimeZone,
                                 typeManager,
                                 pageSource.get(),
-                                dynamicFilters,
-                                session));
+                                dynamicFilterSupplier,
+                                session,
+                                partitionKeys));
             }
         }
 

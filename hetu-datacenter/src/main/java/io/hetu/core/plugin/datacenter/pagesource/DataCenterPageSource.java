@@ -126,6 +126,7 @@ public class DataCenterPageSource
                 DynamicFilter df = entry.getValue();
                 String columnName = entry.getKey().getColumnName();
                 if (df instanceof HashSetDynamicFilter) {
+                    //FIXME: Read fpp from config
                     BloomFilterDynamicFilter bloomFilterDynamicFilter = BloomFilterDynamicFilter.fromHashSetDynamicFilter((HashSetDynamicFilter) df);
                     builder.put(columnName, bloomFilterDynamicFilter.createSerializedBloomFilter());
                 }

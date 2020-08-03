@@ -40,12 +40,12 @@ public class StructEncoding
     }
 
     @Override
-    public void encodeValueInto(int depth, Block block, int position, SliceOutput output)
+    public <T> void encodeValueInto(int depth, Block<T> block, int position, SliceOutput output)
             throws RcFileCorruptionException
     {
         byte separator = getSeparator(depth);
 
-        Block row = block.getObject(position, Block.class);
+        Block<T> row = block.getObject(position, Block.class);
         for (int fieldIndex = 0; fieldIndex < structFields.size(); fieldIndex++) {
             if (fieldIndex > 0) {
                 output.writeByte(separator);

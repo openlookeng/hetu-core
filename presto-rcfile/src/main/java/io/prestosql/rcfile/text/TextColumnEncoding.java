@@ -23,7 +23,7 @@ import io.prestosql.spi.block.BlockBuilder;
 public interface TextColumnEncoding
         extends ColumnEncoding
 {
-    void encodeValueInto(int depth, Block block, int position, SliceOutput output)
+    <T> void encodeValueInto(int depth, Block<T> block, int position, SliceOutput output)
             throws RcFileCorruptionException;
 
     void decodeValueInto(int depth, BlockBuilder builder, Slice slice, int offset, int length)

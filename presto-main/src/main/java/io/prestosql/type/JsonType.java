@@ -50,6 +50,12 @@ public class JsonType
     }
 
     @Override
+    public <T> int compareTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public long hash(Block block, int position)
     {
         return block.hash(position, 0, block.getSliceLength(position));

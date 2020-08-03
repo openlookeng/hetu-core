@@ -53,8 +53,8 @@ import static io.prestosql.orc.reader.ReaderUtils.verifyStreamType;
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static java.util.Objects.requireNonNull;
 
-public class StructColumnReader
-        implements ColumnReader
+public class StructColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(StructColumnReader.class).instanceSize();
 

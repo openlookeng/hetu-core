@@ -45,6 +45,7 @@ import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringBloomFilterFpp;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
 import static io.prestosql.spi.type.TypeUtils.readNativeValue;
 import static io.prestosql.utils.DynamicFilterUtils.getDynamicFilterDataType;
@@ -59,144 +60,34 @@ import static java.util.stream.Collectors.toSet;
 public class DynamicFilterSourceOperator
         implements Operator
 {
-    private static final int EXPECTED_BLOCK_BUILDER_SIZE = 8;
     public static final Logger log = Logger.get(DynamicFilterSourceOperator.class);
-
-    public static class Channel
-    {
-        private final String filterId;
-        String queryId;
-        private final Type type;
-        private final int index;
-
-        public Channel(String filterId, Type type, int index, String queryId)
-        {
-            this.filterId = filterId;
-            this.type = type;
-            this.index = index;
-            this.queryId = queryId;
-        }
-    }
-
-    public static class DynamicFilterSourceOperatorFactory
-            implements OperatorFactory
-    {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
-        private final Consumer<TupleDomain<String>> dynamicPredicateConsumer;
-        private final List<Channel> channels;
-        private final int maxFilterPositionsCount;
-        private final DataSize maxFilterSize;
-        private final DynamicFilterDataType dynamicFilteringDataType;
-
-        private boolean closed;
-
-        private final DynamicFilter.Type filterType;
-        private final StateStoreProvider stateStoreProvider;
-        private final NodeInfo nodeInfo;
-
-        /**
-         * Constructor for the Dynamic Filter Source Operator Factory
-         */
-        public DynamicFilterSourceOperatorFactory(
-                int operatorId,
-                PlanNodeId planNodeId,
-                Consumer<TupleDomain<String>> dynamicPredicateConsumer,
-                List<Channel> channels,
-                int maxFilterPositionsCount,
-                DataSize maxFilterSize,
-                DynamicFilterDataType dynamicFilteringDataType,
-                DynamicFilter.Type filterType,
-                NodeInfo nodeInfo, StateStoreProvider stateStoreProvider)
-        {
-            this.operatorId = operatorId;
-            this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
-            this.dynamicPredicateConsumer = requireNonNull(dynamicPredicateConsumer, "dynamicPredicateConsumer is null");
-            this.channels = requireNonNull(channels, "channels is null");
-            verify(channels.stream().map(channel -> channel.filterId).collect(toSet()).size() == channels.size(),
-                    "duplicate dynamic filters are not allowed");
-            verify(channels.stream().map(channel -> channel.index).collect(toSet()).size() == channels.size(),
-                    "duplicate channel indices are not allowed");
-            this.maxFilterPositionsCount = maxFilterPositionsCount;
-            this.maxFilterSize = maxFilterSize;
-            this.dynamicFilteringDataType = dynamicFilteringDataType;
-            this.filterType = filterType;
-            this.nodeInfo = nodeInfo;
-            this.stateStoreProvider = stateStoreProvider;
-        }
-
-        /**
-         * creating the Dynamic Filter Source Operator using the driver context
-         *
-         * @param driverContext
-         * @return Operator
-         */
-        @Override
-        public Operator createOperator(DriverContext driverContext)
-        {
-            checkState(!closed, "Factory is already closed");
-            return new DynamicFilterSourceOperator(
-                    driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterSourceOperator.class.getSimpleName()),
-                    dynamicPredicateConsumer,
-                    channels,
-                    planNodeId,
-                    maxFilterPositionsCount,
-                    maxFilterSize,
-                    dynamicFilteringDataType,
-                    filterType,
-                    nodeInfo,
-                    stateStoreProvider);
-        }
-
-        /**
-         * No More Operators, function override
-         */
-        @Override
-        public void noMoreOperators()
-        {
-            checkState(!closed, "Factory is already closed");
-            closed = true;
-        }
-
-        /**
-         * Duplicating the Dynamic Filter Source Operator
-         */
-        @Override
-        public OperatorFactory duplicate()
-        {
-            throw new UnsupportedOperationException("duplicate() is not supported for DynamicFilterSourceOperatorFactory");
-        }
-    }
-
+    private static final int EXPECTED_BLOCK_BUILDER_SIZE = 8;
     private final OperatorContext context;
-    private boolean finished;
-    private Page current;
+    private final double bloomFilterFpp;
     private final Consumer<TupleDomain<String>> dynamicPredicateConsumer;
     private final int maxFilterPositionsCount;
     private final long maxFilterSizeInBytes;
     private final DynamicFilterDataType dynamicFilteringDataType;
-
     private final List<Channel> channels;
-
+    private final DynamicFilter.Type filterType;
+    private final NodeInfo nodeInfo;
+    private final StateStoreProvider stateStoreProvider;
+    private boolean finished;
+    private Page current;
     // May be dropped if the predicate becomes too large.
     @Nullable
     private BlockBuilder[] blockBuilders;
     @Nullable
     private TypedSet[] valueSets;
-
-    private final DynamicFilter.Type filterType;
-    private final NodeInfo nodeInfo;
-    private final StateStoreProvider stateStoreProvider;
     private long driverId;
     private boolean haveRegistered;
     private Set[] objectValueSets;
 
     /**
      * Constructor for the Dynamic Filter Source Operator
+     * TODO: no need to collect dynamic filter if it's cached
      */
-    // TODO: no need to collect dynamic filter if it's cached
-    public DynamicFilterSourceOperator(
-            OperatorContext context,
+    public DynamicFilterSourceOperator(OperatorContext context,
             Consumer<TupleDomain<String>> dynamicPredicateConsumer,
             List<Channel> channels,
             PlanNodeId planNodeId,
@@ -208,6 +99,7 @@ public class DynamicFilterSourceOperator
             StateStoreProvider stateStoreProvider)
     {
         this.context = requireNonNull(context, "context is null");
+        this.bloomFilterFpp = getDynamicFilteringBloomFilterFpp(this.context.getSession());
         this.maxFilterPositionsCount = maxFilterPositionsCount;
         this.maxFilterSizeInBytes = maxFilterSize.toBytes();
         this.dynamicFilteringDataType = dynamicFilteringDataType;
@@ -384,7 +276,7 @@ public class DynamicFilterSourceOperator
 
             if (dataType == BLOOM_FILTER) {
                 log.debug("creating new bloom filter dynamic filter for size of: " + objectValueSets[channelIndex].size() + ", key: " + key + ", driver: " + driverId);
-                byte[] finalOutput = BloomFilterDynamicFilter.convertBloomFilterToByteArray(BloomFilterDynamicFilter.createBloomFilterFromSet(objectValueSets[channelIndex]));
+                byte[] finalOutput = BloomFilterDynamicFilter.convertBloomFilterToByteArray(BloomFilterDynamicFilter.createBloomFilterFromSet(objectValueSets[channelIndex], bloomFilterFpp));
                 if (finalOutput != null) {
                     ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key)).add(finalOutput);
                 }
@@ -396,6 +288,110 @@ public class DynamicFilterSourceOperator
             }
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHPREFIX, channel.filterId, channel.queryId))).add(driverId);
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, channel.filterId, channel.queryId))).add(nodeInfo.getNodeId());
+        }
+    }
+
+    public static class Channel
+    {
+        private final String filterId;
+        private final Type type;
+        private final int index;
+        String queryId;
+
+        public Channel(String filterId, Type type, int index, String queryId)
+        {
+            this.filterId = filterId;
+            this.type = type;
+            this.index = index;
+            this.queryId = queryId;
+        }
+    }
+
+    public static class DynamicFilterSourceOperatorFactory
+            implements OperatorFactory
+    {
+        private final int operatorId;
+        private final PlanNodeId planNodeId;
+        private final Consumer<TupleDomain<String>> dynamicPredicateConsumer;
+        private final List<Channel> channels;
+        private final int maxFilterPositionsCount;
+        private final DataSize maxFilterSize;
+        private final DynamicFilterDataType dynamicFilterDataType;
+        private final DynamicFilter.Type filterType;
+        private final StateStoreProvider stateStoreProvider;
+        private final NodeInfo nodeInfo;
+        private boolean closed;
+
+        /**
+         * Constructor for the Dynamic Filter Source Operator Factory
+         */
+        public DynamicFilterSourceOperatorFactory(
+                int operatorId,
+                PlanNodeId planNodeId,
+                Consumer<TupleDomain<String>> dynamicPredicateConsumer,
+                List<Channel> channels,
+                int maxFilterPositionsCount,
+                DataSize maxFilterSize,
+                DynamicFilterDataType dynamicFilteringDataType,
+                DynamicFilter.Type filterType,
+                NodeInfo nodeInfo, StateStoreProvider stateStoreProvider)
+        {
+            this.operatorId = operatorId;
+            this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
+            this.dynamicPredicateConsumer = requireNonNull(dynamicPredicateConsumer, "dynamicPredicateConsumer is null");
+            this.channels = requireNonNull(channels, "channels is null");
+            verify(channels.stream().map(channel -> channel.filterId).collect(toSet()).size() == channels.size(),
+                    "duplicate dynamic filters are not allowed");
+            verify(channels.stream().map(channel -> channel.index).collect(toSet()).size() == channels.size(),
+                    "duplicate channel indices are not allowed");
+            this.maxFilterPositionsCount = maxFilterPositionsCount;
+            this.maxFilterSize = maxFilterSize;
+            this.dynamicFilterDataType = dynamicFilteringDataType;
+            this.filterType = filterType;
+            this.nodeInfo = nodeInfo;
+            this.stateStoreProvider = stateStoreProvider;
+        }
+
+        /**
+         * creating the Dynamic Filter Source Operator using the driver context
+         *
+         * @param driverContext
+         * @return Operator
+         */
+        @Override
+        public Operator createOperator(DriverContext driverContext)
+        {
+            checkState(!closed, "Factory is already closed");
+            return new DynamicFilterSourceOperator(
+                    driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterSourceOperator.class.getSimpleName()),
+                    dynamicPredicateConsumer,
+                    channels,
+                    planNodeId,
+                    maxFilterPositionsCount,
+                    maxFilterSize,
+                    dynamicFilterDataType,
+                    filterType,
+                    nodeInfo,
+                    stateStoreProvider);
+        }
+
+        /**
+         * No More Operators, function override
+         */
+        @Override
+        public void noMoreOperators()
+        {
+            checkState(!closed, "Factory is already closed");
+            closed = true;
+        }
+
+        /**
+         * Duplicating the Dynamic Filter Source Operator
+         */
+        @Override
+        public OperatorFactory duplicate()
+        {
+            throw new UnsupportedOperationException("duplicate() is not supported for DynamicFilterSourceOperatorFactory");
         }
     }
 }

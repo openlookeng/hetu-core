@@ -27,7 +27,7 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
 public class IntArrayBlock
-        implements Block
+        implements Block<Integer>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(IntArrayBlock.class).instanceSize();
 
@@ -124,6 +124,12 @@ public class IntArrayBlock
             throw new IllegalArgumentException("offset must be zero");
         }
         return values[position + arrayOffset];
+    }
+
+    @Override
+    public long getLong(int position, int offset)
+    {
+        return getInt(position, offset);
     }
 
     @Override

@@ -22,11 +22,11 @@ import io.prestosql.spi.block.BlockBuilder;
 public interface BinaryColumnEncoding
         extends ColumnEncoding
 {
-    void encodeValueInto(Block block, int position, SliceOutput output);
+    <T> void encodeValueInto(Block<T> block, int position, SliceOutput output);
 
     int getValueOffset(Slice slice, int offset);
 
     int getValueLength(Slice slice, int offset);
 
-    void decodeValueInto(BlockBuilder builder, Slice slice, int offset, int length);
+    <T> void decodeValueInto(BlockBuilder<T> builder, Slice slice, int offset, int length);
 }

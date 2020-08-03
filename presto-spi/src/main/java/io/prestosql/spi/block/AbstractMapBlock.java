@@ -29,8 +29,8 @@ import static io.prestosql.spi.block.BlockUtil.compactOffsets;
 import static io.prestosql.spi.block.MapBlock.createMapBlockInternal;
 import static java.util.Objects.requireNonNull;
 
-public abstract class AbstractMapBlock
-        implements Block
+public abstract class AbstractMapBlock<T>
+        implements Block<Block<T>>
 {
     // inverse of hash fill ratio, must be integer
     static final int HASH_MULTIPLIER = 2;
