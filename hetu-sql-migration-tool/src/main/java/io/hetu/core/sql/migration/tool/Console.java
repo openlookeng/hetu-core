@@ -135,6 +135,9 @@ public class Console
                 case "hive":
                     sourceType = SqlSyntaxType.HIVE;
                     break;
+                case "impala":
+                    sourceType = SqlSyntaxType.IMPALA;
+                    break;
                 default:
                     System.out.println(format("Error: Migration tool doesn't support type: %s", cliOptions.sourceType));
                     return false;

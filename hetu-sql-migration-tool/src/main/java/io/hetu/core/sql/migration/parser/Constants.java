@@ -25,6 +25,14 @@ public final class Constants
     public static final String SUCCESS = "Success";
     public static final String WARNING = "Warning";
     public static final String FAIL = "Fail";
+    public static final String UNSUPPORTED = "Unsupported";
+
+    // key words for properties
+    public static final String PARTITIONED_BY = "partitioned_by";
+    public static final String SORTED_BY = "sorted_by";
+    public static final String FORMAT = "format";
+    public static final String LOCATION = "location";
+    public static final String TRANSACTIONAL = "transactional";
 
     private Constants()
     {
