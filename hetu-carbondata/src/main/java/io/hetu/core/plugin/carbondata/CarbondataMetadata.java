@@ -768,7 +768,7 @@ public class CarbondataMetadata
                 targetPath = new Path(targetLocation);
             }
         }
-        catch (Exception e) {
+        catch (IllegalArgumentException | IOException e) {
             throw new PrestoException(NOT_SUPPORTED, format("Error %s store path %s ", e.getMessage(), targetLocation));
         }
         locationHandle = locationService.forNewTable(metastore, session, schemaName, tableName, Optional.empty(), Optional.of(targetPath));

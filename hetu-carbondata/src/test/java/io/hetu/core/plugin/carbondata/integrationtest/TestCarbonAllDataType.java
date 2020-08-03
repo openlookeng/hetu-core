@@ -479,6 +479,12 @@ public class TestCarbonAllDataType
     }
 
     @Test
+    public void testCreateTableWithLocationDisabled() throws SQLException {
+        assertEquals(Assert.expectThrows(SQLException.class, () -> hetuServer.execute("CREATE TABLE carbondatacataloglocationdisabled.testdb.testtable3"
+                + "(a int, b int , c int , d int ) with (location='hdfs:///user/')")).getMessage().split(":")[1]," Setting location property is not allowed");
+    }
+
+    @Test
     public void testDropTable() throws SQLException
     {
         hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
