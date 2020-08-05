@@ -27,9 +27,14 @@ public final class HazelcastConstants
     public static final String DISCOVERY_MODE_CONFIG_NAME = "hazelcast.discovery.mode";
 
     /**
-     * Hazelcast TCP-IP port config name
+     * Hazelcast discovery port config name
      */
-    public static final String PORT_CONFIG_NAME = "hazelcast.tcp-ip.port";
+    public static final String DISCOVERY_PORT_CONFIG_NAME = "hazelcast.discovery.port";
+
+    /**
+     * Hazelcast default discovery port
+     */
+    public static final String DEFAULT_DISCOVERY_PORT = "5701";
 
     /**
      * Hazelcast multicast discovery mode

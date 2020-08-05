@@ -40,8 +40,12 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 
 import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
+import static io.prestosql.statestore.StateStoreConstants.DEFAULT_HAZELCAST_DISCOVERY_PORT;
+import static io.prestosql.statestore.StateStoreConstants.HAZELCAST;
+import static io.prestosql.statestore.StateStoreConstants.HAZELCAST_DISCOVERY_PORT_PROPERTY_NAME;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CLUSTER_PROPERTY_NAME;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
+import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_TYPE_PROPERTY_NAME;
 import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.util.Objects.requireNonNull;
 
@@ -98,16 +102,27 @@ public class EmbeddedStateStoreLauncher
         if (STATE_STORE_LAUNCHER_CONFIGURATION.exists()) {
             Map<String, String> properties = new HashMap<>(loadProperties(STATE_STORE_LAUNCHER_CONFIGURATION));
 
-            Set<String> ips = new HashSet<>();
-
             if (seedStoreManager.getSeedStore() != null) {
                 // Set seed store name
                 seedStoreManager.getSeedStore().setName(properties.get(STATE_STORE_CLUSTER_PROPERTY_NAME));
-                // Add seed to seed store
-                ips = seedStoreManager.addSeedToSeedStore(getNodeUri().getHost()).stream().map(x -> x.getLocation()).collect(Collectors.toSet());
+                // Clear expired seeds
+                seedStoreManager.clearExpiredSeeds();
+                // Get all seeds
+                Set<String> locations = seedStoreManager.getAllSeeds().stream().map(x -> x.getLocation()).collect(Collectors.toSet());
+                String launcherPort = getStateStoreLauncherPort(properties);
+                requireNonNull(launcherPort, "The launcher port is null");
+                // Launch state store
+                String currentLocation = getNodeUri().getHost() + ":" + launcherPort;
+                locations.add(currentLocation);
+                if (launchStateStore(locations, properties) != null) {
+                    // Add seed to seed store if and only if state store launched successfully
+                    seedStoreManager.addSeed(currentLocation, true);
+                }
+            }
+            else {
+                launchStateStore(new HashSet<>(), properties);
             }
 
-            launchStateStore(ips, properties);
             if (stateStore == null) {
                 throw new PrestoException(STATE_STORE_FAILURE, "Unable to launch state store, please check your configuration");
             }
@@ -229,22 +244,20 @@ public class EmbeddedStateStoreLauncher
         return registered;
     }
 
-    private void handleNodeFailure(Object failureNodeHost)
+    private void handleNodeFailure(Object failureMember)
     {
-        // Only retry if the failed node is the current discovery node
-        // and when there are multiple coordinators
         if (hetuConfig.isMultipleCoordinatorEnabled()) {
-            StateMap<String, String> discoveryServiceMap =
-                    (StateMap<String, String>) stateStore.getStateCollection(DISCOVERY_SERVICE);
-            registerDiscoveryService((String) failureNodeHost);
+            // failureMember format host:port
+            String failureMemberHost = ((String) failureMember).split(":")[0];
+            registerDiscoveryService(failureMemberHost);
         }
 
         if (seedStoreManager.getSeedStore() != null) {
             try {
-                seedStoreManager.removeSeedFromSeedStore((String) failureNodeHost);
+                seedStoreManager.removeSeed((String) failureMember);
             }
             catch (Exception e) {
-                LOG.error("Cannot remove failure node %s from seed store: %s", failureNodeHost, e.getMessage());
+                LOG.error("Cannot remove failure node %s from seed store: %s", failureMember, e.getMessage());
             }
         }
     }
@@ -257,5 +270,20 @@ public class EmbeddedStateStoreLauncher
         else {
             return httpServerInfo.getHttpUri();
         }
+    }
+
+    private String getStateStoreLauncherPort(Map<String, String> properties)
+    {
+        String port = null;
+        String stateStoreType = properties.get(STATE_STORE_TYPE_PROPERTY_NAME);
+        if (stateStoreType != null) {
+            if (stateStoreType.trim().equals(HAZELCAST)) {
+                port = properties.get(HAZELCAST_DISCOVERY_PORT_PROPERTY_NAME);
+                if (port == null || port.trim().isEmpty()) {
+                    port = DEFAULT_HAZELCAST_DISCOVERY_PORT;
+                }
+            }
+        }
+        return port;
     }
 }

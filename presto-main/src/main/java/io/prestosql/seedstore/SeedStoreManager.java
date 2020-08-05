@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
+import static io.prestosql.spi.StandardErrorCode.SEED_STORE_FAILURE;
 import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -63,19 +64,20 @@ public class SeedStoreManager
     // properties default value
     private static final String SEED_STORE_TYPE_DEFAULT_VALUE = "filebased";
     private static final String SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE = "10000"; // 10 seconds
-    private static final String SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE = "30000"; // 30 seconds
+    private static final String SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE = "60000"; // 60 seconds
     private static final String SEED_STORE_FILESYSTEM_PROFILE_DEFAULT_VALUE = "hdfs-config-default";
     private static final int SEED_RETRY_TIMES = 5;
     private static final long SEED_RETRY_INTERVAL = 500L;
 
     private final Map<String, SeedStoreFactory> seedStoreFactories = new ConcurrentHashMap<>();
     private final FileSystemClientManager fileSystemClientManager;
-    private ScheduledExecutorService seedRefreshExecutor;
+    private ScheduledExecutorService seedRefreshExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("SeedRefresher"));
     private SeedStore seedStore;
     private String seedStoreType;
     private String filesystemProfile;
     private long seedHeartBeat;
     private long seedHeartBeatTimeout;
+    private ConcurrentHashMap<String, Seed> refreshableSeedsMap = new ConcurrentHashMap<>();
 
     @Inject
     public SeedStoreManager(FileSystemClientManager fileSystemClientManager)
@@ -115,39 +117,59 @@ public class SeedStoreManager
                         fileSystemClientManager.getFileSystemClient(filesystemProfile),
                         ImmutableMap.copyOf(config));
             }
-
+            try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStore.getClass().getClassLoader())) {
+                // start seed refresher
+                seedRefreshExecutor.scheduleWithFixedDelay(() -> refreshSeeds(), 0, seedHeartBeat, TimeUnit.MILLISECONDS);
+            }
             LOG.info("-- Loaded seed store %s --", seedStoreType);
         }
     }
 
     /**
-     * add seed to seed store
+     * Get all seeds from seed store
      *
-     * @param seedLocation
-     * @return a collection of current seeds in the seed store
-     * @throws Exception
+     * @return a collection of seeds in the seed store
+     * @throws IOException
      */
-    public Collection<Seed> addSeedToSeedStore(String seedLocation)
-            throws Exception
+    public Collection<Seed> getAllSeeds()
+            throws IOException
+    {
+        if (seedStore == null) {
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
+        }
+
+        Collection<Seed> seeds = seedStore.get();
+
+        return seeds;
+    }
+
+    /**
+     * Add seed to seed store. If refreshable is enabled, seed will be refreshed periodically
+     *
+     * @param refreshable
+     * @return a collection of seeds in the seed store
+     * @throws IOException
+     */
+
+    public Collection<Seed> addSeed(String seedLocation, boolean refreshable)
+            throws IOException
     {
         Collection<Seed> seeds = new HashSet<>();
 
         if (seedStore == null) {
-            throw new PrestoException(STATE_STORE_FAILURE, "Seed store is null");
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
-        if (seedStoreType.equalsIgnoreCase(SEED_STORE_TYPE_DEFAULT_VALUE)) {
-            try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStore.getClass().getClassLoader())) {
-                // Clear expired seeds in the seed file
-                clearExpiredSeed();
-                // Create a seed and add seed to seed store
-                Seed seed = seedStore.create(ImmutableMap.of(
-                        Seed.LOCATION_PROPERTY_NAME, seedLocation,
-                        Seed.TIMESTAMP_PROPERTY_NAME, String.valueOf(System.currentTimeMillis())));
-                seeds = addToSeedStore(seed);
-                //start seed refresher
-                startSeedRefresh(seed);
-            }
+
+        Seed seed = seedStore.create(ImmutableMap.of(
+                Seed.LOCATION_PROPERTY_NAME, seedLocation,
+                Seed.TIMESTAMP_PROPERTY_NAME, String.valueOf(System.currentTimeMillis())));
+        seeds = addSeed(seed);
+
+        if (refreshable) {
+            refreshableSeedsMap.put(seedLocation, seed);
         }
+
+        LOG.debug("Seed=%s added to seed store", seedLocation);
         return seeds;
     }
 
@@ -155,37 +177,65 @@ public class SeedStoreManager
      * remove seed from seed store
      *
      * @param seedLocation
-     * @return a collection of current seeds in the seed store
-     * @throws Exception
+     * @return a collection of seeds in the seed store
+     * @throws IOException
      */
 
-    public Collection removeSeedFromSeedStore(String seedLocation)
-            throws Exception
+    public Collection<Seed> removeSeed(String seedLocation)
+            throws IOException
     {
         Collection<Seed> seeds = new HashSet<>();
 
         if (seedStore == null) {
-            throw new PrestoException(STATE_STORE_FAILURE, "Seed store is null");
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
 
-        if (seedStoreType.equalsIgnoreCase(SEED_STORE_TYPE_DEFAULT_VALUE)) {
-            try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStore.getClass().getClassLoader())) {
-                Seed seed = seedStore.get().stream().filter(s -> s.getLocation().equals(seedLocation)).findFirst().get();
+        refreshableSeedsMap.remove(seedLocation);
+        Optional<Seed> seedOptional = seedStore.get().stream().filter(s -> s.getLocation().equals(seedLocation)).findFirst();
 
-                seeds.remove(Lists.newArrayList(seed));
-            }
+        if (seedOptional.isPresent()) {
+            seeds = seedStore.remove(Lists.newArrayList(seedOptional.get()));
+            LOG.debug("Seed=%s removed from seed store", seedLocation);
         }
+
         return seeds;
     }
 
     /**
-     * Add seed to seed store
+     * Clear expired seed in the seed store
      *
-     * @return updated list of seeds
-     * @throws Exception
+     * @throws IOException
      */
-    private Collection<Seed> addToSeedStore(Seed seed)
-            throws Exception
+    public void clearExpiredSeeds()
+            throws IOException
+    {
+        if (seedStore == null) {
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
+        }
+
+        long retryInterval = 0L;
+        for (int retryTimes = 0; retryTimes <= SEED_RETRY_TIMES; retryTimes++) {
+            try {
+                TimeUnit.MILLISECONDS.sleep(retryInterval);
+                Collection<Seed> expiredSeeds = seedStore.get()
+                        .stream()
+                        .filter(s -> (System.currentTimeMillis() - s.getTimestamp() > seedHeartBeatTimeout))
+                        .collect(Collectors.toList());
+                if (expiredSeeds.size() > 0) {
+                    LOG.debug("Expired seeds=%s will be cleared", expiredSeeds);
+                    seedStore.remove(expiredSeeds);
+                }
+                break;
+            }
+            catch (InterruptedException | RuntimeException e) {
+                LOG.warn("clearExpiredSeed failed: %s, will retry at times: %s", e.getMessage(), ++retryTimes);
+                retryInterval += SEED_RETRY_INTERVAL;
+            }
+        }
+    }
+
+    private Collection<Seed> addSeed(Seed seed)
+            throws IOException
     {
         int retryTimes = 0;
         long retryInterval = 0L;
@@ -197,7 +247,7 @@ public class SeedStoreManager
                 seeds = seedStore.add(Lists.newArrayList(seed));
             }
             catch (InterruptedException | RuntimeException e) {
-                LOG.warn("addSeedToSeedStore failed: %s, will retry at times: %s", e.getMessage(), retryTimes);
+                LOG.warn("add seed=%s failed: %s, will retry at times: %s", seed, e.getMessage(), retryTimes);
             }
             finally {
                 retryTimes++;
@@ -207,7 +257,8 @@ public class SeedStoreManager
         while (retryTimes <= SEED_RETRY_TIMES && (seeds == null || seeds.size() == 0));
 
         if (seeds == null || seeds.size() == 0) {
-            throw new PrestoException(STATE_STORE_FAILURE, "addSeedToSeedStore failed after retry:" + SEED_RETRY_TIMES);
+            throw new PrestoException(SEED_STORE_FAILURE, String.format("add seed=%s to seed store failed after retry:%d",
+                    seed.getLocation(), SEED_RETRY_TIMES));
         }
 
         return seeds;
@@ -234,54 +285,22 @@ public class SeedStoreManager
         return seedStore;
     }
 
-    /**
-     * Start background task to keep refreshing seed's timestamp to SeedStore
-     *
-     * @param seed Seed node to refresh
-     */
-    private void startSeedRefresh(Seed seed)
+    private void refreshSeeds()
     {
-        if (seedRefreshExecutor == null) {
-            seedRefreshExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("SeedRefresher"));
-            seedRefreshExecutor.scheduleWithFixedDelay(() -> refreshSeed(seed), 0, seedHeartBeat, TimeUnit.MILLISECONDS);
-        }
-        else {
-            LOG.debug("Seed Refresh has been started, ignored");
-        }
-    }
-
-    private void refreshSeed(Seed seed)
-    {
-        try {
+        for (Map.Entry<String, Seed> entry : refreshableSeedsMap.entrySet()) {
+            long newTime = System.currentTimeMillis();
+            LOG.debug("seed=%s refresh with oldTimestamp=%s and newTimestamp=%s", entry.getKey(), entry.getValue().getTimestamp(), newTime);
             Seed newSeed = seedStore.create(ImmutableMap.of(
-                    Seed.LOCATION_PROPERTY_NAME, seed.getLocation(),
-                    Seed.TIMESTAMP_PROPERTY_NAME, String.valueOf(System.currentTimeMillis())));
-
-            seedStore.add(Lists.newArrayList(newSeed));
-        }
-        catch (Exception e) {
-            LOG.debug("Error refreshSeed: %s, will refresh in next %s milliseconds" + e.getMessage(), seedHeartBeat);
-        }
-    }
-
-    private void clearExpiredSeed()
-            throws IOException
-    {
-        long retryInterval = 0L;
-        for (int retryTimes = 0; retryTimes <= SEED_RETRY_TIMES; retryTimes++) {
+                    Seed.LOCATION_PROPERTY_NAME, entry.getKey(),
+                    Seed.TIMESTAMP_PROPERTY_NAME, String.valueOf(newTime)));
             try {
-                TimeUnit.MILLISECONDS.sleep(retryInterval);
-                Collection<Seed> expiredSeeds = seedStore.get().stream()
-                        .filter(s -> (System.currentTimeMillis() - s.getTimestamp() > seedHeartBeatTimeout))
-                        .collect(Collectors.toList());
-                if (expiredSeeds.size() > 0) {
-                    seedStore.remove(expiredSeeds);
-                }
-                break;
+                seedStore.add(Lists.newArrayList(newSeed));
+                entry.setValue(newSeed);
             }
-            catch (InterruptedException | RuntimeException e) {
-                LOG.debug("clearExpiredSeed failed: %s, will retry at times: %s", e.getMessage(), ++retryTimes);
-                retryInterval += SEED_RETRY_INTERVAL;
+            catch (IOException | RuntimeException e) {
+                LOG.warn("Error refresh seed=%s with error message: %s, will refresh in next %s milliseconds",
+                        entry.getKey(), e.getMessage(), seedHeartBeat);
+                continue;
             }
         }
     }

@@ -35,7 +35,7 @@ import java.util.UUID;
 import static io.hetu.core.statestore.Constants.STATE_STORE_CLUSTER_CONFIG_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_TCPIP;
-import static io.hetu.core.statestore.hazelcast.HazelcastConstants.PORT_CONFIG_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -130,7 +130,7 @@ public class TestHazelcastStateStoreFactory
         Map<String, String> config = new HashMap<>(0);
         config.put(DISCOVERY_MODE_CONFIG_NAME, DISCOVERY_MODE_TCPIP);
         config.put(STATE_STORE_CLUSTER_CONFIG_NAME, TEST_CLUSTER_NAME);
-        config.put(PORT_CONFIG_NAME, PORT);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, PORT);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         bootstrapper.bootstrap(ImmutableSet.of(MEMBER_ADDRESS), config);
