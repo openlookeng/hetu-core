@@ -15,8 +15,10 @@
 package io.prestosql.connector;
 
 import com.google.common.collect.Sets;
+import io.airlift.log.Logger;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
+import io.prestosql.spi.PrestoTransportException;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorFactory;
 
@@ -39,6 +41,8 @@ import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
 @ThreadSafe
 public class DataCenterConnectorManager
 {
+    private static final Logger log = Logger.get(DataCenterUtility.class);
+
     private final ConnectorManager connectorManager;
     private final CatalogManager catalogManager;
     private final CatalogConnectorStore catalogConnectorStore;
@@ -184,28 +188,33 @@ public class DataCenterConnectorManager
         boolean updated = false;
         List<String> dataCenterNames = catalogConnectorStore.getDataCenterNames();
         for (String dataCenterName : dataCenterNames) {
-            Connector catalogConnector = catalogConnectorStore.getCatalogConnector(dataCenterName);
-            Map<String, String> properties = catalogConnectorStore.getCatalogProperties(dataCenterName);
-            Set<String> remoteSubCatalogs = Sets.newHashSet(catalogConnector.getCatalogs(properties.get(CONNECTION_USER), properties));
-            // availableCatalogs is the List of all dc sub catalogs stored in Hetu
-            Set<String> availableCatalogs = catalogConnectorStore.getSubCatalogs(dataCenterName);
+            try {
+                Connector catalogConnector = catalogConnectorStore.getCatalogConnector(dataCenterName);
+                Map<String, String> properties = catalogConnectorStore.getCatalogProperties(dataCenterName);
+                Set<String> remoteSubCatalogs = Sets.newHashSet(catalogConnector.getCatalogs(properties.get(CONNECTION_USER), properties));
+                // availableCatalogs is the List of all dc sub catalogs stored in Hetu
+                Set<String> availableCatalogs = catalogConnectorStore.getSubCatalogs(dataCenterName);
 
-            // This loop traverses through each remote sub catalog and add the remote sub catalogs
-            // which is not available in Hetu
-            for (String subCatalog : remoteSubCatalogs) {
-                if (!catalogConnectorStore.containsSubCatalog(dataCenterName, subCatalog)) {
-                    addSubCatalog(dataCenterName, subCatalog, properties);
-                    updated = true;
+                // This loop traverses through each remote sub catalog and add the remote sub catalogs
+                // which is not available in Hetu
+                for (String subCatalog : remoteSubCatalogs) {
+                    if (!catalogConnectorStore.containsSubCatalog(dataCenterName, subCatalog)) {
+                        addSubCatalog(dataCenterName, subCatalog, properties);
+                        updated = true;
+                    }
+                }
+
+                // This loop traverses through each available catalog and deletes the sub catalog which
+                // is not available in remote Hetu dc
+                for (String availableCatalog : availableCatalogs) {
+                    if (!remoteSubCatalogs.contains(availableCatalog)) {
+                        deleteSubCatalog(dataCenterName, availableCatalog);
+                        updated = true;
+                    }
                 }
             }
-
-            // This loop traverses through each available catalog and deletes the sub catalog which
-            // is not available in remote Hetu dc
-            for (String availableCatalog : availableCatalogs) {
-                if (!remoteSubCatalogs.contains(availableCatalog)) {
-                    deleteSubCatalog(dataCenterName, availableCatalog);
-                    updated = true;
-                }
+            catch (PrestoTransportException ignore) {
+                log.warn(ignore, "Load the catalogs of data center %s failed.", dataCenterName);
             }
         }
         if (updated) {
