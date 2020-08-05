@@ -12,7 +12,9 @@ The Heuristic Indexer allows creating indexes on existing data but stores the in
   - New index types not supported by the underlying data source can be created
   - Index data does not use the storage space of the data source
 
-## Example Usecases
+## Use cases
+
+Currently, heuristic indexer is supported on hive ORC data source to reduce the number of splits or rows read.
 
 ### 1. Filtering scheduled Splits during query execution
 
@@ -28,3 +30,50 @@ When data needs to be read from an ORC file, the ORCRecordReader is used. This r
 
 By keeping an external bitmap index for the predicate column, the Heuristic Indexer can filter out rows which do not match the predicates before the Filter operator is even applied.
 
+## Example tutorial
+
+This section gives a short tutorial which introduces the basic usage of heuristic index through a sample query.
+
+### Identify a type of index on a column that can help
+
+For a query:
+
+    SELECT * FROM table1 WHERE id="abcd1234";
+   
+A bloom index on id column can significantly decrease the splits to read when scanning table1. 
+
+We will use this example throughout this tutorial.
+
+### Configure indexer settings
+
+In `etc/config.properties`, add these lines:
+
+    hetu.heuristicindex.filter.enabled=true
+    hetu.heuristicindex.filter.cache.max-indices-number=2000000
+    hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
+    hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
+    
+Then create an hdfs client profile in `etc/filesystem/index-store-profile.properties`, where `index-store-profile` is what specified above as the file name:
+
+    fs.client.type=hdfs
+    hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
+    hdfs.authentication.type=NONE
+    fs.hdfs.impl.disable.cache=true
+    
+If the hdfs cluster enables kerberos authentication, additional configs `hdfs.krb5.conf.path, hdfs.krb5.keytab.path, hdfs.krb5.principal` needs to be configured. 
+
+In this example we use a hdfs cluster to store the index files, which can be shard across different hetu servers. If you would like to use local disk to store index, simply change `index-store-profile.properties` to:
+
+    fs.client.type=local
+    
+Note that you may create multiple filesystem profiles in `etc/filesystem`, several for different hdfs clusters and one for local, so you can easily switch between them by just changing the value of `hetu.heuristicindex.indexstore.filesystem.profile`.
+
+### Create index
+
+To write index to the indexstore specified above, just change directory to your hetu installation's `bin` folder, then run:
+
+    ./index -c <your-etc-folder-directory> --table table1 --column id --type bloom create
+    
+### Run query
+
+After this is finished, run the query on hetu server again, and it will start loading index in the background. Keep running the same query while it's loading, then you should see decrease in the number of splits processed, which finally goes down to a rather small value.

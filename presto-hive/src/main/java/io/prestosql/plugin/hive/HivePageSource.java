@@ -14,6 +14,8 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.primitives.Booleans;
 import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.HivePageSourceProvider.BucketAdaptation;
@@ -39,11 +41,13 @@ import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
@@ -54,11 +58,14 @@ import org.joda.time.DateTimeZone;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.hive.HiveBucketing.getHiveBucket;
@@ -78,12 +85,12 @@ import static io.prestosql.plugin.hive.HiveUtil.charPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.datePartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.doublePartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.extractStructFieldTypes;
-import static io.prestosql.plugin.hive.HiveUtil.filterRows;
 import static io.prestosql.plugin.hive.HiveUtil.floatPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.integerPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.isArrayType;
 import static io.prestosql.plugin.hive.HiveUtil.isHiveNull;
 import static io.prestosql.plugin.hive.HiveUtil.isMapType;
+import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.plugin.hive.HiveUtil.isRowType;
 import static io.prestosql.plugin.hive.HiveUtil.longDecimalPartitionKey;
 import static io.prestosql.plugin.hive.HiveUtil.shortDecimalPartitionKey;
@@ -126,14 +133,20 @@ public class HivePageSource
     private final Optional<BucketAdapter> bucketAdapter;
     private final Object[] prefilledValues;
     private final Type[] types;
+    private final TypeManager typeManager;
     private final List<Optional<Function<Block, Block>>> coercers;
     private boolean eligibleForRowFiltering;
 
     private final ConnectorPageSource delegate;
 
-    private final Map<Integer, DynamicFilter> dynamicFilters = new HashMap<>();
+    private Map<ColumnHandle, DynamicFilter> dynamicFilters;
+    private final List<HivePartitionKey> partitionKeys;
 
+    private final Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier;
     private final ConnectorSession session;
+    private int numberOfGlobalDynamicFilters;
+    private int numberOfLocalDynamicFilters;
+    private final long waitUntil;
 
     public HivePageSource(
             List<ColumnMapping> columnMappings,
@@ -141,12 +154,13 @@ public class HivePageSource
             DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             ConnectorPageSource delegate,
-            Map<ColumnHandle, DynamicFilter> dynamicFilters,
-            ConnectorSession session)
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
+            ConnectorSession session,
+            List<HivePartitionKey> partitionKeys)
     {
         requireNonNull(columnMappings, "columnMappings is null");
         requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
-        requireNonNull(typeManager, "typeManager is null");
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
 
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.columnMappings = columnMappings;
@@ -154,27 +168,14 @@ public class HivePageSource
 
         this.session = session;
 
-        int size = columnMappings.size();
+        this.dynamicFilterSupplier = dynamicFilterSupplier;
 
-        // The local map for column index to dynamic filter is created here
-        if (dynamicFilters != null && !dynamicFilters.isEmpty()) {
-            int numberOfGlobalDynamicFilters = 0;
-            int numberOfLocalDynamicFilters = 0;
-            for (int columnIndex = 0; columnIndex < size; columnIndex++) {
-                HiveColumnHandle columnHandle = columnMappings.get(columnIndex).getHiveColumnHandle();
-                if (dynamicFilters.containsKey(columnHandle)) {
-                    DynamicFilter dynamicFilter = dynamicFilters.get(columnHandle);
-                    this.dynamicFilters.put(columnIndex, dynamicFilter);
-                    if (dynamicFilter.getType() == DynamicFilter.Type.GLOBAL) {
-                        numberOfGlobalDynamicFilters += 1;
-                    }
-                    else {
-                        numberOfLocalDynamicFilters += 1;
-                    }
-                }
-            }
-            eligibleForRowFiltering = isEligibleForRowFiltering(numberOfGlobalDynamicFilters, numberOfLocalDynamicFilters);
-        }
+        this.partitionKeys = partitionKeys;
+        //FIXME: KEN: BIG ASSUMPTION, assuming system time is synchronized across the cluster
+        this.waitUntil = session.getStartTime() + session.getDynamicFilteringWaitTime().toMillis();
+        this.eligibleForRowFiltering = isDynamicFilteringFilterRows(session);
+
+        int size = columnMappings.size();
 
         prefilledValues = new Object[size];
         types = new Type[size];
@@ -252,6 +253,73 @@ public class HivePageSource
         this.coercers = coercers.build();
     }
 
+    private static Function<Block, Block> createCoercer(TypeManager typeManager, HiveType fromHiveType, HiveType toHiveType)
+    {
+        Type fromType = typeManager.getType(fromHiveType.getTypeSignature());
+        Type toType = typeManager.getType(toHiveType.getTypeSignature());
+
+        if (toType instanceof VarcharType && fromType instanceof VarcharType) {
+            return new VarcharToVarcharCoercer((VarcharType) fromType, (VarcharType) toType);
+        }
+        if (toType instanceof VarcharType && (fromHiveType.equals(HIVE_BYTE) || fromHiveType.equals(HIVE_SHORT) || fromHiveType.equals(HIVE_INT) || fromHiveType.equals(HIVE_LONG))) {
+            return new IntegerNumberToVarcharCoercer<>(fromType, (VarcharType) toType);
+        }
+        if (fromType instanceof VarcharType && (toHiveType.equals(HIVE_BYTE) || toHiveType.equals(HIVE_SHORT) || toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG))) {
+            return new VarcharToIntegerNumberCoercer<>((VarcharType) fromType, toType);
+        }
+        if (fromHiveType.equals(HIVE_BYTE) && toHiveType.equals(HIVE_SHORT) || toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG)) {
+            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
+        }
+        if (fromHiveType.equals(HIVE_SHORT) && toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG)) {
+            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
+        }
+        if (fromHiveType.equals(HIVE_INT) && toHiveType.equals(HIVE_LONG)) {
+            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
+        }
+        if (fromHiveType.equals(HIVE_FLOAT) && toHiveType.equals(HIVE_DOUBLE)) {
+            return new FloatToDoubleCoercer();
+        }
+        if (fromHiveType.equals(HIVE_DOUBLE) && toHiveType.equals(HIVE_FLOAT)) {
+            return new DoubleToFloatCoercer();
+        }
+        if (fromType instanceof DecimalType && toType instanceof DecimalType) {
+            return createDecimalToDecimalCoercer((DecimalType) fromType, (DecimalType) toType);
+        }
+        if (fromType instanceof DecimalType && toType == DOUBLE) {
+            return createDecimalToDoubleCoercer((DecimalType) fromType);
+        }
+        if (fromType instanceof DecimalType && toType == REAL) {
+            return createDecimalToRealCoercer((DecimalType) fromType);
+        }
+        if (fromType == DOUBLE && toType instanceof DecimalType) {
+            return createDoubleToDecimalCoercer((DecimalType) toType);
+        }
+        if (fromType == REAL && toType instanceof DecimalType) {
+            return createRealToDecimalCoercer((DecimalType) toType);
+        }
+        if (isArrayType(fromType) && isArrayType(toType)) {
+            return new ListCoercer(typeManager, fromHiveType, toHiveType);
+        }
+        if (isMapType(fromType) && isMapType(toType)) {
+            return new MapCoercer(typeManager, fromHiveType, toHiveType);
+        }
+        if (isRowType(fromType) && isRowType(toType)) {
+            return new StructCoercer(typeManager, fromHiveType, toHiveType);
+        }
+
+        throw new PrestoException(NOT_SUPPORTED, format("Unsupported coercion from %s to %s", fromHiveType, toHiveType));
+    }
+
+    private static Page extractColumns(Page page, int[] columns)
+    {
+        Block[] blocks = new Block[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            int dataColumn = columns[i];
+            blocks[i] = page.getBlock(dataColumn);
+        }
+        return new Page(page.getPositionCount(), blocks);
+    }
+
     @Override
     public long getCompletedBytes()
     {
@@ -270,10 +338,55 @@ public class HivePageSource
         return delegate.isFinished();
     }
 
+    private Map<ColumnHandle, DynamicFilter> getDynamicFilters()
+    {
+        if (dynamicFilterSupplier == null) {
+            return ImmutableMap.of();
+        }
+        Map<ColumnHandle, DynamicFilter> dynamicFilters = dynamicFilterSupplier.get();
+        // TODO: Remove this logic when row filtering decision can be made in optimizers
+        numberOfGlobalDynamicFilters = 0;
+        numberOfLocalDynamicFilters = 0;
+        dynamicFilters.entrySet().stream().forEach(entry -> {
+            if (entry.getValue().getType() == DynamicFilter.Type.GLOBAL) {
+                numberOfGlobalDynamicFilters += 1;
+            }
+            else {
+                numberOfLocalDynamicFilters += 1;
+            }
+        });
+        return dynamicFilters;
+    }
+
+    /**
+     * this method is design to wait until a specific time when there are expected dynamic filters
+     * The wait until time is relative to the SQL query start time
+     */
+    private boolean needToWait()
+    {
+        //assuming starttime is global indicting the time query execution started
+        //assuming system time is accurate enough to ms level
+        return System.currentTimeMillis() <= waitUntil;
+    }
+
     @Override
     public Page getNextPage()
     {
         try {
+            dynamicFilters = getDynamicFilters();
+            if (dynamicFilterSupplier != null) {
+                // Wait for any dynamic filter
+                if (dynamicFilters.isEmpty() && needToWait()) {
+                    return null;
+                }
+
+                // Close the current PageSource if the partition should be filtered
+                if (isPartitionFiltered(partitionKeys, new HashSet(dynamicFilters.values()), typeManager)) {
+                    close();
+                    return null;
+                }
+            }
+
             Page dataPage = delegate.getNextPage();
             if (dataPage == null) {
                 return null;
@@ -282,14 +395,25 @@ public class HivePageSource
             // This part is for filtering using the bloom filter
             // we filter out rows that are not in the bloom filter
             // using the filter rows function
-            if (eligibleForRowFiltering) {
-                IntArrayList rowsToKeep = filterRows(dataPage, dynamicFilters, types);
-                dataPage = createFilteredPage(dataPage, rowsToKeep);
+            if ((numberOfGlobalDynamicFilters > 0 && numberOfLocalDynamicFilters == 0) || eligibleForRowFiltering) {
+                if (!dynamicFilters.isEmpty()) {
+                    dataPage = filter(dynamicFilters, dataPage);
+                }
             }
 
             if (bucketAdapter.isPresent()) {
                 IntArrayList rowsToKeep = bucketAdapter.get().computeEligibleRowIds(dataPage);
-                dataPage = createFilteredPage(dataPage, rowsToKeep);
+                Block[] adaptedBlocks = new Block[dataPage.getChannelCount()];
+                for (int i = 0; i < adaptedBlocks.length; i++) {
+                    Block block = dataPage.getBlock(i);
+                    if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
+                        adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(dataPage.getBlock(i), rowsToKeep.elements()));
+                    }
+                    else {
+                        adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
+                    }
+                }
+                dataPage = new Page(rowsToKeep.size(), adaptedBlocks);
             }
 
             int batchSize = dataPage.getPositionCount();
@@ -370,61 +494,64 @@ public class HivePageSource
         return delegate;
     }
 
-    private static Function<Block, Block> createCoercer(TypeManager typeManager, HiveType fromHiveType, HiveType toHiveType)
+    private Page filter(Map<ColumnHandle, DynamicFilter> dynamicFilters, Page page)
     {
-        Type fromType = typeManager.getType(fromHiveType.getTypeSignature());
-        Type toType = typeManager.getType(toHiveType.getTypeSignature());
+        boolean[] result = new boolean[page.getPositionCount()];
+        Arrays.fill(result, Boolean.TRUE);
 
-        if (toType instanceof VarcharType && fromType instanceof VarcharType) {
-            return new VarcharToVarcharCoercer((VarcharType) fromType, (VarcharType) toType);
-        }
-        if (toType instanceof VarcharType && (fromHiveType.equals(HIVE_BYTE) || fromHiveType.equals(HIVE_SHORT) || fromHiveType.equals(HIVE_INT) || fromHiveType.equals(HIVE_LONG))) {
-            return new IntegerNumberToVarcharCoercer<>(fromType, (VarcharType) toType);
-        }
-        if (fromType instanceof VarcharType && (toHiveType.equals(HIVE_BYTE) || toHiveType.equals(HIVE_SHORT) || toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG))) {
-            return new VarcharToIntegerNumberCoercer<>((VarcharType) fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_BYTE) && toHiveType.equals(HIVE_SHORT) || toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG)) {
-            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_SHORT) && toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG)) {
-            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_INT) && toHiveType.equals(HIVE_LONG)) {
-            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_FLOAT) && toHiveType.equals(HIVE_DOUBLE)) {
-            return new FloatToDoubleCoercer();
-        }
-        if (fromHiveType.equals(HIVE_DOUBLE) && toHiveType.equals(HIVE_FLOAT)) {
-            return new DoubleToFloatCoercer();
-        }
-        if (fromType instanceof DecimalType && toType instanceof DecimalType) {
-            return createDecimalToDecimalCoercer((DecimalType) fromType, (DecimalType) toType);
-        }
-        if (fromType instanceof DecimalType && toType == DOUBLE) {
-            return createDecimalToDoubleCoercer((DecimalType) fromType);
-        }
-        if (fromType instanceof DecimalType && toType == REAL) {
-            return createDecimalToRealCoercer((DecimalType) fromType);
-        }
-        if (fromType == DOUBLE && toType instanceof DecimalType) {
-            return createDoubleToDecimalCoercer((DecimalType) toType);
-        }
-        if (fromType == REAL && toType instanceof DecimalType) {
-            return createRealToDecimalCoercer((DecimalType) toType);
-        }
-        if (isArrayType(fromType) && isArrayType(toType)) {
-            return new ListCoercer(typeManager, fromHiveType, toHiveType);
-        }
-        if (isMapType(fromType) && isMapType(toType)) {
-            return new MapCoercer(typeManager, fromHiveType, toHiveType);
-        }
-        if (isRowType(fromType) && isRowType(toType)) {
-            return new StructCoercer(typeManager, fromHiveType, toHiveType);
+        Map<Integer, ColumnHandle> eligibleColumns = new HashMap<>();
+        for (int channel = 0; channel < page.getChannelCount(); channel++) {
+            HiveColumnHandle columnHandle = columnMappings.get(channel).getHiveColumnHandle();
+            if (dynamicFilters.containsKey(columnHandle)) {
+                eligibleColumns.put(channel, columnHandle);
+            }
         }
 
-        throw new PrestoException(NOT_SUPPORTED, format("Unsupported coercion from %s to %s", fromHiveType, toHiveType));
+        for (Map.Entry<Integer, ColumnHandle> column : eligibleColumns.entrySet()) {
+            DynamicFilter dynamicFilter = dynamicFilters.get(column.getValue());
+            Block block = page.getBlock(column.getKey()).getLoadedBlock();
+            if (dynamicFilter instanceof BloomFilterDynamicFilter) {
+                block.filter(((BloomFilterDynamicFilter) dynamicFilters.get(column.getValue())).getBloomFilterDeserialized(), result);
+            }
+            else {
+                for (int i = 0; i < block.getPositionCount(); i++) {
+                    result[i] = result[i] && dynamicFilter.contains(TypeUtils.readNativeValue(types[column.getKey()], block, i));
+                }
+            }
+        }
+
+        Block[] adaptedBlocks = new Block[page.getChannelCount()];
+        int[] rowsToKeep = toPositions(result);
+        for (int i = 0; i < adaptedBlocks.length; i++) {
+            Block block = page.getBlock(i);
+            if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
+                adaptedBlocks[i] = new LazyBlock(rowsToKeep.length, new RowFilterLazyBlockLoader(page.getBlock(i), rowsToKeep));
+            }
+            else {
+                adaptedBlocks[i] = block.getPositions(rowsToKeep, 0, rowsToKeep.length);
+            }
+        }
+        return new Page(rowsToKeep.length, adaptedBlocks);
+    }
+
+    /**
+     * Is position 1-based? extract the "true" value positions
+     *
+     * @param keep
+     * @return
+     */
+    private int[] toPositions(boolean[] keep)
+    {
+        int size = Booleans.countTrue(keep);
+        int[] result = new int[size];
+        int idx = 0;
+        for (int i = 0; i < keep.length; i++) {
+            if (keep[i]) {
+                result[idx] = i; //position is 1-based
+                idx++;
+            }
+        }
+        return result;
     }
 
     private static class ListCoercer
@@ -581,10 +708,10 @@ public class HivePageSource
     private static final class RowFilterLazyBlockLoader
             implements LazyBlockLoader<LazyBlock>
     {
+        private final int[] rowsToKeep;
         private Block block;
-        private final IntArrayList rowsToKeep;
 
-        public RowFilterLazyBlockLoader(Block block, IntArrayList rowsToKeep)
+        public RowFilterLazyBlockLoader(Block block, int[] rowsToKeep)
         {
             this.block = requireNonNull(block, "block is null");
             this.rowsToKeep = requireNonNull(rowsToKeep, "rowsToKeep is null");
@@ -597,56 +724,11 @@ public class HivePageSource
                 return;
             }
 
-            lazyBlock.setBlock(block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size()));
+            lazyBlock.setBlock(block.getPositions(rowsToKeep, 0, rowsToKeep.length));
 
             // clear reference to loader to free resources, since load was successful
             block = null;
         }
-    }
-
-    private static Page extractColumns(Page page, int[] columns)
-    {
-        Block[] blocks = new Block[columns.length];
-        for (int i = 0; i < columns.length; i++) {
-            int dataColumn = columns[i];
-            blocks[i] = page.getBlock(dataColumn);
-        }
-        return new Page(page.getPositionCount(), blocks);
-    }
-
-    private boolean isEligibleForRowFiltering(int numberOfGlobalDynamicFilters, int numberOfLocalDynamicFilters)
-    {
-        if (numberOfGlobalDynamicFilters > 0 && numberOfLocalDynamicFilters == 0) {
-            return true;
-        }
-
-        if (isDynamicFilteringFilterRows(session)) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Create a new page containing some rows from original page
-     *
-     * @param dataPage original page
-     * @param rowsToKeep rows to keep in the new page
-     * @return the new page containing filtered rows
-     */
-    private static Page createFilteredPage(Page dataPage, IntArrayList rowsToKeep)
-    {
-        Block[] adaptedBlocks = new Block[dataPage.getChannelCount()];
-        for (int i = 0; i < adaptedBlocks.length; i++) {
-            Block block = dataPage.getBlock(i);
-            if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
-                adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(dataPage.getBlock(i), rowsToKeep));
-            }
-            else {
-                adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
-            }
-        }
-        return new Page(rowsToKeep.size(), adaptedBlocks);
     }
 
     public static class BucketAdapter

@@ -35,6 +35,7 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
+import io.prestosql.spi.statestore.listener.MapListener;
 import io.prestosql.spi.type.TestingTypeManager;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.tree.QualifiedName;
@@ -316,6 +317,12 @@ public class TestSplitCacheStateInitializer
         {
             return map.keySet();
         }
+
+        @Override
+        public void addEntryListener(MapListener listener) {}
+
+        @Override
+        public void removeEntryListener(MapListener listener) {}
 
         @Override
         public String getName()

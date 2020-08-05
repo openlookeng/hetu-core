@@ -46,8 +46,8 @@ import static io.prestosql.spi.type.Varchars.byteCount;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static java.util.Objects.requireNonNull;
 
-public class SliceColumnReader
-        implements ColumnReader
+public class SliceColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceColumnReader.class).instanceSize();
 

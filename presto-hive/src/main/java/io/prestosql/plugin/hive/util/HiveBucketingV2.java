@@ -64,7 +64,7 @@ public final class HiveBucketingV2
         return result;
     }
 
-    private static int hash(TypeInfo type, Block block, int position)
+    private static <T> int hash(TypeInfo type, Block<T> block, int position)
     {
         // This function mirrors the behavior of function hashCodeMurmur in
         // HIVE-18910 (and following) 7dc47faddb serde/src/java/org/apache/hadoop/hive/serde2/objectinspector/ObjectInspectorUtils.java

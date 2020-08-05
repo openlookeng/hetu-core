@@ -64,6 +64,17 @@ public class TestIndexMetadata
             {
                 //do nothing
             }
+
+            @Override
+            public int getExpectedNumOfEntries()
+            {
+                return 0;
+            }
+
+            @Override
+            public void setExpectedNumOfEntries(int expectedNumOfEntries)
+            {
+            }
         };
 
         String table = "table";

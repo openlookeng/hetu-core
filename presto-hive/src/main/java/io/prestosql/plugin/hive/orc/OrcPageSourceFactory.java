@@ -72,6 +72,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -149,7 +150,7 @@ public class OrcPageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -191,7 +192,7 @@ public class OrcPageSourceFactory
                 getOrcLazyReadSmallRanges(session),
                 isOrcBloomFiltersEnabled(session),
                 stats,
-                dynamicFilter,
+                dynamicFilters,
                 deleteDeltaLocations,
                 startRowOffsetOfFile,
                 indexes,
@@ -221,7 +222,7 @@ public class OrcPageSourceFactory
             boolean lazyReadSmallRanges,
             boolean orcBloomFiltersEnabled,
             FileFormatDataSourceStats stats,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

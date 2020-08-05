@@ -49,8 +49,8 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
-public class MapColumnReader
-        implements ColumnReader
+public class MapColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(MapColumnReader.class).instanceSize();
 

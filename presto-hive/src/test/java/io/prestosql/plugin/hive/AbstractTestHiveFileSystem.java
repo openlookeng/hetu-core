@@ -92,8 +92,8 @@ import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveDataStreamFactories;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveFileWriterFactories;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveRecordCursorProvider;
-import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultIndexManager;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultOrcFileWriterFactory;
+import static io.prestosql.plugin.hive.HiveTestUtils.getNoOpIndexCache;
 import static io.prestosql.plugin.hive.HiveTestUtils.getTypes;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.UNGROUPED_SCHEDULING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -208,7 +208,7 @@ public abstract class AbstractTestHiveFileSystem
                 config.getMaxInitialSplits(),
                 config.getSplitLoaderConcurrency(),
                 config.getMaxSplitsPerSecond(),
-                config.getRecursiveDirWalkerEnabled(), null);
+                config.getRecursiveDirWalkerEnabled(), null, config);
         pageSinkProvider = new HivePageSinkProvider(
                 getDefaultHiveFileWriterFactories(config),
                 hdfsEnvironment,
@@ -224,7 +224,7 @@ public abstract class AbstractTestHiveFileSystem
                 new HiveSessionProperties(config, new OrcFileWriterConfig(), new ParquetFileWriterConfig()),
                 new HiveWriterStats(),
                 getDefaultOrcFileWriterFactory(config));
-        pageSourceProvider = new HivePageSourceProvider(config, hdfsEnvironment, getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getDefaultIndexManager());
+        pageSourceProvider = new HivePageSourceProvider(config, hdfsEnvironment, getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache());
     }
 
     protected ConnectorSession newSession()

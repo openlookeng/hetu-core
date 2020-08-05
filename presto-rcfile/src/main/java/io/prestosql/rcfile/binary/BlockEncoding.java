@@ -37,7 +37,7 @@ public abstract class BlockEncoding
     private final DynamicSliceOutput buffer = new DynamicSliceOutput(0);
 
     @Override
-    public final void encodeColumn(Block block, SliceOutput output, EncodeOutput encodeOutput)
+    public final <T> void encodeColumn(Block<T> block, SliceOutput output, EncodeOutput encodeOutput)
     {
         for (int position = 0; position < block.getPositionCount(); position++) {
             if (!block.isNull(position)) {
@@ -48,7 +48,7 @@ public abstract class BlockEncoding
     }
 
     @Override
-    public final void encodeValueInto(Block block, int position, SliceOutput output)
+    public final <T> void encodeValueInto(Block<T> block, int position, SliceOutput output)
     {
         buffer.reset();
         encodeValue(block, position, buffer);
@@ -59,7 +59,7 @@ public abstract class BlockEncoding
         output.writeBytes(slice);
     }
 
-    protected abstract void encodeValue(Block block, int position, SliceOutput output);
+    protected abstract <T> void encodeValue(Block<T> block, int position, SliceOutput output);
 
     @Override
     public final Block decodeColumn(ColumnData columnData)

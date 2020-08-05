@@ -14,8 +14,7 @@
  */
 package io.prestosql.operator.dynamicfilter;
 
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
+import com.google.common.primitives.Booleans;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
@@ -28,6 +27,7 @@ import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.PlanNodeId;
@@ -36,7 +36,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,52 +47,13 @@ import static java.util.Objects.requireNonNull;
 public class DynamicFilterOperator
         implements Operator
 {
-    public static class DynamicFilterOperatorFactory
-            implements OperatorFactory
-    {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
-        private final String queryId;
-        private final StateStoreProvider stateStoreProvider;
-        private final List<Symbol> symbols;
-        private final TypeProvider typeProvider;
-
-        public DynamicFilterOperatorFactory(int operatorId, PlanNodeId planNodeId, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider)
-        {
-            this.operatorId = operatorId;
-            this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
-            this.queryId = requireNonNull(queryId, "queryId is null");
-            this.symbols = requireNonNull(symbols, "symbols is null");
-            this.typeProvider = requireNonNull(typeProvider, "typeProvider is null");
-            this.stateStoreProvider = stateStoreProvider;
-        }
-
-        @Override
-        public Operator createOperator(DriverContext driverContext)
-        {
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterOperator.class.getSimpleName());
-            return new DynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, stateStoreProvider);
-        }
-
-        @Override
-        public void noMoreOperators()
-        {
-        }
-
-        @Override
-        public OperatorFactory duplicate()
-        {
-            return new DynamicFilterOperatorFactory(operatorId, planNodeId, queryId, symbols, typeProvider, stateStoreProvider);
-        }
-    }
-
     private final OperatorContext operatorContext;
-    private boolean finished;
-    private Page currentPage;
     private final String queryId;
     private final List<Symbol> symbols;
     private final StateStoreProvider stateStoreProvider;
     private final Map<Integer, Type> columnTypes = new HashMap<>();
+    private boolean finished;
+    private Page currentPage;
     private Map<Integer, BloomFilter> bloomFilterMap = new HashMap<>();
 
     public DynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider)
@@ -143,7 +104,7 @@ public class DynamicFilterOperator
                     if (bloomFilters.containsKey(symbol.getName()) && !bloomFilterMap.containsKey(i)) {
                         // Deserialize new bloomfilters
                         try (ByteArrayInputStream input = new ByteArrayInputStream(bloomFilters.get(symbol.getName()))) {
-                            bloomFilterMap.put(i, BloomFilter.readFrom(input, Funnels.stringFunnel(Charset.defaultCharset())));
+                            bloomFilterMap.put(i, BloomFilter.readFrom(input));
                         }
                         catch (IOException e) {
                             // ignore the bloomfilter if broken
@@ -159,7 +120,7 @@ public class DynamicFilterOperator
             for (int i = 0; i < adaptedBlocks.length; i++) {
                 Block block = page.getBlock(i);
                 if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
-                    adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(page.getBlock(i), rowsToKeep));
+                    adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(page.getBlock(i), rowsToKeep.elements()));
                 }
                 else {
                     adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
@@ -192,6 +153,50 @@ public class DynamicFilterOperator
         return finished && currentPage == null;
     }
 
+    private Page filter(Page page)
+    {
+        boolean[] result = new boolean[page.getPositionCount()];
+        Arrays.fill(result, Boolean.TRUE);
+        for (Map.Entry<Integer, BloomFilter> entry : bloomFilterMap.entrySet()) {
+            int columnIndex = entry.getKey();
+            Block block = page.getBlock(columnIndex).getLoadedBlock();
+            block.filter(entry.getValue(), result);
+        }
+
+        Block[] adaptedBlocks = new Block[page.getChannelCount()];
+        int[] rowsToKeep = toPositions(result);
+        for (int i = 0; i < adaptedBlocks.length; i++) {
+            Block block = page.getBlock(i);
+            if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
+                adaptedBlocks[i] = new LazyBlock(rowsToKeep.length, new RowFilterLazyBlockLoader(page.getBlock(i), rowsToKeep));
+            }
+            else {
+                adaptedBlocks[i] = block.getPositions(rowsToKeep, 0, rowsToKeep.length);
+            }
+        }
+        return new Page(rowsToKeep.length, adaptedBlocks);
+    }
+
+    /**
+     * Is position 1-based? extract the "true" value positions
+     *
+     * @param keep
+     * @return
+     */
+    private int[] toPositions(boolean[] keep)
+    {
+        int size = Booleans.countTrue(keep);
+        int[] result = new int[size];
+        int idx = 0;
+        for (int i = 0; i < keep.length; i++) {
+            if (keep[i]) {
+                result[idx] = i + 1; //position is 1-based
+                idx++;
+            }
+        }
+        return result;
+    }
+
     private IntArrayList filterRows(Page page)
     {
         IntArrayList ids = new IntArrayList(page.getPositionCount());
@@ -209,7 +214,7 @@ public class DynamicFilterOperator
                 Block block = page.getBlock(columnIndex).getLoadedBlock();
                 String nativeValue = TypeUtils.readNativeValueForDynamicFilter(columnTypes.get(columnIndex), block, position);
 
-                if (nativeValue != null && !entry.getValue().mightContain(nativeValue)) {
+                if (nativeValue != null && !entry.getValue().test(nativeValue.getBytes())) {
                     shouldKeep = false;
                     break;
                 }
@@ -222,26 +227,65 @@ public class DynamicFilterOperator
         return ids;
     }
 
-    private final class RowFilterLazyBlockLoader
-            implements LazyBlockLoader<LazyBlock>
+    public static class DynamicFilterOperatorFactory
+            implements OperatorFactory
     {
-        private Block block;
-        private final IntArrayList rowsToKeep;
+        private final int operatorId;
+        private final PlanNodeId planNodeId;
+        private final String queryId;
+        private final StateStoreProvider stateStoreProvider;
+        private final List<Symbol> symbols;
+        private final TypeProvider typeProvider;
 
-        public RowFilterLazyBlockLoader(Block block, IntArrayList rowsToKeep)
+        public DynamicFilterOperatorFactory(int operatorId, PlanNodeId planNodeId, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider)
+        {
+            this.operatorId = operatorId;
+            this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
+            this.queryId = requireNonNull(queryId, "queryId is null");
+            this.symbols = requireNonNull(symbols, "symbols is null");
+            this.typeProvider = requireNonNull(typeProvider, "typeProvider is null");
+            this.stateStoreProvider = stateStoreProvider;
+        }
+
+        @Override
+        public Operator createOperator(DriverContext driverContext)
+        {
+            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterOperator.class.getSimpleName());
+            return new DynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, stateStoreProvider);
+        }
+
+        @Override
+        public void noMoreOperators()
+        {
+        }
+
+        @Override
+        public OperatorFactory duplicate()
+        {
+            return new DynamicFilterOperatorFactory(operatorId, planNodeId, queryId, symbols, typeProvider, stateStoreProvider);
+        }
+    }
+
+    private final class RowFilterLazyBlockLoader<T>
+            implements LazyBlockLoader<T>
+    {
+        private final int[] rowsToKeep;
+        private Block block;
+
+        public RowFilterLazyBlockLoader(Block block, int[] rowsToKeep)
         {
             this.block = requireNonNull(block, "block is null");
             this.rowsToKeep = requireNonNull(rowsToKeep, "rowsToKeep is null");
         }
 
         @Override
-        public void load(LazyBlock lazyBlock)
+        public void load(LazyBlock<T> lazyBlock)
         {
             if (block == null) {
                 return;
             }
 
-            lazyBlock.setBlock(block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size()));
+            lazyBlock.setBlock(block.getPositions(rowsToKeep, 0, rowsToKeep.length));
 
             // clear reference to loader to free resources, since load was successful
             block = null;

@@ -238,13 +238,13 @@ public class PageProcessor
             }
         }
 
-        private void updateRetainedSize()
+        private <T> void updateRetainedSize()
         {
             // increment the size only when it is the first reference
             retainedSizeInBytes = Page.INSTANCE_SIZE + SizeOf.sizeOfObjectArray(page.getChannelCount());
             ReferenceCountMap referenceCountMap = new ReferenceCountMap();
             for (int channel = 0; channel < page.getChannelCount(); channel++) {
-                Block block = page.getBlock(channel);
+                Block<T> block = page.getBlock(channel);
                 if (!isNotLoadedLazyBlock(block)) {
                     block.retainedBytesForEachPart((object, size) -> {
                         if (referenceCountMap.incrementAndGet(object) == 1) {
@@ -253,7 +253,7 @@ public class PageProcessor
                     });
                 }
             }
-            for (Block previouslyComputedResult : previouslyComputedResults) {
+            for (Block<T> previouslyComputedResult : previouslyComputedResults) {
                 if (previouslyComputedResult != null) {
                     previouslyComputedResult.retainedBytesForEachPart((object, size) -> {
                         if (referenceCountMap.incrementAndGet(object) == 1) {

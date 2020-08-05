@@ -13,12 +13,14 @@
  */
 package io.prestosql.spi.connector;
 
+import io.airlift.units.Duration;
 import io.prestosql.spi.security.ConnectorIdentity;
 import io.prestosql.spi.type.TimeZoneKey;
 
 import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.TimeUnit;
 
 public interface ConnectorSession
 {
@@ -66,5 +68,10 @@ public interface ConnectorSession
     default int getTaskWriterCount()
     {
         return 1;
+    }
+
+    default Duration getDynamicFilteringWaitTime()
+    {
+        return new Duration(0, TimeUnit.MILLISECONDS);
     }
 }

@@ -32,11 +32,11 @@ import static java.util.Objects.requireNonNull;
 public class DynamicSplitPlacementPolicy
         implements SplitPlacementPolicy
 {
+    //TODO the following variables will be removed after implementing Discovery Service AA mode
+    public static final String QUERY_MANAGER_REQUIRED_WORKERS_MAX_WAIT = "query-manager.required-workers-max-wait";
     private static final Logger LOG = Logger.get(DynamicSplitPlacementPolicy.class);
     private final NodeSelector nodeSelector;
     private final Supplier<? extends List<RemoteTask>> remoteTasks;
-    //TODO the following variables will be removed after implementing Discovery Service AA mode
-    public static final String QUERY_MANAGER_REQUIRED_WORKERS_MAX_WAIT = "query-manager.required-workers-max-wait";
     private final Duration defaultMaxComputeAssignmentDuration = new Duration(1, TimeUnit.MINUTES);
     private final long computeAssignmentSleepMilliSeconds = 5000;
 
@@ -49,12 +49,17 @@ public class DynamicSplitPlacementPolicy
     @Override
     public SplitPlacementResult computeAssignments(Set<Split> splits)
     {
+        ensureClusterReady();
+        return nodeSelector.computeAssignments(splits, remoteTasks.get());
+    }
+
+    private void ensureClusterReady()
+    {
         //TODO for-loop will be removed after implementing discovery Service AA mode(now with AP mode)
         /*
             Note: After main coordinator/discovery dies, it generally takes 10-20 seconds to recover, so
                   double the time here
          */
-        SplitPlacementResult result = null;
         Duration maxComputeAssignmentRetryDuration = defaultMaxComputeAssignmentDuration;
 
         try {
@@ -63,7 +68,6 @@ public class DynamicSplitPlacementPolicy
         catch (Exception e) {
             LOG.warn(e.getMessage());
         }
-
         int maxComputeAssignmentRetry = (int) (maxComputeAssignmentRetryDuration.toMillis() / computeAssignmentSleepMilliSeconds);
 
         int retry = 0;
@@ -82,8 +86,6 @@ public class DynamicSplitPlacementPolicy
         if (retry >= maxComputeAssignmentRetry) {
             throw new PrestoException(NO_NODES_AVAILABLE, "Cluster may not be ready, no nodes available to run query at this moment");
         }
-
-        return nodeSelector.computeAssignments(splits, remoteTasks.get());
     }
 
     @Override

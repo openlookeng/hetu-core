@@ -1,4 +1,4 @@
-# REST API Overview
+# openLooKeng REST API
 
 
 This chapter defines the openLooKeng REST API. openLooKeng uses REST for all
@@ -7,6 +7,8 @@ facilitate communication between the client and the openLooKeng coordinator as
 well as for communicate between a openLooKeng coordinator and multiple openLooKeng
 workers. In this chapter you will find detailed descriptions of the APIs
 offered by openLooKeng as well as example requests and responses.
+
+## REST API Overview
 
 In openLooKeng, everything is exposed as a REST API in openLooKeng and HTTP is the
 method by which all component communicate with each other.

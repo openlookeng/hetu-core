@@ -107,19 +107,19 @@ public class SplitCacheMap
         tableCache.setCachedNode(splitKey, workerId);
     }
 
-    public Map<String, String> showCache()
+    public Map<String, TableCacheInfo> showCache()
     {
-        Map<String, String> cacheInfoByTableName = new LinkedHashMap<>();
+        Map<String, TableCacheInfo> cacheInfoByTableName = new LinkedHashMap<>();
         tableCacheInfoMap.keySet().forEach(fqTableName -> cacheInfoByTableName.putAll(showCache(fqTableName)));
         return cacheInfoByTableName;
     }
 
-    public Map<String, String> showCache(String fqTableName)
+    public Map<String, TableCacheInfo> showCache(String fqTableName)
     {
-        Map<String, String> cacheInfoByTableName = new LinkedHashMap<>();
+        Map<String, TableCacheInfo> cacheInfoByTableName = new LinkedHashMap<>();
         TableCacheInfo tableCache = tableCacheInfoMap.get(fqTableName);
         if (tableCache != null) {
-            cacheInfoByTableName.put(fqTableName, tableCache.showCacheResult());
+            cacheInfoByTableName.put(fqTableName, tableCache);
         }
         return cacheInfoByTableName;
     }

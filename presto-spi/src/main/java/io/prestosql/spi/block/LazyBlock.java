@@ -20,17 +20,17 @@ import java.util.function.BiConsumer;
 
 import static java.util.Objects.requireNonNull;
 
-public class LazyBlock
-        implements Block
+public class LazyBlock<T>
+        implements Block<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LazyBlock.class).instanceSize();
 
     private final int positionCount;
-    private LazyBlockLoader<LazyBlock> loader;
+    private LazyBlockLoader<T> loader;
 
-    private Block block;
+    private Block<T> block;
 
-    public LazyBlock(int positionCount, LazyBlockLoader<LazyBlock> loader)
+    public LazyBlock(int positionCount, LazyBlockLoader<T> loader)
     {
         this.positionCount = positionCount;
         this.loader = requireNonNull(loader, "loader is null");
@@ -269,7 +269,7 @@ public class LazyBlock
     }
 
     @Override
-    public Block getLoadedBlock()
+    public Block<T> getLoadedBlock()
     {
         assureLoaded();
         return block;

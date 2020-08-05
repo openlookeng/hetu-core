@@ -21,6 +21,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.jdbc.PrestoStatement;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.plugin.hive.HivePlugin;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.tests.DistributedQueryRunner;
 import org.apache.commons.lang.StringUtils;
@@ -47,6 +48,7 @@ import static io.prestosql.spi.type.TimeZoneKey.UTC_KEY;
 public class HetuTestServer
 {
     private static final String carbonDataCatalog = "carbondata";
+    private static final String carbonDataCatalogLocationDisabled = "carbondatacataloglocationdisabled";
     private static final String carbonDataConnector = "carbondata";
     private static final String carbonDataSource = "carbondata";
 
@@ -171,14 +173,26 @@ public class HetuTestServer
                     .putAll(this.carbonProperties)
                     .put("carbon.unsafe.working.memory.in.mb", "512")
                     .build();
+            Map<String, String> carbonPropertiesLocationDisabled = ImmutableMap.<String, String>builder()
+                    .putAll(this.carbonProperties)
+                    .put("carbon.unsafe.working.memory.in.mb", "512")
+                    .put("hive.table-creates-with-location-allowed","false")
+                    .build();
 
             // CreateCatalog will create a catalog for CarbonData in etc/catalog.
             queryRunner.createCatalog(carbonDataCatalog, carbonDataConnector, carbonProperties);
+            queryRunner.createCatalog(carbonDataCatalogLocationDisabled, carbonDataConnector, carbonPropertiesLocationDisabled);
         } catch (RuntimeException e) {
             queryRunner.close();
             throw e;
         }
 
         return queryRunner;
+    }
+
+    public void addHiveCatalogToQueryRunner(Map<String, String> hiveProperties)
+    {
+        queryRunner.installPlugin(new HivePlugin("hive"));
+        queryRunner.createCatalog("hive", "hive", hiveProperties);
     }
 }

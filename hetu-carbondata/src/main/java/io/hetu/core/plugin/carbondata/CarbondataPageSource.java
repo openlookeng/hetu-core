@@ -76,7 +76,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Carbondata Page Source class for custom Carbondata RecordSet Iteration.
  */
-class CarbondataPageSource
+public class CarbondataPageSource
         implements ConnectorPageSource
 {
     private static final Logger LOGGER =
@@ -543,5 +543,15 @@ class CarbondataPageSource
             }
             loaded = true;
         }
+    }
+
+    public CarbonTable getCarbonTable()
+    {
+        return this.carbonTable;
+    }
+
+    public HdfsEnvironment getHdfsEnvironment()
+    {
+        return hdfsEnvironment;
     }
 }

@@ -28,7 +28,8 @@ import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
 import io.prestosql.plugin.hive.rcfile.RcFilePageSourceFactory;
 import io.prestosql.plugin.hive.s3.HiveS3Config;
 import io.prestosql.plugin.hive.s3.PrestoS3ConfigurationInitializer;
-import io.prestosql.plugin.hive.util.IndexManager;
+import io.prestosql.plugin.hive.util.IndexCache;
+import io.prestosql.plugin.hive.util.IndexCacheLoader;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -36,6 +37,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.NamedTypeSignature;
@@ -61,7 +64,7 @@ import java.util.function.Supplier;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
-import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
+import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
 import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
 import static io.prestosql.spi.type.Decimals.encodeScaledValue;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -102,9 +105,16 @@ public final class HiveTestUtils
                 .build();
     }
 
-    public static IndexManager getDefaultIndexManager()
+    public static IndexCache getNoOpIndexCache()
     {
-        return new IndexManager((catalog, hiveTable, hiveSplit, effectivePredicate, partitions) -> ImmutableList.of());
+        return new IndexCache(new IndexCacheLoader(null))
+        {
+            @Override
+            public List<IndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit, TupleDomain<HiveColumnHandle> effectivePredicate, List<HiveColumnHandle> partitions)
+            {
+                return ImmutableList.of();
+            }
+        };
     }
 
     public static Set<HiveRecordCursorProvider> getDefaultHiveRecordCursorProvider(HiveConfig hiveConfig)
@@ -206,13 +216,13 @@ public final class HiveTestUtils
         }
     }
 
-    public static Supplier<Set<DynamicFilter>> createTestDynamicFilterSupplier(String filterKey, List<Object> filterValues)
+    public static Supplier<Set<DynamicFilter>> createTestDynamicFilterSupplier(String filterKey, List<Long> filterValues)
     {
         Supplier<Set<DynamicFilter>> dynamicFilterSupplier = () -> {
             Set<DynamicFilter> dynamicFilters = new HashSet<>();
-            ColumnHandle columnHandle = new HiveColumnHandle(filterKey, HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
+            ColumnHandle columnHandle = new HiveColumnHandle(filterKey, HIVE_LONG, parseTypeSignature(StandardTypes.BIGINT), 0, PARTITION_KEY, Optional.empty());
             BloomFilter filter = new BloomFilter(1024 * 1024, 0.01);
-            filterValues.stream().forEach(value -> filter.add(((String) value).getBytes()));
+            filterValues.stream().forEach(value -> filter.add(value));
 
             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 filter.writeTo(out);

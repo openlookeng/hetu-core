@@ -142,7 +142,7 @@ public class TestRowBlock
     }
 
     @Override
-    protected <T> void assertPositionValue(Block block, int position, T expectedValue)
+    protected <T> void assertPositionValue(Block<T> block, int position, T expectedValue)
     {
         if (expectedValue instanceof List) {
             assertValue(block, position, (List<Object>) expectedValue);

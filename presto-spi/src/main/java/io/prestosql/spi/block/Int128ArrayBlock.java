@@ -27,7 +27,7 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
 public class Int128ArrayBlock
-        implements Block
+        implements Block<Long>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(Int128ArrayBlock.class).instanceSize();
     public static final int INT128_BYTES = Long.BYTES + Long.BYTES;

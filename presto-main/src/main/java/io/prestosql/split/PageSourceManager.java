@@ -26,12 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
 import static java.util.Objects.requireNonNull;
 
 public class PageSourceManager
@@ -60,27 +58,6 @@ public class PageSourceManager
 
         ConnectorPageSourceProvider provider = getPageSourceProvider(catalogName);
 
-        Map<ColumnHandle, DynamicFilter> constraint = null;
-        if (dynamicFilter != null) {
-            constraint = dynamicFilter.get(); // should not block
-            if (constraint == null || constraint.size() == 0) {
-                try {
-                    long waitMillis = getDynamicFilteringWaitTime(session).toMillis();
-                    long checkInterval = 50;
-                    while (waitMillis > 0) {
-                        TimeUnit.MILLISECONDS.sleep(checkInterval);
-                        constraint = dynamicFilter.get(); // try again
-                        if (constraint.size() > 0) {
-                            break;
-                        }
-                        waitMillis -= checkInterval;
-                    }
-                }
-                catch (InterruptedException e) {
-                    // no-ops
-                }
-            }
-        }
         if (dynamicFilter == null) {
             return provider.createPageSource(
                     table.getTransaction(),

@@ -20,8 +20,8 @@ import java.util.function.BiConsumer;
 
 import static java.lang.String.format;
 
-public class SingleRowBlock
-        extends AbstractSingleRowBlock
+public class SingleRowBlock<T>
+        extends AbstractSingleRowBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleRowBlock.class).instanceSize();
 

@@ -33,7 +33,6 @@ import java.util.concurrent.Callable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.hetu.core.heuristicindex.IndexCommandUtils.loadDataSourceProperties;
-import static io.hetu.core.heuristicindex.IndexCommandUtils.loadIndexProperties;
 import static io.hetu.core.heuristicindex.IndexCommandUtils.loadIndexStore;
 import static java.util.Objects.requireNonNull;
 
@@ -108,6 +107,11 @@ public class IndexCommand
                     " delete command works a column level")
     Command command;
     @CommandLine.Option(
+            names = {"-I", "--indexproperties"},
+            split = ",",
+            description = "additional index properties separated by comma, for example, 'bloom.fpp=0.01,bitmap.foo=bar'")
+    String[] indexProps;
+    @CommandLine.Option(
             names = {"-L", "--disableLocking"},
             description = "by default locking is enabled at the table level; if this is set to false, the user must ensure " +
                     "that the same data is not indexed by multiple callers at the same time (indexing different columns " +
@@ -151,7 +155,17 @@ public class IndexCommand
         // based on the command, different values are required
         try {
             Properties dsProperties = loadDataSourceProperties(table, configDirPath);
-            Properties ixProperties = loadIndexProperties(configDirPath);
+            Properties ixProperties = new Properties();
+            if (indexProps != null) {
+                for (String s : indexProps) {
+                    if (!s.contains("=")) {
+                        throw new IllegalArgumentException("Index properties should be like 'xx.xx=xx'");
+                    }
+                    String key = s.split("=")[0];
+                    String val = s.split("=")[1];
+                    ixProperties.setProperty(key, val);
+                }
+            }
             IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
             switch (command) {
                 case create:

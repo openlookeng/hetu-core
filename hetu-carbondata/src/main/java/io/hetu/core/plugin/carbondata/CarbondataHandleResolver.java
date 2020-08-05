@@ -19,6 +19,7 @@ import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
+import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 
 public class CarbondataHandleResolver
         extends HiveHandleResolver
@@ -33,6 +34,12 @@ public class CarbondataHandleResolver
     public Class<? extends ConnectorUpdateTableHandle> getUpdateTableHandleClass()
     {
         return CarbondataUpdateTableHandle.class;
+    }
+
+    @Override
+    public Class<? extends ConnectorVacuumTableHandle> getVacuumTableHandleClass()
+    {
+        return CarbondataVacuumTableHandle.class;
     }
 
     @Override

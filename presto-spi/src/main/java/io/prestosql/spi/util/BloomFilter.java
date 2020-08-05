@@ -61,8 +61,8 @@ public class BloomFilter
     private static final long NULL_HASHCODE = 2862933555777941757L;
 
     private final BitSet bitSet;
-    private int numBits;
     private final int numHashFunctions;
+    private int numBits;
 
     public BloomFilter(long expectedEntries, double fpp)
     {
@@ -88,6 +88,63 @@ public class BloomFilter
         numHashFunctions = numFuncs;
     }
 
+    static int optimalNumOfHashFunctions(long n, long m)
+    {
+        return Math.max(1, (int) Math.round((double) m / n * Math.log(2)));
+    }
+
+    static int optimalNumOfBits(long n, double p)
+    {
+        return (int) (-n * Math.log(p) / (Math.log(2) * Math.log(2)));
+    }
+
+    // Thomas Wang's integer hash function
+    // http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
+    private static long getLongHash(long key)
+    {
+        key = (~key) + (key << 21); // key = (key << 21) - key - 1;
+        key ^= (key >> 24);
+        key = (key + (key << 3)) + (key << 8); // key * 265
+        key ^= (key >> 14);
+        key = (key + (key << 2)) + (key << 4); // key * 21
+        key ^= (key >> 28);
+        key += (key << 31);
+        return key;
+    }
+
+    /**
+     * De-serialize a BloomFilter from a given InputStream
+     *
+     * @param in InputStream that contains serialized value of a BloomFilter
+     * @return De-serialized BloomFilter
+     * @throws IOException Exception reading values from the InputStream
+     */
+    public static BloomFilter readFrom(InputStream in)
+            throws IOException
+    {
+        int numHashFunctions = 0;
+        int numBits = 0;
+        try {
+            DataInputStream dataInputStream = new DataInputStream(in);
+            numHashFunctions = dataInputStream.readInt();
+            numBits = dataInputStream.readInt();
+
+            long[] bits = new long[numBits];
+            for (int i = 0; i < numBits; i++) {
+                bits[i] = dataInputStream.readLong();
+            }
+            return new BloomFilter(bits, numHashFunctions);
+        }
+        catch (IOException e) {
+            throw new IOException("Failed to deserialize BloomFilter, numHashFunctions: "
+                    + numHashFunctions
+                    + ", numBits: "
+                    + numBits
+                    + ", cause: "
+                    + e.getLocalizedMessage());
+        }
+    }
+
     /**
      * Merge in another BloomFilter if it's compatible
      *
@@ -109,16 +166,6 @@ public class BloomFilter
 
         bitSet.merge(that.bitSet);
         this.numBits = (int) bitSet.bitSize();
-    }
-
-    static int optimalNumOfHashFunctions(long n, long m)
-    {
-        return Math.max(1, (int) Math.round((double) m / n * Math.log(2)));
-    }
-
-    static int optimalNumOfBits(long n, double p)
-    {
-        return (int) (-n * Math.log(p) / (Math.log(2) * Math.log(2)));
     }
 
     public long getRetainedSizeInBytes()
@@ -170,19 +217,30 @@ public class BloomFilter
         }
     }
 
+    public void add(long val)
+    {
+        addHash(getLongHash(val));
+    }
+
+    public void add(Slice val)
+    {
+        byte[] bytesValue = (val == null) ? null : val.getBytes();
+        add(bytesValue);
+    }
+
     public void addLong(long val)
     {
         addHash(getLongHash(val));
     }
 
-    public void addDouble(double val)
+    public void add(double val)
     {
         addLong(doubleToLongBits(val));
     }
 
-    public void addFloat(float val)
+    public void add(float val)
     {
-        addDouble(val);
+        add((double) val);
     }
 
     public boolean test(byte[] val)
@@ -191,7 +249,7 @@ public class BloomFilter
         return testHash(hash64);
     }
 
-    public boolean testSlice(Slice val)
+    public boolean test(Slice val)
     {
         long hash64 = (val == null) ? NULL_HASHCODE : OrcMurmur3.hash64(val);
         return testHash(hash64);
@@ -216,33 +274,19 @@ public class BloomFilter
         return true;
     }
 
-    public boolean testLong(long val)
+    public boolean test(long val)
     {
         return testHash(getLongHash(val));
     }
 
-    // Thomas Wang's integer hash function
-    // http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
-    private static long getLongHash(long key)
+    public boolean test(double val)
     {
-        key = (~key) + (key << 21); // key = (key << 21) - key - 1;
-        key ^= (key >> 24);
-        key = (key + (key << 3)) + (key << 8); // key * 265
-        key ^= (key >> 14);
-        key = (key + (key << 2)) + (key << 4); // key * 21
-        key ^= (key >> 28);
-        key += (key << 31);
-        return key;
+        return test(doubleToLongBits(val));
     }
 
-    public boolean testDouble(double val)
+    public boolean test(float val)
     {
-        return testLong(doubleToLongBits(val));
-    }
-
-    public boolean testFloat(float val)
-    {
-        return testDouble(val);
+        return test((double) val);
     }
 
     public int getNumBits()
@@ -305,39 +349,6 @@ public class BloomFilter
         dataOutputStream.writeInt(bits.length);
         for (int i = 0; i < bits.length; i++) {
             dataOutputStream.writeLong(bits[i]);
-        }
-    }
-
-    /**
-     * De-serialize a BloomFilter from a given InputStream
-     *
-     * @param in InputStream that contains serialized value of a BloomFilter
-     * @return De-serialized BloomFilter
-     * @throws IOException Exception reading values from the InputStream
-     */
-    public static BloomFilter readFrom(InputStream in)
-            throws IOException
-    {
-        int numHashFunctions = 0;
-        int numBits = 0;
-        try {
-            DataInputStream dataInputStream = new DataInputStream(in);
-            numHashFunctions = dataInputStream.readInt();
-            numBits = dataInputStream.readInt();
-
-            long[] bits = new long[numBits];
-            for (int i = 0; i < numBits; i++) {
-                bits[i] = dataInputStream.readLong();
-            }
-            return new BloomFilter(bits, numHashFunctions);
-        }
-        catch (IOException e) {
-            throw new IOException("Failed to deserialize BloomFilter, numHashFunctions: "
-                    + numHashFunctions
-                    + ", numBits: "
-                    + numBits
-                    + ", cause: "
-                    + e.getLocalizedMessage());
         }
     }
 

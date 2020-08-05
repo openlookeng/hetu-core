@@ -81,6 +81,8 @@ public class TestCarbonAllDataType
         map.put("hive.allow-drop-table", "true");
         map.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
         map.put("carbondata.store-location", "file://" + storePath + "/carbon.store");
+        map.put("carbondata.minor-compaction-seg-count", "4");
+        map.put("carbondata.major-compaction-seg-size", "1");
 
         if (!FileFactory.isFileExist( storePath + "/carbon.store")) {
             FileFactory.mkdirs( storePath + "/carbon.store");
@@ -477,6 +479,12 @@ public class TestCarbonAllDataType
     }
 
     @Test
+    public void testCreateTableWithLocationDisabled() throws SQLException {
+        assertEquals(Assert.expectThrows(SQLException.class, () -> hetuServer.execute("CREATE TABLE carbondatacataloglocationdisabled.testdb.testtable3"
+                + "(a int, b int , c int , d int ) with (location='hdfs:///user/')")).getMessage().split(":")[1]," Setting location property is not allowed");
+    }
+
+    @Test
     public void testDropTable() throws SQLException
     {
         hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
@@ -814,5 +822,80 @@ public class TestCarbonAllDataType
         catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void testVacuumNonPartitionedTable() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.mytesttable (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (1, 2)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (2, 4)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (3, 6)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (4, 8)");
+
+        try {
+            hetuServer.execute("VACUUM TABLE testdb.mytesttable");
+            assertEquals(FileFactory.isFileExist(storePath +
+                    "/carbon.store/testdb/mytesttable/Fact/Part0/Segment_0.1", false), true);
+        } catch (IOException e) {
+            hetuServer.execute("DROP TABLE testdb.mytesttable");
+            e.printStackTrace();
+        }
+
+        hetuServer.execute("DROP TABLE testdb.mytesttable");
+    }
+
+    @Test
+    public void testDoubleVacuumNonPartitionedTable() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.mytesttable2 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable2 VALUES (1, 2)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable2 VALUES (2, 4)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable2 VALUES (3, 6)");
+        hetuServer.execute("INSERT INTO testdb.mytesttable2 VALUES (4, 8)");
+
+        try {
+            hetuServer.execute("VACUUM TABLE testdb.mytesttable2");
+            hetuServer.execute("VACUUM TABLE testdb.mytesttable2");
+            assertEquals(FileFactory.isFileExist(storePath +
+                    "/carbon.store/testdb/mytesttable2/Fact/Part0/Segment_0.1", false), true);
+        } catch (IOException e) {
+            hetuServer.execute("DROP TABLE testdb.mytesttable2");
+            e.printStackTrace();
+        }
+
+        hetuServer.execute("DROP TABLE testdb.mytesttable2");
+    }
+
+    @Test
+    public void testVacuumRollback() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.myECTable (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (1, 2)");
+        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (2, 4)");
+        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (3, 6)");
+        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (4, 8)");
+
+        try {
+            CarbonUtil.deleteFoldersAndFiles(FileFactory.getCarbonFile(storePath +
+                    "/carbon.store/testdb/myECTable"));
+            try {
+                hetuServer.execute("VACUUM TABLE testdb.myECTable");
+            }
+            catch (Exception e) {
+                Boolean ret = e.getMessage().contains("Failed while reading metadata of the table");
+                assertEquals("true", ret.toString());
+                CarbonUtil.deleteFoldersAndFiles(FileFactory.getCarbonFile(storePath +
+                        "/carbon.store/testdb/myECTable"));
+                return;
+            }
+
+        }
+        catch (IOException | InterruptedException e) {
+            hetuServer.execute("DROP TABLE testdb.myECTable");
+            e.printStackTrace();
+        }
+
+        hetuServer.execute("DROP TABLE testdb.myECTable");
     }
 }

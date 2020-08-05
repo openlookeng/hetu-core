@@ -27,9 +27,9 @@ import static io.prestosql.spi.block.BlockUtil.calculateBlockResetSize;
 import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
 
-public class ArrayBlockBuilder
-        extends AbstractArrayBlock
-        implements BlockBuilder
+public class ArrayBlockBuilder<T>
+        extends AbstractArrayBlock<T>
+        implements BlockBuilder<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ArrayBlockBuilder.class).instanceSize();
 

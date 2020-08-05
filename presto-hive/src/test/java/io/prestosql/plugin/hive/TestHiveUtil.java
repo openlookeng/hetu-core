@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.hive;
 
-import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.LongArrayBlockBuilder;
@@ -22,7 +21,9 @@ import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.TestingTypeManager;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.util.BloomFilter;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.conf.Configuration;
@@ -50,12 +51,14 @@ import static io.airlift.testing.Assertions.assertInstanceOf;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
+import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
 import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
 import static io.prestosql.plugin.hive.HiveUtil.filterRows;
 import static io.prestosql.plugin.hive.HiveUtil.getDeserializer;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.plugin.hive.HiveUtil.parseHiveTimestamp;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
+import static io.prestosql.spi.type.StandardTypes.BIGINT;
 import static io.prestosql.spi.type.StandardTypes.INTEGER;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -105,35 +108,36 @@ public class TestHiveUtil
     @Test
     public void testIsPartitionFiltered()
     {
-        assertFalse(isPartitionFiltered(null, null, null), "Should not filter partition if either partitions or dynamicFilters is null");
+        TypeManager typeManager = new TestingTypeManager();
+        assertFalse(isPartitionFiltered(null, null, typeManager), "Should not filter partition if either partitions or dynamicFilters is null");
 
         Set<DynamicFilter> dynamicFilters = new HashSet<>();
         List<HivePartitionKey> partitions = new ArrayList<>();
 
-        assertFalse(isPartitionFiltered(partitions, null, null), "Should not filter partition if either partitions or dynamicFilters is null");
-        assertFalse(isPartitionFiltered(null, dynamicFilters, null), "Should not filter partition if either partitions or dynamicFilters is null");
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if partitions and dynamicFilters are empty");
+        assertFalse(isPartitionFiltered(partitions, null, typeManager), "Should not filter partition if either partitions or dynamicFilters is null");
+        assertFalse(isPartitionFiltered(null, dynamicFilters, typeManager), "Should not filter partition if either partitions or dynamicFilters is null");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should not filter partition if partitions and dynamicFilters are empty");
 
         partitions.add(new HivePartitionKey("pt_d", "0"));
         partitions.add(new HivePartitionKey("app_id", "10000"));
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if dynamicFilters is empty");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should not filter partition if dynamicFilters is empty");
 
-        ColumnHandle dayColumn = new HiveColumnHandle("pt_d", HIVE_INT, parseTypeSignature(INTEGER), 0, PARTITION_KEY, Optional.empty());
+        ColumnHandle dayColumn = new HiveColumnHandle("pt_d", HIVE_LONG, parseTypeSignature(BIGINT), 0, PARTITION_KEY, Optional.empty());
         BloomFilter dayFilter = new BloomFilter(1024 * 1024, 0.01);
         dynamicFilters.add(new BloomFilterDynamicFilter("1", dayColumn, dayFilter, DynamicFilter.Type.GLOBAL));
-        assertTrue(isPartitionFiltered(partitions, dynamicFilters, null), "Should filter partition if any dynamicFilter has 0 element count");
-        assertTrue(isPartitionFiltered(ImmutableList.of(), dynamicFilters, null), "Should filter partition if any dynamicFilter has 0 element count");
+        assertTrue(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should filter partition if any dynamicFilter has 0 element count");
 
-        dayFilter.add(new byte[] {'1'});
-        assertTrue(isPartitionFiltered(partitions, dynamicFilters, null), "Should filter partition if partition value not in dynamicFilter");
+        dayFilter.add(1L);
+        assertTrue(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should filter partition if partition value not in dynamicFilter");
 
-        dayFilter.add(new byte[] {'0'});
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if partition value is in dynamicFilter");
+        dayFilter.add(0L);
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should not filter partition if partition value is in dynamicFilter");
     }
 
     @Test
     public void testIsPartitionFilteredWithNonPartitionFilter()
     {
+        TypeManager typeManager = new TestingTypeManager();
         Set<DynamicFilter> dynamicFilters = new HashSet<>();
         List<HivePartitionKey> partitions = new ArrayList<>();
 
@@ -145,7 +149,7 @@ public class TestHiveUtil
         Set nameFilter = new HashSet();
         nameFilter.add("Alice");
         dynamicFilters.add(new HashSetDynamicFilter("1", nameColumn, nameFilter, DynamicFilter.Type.GLOBAL));
-        assertFalse(isPartitionFiltered(partitions, dynamicFilters, null), "Should not filter partition if dynamicFilter is on non-partition column");
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should not filter partition if dynamicFilter is on non-partition column");
     }
 
     @Test

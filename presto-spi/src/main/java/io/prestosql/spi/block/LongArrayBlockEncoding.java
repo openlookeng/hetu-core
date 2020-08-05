@@ -46,7 +46,7 @@ public class LongArrayBlockEncoding
     }
 
     @Override
-    public Block readBlock(BlockEncodingSerde blockEncodingSerde, SliceInput sliceInput)
+    public Block<Long> readBlock(BlockEncodingSerde blockEncodingSerde, SliceInput sliceInput)
     {
         int positionCount = sliceInput.readInt();
 

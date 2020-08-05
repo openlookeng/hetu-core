@@ -14,6 +14,7 @@
  */
 package io.prestosql.utils;
 
+import io.airlift.units.Duration;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.SqlStageExecution;
@@ -30,6 +31,7 @@ import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -47,6 +49,9 @@ public class TestSplitUtils
         PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, Long.valueOf(100));
         PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, "/tmp/hetu/indices");
         PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, new Duration(10, TimeUnit.MINUTES));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(5000, TimeUnit.MILLISECONDS));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
 
         ComparisonExpression expr = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new StringLiteral("test_value"));
 
@@ -64,7 +69,9 @@ public class TestSplitUtils
         mockSplits.add(new Split(new CatalogName("bogus_catalog"), mock3, Lifespan.taskWide()));
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
-        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.buildPredicates(stage), nextSplits, new HeuristicIndexerManager(new FileSystemClientManager()));
+        HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
+        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.getExpression(stage),
+                PredicateExtractor.getFullyQualifiedName(stage), nextSplits, indexerManager);
         assertNotNull(filteredSplits);
         assertEquals(filteredSplits.size(), 4);
     }

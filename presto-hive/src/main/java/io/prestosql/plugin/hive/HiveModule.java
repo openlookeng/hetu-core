@@ -34,9 +34,7 @@ import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
 import io.prestosql.plugin.hive.rcfile.RcFilePageSourceFactory;
 import io.prestosql.plugin.hive.s3.PrestoS3ClientFactory;
 import io.prestosql.plugin.hive.util.IndexCache;
-import io.prestosql.plugin.hive.util.IndexManager;
-import io.prestosql.plugin.hive.util.LocalIndexCache;
-import io.prestosql.plugin.hive.util.LocalIndexCacheLoader;
+import io.prestosql.plugin.hive.util.IndexCacheLoader;
 import io.prestosql.spi.connector.ConnectorNodePartitioningProvider;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
@@ -125,9 +123,8 @@ public class HiveModule
 
         configBinder(binder).bindConfig(ParquetFileWriterConfig.class);
 
-        binder.bind(IndexManager.class).in(Scopes.SINGLETON);
-        binder.bind(CacheLoader.class).to(LocalIndexCacheLoader.class).in(Scopes.SINGLETON);
-        binder.bind(IndexCache.class).to(LocalIndexCache.class).in(Scopes.SINGLETON);
+        binder.bind(CacheLoader.class).to(IndexCacheLoader.class).in(Scopes.SINGLETON);
+        binder.bind(IndexCache.class).in(Scopes.SINGLETON);
 
         binder.bind(FileTailCacheStatsLister.class).in(Scopes.SINGLETON);
         newExporter(binder).export(FileTailCacheStatsLister.class).withGeneratedName();

@@ -18,7 +18,7 @@ import io.prestosql.spi.block.Block;
 
 public interface ColumnEncoding
 {
-    void encodeColumn(Block block, SliceOutput output, EncodeOutput encodeOutput)
+    <T> void encodeColumn(Block<T> block, SliceOutput output, EncodeOutput encodeOutput)
             throws RcFileCorruptionException;
 
     Block decodeColumn(ColumnData columnData)

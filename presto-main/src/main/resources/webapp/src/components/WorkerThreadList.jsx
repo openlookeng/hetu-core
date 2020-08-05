@@ -43,7 +43,7 @@ export class WorkerThreadList extends React.Component {
 
     captureSnapshot() {
         const nodeId = getFirstParameter(window.location.search);
-        $.get('/v1/worker/' + nodeId + '/thread', function (threads) {
+        $.get('../v1/worker/' + nodeId + '/thread', function (threads) {
             this.setState({
                 threads: WorkerThreadList.processThreads(threads),
                 snapshotTime: new Date(),

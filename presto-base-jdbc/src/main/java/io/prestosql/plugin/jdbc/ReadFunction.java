@@ -13,7 +13,7 @@
  */
 package io.prestosql.plugin.jdbc;
 
-public interface ReadFunction
+public interface ReadFunction<T>
 {
     Class<?> getJavaType();
 

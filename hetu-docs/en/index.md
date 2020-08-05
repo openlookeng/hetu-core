@@ -165,8 +165,7 @@ headless: true
     - [Migrating From Hive]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL Migration Tool]({{< relref "./docs/migration/sql-migration-tool.md" >}})
 
-- [Developer Guide]("#")
-    - [Preface]({{< relref "./docs/develop/preface.md" >}})
+- [Developer Guide]({{< relref "./docs/develop/_index.md" >}})
     - [Getting Started]({{< relref "./docs/develop/getting-started.md" >}})
     - [SPI Overview]({{< relref "./docs/develop/spi-overview.md" >}})
     - [Connectors]({{< relref "./docs/develop/connectors.md" >}})
@@ -180,8 +179,7 @@ headless: true
     - [Heuristic indexer]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
 
-- [openLooKeng REST API]("#")
-    - [REST API Overview]({{< relref "./docs/rest/overview.md" >}})
+- [openLooKeng REST API]({{< relref "./docs/rest/_index.md" >}})
     - [Node Resource]({{< relref "./docs/rest/node.md" >}})
     - [Query Resource]({{< relref "./docs/rest/query.md" >}})
     - [Stage Resource]({{< relref "./docs/rest/stage.md" >}})

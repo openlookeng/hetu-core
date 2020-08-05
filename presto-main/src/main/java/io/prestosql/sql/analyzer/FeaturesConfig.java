@@ -139,6 +139,7 @@ public class FeaturesConfig
     private int dynamicFilteringMaxPerDriverRowCount = 100;
     private DynamicFilterDataType dynamicFilteringDataType = BLOOM_FILTER;
     private DataSize dynamicFilteringMaxPerDriverSize = new DataSize(10, KILOBYTE);
+    private double dynamicFilteringBloomFilterFpp = 0.1D;
     // enable or disable execution plan cache functionality via Session properties
     private boolean enableExecutionPlanCache;
 
@@ -820,7 +821,7 @@ public class FeaturesConfig
         return enableDynamicFiltering;
     }
 
-    @Config("experimental.enable-dynamic-filtering")
+    @Config("enable-dynamic-filtering")
     public FeaturesConfig setEnableDynamicFiltering(boolean value)
     {
         this.enableDynamicFiltering = value;
@@ -832,7 +833,7 @@ public class FeaturesConfig
         return dynamicFilteringDataType;
     }
 
-    @Config("experimental.dynamic-filtering-data-type")
+    @Config("dynamic-filtering-data-type")
     public FeaturesConfig setDynamicFilteringDataType(DynamicFilterDataType dynamicFilteringDataType)
     {
         this.dynamicFilteringDataType = dynamicFilteringDataType;
@@ -844,23 +845,34 @@ public class FeaturesConfig
         return dynamicFilteringMaxPerDriverRowCount;
     }
 
-    @Config("experimental.dynamic-filtering-max-per-driver-row-count")
+    @Config("dynamic-filtering-max-per-driver-row-count")
     public FeaturesConfig setDynamicFilteringMaxPerDriverRowCount(int dynamicFilteringMaxPerDriverRowCount)
     {
         this.dynamicFilteringMaxPerDriverRowCount = dynamicFilteringMaxPerDriverRowCount;
         return this;
     }
 
-    @MaxDataSize("1MB")
     public DataSize getDynamicFilteringMaxPerDriverSize()
     {
         return dynamicFilteringMaxPerDriverSize;
     }
 
-    @Config("experimental.dynamic-filtering-max-per-driver-size")
+    @Config("dynamic-filtering-max-per-driver-size")
     public FeaturesConfig setDynamicFilteringMaxPerDriverSize(DataSize dynamicFilteringMaxPerDriverSize)
     {
         this.dynamicFilteringMaxPerDriverSize = dynamicFilteringMaxPerDriverSize;
+        return this;
+    }
+
+    public double getDynamicFilteringBloomFilterFpp()
+    {
+        return dynamicFilteringBloomFilterFpp;
+    }
+
+    @Config("dynamic-filtering-bloom-filter-fpp")
+    public FeaturesConfig setDynamicFilteringBloomFilterFpp(double dynamicFilteringBloomFilterFpp)
+    {
+        this.dynamicFilteringBloomFilterFpp = dynamicFilteringBloomFilterFpp;
         return this;
     }
 

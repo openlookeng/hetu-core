@@ -20,7 +20,8 @@ import org.testng.annotations.Test;
 import java.util.HashSet;
 
 import static io.airlift.slice.Slices.utf8Slice;
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 public class TestBloomFilterDynamicFilter
 {
@@ -32,6 +33,7 @@ public class TestBloomFilterDynamicFilter
         long v3 = 2L;
         double v4 = 0.9;
         Slice v5 = utf8Slice("test2");
+        String v6 = "20190101";
 
         HashSet hs = new HashSet();
         hs.add(v1);
@@ -39,14 +41,17 @@ public class TestBloomFilterDynamicFilter
         hs.add(v3);
         hs.add(v4);
         hs.add(v5);
+        hs.add(v6);
         HashSetDynamicFilter hsdf = new HashSetDynamicFilter("19", null, hs, DynamicFilter.Type.LOCAL);
-        BloomFilterDynamicFilter bfdf = BloomFilterDynamicFilter.fromHashSetDynamicFilter(hsdf);
+        BloomFilterDynamicFilter bfdf = BloomFilterDynamicFilter.fromHashSetDynamicFilter(hsdf, 0.00001);
 
-        assertEquals(bfdf.contains(String.valueOf(v1)), true);
-        assertEquals(bfdf.contains(String.valueOf(v2)), true);
-        assertEquals(bfdf.contains(String.valueOf(v3)), true);
-        assertEquals(bfdf.contains(String.valueOf(v4)), true);
-        assertEquals(bfdf.contains(new String(v5.getBytes())), true);
-        assertEquals(bfdf.contains(String.valueOf(5)), false);
+        assertTrue(bfdf.contains(String.valueOf(v1)));
+        assertTrue(bfdf.contains(v2));
+        assertTrue(bfdf.contains(v3));
+        assertTrue(bfdf.contains(String.valueOf(v4)));
+        assertTrue(bfdf.contains(v5));
+        assertTrue(bfdf.contains(new String(v5.getBytes())));
+        assertFalse(bfdf.contains(String.valueOf(5)));
+        assertTrue(bfdf.contains(v6));
     }
 }

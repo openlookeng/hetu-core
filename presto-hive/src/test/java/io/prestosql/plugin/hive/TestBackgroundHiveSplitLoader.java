@@ -33,6 +33,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.TestingTypeManager;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.testing.TestingConnectorSession;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -529,6 +531,7 @@ public class TestBackgroundHiveSplitLoader
     public void testPartitionedTableWithDynamicFilter()
             throws Exception
     {
+        TypeManager typeManager = new TestingTypeManager();
         List<HivePartitionMetadata> hivePartitionMetadatas =
                 ImmutableList.of(
                         new HivePartitionMetadata(
@@ -563,9 +566,10 @@ public class TestBackgroundHiveSplitLoader
                 2,
                 false,
                 Optional.empty(),
-                createTestDynamicFilterSupplier("partitionColumn", ImmutableList.of("0", "2", "3")),
+                createTestDynamicFilterSupplier("partitionColumn", ImmutableList.of(0L, 2L, 3L)),
                 Optional.empty(),
-                ImmutableMap.of(), null);
+                ImmutableMap.of(),
+                typeManager);
 
         HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
         backgroundHiveSplitLoader.start(hiveSplitSource);
@@ -770,7 +774,7 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
     }
 
     private static Table table(

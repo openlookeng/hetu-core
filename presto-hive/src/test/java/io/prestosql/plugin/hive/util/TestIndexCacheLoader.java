@@ -14,6 +14,7 @@
  */
 package io.prestosql.plugin.hive.util;
 
+import io.airlift.units.Duration;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.heuristicindex.IndexClient;
@@ -25,12 +26,13 @@ import org.testng.annotations.Test;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
-public class TestLocalIndexCacheLoader
+public class TestIndexCacheLoader
 {
     private static final String TABLE = "test_table";
     private static final String COLUMN = "test_column";
@@ -41,69 +43,72 @@ public class TestLocalIndexCacheLoader
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
         PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
         PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, 10L);
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, new Duration(10, TimeUnit.MINUTES));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(5000, TimeUnit.MILLISECONDS));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoLastModifiedTime() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", 1);
 
         // throw exception to produce "no last modified time file found" behaviour
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenThrow(Exception.class);
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoMatchingLastModifiedTime() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", 1L);
 
         // return different last modified time to simulate expired index
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(2L);
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoValidIndexFilesFoundException() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         long lastModifiedTime = 1L;
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", lastModifiedTime);
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenThrow(Exception.class);
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test(expectedExceptions = Exception.class)
     public void testNoValidIndexFilesFound() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         long lastModifiedTime = 1L;
         IndexCacheKey indexCacheKey = new IndexCacheKey("/path/to/split", lastModifiedTime);
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenReturn(Collections.emptyList());
 
-        localIndexCacheLoader.load(indexCacheKey);
+        indexCacheLoader.load(indexCacheKey);
     }
 
     @Test
     public void testIndexFound() throws Exception
     {
         IndexClient indexclient = mock(IndexClient.class);
-        LocalIndexCacheLoader localIndexCacheLoader = new LocalIndexCacheLoader(indexclient);
+        IndexCacheLoader indexCacheLoader = new IndexCacheLoader(indexclient);
 
         List<IndexMetadata> expectedSplitIndexes = new LinkedList<>();
         expectedSplitIndexes.add(mock(IndexMetadata.class));
@@ -113,7 +118,7 @@ public class TestLocalIndexCacheLoader
         when(indexclient.getLastModified((indexCacheKey.getPath()))).thenReturn(lastModifiedTime);
         when(indexclient.readSplitIndex((indexCacheKey.getPath()))).thenReturn(expectedSplitIndexes);
 
-        List<IndexMetadata> actualSplitIndexes = localIndexCacheLoader.load(indexCacheKey);
+        List<IndexMetadata> actualSplitIndexes = indexCacheLoader.load(indexCacheKey);
         assertEquals(expectedSplitIndexes.size(), actualSplitIndexes.size());
     }
 }

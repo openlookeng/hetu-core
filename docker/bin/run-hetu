@@ -24,13 +24,26 @@ if [[ ! -d /usr/lib/hetu/lib/plugin ]]; then
 fi
 
 setConfig() {
-    i=0
+    local i=0
     unset attributes
     declare -a attributes
-    while read line; do
+    while read line || [[ -n "$line" ]]; do
        attributes[$((i++))]=$line
     done < $1
     numPattern=${#patterns[@]}
+    # add new patterns directly
+    for ((i=0; i<$numPattern; i++)); do
+        exists=0
+        for ((k=0; k<${#attributes[@]}; k++)); do
+             if [[ ${attributes[$k]} =~ ^${patterns[$i]}.* ]]; then
+                exists=1
+                break;
+             fi
+        done
+        if [ $exists == 0 ]; then
+            attributes+=( "${patterns[$i]}" )
+        fi
+    done
     for ((i=0; i<${#attributes[@]}; i++)); do
         for ((k=0; k<$numPattern; k++)); do
             attributes[$i]=$(echo ${attributes[$i]}| sed -e "s|${patterns[$k]}|${values[$k]}|m")
@@ -44,26 +57,95 @@ setConfig() {
     unset values
 }
 
+updateConfigByFile() {
+    local thisConfig=$1
+    local thatConfig=$2
+    local numAttri=0
+
+    unset attributes
+    declare -a attributes
+    while read line || [[ -n "$line" ]]; do
+        attributes[$((numAttri++))]=$line
+    done < ${thisConfig}
+
+    declare -a patterns
+    declare -a values
+    local i=0
+    # discard any empty line;
+    while read line || [[ -n "$line" ]]; do
+        if [[ -n "$line" ]]; then
+            if [[ ${line} =~ ^\#.* ]]; then
+                patterns[$i]=${line}
+                values[$((i++))]=${line}
+            else
+                patterns[$i]=${line%%=*}
+                values[$((i++))]=${line##*=}
+            fi
+        fi
+    done < ${thatConfig}
+
+    for ((i=0; i<${#patterns[@]}; i++)); do
+        ATTRI_EXISTS=0
+        # check if it's a comment
+        [[ ${patterns[$i]} =~ ^\#.* ]]
+        IS_COMMENT=$?
+
+        for ((k=0; k<${#attributes[@]}; k++)); do
+            if [[ ${attributes[$k]} =~ ^${patterns[$i]}=.* ]]; then
+                ATTRI_EXISTS=1
+                attributes[$k]="${patterns[$i]}=${values[$i]}"
+                break
+            elif [[ $IS_COMMENT == 0 ]] && [[ "${patterns[$i]}" == "${attributes[$k]}" ]]; then
+                ATTRI_EXISTS=1
+                break
+            fi
+        done
+
+        if [[ $ATTRI_EXISTS == 0 ]]; then
+            if [[ $IS_COMMENT == 0 ]]; then
+                attributes[$((numAttri++))]="${values[$i]}"
+            else
+                attributes[$((numAttri++))]="${patterns[$i]}=${values[$i]}"
+            fi
+        fi
+    done
+
+    for ((i=0; i<$numAttri; i++)); do
+        echo "${attributes[$i]}" >> "$thisConfig.tmp"
+    done
+    mv "$thisConfig"{.tmp,}
+}
+
+processCustomConfigFiles() {
+    local etcDir="$1"
+    local newDir="$2"
+    mkdir -p ${etcDir}
+    set +e
+    for configFile in $(find ${newDir} -maxdepth 1 \( -type f -o -type l \) \( -name "*.properties" -o -name "*.config" -o -name "*.xml" -o -name "*.json" \) -printf "%f\n"); do
+        ls $etcDir/$configFile 2>/dev/null
+        File_EXISTS=$?
+        # currently doesn't apply merge on jvm configs, simply copy and replace
+        if [ $File_EXISTS == 0 ] && [ "$configFile" != "jvm.config" ]; then
+        # update contents by accepting configFile
+            updateConfigByFile $etcDir/$configFile $newDir/$configFile
+        else
+        # if config is not in the default package then simply copy it
+            cp ${newDir}/${configFile} $etcDir/${configFile}
+        fi
+    done
+    set -e
+}
+
 declare -a patterns
 declare -a values
-
-type=coordinator
+configDir=
+type=
 discoveryURI=
 nodeEnv=
 includeCoordinator=
+xmx=
 
-# check if user specified node.id & node.environment
-set +e
-tmp=$(grep -s 'node.id' /usr/lib/hetu/etc/node.properties)
-NODE_ID=${tmp:8}
-[[ -n $NODE_ID ]] && NODE_ID_EXISTS=0
-[[ -z $NODE_ID ]] && NODE_ID_EXISTS=1
-grep -s -q 'node.environment' /usr/lib/hetu/etc/node.properties
-NODE_ENV_EXISTS=$?
-tmp=$(grep -s 'node.environment' /usr/lib/hetu/etc/node.properties)
-nodeEnv=${tmp:17}
-set -e
-
+# Process parameters
 if [[ $# != 0 ]]; then
     while [[ $# != 0 && -n "$1" ]]; do
         case "$1" in
@@ -87,14 +169,49 @@ if [[ $# != 0 ]]; then
                 shift
                 shift
                 ;;
+            -configDir)
+                configDir="$2"
+                shift
+                shift
+                ;;
+            -jvmXmx)
+                xmx="$2"
+                shift
+                shift
+                ;;
             *)
                 echo "not supported option $1"
                 exit 1
                 ;;
         esac
     done
+fi
 
+# Process configurations
+if [ -d "$configDir" ]; then
+    processCustomConfigFiles $CONFIG_PATH $configDir
+    if [ -d "$configDir/catalog" ]; then
+        processCustomConfigFiles $CONFIG_PATH/catalog $configDir/catalog
+    fi
+    if [ -d "$configDir/filesystem" ]; then
+        processCustomConfigFiles $CONFIG_PATH/filesystem $configDir/filesystem
+    fi
+fi
 
+# check if user specified node.id & node.environment
+set +e
+tmp=$(grep -s 'node.id' /usr/lib/hetu/etc/node.properties)
+NODE_ID=${tmp:8}
+NODE_ID_EXISTS=0
+[[ -z $NODE_ID ]] && NODE_ID_EXISTS=1
+
+tmp=$(grep -s 'node.environment' /usr/lib/hetu/etc/node.properties)
+nodeEnv=${tmp:17}
+NODE_ENV_EXISTS=0
+[[ -z $nodeEnv ]] && NODE_ENV_EXISTS=1
+set -e
+
+if [ -n "$type" ]; then
     case "$type" in
         worker)
             patterns=("^discovery-server.enabled=.*" "^coordinator=.*")
@@ -112,23 +229,27 @@ if [[ $# != 0 ]]; then
             echo "no matching supported server type: \"$type\"; Please specify \"coordinator\" or \"worker\""
             exit 1
     esac
+fi
 
-    if [ -n "$discoveryURI" ]; then
-        echo "Use discovery.uri $discoveryURI"
-        patterns=("^discovery.uri=.*")
-        values=("discovery.uri=$discoveryURI")
-        setConfig "$CONFIG_PATH/config.properties"
-    else
-        echo "empty discoveryURI, using default \"http://localhost:8080\""
-    fi
+if [ -n "$discoveryURI" ]; then
+    echo "Use discovery.uri $discoveryURI"
+    patterns=("^discovery.uri=.*")
+    values=("discovery.uri=$discoveryURI")
+    setConfig "$CONFIG_PATH/config.properties"
+fi
 
-    if [ -n "$includeCoordinator" ] && [ "true" != $includeCoordinator ]; then
-        echo "Allow scheduling work on the coordinator"
-        patterns=("^node-scheduler.include-coordinator=.*")
-        values=("node-scheduler.include-coordinator=$includeCoordinator")
-        setConfig "$CONFIG_PATH/config.properties"
-    fi
+if [ -n "$includeCoordinator" ]; then
+    echo "Allow scheduling work on the coordinator"
+    patterns=("^node-scheduler.include-coordinator=.*")
+    values=("node-scheduler.include-coordinator=$includeCoordinator")
+    setConfig "$CONFIG_PATH/config.properties"
+fi
 
+if [ -n "$xmx" ]; then
+   echo "Using jmx setting: -Xmx$xmx"
+   patterns=("-Xmx")
+   values=("-Xmx$xmx")
+   setConfig "$CONFIG_PATH/jvm.config"
 fi
 
 if [ $NODE_ID_EXISTS != 0 ]; then
@@ -143,7 +264,6 @@ if [ $NODE_ID_EXISTS != 0 ]; then
     patterns=("^node.environment=.*" "^node.id=.*")
     values=("node.environment=$nodeEnv" "node.id=$NODE_ID")
     setConfig "$CONFIG_PATH/node.properties"
-    NODE_ID="-Dnode.id=$NODE_ID"
 else
     if [ -n "$nodeEnv" ]; then
         echo "Set node.environment as $nodeEnv"
@@ -156,4 +276,5 @@ else
     setConfig "$CONFIG_PATH/node.properties"
 fi
 
+NODE_ID="-Dnode.id=$NODE_ID"
 exec /usr/lib/hetu/bin/launcher run ${NODE_ID} "$@"

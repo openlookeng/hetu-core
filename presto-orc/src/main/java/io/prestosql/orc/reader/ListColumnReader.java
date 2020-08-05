@@ -48,8 +48,8 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
-public class ListColumnReader
-        implements ColumnReader
+public class ListColumnReader<T>
+        implements ColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ListColumnReader.class).instanceSize();
 

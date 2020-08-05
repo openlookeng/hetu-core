@@ -16,6 +16,7 @@ package io.prestosql.spi.block;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -30,8 +31,8 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.compactOffsets;
 import static io.prestosql.spi.block.BlockUtil.compactSlice;
 
-public class VariableWidthBlock
-        extends AbstractVariableWidthBlock
+public class VariableWidthBlock<T>
+        extends AbstractVariableWidthBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VariableWidthBlock.class).instanceSize();
 
@@ -221,5 +222,16 @@ public class VariableWidthBlock
         sb.append(", slice=").append(slice);
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public boolean[] filter(BloomFilter filter, boolean[] validPositions)
+    {
+        //boolean[] result = new boolean[values.length];
+        for (int i = 0; i < positionCount; i++) {
+            byte[] value = slice.slice(offsets[i + arrayOffset], offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]).getBytes();
+            validPositions[i] = validPositions[i] && filter.test(value);
+        }
+        return validPositions;
     }
 }

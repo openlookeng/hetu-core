@@ -15,17 +15,15 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
-import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.TestingTypeManager;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.testing.TestingConnectorSession;
 import org.testng.annotations.Test;
 
@@ -33,7 +31,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +40,6 @@ import static io.airlift.testing.Assertions.assertContains;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.plugin.hive.HiveTestUtils.createTestDynamicFilterSupplier;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.lang.Math.toIntExact;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -66,7 +62,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
 
         // add 10 splits
         for (int i = 0; i < 10; i++) {
@@ -102,7 +98,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
 
         // add some splits
         for (int i = 0; i < 5; i++) {
@@ -162,7 +158,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
 
         final SettableFuture<ConnectorSplit> splits = SettableFuture.create();
 
@@ -223,7 +219,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
         int testSplitSizeInBytes = new TestSplit(0).getEstimatedSizeInBytes();
 
         int maxSplitCount = toIntExact(maxOutstandingSplitsSize.toBytes()) / testSplitSizeInBytes;
@@ -262,7 +258,7 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null);
+                null, null, new HiveConfig());
         hiveSplitSource.addToQueue(new TestSplit(0, OptionalInt.of(2)));
         hiveSplitSource.noMoreSplits();
         assertEquals(getSplits(hiveSplitSource, OptionalInt.of(0), 10).size(), 0);
@@ -274,6 +270,7 @@ public class TestHiveSplitSource
     @Test
     public void testHiveSplitSourceWithDynamicFilter()
     {
+        TypeManager typeManager = new TestingTypeManager();
         ConnectorSession session = new TestingConnectorSession(
                 new HiveSessionProperties(new HiveConfig().setDynamicFilterPartitionFilteringEnabled(true), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
 
@@ -288,8 +285,10 @@ public class TestHiveSplitSource
                 new TestingHiveSplitLoader(),
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
-                createTestDynamicFilterSupplier("pt_d", ImmutableList.of("0")),
-                null, null);
+                createTestDynamicFilterSupplier("pt_d", ImmutableList.of(1L)),
+                null,
+                typeManager,
+                new HiveConfig());
 
         for (int i = 0; i < 5; i++) {
             hiveSplitSource.addToQueue(new TestPartitionSplit(2 * i, ImmutableList.of(new HivePartitionKey("pt_d", "0")), "pt_d=0"));
@@ -298,63 +297,6 @@ public class TestHiveSplitSource
         }
 
         assertEquals(getSplits(hiveSplitSource, 10).size(), 5);
-    }
-
-    @Test
-    public void testSplitCacheable()
-    {
-        ConnectorSession session = new TestingConnectorSession(
-                new HiveSessionProperties(new HiveConfig().setDynamicFilterPartitionFilteringEnabled(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
-
-        ColumnMetadata ptdMetadata = new ColumnMetadata("pt_d", BIGINT);
-        Set<TupleDomain<ColumnMetadata>> cachePredicates = ImmutableSet.of(
-                TupleDomain.withColumnDomains(ImmutableMap.of(ptdMetadata, Domain.singleValue(BIGINT, 20200522L))),
-                TupleDomain.withColumnDomains(ImmutableMap.of(ptdMetadata, Domain.singleValue(BIGINT, 20200521L))));
-        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
-                session,
-                "database",
-                "table",
-                10,
-                10000,
-                new DataSize(10, MEGABYTE),
-                Integer.MAX_VALUE,
-                new TestingHiveSplitLoader(),
-                Executors.newFixedThreadPool(5),
-                new CounterStat(),
-                null,
-                cachePredicates, null);
-
-        int[] idPrefix = new int[] {1};
-        ImmutableMap
-                .of("__HIVE_DEFAULT_PARTITION__", 1, "20200520", 2, "20200521", 3, "20200522", 2)
-                .forEach((ptdValue, splitCount) -> {
-                    for (int i = 1; i <= splitCount; i++) {
-                        hiveSplitSource.addToQueue(new TestPartitionSplit(idPrefix[0] * 10 + i, ImmutableList.of(new HivePartitionKey("pt_d", ptdValue)), "pt_d=" + ptdValue));
-                    }
-                    idPrefix[0] = idPrefix[0] + 1;
-                });
-
-        List<ConnectorSplit> splits = getSplits(hiveSplitSource, 10);
-        assertEquals(splits.size(), 8);
-        assertEquals(splits.stream().filter(ConnectorSplit::isCacheable).count(), 5);
-        assertEquals(splits.stream()
-                .filter(ConnectorSplit::isCacheable)
-                .map(HiveSplitWrapper::getOnlyHiveSplit)
-                .filter(hiveSplit -> hiveSplit
-                        .getPartitionKeys()
-                        .contains(new HivePartitionKey("pt_d", "20200521"))).count(), 3);
-        assertEquals(splits.stream()
-                .filter(ConnectorSplit::isCacheable)
-                .map(HiveSplitWrapper::getOnlyHiveSplit)
-                .filter(hiveSplit -> hiveSplit
-                        .getPartitionKeys()
-                        .contains(new HivePartitionKey("pt_d", "20200522"))).count(), 2);
-        assertEquals(splits.stream()
-                .filter(ConnectorSplit::isCacheable)
-                .map(HiveSplitWrapper::getOnlyHiveSplit)
-                .filter(hiveSplit -> hiveSplit
-                        .getPartitionKeys()
-                        .contains(new HivePartitionKey("pt_d", "20200520"))).count(), 0);
     }
 
     private static List<ConnectorSplit> getSplits(ConnectorSplitSource source, int maxSize)

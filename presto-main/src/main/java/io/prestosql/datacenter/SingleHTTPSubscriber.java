@@ -19,22 +19,8 @@ import io.prestosql.server.protocol.PageSubscriber;
 import io.prestosql.server.protocol.Query;
 
 import javax.ws.rs.container.AsyncResponse;
-import javax.ws.rs.core.Response;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.Map;
-
-import static io.prestosql.client.PrestoHeaders.PRESTO_ADDED_PREPARE;
-import static io.prestosql.client.PrestoHeaders.PRESTO_CLEAR_SESSION;
-import static io.prestosql.client.PrestoHeaders.PRESTO_CLEAR_TRANSACTION_ID;
-import static io.prestosql.client.PrestoHeaders.PRESTO_DEALLOCATED_PREPARE;
-import static io.prestosql.client.PrestoHeaders.PRESTO_SET_CATALOG;
-import static io.prestosql.client.PrestoHeaders.PRESTO_SET_PATH;
-import static io.prestosql.client.PrestoHeaders.PRESTO_SET_ROLE;
-import static io.prestosql.client.PrestoHeaders.PRESTO_SET_SCHEMA;
-import static io.prestosql.client.PrestoHeaders.PRESTO_SET_SESSION;
-import static io.prestosql.client.PrestoHeaders.PRESTO_STARTED_TRANSACTION_ID;
+import static io.prestosql.server.protocol.ExecutingStatementResource.toResponse;
 import static java.util.Objects.requireNonNull;
 
 public class SingleHTTPSubscriber
@@ -72,61 +58,5 @@ public class SingleHTTPSubscriber
     public void send(Query query, DataCenterQueryResults results)
     {
         this.asyncResponse.resume(toResponse(query, results));
-    }
-
-    private static Response toResponse(Query query, DataCenterQueryResults queryResults)
-    {
-        Response.ResponseBuilder response = Response.ok(queryResults);
-
-        if (query != null) {
-            query.getSetCatalog().ifPresent(catalog -> response.header(PRESTO_SET_CATALOG, catalog));
-            query.getSetSchema().ifPresent(schema -> response.header(PRESTO_SET_SCHEMA, schema));
-            query.getSetPath().ifPresent(path -> response.header(PRESTO_SET_PATH, path));
-
-            // add set session properties
-            query.getSetSessionProperties()
-                    .forEach((key, value) -> response.header(PRESTO_SET_SESSION, key + '=' + urlEncode(value)));
-
-            // add clear session properties
-            query.getResetSessionProperties()
-                    .forEach(name -> response.header(PRESTO_CLEAR_SESSION, name));
-
-            // add set roles
-            query.getSetRoles()
-                    .forEach((key, value) -> response.header(PRESTO_SET_ROLE, key + '=' + urlEncode(value.toString())));
-
-            // add added prepare statements
-            for (Map.Entry<String, String> entry : query.getAddedPreparedStatements().entrySet()) {
-                String encodedKey = urlEncode(entry.getKey());
-                String encodedValue = urlEncode(entry.getValue());
-                response.header(PRESTO_ADDED_PREPARE, encodedKey + '=' + encodedValue);
-            }
-
-            // add deallocated prepare statements
-            for (String name : query.getDeallocatedPreparedStatements()) {
-                response.header(PRESTO_DEALLOCATED_PREPARE, urlEncode(name));
-            }
-
-            // add new transaction ID
-            query.getStartedTransactionId()
-                    .ifPresent(transactionId -> response.header(PRESTO_STARTED_TRANSACTION_ID, transactionId));
-
-            // add clear transaction ID directive
-            if (query.isClearTransactionId()) {
-                response.header(PRESTO_CLEAR_TRANSACTION_ID, true);
-            }
-        }
-
-        return response.build();
-    }
-
-    private static String urlEncode(String value)
-    {
-        try {
-            return URLEncoder.encode(value, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new AssertionError(e);
-        }
     }
 }

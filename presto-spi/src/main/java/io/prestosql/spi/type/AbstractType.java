@@ -70,21 +70,9 @@ public abstract class AbstractType
     }
 
     @Override
-    public long hash(Block block, int position)
+    public <T> Object getObject(Block<T> block, int position)
     {
-        throw new UnsupportedOperationException(getTypeSignature() + " type is not comparable");
-    }
-
-    @Override
-    public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
-    {
-        throw new UnsupportedOperationException(getTypeSignature() + " type is not comparable");
-    }
-
-    @Override
-    public int compareTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
-    {
-        throw new UnsupportedOperationException(getTypeSignature() + " type is not orderable");
+        throw new UnsupportedOperationException(getClass().getName());
     }
 
     @Override
@@ -142,12 +130,6 @@ public abstract class AbstractType
     }
 
     @Override
-    public Object getObject(Block block, int position)
-    {
-        throw new UnsupportedOperationException(getClass().getName());
-    }
-
-    @Override
     public void writeObject(BlockBuilder blockBuilder, Object value)
     {
         throw new UnsupportedOperationException(getClass().getName());
@@ -176,5 +158,23 @@ public abstract class AbstractType
     public int hashCode()
     {
         return signature.hashCode();
+    }
+
+    @Override
+    public <T> boolean equalTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
+    {
+        return false;
+    }
+
+    @Override
+    public <T> long hash(Block<T> block, int position)
+    {
+        return 0;
+    }
+
+    @Override
+    public <T> int compareTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
+    {
+        return 0;
     }
 }

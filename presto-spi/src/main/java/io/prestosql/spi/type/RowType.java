@@ -157,7 +157,8 @@ public class RowType
     @Override
     public Block getObject(Block block, int position)
     {
-        return block.getObject(position, Block.class);
+        //FIXME: KEN: Generic
+        return (Block) block.getObject(position, Block.class);
     }
 
     @Override
@@ -211,11 +212,11 @@ public class RowType
         return fields.stream().allMatch(field -> field.getType().isOrderable());
     }
 
-    @Override
-    public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
+    public <T> boolean equalTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
     {
-        Block leftRow = leftBlock.getObject(leftPosition, Block.class);
-        Block rightRow = rightBlock.getObject(rightPosition, Block.class);
+        //FIXME: KEN: Generic should be used
+        Block leftRow = (Block) leftBlock.getObject(leftPosition, Block.class);
+        Block rightRow = (Block) rightBlock.getObject(rightPosition, Block.class);
 
         for (int i = 0; i < leftRow.getPositionCount(); i++) {
             checkElementNotNull(leftRow.isNull(i));
@@ -230,7 +231,7 @@ public class RowType
     }
 
     @Override
-    public int compareTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
+    public <T> int compareTo(Block<T> leftBlock, int leftPosition, Block<T> rightBlock, int rightPosition)
     {
         Block leftRow = leftBlock.getObject(leftPosition, Block.class);
         Block rightRow = rightBlock.getObject(rightPosition, Block.class);
@@ -252,7 +253,7 @@ public class RowType
     }
 
     @Override
-    public long hash(Block block, int position)
+    public <T> long hash(Block<T> block, int position)
     {
         Block arrayBlock = block.getObject(position, Block.class);
         long result = 1;

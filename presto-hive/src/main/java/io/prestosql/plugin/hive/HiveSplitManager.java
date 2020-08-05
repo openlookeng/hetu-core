@@ -67,6 +67,7 @@ import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Iterables.transform;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.GROUPED_SCHEDULING;
 import static java.lang.Math.min;
@@ -96,6 +97,7 @@ public class HiveSplitManager
     private final boolean recursiveDfsWalkerEnabled;
     private final CounterStat highMemorySplitSourceCounter;
     private final TypeManager typeManager;
+    private final HiveConfig hiveConfig;
 
     @Inject
     public HiveSplitManager(
@@ -127,7 +129,8 @@ public class HiveSplitManager
                 hiveConfig.getSplitLoaderConcurrency(),
                 hiveConfig.getMaxSplitsPerSecond(),
                 hiveConfig.getRecursiveDirWalkerEnabled(),
-                typeManager);
+                typeManager,
+                hiveConfig);
     }
 
     public HiveSplitManager(
@@ -147,7 +150,8 @@ public class HiveSplitManager
             int splitLoaderConcurrency,
             @Nullable Integer maxSplitsPerSecond,
             boolean recursiveDfsWalkerEnabled,
-            TypeManager typeManager)
+            TypeManager typeManager,
+            HiveConfig hiveConfig)
     {
         this.metastoreProvider = requireNonNull(metastoreProvider, "metastore is null");
         this.partitionManager = requireNonNull(partitionManager, "partitionManager is null");
@@ -167,6 +171,7 @@ public class HiveSplitManager
         this.maxSplitsPerSecond = firstNonNull(maxSplitsPerSecond, Integer.MAX_VALUE);
         this.recursiveDfsWalkerEnabled = recursiveDfsWalkerEnabled;
         this.typeManager = typeManager;
+        this.hiveConfig = hiveConfig;
     }
 
     @Override
@@ -196,6 +201,9 @@ public class HiveSplitManager
         SemiTransactionalHiveMetastore metastore = metastoreProvider.apply((HiveTransactionHandle) transaction);
         Table table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
+        if (table.getStorage().getStorageFormat().getInputFormat().contains("carbon")) {
+            throw new PrestoException(NOT_SUPPORTED, "Hive connector can't read carbondata tables");
+        }
 
         // verify table is not marked as non-readable
         String tableNotReadable = table.getParameters().get(OBJECT_NOT_READABLE);
@@ -260,7 +268,8 @@ public class HiveSplitManager
                         new CounterStat(),
                         dynamicFilterSupplier,
                         userDefinedCachePredicates,
-                        typeManager);
+                        typeManager,
+                        hiveConfig);
                 break;
             case GROUPED_SCHEDULING:
                 splitSource = HiveSplitSource.bucketed(
@@ -276,7 +285,8 @@ public class HiveSplitManager
                         new CounterStat(),
                         dynamicFilterSupplier,
                         userDefinedCachePredicates,
-                        typeManager);
+                        typeManager,
+                        hiveConfig);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown splitSchedulingStrategy: " + splitSchedulingStrategy);

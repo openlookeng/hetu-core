@@ -29,9 +29,9 @@ import static io.prestosql.spi.block.RowBlock.createRowBlockInternal;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class RowBlockBuilder
-        extends AbstractRowBlock
-        implements BlockBuilder
+public class RowBlockBuilder<T>
+        extends AbstractRowBlock<T>
+        implements BlockBuilder<Block<T>>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(RowBlockBuilder.class).instanceSize();
 

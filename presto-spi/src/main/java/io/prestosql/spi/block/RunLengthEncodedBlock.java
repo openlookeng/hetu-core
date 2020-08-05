@@ -26,12 +26,12 @@ import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class RunLengthEncodedBlock
-        implements Block
+public class RunLengthEncodedBlock<T>
+        implements Block<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(RunLengthEncodedBlock.class).instanceSize();
 
-    public static Block create(Type type, Object value, int positionCount)
+    public static RunLengthEncodedBlock create(Type type, Object value, int positionCount)
     {
         Block block = Utils.nativeValueToBlock(type, value);
         if (block instanceof RunLengthEncodedBlock) {
@@ -40,7 +40,7 @@ public class RunLengthEncodedBlock
         return new RunLengthEncodedBlock(block, positionCount);
     }
 
-    private final Block value;
+    private final Block<T> value;
     private final int positionCount;
 
     public RunLengthEncodedBlock(Block value, int positionCount)

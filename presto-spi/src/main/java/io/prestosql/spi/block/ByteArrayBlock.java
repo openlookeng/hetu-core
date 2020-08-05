@@ -26,8 +26,8 @@ import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
-public class ByteArrayBlock
-        implements Block
+public class ByteArrayBlock<T>
+        implements Block<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ByteArrayBlock.class).instanceSize();
 

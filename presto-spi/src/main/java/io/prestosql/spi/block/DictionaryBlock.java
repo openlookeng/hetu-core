@@ -32,13 +32,13 @@ import static io.prestosql.spi.block.DictionaryId.randomDictionaryId;
 import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
-public class DictionaryBlock
-        implements Block
+public class DictionaryBlock<T>
+        implements Block<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(DictionaryBlock.class).instanceSize() + ClassLayout.parseClass(DictionaryId.class).instanceSize();
 
     private final int positionCount;
-    private final Block dictionary;
+    private final Block<T> dictionary;
     private final int idsOffset;
     private final int[] ids;
     private final long retainedSizeInBytes;

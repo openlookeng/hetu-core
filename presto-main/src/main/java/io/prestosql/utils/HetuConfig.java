@@ -18,6 +18,7 @@ import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.prestosql.spi.HetuConstant;
 
 import javax.validation.constraints.NotNull;
 
@@ -31,7 +32,10 @@ import java.util.concurrent.TimeUnit;
 public class HetuConfig
 {
     private Boolean enableFilter = Boolean.FALSE;
-    private Long maxIndicesInCache = Long.valueOf(10000000);
+    private long maxIndicesInCache = 10000000L;
+    private long indexCacheLoadingThreads = 2L;
+    private Duration indexCacheLoadingDelay = new Duration(5000, TimeUnit.MILLISECONDS);
+    private Duration indexCacheTTLMinutes = new Duration(10, TimeUnit.MINUTES);
     private String indexStoreUri = "/opt/hetu/indices/";
     private String indexStoreFileSystemProfile = "local-config-default";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
@@ -59,7 +63,7 @@ public class HetuConfig
         return enableFilter;
     }
 
-    @Config("hetu.heuristicindex.filter.enabled")
+    @Config(HetuConstant.FILTER_ENABLED)
     @ConfigDescription("Is split filter enabled")
     public HetuConfig setFilterEnabled(boolean enabled)
     {
@@ -73,7 +77,7 @@ public class HetuConfig
         return indexStoreUri;
     }
 
-    @Config("hetu.heuristicindex.indexstore.uri")
+    @Config(HetuConstant.INDEXSTORE_URI)
     @ConfigDescription("default indexstore uri")
     public HetuConfig setIndexStoreUri(String indexStoreUri)
     {
@@ -87,7 +91,7 @@ public class HetuConfig
         return indexStoreFileSystemProfile;
     }
 
-    @Config("hetu.heuristicindex.indexstore.filesystem.profile")
+    @Config(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE)
     @ConfigDescription("filesystem client profile for indexstore")
     public HetuConfig setIndexStoreFileSystemProfile(String indexStoreFileSystemProfile)
     {
@@ -95,14 +99,53 @@ public class HetuConfig
         return this;
     }
 
-    public Long getMaxIndicesInCache()
+    public Duration getIndexCacheTTLMinutes()
+    {
+        return this.indexCacheTTLMinutes;
+    }
+
+    @Config(HetuConstant.FILTER_CACHE_TTL)
+    @ConfigDescription("The duration after which index cache expires")
+    public HetuConfig setIndexCacheTTLMinutes(Duration indexCacheTTLMinutes)
+    {
+        this.indexCacheTTLMinutes = indexCacheTTLMinutes;
+        return this;
+    }
+
+    public Duration getIndexCacheLoadingDelay()
+    {
+        return this.indexCacheLoadingDelay;
+    }
+
+    @Config(HetuConstant.FILTER_CACHE_LOADING_DELAY)
+    @ConfigDescription("The delay to wait before async loading task")
+    public HetuConfig setIndexCacheLoadingDelay(Duration indexCacheLoadingDelay)
+    {
+        this.indexCacheLoadingDelay = indexCacheLoadingDelay;
+        return this;
+    }
+
+    public long getIndexCacheLoadingThreads()
+    {
+        return this.indexCacheLoadingThreads;
+    }
+
+    @Config(HetuConstant.FILTER_CACHE_LOADING_THREADS)
+    @ConfigDescription("The number of threads used to load indices in parallel")
+    public HetuConfig setIndexCacheLoadingThreads(long indexCacheLoadingThreads)
+    {
+        this.indexCacheLoadingThreads = indexCacheLoadingThreads;
+        return this;
+    }
+
+    public long getMaxIndicesInCache()
     {
         return this.maxIndicesInCache;
     }
 
-    @Config("hetu.heuristicindex.filter.cache.max-indices-number")
+    @Config(HetuConstant.FILTER_MAX_INDICES_IN_CACHE)
     @ConfigDescription("The maximum number of indices that could be loaded into cache before eviction happens")
-    public HetuConfig setMaxIndicesInCache(Long maxIndicesInCache)
+    public HetuConfig setMaxIndicesInCache(long maxIndicesInCache)
     {
         this.maxIndicesInCache = maxIndicesInCache;
         return this;

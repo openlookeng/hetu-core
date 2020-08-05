@@ -14,6 +14,7 @@
 package io.prestosql;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.Duration;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.spi.PrestoException;
@@ -159,5 +160,11 @@ public class FullConnectorSession
     public int getTaskWriterCount()
     {
         return SystemSessionProperties.getTaskWriterCount(session);
+    }
+
+    @Override
+    public Duration getDynamicFilteringWaitTime()
+    {
+        return SystemSessionProperties.getDynamicFilteringWaitTime(session);
     }
 }

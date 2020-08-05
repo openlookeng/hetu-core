@@ -71,24 +71,6 @@ public class IndexCommandUtils
     }
 
     /**
-     * Loads the properties from config.properties in configRootDir and reads
-     * only the index properties
-     *
-     * @param configRootDir The path to the directory that contains the configuration files
-     * @return Properties object with global indexer properties loaded from the configuration files
-     * @throws IOException Thrown by reading the configuration files
-     */
-    public static Properties loadIndexProperties(String configRootDir)
-            throws IOException
-    {
-        // load all properties from config.properties
-        File configPropertiesFile = Paths.get(configRootDir, IndexConstants.CONFIG_FILE).toFile();
-        Properties properties = IndexServiceUtils.loadProperties(configPropertiesFile);
-
-        return IndexServiceUtils.getPropertiesSubset(properties, IndexConstants.INDEX_KEYS_PREFIX);
-    }
-
-    /**
      * Load the properties from config.properties related to indexstore, including the root dir and filesystem profile
      *
      * @param configRootDir The path to the directory that contains the configuration files

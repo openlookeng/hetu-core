@@ -14,6 +14,7 @@
  */
 package io.prestosql.dynamicfilter;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
@@ -86,11 +87,12 @@ public class DynamicFilterService
 {
     private static final Logger log = Logger.get(DynamicFilterService.class);
     private final ScheduledExecutorService filterMergeExecutor;
-    private static final int THREAD_POOL_SIZE = 3;
-    private static final int MERGE_DYNAMIC_FILTER_INTERVAL = 20;
+    private static final int THREAD_POOL_SIZE = 1;
+    private static final int MERGE_DYNAMIC_FILTER_INTERVAL = 1;
     private ScheduledFuture<?> backgroundTask;
 
     private Map<String, Map<String, DynamicFilterRegistryInfo>> dynamicFilters = new ConcurrentHashMap<>();
+    private ArrayListMultimap<String, String> mergedDynamicFilters = ArrayListMultimap.create();
     private Map<String, CopyOnWriteArrayList<String>> dynamicFiltersToWorker = new ConcurrentHashMap<>();
     private static Map<String, Map<String, DynamicFilter>> cachedDynamicFilters = new HashMap<>();
 
@@ -167,6 +169,7 @@ public class DynamicFilterService
                                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "FPP too high: " + mergedBloomFilter.approximateElementCount());
                             }
                             mergedFilter = new BloomFilterDynamicFilter(filterKey, null, mergedBloomFilter, filterType);
+                            mergedDynamicFilters.put(queryId, filterId);
 
                             if (filterType == GLOBAL) {
                                 try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -179,6 +182,7 @@ public class DynamicFilterService
                         else if (filterDataType == HASHSET) {
                             Set mergedSet = mergeHashSets(results);
                             mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
+                            mergedDynamicFilters.put(queryId, filterId);
 
                             if (filterType == GLOBAL) {
                                 ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, mergedSet);
@@ -242,6 +246,7 @@ public class DynamicFilterService
         int finishedNum = 0;
         final StateStore stateStore = stateStoreProvider.getStateStore();
 
+        //FIXME: KEN: can we merge the info into 1 collection?
         StateCollection temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterKey, queryId));
         if (temp != null) {
             registeredNum = temp.size();
@@ -316,13 +321,16 @@ public class DynamicFilterService
                 String filterId = entry.getKey();
                 clearPartialResults(entry.getKey(), queryId);
                 dynamicFiltersToWorker.remove(filterId + "-" + queryId);
-
-                // Clear cached dynamic filters in state store
-                String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
-                ((StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).remove(filterKey);
             }
         }
         dynamicFilters.remove(queryId);
+
+        // Clear merged filters
+        mergedDynamicFilters.get(queryId).forEach(filterId -> {
+            String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
+            ((StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).remove(filterKey);
+        });
+        mergedDynamicFilters.removeAll(queryId);
 
         // Clear cached dynamic filters locally
         cachedDynamicFilters.remove(queryId);

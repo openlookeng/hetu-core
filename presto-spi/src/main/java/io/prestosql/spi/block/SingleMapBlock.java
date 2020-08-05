@@ -29,8 +29,8 @@ import static io.prestosql.spi.block.AbstractMapBlock.HASH_MULTIPLIER;
 import static io.prestosql.spi.block.MapBlockBuilder.computePosition;
 import static java.lang.String.format;
 
-public class SingleMapBlock
-        extends AbstractSingleMapBlock
+public class SingleMapBlock<T>
+        extends AbstractSingleMapBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleMapBlock.class).instanceSize();
 

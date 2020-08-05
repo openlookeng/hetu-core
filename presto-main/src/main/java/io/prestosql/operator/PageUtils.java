@@ -25,15 +25,15 @@ final class PageUtils
     {
     }
 
-    static Page recordMaterializedBytes(Page page, LongConsumer sizeInBytesConsumer)
+    static <T> Page recordMaterializedBytes(Page page, LongConsumer sizeInBytesConsumer)
     {
         // account processed bytes from lazy blocks only when they are loaded
-        Block[] blocks = new Block[page.getChannelCount()];
+        Block<T>[] blocks = new Block[page.getChannelCount()];
         for (int i = 0; i < page.getChannelCount(); ++i) {
-            Block block = page.getBlock(i);
+            Block<T> block = page.getBlock(i);
             if (block instanceof LazyBlock) {
-                LazyBlock delegateLazyBlock = (LazyBlock) block;
-                blocks[i] = new LazyBlock(page.getPositionCount(), lazyBlock -> {
+                LazyBlock<T> delegateLazyBlock = (LazyBlock) block;
+                blocks[i] = new LazyBlock<T>(page.getPositionCount(), lazyBlock -> {
                     Block loadedBlock = delegateLazyBlock.getLoadedBlock();
                     sizeInBytesConsumer.accept(loadedBlock.getSizeInBytes());
                     lazyBlock.setBlock(loadedBlock);

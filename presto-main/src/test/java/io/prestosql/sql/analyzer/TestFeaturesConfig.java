@@ -117,6 +117,7 @@ public class TestFeaturesConfig
                 .setDynamicFilteringMaxPerDriverRowCount(100)
                 .setDynamicFilteringDataType(BLOOM_FILTER)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(10, KILOBYTE))
+                .setDynamicFilteringBloomFilterFpp(0.1)
                 .setQueryPushDown(true)
                 .setPushLimitDown(true)
                 .setPushLimitThroughOuterJoin(true)
@@ -193,16 +194,17 @@ public class TestFeaturesConfig
                 .put("experimental.work-processor-pipelines", "true")
                 .put("optimizer.skip-redundant-sort", "false")
                 .put("optimizer.predicate-pushdown-use-table-properties", "false")
-                .put("experimental.enable-dynamic-filtering", "true")
+                .put("enable-dynamic-filtering", "true")
                 .put("experimental.enable-execution-plan-cache", "true")
                 .put("hetu.query-pushdown", "false")
                 .put("optimizer.push-limit-down", "false")
                 .put("optimizer.push-limit-through-union", "false")
                 .put("optimizer.push-limit-through-semi-join", "false")
                 .put("optimizer.push-limit-through-outer-join", "false")
-                .put("experimental.dynamic-filtering-max-per-driver-row-count", "256")
-                .put("experimental.dynamic-filtering-data-type", "HASHSET")
-                .put("experimental.dynamic-filtering-max-per-driver-size", "64kB")
+                .put("dynamic-filtering-max-per-driver-row-count", "256")
+                .put("dynamic-filtering-data-type", "HASHSET")
+                .put("dynamic-filtering-max-per-driver-size", "64kB")
+                .put("dynamic-filtering-bloom-filter-fpp", "0.001")
                 .put("implicit-conversion", "true")
                 .build();
 
@@ -280,7 +282,8 @@ public class TestFeaturesConfig
                 .setEnableExecutionPlanCache(true)
                 .setDynamicFilteringMaxPerDriverRowCount(256)
                 .setDynamicFilteringDataType(HASHSET)
-                .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE));
+                .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
+                .setDynamicFilteringBloomFilterFpp(0.001);
         assertFullMapping(properties, expected);
     }
 

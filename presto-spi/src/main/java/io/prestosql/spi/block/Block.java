@@ -14,13 +14,15 @@
 package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
+import io.prestosql.spi.util.BloomFilter;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.function.BiConsumer;
 
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static io.prestosql.spi.block.DictionaryId.randomDictionaryId;
 
-public interface Block
+public interface Block<T>
 {
     /**
      * Gets the length of the value at the {@code position}.
@@ -57,6 +59,9 @@ public interface Block
 
     /**
      * Gets a little endian long at {@code offset} in the value at {@code position}.
+     * <p>
+     * FIXME: KEN: the only place used a offset other than 0 is the
+     * DecimalInequalityOperators, IPAddressType, UuidType, LongDecimalType
      */
     default long getLong(int position, int offset)
     {
@@ -163,7 +168,7 @@ public interface Block
      *
      * @throws IllegalArgumentException if this position is not valid
      */
-    Block getSingleValueBlock(int position);
+    Block<T> getSingleValueBlock(int position);
 
     /**
      * Returns the number of positions in this block.
@@ -236,7 +241,7 @@ public interface Block
      * only with respect to {@code positions} that starts at {@code offset} and has length of {@code length}.
      * May return a view over the data in this block or may return a copy
      */
-    default Block getPositions(int[] positions, int offset, int length)
+    default Block<T> getPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
 
@@ -251,7 +256,7 @@ public interface Block
      * <p>
      * The returned block must be a compact representation of the original block.
      */
-    Block copyPositions(int[] positions, int offset, int length);
+    Block<T> copyPositions(int[] positions, int offset, int length);
 
     /**
      * Returns a block starting at the specified position and extends for the
@@ -262,10 +267,10 @@ public interface Block
      * the region block may also be released.  If the region block is released
      * this block may also be released.
      */
-    Block getRegion(int positionOffset, int length);
+    Block<T> getRegion(int positionOffset, int length);
 
     /**
-     * Returns a block starting at the specified position and extends for the
+     * Ret>urns a block starting at the specified position and extends for the
      * specified length.  The specified region must be entirely contained
      * within this block.
      * <p>
@@ -274,7 +279,7 @@ public interface Block
      * operators that hold on to a range of values without holding on to the
      * entire block.
      */
-    Block copyRegion(int position, int length);
+    Block<T> copyRegion(int position, int length);
 
     /**
      * Is it possible the block may have a null value?  If false, the block can not contain
@@ -299,8 +304,33 @@ public interface Block
      * This allows streaming data sources to skip sections that are not
      * accessed in a query.
      */
-    default Block getLoadedBlock()
+    default Block<T> getLoadedBlock()
     {
         return this;
+    }
+
+    /**
+     * @param position
+     * @return
+     * @ICINSUT return the value with proper type at the specified position
+     */
+    default T get(int position)
+    {
+        throw new NotImplementedException();
+    }
+
+    /**
+     * Enable filtering at the block level to allow vector operations
+     * Can we pass in bloomfilters?
+     * return boolean array indicating valid positions
+     *
+     * @param filter
+     * @param validPositions the validate positions in the block
+     * @return
+     */
+    default boolean[] filter(BloomFilter filter, boolean[] validPositions)
+    {
+        //by default we will not filter anything
+        return validPositions;
     }
 }

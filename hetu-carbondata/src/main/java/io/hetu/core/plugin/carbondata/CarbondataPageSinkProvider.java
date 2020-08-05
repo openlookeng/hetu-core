@@ -25,9 +25,9 @@ import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveACIDWriteType;
 import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveFileWriterFactory;
-import io.prestosql.plugin.hive.HivePageSink;
 import io.prestosql.plugin.hive.HivePageSinkProvider;
 import io.prestosql.plugin.hive.HiveSessionProperties;
+import io.prestosql.plugin.hive.HiveVacuumTableHandle;
 import io.prestosql.plugin.hive.HiveWritableTableHandle;
 import io.prestosql.plugin.hive.HiveWriterStats;
 import io.prestosql.plugin.hive.LocationService;
@@ -46,6 +46,7 @@ import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
+import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 import io.prestosql.spi.type.TypeManager;
 
 import javax.inject.Inject;
@@ -77,6 +78,7 @@ public class CarbondataPageSinkProvider
     private final LocationService locationService;
     private final ListeningExecutorService writeVerificationExecutor;
     private final JsonCodec<PartitionUpdate> partitionUpdateCodec;
+    private final JsonCodec<CarbondataSegmentInfoUtil> carbondataSegmentInfoCodec;
     private final NodeManager nodeManager;
     private final EventClient eventClient;
     private final HiveSessionProperties hiveSessionProperties;
@@ -94,6 +96,7 @@ public class CarbondataPageSinkProvider
                                       HiveConfig config,
                                       LocationService locationService,
                                       JsonCodec<PartitionUpdate> partitionUpdateCodec,
+                                      JsonCodec<CarbondataSegmentInfoUtil> carbondataSegmentInfoCodec,
                                       NodeManager nodeManager,
                                       EventClient eventClient,
                                       HiveSessionProperties hiveSessionProperties,
@@ -118,6 +121,7 @@ public class CarbondataPageSinkProvider
         this.locationService = requireNonNull(locationService, "locationService is null");
         this.writeVerificationExecutor = listeningDecorator(newFixedThreadPool(config.getWriteValidationThreads(), daemonThreadsNamed("hive-write-validation-%s")));
         this.partitionUpdateCodec = requireNonNull(partitionUpdateCodec, "partitionUpdateCodec is null");
+        this.carbondataSegmentInfoCodec = requireNonNull(carbondataSegmentInfoCodec, "carbondataSegmentInfoCodec is null");
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.eventClient = requireNonNull(eventClient, "eventClient is null");
         this.hiveSessionProperties = requireNonNull(hiveSessionProperties, "hiveSessionProperties is null");
@@ -165,6 +169,23 @@ public class CarbondataPageSinkProvider
             ImmutableMap.of(), handle.getAdditionalConf(), true);
     }
 
+    @Override
+    public ConnectorPageSink createPageSink(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorVacuumTableHandle tableHandle)
+    {
+        CarbondataVacuumTableHandle vacuumTableHandle = (CarbondataVacuumTableHandle) tableHandle;
+        HiveVacuumTableHandle hiveVacuumTableHandle = new HiveVacuumTableHandle(vacuumTableHandle.getSchemaName(),
+                vacuumTableHandle.getTableName(),
+                vacuumTableHandle.getInputColumns(),
+                vacuumTableHandle.getPageSinkMetadata(),
+                vacuumTableHandle.getLocationHandle(),
+                vacuumTableHandle.getBucketProperty(),
+                vacuumTableHandle.getTableStorageFormat(),
+                vacuumTableHandle.getPartitionStorageFormat(),
+                vacuumTableHandle.isFullVacuum(),
+                null);
+        return createPageSink(hiveVacuumTableHandle, session, HiveACIDWriteType.VACUUM, ImmutableMap.of(), vacuumTableHandle.getAdditionalConf(), false);
+    }
+
     private ConnectorPageSink createPageSink(HiveWritableTableHandle handle, ConnectorSession session,
                                              HiveACIDWriteType acidWriteType,
                                              Map<String, String> additionalTableParameters,
@@ -210,7 +231,7 @@ public class CarbondataPageSinkProvider
                 orcFileWriterFactory,
                 additionalConf);
 
-        return new HivePageSink(
+        return new CarbondataPageSink(
                 writerFactory,
                 handle.getInputColumns(),
                 handle.getBucketProperty(),
@@ -220,8 +241,10 @@ public class CarbondataPageSinkProvider
                 maxOpenPartitions,
                 writeVerificationExecutor,
                 partitionUpdateCodec,
+                carbondataSegmentInfoCodec,
                 session,
                 acidWriteType,
-                handle);
+                handle,
+                additionalConf);
     }
 }

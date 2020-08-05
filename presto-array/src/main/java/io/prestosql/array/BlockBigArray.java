@@ -57,9 +57,9 @@ public final class BlockBigArray
      *
      * @param index a position in this big array.
      */
-    public void set(long index, Block value)
+    public <T> void set(long index, Block<T> value)
     {
-        Block currentValue = array.get(index);
+        Block<T> currentValue = array.get(index);
         if (currentValue != null) {
             currentValue.retainedBytesForEachPart((object, size) -> {
                 if (currentValue == object) {
