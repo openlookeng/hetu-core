@@ -7,8 +7,29 @@
 
     catalog.dynamic-enabled=true
 
-然后在`hdfs-config-catalog.properties`和`local-config-catalog.properties`中配置用于存储动态目录信息的文件系统。查看文件系统文档以获取更多信息。
+然后在`hdfs-config-catalog.properties`和`local-config-catalog.properties`中配置用于存储动态目录信息的文件系统。查看[文件系统文档](../develop/filesystem.md )以获取更多信息。
 
+* 在`etc/filesystem/`目录下添加`hdfs-config-catalog.properties`文件， 如果这个目录不存在，请创建。
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=NONE
+fs.hdfs.impl.disable.cache=true
+```
+如果HDFS开启Kerberos认证，那么
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=KERBEROS
+hdfs.krb5.conf.path=/opt/openlookeng/config/krb5.conf
+hdfs.krb5.keytab.path=/opt/openlookeng/config/user.keytab
+hdfs.krb5.principal=openlookeng@HADOOP.COM # replace openlookeng@HADOOP.COM to your principal 
+fs.hdfs.impl.disable.cache=true
+```
+* 在`etc/filesystem/`目录下添加`local-config-catalog.properties`文件。
+```
+fs.client.type=local
+```
 ## 使用
 
 目录操作是通过openLooKeng协调节点上的RESTful API来完成的。HTTP请求具有如下形态（以hive连接节点为例）：
