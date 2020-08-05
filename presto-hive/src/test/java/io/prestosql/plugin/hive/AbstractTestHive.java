@@ -585,14 +585,14 @@ public abstract class AbstractTestHive
     protected ExecutorService executor;
 
     private ScheduledExecutorService heartbeatService;
-    private ScheduledExecutorService vacuumCleanupService;
+    private ScheduledExecutorService vacuumExecutorService;
 
     @BeforeClass
     public void setupClass()
     {
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
         heartbeatService = newScheduledThreadPool(1);
-        vacuumCleanupService = newScheduledThreadPool(1);
+        vacuumExecutorService = newScheduledThreadPool(1);
     }
 
     @AfterClass(alwaysRun = true)
@@ -606,9 +606,9 @@ public abstract class AbstractTestHive
             heartbeatService.shutdownNow();
             heartbeatService = null;
         }
-        if (vacuumCleanupService != null) {
-            vacuumCleanupService.shutdownNow();
-            vacuumCleanupService = null;
+        if (vacuumExecutorService != null) {
+            vacuumExecutorService.shutdownNow();
+            vacuumExecutorService = null;
         }
     }
 
@@ -747,11 +747,12 @@ public abstract class AbstractTestHive
                 locationService,
                 partitionUpdateCodec,
                 newFixedThreadPool(2),
-                vacuumCleanupService,
+                vacuumExecutorService,
                 heartbeatService,
                 new HiveTypeTranslator(),
                 TEST_SERVER_VERSION,
-                SqlStandardAccessControlMetadata::new);
+                SqlStandardAccessControlMetadata::new,
+                10, 0.1, false);
         transactionManager = new HiveTransactionManager();
         splitManager = new HiveSplitManager(
                 transactionHandle -> ((HiveMetadata) transactionManager.get(transactionHandle)).getMetastore(),

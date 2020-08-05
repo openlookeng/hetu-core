@@ -61,6 +61,7 @@ public final class HiveQueryRunner
 
     public static final String HIVE_CATALOG = "hive";
     public static final String HIVE_BUCKETED_CATALOG = "hive_bucketed";
+    public static final String HIVE_AUTO_VACUUM_CATALOG = "hive_auto_vacuum";
     public static final String TPCH_SCHEMA = "tpch";
     private static final String TPCH_BUCKETED_SCHEMA = "tpch_bucketed";
     private static final DateTimeZone TIME_ZONE = DateTimeZone.forID("America/Bahia_Banderas");
@@ -109,6 +110,7 @@ public final class HiveQueryRunner
             queryRunner = DistributedQueryRunner
                     .builder(createSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))))
                     .setNodeCount(4)
+                    .setCoordinatorProperties(ImmutableMap.of("auto-vacuum.enabled", "true"))
                     .setExtraProperties(extraProperties)
                     .setBaseDataDir(baseDataDir)
                     .build();
@@ -141,6 +143,11 @@ public final class HiveQueryRunner
                     .put("hive.storage-format", "TEXTFILE") // so that there's no minimum split size for the file
                     .put("hive.compression-codec", "NONE") // so that the file is splittable
                     .build();
+            Map<String, String> hiveAutoVacuumProperties = ImmutableMap.<String, String>builder()
+                    .putAll(hiveProperties)
+                    .put("hive.auto-vacuum-enabled", "true")
+                    .build();
+            queryRunner.createCatalog(HIVE_AUTO_VACUUM_CATALOG, HIVE_CATALOG, hiveAutoVacuumProperties);
             queryRunner.createCatalog(HIVE_CATALOG, HIVE_CATALOG, hiveProperties);
             queryRunner.createCatalog(HIVE_BUCKETED_CATALOG, HIVE_CATALOG, hiveBucketedProperties);
 
@@ -200,6 +207,19 @@ public final class HiveQueryRunner
                                 .orElse(ImmutableMap.of())))
                 .setCatalog(HIVE_BUCKETED_CATALOG)
                 .setSchema(TPCH_BUCKETED_SCHEMA)
+                .build();
+    }
+
+    public static Session createAutoVacuumSession(Optional<SelectedRole> role)
+    {
+        return testSessionBuilder()
+                .setIdentity(new Identity(
+                        "openLooKeng",
+                        Optional.empty(),
+                        role.map(selectedRole -> ImmutableMap.of("hive", selectedRole))
+                                .orElse(ImmutableMap.of())))
+                .setCatalog(HIVE_AUTO_VACUUM_CATALOG)
+                .setSchema(TPCH_SCHEMA)
                 .build();
     }
 

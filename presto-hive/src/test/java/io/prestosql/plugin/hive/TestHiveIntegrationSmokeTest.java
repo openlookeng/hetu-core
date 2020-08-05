@@ -70,6 +70,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -143,19 +144,25 @@ public class TestHiveIntegrationSmokeTest
 {
     private final String catalog;
     private final Session bucketedSession;
+    private final Session autoVacuumSession;
     private final TypeTranslator typeTranslator;
 
     @SuppressWarnings("unused")
     public TestHiveIntegrationSmokeTest()
     {
-        this(() -> HiveQueryRunner.createQueryRunner(ORDERS, CUSTOMER), HiveQueryRunner.createBucketedSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))), HiveQueryRunner.HIVE_CATALOG, new HiveTypeTranslator());
+        this(() -> HiveQueryRunner.createQueryRunner(ORDERS, CUSTOMER),
+                HiveQueryRunner.createBucketedSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))),
+                HiveQueryRunner.createAutoVacuumSession(Optional.of(new SelectedRole(SelectedRole.Type.ALL, Optional.empty()))),
+                HiveQueryRunner.HIVE_CATALOG,
+                new HiveTypeTranslator());
     }
 
-    protected TestHiveIntegrationSmokeTest(QueryRunnerSupplier queryRunnerSupplier, Session bucketedSession, String catalog, TypeTranslator typeTranslator)
+    protected TestHiveIntegrationSmokeTest(QueryRunnerSupplier queryRunnerSupplier, Session bucketedSession, Session autoVacuumSession, String catalog, TypeTranslator typeTranslator)
     {
         super(queryRunnerSupplier);
         this.catalog = requireNonNull(catalog, "catalog is null");
         this.bucketedSession = requireNonNull(bucketedSession, "bucketSession is null");
+        this.autoVacuumSession = requireNonNull(autoVacuumSession, "autoVacuumSession is null");
         this.typeTranslator = requireNonNull(typeTranslator, "typeTranslator is null");
     }
 
@@ -4779,5 +4786,72 @@ public class TestHiveIntegrationSmokeTest
         {
             return format;
         }
+    }
+
+    @Test
+    public void testAutoVacuum()
+    {
+        assertUpdate(autoVacuumSession, "CREATE TABLE auto_vacuum_test_table1 (a int) with (format='orc', transactional=true)");
+
+        TableMetadata tableMetadata = getTableMetadata(autoVacuumSession.getCatalog().get(), autoVacuumSession.getSchema().get(),
+                "auto_vacuum_test_table1");
+
+        for (int i = 0; i <= 10; i++) {
+            String query = format("INSERT INTO auto_vacuum_test_table1 VALUES(%d), (%d)", i, i * 2);
+            assertUpdate(autoVacuumSession, query, 2);
+        }
+
+        String tablePath = String.valueOf(tableMetadata.getMetadata().getProperties().get("location"));
+
+        checkBaseDirectoryExists(tablePath, true);
+
+        assertUpdate(autoVacuumSession, "DROP TABLE auto_vacuum_test_table1");
+    }
+
+    @Test
+    public void testAutoVacuumOnPartitionTable()
+    {
+        assertUpdate(autoVacuumSession, "CREATE TABLE auto_vacuum_test_table2 (a int, b int)" +
+                " with (format='orc', transactional=true, partitioned_by=Array['b'])");
+
+        TableMetadata tableMetadata = getTableMetadata(autoVacuumSession.getCatalog().get(), autoVacuumSession.getSchema().get(),
+                "auto_vacuum_test_table2");
+
+        for (int i = 0; i <= 10; i++) {
+            String query = format("INSERT INTO auto_vacuum_test_table2 VALUES(%d, 1), (%d, 2)", i, i * 2);
+            assertUpdate(autoVacuumSession, query, 2);
+        }
+
+        String tablePath = String.valueOf(tableMetadata.getMetadata().getProperties().get("location"));
+
+        checkBaseDirectoryExists(tablePath + "/b=1", true);
+        checkBaseDirectoryExists(tablePath + "/b=2", false);
+
+        assertUpdate(autoVacuumSession, "DROP TABLE auto_vacuum_test_table2");
+    }
+
+    private void checkBaseDirectoryExists(String path, boolean delayRequired)
+    {
+        try {
+            // Since auto-vacuum runs asynchronously
+            if (delayRequired) {
+                TimeUnit.SECONDS.sleep(80);
+            }
+        }
+        catch (InterruptedException e) {
+            // Ignore
+        }
+        if (path.startsWith("file:")) {
+            path = path.replace("file:", "");
+        }
+        String[] actualDirectoryList = new File(path).list(new FilenameFilter() {
+            @Override
+            public boolean accept(File file, String s)
+            {
+                return s.startsWith("base");
+            }
+        });
+
+        assertEquals(actualDirectoryList.length, 1);
     }
 }

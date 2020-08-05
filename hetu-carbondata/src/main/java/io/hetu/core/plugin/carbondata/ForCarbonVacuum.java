@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive;
+package io.hetu.core.plugin.carbondata;
 
 import javax.inject.Qualifier;
 
@@ -26,4 +26,4 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({FIELD, PARAMETER, METHOD})
 @Qualifier
-public @interface ForHiveVacuumCleanUp {}
+public @interface ForCarbonVacuum {}

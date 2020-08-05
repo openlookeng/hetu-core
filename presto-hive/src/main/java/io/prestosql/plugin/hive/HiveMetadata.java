@@ -63,6 +63,7 @@ import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
+import io.prestosql.spi.connector.ConnectorVacuumTableInfo;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
@@ -115,6 +116,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -207,6 +209,11 @@ public class HiveMetadata
     private final AccessControlMetadata accessControlMetadata;
     protected final boolean tableCreatesWithLocationAllowed;
 
+    private final int vacuumDeltaNumThreshold;
+    private final double vacuumDeltaPercentThreshold;
+    private final boolean autoVacuumEnabled;
+    private final ScheduledExecutorService vacuumExecutorService;
+
     private boolean externalTable;
 
     public HiveMetadata(
@@ -224,7 +231,11 @@ public class HiveMetadata
             TypeTranslator typeTranslator,
             String prestoVersion,
             HiveStatisticsProvider hiveStatisticsProvider,
-            AccessControlMetadata accessControlMetadata)
+            AccessControlMetadata accessControlMetadata,
+            boolean autoVacuumEnabled,
+            int vacuumDeltaNumThreshold,
+            double vacuumDeltaPercentThreshold,
+            ScheduledExecutorService vacuumExecutorService)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
 
@@ -243,6 +254,11 @@ public class HiveMetadata
         this.hiveStatisticsProvider = requireNonNull(hiveStatisticsProvider, "hiveStatisticsProvider is null");
         this.accessControlMetadata = requireNonNull(accessControlMetadata, "accessControlMetadata is null");
         this.externalTable = false;
+
+        this.vacuumDeltaNumThreshold = vacuumDeltaNumThreshold;
+        this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
+        this.autoVacuumEnabled = autoVacuumEnabled;
+        this.vacuumExecutorService = vacuumExecutorService;
     }
 
     public SemiTransactionalHiveMetastore getMetastore()
@@ -1667,6 +1683,10 @@ public class HiveMetadata
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
                 finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates, true);
 
+        if ((!session.getSource().get().isEmpty()) &&
+                session.getSource().get().equals("auto-vacuum")) {
+            VacuumEligibleTableCollector.finishVacuum(vacuumTableHandle.getSchemaName() + "." + vacuumTableHandle.getTableName());
+        }
         metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
         return connectorOutputMetadata;
     }
@@ -2672,5 +2692,15 @@ public class HiveMetadata
             throw new PrestoException(NOT_SUPPORTED,
                     String.format("Tables with %s are not supported by Hive connector", sf.substring(sf.lastIndexOf(".") + 1)));
         }
+    }
+
+    @Override
+    public List<ConnectorVacuumTableInfo> getTablesForVacuum()
+    {
+        if (autoVacuumEnabled) {
+            return VacuumEligibleTableCollector.getVacuumTableList(metastore, hdfsEnvironment,
+                    vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, vacuumExecutorService);
+        }
+        return null;
     }
 }

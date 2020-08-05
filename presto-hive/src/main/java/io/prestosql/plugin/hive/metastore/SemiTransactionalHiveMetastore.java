@@ -122,7 +122,7 @@ public class SemiTransactionalHiveMetastore
     private final HiveMetastore delegate;
     private final HdfsEnvironment hdfsEnvironment;
     private final Executor renameExecutor;
-    private final ScheduledExecutorService vacuumCleanUpExecutor;
+    private final ScheduledExecutorService vacuumExecutorService;
     private final Optional<Duration> configuredVacuumCleanupInterval;
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
@@ -162,7 +162,7 @@ public class SemiTransactionalHiveMetastore
             HdfsEnvironment hdfsEnvironment,
             HiveMetastore delegate,
             Executor renameExecutor,
-            ScheduledExecutorService vacuumCleanUpExecutor,
+            ScheduledExecutorService vacuumExecutorService,
             Optional<Duration> vacuumCleanupInterval,
             boolean skipDeletionForAlter,
             boolean skipTargetCleanupOnRollback,
@@ -172,7 +172,7 @@ public class SemiTransactionalHiveMetastore
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.renameExecutor = requireNonNull(renameExecutor, "renameExecutor is null");
-        this.vacuumCleanUpExecutor = requireNonNull(vacuumCleanUpExecutor, "cleanUpExecutor is null");
+        this.vacuumExecutorService = requireNonNull(vacuumExecutorService, "vacuumExecutorService is null");
         this.configuredVacuumCleanupInterval = requireNonNull(vacuumCleanupInterval, "vacuumCleanupInterval is null");
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
@@ -3140,9 +3140,9 @@ public class SemiTransactionalHiveMetastore
         void execute(HiveMetastore delegate, HdfsEnvironment hdfsEnvironment);
     }
 
-    public ScheduledExecutorService getVacuumCleanUpExecutor()
+    public ScheduledExecutorService getVacuumExecutorService()
     {
-        return vacuumCleanUpExecutor;
+        return vacuumExecutorService;
     }
 
     public long getVacuumCleanupInterval()

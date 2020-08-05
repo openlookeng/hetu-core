@@ -73,6 +73,7 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
+import io.prestosql.spi.connector.ConnectorVacuumTableInfo;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableAlreadyExistsException;
@@ -144,6 +145,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -231,12 +233,13 @@ public class CarbondataMetadata
                               JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
                               TypeTranslator typeTranslator, String hetuVersion,
                               HiveStatisticsProvider hiveStatisticsProvider, AccessControlMetadata accessControlMetadata,
-                              CarbondataTableReader carbondataTableReader, String carbondataTableStore, long carbondataMajorVacuumSegSize, long carbondataMinorVacuumSegCount)
+                              CarbondataTableReader carbondataTableReader, String carbondataTableStore, long carbondataMajorVacuumSegSize, long carbondataMinorVacuumSegCount,
+                              ScheduledExecutorService executorService)
     {
         super(metastore, hdfsEnvironment, partitionManager, timeZone, allowCorruptWritesForTesting,
                 writesToNonManagedTablesEnabled, createsOfNonManagedTablesEnabled, tableCreatesWithLocationAllowed,
                 typeManager, locationService, partitionUpdateCodec, typeTranslator, hetuVersion,
-                hiveStatisticsProvider, accessControlMetadata);
+                hiveStatisticsProvider, accessControlMetadata, false, 2, 0.0, executorService);
         this.carbondataTableReader = carbondataTableReader;
         this.carbondataTableStore = carbondataTableStore;
         this.metadataLock = null;
@@ -1574,5 +1577,12 @@ public class CarbondataMetadata
 
         return new ConnectorTableMetadata(tableName, columns.build(), properties.build(), comment,
                 Optional.of(immutableColumns.build()), Optional.of(NON_INHERITABLE_PROPERTIES));
+    }
+
+    @Override
+    public List<ConnectorVacuumTableInfo> getTablesForVacuum()
+    {
+        LOG.debug("Carbondata does not support auto-vacuum");
+        return ImmutableList.of();
     }
 }
