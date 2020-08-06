@@ -176,7 +176,13 @@ public class CarbondataHetuCompactorUtil
                 new ArrayList<>(CarbonCommonConstants.DEFAULT_COLLECTION_SIZE);
 
         // this value is brought in from the config file, populated by the user
-        int level1Size = (int) minorVacuumSegCount;
+        int level1Size = -1;
+        boolean isUserDefinedMinorSegCountUsed = false;
+
+        if (minorVacuumSegCount >= 2) {
+            level1Size = (int) minorVacuumSegCount;
+            isUserDefinedMinorSegCountUsed = true;
+        }
 
         int unMergeCounter = 0;
 
@@ -188,11 +194,19 @@ public class CarbondataHetuCompactorUtil
             }
             unMergeCounter++;
             unMergedSegments.add(segment);
-            if (unMergeCounter == (level1Size)) {
-                return unMergedSegments;
+            if (isUserDefinedMinorSegCountUsed) {
+                if (unMergeCounter == (level1Size)) {
+                    break;
+                }
             }
         }
-        return new ArrayList<>(0);
+
+        if (unMergedSegments.size() != 0) {
+            return unMergedSegments;
+        }
+        else {
+            return new ArrayList<>(0);
+        }
     }
 
     private static long getSizeOfSegment(String tablePath, String segId, Configuration configuration)
