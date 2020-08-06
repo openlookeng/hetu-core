@@ -295,4 +295,10 @@ public class DataCenterMetadata
         String tableFullName = tableHandle.getSchemaPrefixedTableName();
         return dataCenterClient.getTableStatistics(tableFullName, columnHandles);
     }
+
+    @Override
+    public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return true;
+    }
 }
