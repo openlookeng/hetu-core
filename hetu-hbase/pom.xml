@@ -17,11 +17,9 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <version.jettison>1.3.8</version.jettison>
         <version.annotations>13.0</version.annotations>
-        <version.commons-long>2.6</version.commons-long>
         <version.validation-api>2.0.1.Final</version.validation-api>
-        <version.commons-lang3>3.6</version.commons-lang3>
+        <version.commons-lang3>3.10</version.commons-lang3>
         <version.mockito-all>1.10.18</version.mockito-all>
         <version.junit>4.12</version.junit>
         <version.protobuf-java>2.5.0</version.protobuf-java>
@@ -36,7 +34,6 @@
         <dependency>
             <groupId>org.codehaus.jettison</groupId>
             <artifactId>jettison</artifactId>
-            <version>${version.jettison}</version>
             <exclusions>
                 <exclusion>
                     <artifactId>stax-api</artifactId>
@@ -111,16 +108,12 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
-        <dependency>
-            <groupId>commons-lang</groupId>
-            <artifactId>commons-lang</artifactId>
-            <version>${version.commons-long}</version>
-        </dependency>
 
         <dependency>
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
