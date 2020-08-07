@@ -9,8 +9,8 @@
 使用方法：index [-v] [--debug] [--disableLocking] --table=<table>
          [-c=<configDirPath>] [--column=<columns>[,<columns>...]]...
          [--partition=<partitions>[,<partitions>...]]...
-         [--type=<indexTypes>[,<indexTypes>...]]...[-p=<plugins>[,
-         <plugins>...]]...<command>
+         [--type=<indexTypes>[,<indexTypes>...]]...
+         [-I=<indexproperties>[,<indexproperties>...]]<command>
 
 使用此索引工具，您可以创建、显示和删除索引。
 

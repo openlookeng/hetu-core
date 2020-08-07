@@ -127,7 +127,7 @@ public class HivePageSourceProvider
                 new HdfsEnvironment.HdfsContext(session, hiveSplit.getDatabase(), hiveSplit.getTable()), path);
 
         List<IndexMetadata> indexes = null;
-        if (indexCache != null) {
+        if (indexCache != null && session.isHeuristicIndexFilterEnabled()) {
             indexes = indexCache.getIndices(
                     session.getCatalog().orElse(null),
                     hiveTable.getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
