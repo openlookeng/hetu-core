@@ -13,6 +13,9 @@
  */
 package io.prestosql.spi.block;
 
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -230,5 +233,15 @@ public class Int128ArrayBlock
         if (position < 0 || position >= getPositionCount()) {
             throw new IllegalArgumentException("position is not valid");
         }
+    }
+
+    @Override
+    public boolean[] filter(BloomFilter filter, boolean[] validPositions)
+    {
+        for (int i = 0; i < values.length / 2; i++) {
+            Slice value = Slices.wrappedLongArray(values[i * 2], values[i * 2 + 1]);
+            validPositions[i] = validPositions[i] && filter.test(value);
+        }
+        return validPositions;
     }
 }
