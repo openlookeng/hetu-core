@@ -99,8 +99,9 @@ public class CarbondataPageSink
     private final HdfsEnvironment hdfsEnvironment;
     private final ListeningExecutorService writeVerificationExecutor;
     private CarbondataSegmentInfoUtil segmentInfoData;
-    private JsonCodec<CarbondataSegmentInfoUtil> segmentInfo; //can directly use Gson to encode the object
+    private JsonCodec<CarbondataSegmentInfoUtil> segmentInfo;
     private boolean isCompactionCalled;
+    List<TableBlockInfo> tableBlockInfoList;
 
     public CarbondataPageSink(CarbondataWriterFactory writerFactory,
             List<HiveColumnHandle> inputColumns,
@@ -178,7 +179,7 @@ public class CarbondataPageSink
                 String databaseName = carbonTable.getDatabaseName();
                 String factTableName = carbonTable.getTableName();
 
-                List<TableBlockInfo> tableBlockInfoList = CarbonInputSplit.createBlocks(splitList);
+                tableBlockInfoList = CarbonInputSplit.createBlocks(splitList);
                 Collections.sort(tableBlockInfoList);
 
                 Map<String, TaskBlockInfo> segmentMapping =
@@ -324,6 +325,21 @@ public class CarbondataPageSink
         else {
             ListenableFuture<Collection<Slice>> result = hdfsEnvironment.doAs(session.getUser(), this::doFinish);
             return MoreFutures.toCompletableFuture(result);
+        }
+    }
+
+    @Override
+    public long getRowsWritten()
+    {
+        if (!isCompactionCalled) {
+            return super.getRowsWritten();
+        }
+        else {
+            long rowCount = 0;
+            for (TableBlockInfo tableInfo : tableBlockInfoList) {
+                rowCount += tableInfo.getDetailInfo().getRowCount();
+            }
+            return rowCount;
         }
     }
 

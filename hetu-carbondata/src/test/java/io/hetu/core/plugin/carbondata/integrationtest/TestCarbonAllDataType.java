@@ -837,7 +837,7 @@ public class TestCarbonAllDataType
         hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (4, 8)");
 
         try {
-            hetuServer.execute("VACUUM TABLE testdb.mytesttable");
+            hetuServer.execute("VACUUM TABLE testdb.mytesttable AND WAIT");
             assertEquals(FileFactory.isFileExist(storePath +
                     "/carbon.store/testdb/mytesttable/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
@@ -863,7 +863,7 @@ public class TestCarbonAllDataType
             assertEquals(FileFactory.isFileExist(storePath +
                     "/carbon.store/testdb/mytesttable2/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
-            hetuServer.execute("DROP if exists TABLE testdb.mytesttable2");
+            hetuServer.execute("DROP TABLE if exists testdb.mytesttable2");
             e.printStackTrace();
         }
 
