@@ -15,6 +15,7 @@
 package io.prestosql.plugin.hive.benchmark;
 
 import io.prestosql.plugin.hive.HiveColumnHandle;
+import io.prestosql.plugin.hive.HivePageSource;
 import io.prestosql.plugin.hive.HivePartitionKey;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
@@ -22,10 +23,8 @@ import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.util.BloomFilter;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
@@ -50,8 +49,8 @@ import java.util.concurrent.TimeUnit;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
-import static io.prestosql.plugin.hive.HiveUtil.filterRows;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.StandardTypes.INTEGER;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 
@@ -65,9 +64,10 @@ public class DynamicFilterBenchmark
     @State(Scope.Benchmark)
     public static class BenchmarkData
     {
-        private Map<Integer, DynamicFilter> dynamicFilters;
+        private Map<ColumnHandle, DynamicFilter> dynamicFilters;
         private Page page;
         private List<HivePartitionKey> partitions;
+        private Map<Integer, ColumnHandle> eligibleColumns = new HashMap<>();
 
         public BenchmarkData()
         {
@@ -76,25 +76,32 @@ public class DynamicFilterBenchmark
             for (int i = 0; i < numValues; i++) {
                 builder.writeLong(i);
             }
-            page = new Page(builder.build());
+            page = new Page(builder.build(), builder.build());
 
             dynamicFilters = new HashMap<>();
             ColumnHandle dayColumn = new HiveColumnHandle("pt_d", HIVE_INT, parseTypeSignature(INTEGER), 0, REGULAR, Optional.empty());
-            ColumnHandle appColumn = new HiveColumnHandle("app_d", HIVE_INT, parseTypeSignature(INTEGER), 0, PARTITION_KEY, Optional.empty());
+            ColumnHandle appColumn = new HiveColumnHandle("app_d", HIVE_INT, parseTypeSignature(INTEGER), 1, PARTITION_KEY, Optional.empty());
 
             BloomFilter dayFilter = new BloomFilter(1024 * 1024, 0.01);
-            dayFilter.add("1024".getBytes());
+            for (int i = 0; i < 10; i++) {
+                dayFilter.add(i);
+            }
             BloomFilter appFilter = new BloomFilter(1024 * 1024, 0.01);
-            appFilter.add("1024".getBytes());
+            for (int i = 1023; i > 1013; i--) {
+                appFilter.add(i);
+            }
 
-            dynamicFilters.put(0, new BloomFilterDynamicFilter("1", dayColumn, dayFilter, DynamicFilter.Type.GLOBAL));
-            dynamicFilters.put(1, new BloomFilterDynamicFilter("2", appColumn, appFilter, DynamicFilter.Type.GLOBAL));
+            dynamicFilters.put(dayColumn, new BloomFilterDynamicFilter("1", dayColumn, dayFilter, DynamicFilter.Type.GLOBAL));
+            dynamicFilters.put(appColumn, new BloomFilterDynamicFilter("2", appColumn, appFilter, DynamicFilter.Type.GLOBAL));
+
+            eligibleColumns.put(0, dayColumn);
+            eligibleColumns.put(1, appColumn);
 
             partitions = new ArrayList<>();
             partitions.add(new HivePartitionKey("app_id", "10000"));
         }
 
-        public Map<Integer, DynamicFilter> getDynamicFilters()
+        public Map<ColumnHandle, DynamicFilter> getDynamicFilters()
         {
             return dynamicFilters;
         }
@@ -108,12 +115,17 @@ public class DynamicFilterBenchmark
         {
             return partitions;
         }
+
+        public Map<Integer, ColumnHandle> getEligibleColumns()
+        {
+            return eligibleColumns;
+        }
     }
 
     @Benchmark
     public void testFilterRows(BenchmarkData data)
     {
-        IntArrayList rowsToKeep = filterRows(data.getPage(), data.getDynamicFilters(), new Type[] {BigintType.BIGINT});
+        Page filteredPage = HivePageSource.filter(data.getDynamicFilters(), data.getPage(), data.getEligibleColumns(), new Type[] {BIGINT, BIGINT});
     }
 
     @Benchmark

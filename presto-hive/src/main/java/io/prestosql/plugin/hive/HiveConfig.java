@@ -188,6 +188,7 @@ public class HiveConfig
     private boolean tableCreatesWithLocationAllowed = true;
 
     private boolean dynamicFilterPartitionFilteringEnabled;
+    private int dynamicFilteringRowFilteringThreshold = 2000;
 
     private boolean orcCacheStatsMetricCollectionEnabled;
 
@@ -1620,6 +1621,20 @@ public class HiveConfig
     public boolean isDynamicFilterPartitionFilteringEnabled()
     {
         return dynamicFilterPartitionFilteringEnabled;
+    }
+
+    @Min(1)
+    @Config("hive.dynamic-filtering-row-filtering-threshold")
+    @ConfigDescription("Filter out hive rows early if the dynamic filter size is below the threshold")
+    public HiveConfig setDynamicFilteringRowFilteringThreshold(int dynamicFilteringRowFilteringThreshold)
+    {
+        this.dynamicFilteringRowFilteringThreshold = dynamicFilteringRowFilteringThreshold;
+        return this;
+    }
+
+    public int getDynamicFilteringRowFilteringThreshold()
+    {
+        return dynamicFilteringRowFilteringThreshold;
     }
 
     public boolean isOrcCacheStatsMetricCollectionEnabled()

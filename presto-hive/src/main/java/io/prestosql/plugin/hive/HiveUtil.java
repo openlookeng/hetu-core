@@ -38,14 +38,13 @@ import io.prestosql.plugin.hive.util.MergingPageIterator;
 import io.prestosql.spi.ErrorCodeSupplier;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.type.AbstractVariableWidthType;
 import io.prestosql.spi.type.CharType;
@@ -54,9 +53,7 @@ import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -100,7 +97,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
@@ -1003,6 +999,8 @@ public final class HiveUtil
                 .collect(Collectors.toMap(HivePartitionKey::getName, HivePartitionKey::getValue));
 
         for (DynamicFilter dynamicFilter : dynamicFilters) {
+            final ColumnHandle columnHandle = dynamicFilter.getColumnHandle();
+
             // If the dynamic filter contains no data there can't be any match
             // FIXME: Currently approximate element count is inaccurate after serialization
             // if (dynamicFilter.getSize() == 0) {
@@ -1010,11 +1008,11 @@ public final class HiveUtil
             // }
 
             // No need to check non-partition columns
-            if (!((HiveColumnHandle) dynamicFilter.getColumnHandle()).isPartitionKey()) {
+            if (!((HiveColumnHandle) columnHandle).isPartitionKey()) {
                 continue;
             }
 
-            String partitionValue = partitions.get(dynamicFilter.getColumnHandle().getColumnName());
+            String partitionValue = partitions.get(columnHandle.getColumnName());
             if (partitionValue == null) {
                 continue;
             }
@@ -1025,7 +1023,7 @@ public final class HiveUtil
             }
 
             try {
-                Object realObjectValue = getValueAsType(((HiveColumnHandle) dynamicFilter.getColumnHandle())
+                Object realObjectValue = getValueAsType(((HiveColumnHandle) columnHandle)
                         .getColumnMetadata(typeManager).getType(), partitionValue);
                 // FIXME: Remove this check once BloomFilter type conversion is removed
                 if (dynamicFilter instanceof BloomFilterDynamicFilter && !(realObjectValue instanceof Long)) {
@@ -1041,46 +1039,6 @@ public final class HiveUtil
             }
         }
         return false;
-    }
-
-    // This function filters rows based on the bloom filter,
-    // it does a row by row comparison, sees
-    // if the row is contained in the Dynamic Filter,
-    // and if not, it would filter the row out
-    public static IntArrayList filterRows(Page page, Map<Integer, DynamicFilter> dynamicFilters, Type[] types)
-    {
-        Map<Integer, DynamicFilter> eligibleFilters = dynamicFilters.entrySet().stream()
-                .filter(entry -> entry.getKey() < page.getChannelCount())
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        boolean[] toKeep = new boolean[page.getPositionCount()];
-        Arrays.fill(toKeep, true);
-
-        for (Map.Entry<Integer, DynamicFilter> entry : eligibleFilters.entrySet()) {
-            int columnIndex = entry.getKey();
-            DynamicFilter dynamicFilter = entry.getValue();
-            Block block = page.getBlock(columnIndex).getLoadedBlock();
-
-            for (int position = 0; position < page.getPositionCount(); position++) {
-                Object nativeValue;
-                if (dynamicFilter instanceof HashSetDynamicFilter) {
-                    nativeValue = TypeUtils.readNativeValue(types[columnIndex], block, position);
-                }
-                else {
-                    nativeValue = TypeUtils.readNativeValueForDynamicFilter(types[columnIndex], block, position);
-                }
-
-                toKeep[position] = toKeep[position] && nativeValue != null && dynamicFilter.contains(nativeValue);
-            }
-        }
-
-        IntArrayList ids = new IntArrayList(toKeep.length);
-        for (int i = 0; i < toKeep.length; i++) {
-            if (toKeep[i]) {
-                ids.add(i);
-            }
-        }
-        return ids;
     }
 
     public static Iterator<Page> getMergeSortedPages(List<ConnectorPageSource> pageSources,

@@ -102,8 +102,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
 
         OperatorStats probeStats = searchScanFilterAndProjectOperatorStats(result.getQueryId(), "tpch:lineitem");
         // Probe-side is not scanned at all, due to dynamic filtering:
-        // We have removed the Local Dynamic Filtering using Tuple Domains from the JMX connector, therefore, no filtering is being done
-        assertEquals(probeStats.getInputPositions(), 60_175L);
+        assertEquals(probeStats.getInputPositions(), 0L);
     }
 
     @Test
