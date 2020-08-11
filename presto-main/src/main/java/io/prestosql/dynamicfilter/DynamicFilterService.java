@@ -319,8 +319,7 @@ public class DynamicFilterService
         if (filters != null) {
             for (Entry<String, DynamicFilterRegistryInfo> entry : filters.entrySet()) {
                 String filterId = entry.getKey();
-                clearPartialResults(entry.getKey(), queryId);
-                dynamicFiltersToWorker.remove(filterId + "-" + queryId);
+                clearPartialResults(filterId, queryId);
             }
         }
         dynamicFilters.remove(queryId);
@@ -329,6 +328,7 @@ public class DynamicFilterService
         mergedDynamicFilters.get(queryId).forEach(filterId -> {
             String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
             ((StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).remove(filterKey);
+            clearPartialResults(filterId, queryId);
         });
         mergedDynamicFilters.removeAll(queryId);
 
@@ -351,6 +351,7 @@ public class DynamicFilterService
             clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId));
             clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId));
         }
+        dynamicFiltersToWorker.remove(filterId + "-" + queryId);
     }
 
     private static void clearStatesInStateStore(StateStore stateStore, String stateCollectionName)
