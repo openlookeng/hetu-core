@@ -15,8 +15,8 @@ package io.prestosql.execution.buffer;
 
 import io.airlift.compress.Compressor;
 import io.airlift.compress.Decompressor;
-import io.airlift.compress.lz4.Lz4Compressor;
-import io.airlift.compress.lz4.Lz4Decompressor;
+import io.airlift.compress.zstd.ZstdCompressor;
+import io.airlift.compress.zstd.ZstdDecompressor;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
@@ -41,8 +41,8 @@ public class TestingPagesSerdeFactory
     {
         return new SynchronizedPagesSerde(
                 createTestMetadataManager().getBlockEncodingSerde(),
-                Optional.of(new Lz4Compressor()),
-                Optional.of(new Lz4Decompressor()),
+                Optional.of(new ZstdCompressor()),
+                Optional.of(new ZstdDecompressor()),
                 Optional.empty());
     }
 

@@ -50,6 +50,7 @@ public class DataCenterPageSourceProvider
 {
     private static final int STRING_CAPACITY = 16;
     private static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
+    private static final String EXCHANGE_COMPRESSION = "exchange_compression";
 
     private final DataCenterConfig config;
 
@@ -130,7 +131,9 @@ public class DataCenterPageSourceProvider
         if (dynamicFilterSupplier != null) {
             properties.put(ENABLE_CROSS_REGION_DYNAMIC_FILTER, "true");
         }
-
+        if (config.isCompressionEnabled()) {
+            properties.put(EXCHANGE_COMPRESSION, "true");
+        }
         // Create a new client session
         DataCenterClientSession clientSession = DataCenterStatementClientFactory.createClientSession(this.config,
                 this.typeManager, properties);

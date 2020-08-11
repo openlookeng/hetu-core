@@ -20,6 +20,8 @@ import io.prestosql.client.DataCenterQueryResults;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
+import java.util.concurrent.BlockingQueue;
+
 public class PageConsumer
 {
     enum State
@@ -32,7 +34,6 @@ public class PageConsumer
     private final DataCenterQueryResults standardFailed;
     private final long pageConsumerTimeout;
     private DataCenterQueryResults lastResult;
-    private DataCenterQueryResults currentResult;
     private long lastToken = -1;
     private State state = State.RUNNING;
     private Query query;
@@ -50,26 +51,9 @@ public class PageConsumer
         this.lastSubscriberTime = System.currentTimeMillis();
     }
 
-    public synchronized void consume(Query query, DataCenterQueryResults result)
-    {
-        if (this.currentResult == null) {
-            this.query = query;
-            this.currentResult = result;
-        }
-        else {
-            throw new IllegalStateException("lastResult is not consumed yet");
-        }
-    }
-
-    public synchronized boolean hasRoom()
-    {
-        return this.currentResult == null;
-    }
-
-    public synchronized boolean isFinished()
+    public boolean isFinished()
     {
         return this.stopped || (this.lastResult == null &&
-                this.currentResult == null &&
                 (this.state == State.FINISHED || this.state == State.ERROR) &&
                 // no more requests expected or sent final result and it's been more than 30 sec
                 (this.expectNoMoreRequests || (this.sentFinalStatus && (System.currentTimeMillis() - this.lastSubscriberTime <= 30_000))));
@@ -81,27 +65,38 @@ public class PageConsumer
         return System.currentTimeMillis() - this.lastSubscriberTime <= this.pageConsumerTimeout;
     }
 
-    private synchronized DataCenterQueryResults getResult(long token)
+    private DataCenterQueryResults getResult(long token, BlockingQueue<DataCenterQueryResults> queryResults)
     {
-        // is this the first request?
-        if (lastResult == null && currentResult == null) {
-            if (this.sentFinalStatus && (token == (lastToken + 1))) {
-                this.expectNoMoreRequests = true;
-            }
-            DataCenterQueryResults results;
-            if (this.state == State.FINISHED) {
-                results = this.standardFinished;
-                this.sentFinalStatus = true;
-            }
-            else if (this.state == State.ERROR) {
-                results = this.standardFailed;
-                this.sentFinalStatus = true;
+        if (token == (lastToken + 1)) {
+            // Current result
+            lastResult = queryResults.poll();
+
+            if (lastResult == null) {
+                if (this.sentFinalStatus && (token == (lastToken + 1))) {
+                    this.expectNoMoreRequests = true;
+                }
+                if (this.state == State.FINISHED) {
+                    // this query is finished, return finished.
+                    lastResult = this.standardFinished;
+                    this.sentFinalStatus = true;
+                }
+                else if (this.state == State.ERROR) {
+                    // this query state is error, return failed.
+                    lastResult = this.standardFailed;
+                    this.sentFinalStatus = true;
+                }
+                else {
+                    // queryResults is empty and this query is running, return running.
+                    lastResult = this.standardRunning;
+                }
             }
             else {
-                results = this.standardRunning;
+                if (lastResult.getNextUri() == null) {
+                    this.sentFinalStatus = true;
+                }
             }
             lastToken = token;
-            return results;
+            return lastResult;
         }
 
         // is the a repeated request for the last results?
@@ -110,21 +105,6 @@ public class PageConsumer
                 return this.standardRunning;
             }
             return lastResult;
-        }
-        else if (token == (lastToken + 1)) {
-            // Current result
-            lastToken = token;
-            lastResult = currentResult;
-            currentResult = null;
-            if (lastResult == null) {
-                return this.standardRunning;
-            }
-            else {
-                if (lastResult.getNextUri() == null) {
-                    this.sentFinalStatus = true;
-                }
-                return lastResult;
-            }
         }
 
         // if this is a result before the lastResult, the data is gone
@@ -136,19 +116,22 @@ public class PageConsumer
         throw new WebApplicationException(Response.Status.NOT_FOUND);
     }
 
-    public synchronized void add(PageSubscriber subscriber)
+    public void add(Query query, PageSubscriber subscriber, BlockingQueue<DataCenterQueryResults> queryResults)
     {
+        if (this.query == null && query != null) {
+            this.query = query;
+        }
         long clientToken = subscriber.getToken();
         this.lastSubscriberTime = System.currentTimeMillis();
-        subscriber.send(this.query, getResult(clientToken));
+        subscriber.send(this.query, getResult(clientToken, queryResults));
     }
 
-    public synchronized void stop()
+    public void stop()
     {
         this.stopped = true;
     }
 
-    public synchronized void setState(Query query, State state)
+    public void setState(Query query, State state)
     {
         this.query = query;
         if (this.state == State.RUNNING) {

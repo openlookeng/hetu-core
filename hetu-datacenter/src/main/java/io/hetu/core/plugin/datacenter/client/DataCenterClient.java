@@ -52,6 +52,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -77,6 +78,8 @@ import static java.util.Objects.requireNonNull;
 public class DataCenterClient
 {
     private static final JsonCodec<Integer> INTEGER_JSON_CODEC = jsonCodec(Integer.class);
+
+    private static final String EXCHANGE_COMPRESSION = "exchange_compression";
 
     private static final String SPLIT_DOT = ".";
 
@@ -108,9 +111,13 @@ public class DataCenterClient
     @Inject
     public DataCenterClient(DataCenterConfig config, OkHttpClient httpClient, TypeManager typeManager)
     {
+        Map<String, String> properties = new HashMap<>();
         this.config = requireNonNull(config, "config is null");
         this.serverUri = config.getConnectionUrl();
-        this.clientSession = DataCenterStatementClientFactory.createClientSession(config, typeManager);
+        if (config.isCompressionEnabled()) {
+            properties.put(EXCHANGE_COMPRESSION, "true");
+        }
+        this.clientSession = DataCenterStatementClientFactory.createClientSession(config, typeManager, properties);
         this.httpClient = httpClient;
         this.globalQueryIdGenerator = new GlobalQueryIdGenerator(Optional.ofNullable(config.getRemoteClusterId()));
         this.typeManager = typeManager;

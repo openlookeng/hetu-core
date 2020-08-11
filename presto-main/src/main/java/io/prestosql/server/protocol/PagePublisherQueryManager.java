@@ -14,6 +14,7 @@
  */
 package io.prestosql.server.protocol;
 
+import com.google.common.collect.Sets;
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
@@ -35,7 +36,6 @@ import javax.ws.rs.core.Response;
 
 import java.net.URI;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -54,12 +54,10 @@ public class PagePublisherQueryManager
     private static final Logger log = Logger.get(PagePublisherQueryManager.class);
 
     private static final DataSize DEFAULT_TARGET_RESULT_SIZE = new DataSize(1, MEGABYTE);
-    private static final DataSize MAX_TARGET_RESULT_SIZE = new DataSize(128, MEGABYTE);
     private static final int MAX_CONCURRENT_SUBSCRIBERS_PER_QUERY = 10;
 
-    private final long bandwidth = MAX_TARGET_RESULT_SIZE.toBytes();
     private DataSize resultSizeQuota = DEFAULT_TARGET_RESULT_SIZE;
-    private final Set<String> queries = new HashSet<>();
+    private final Set<String> queries = Sets.newConcurrentHashSet();
     private final Map<String, PagePublisherQueryRunner> queryRunners = new ConcurrentHashMap<>();
     private static final DataCenterQueryResults FINISHED_RESULTS_DONOT_USE_HEADER = new DataCenterQueryResults("", URI.create(""), null, null, null, null,
             new StatementStats("FINISHED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
@@ -104,9 +102,7 @@ public class PagePublisherQueryManager
                                 Duration maxAnticipatedDelay = queryRunner.getMaxAnticipatedDelay();
                                 // After maxAnticipatedDelay, delete the query from the set
                                 this.queryPurger.schedule(() -> {
-                                    synchronized (this) {
-                                        this.queries.remove(queryId);
-                                    }
+                                    this.queries.remove(queryId);
                                 }, maxAnticipatedDelay.toMillis(), MILLISECONDS);
                                 return true;
                             }
@@ -155,8 +151,11 @@ public class PagePublisherQueryManager
                 // (if the query is null, need a active customer) and remove from queryRunners.
                 // so we need register customer first to add a active customer, then put to queryRunners.
                 runner.register(globalQueryId, clientId);
-                this.queryRunners.put(globalQueryId, runner);
+                // it's better to add globalQueryId into queries before to add runner into queryRunners.
+                // otherwise, in high concurrency scenarios, something strange will happen,
+                // such as when invoke add method, the result of this.queries.contains(globalQueryId) is false.
                 this.queries.add(globalQueryId);
+                this.queryRunners.put(globalQueryId, runner);
             }
         }
         else {
@@ -165,20 +164,16 @@ public class PagePublisherQueryManager
         return runner;
     }
 
-    public synchronized void add(String globalQueryId, String slug, String clientId, PageSubscriber subscriber)
+    public void add(String globalQueryId, String slug, String clientId, PageSubscriber subscriber)
     {
         if (!this.queries.contains(globalQueryId)) {
             throw new WebApplicationException(Response.Status.NOT_FOUND);
         }
         PagePublisherQueryRunner runner = this.queryRunners.get(globalQueryId);
-        if (runner == null && this.queries.contains(globalQueryId)) {
+        if (runner == null) {
             // already finished
             subscriber.send(null, FINISHED_RESULTS_DONOT_USE_HEADER);
             return;
-        }
-        if (runner == null && !this.queries.contains(globalQueryId)) {
-            // already finished and query gone
-            throw new WebApplicationException(Response.Status.GONE);
         }
         if (!Objects.equals(runner.getSlug(), slug)) {
             throw new WebApplicationException(Response.Status.NOT_FOUND);
