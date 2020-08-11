@@ -19,6 +19,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.log.Logger;
+import io.hetu.core.metastore.MetastoreUtFileLoader;
 import io.hetu.core.metastore.TestingMysqlDatabase;
 import io.hetu.core.metastore.jdbc.JdbcMetastoreModule;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
@@ -36,10 +38,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.weakref.jmx.guice.MBeanModule;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static io.hetu.core.metastore.MetaStoreUtConstants.PROPERTY_FILE_PATH;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -59,6 +64,8 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestJdbcHetuMetastore
 {
+    private static final Logger LOG = Logger.get(TestJdbcHetuMetastore.class);
+
     private TestingMysqlDatabase database;
 
     private final String viewData = "select * from table";
@@ -68,8 +75,21 @@ public class TestJdbcHetuMetastore
     private HetuMetastore metastore;
     private CatalogEntity defaultCatalog;
     private DatabaseEntity defaultDatabase;
-    private final String user = "user";
-    private final String password = "testpass";
+    private static String user;
+    private static String password;
+
+    static {
+        MetastoreUtFileLoader metastoreUtFileLoader = MetastoreUtFileLoader.getInstance();
+
+        try {
+            Map<String, String> properties = new HashMap<>(metastoreUtFileLoader.loadProperties(PROPERTY_FILE_PATH));
+            user = properties.get("hetu.metastore.db.user");
+            password = properties.get("hetu.metastore.db.password");
+        }
+        catch (IOException e) {
+            LOG.warn("Failed to load properties for resources file %s", PROPERTY_FILE_PATH);
+        }
+    }
 
     /**
      * setUp
