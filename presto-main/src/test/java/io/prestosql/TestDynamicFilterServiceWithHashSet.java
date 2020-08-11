@@ -43,6 +43,7 @@ import java.util.function.Supplier;
 import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_DATA_TYPE;
 import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
+import static io.prestosql.utils.DynamicFilterUtils.createKey;
 import static io.prestosql.utils.TestDynamicFilterUtil.registerDf;
 import static io.prestosql.utils.TestDynamicFilterUtil.setupMockStateStore;
 import static org.mockito.Mockito.mock;
@@ -63,7 +64,7 @@ public class TestDynamicFilterServiceWithHashSet
     {
         filterId = "df2";
         session = testSessionBuilder()
-                .setQueryId(QueryId.valueOf("qq1"))
+                .setQueryId(QueryId.valueOf("qq2"))
                 .setSystemProperty(DYNAMIC_FILTERING_DATA_TYPE, "HASHSET")
                 .build();
 
@@ -124,6 +125,17 @@ public class TestDynamicFilterServiceWithHashSet
                 ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression)),
                 ImmutableMap.of(new Symbol("name"), mockColumnHandle));
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set for invalid or non-existing queryId");
+
+        String queryId = session.getQueryId().getId();
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId)).size(), 4);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId)).size(), 4);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 4);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId)).size(), 2);
+        dynamicFilterService.clearDynamicFiltersForQuery(queryId);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId)).size(), 0);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId)).size(), 0);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 0);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId)).size(), 0);
     }
 
     private Set fetchDynamicFilterHashSet(String filterId, String queryId)
