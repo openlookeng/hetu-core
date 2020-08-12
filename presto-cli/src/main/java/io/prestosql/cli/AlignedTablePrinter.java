@@ -18,8 +18,6 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.client.Column;
-import jline.TerminalFactory;
-import org.fusesource.jansi.AnsiString;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -43,7 +41,8 @@ import static io.prestosql.client.ClientStandardTypes.TINYINT;
 import static java.lang.Math.max;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
-import static jline.console.WCWidth.wcwidth;
+import static org.jline.utils.AttributedString.stripAnsi;
+import static org.jline.utils.WCWidth.wcwidth;
 
 public class AlignedTablePrinter
         implements OutputPrinter
@@ -105,9 +104,8 @@ public class AlignedTablePrinter
 
         if (!headerOutput) {
             headerOutput = true;
+
             for (int i = 0; i < columns; i++) {
-                currentLineWidth += maxWidth[i];
-                checkWidth();
                 if (i > 0) {
                     writer.append('|');
                 }
@@ -116,10 +114,7 @@ public class AlignedTablePrinter
             }
             writer.append('\n');
 
-            currentLineWidth = 0;
             for (int i = 0; i < columns; i++) {
-                currentLineWidth += maxWidth[i];
-                checkWidth();
                 if (i > 0) {
                     writer.append('+');
                 }
@@ -139,7 +134,6 @@ public class AlignedTablePrinter
             }
 
             for (int line = 0; line < maxLines; line++) {
-                currentLineWidth = 0;
                 for (int column = 0; column < columns; column++) {
                     if (column > 0) {
                         writer.append('|');
@@ -148,8 +142,6 @@ public class AlignedTablePrinter
                     String s = (line < lines.size()) ? lines.get(line) : "";
                     boolean numeric = numericFields.get(column);
                     String out = align(s, maxWidth[column], 1, numeric);
-                    currentLineWidth += out.length();
-                    checkWidth();
                     if ((!complete || (rowCount > 1)) && ((line + 1) < lines.size())) {
                         out = out.substring(0, out.length() - 1) + "+";
                     }
@@ -233,30 +225,11 @@ public class AlignedTablePrinter
 
     static int consoleWidth(String s)
     {
-        return consoleWidth(new AnsiString(s));
-    }
-
-    private static int consoleWidth(AnsiString s)
-    {
-        CharSequence plain = s.getPlain();
+        CharSequence plain = stripAnsi(s);
         int n = 0;
         for (int i = 0; i < plain.length(); i++) {
             n += max(wcwidth(plain.charAt(i)), 0);
         }
         return n;
-    }
-
-    private static int getWidth()
-    {
-        return TerminalFactory.get().getWidth();
-    }
-
-    private void checkWidth()
-            throws IOException
-    {
-        if (currentLineWidth > getWidth() - 4) {
-            writer.append('\n');
-            currentLineWidth = 0;
-        }
     }
 }
