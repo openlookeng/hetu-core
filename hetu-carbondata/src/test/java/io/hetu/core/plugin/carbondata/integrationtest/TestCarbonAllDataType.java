@@ -810,11 +810,11 @@ public class TestCarbonAllDataType
             assertEquals(FileFactory.isFileExist(storePath +
                     "/carbon.store/testdb/mytesttable/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
-            hetuServer.execute("DROP TABLE testdb.mytesttable");
+            hetuServer.execute("DROP TABLE if exists testdb.mytesttable");
             e.printStackTrace();
         }
 
-        hetuServer.execute("DROP TABLE testdb.mytesttable");
+        hetuServer.execute("DROP TABLE if exists testdb.mytesttable");
     }
 
     @Test
@@ -832,11 +832,11 @@ public class TestCarbonAllDataType
             assertEquals(FileFactory.isFileExist(storePath +
                     "/carbon.store/testdb/mytesttable2/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
-            hetuServer.execute("DROP TABLE testdb.mytesttable2");
+            hetuServer.execute("DROP if exists TABLE testdb.mytesttable2");
             e.printStackTrace();
         }
 
-        hetuServer.execute("DROP TABLE testdb.mytesttable2");
+        hetuServer.execute("DROP TABLE if exists testdb.mytesttable2");
     }
 
     @Test
@@ -864,11 +864,11 @@ public class TestCarbonAllDataType
 
         }
         catch (IOException | InterruptedException e) {
-            hetuServer.execute("DROP TABLE testdb.myECTable");
+            hetuServer.execute("DROP TABLE if exists testdb.myECTable");
             e.printStackTrace();
         }
 
-        hetuServer.execute("DROP TABLE testdb.myECTable");
+        hetuServer.execute("DROP TABLE if exists testdb.myECTable");
     }
 
     @Test

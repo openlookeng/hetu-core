@@ -98,11 +98,11 @@ public class TestCarbondataMinorConfig
             assertEquals(FileFactory.isFileExist(storePath +
                     "/carbon.store/mytestdb/mytesttable/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
-            hetuServer.execute("DROP TABLE mytestdb.mytesttable");
+            hetuServer.execute("DROP TABLE if exists mytestdb.mytesttable");
             e.printStackTrace();
         }
 
-        hetuServer.execute("DROP TABLE mytestdb.mytesttable");
+        hetuServer.execute("DROP TABLE if exists mytestdb.mytesttable");
     }
 
 }
