@@ -475,7 +475,7 @@ Heuristic index is external index module that which can be used to filter to out
 >
 > This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
 
-##Execution Plan Cache Properties
+## Execution Plan Cache Properties
 
 Execution plan cache feature allows the coordinator to reuse execution plans between identical queries, instead
 of constructing another execution plan, thus reducing the amount of query pre-processing required.
