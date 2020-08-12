@@ -212,7 +212,7 @@ public class HiveMetadata
     private final int vacuumDeltaNumThreshold;
     private final double vacuumDeltaPercentThreshold;
     private final boolean autoVacuumEnabled;
-    private final ScheduledExecutorService vacuumExecutorService;
+    protected final ScheduledExecutorService vacuumExecutorService;
 
     private boolean externalTable;
 
