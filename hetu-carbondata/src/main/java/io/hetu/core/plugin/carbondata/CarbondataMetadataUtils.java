@@ -19,12 +19,15 @@ import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
+import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
+import org.apache.carbondata.core.datastore.filesystem.CarbonFileFilter;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 import org.apache.carbondata.core.locks.CarbonLockUtil;
 import org.apache.carbondata.core.locks.ICarbonLock;
 import org.apache.carbondata.core.locks.LockUsage;
 import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
 import org.apache.carbondata.core.metadata.CarbonMetadata;
+import org.apache.carbondata.core.metadata.SegmentFileStore;
 import org.apache.carbondata.core.metadata.converter.SchemaConverter;
 import org.apache.carbondata.core.metadata.converter.ThriftWrapperSchemaConverterImpl;
 import org.apache.carbondata.core.metadata.datatype.StructField;
@@ -36,12 +39,14 @@ import org.apache.carbondata.core.metadata.schema.table.TableInfo;
 import org.apache.carbondata.core.metadata.schema.table.TableSchema;
 import org.apache.carbondata.core.metadata.schema.table.TableSchemaBuilder;
 import org.apache.carbondata.core.metadata.schema.table.column.ColumnSchema;
+import org.apache.carbondata.core.statusmanager.SegmentStatus;
 import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
 import org.apache.carbondata.core.writer.ThriftWriter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -169,6 +174,55 @@ public class CarbondataMetadataUtils
             if (null != metadataLock) {
                 CarbonLockUtil.fileUnlock(metadataLock, LockUsage.METADATA_LOCK);
             }
+        }
+    }
+
+    public static void writeSegmentFile(CarbonTable carbonTable, String segmentId, String uuid)
+            throws IOException
+    {
+        String tablePath = carbonTable.getTablePath();
+        boolean supportFlatFolder = carbonTable.isSupportFlatFolder();
+        String segmentPath = CarbonTablePath.getSegmentPath(tablePath, segmentId);
+        CarbonFile segmentFolder = FileFactory.getCarbonFile(segmentPath);
+        CarbonFile[] indexFiles = segmentFolder.listFiles(new CarbonFileFilter()
+        {
+            @Override
+            public boolean accept(CarbonFile file)
+            {
+                return (file.getName().endsWith(CarbonTablePath.INDEX_FILE_EXT) || file.getName()
+                        .endsWith(CarbonTablePath.MERGE_INDEX_FILE_EXT));
+            }
+        });
+        if (indexFiles != null && indexFiles.length > 0) {
+            SegmentFileStore.SegmentFile segmentFile = new SegmentFileStore.SegmentFile();
+            SegmentFileStore.FolderDetails folderDetails = new SegmentFileStore.FolderDetails();
+            folderDetails.setRelative(true);
+            folderDetails.setStatus(SegmentStatus.SUCCESS.getMessage());
+            for (CarbonFile file : indexFiles) {
+                if (file.getName().endsWith(CarbonTablePath.MERGE_INDEX_FILE_EXT)) {
+                    folderDetails.setMergeFileName(file.getName());
+                }
+                else {
+                    folderDetails.getFiles().add(file.getName());
+                }
+            }
+            String segmentRelativePath = "/";
+            if (!supportFlatFolder) {
+                segmentRelativePath = segmentPath.substring(tablePath.length());
+            }
+            segmentFile.getLocationMap().put(segmentRelativePath, folderDetails);
+            String segmentFileFolder = CarbonTablePath.getSegmentFilesLocation(tablePath) + CarbonCommonConstants.FILE_SEPARATOR +
+                    segmentId + "_" + uuid + ".tmp";
+            CarbonFile carbonFile = FileFactory.getCarbonFile(segmentFileFolder);
+            if (!carbonFile.exists()) {
+                carbonFile.mkdirs();
+            }
+            String segmentFileName = SegmentFileStore.genSegmentFileName(segmentId, uuid) + CarbonTablePath.SEGMENT_EXT;
+            // write segment info to new file.
+            SegmentFileStore.writeSegmentFile(segmentFile, segmentFileFolder + File.separator + segmentFileName);
+        }
+        else {
+            // Index files are not present at segment data location
         }
     }
 }

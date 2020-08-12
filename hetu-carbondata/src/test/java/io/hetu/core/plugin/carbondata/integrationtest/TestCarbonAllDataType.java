@@ -40,6 +40,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -51,6 +53,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestCarbonAllDataType
@@ -63,6 +66,7 @@ public class TestCarbonAllDataType
     private String storePath = rootPath + "/target/store";
     private String systemPath = rootPath + "/target/system";
     private HetuTestServer hetuServer = new HetuTestServer();
+    private String carbonStoreLocation = storePath + "/carbon.store";
 
     public TestCarbonAllDataType() throws Exception
     {
@@ -80,7 +84,7 @@ public class TestCarbonAllDataType
         map.put("hive.metastore", "file");
         map.put("hive.allow-drop-table", "true");
         map.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
-        map.put("carbondata.store-location", "file://" + storePath + "/carbon.store");
+        map.put("carbondata.store-location", "file://" + carbonStoreLocation);
         map.put("carbondata.minor-compaction-seg-count", "4");
         map.put("carbondata.major-compaction-seg-size", "1");
 
@@ -945,5 +949,26 @@ public class TestCarbonAllDataType
         }};
         assertEquals(actualResult.toString(), expectedResult.toString());
         hetuServer.execute("drop table testdb.testtable2");
+    }
+
+    @Test
+    public void validateMetadataEntriesAfterInsert() throws SQLException, IOException
+    {
+        String tableName = "testtablestatus";
+        hetuServer.execute(String.format("CREATE TABLE testdb.%s (a int, b int)", tableName));
+        hetuServer.execute(String.format("INSERT INTO testdb.%s VALUES(1, 2)", tableName));
+
+        // Verify number of segment files inside Metadata Folder
+        String tablePath = carbonStoreLocation + "/" + "testdb" + "/" + tableName;
+        String segmentDir = tablePath + "/Metadata/segments";
+        File folder = new File(segmentDir);
+        assertEquals(folder.listFiles().length, 1);
+
+        // Segment file entry should be inside table status file
+        String tableStatusFilePath = tablePath + "/Metadata/tablestatus";
+        String content = new String(Files.readAllBytes(Paths.get(tableStatusFilePath)));
+        assertTrue(content.contains(folder.listFiles()[0].getName()));
+
+        hetuServer.execute("DROP TABLE testdb.testTableStatus");
     }
 }
