@@ -2184,6 +2184,44 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testCreateTableWithSortedBy()
+    {
+        @Language("SQL") String createTableSql = format("" +
+                        "CREATE TABLE %s.%s.test_create_sorted (\n" +
+                        "   viewTime int,\n" +
+                        "   userID bigint\n" +
+                        ")\n" +
+                        "WITH (\n" +
+                        "   bucketed_by = ARRAY['userID'],\n" +
+                        "   sorted_by = ARRAY['viewTime'],\n" +
+                        "   bucket_count = 3,\n" +
+                        "   format = 'TEXTFILE'\n" +
+                        ")",
+                getSession().getCatalog().get(),
+                getSession().getSchema().get());
+
+        assertUpdate(createTableSql);
+
+        String expectedSql = format("" +
+                        "CREATE TABLE %s.%s.test_create_sorted (\n" +
+                        "   viewtime int,\n" +
+                        "   userid bigint\n" +
+                        ")\n" +
+                        "WITH (\n" +
+                        "   bucketed_by = ARRAY['userid'],\n" +
+                        "   sorted_by = ARRAY['viewtime'],\n" +
+                        "   bucket_count = 3,\n" +
+                        "   format = 'TEXTFILE'\n" +
+                        ")",
+                getSession().getCatalog().get(),
+                getSession().getSchema().get());
+        MaterializedResult actual = computeActual("SHOW CREATE TABLE test_create_sorted");
+        assertShowCreateTableOutput(actual.getOnlyValue(), expectedSql);
+
+        assertUpdate("DROP TABLE test_create_sorted");
+    }
+
+    @Test
     public void testCommentTable()
     {
         String createTableSql = format("" +

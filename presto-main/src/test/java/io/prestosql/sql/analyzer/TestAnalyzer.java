@@ -1733,6 +1733,12 @@ public class TestAnalyzer
         analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.h < t8.k");
         analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.k = t8.h");
         analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.a > '10.3' and t8.e = '10' or t8.g < '10.8'");
+        analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.a between real '3.1' and double '10.2'");
+        analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.b between int '1' and bigint '10'");
+        analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.k between 'abc' and 'def'");
+        analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.j between '2010-02-26' and '2020-02-26'");
+        analyze(implicitConversionSession, "SELECT * FROM t8 WHERE t8.j between date '2010-02-26' and date '2020-02-26'");
+        assertFails(implicitConversionSession, TYPE_MISMATCH, "SELECT * FROM t8 WHERE t8.a between date '2010-02-26' and date '2020-02-26'");
     }
 
     @Test

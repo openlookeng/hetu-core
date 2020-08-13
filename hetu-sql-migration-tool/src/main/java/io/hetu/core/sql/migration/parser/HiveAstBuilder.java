@@ -244,7 +244,8 @@ public class HiveAstBuilder
                 properties);
     }
 
-    @Override public Node visitDropSchema(HiveSqlParser.DropSchemaContext context)
+    @Override
+    public Node visitDropSchema(HiveSqlParser.DropSchemaContext context)
     {
         if (context.CASCADE() != null) {
             throw parseError("Unsupported statement: CASCADE", context);
@@ -256,13 +257,34 @@ public class HiveAstBuilder
                 context.EXISTS() != null, false);
     }
 
-    @Override public Node visitShowSchemas(HiveSqlParser.ShowSchemasContext context)
+    @Override
+    public Node visitShowSchemas(HiveSqlParser.ShowSchemasContext context)
     {
         Optional<String> pattern = getTextIfPresent(context.pattern).map(HiveAstBuilder::unquote);
+        Optional<String> escape = Optional.empty();
         if (pattern.isPresent()) {
+            if (pattern.get().contains("|")) {
+                throw parseError("Unsupported wildcards: |", context.pattern);
+            }
+            if (pattern.get().contains("_")) {
+                pattern = Optional.of(pattern.get().replace("_", "#_"));
+                escape = Optional.of("#");
+            }
             pattern = Optional.of(pattern.get().replace("*", "%"));
         }
-        return new ShowSchemas(getLocation(context), Optional.empty(), pattern, Optional.empty());
+        return new ShowSchemas(getLocation(context), Optional.empty(), pattern, escape);
+    }
+
+    @Override
+    public Node visitAlterSchema(HiveSqlParser.AlterSchemaContext context)
+    {
+        throw parseError("Unsupported statement: Alter Schema/Database", context);
+    }
+
+    @Override
+    public Node visitDescribeSchema(HiveSqlParser.DescribeSchemaContext context)
+    {
+        throw parseError("Unsupported statement: Describe Schema/Database", context);
     }
 
     @Override
@@ -305,6 +327,12 @@ public class HiveAstBuilder
     }
 
     @Override
+    public Node visitShowViews(HiveSqlParser.ShowViewsContext context)
+    {
+        throw parseError("Unsupported statement: Show Views", context);
+    }
+
+    @Override
     public Node visitDropView(HiveSqlParser.DropViewContext context)
     {
         return new DropView(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
@@ -313,12 +341,24 @@ public class HiveAstBuilder
     @Override
     public Node visitCreateTable(HiveSqlParser.CreateTableContext context)
     {
+        if (context.TEMPORARY() != null) {
+            throw parseError("Unsupported statement: CREATE TEMPORARY TABLE", context);
+        }
+        if (context.constraintSpecification() != null) {
+            throw parseError("Unsupported constraint statement", context.constraintSpecification());
+        }
+
         Optional<String> comment = Optional.empty();
         if (context.COMMENT() != null) {
             comment = Optional.of(((StringLiteral) visit(context.string(0))).getValue());
         }
 
         List<Property> properties = new ArrayList<>();
+        if (context.TRANSACTIONAL() != null) {
+            Identifier name = new Identifier("transactional");
+            Expression value = new Identifier("true");
+            properties.add(new Property(name, value));
+        }
         List<TableElement> elements = getTableElements(context.tableElement());
         if (context.PARTITIONED() != null) {
             Identifier name = new Identifier("partitioned_by");
@@ -346,12 +386,18 @@ public class HiveAstBuilder
         }
         if (context.SORTED() != null) {
             Identifier name = new Identifier("sorted_by");
-            List<Expression> quotedExpressions = new ArrayList<>();
-            List<Expression> expressions = getExpressions(context.sortedBy().expression());
-            for (int i = 0; i < expressions.size(); i++) {
-                quotedExpressions.add(new StringLiteral(expressions.get(i).toString()));
+            List<Expression> expressions = new ArrayList<>();
+            List<HiveSqlParser.SortItemContext> sortItemContexts = context.sortedBy().sortItem();
+            for (int i = 0; i < sortItemContexts.size(); i++) {
+                HiveSqlParser.SortItemContext sortItemContext = sortItemContexts.get(i);
+                String sortedBy = sortItemContext.expression().getText();
+                if (sortItemContext.ordering != null) {
+                    sortedBy += " " + sortItemContext.ordering.getText();
+                }
+                expressions.add(new StringLiteral(sortedBy));
             }
-            Expression value = new ArrayConstructor(quotedExpressions);
+
+            Expression value = new ArrayConstructor(expressions);
             properties.add(new Property(name, value));
         }
         if (context.INTO() != null) {
@@ -359,7 +405,16 @@ public class HiveAstBuilder
             Expression value = (Expression) visit(context.bucketcount);
             properties.add(new Property(name, value));
         }
-        if (context.STORED_AS() != null) {
+        if (context.SKEWED() != null) {
+            throw parseError("Unsupported statement: SKEWED", context.columnAliases());
+        }
+        if (context.ROW() != null) {
+            throw parseError("Unsupported statement: ROW FORMAT", context.rowFormat());
+        }
+        if (context.STORED() != null) {
+            throw parseError("Unsupported statement: STORED BY", context.storedBy);
+        }
+        if (context.STORED_AS().size() != 0) {
             Identifier name = new Identifier("format");
             String storedAsString = ((Identifier) visit(context.stored_as)).getValue();
             Expression value = new StringLiteral(getFileFormat(storedAsString));
@@ -379,7 +434,7 @@ public class HiveAstBuilder
             properties.add(new Property(name, value));
         }
         if (context.TBLPROPERTIES() != null) {
-            List<Property> tblProperties = visit(context.properties().property(), Property.class);
+            List<Property> tblProperties = visit(context.tableProperties.property(), Property.class);
             for (int i = 0; i < tblProperties.size(); i++) {
                 Property property = tblProperties.get(i);
                 if (property.getName().getValue().equalsIgnoreCase("transactional")) {
@@ -388,7 +443,7 @@ public class HiveAstBuilder
                     properties.add(new Property(name, value));
                 }
                 else {
-                    throw parseError(format("Unsupported attribute: %s", property.getName().getValue()), context.properties());
+                    throw parseError(format("Unsupported attribute: %s", property.getName().getValue()), context.tableProperties);
                 }
             }
         }
@@ -402,8 +457,13 @@ public class HiveAstBuilder
                 comment);
     }
 
-    @Override public Node visitCreateTableAsSelect(HiveSqlParser.CreateTableAsSelectContext context)
+    @Override
+    public Node visitCreateTableAsSelect(HiveSqlParser.CreateTableAsSelectContext context)
     {
+        if (context.TEMPORARY() != null) {
+            throw parseError("Unsupported statement: CREATE TEMPORARY TABLE", context);
+        }
+
         Optional<String> comment = Optional.empty();
         if (context.COMMENT() != null) {
             comment = Optional.of(((StringLiteral) visit(context.string(0))).getValue());
@@ -415,6 +475,11 @@ public class HiveAstBuilder
         }
 
         List<Property> properties = new ArrayList<>();
+        if (context.TRANSACTIONAL() != null) {
+            Identifier name = new Identifier("transactional");
+            Expression value = new Identifier("true");
+            properties.add(new Property(name, value));
+        }
         if (context.STORED_AS() != null) {
             Identifier name = new Identifier("format");
             String storedAsString = ((Identifier) visit(context.stored_as)).getValue();
@@ -487,7 +552,15 @@ public class HiveAstBuilder
     public Node visitShowTables(HiveSqlParser.ShowTablesContext context)
     {
         Optional<String> pattern = getTextIfPresent(context.pattern).map(HiveAstBuilder::unquote);
+        Optional<String> escape = Optional.empty();
         if (pattern.isPresent()) {
+            if (pattern.get().contains("|")) {
+                throw parseError("Unsupported wildcards: |", context.pattern);
+            }
+            if (pattern.get().contains("_")) {
+                pattern = Optional.of(pattern.get().replace("_", "#_"));
+                escape = Optional.of("#");
+            }
             pattern = Optional.of(pattern.get().replace("*", "%"));
         }
         return new ShowTables(
@@ -495,7 +568,7 @@ public class HiveAstBuilder
                 Optional.ofNullable(context.qualifiedName())
                         .map(this::getQualifiedName),
                 pattern,
-                Optional.empty());
+                escape);
     }
 
     @Override
@@ -530,6 +603,324 @@ public class HiveAstBuilder
     }
 
     @Override
+    public Node visitAlterTableAddConstraint(HiveSqlParser.AlterTableAddConstraintContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Add Constraint", context);
+    }
+
+    @Override
+    public Node visitAlterTableChangeConstraint(HiveSqlParser.AlterTableChangeConstraintContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Change Constraint", context);
+    }
+
+    @Override
+    public Node visitAlterTableDropConstraint(HiveSqlParser.AlterTableDropConstraintContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Drop Constraint", context);
+    }
+
+    @Override
+    public Node visitAlterTableSerde(HiveSqlParser.AlterTableSerdeContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Serde", context);
+    }
+
+    @Override
+    public Node visitAlterTableStorage(HiveSqlParser.AlterTableStorageContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Storage", context);
+    }
+
+    @Override
+    public Node visitAlterTableSkewed(HiveSqlParser.AlterTableSkewedContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Skewed", context);
+    }
+
+    @Override
+    public Node visitAlterTableNotSkewed(HiveSqlParser.AlterTableNotSkewedContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Not Skewed", context);
+    }
+
+    @Override
+    public Node visitAlterTableNotAsDirectories(HiveSqlParser.AlterTableNotAsDirectoriesContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Not Stored As Directoriese", context);
+    }
+
+    @Override
+    public Node visitAlterTableSetSkewedLocation(HiveSqlParser.AlterTableSetSkewedLocationContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Set Skewed Location", context);
+    }
+
+    @Override
+    public Node visitAlterTableAddPartition(HiveSqlParser.AlterTableAddPartitionContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Add Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTableRenamePartition(HiveSqlParser.AlterTableRenamePartitionContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Rename Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTableExchangePartition(HiveSqlParser.AlterTableExchangePartitionContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Exchange Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTableRecoverPartitions(HiveSqlParser.AlterTableRecoverPartitionsContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Recover Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTableDropPartition(HiveSqlParser.AlterTableDropPartitionContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Drop Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTableArchivePartition(HiveSqlParser.AlterTableArchivePartitionContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Archive/Unarchive Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionFileFormat(HiveSqlParser.AlterTablePartitionFileFormatContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Partition File Format", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionLocation(HiveSqlParser.AlterTablePartitionLocationContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Partition Location", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionTouch(HiveSqlParser.AlterTablePartitionTouchContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Touch Partition", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionProtections(HiveSqlParser.AlterTablePartitionProtectionsContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Partition Protections", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionCompact(HiveSqlParser.AlterTablePartitionCompactContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Partition Compact", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionConcatenate(HiveSqlParser.AlterTablePartitionConcatenateContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Partition Concatenate", context);
+    }
+
+    @Override
+    public Node visitAlterTablePartitionUpdateColumns(HiveSqlParser.AlterTablePartitionUpdateColumnsContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Partition Update Columns", context);
+    }
+
+    @Override
+    public Node visitAlterTableChangeColumn(HiveSqlParser.AlterTableChangeColumnContext context)
+    {
+        throw parseError("Unsupported statement: Alter Table Change Column", context);
+    }
+
+    @Override
+    public Node visitShowTableExtended(HiveSqlParser.ShowTableExtendedContext context)
+    {
+        throw parseError("Unsupported statement: Show Table Extended", context);
+    }
+
+    @Override
+    public Node visitShowTableProperties(HiveSqlParser.ShowTablePropertiesContext context)
+    {
+        throw parseError("Unsupported statement: Show Table Properties", context);
+    }
+
+    @Override
+    public Node visitTruncateTable(HiveSqlParser.TruncateTableContext context)
+    {
+        throw parseError("Unsupported statement: Truncate Table", context);
+    }
+
+    @Override
+    public Node visitMsckRepairTable(HiveSqlParser.MsckRepairTableContext context)
+    {
+        throw parseError("Unsupported statement: Msck Repair Table", context);
+    }
+
+    @Override
+    public Node visitCreateMaterializedView(HiveSqlParser.CreateMaterializedViewContext context)
+    {
+        throw parseError("Unsupported statement: Create Materialized View", context);
+    }
+
+    @Override
+    public Node visitDropMaterializedView(HiveSqlParser.DropMaterializedViewContext context)
+    {
+        throw parseError("Unsupported statement: Drop Materialized View", context);
+    }
+
+    @Override
+    public Node visitAlterMaterializedView(HiveSqlParser.AlterMaterializedViewContext context)
+    {
+        throw parseError("Unsupported statement: Alter Materialized View", context);
+    }
+
+    @Override
+    public Node visitShowMaterializedViews(HiveSqlParser.ShowMaterializedViewsContext context)
+    {
+        throw parseError("Unsupported statement: Show Materialized Views", context);
+    }
+
+    @Override
+    public Node visitCreateFunction(HiveSqlParser.CreateFunctionContext context)
+    {
+        throw parseError("Unsupported statement: Create Function", context);
+    }
+
+    @Override
+    public Node visitDropFunction(HiveSqlParser.DropFunctionContext context)
+    {
+        throw parseError("Unsupported statement: Drop Function", context);
+    }
+
+    @Override
+    public Node visitReloadFunctions(HiveSqlParser.ReloadFunctionsContext context)
+    {
+        throw parseError("Unsupported statement: Reload Functions", context);
+    }
+
+    @Override
+    public Node visitCreateIndex(HiveSqlParser.CreateIndexContext context)
+    {
+        throw parseError("Unsupported statement: Create Index", context);
+    }
+
+    @Override
+    public Node visitDropIndex(HiveSqlParser.DropIndexContext context)
+    {
+        throw parseError("Unsupported statement: Drop Index", context);
+    }
+
+    @Override
+    public Node visitAlterIndex(HiveSqlParser.AlterIndexContext context)
+    {
+        throw parseError("Unsupported statement: Alter Index", context);
+    }
+
+    @Override
+    public Node visitShowIndex(HiveSqlParser.ShowIndexContext context)
+    {
+        throw parseError("Unsupported statement: Show Index", context);
+    }
+
+    @Override
+    public Node visitShowPartitions(HiveSqlParser.ShowPartitionsContext context)
+    {
+        throw parseError("Unsupported statement: Show Partitions", context);
+    }
+
+    @Override
+    public Node visitDescribePartition(HiveSqlParser.DescribePartitionContext context)
+    {
+        throw parseError("Unsupported statement: Describe Partition", context);
+    }
+
+    @Override
+    public Node visitCreateMacro(HiveSqlParser.CreateMacroContext context)
+    {
+        throw parseError("Unsupported statement: Create Macro", context);
+    }
+
+    @Override
+    public Node visitDropMacro(HiveSqlParser.DropMacroContext context)
+    {
+        throw parseError("Unsupported statement: Drop Macro", context);
+    }
+
+    @Override
+    public Node visitShowRoleGrant(HiveSqlParser.ShowRoleGrantContext context)
+    {
+        throw parseError("Unsupported statement: Show Role Grant", context);
+    }
+
+    @Override
+    public Node visitShowPrincipals(HiveSqlParser.ShowPrincipalsContext context)
+    {
+        throw parseError("Unsupported statement: Show Principals", context);
+    }
+
+    @Override
+    public Node visitShowLocks(HiveSqlParser.ShowLocksContext context)
+    {
+        throw parseError("Unsupported statement: Show Locks", context);
+    }
+
+    @Override
+    public Node visitShowConf(HiveSqlParser.ShowConfContext context)
+    {
+        throw parseError("Unsupported statement: Show Conf", context);
+    }
+
+    @Override
+    public Node visitShowTransactions(HiveSqlParser.ShowTransactionsContext context)
+    {
+        throw parseError("Unsupported statement: Show Transactions", context);
+    }
+
+    @Override
+    public Node visitShowCompactions(HiveSqlParser.ShowCompactionsContext context)
+    {
+        throw parseError("Unsupported statement: Show Compactions", context);
+    }
+
+    @Override
+    public Node visitAbortTransactions(HiveSqlParser.AbortTransactionsContext context)
+    {
+        throw parseError("Unsupported statement: Abort Transactions", context);
+    }
+
+    @Override
+    public Node visitLoadData(HiveSqlParser.LoadDataContext context)
+    {
+        throw parseError("Unsupported statement: Load Data", context);
+    }
+
+    @Override
+    public Node visitMerge(HiveSqlParser.MergeContext context)
+    {
+        throw parseError("Unsupported statement: Merge", context);
+    }
+
+    @Override
+    public Node visitExportData(HiveSqlParser.ExportDataContext context)
+    {
+        throw parseError("Unsupported statement: Export", context);
+    }
+
+    @Override
+    public Node visitImportData(HiveSqlParser.ImportDataContext context)
+    {
+        throw parseError("Unsupported statement: Import", context);
+    }
+
+    @Override
     public Node visitDropTable(HiveSqlParser.DropTableContext context)
     {
         if (context.PURGE() != null) {
@@ -549,25 +940,47 @@ public class HiveAstBuilder
             throw parseError("Unsupported attribute: LIKE", context.pattern);
         }
 
+        QualifiedName qualifiedName = QualifiedName.of(visit(context.tableName.identifier(), Identifier.class));
+        return new ShowColumns(getLocation(context), qualifiedName);
+    }
+
+    @Override
+    public Node visitDescribeTable(HiveSqlParser.DescribeTableContext context)
+    {
         if (context.EXTENDED() != null || context.FORMATTED() != null) {
             throw parseError("Unsupported attribute: EXTENDED/FORMATTED", context);
         }
 
-        return new ShowColumns(getLocation(context), getQualifiedName(context.qualifiedName(0)));
+        if (context.describeTableOption() != null) {
+            throw parseError("Unsupported Describe statement", context.describeTableOption());
+        }
+
+        QualifiedName qualifiedName = QualifiedName.of(visit(context.describeName().identifier(), Identifier.class));
+        return new ShowColumns(getLocation(context), qualifiedName);
     }
 
     @Override
-    public Node visitAddColumn(HiveSqlParser.AddColumnContext context)
+    public Node visitAddReplaceColumn(HiveSqlParser.AddReplaceColumnContext context)
     {
         if (context.CASCADE() != null) {
             throw parseError("Unsupported statement: CASCADE", context);
         }
+        if (context.REPLACE() != null) {
+            throw parseError("Unsupported statement: REPLACE", context);
+        }
+        if (context.PARTITION() != null) {
+            throw parseError("Unsupported statement: PARTITION", context.partition);
+        }
+        if (context.tableElement().size() > 1) {
+            throw parseError("Unsupported add multiple columns", context.tableElement(0));
+        }
 
-        Identifier identifier = (Identifier) visit(context.identifier());
-        String type = getType(context.type());
+        HiveSqlParser.ColumnDefinitionContext columnDefinitionContext = context.tableElement(0).columnDefinition();
+        Identifier identifier = (Identifier) visit(columnDefinitionContext.identifier());
+        String type = getType(columnDefinitionContext.type());
         Optional<String> comment = Optional.empty();
-        if (context.COMMENT() != null) {
-            comment = Optional.of(((StringLiteral) visit(context.string())).getValue());
+        if (columnDefinitionContext.COMMENT() != null) {
+            comment = Optional.of(((StringLiteral) visit(columnDefinitionContext.string())).getValue());
         }
         ColumnDefinition columnDefinition = new ColumnDefinition(identifier, type, true, ImmutableList.of(), comment);
 
@@ -604,6 +1017,12 @@ public class HiveAstBuilder
                 columnAliases,
                 (Query) visit(context.query()),
                 true);
+    }
+
+    @Override
+    public Node visitInsertFilesystem(HiveSqlParser.InsertFilesystemContext context)
+    {
+        throw parseError("Unsupported statement: Insert Filesystem", context);
     }
 
     @Override public Node visitUpdateTable(HiveSqlParser.UpdateTableContext context)
@@ -750,13 +1169,27 @@ public class HiveAstBuilder
     @Override
     public Node visitExplain(HiveSqlParser.ExplainContext context)
     {
+        if (context.EXTENDED() != null || context.CBO() != null || context.AST() != null || context.DEPENDENCY() != null
+                || context.AUTHORIZATION() != null || context.LOCKS() != null || context.VECTORIZATIONANALYZE() != null) {
+            throw parseError("Only supported attribute: ANALYZE", context);
+        }
         return new Explain(getLocation(context), context.ANALYZE() != null, false, (Statement) visit(context.statement()), ImmutableList.of());
     }
 
     @Override
-    public Node visitShowSession(HiveSqlParser.ShowSessionContext context)
+    public Node visitSetSession(HiveSqlParser.SetSessionContext context)
     {
+        if (context.property() != null) {
+            throw parseError("Unsupported to set session property", context.property());
+        }
+
         return new ShowSession(getLocation(context));
+    }
+
+    @Override
+    public Node visitResetSession(HiveSqlParser.ResetSessionContext context)
+    {
+        throw parseError("Unsupported statement: Reset", context);
     }
 
     @Override
@@ -825,7 +1258,7 @@ public class HiveAstBuilder
             throw parseError("Unsupported attribute: DISTRIBUTE BY", context.distributeBy());
         }
 
-        if (context.clusteredBy() != null || context.distributeBy() != null || context.sortedBy() != null) {
+        if (context.sortedBy() != null) {
             throw parseError("Unsupported attribute: SORTED BY", context.sortedBy());
         }
 
@@ -1467,19 +1900,16 @@ public class HiveAstBuilder
             comment = Optional.of(((StringLiteral) visit(context.string())).getValue());
         }
 
-        List<Property> properties = ImmutableList.of();
-        if (context.properties() != null) {
-            properties = visit(context.properties().property(), Property.class);
+        if (context.columnConstraintSpecification() != null) {
+            throw parseError("Unsupported attribute: Column constraint", context.columnConstraintSpecification());
         }
-
-        boolean nullable = context.NOT() == null;
 
         return new ColumnDefinition(
                 getLocation(context),
                 (Identifier) visit(context.identifier()),
                 getType(context.type()),
-                nullable,
-                properties,
+                true,
+                ImmutableList.of(),
                 comment);
     }
 
@@ -1947,7 +2377,7 @@ public class HiveAstBuilder
             return "MAP(" + getType(type.type(0)) + "," + getType(type.type(1)) + ")";
         }
 
-        throw new IllegalArgumentException("Illegal data type: " + type.getText());
+        throw new IllegalArgumentException("Unsupported data type: " + type.getText());
     }
 
     private String typeParameterToString(HiveSqlParser.TypeParameterContext typeParameter)

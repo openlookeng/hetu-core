@@ -126,6 +126,7 @@ public class HiveTableProperties
                         false,
                         value -> ((Collection<?>) value).stream()
                                 .map(String.class::cast)
+                                .map(name -> name.toLowerCase(ENGLISH))
                                 .map(HiveTableProperties::sortingColumnFromString)
                                 .collect(toImmutableList()),
                         value -> ((Collection<?>) value).stream()

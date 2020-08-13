@@ -38,23 +38,30 @@ statement
         (COMMENT comment=string)? (LOCATION location=string)?
         (WITH DBPROPERTIES properties)?                                             #createSchema
     | DROP (SCHEMA | DATABASE) (IF EXISTS)? qualifiedName (CASCADE | RESTRICT)?     #dropSchema
-    | CREATE TABLE (IF NOT EXISTS)? qualifiedName columnAliases?
+    | ALTER (SCHEMA | DATABASE) qualifiedName
+        (SET DBPROPERTIES properties
+          | SET OWNER (USER | ROLE) identifier
+          | SET LOCATION string
+          | SET MANAGEDLOCATION string)                                             #alterSchema
+    | DESCRIBE (SCHEMA | DATABASE) EXTENDED? qualifiedName                          #describeSchema
+    | CREATE TEMPORARY? TRANSACTIONAL? TABLE (IF NOT EXISTS)? qualifiedName columnAliases?
         (COMMENT string)?
         (STORED_AS stored_as=identifier)?
         (LOCATION location=string)?
         (TBLPROPERTIES properties)?
         AS query                                                       #createTableAsSelect
-    | CREATE TEMPORARY? EXTERNAL? TABLE (IF NOT EXISTS)? qualifiedName
-        '(' tableElement (',' tableElement)* ')'
+    | CREATE TEMPORARY? EXTERNAL? TRANSACTIONAL? TABLE (IF NOT EXISTS)? qualifiedName
+        '(' tableElement (',' tableElement)* (',' constraintSpecification)?')'
         (COMMENT string)?
         (PARTITIONED BY '('partitionedBy')')?
         (CLUSTERED BY '('clusteredBy')'
           (SORTED BY '(' sortedBy ')')?
           (INTO bucketcount=expression BUCKETS)
         )?
-        (STORED_AS stored_as=identifier)?
+        (SKEWED BY columnAliases ON expression (',' expression)* (STORED_AS DIRECTORIES)?)?
+        ((ROW FORMAT rowFormat)? (STORED_AS stored_as=identifier)? | (STORED BY storedBy=expression (WITH SERDEPROPERTIES serdeProperties=properties)?))
         (LOCATION location=string)?
-        (TBLPROPERTIES properties)?                                    #createTable
+        (TBLPROPERTIES tableProperties=properties)?                                 #createTable
     | CREATE TEMPORARY? EXTERNAL? TABLE (IF NOT EXISTS)? tableName=qualifiedName
         LIKE likeTableName=qualifiedName (LOCATION location=string)?   #createTableLike
     | DROP TABLE (IF EXISTS)? qualifiedName PURGE?                     #dropTable
@@ -62,19 +69,52 @@ statement
         (PARTITION '('insertPartition')')? columnAliases? query        #insertInto
     | INSERT OVERWRITE TABLE qualifiedName
         (PARTITION '('insertPartition')' (IF NOT EXISTS)? )?  query    #insertOverwrite
+    | INSERT OVERWRITE LOCAL? DIRECTORY identifier
+        (ROW FORMAT rowFormat)?
+        (STORED_AS stored_as=identifier)?
+        query                                                          #insertFilesystem
     | UPDATE qualifiedName SET assignmentList
         (WHERE booleanExpression)?                                     #updateTable
     | DELETE FROM qualifiedName (WHERE booleanExpression)?             #delete
     | ALTER TABLE from=qualifiedName RENAME TO to=qualifiedName        #renameTable
     | ALTER TABLE qualifiedName SET TBLPROPERTIES properties           #commentTable
-    | ALTER TABLE tableName=qualifiedName
-        ADD COLUMNS '('identifier type (COMMENT string)?')' (CASCADE | RESTRICT)?  #addColumn
+    | ALTER TABLE tableName=qualifiedName (PARTITION partition=properties)?
+        (ADD | REPLACE) COLUMNS '('tableElement (',' tableElement)*')' (CASCADE | RESTRICT)?                                                    #addReplaceColumn
+    | ALTER TABLE qualifiedName (PARTITION properties)? (SET SERDE string (WITH SERDEPROPERTIES properties)? | SET SERDEPROPERTIES properties)  #alterTableSerde
+    | ALTER TABLE qualifiedName CLUSTERED BY columnAliases (SORTED BY columnAliases)? INTO expression BUCKETS                                   #alterTableStorage
+    | ALTER TABLE qualifiedName SKEWED BY columnAliases ON  expression (',' expression)* (STORED_AS DIRECTORIES)?                               #alterTableSkewed
+    | ALTER TABLE qualifiedName NOT SKEWED                                                                                                      #alterTableNotSkewed
+    | ALTER TABLE qualifiedName NOT STORED AS DIRECTORIES                                                                                       #alterTableNotAsDirectories
+    | ALTER TABLE qualifiedName SET SKEWED LOCATION properties                                                                                  #alterTableSetSkewedLocation
+    | ALTER TABLE qualifiedName ADD CONSTRAINT identifier
+        (PRIMARY KEY columnAliases DISABLE NOVALIDATE
+          | FOREIGN KEY columnAliases REFERENCES identifier columnAliases DISABLE NOVALIDATE RELY
+          | UNIQUE columnAliases DISABLE NOVALIDATE)                                                                                            #alterTableAddConstraint
+    | ALTER TABLE qualifiedName CHANGE COLUMN identifier identifier type
+        CONSTRAINT identifier (NOT NULL ENABLE | DEFAULT defaultValue ENABLE | CHECK expression ENABLE)                                         #alterTableChangeConstraint
+    | ALTER TABLE qualifiedName DROP CONSTRAINT identifier                                                                                      #alterTableDropConstraint
+    | ALTER TABLE qualifiedName ADD (IF NOT EXISTS)? PARTITION properties (LOCATION string)? (',' PARTITION properties (LOCATION string)?)*     #alterTableAddPartition
+    | ALTER TABLE qualifiedName PARTITION properties RENAME TO PARTITION properties                                                             #alterTableRenamePartition
+    | ALTER TABLE qualifiedName EXCHANGE PARTITION properties WITH TABLE qualifiedName                                                          #alterTableExchangePartition
+    | ALTER TABLE qualifiedName RECOVER PARTITIONS                                                                                              #alterTableRecoverPartitions
+    | ALTER TABLE qualifiedName DROP (IF EXISTS)? PARTITION properties (',' PARTITION properties)? (IGNORE PROTECTION)? PURGE?                  #alterTableDropPartition
+    | ALTER TABLE qualifiedName (ARCHIVE | UNARCHIVE) PARTITION properties                                                                      #alterTableArchivePartition
+    | ALTER TABLE qualifiedName PARTITION properties SET FILEFORMAT identifier                                                                  #alterTablePartitionFileFormat
+    | ALTER TABLE qualifiedName PARTITION properties SET LOCATION string                                                                        #alterTablePartitionLocation
+    | ALTER TABLE qualifiedName TOUCH PARTITION properties                                                                                      #alterTablePartitionTouch
+    | ALTER TABLE qualifiedName PARTITION properties (ENABLE | DISABLE) (NO_DROP CASCADE? | OFFLINE)                                            #alterTablePartitionProtections
+    | ALTER TABLE qualifiedName PARTITION properties COMPACT string (AND WAIT)? WITH OVERWRITE TBLPROPERTIES properties                         #alterTablePartitionCompact
+    | ALTER TABLE qualifiedName PARTITION properties CONCATENATE                                                                                #alterTablePartitionConcatenate
+    | ALTER TABLE qualifiedName PARTITION properties UPDATE COLUMNS                                                                             #alterTablePartitionUpdateColumns
+    | ALTER TABLE qualifiedName (PARTITION properties)? CHANGE COLUMN? oldName=identifier newName=identifier type
+        (COMMENT string)? (FIRST | AFTER columnName=identifier)? (CASCADE | RESTRICT)?                                                          #alterTableChangeColumn
     | CREATE VIEW (IF NOT EXISTS)?  qualifiedName viewColumns?
         (COMMENT string)?
         (TBLPROPERTIES properties)? AS query                           #createView
     | DROP VIEW (IF EXISTS)? qualifiedName                             #dropView
     | ALTER VIEW qualifiedName
         (SET TBLPROPERTIES properties | AS query)                      #alterView
+    | SHOW VIEWS ((IN | FROM) qualifiedName)? (LIKE string)?           #showViews
     | CREATE ROLE name=identifier                                      #createRole
     | DROP ROLE name=identifier                                        #dropRole
     | GRANT ROLE?
@@ -86,6 +126,8 @@ statement
         ROLE?
         roles
         FROM principal (',' principal)*                                #revokeRoles
+    | SHOW ROLE GRANT principal                                        #showRoleGrant
+    | SHOW PRINCIPALS identifier                                       #showPrincipals
     | SET ROLE (ALL | NONE | role=identifier)                          #setRole
     | GRANT
         privilege (',' privilege)*
@@ -98,21 +140,66 @@ statement
     | SHOW GRANT
         principal?
         ON (ALL | TABLE? qualifiedName)                                #showGrants
-    | EXPLAIN ANALYZE? statement                                       #explain
+    | EXPLAIN (EXTENDED | CBO | AST | DEPENDENCY | AUTHORIZATION | LOCKS | VECTORIZATIONANALYZE | ANALYZE)? statement    #explain
     | SHOW CREATE TABLE qualifiedName                                  #showCreateTable
     | SHOW TABLES ((FROM | IN) qualifiedName)?
         (LIKE)? (pattern=string)?                                      #showTables
+    | SHOW TABLE EXTENDED ((FROM | IN) qualifiedName)?
+        LIKE pattern=identifier (PARTITION properties)?                #showTableExtended
+    | SHOW TBLPROPERTIES qualifiedName ('(' identifier ')')?           #showTableProperties
+    | TRUNCATE TABLE qualifiedName (PARTITION properties)?             #truncateTable
+    | MSCK REPAIR? TABLE qualifiedName
+        ((ADD | DROP | SYNC) PARTITIONS)?                              #msckRepairTable
     | SHOW (SCHEMAS | DATABASES)
         (LIKE pattern=string)?                                         #showSchemas
     | SHOW COLUMNS (FROM | IN) tableName=qualifiedName
         ((FROM | IN) dbName=qualifiedName)?
         (LIKE)? (pattern=string)?                                      #showColumns
     | SHOW CURRENT? ROLES                                              #showRoles
-    | DESCRIBE (EXTENDED | FORMATTED)? qualifiedName                   #showColumns
-    | DESC (EXTENDED | FORMATTED)? qualifiedName                       #showColumns
+    | (DESCRIBE | DESC) (EXTENDED | FORMATTED)? describeName
+        describeTableOption?                                           #describeTable
+    | CREATE (TEMPORARY)? FUNCTION qualifiedName
+        AS qualifiedName createFunctionOption*                         #createFunction
+    | DROP (TEMPORARY)? FUNCTION (IF EXISTS)? qualifiedName            #dropFunction
+    | RELOAD (FUNCTIONS | FUNCTION)                                    #reloadFunctions
     | SHOW FUNCTIONS
         (LIKE pattern=string)?                                         #showFunctions
-    | SET                                                              #showSession
+    | SET property?                                                    #setSession
+    | RESET                                                            #resetSession
+    | CREATE MATERIALIZED VIEW (IF NOT EXISTS)? qualifiedName
+        createMaterializedViewOption* AS query                                              #createMaterializedView
+    | DROP MATERIALIZED VIEW qualifiedName                                                  #dropMaterializedView
+    | ALTER MATERIALIZED VIEW qualifiedName (ENABLE | DISABLE) REWRITE                      #alterMaterializedView
+    | SHOW MATERIALIZED VIEWS ((IN | FROM) qualifiedName)? (LIKE pattern=string)?           #showMaterializedViews
+    | CREATE INDEX identifier ON TABLE? identifier columnAliases
+        AS identifier createIndexOptions*                                                   #createIndex
+    | DROP INDEX (IF EXISTS)? identifier ON identifier                                      #dropIndex
+    | ALTER INDEX identifier ON identifier (PARTITION properties)? REBUILD                  #alterIndex
+    | SHOW (FORMATTED)? (INDEX | INDEXES) ON identifier ((FROM | IN) qualifiedName)?        #showIndex
+    | SHOW PARTITIONS qualifiedName (PARTITION properties)?
+        (WHERE where=booleanExpression)?
+        (ORDER BY sortItem (',' sortItem)*)?
+        (LIMIT rows=INTEGER_VALUE)?                                                         #showPartitions
+    | (DESCRIBE | DESC) (EXTENDED | FORMATTED)? qualifiedName identifier?
+        PARTITION properties                                                                #describePartition
+    | (DESCRIBE | DESC) (EXTENDED | FORMATTED)? qualifiedName
+        (PARTITION properties)?
+        (identifier (('.' identifier) | ('.' '$' identifier '$'))*)?                        #describePartition
+    | CREATE TEMPORARY MACRO identifier '(' (tableElement (',' tableElement)*)? ')' expression    #createMacro
+    | DROP TEMPORARY MACRO (IF EXISTS)? identifier                                          #dropMacro
+    | SHOW LOCKS (DATABASE | SCHEMA)? identifier (PARTITION properties)? EXTENDED?          #showLocks
+    | SHOW CONF identifier                                                                  #showConf
+    | SHOW TRANSACTIONS                                                                     #showTransactions
+    | SHOW COMPACTIONS                                                                      #showCompactions
+    | ABORT TRANSACTIONS INTEGER_VALUE (INTEGER_VALUE)*                                     #abortTransactions
+    | LOAD DATA LOCAL? INPATH identifier OVERWRITE? INTO TABLE identifier
+        (PARTITION properties)? (INPUTFORMAT identifier SERDE identifier)?                  #loadData
+    | MERGE INTO qualifiedName AS T USING (qualifiedName | query) AS S ON booleanExpression
+        (WHEN MATCHED (AND booleanExpression)? THEN UPDATE SET property (',' property)*)?
+        (WHEN MATCHED (AND booleanExpression)? THEN DELETE)?
+        (WHEN NOT MATCHED (AND booleanExpression)? THEN INSERT VALUES expression (',' expression)* )?             #merge
+    | EXPORT TABLE identifier (PARTITION properties)? TO string (FOR REPLICATION '(' identifier ')')?             #exportData
+    | IMPORT (EXTERNAL? TABLE identifier (PARTITION properties)?)? FROM string (LOCATION string)?                 #importData
     ;
 
 assignmentList
@@ -121,6 +208,43 @@ assignmentList
 
 assignmentItem
     :  qualifiedName EQ expression
+    ;
+
+describeName
+    : identifier ('.'identifier)?
+    ;
+
+describeTableOption
+    : (('.' identifier) | ('.' '$' identifier '$'))+
+    | identifier (('.' identifier) | ('.' '$' identifier '$'))*
+    ;
+
+createFunctionOption
+    : USING (JAR | FILE | ARCHIVE) expression (',' (JAR | FILE | ARCHIVE) expression)?
+    ;
+
+createMaterializedViewOption
+    : DISABLE REWRITE
+    | COMMENT string
+    | PARTITIONED ON columnAliases
+    | CLUSTERED ON columnAliases
+    | DISTRIBUTE ON columnAliases SORTED ON columnAliases
+    | ROW FORMAT expression
+    | STORED_AS expression
+    | STORED BY expression (WITH SERDEPROPERTIES properties)?
+    | LOCATION expression
+    | TBLPROPERTIES properties
+    ;
+
+createIndexOptions
+    : WITH DEFERRED REBUILD
+    | IDXPROPERTIES properties
+    | IN TABLE identifier
+    | (ROW FORMAT expression)? STORED_AS expression
+    | STORED BY expression
+    | LOCATION string
+    | TBLPROPERTIES properties
+    | COMMENT string
     ;
 
 viewColumns
@@ -140,7 +264,7 @@ tableElement
     ;
 
 columnDefinition
-    : identifier type (NOT NULL)? (COMMENT string)? (WITH properties)?
+    : identifier type columnConstraintSpecification? (COMMENT string)?
     ;
 
 properties
@@ -159,12 +283,44 @@ partitionedBy
     : columnDefinition (',' columnDefinition)*
     ;
 
+rowFormat
+    : DELIMITED (FIELDS TERMINATED BY string (ESCAPED BY string)?)?
+      (COLLECTION ITEMS TERMINATED BY string)?
+      (MAP KEYS TERMINATED BY string)?
+      (LINES TERMINATED BY string)?
+      (NULL DEFINED AS string)?
+    | SERDE string (WITH SERDEPROPERTIES properties)?
+    ;
+
+columnConstraintSpecification
+    : PRIMARY KEY
+    | UNIQUE (DISABLE NOVALIDATE)?
+    | NOT NULL
+    | DEFAULT defaultValue?
+    | CHECK expression? ((ENABLE | DISABLE) NOVALIDATE (RELY | NORELY)?)?
+    ;
+
+constraintSpecification
+    : PRIMARY KEY columnAliases DISABLE NOVALIDATE (RELY | NORELY)?
+    | CONSTRAINT identifier FOREIGN KEY columnAliases REFERENCES qualifiedName columnAliases DISABLE NOVALIDATE
+    | CONSTRAINT identifier UNIQUE columnAliases DISABLE NOVALIDATE (RELY | NORELY)?
+    | CONSTRAINT identifier CHECK expression? ((ENABLE | DISABLE) NOVALIDATE (RELY | NORELY)?)?
+    ;
+
+defaultValue
+    : LITERAL
+    | CURRENT_USER '(' ')'
+    | CURRENT_DATE '(' ')'
+    | CURRENT_TIMESTAMP '(' ')'
+    | NULL
+    ;
+
 insertPartition
     : identifier (EQ expression)? (',' identifier (EQ expression)? )*
     ;
 
 sortedBy
-    : expression (',' expression)*
+    : sortItem (',' sortItem)*
     ;
 
 property
@@ -442,6 +598,7 @@ principal
     : identifier            #unspecifiedPrincipal
     | USER identifier       #userPrincipal
     | ROLE identifier       #rolePrincipal
+    | GROUP identifier      #groupPrincipal
     ;
 
 roles
@@ -464,34 +621,37 @@ number
 
 nonReserved
     // IMPORTANT: this rule must only contain tokens. Nested rules are not supported. See SqlParser.exitNonReserved
-    : ADD | ADMIN | ALL | ANALYZE | ANY | ARRAY | ASC | AT
+    : ADD | ADMIN | ALL | ANALYZE | ANY | ARRAY | ASC | AT | AUTHORIZATION | ABORT
     | BERNOULLI
-    | CALL | CASCADE | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CURRENT
-    | DATA | DATABASE | DATABASES | DATE | DAY | DAYS | DEFINER | DESC | DISTRIBUTED
-    | EXCLUDING | EXPLAIN
-    | FETCH | FILTER | FIRST | FOLLOWING | FORMAT | FUNCTIONS
-    | GRANT | GRANTED | GRANTS | GRAPHVIZ
+    | CALL | CASCADE | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CURRENT | CONF | CHANGE | CHECK | COLLECTION | COMPACTIONS
+    | DATA | DATABASE | DATABASES | DATE | DAY | DAYS | DEFINER | DESC | DISTRIBUTED | DEFAULT | DIRECTORY | DIRECTORIES
+    | EXCLUDING | EXPLAIN | EXCHANGE | EXPORT
+    | FETCH | FILTER | FIRST | FOLLOWING | FORMAT | FUNCTION | FUNCTIONS | FIELDS | FOREIGN
+    | GRANT | GRANTED | GRANTS | GRAPHVIZ | GROUP
     | HOUR | HOURS
-    | IF | INCLUDING | INPUT | INTERVAL | INVOKER | IO | ISOLATION
+    | IF | INCLUDING | INPUT | INTERVAL | INVOKER | IO | ISOLATION | IGNORE | IMPORT | INDEX | INDEXES | ITEMS
     | JSON
-    | LAST | LATERAL | LEVEL | LIMIT | LOGICAL
-    | MAP | MINUTE | MINUTES | MONTH | MONTHS
+    | KEY | KEYS
+    | LAST | LATERAL | LEVEL | LIMIT | LOGICAL | LOAD | LOCAL | LINES | LOAD | LOCAL | LOCKS
+    | MAP | MINUTE | MINUTES | MONTH | MONTHS | MERGE | MSCK
     | NEXT | NFC | NFD | NFKC | NFKD | NO | NONE | NULLIF | NULLS
-    | OFFSET | ONLY | OPTION | ORDINALITY | OUTPUT | OVER
-    | PARTITION | PARTITIONS | PATH | POSITION | PRECEDING | PRIVILEGES | PROPERTIES
-    | RANGE | READ | RENAME | REPEATABLE | REPLACE | RESET | RESTRICT | REVOKE | ROLE | ROLES | ROLLBACK | ROW | ROWS
-    | SCHEMA | SCHEMAS | SECOND | SECONDS | SECURITY | SERIALIZABLE | SESSION | SET | SETS
+    | OFFSET | ONLY | OPTION | ORDINALITY | OUTPUT | OVER | OFFLINE
+    | PARTITION | PARTITIONS | PATH | POSITION | PRECEDING | PRIVILEGES | PROPERTIES | PROTECTION | PRIMARY | PRINCIPALS
+    | RANGE | READ | RENAME | REPEATABLE | REPLACE | RESET | RESTRICT | REVOKE | ROLE | ROLES | ROLLBACK | ROW | ROWS | REBUILD | RECOVER
+    | S | SCHEMA | SCHEMAS | SECOND | SECONDS | SECURITY | SERIALIZABLE | SESSION | SET | SETS
     | SHOW | SOME | START | STATS | STRUCT | SUBSTRING | SYSTEM
-    | TABLES | TABLESAMPLE | TEXT | TIES | TIME | TIMESTAMP | TO | TRANSACTION | TRY_CAST | TYPE
-    | UNBOUNDED | UNCOMMITTED | UNIONTYPE | USE | USER
+    | T | TABLES | TABLESAMPLE  | TRANSACTION | TRANSACTIONS | TRANSACTIONAL | TEXT | TIES | TIME | TIMESTAMP | TO | TRY_CAST | TYPE | TRUNCATE
+    | UNBOUNDED | UNCOMMITTED | UNIONTYPE | USE | USER | UNARCHIVE | UNIQUE
     | VALIDATE | VERBOSE | VIEW | VIEWS
-    | WORK | WRITE
+    | WORK | WRITE | WAIT
     | YEAR | YEARS
     | ZONE
     ;
 
+ABORT: 'ABORT';
 ADD: 'ADD';
 ADMIN: 'ADMIN';
+AFTER: 'AFTER';
 ALL: 'ALL';
 ALTER: 'ALTER';
 ANALYZE: 'ANALYZE';
@@ -501,7 +661,9 @@ ARCHIVE: 'ARCHIVE';
 ARRAY: 'ARRAY';
 AS: 'AS';
 ASC: 'ASC';
+AST: 'AST';
 AT: 'AT';
+AUTHORIZATION: 'AUTHORIZATION';
 BERNOULLI: 'BERNOULLI';
 BETWEEN: 'BETWEEN';
 PARTITIONED: 'PARTITIONED';
@@ -512,6 +674,7 @@ SORTED: 'SORTED';
 DISTRIBUTE: 'DISTRIBUTE';
 BUCKETS: 'BUCKETS';
 PURGE: 'PURGE';
+SKEWED: 'SKEWED';
 STORED: 'STORED';
 STORED_AS: 'STORED AS';
 LOCATION: 'LOCATION';
@@ -523,11 +686,19 @@ CASCADE: 'CASCADE';
 CASE: 'CASE';
 CAST: 'CAST';
 CATALOGS: 'CATALOGS';
+CBO: 'CBO';
+CHANGE: 'CHANGE';
+CHECK: 'CHECK';
+COLLECTION: 'COLLECTION';
 COLUMN: 'COLUMN';
 COLUMNS: 'COLUMNS';
+CONCATENATE: 'CONCATENATE';
+COMPACTIONS: 'COMPACTIONS';
 COMMENT: 'COMMENT';
 COMMIT: 'COMMIT';
 COMMITTED: 'COMMITTED';
+COMPACT: 'COMPACT';
+CONF: 'CONF';
 CONSTRAINT: 'CONSTRAINT';
 CREATE: 'CREATE';
 CROSS: 'CROSS';
@@ -546,12 +717,19 @@ DATE: 'DATE';
 DAY: 'DAY';
 DAYS: 'DAYS';
 DEALLOCATE: 'DEALLOCATE';
+DEFAULT: 'DEFAULT';
+DEFERRED: 'DEFERRED';
+DELIMITED: 'DELIMITED';
 DEFINER: 'DEFINER';
+DEPENDENCY: 'DEPENDENCY';
 DELETE: 'DELETE';
 DISABLE: 'DISABLE';
 UPDATE: 'UPDATE';
+DEFINED: 'DEFINED';
 DESC: 'DESC';
 DESCRIBE: 'DESCRIBE';
+DIRECTORY: 'DIRECTORY';
+DIRECTORIES: 'DIRECTORIES';
 DISTINCT: 'DISTINCT';
 DISTRIBUTED: 'DISTRIBUTED';
 DROP: 'DROP';
@@ -559,20 +737,26 @@ ELSE: 'ELSE';
 ENABLE: 'ENABLE';
 END: 'END';
 ESCAPE: 'ESCAPE';
+ESCAPED: 'ESCAPED';
 EXCEPT: 'EXCEPT';
+EXCHANGE: 'EXCHANGE';
 EXCLUDING: 'EXCLUDING';
 EXECUTE: 'EXECUTE';
 EXISTS: 'EXISTS';
 EXPLAIN: 'EXPLAIN';
+EXPORT: 'EXPORT';
 EXTRACT: 'EXTRACT';
 EXTENDED: 'EXTENDED';
 FALSE: 'FALSE';
 FETCH: 'FETCH';
 FILE: 'FILE';
+FILEFORMAT: 'FILEFORMAT';
 FILTER: 'FILTER';
+FIELDS: 'FIELDS';
 FIRST: 'FIRST';
 FOLLOWING: 'FOLLOWING';
 FOR: 'FOR';
+FOREIGN: 'FOREIGN';
 FORMAT: 'FORMAT';
 FORMATTED: 'FORMATTED';
 FROM: 'FROM';
@@ -588,9 +772,16 @@ GROUPING: 'GROUPING';
 HAVING: 'HAVING';
 HOUR: 'HOUR';
 HOURS: 'HOURS';
+IDXPROPERTIES: 'IDXPROPERTIES';
 IF: 'IF';
+IGNORE: 'IGNORE';
+IMPORT: 'IMPORT';
 IN: 'IN';
 INCLUDING: 'INCLUDING';
+INDEX: 'INDEX';
+INDEXES: 'INDEXES';
+INPATH: 'INPATH';
+INPUTFORMAT: 'INPUTFORMAT';
 INNER: 'INNER';
 INPUT: 'INPUT';
 INSERT: 'INSERT';
@@ -601,24 +792,37 @@ INVOKER: 'INVOKER';
 IO: 'IO';
 IS: 'IS';
 ISOLATION: 'ISOLATION';
+ITEMS: 'ITEMS';
 JAR: 'JAR';
 JSON: 'JSON';
 JOIN: 'JOIN';
+KEY: 'KEY';
+KEYS: 'KEYS';
 LAST: 'LAST';
 LATERAL: 'LATERAL';
 LEFT: 'LEFT';
 LEVEL: 'LEVEL';
 LIKE: 'LIKE';
 LIMIT: 'LIMIT';
+LINES: 'LINES';
+LITERAL: 'LITERAL';
+LOAD: 'LOAD';
+LOCAL: 'LOCAL';
 LOCALTIME: 'LOCALTIME';
 LOCALTIMESTAMP: 'LOCALTIMESTAMP';
+LOCKS: 'LOCKS';
 LOGICAL: 'LOGICAL';
+MACRO: 'MACRO';
+MANAGEDLOCATION: 'MANAGEDLOCATION';
 MATERIALIZED: 'MATERIALIZED';
 MAP: 'MAP';
+MATCHED: 'MATCHED';
+MERGE: 'MERGE';
 MINUTE: 'MINUTE';
 MINUTES: 'MINUTES';
 MONTH: 'MONTH';
 MONTHS: 'MONTHS';
+MSCK: 'MSCK';
 NATURAL: 'NATURAL';
 NEXT: 'NEXT';
 NFC : 'NFC';
@@ -626,12 +830,16 @@ NFD : 'NFD';
 NFKC : 'NFKC';
 NFKD : 'NFKD';
 NO: 'NO';
+NO_DROP: 'NO_DROP';
 NONE: 'NONE';
 NORMALIZE: 'NORMALIZE';
+NOVALIDATE: 'NOVALIDATE';
+NORELY: 'NORELY';
 NOT: 'NOT';
 NULL: 'NULL';
 NULLIF: 'NULLIF';
 NULLS: 'NULLS';
+OFFLINE: 'OFFLINE';
 OFFSET: 'OFFSET';
 ON: 'ON';
 ONLY: 'ONLY';
@@ -650,15 +858,25 @@ PATH: 'PATH';
 POSITION: 'POSITION';
 PRECEDING: 'PRECEDING';
 PREPARE: 'PREPARE';
+PROTECTION: 'PROTECTION';
+PRIMARY: 'PRIMARY';
+PRINCIPALS: 'PRINCIPALS';
 PRIVILEGES: 'PRIVILEGES';
 PROPERTIES: 'PROPERTIES';
+S: 'S';
 RANGE: 'RANGE';
 READ: 'READ';
+REBUILD: 'REBUILD';
+RECOVER: 'RECOVER';
 RELOAD: 'RELOAD';
+RELY: 'RELY';
 RECURSIVE: 'RECURSIVE';
+REFERENCES: 'REFERENCES';
 RENAME: 'RENAME';
 REPEATABLE: 'REPEATABLE';
+REPAIR: 'REPAIR';
 REPLACE: 'REPLACE';
+REPLICATION: 'REPLICATION';
 REWRITE: 'REWRITE';
 RESET: 'RESET';
 RESTRICT: 'RESTRICT';
@@ -677,6 +895,7 @@ SECONDS: 'SECONDS';
 SECURITY: 'SECURITY';
 SELECT: 'SELECT';
 SERDEPROPERTIES: 'SERDEPROPERTIES';
+SERDE: 'SERDE';
 SERIALIZABLE: 'SERIALIZABLE';
 SESSION: 'SESSION';
 SET: 'SET';
@@ -687,23 +906,32 @@ START: 'START';
 STATS: 'STATS';
 STRUCT: 'STRUCT';
 SUBSTRING: 'SUBSTRING';
+SYNC: 'SYNC';
 SYSTEM: 'SYSTEM';
+T: 'T';
 TABLE: 'TABLE';
 TABLES: 'TABLES';
 TABLESAMPLE: 'TABLESAMPLE';
+TERMINATED: 'TERMINATED';
 TEXT: 'TEXT';
 THEN: 'THEN';
 TIES: 'TIES';
 TIME: 'TIME';
 TIMESTAMP: 'TIMESTAMP';
 TO: 'TO';
+TOUCH: 'TOUCH';
 TRANSACTION: 'TRANSACTION';
+TRANSACTIONS: 'TRANSACTIONS';
+TRANSACTIONAL: 'TRANSACTIONAL';
 TRUE: 'TRUE';
+TRUNCATE: 'TRUNCATE';
 TRY_CAST: 'TRY_CAST';
 TYPE: 'TYPE';
 UESCAPE: 'UESCAPE';
+UNARCHIVE: 'UNARCHIVE';
 UNBOUNDED: 'UNBOUNDED';
 UNCOMMITTED: 'UNCOMMITTED';
+UNIQUE: 'UNIQUE';
 UNION: 'UNION';
 UNIONTYPE: 'UNIONTYPE ';
 UNNEST: 'UNNEST';
@@ -715,6 +943,8 @@ VALUES: 'VALUES';
 VERBOSE: 'VERBOSE';
 VIEW: 'VIEW';
 VIEWS: 'VIEWS';
+VECTORIZATIONANALYZE: 'VECTORIZATIONANALYZE';
+WAIT: 'WAIT';
 WHEN: 'WHEN';
 WHERE: 'WHERE';
 WITH: 'WITH';
@@ -739,8 +969,8 @@ PERCENT: '%';
 CONCAT: '||';
 
 STRING
-    : '\'' ( ~'\'' | '\'\'' )* '\''
-    | '"' ( ~'"' | '""' )* '"'
+    : '\'' ( ~'\'' | '\'\'' | '\\\'')* '\''
+    | '"' ( ~'"' | '""' | '\\"' )* '"'
     ;
 
 // Note: we allow any character inside the binary literal and validate
