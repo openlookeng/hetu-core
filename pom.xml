@@ -51,7 +51,7 @@
         <dep.logback.version>1.2.3</dep.logback.version>
         <dep.jmxutils.version>1.21</dep.jmxutils.version>
         <dep.gcs.version>1.9.10</dep.gcs.version>
-        <dep.prestosql.apache.hadoop.version>3.2.0-3</dep.prestosql.apache.hadoop.version>
+        <dep.prestosql.apache.hadoop.version>3.2.0-8</dep.prestosql.apache.hadoop.version>
         <carbon.version>2.0.1</carbon.version>
         <dep.prestosql.version>316</dep.prestosql.version>
         <dep.hetu.version>010</dep.hetu.version>
