@@ -21,6 +21,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.block.ShortArrayBlock;
 import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -44,10 +45,10 @@ public class ShortColumnReader
      * @param systemMemoryContext
      * @throws OrcCorruptionException
      */
-    public ShortColumnReader(OrcColumn column, LocalMemoryContext systemMemoryContext)
+    public ShortColumnReader(Type type, OrcColumn column, LocalMemoryContext systemMemoryContext)
             throws OrcCorruptionException
     {
-        super(column, systemMemoryContext);
+        super(type, column, systemMemoryContext);
     }
 
     @Override
