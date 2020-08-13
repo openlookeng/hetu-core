@@ -44,7 +44,6 @@ import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.CreateView;
 import io.prestosql.sql.tree.Cube;
-import io.prestosql.sql.tree.CurrentPath;
 import io.prestosql.sql.tree.CurrentTime;
 import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.DecimalLiteral;
@@ -422,7 +421,7 @@ public class HiveAstBuilder
         }
         if (context.EXTERNAL() != null) {
             if (context.LOCATION() == null) {
-                throw parseError("External attribute should be used with location", context);
+                throw parseError("Unsupported statement: External attribute should be used with location", context);
             }
             Identifier name = new Identifier("external");
             Expression value = new Identifier("true");
@@ -843,6 +842,12 @@ public class HiveAstBuilder
     }
 
     @Override
+    public Node visitDescribeFunction(HiveSqlParser.DescribeFunctionContext context)
+    {
+        throw parseError("Unsupported statement: Describe Function", context);
+    }
+
+    @Override
     public Node visitCreateMacro(HiveSqlParser.CreateMacroContext context)
     {
         throw parseError("Unsupported statement: Create Macro", context);
@@ -1259,7 +1264,7 @@ public class HiveAstBuilder
         }
 
         if (context.sortedBy() != null) {
-            throw parseError("Unsupported attribute: SORTED BY", context.sortedBy());
+            throw parseError("Unsupported attribute: SORT BY", context.sortedBy());
         }
 
         Optional<Node> limit = Optional.empty();
@@ -1308,6 +1313,10 @@ public class HiveAstBuilder
     @Override
     public Node visitQuerySpecification(HiveSqlParser.QuerySpecificationContext context)
     {
+        if (context.lateralView().size() > 0) {
+            throw parseError("Unsupported statement: LATERAL VIEW", context.lateralView(0));
+        }
+
         Optional<Relation> from = Optional.empty();
         List<SelectItem> selectItems = visit(context.selectItem(), SelectItem.class);
 
@@ -1448,23 +1457,44 @@ public class HiveAstBuilder
     public Node visitJoinRelation(HiveSqlParser.JoinRelationContext context)
     {
         Relation leftRelation = (Relation) visit(context.left);
-
         Relation rightRelation;
-        // Cross join
-        if (context.CROSS() != null) {
-            rightRelation = (Relation) visit(context.right);
-            return new Join(getLocation(context), Join.Type.CROSS, leftRelation, rightRelation, Optional.empty());
+        Optional<JoinCriteria> criteria = Optional.empty();
+
+        // Semi Join
+        if (context.semiJoin() != null) {
+            throw parseError("Unsupported statement: Left semi join", context.semiJoin());
         }
+
+        // Cross join
+        if (context.crossJoin() != null) {
+            if (context.crossJoin().joinCriteria() != null) {
+                throw parseError("Unsupported statement: Cross join must not contain join condition", context.crossJoin().joinCriteria());
+            }
+
+            rightRelation = (Relation) visit(context.crossJoin().right);
+            return new Join(getLocation(context), Join.Type.CROSS, leftRelation, rightRelation, criteria);
+        }
+
+        // Inner join
+        if (context.innerJoin() != null) {
+            if (context.innerJoin().joinCriteria() == null) {
+                throw parseError("Unsupported statement: Inner join must contain join condition", context.innerJoin());
+            }
+
+            rightRelation = (Relation) visit(context.innerJoin().right);
+            criteria = Optional.of(new JoinOn((Expression) visit(context.innerJoin().joinCriteria().booleanExpression())));
+            return new Join(getLocation(context), Join.Type.INNER, leftRelation, rightRelation, criteria);
+        }
+
+        // Outer join
+        HiveSqlParser.OuterJoinContext outerJoinContext = context.outerJoin();
 
         // Get join type
         Join.Type joinType;
-        if (context.joinType().INNER() != null) {
-            joinType = Join.Type.INNER;
-        }
-        else if (context.joinType().LEFT() != null) {
+        if (outerJoinContext.joinType().LEFT() != null) {
             joinType = Join.Type.LEFT;
         }
-        else if (context.joinType().RIGHT() != null) {
+        else if (outerJoinContext.joinType().RIGHT() != null) {
             joinType = Join.Type.RIGHT;
         }
         else {
@@ -1472,13 +1502,10 @@ public class HiveAstBuilder
         }
 
         // Get right relation
-        rightRelation = (Relation) visit(context.rightRelation);
+        rightRelation = (Relation) visit(outerJoinContext.rightRelation);
 
         // Get join criteria
-        Optional<JoinCriteria> criteria = Optional.empty();
-        if (context.joinCriteria().ON() != null) {
-            criteria = Optional.of(new JoinOn((Expression) visit(context.joinCriteria().booleanExpression())));
-        }
+        criteria = Optional.of(new JoinOn((Expression) visit(outerJoinContext.joinCriteria().booleanExpression())));
 
         return new Join(getLocation(context), joinType, leftRelation, rightRelation, criteria);
     }
@@ -1535,6 +1562,12 @@ public class HiveAstBuilder
     }
 
     @Override
+    public Node visitExpressionPredicated(HiveSqlParser.ExpressionPredicatedContext context)
+    {
+        throw parseError(format("Unsupported statement: %s", context.getText()), context);
+    }
+
+    @Override
     public Node visitComparison(HiveSqlParser.ComparisonContext context)
     {
         return new ComparisonExpression(
@@ -1553,7 +1586,7 @@ public class HiveAstBuilder
                 (Expression) visit(context.value),
                 (Expression) visit(context.right));
 
-        if (context.NOT() != null) {
+        if (context.NOT() != null || context.NON() != null) {
             expression = new NotExpression(getLocation(context), expression);
         }
 
@@ -1569,7 +1602,7 @@ public class HiveAstBuilder
                 (Expression) visit(context.lower),
                 (Expression) visit(context.upper));
 
-        if (context.NOT() != null) {
+        if (context.NOT() != null || context.NON() != null) {
             expression = new NotExpression(getLocation(context), expression);
         }
 
@@ -1581,7 +1614,7 @@ public class HiveAstBuilder
     {
         Expression child = (Expression) visit(context.value);
 
-        if (context.NOT() == null) {
+        if (context.NOT() == null && context.NON() == null) {
             return new IsNullPredicate(getLocation(context), child);
         }
 
@@ -1595,13 +1628,25 @@ public class HiveAstBuilder
                 getLocation(context),
                 (Expression) visit(context.value),
                 (Expression) visit(context.pattern),
-                visitIfPresent(context.escape, Expression.class));
+                Optional.empty());
 
-        if (context.NOT() != null) {
+        if (context.NOT() != null || context.NON() != null) {
             result = new NotExpression(getLocation(context), result);
         }
 
         return result;
+    }
+
+    @Override
+    public Node visitRlike(HiveSqlParser.RlikeContext context)
+    {
+        throw parseError("Unsupported statement: RLIKE", context);
+    }
+
+    @Override
+    public Node visitRegexp(HiveSqlParser.RegexpContext context)
+    {
+        throw parseError("Unsupported statement: REGEXP", context);
     }
 
     @Override
@@ -1612,7 +1657,7 @@ public class HiveAstBuilder
                 (Expression) visit(context.value),
                 new InListExpression(getLocation(context), visit(context.expression(), Expression.class)));
 
-        if (context.NOT() != null) {
+        if (context.NOT() != null || context.NON() != null) {
             result = new NotExpression(getLocation(context), result);
         }
 
@@ -1627,7 +1672,7 @@ public class HiveAstBuilder
                 (Expression) visit(context.value),
                 new SubqueryExpression(getLocation(context), (Query) visit(context.query())));
 
-        if (context.NOT() != null) {
+        if (context.NOT() != null || context.NON() != null) {
             result = new NotExpression(getLocation(context), result);
         }
 
@@ -1679,6 +1724,12 @@ public class HiveAstBuilder
     }
 
     @Override
+    public Node visitArithmeticBit(HiveSqlParser.ArithmeticBitContext context)
+    {
+        throw parseError("Unsupported statement: Bit arithmetic", context);
+    }
+
+    @Override
     public Node visitConcatenation(HiveSqlParser.ConcatenationContext context)
     {
         return new FunctionCall(
@@ -1719,11 +1770,6 @@ public class HiveAstBuilder
     public Node visitSpecialDateTimeFunction(HiveSqlParser.SpecialDateTimeFunctionContext context)
     {
         CurrentTime.Function function = getDateTimeFunctionType(context.name);
-
-        if (context.precision != null) {
-            return new CurrentTime(getLocation(context), function, Integer.parseInt(context.precision.getText()));
-        }
-
         return new CurrentTime(getLocation(context), function);
     }
 
@@ -1731,12 +1777,6 @@ public class HiveAstBuilder
     public Node visitCurrentUser(HiveSqlParser.CurrentUserContext context)
     {
         return new CurrentUser(getLocation(context.CURRENT_USER()));
-    }
-
-    @Override
-    public Node visitCurrentPath(HiveSqlParser.CurrentPathContext context)
-    {
-        return new CurrentPath(getLocation(context.CURRENT_PATH()));
     }
 
     @Override
@@ -1991,6 +2031,12 @@ public class HiveAstBuilder
         return new Identifier(getLocation(context), identifier, true);
     }
 
+    @Override
+    public Node visitDigitIdentifier(HiveSqlParser.DigitIdentifierContext context)
+    {
+        throw parseError(format("Unsupported statement: %s(identifiers must not start with a digit)", context.getText()), context);
+    }
+
     // ************** literals **************
 
     @Override
@@ -2148,8 +2194,10 @@ public class HiveAstBuilder
 
     private static String unquote(String value)
     {
-        return value.substring(1, value.length() - 1)
-                .replace("''", "'").replace("\"\"", "\"");
+        if (value.contains("\\'")) {
+            throw new IllegalArgumentException("Unsupported string: " + value);
+        }
+        return value.substring(1, value.length() - 1);
     }
 
     private QualifiedName getQualifiedName(HiveSqlParser.QualifiedNameContext context)

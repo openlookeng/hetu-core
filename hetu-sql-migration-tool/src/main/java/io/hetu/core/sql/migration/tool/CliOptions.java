@@ -19,18 +19,18 @@ import io.airlift.airline.Option;
 
 public class CliOptions
 {
-    @Option(name = "--file", title = "file", description = "SQL file path")
+    @Option(name = {"-f", "--file"}, title = "file", description = "SQL file path")
     public String sqlFile;
 
-    @Option(name = "--sourceType", title = "source type", description = "SQL type, eg. hive")
+    @Option(name = {"-t", "--type"}, title = "source type", description = "SQL type, eg. hive")
     public String sourceType;
 
-    @Option(name = "--execute", title = "execute", description = "Execute specified statements and exit")
+    @Option(name = {"-e", "--execute"}, title = "execute", description = "Execute specified statements and exit")
     public String execute;
 
-    @Option(name = "--output", title = "output", description = "Output file path")
+    @Option(name = {"-o", "--output"}, title = "output", description = "Output file path")
     public String outputPath;
 
-    @Option(name = "--config", title = "config", description = "Config file path")
+    @Option(name = {"-c", "--config"}, title = "config", description = "Config file path")
     public String configFile;
 }
