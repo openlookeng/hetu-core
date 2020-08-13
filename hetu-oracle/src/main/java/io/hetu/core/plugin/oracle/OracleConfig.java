@@ -35,7 +35,7 @@ public class OracleConfig
 {
     private static final int MAX_DEFAULT_SCALE = 38;
 
-    private static final int DEFAULT_SCALE = -1;
+    private static final int DEFAULT_SCALE = 0;
 
     private boolean isQueryPushDownEnabled = true;
 
@@ -103,6 +103,8 @@ public class OracleConfig
         return this;
     }
 
+    @Min(0)
+    @Max(MAX_DEFAULT_SCALE)
     public int getNumberDefaultScale()
     {
         return numberDefaultScale;
@@ -117,8 +119,6 @@ public class OracleConfig
     @Config("oracle.number.default-scale")
     @ConfigDescription("Default Hetu DECIMAL scale for Oracle NUMBER (without precision and scale) data type. "
             + "When not set then such column will be treated as not supported")
-    @Min(0)
-    @Max(MAX_DEFAULT_SCALE)
     public OracleConfig setNumberDefaultScale(Integer numberDefaultScale)
     {
         this.numberDefaultScale = numberDefaultScale;

@@ -60,12 +60,11 @@ public class JdbcMetadataConfig
     }
 
     @NotNull
-    public Duration getMetadataCacheTtl()
+    public @MinDuration("0ms") Duration getMetadataCacheTtl()
     {
         return metadataCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("metadata-cache-ttl")
     @ConfigDescription("Set the metadata cache eviction time for Jdbc based connectors")
     public JdbcMetadataConfig setMetadataCacheTtl(Duration metadataCacheTtl)
@@ -74,12 +73,12 @@ public class JdbcMetadataConfig
         return this;
     }
 
+    @Min(1)
     public long getMetadataCacheMaximumSize()
     {
         return metadataCacheMaximumSize;
     }
 
-    @Min(1)
     @Config("metadata-cache-maximum-size")
     @ConfigDescription("Set the metadata cache max size for Jdbc based connectors")
     public JdbcMetadataConfig setMetadataCacheMaximumSize(long metadataCacheMaximumSize)

@@ -17,6 +17,7 @@ package io.hetu.core.plugin.carbondata.server;
 
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.plugin.carbondata.CarbondataPlugin;
+import io.hetu.core.plugin.carbondata.impl.CarbondataTableReader;
 import io.prestosql.Session;
 import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.jdbc.PrestoStatement;
@@ -24,9 +25,9 @@ import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.plugin.hive.HivePlugin;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.tests.DistributedQueryRunner;
+import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.log4j.Logger;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -52,7 +53,8 @@ public class HetuTestServer
     private static final String carbonDataConnector = "carbondata";
     private static final String carbonDataSource = "carbondata";
 
-    private final Logger logger = LoggerFactory.getLogger(HetuTestServer.class);
+    private static final Logger logger =
+            LogServiceFactory.getLogService(HetuTestServer.class.getName());
     private ThreadLocalRandom random = ThreadLocalRandom.current();
     private final int port = random.nextInt(1024, 15000);
 

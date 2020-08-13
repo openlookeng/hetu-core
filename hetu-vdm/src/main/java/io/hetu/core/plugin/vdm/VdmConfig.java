@@ -56,7 +56,7 @@ public class VdmConfig
     }
 
     @NotNull
-    public Duration getMetadataCacheTtl()
+    public @MinDuration("0ms") Duration getMetadataCacheTtl()
     {
         return metadataCacheTtl;
     }
@@ -67,7 +67,6 @@ public class VdmConfig
      * @param metadataCacheTtl metadata cache ttl
      * @return vdm config
      */
-    @MinDuration("0ms")
     @Config("vdm.metadata-cache-ttl")
     @ConfigDescription("Set the metadata cache eviction time for vdm connector")
     public VdmConfig setMetadataCacheTtl(Duration metadataCacheTtl)
@@ -76,6 +75,7 @@ public class VdmConfig
         return this;
     }
 
+    @Min(1)
     public long getMetadataCacheMaximumSize()
     {
         return metadataCacheMaximumSize;
@@ -87,7 +87,6 @@ public class VdmConfig
      * @param metadataCacheMaximumSize maxinum size of cache
      * @return vdm config
      */
-    @Min(1)
     @Config("vdm.metadata-cache-maximum-size")
     @ConfigDescription("Set the metadata cache max size for vdm connector")
     public VdmConfig setMetadataCacheMaximumSize(long metadataCacheMaximumSize)

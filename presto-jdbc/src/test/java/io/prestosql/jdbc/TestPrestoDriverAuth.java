@@ -163,7 +163,7 @@ public class TestPrestoDriverAuth
         }
     }
 
-    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: Unsigned Claims JWTs are not supported.")
+    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: Unauthorized")
     public void testFailedUnsigned()
             throws Exception
     {
@@ -178,7 +178,7 @@ public class TestPrestoDriverAuth
         }
     }
 
-    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: JWT signature does not match.*")
+    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: Unauthorized")
     public void testFailedBadHmacSignature()
             throws Exception
     {
@@ -194,7 +194,7 @@ public class TestPrestoDriverAuth
         }
     }
 
-    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: JWT signature does not match.*")
+    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: Unauthorized")
     public void testFailedWrongPublicKey()
             throws Exception
     {
@@ -211,7 +211,7 @@ public class TestPrestoDriverAuth
         }
     }
 
-    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: Unknown signing key ID")
+    @Test(expectedExceptions = SQLException.class, expectedExceptionsMessageRegExp = "Authentication failed: Unauthorized")
     public void testFailedUnknownPublicKey()
             throws Exception
     {

@@ -45,7 +45,7 @@ public class TestHiveConfig
                 .setMaxSplitIteratorThreads(1_000)
                 .setAllowCorruptWritesForTesting(false)
                 .setMetastoreCacheTtl(new Duration(0, TimeUnit.SECONDS))
-                .setMetastoreRefreshInterval(new Duration(0, TimeUnit.SECONDS))
+                .setMetastoreRefreshInterval(new Duration(1, TimeUnit.SECONDS))
                 .setMetastoreCacheMaximumSize(10000)
                 .setPerTransactionMetastoreCacheMaximumSize(1000)
                 .setMaxMetastoreRefreshThreads(100)
