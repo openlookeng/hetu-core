@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,37 +12,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive;
+package io.prestosql.spi.connector;
 
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.SchemaTableName;
 
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static java.lang.String.format;
 
-public class TableAlreadyExistsException
+public class CatalogAlreadyExistsException
         extends PrestoException
 {
-    private final SchemaTableName tableName;
+    private final String catalogName;
 
-    public TableAlreadyExistsException(SchemaTableName tableName)
+    public CatalogAlreadyExistsException(String catalogName)
     {
-        this(tableName, format("Table already exists: '%s'", tableName));
+        this(catalogName, format("Catalog already exists: '%s'", catalogName));
     }
 
-    public TableAlreadyExistsException(SchemaTableName tableName, String message)
+    public CatalogAlreadyExistsException(String catalogName, String message)
     {
-        this(tableName, message, null);
+        super(ALREADY_EXISTS, message);
+        this.catalogName = catalogName;
     }
 
-    public TableAlreadyExistsException(SchemaTableName tableName, String message, Throwable cause)
+    public String getCatalogName()
     {
-        super(ALREADY_EXISTS, message, cause);
-        this.tableName = tableName;
-    }
-
-    public SchemaTableName getTableName()
-    {
-        return tableName;
+        return catalogName;
     }
 }

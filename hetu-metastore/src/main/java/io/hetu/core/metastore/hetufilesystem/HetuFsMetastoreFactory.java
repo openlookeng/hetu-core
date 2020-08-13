@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.metastore.jdbc;
+package io.hetu.core.metastore.hetufilesystem;
 
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
@@ -26,13 +26,19 @@ import java.util.Map;
 import static com.google.common.base.Throwables.throwIfUnchecked;
 import static java.util.Objects.requireNonNull;
 
-public class JdbcHetuMetastoreFactory
+public class HetuFsMetastoreFactory
         implements HetuMetaStoreFactory
 {
-    private static final String FACTORY_TYPE = "jdbc";
-    private ClassLoader classLoader;
+    private static final String FACTORY_TYPE = "hetufilesystem";
+    private final ClassLoader classLoader;
 
-    public JdbcHetuMetastoreFactory(ClassLoader classLoader)
+    @Override
+    public String getName()
+    {
+        return FACTORY_TYPE;
+    }
+
+    public HetuFsMetastoreFactory(ClassLoader classLoader)
     {
         this.classLoader = requireNonNull(classLoader, "classLoader is null");
     }
@@ -42,7 +48,7 @@ public class JdbcHetuMetastoreFactory
     {
         requireNonNull(config, "config is null");
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            Bootstrap app = new Bootstrap(new JdbcMetastoreModule());
+            Bootstrap app = new Bootstrap(new HetuFsMetastoreModule(client));
             Injector injector =
                     app.strictConfig().doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
 
@@ -52,11 +58,5 @@ public class JdbcHetuMetastoreFactory
             throwIfUnchecked(e);
             throw new ExceptionInInitializerError();
         }
-    }
-
-    @Override
-    public String getName()
-    {
-        return FACTORY_TYPE;
     }
 }

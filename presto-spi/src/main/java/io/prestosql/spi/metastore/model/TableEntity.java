@@ -14,6 +14,9 @@
  */
 package io.prestosql.spi.metastore.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,20 +56,28 @@ public class TableEntity
     /**
      * construction
      *
-     * @param catalogName      catalog name
-     * @param databaseName     database name
-     * @param name             table name
-     * @param owner            owner
-     * @param type             table type
+     * @param catalogName catalog name
+     * @param databaseName database name
+     * @param name table name
+     * @param owner owner
+     * @param type table type
      * @param viewOriginalText view sql
-     * @param createTime       create time
-     * @param comment          comment
-     * @param parameters       paramters
-     * @param columns          columns
+     * @param createTime create time
+     * @param comment comment
+     * @param parameters paramters
+     * @param columns columns
      */
-    public TableEntity(String catalogName, String databaseName, String name, String owner, String type,
-                       String viewOriginalText, long createTime, String comment, Map<String, String> parameters,
-                       List<ColumnEntity> columns)
+    @JsonCreator
+    public TableEntity(@JsonProperty("catalogName") String catalogName,
+            @JsonProperty("databaseName") String databaseName,
+            @JsonProperty("name") String name,
+            @JsonProperty("owner") String owner,
+            @JsonProperty("type") String type,
+            @JsonProperty("viewOriginalText") String viewOriginalText,
+            @JsonProperty("createTime") long createTime,
+            @JsonProperty("comment") String comment,
+            @JsonProperty("parameters") Map<String, String> parameters,
+            @JsonProperty("columns") List<ColumnEntity> columns)
     {
         this.catalogName = requireNonNull(catalogName, "catalog name is null");
         this.databaseName = requireNonNull(databaseName, "database name is null");
@@ -80,6 +91,7 @@ public class TableEntity
         this.columns = columns;
     }
 
+    @JsonProperty
     public String getCatalogName()
     {
         return catalogName;
@@ -90,6 +102,7 @@ public class TableEntity
         this.catalogName = catalogName;
     }
 
+    @JsonProperty
     public String getName()
     {
         return name;
@@ -100,6 +113,7 @@ public class TableEntity
         this.name = name;
     }
 
+    @JsonProperty
     public String getOwner()
     {
         return owner;
@@ -110,11 +124,18 @@ public class TableEntity
         this.owner = owner;
     }
 
+    @JsonProperty
     public long getCreateTime()
     {
         return createTime;
     }
 
+    public void setCreateTime(long createTime)
+    {
+        this.createTime = createTime;
+    }
+
+    @JsonProperty
     public Map<String, String> getParameters()
     {
         return parameters;
@@ -125,6 +146,7 @@ public class TableEntity
         this.parameters = parameters;
     }
 
+    @JsonProperty
     public String getDatabaseName()
     {
         return databaseName;
@@ -135,6 +157,7 @@ public class TableEntity
         this.databaseName = databaseName;
     }
 
+    @JsonProperty
     public String getType()
     {
         return type;
@@ -145,6 +168,7 @@ public class TableEntity
         this.type = type;
     }
 
+    @JsonProperty
     public String getViewOriginalText()
     {
         return viewOriginalText;
@@ -155,6 +179,7 @@ public class TableEntity
         this.viewOriginalText = viewOriginalText;
     }
 
+    @JsonProperty
     public List<ColumnEntity> getColumns()
     {
         return columns;
@@ -165,11 +190,7 @@ public class TableEntity
         this.columns = columns;
     }
 
-    public void setCreateTime(long createTime)
-    {
-        this.createTime = createTime;
-    }
-
+    @JsonProperty
     public String getComment()
     {
         return comment;
@@ -418,7 +439,7 @@ public class TableEntity
         /**
          * set parameter
          *
-         * @param key   key
+         * @param key key
          * @param value value
          * @return builder
          */

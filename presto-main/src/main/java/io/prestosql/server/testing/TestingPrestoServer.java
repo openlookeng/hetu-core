@@ -48,6 +48,7 @@ import io.prestosql.execution.SqlQueryManager;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.TaskManager;
 import io.prestosql.execution.resourcegroups.InternalResourceGroupManager;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.memory.LocalMemoryManager;
 import io.prestosql.metadata.AllNodes;
@@ -365,7 +366,7 @@ public class TestingPrestoServer
     public void loadMetastore()
             throws Exception
     {
-        hetuMetaStoreManager.loadHetuMetatstore();
+        hetuMetaStoreManager.loadHetuMetatstore(new FileSystemClientManager());
     }
 
     public CatalogName createCatalog(String catalogName, String connectorName)
