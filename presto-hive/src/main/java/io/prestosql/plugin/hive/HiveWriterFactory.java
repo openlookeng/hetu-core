@@ -194,7 +194,14 @@ public class HiveWriterFactory
         this.immutablePartitions = immutablePartitions;
 
         if (acidWriteType == HiveACIDWriteType.INSERT_OVERWRITE) {
-            this.insertExistingPartitionsBehavior = InsertExistingPartitionsBehavior.OVERWRITE;
+            //In case of ACID txn tables, dont delete old data. Just create new base in same partition.
+            if (pageSinkMetadataProvider.getTable().isPresent() &&
+                    AcidUtils.isTransactionalTable(pageSinkMetadataProvider.getTable().get().getParameters())) {
+                this.insertExistingPartitionsBehavior = InsertExistingPartitionsBehavior.APPEND;
+            }
+            else {
+                this.insertExistingPartitionsBehavior = InsertExistingPartitionsBehavior.OVERWRITE;
+            }
         }
         else if (acidWriteType == HiveACIDWriteType.UPDATE) {
             // if the write type is update, then ignore the session property
@@ -470,6 +477,10 @@ public class HiveWriterFactory
             if (acidWriteType == HiveACIDWriteType.DELETE) {
                 //to support delete as insert
                 options.writingDeleteDelta(true);
+            }
+            else if (acidWriteType == HiveACIDWriteType.INSERT_OVERWRITE) {
+                //In case of ACID txn tables, dont delete old data. Just create new base in same partition.
+                options.writingBase(true);
             }
             if (vacuumOptions.isPresent() && acidWriteType == HiveACIDWriteType.VACUUM) {
                 Options vOptions = vacuumOptions.get();

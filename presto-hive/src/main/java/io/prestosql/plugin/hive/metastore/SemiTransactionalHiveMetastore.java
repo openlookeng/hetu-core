@@ -955,6 +955,8 @@ public class SemiTransactionalHiveMetastore
         try {
             switch (state) {
                 case EMPTY:
+                    //release locks if any.
+                    commitTransaction();
                     break;
                 case SHARED_OPERATION_BUFFERED:
                     commitShared();
@@ -979,6 +981,8 @@ public class SemiTransactionalHiveMetastore
         try {
             switch (state) {
                 case EMPTY:
+                    //release locks if any.
+                    abortTransaction();
                 case EXCLUSIVE_OPERATION_BUFFERED:
                     break;
                 case SHARED_OPERATION_BUFFERED:
@@ -1002,27 +1006,29 @@ public class SemiTransactionalHiveMetastore
 
         synchronized (this) {
             checkState(
-                    !currentQueryId.isPresent() && !hiveTransactionSupplier.isPresent(),
+                    !currentQueryId.isPresent(),
                     "Query already begun: %s while starting query %s",
                     currentQueryId,
                     queryId);
             currentQueryId = Optional.of(queryId);
 
-            hiveTransactionSupplier = Optional.of(() -> {
-                long heartbeatInterval = configuredTransactionHeartbeatInterval
-                        .map(Duration::toMillis)
-                        .orElseGet(this::getServerExpectedHeartbeatIntervalMillis);
-                long transactionId = delegate.openTransaction(identity);
-                log.debug("Using hive transaction %s for query %s", transactionId, queryId);
+            if (!hiveTransactionSupplier.isPresent()) {
+                hiveTransactionSupplier = Optional.of(() -> {
+                    long heartbeatInterval = configuredTransactionHeartbeatInterval
+                            .map(Duration::toMillis)
+                            .orElseGet(this::getServerExpectedHeartbeatIntervalMillis);
+                    long transactionId = delegate.openTransaction(identity);
+                    log.debug("Using hive transaction %s for query %s", transactionId, queryId);
 
-                ScheduledFuture<?> heartbeatTask = heartbeatExecutor.scheduleAtFixedRate(
-                        () -> delegate.sendTransactionHeartbeat(identity, transactionId),
-                        0,
-                        heartbeatInterval,
-                        MILLISECONDS);
+                    ScheduledFuture<?> heartbeatTask = heartbeatExecutor.scheduleAtFixedRate(
+                            () -> delegate.sendTransactionHeartbeat(identity, transactionId),
+                            0,
+                            heartbeatInterval,
+                            MILLISECONDS);
 
-                return new HiveTransaction(identity, queryId, transactionId, heartbeatTask);
-            });
+                    return new HiveTransaction(identity, transactionId, heartbeatTask);
+                });
+            }
         }
     }
 
@@ -1048,7 +1054,7 @@ public class SemiTransactionalHiveMetastore
                     .get());
         }
 
-        return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle));
+        return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle, queryId));
     }
 
     public synchronized Optional<Long> getTableWriteId(ConnectorSession session, HiveTableHandle tableHandle, HiveACIDWriteType writeType)
@@ -1065,29 +1071,50 @@ public class SemiTransactionalHiveMetastore
                     .get());
         }
 
-        return Optional.of(currentHiveTransaction.get().getTableWriteId(delegate, tableHandle, writeType));
+        return Optional.of(currentHiveTransaction.get().getTableWriteId(delegate, tableHandle, writeType, queryId));
     }
 
     public synchronized void cleanupQuery(ConnectorSession session)
     {
         String queryId = session.getQueryId();
-        HiveIdentity identity = new HiveIdentity(session);
         checkState(currentQueryId.equals(Optional.of(queryId)), "Invalid query id %s while current query is", queryId, currentQueryId);
-        Optional<HiveTransaction> transaction = currentHiveTransaction;
         currentQueryId = Optional.empty();
-        currentHiveTransaction = Optional.empty();
-        hiveTransactionSupplier = Optional.empty();
+    }
+
+    private void commitTransaction()
+    {
+        Optional<HiveTransaction> transaction = currentHiveTransaction;
 
         if (!transaction.isPresent()) {
             return;
         }
 
         long transactionId = transaction.get().getTransactionId();
+        // Any failure around aborted transactions, etc would be handled by Hive Metastore commit and PrestoException will be thrown
+        delegate.commitTransaction(transaction.get().getIdentity(), transactionId);
+
+        currentHiveTransaction = Optional.empty();
+        hiveTransactionSupplier = Optional.empty();
         ScheduledFuture<?> heartbeatTask = transaction.get().getHeartbeatTask();
         heartbeatTask.cancel(true);
+    }
 
+    private void abortTransaction()
+    {
+        Optional<HiveTransaction> transaction = currentHiveTransaction;
+
+        if (!transaction.isPresent()) {
+            return;
+        }
+
+        long transactionId = transaction.get().getTransactionId();
         // Any failure around aborted transactions, etc would be handled by Hive Metastore commit and PrestoException will be thrown
-        delegate.commitTransaction(identity, transactionId);
+        delegate.abortTransaction(transaction.get().getIdentity(), transactionId);
+
+        currentHiveTransaction = Optional.empty();
+        hiveTransactionSupplier = Optional.empty();
+        ScheduledFuture<?> heartbeatTask = transaction.get().getHeartbeatTask();
+        heartbeatTask.cancel(true);
     }
 
     @GuardedBy("this")
@@ -1152,6 +1179,8 @@ public class SemiTransactionalHiveMetastore
             committer.executeAlterPartitionOperations();
             committer.executeAddPartitionOperations();
             committer.executeUpdateStatisticsOperations();
+            //finally commit the transaction
+            commitTransaction();
         }
         catch (Throwable t) {
             committer.cancelUnstartedAsyncRenames();
@@ -1356,9 +1385,9 @@ public class SemiTransactionalHiveMetastore
             Table table = tableAndMore.getTable();
             Path targetPath = new Path(table.getStorage().getLocation());
             Path currentPath = tableAndMore.getCurrentLocation().get();
-            cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, false));
             if (!targetPath.equals(currentPath)) {
-                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, tableAndMore.getFileNames().get());
+                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, tableAndMore.getFileNames().get(),
+                        cleanUpTasksForAbort);
             }
             updateStatisticsOperations.add(new UpdateStatisticsOperation(
                     table.getSchemaTableName(),
@@ -1499,9 +1528,9 @@ public class SemiTransactionalHiveMetastore
             Partition partition = partitionAndMore.getPartition();
             Path targetPath = new Path(partition.getStorage().getLocation());
             Path currentPath = partitionAndMore.getCurrentLocation();
-            cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, false));
             if (!targetPath.equals(currentPath)) {
-                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, partitionAndMore.getFileNames());
+                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, partitionAndMore.getFileNames(),
+                        cleanUpTasksForAbort);
             }
             updateStatisticsOperations.add(new UpdateStatisticsOperation(
                     partition.getSchemaTableName(),
@@ -1719,6 +1748,9 @@ public class SemiTransactionalHiveMetastore
     {
         checkHoldsLock();
 
+        //Abort transaction, if any
+        abortTransaction();
+
         for (DeclaredIntentionToWrite declaredIntentionToWrite : declaredIntentionsToWrite) {
             switch (declaredIntentionToWrite.getMode()) {
                 case STAGE_AND_MOVE_TO_TARGET_DIRECTORY:
@@ -1898,7 +1930,8 @@ public class SemiTransactionalHiveMetastore
             HdfsContext context,
             Path currentPath,
             Path targetPath,
-            List<String> fileNames)
+            List<String> fileNames,
+            List<DirectoryCleanUpTask> cleanUpTasksForAbort)
     {
         FileSystem fileSystem;
         try {
@@ -1928,6 +1961,7 @@ public class SemiTransactionalHiveMetastore
                     if (!fileSystem.rename(source, target)) {
                         throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target));
                     }
+                    cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
                 }
                 catch (IOException e) {
                     throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target), e);
@@ -2032,7 +2066,7 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    private static void renameDirectory(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenPathDoesntExist)
+    private static void renameDirectory(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenRenameSuccess)
     {
         if (pathExists(context, hdfsEnvironment, target)) {
             throw new PrestoException(HIVE_PATH_ALREADY_EXISTS,
@@ -2043,14 +2077,11 @@ public class SemiTransactionalHiveMetastore
             createDirectory(context, hdfsEnvironment, target.getParent());
         }
 
-        // The runnable will assume that if rename fails, it will be okay to delete the directory (if the directory is empty).
-        // This is not technically true because a race condition still exists.
-        runWhenPathDoesntExist.run();
-
         try {
             if (!hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
                 throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename %s to %s: rename returned false", source, target));
             }
+            runWhenRenameSuccess.run();
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename %s to %s", source, target), e);

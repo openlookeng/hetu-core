@@ -410,6 +410,13 @@ public class MockThriftMetastoreClient
     }
 
     @Override
+    public void abortTransaction(long transactionId)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void sendTransactionHeartbeat(long transactionId)
             throws TException
     {

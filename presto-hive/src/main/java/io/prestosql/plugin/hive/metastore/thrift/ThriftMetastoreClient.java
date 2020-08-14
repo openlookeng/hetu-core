@@ -155,6 +155,9 @@ public interface ThriftMetastoreClient
     void commitTransaction(long transactionId)
             throws TException;
 
+    void abortTransaction(long transactionId)
+            throws TException;
+
     void sendTransactionHeartbeat(long transactionId)
             throws TException;
 

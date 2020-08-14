@@ -97,6 +97,7 @@ import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.security.PrincipalType.ROLE;
 import static io.prestosql.spi.security.PrincipalType.USER;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -127,6 +128,7 @@ public class FileHiveMetastore
     private final JsonCodec<List<PermissionMetadata>> permissionsCodec = JsonCodec.listJsonCodec(PermissionMetadata.class);
     private final JsonCodec<List<String>> rolesCodec = JsonCodec.listJsonCodec(String.class);
     private final JsonCodec<List<RoleGrant>> roleGrantsCodec = JsonCodec.listJsonCodec(RoleGrant.class);
+    private long txnId = 1L;
 
     public static FileHiveMetastore createTestingFileHiveMetastore(File catalogDirectory)
     {
@@ -989,11 +991,16 @@ public class FileHiveMetastore
     @Override
     public long openTransaction(HiveIdentity identity)
     {
-        return 0;
+        return txnId++;
     }
 
     @Override
     public void commitTransaction(HiveIdentity identity, long transactionId)
+    {
+    }
+
+    @Override
+    public void abortTransaction(HiveIdentity identity, long transactionId)
     {
     }
 
@@ -1018,8 +1025,12 @@ public class FileHiveMetastore
     @Override
     public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
     {
-        /* doNothing */
-        return "";
+        // <schema>.<table>:<highWatermark>:<minOpenWriteId>::<AbortedTxns>
+        return format("%d$%s.%s:%d:9223372036854775807::",
+                currentTransactionId,
+                tables.get(0).getSchemaName(),
+                tables.get(0).getTableName(),
+                currentTransactionId - 1);
     }
 
     @Override
