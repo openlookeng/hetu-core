@@ -38,6 +38,7 @@ import io.prestosql.plugin.hive.HivePartitionManager;
 import io.prestosql.plugin.hive.HiveSessionProperties;
 import io.prestosql.plugin.hive.HiveStorageFormat;
 import io.prestosql.plugin.hive.HiveTableHandle;
+import io.prestosql.plugin.hive.HiveTableProperties;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveTypeName;
 import io.prestosql.plugin.hive.HiveUpdateTableHandle;
@@ -61,6 +62,7 @@ import io.prestosql.plugin.hive.statistics.HiveStatisticsProvider;
 import io.prestosql.plugin.hive.util.ConfigurationUtils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorNewTableLayout;
@@ -115,6 +117,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.io.IOConstants;
 import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapreduce.JobID;
@@ -141,16 +144,19 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static io.hetu.core.plugin.carbondata.CarbondataConstants.EncodedLoadModel;
 import static io.hetu.core.plugin.carbondata.CarbondataTableProperties.getCarbondataLocation;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
 import static io.prestosql.plugin.hive.HiveTableProperties.LOCATION_PROPERTY;
+import static io.prestosql.plugin.hive.HiveTableProperties.NON_INHERITABLE_PROPERTIES;
 import static io.prestosql.plugin.hive.HiveTableProperties.TRANSACTIONAL;
 import static io.prestosql.plugin.hive.HiveTableProperties.getTransactionalValue;
 import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
 import static io.prestosql.plugin.hive.HiveUtil.getPartitionKeyColumnHandles;
+import static io.prestosql.plugin.hive.HiveUtil.hiveColumnHandles;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -1488,5 +1494,49 @@ public class CarbondataMetadata
             LOG.error("Error in updating table status file after compaction");
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error in updating table status file after compaction");
         }
+    }
+
+    @Override
+    protected ConnectorTableMetadata doGetTableMetadata(SchemaTableName tableName)
+    {
+        Optional<Table> table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+        if (!table.isPresent() || table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
+            throw new TableNotFoundException(tableName);
+        }
+
+        Function<HiveColumnHandle, ColumnMetadata> metadataGetter = columnMetadataGetter(table.get(), typeManager);
+        ImmutableList.Builder<ColumnMetadata> columns = ImmutableList.builder();
+        for (HiveColumnHandle columnHandle : hiveColumnHandles(table.get())) {
+            columns.add(metadataGetter.apply(columnHandle));
+        }
+
+        // External location property
+        ImmutableMap.Builder<String, Object> properties = ImmutableMap.builder();
+        properties.put(LOCATION_PROPERTY, table.get().getStorage().getLocation());
+
+        // Storage format property
+        properties.put(HiveTableProperties.STORAGE_FORMAT_PROPERTY, CarbondataStorageFormat.CARBON);
+
+        // Partitioning property
+        List<String> partitionedBy = table.get().getPartitionColumns().stream()
+                .map(Column::getName)
+                .collect(toList());
+        if (!partitionedBy.isEmpty()) {
+            properties.put(HiveTableProperties.PARTITIONED_BY_PROPERTY, partitionedBy);
+        }
+
+        Optional<String> comment = Optional.ofNullable(table.get().getParameters().get(TABLE_COMMENT));
+
+        // add partitioned columns into immutableColumns
+        ImmutableList.Builder<ColumnMetadata> immutableColumns = ImmutableList.builder();
+
+        for (HiveColumnHandle columnHandle : hiveColumnHandles(table.get())) {
+            if (columnHandle.getColumnType().equals(HiveColumnHandle.ColumnType.PARTITION_KEY)) {
+                immutableColumns.add(metadataGetter.apply(columnHandle));
+            }
+        }
+
+        return new ConnectorTableMetadata(tableName, columns.build(), properties.build(), comment,
+                Optional.of(immutableColumns.build()), Optional.of(NON_INHERITABLE_PROPERTIES));
     }
 }
