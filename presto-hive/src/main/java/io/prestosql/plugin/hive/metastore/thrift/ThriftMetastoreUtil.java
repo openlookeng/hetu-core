@@ -983,4 +983,12 @@ public final class ThriftMetastoreUtil
                 type.equals(DOUBLE) || type.equals(REAL) ||
                 type instanceof DecimalType;
     }
+
+    public static HivePrincipal applyRoleNameCaseSensitive(HivePrincipal hivePrincipal, boolean isRoleNameCaseSensitive)
+    {
+        if (hivePrincipal != null && !isRoleNameCaseSensitive && hivePrincipal.getType() == ROLE) {
+            return new HivePrincipal(hivePrincipal.getType(), hivePrincipal.getName().toLowerCase(ENGLISH));
+        }
+        return hivePrincipal;
+    }
 }

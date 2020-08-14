@@ -661,7 +661,7 @@ public class ThriftHiveMetastore
         for (HivePrincipal grantee : grantees) {
             for (String role : roles) {
                 grantRole(
-                        isRoleNameCaseSensitive ? role : role.toLowerCase(Locale.ENGLISH),
+                        role,
                         grantee.getName(), ThriftMetastoreUtil.fromPrestoPrincipalType(grantee.getType()),
                         grantor.getName(), ThriftMetastoreUtil.fromPrestoPrincipalType(grantor.getType()),
                         withAdminOption);
@@ -678,7 +678,11 @@ public class ThriftHiveMetastore
                     .run("grantRole", stats.getGrantRole().wrap(() -> {
                         try (ThriftMetastoreClient client = clientProvider.createMetastoreClient()) {
                             client.grantRole(isRoleNameCaseSensitive ? role : role.toLowerCase(Locale.ENGLISH),
-                                    granteeName, granteeType, grantorName, grantorType, grantOption);
+                                    (granteeType == PrincipalType.ROLE && isRoleNameCaseSensitive) ? granteeName : granteeName.toLowerCase(Locale.ENGLISH),
+                                    granteeType,
+                                    (grantorType == PrincipalType.ROLE && isRoleNameCaseSensitive) ? grantorName : grantorName.toLowerCase(Locale.ENGLISH),
+                                    grantorType,
+                                    grantOption);
                             return null;
                         }
                     }));
@@ -697,7 +701,7 @@ public class ThriftHiveMetastore
         for (HivePrincipal grantee : grantees) {
             for (String role : roles) {
                 revokeRole(
-                        isRoleNameCaseSensitive ? role : role.toLowerCase(Locale.ENGLISH),
+                        role,
                         grantee.getName(), ThriftMetastoreUtil.fromPrestoPrincipalType(grantee.getType()),
                         adminOptionFor);
             }
@@ -713,7 +717,9 @@ public class ThriftHiveMetastore
                     .run("revokeRole", stats.getRevokeRole().wrap(() -> {
                         try (ThriftMetastoreClient client = clientProvider.createMetastoreClient()) {
                             client.revokeRole(isRoleNameCaseSensitive ? role : role.toLowerCase(Locale.ENGLISH),
-                                    granteeName, granteeType, grantOption);
+                                    (granteeType == PrincipalType.ROLE && isRoleNameCaseSensitive) ? granteeName : granteeName.toLowerCase(Locale.ENGLISH),
+                                    granteeType,
+                                    grantOption);
                             return null;
                         }
                     }));
@@ -727,13 +733,14 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public Set<RoleGrant> listRoleGrants(HivePrincipal principal)
+    public Set<RoleGrant> listRoleGrants(HivePrincipal sourcePrincipal)
     {
         try {
             return retry()
                     .stopOn(MetaException.class)
                     .stopOnIllegalExceptions()
                     .run("listRoleGrants", stats.getListRoleGrants().wrap(() -> {
+                        HivePrincipal principal = ThriftMetastoreUtil.applyRoleNameCaseSensitive(sourcePrincipal, isRoleNameCaseSensitive);
                         try (ThriftMetastoreClient client = clientProvider.createMetastoreClient()) {
                             return ThriftMetastoreUtil.fromRolePrincipalGrants(client.listRoleGrants(principal.getName(),
                                     ThriftMetastoreUtil.fromPrestoPrincipalType(principal.getType())),
@@ -1228,12 +1235,13 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public void grantTablePrivileges(String databaseName, String tableName, HivePrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void grantTablePrivileges(String databaseName, String tableName, HivePrincipal sourceGrantee, Set<HivePrivilegeInfo> privileges)
     {
         Set<PrivilegeGrantInfo> requestedPrivileges = privileges.stream()
                 .map(ThriftMetastoreUtil::toMetastoreApiPrivilegeGrantInfo)
                 .collect(Collectors.toSet());
         checkArgument(!containsAllPrivilege(requestedPrivileges), "\"ALL\" not supported in PrivilegeGrantInfo.privilege");
+        HivePrincipal grantee = ThriftMetastoreUtil.applyRoleNameCaseSensitive(sourceGrantee, isRoleNameCaseSensitive);
 
         try {
             retry()
@@ -1279,12 +1287,13 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public void revokeTablePrivileges(String databaseName, String tableName, HivePrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void revokeTablePrivileges(String databaseName, String tableName, HivePrincipal sourceGrantee, Set<HivePrivilegeInfo> privileges)
     {
         Set<PrivilegeGrantInfo> requestedPrivileges = privileges.stream()
                 .map(ThriftMetastoreUtil::toMetastoreApiPrivilegeGrantInfo)
                 .collect(Collectors.toSet());
         checkArgument(!containsAllPrivilege(requestedPrivileges), "\"ALL\" not supported in PrivilegeGrantInfo.privilege");
+        HivePrincipal grantee = ThriftMetastoreUtil.applyRoleNameCaseSensitive(sourceGrantee, isRoleNameCaseSensitive);
 
         try {
             retry()
@@ -1317,7 +1326,7 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, HivePrincipal principal)
+    public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, HivePrincipal sourcePrincipal)
     {
         try {
             return retry()
@@ -1327,6 +1336,7 @@ public class ThriftHiveMetastore
                         try (ThriftMetastoreClient client = createMetastoreClient()) {
                             ImmutableSet.Builder<HivePrivilegeInfo> privileges = ImmutableSet.builder();
                             List<HiveObjectPrivilege> hiveObjectPrivilegeList;
+                            HivePrincipal principal = ThriftMetastoreUtil.applyRoleNameCaseSensitive(sourcePrincipal, isRoleNameCaseSensitive);
                             // principal can be null when we want to list all privileges for admins
                             if (principal == null) {
                                 hiveObjectPrivilegeList = client.listPrivileges(
@@ -1345,7 +1355,9 @@ public class ThriftHiveMetastore
                             }
                             for (HiveObjectPrivilege hiveObjectPrivilege : hiveObjectPrivilegeList) {
                                 HivePrincipal grantee = new HivePrincipal(ThriftMetastoreUtil.fromMetastoreApiPrincipalType(hiveObjectPrivilege.getPrincipalType()), hiveObjectPrivilege.getPrincipalName());
-                                privileges.addAll(ThriftMetastoreUtil.parsePrivilege(hiveObjectPrivilege.getGrantInfo(), Optional.of(grantee)));
+
+                                privileges.addAll(ThriftMetastoreUtil.parsePrivilege(hiveObjectPrivilege.getGrantInfo(),
+                                        Optional.of(ThriftMetastoreUtil.applyRoleNameCaseSensitive(grantee, isRoleNameCaseSensitive))));
                             }
                             return privileges.build();
                         }
