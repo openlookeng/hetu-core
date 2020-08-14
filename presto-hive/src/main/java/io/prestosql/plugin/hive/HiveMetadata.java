@@ -1864,8 +1864,15 @@ public class HiveMetadata
     @Override
     public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        throw new PrestoException(NOT_SUPPORTED, "This connector only supports delete where one or more partitions" +
-                " are deleted entirely for Non-Transactional tables");
+        HiveTableHandle handle = (HiveTableHandle) tableHandle;
+        if (AcidUtils.isInsertOnlyTable(handle.getTableParameters().get())) {
+            throw new PrestoException(NOT_SUPPORTED, "Attempt to do delete on table " + handle.getTableName() +
+                    " that is insert-only transactional");
+        }
+        else {
+            throw new PrestoException(NOT_SUPPORTED, "This connector only supports delete where one or more partitions" +
+                    " are deleted entirely for Non-Transactional tables");
+        }
     }
 
     @Override
