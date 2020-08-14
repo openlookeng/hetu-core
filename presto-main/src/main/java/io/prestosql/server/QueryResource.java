@@ -279,6 +279,7 @@ public class QueryResource
 
     private boolean isQueryUriLocal(BasicQueryInfo basicQueryInfo)
     {
-        return basicQueryInfo.getSelf().getHost().equals(httpServerInfo.getHttpUri().getHost());
+        String localhost = httpServerInfo.getHttpUri() != null ? httpServerInfo.getHttpUri().getHost() : httpServerInfo.getHttpsUri().getHost();
+        return basicQueryInfo.getSelf().getHost().equals(localhost);
     }
 }
