@@ -487,6 +487,7 @@ public class TestCarbonAllDataType
     @Test
     public void testDropTable() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.testtable2");
         hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
         hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
 
@@ -897,5 +898,85 @@ public class TestCarbonAllDataType
         }
 
         hetuServer.execute("DROP TABLE testdb.myECTable");
+    }
+
+    @Test
+    public void testCreateDropTableDifferentLocation() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable2");
+
+        // creating table with same name
+        try {
+            if (!FileFactory.isFileExist( storePath + "/carbon.store/mytestDb/")) {
+                FileFactory.mkdirs( storePath + "/carbon.store/mytestDb");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        String location = "'" + "file:///" + storePath + "/carbon.store/mytestDb" + "')" ;
+        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON', location = " + location);
+        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable2");
+    }
+
+    @Test
+    public void testCheckingCarbonCacheUpdate() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 0); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        File OriginalFile = new File(storePath + "/carbon.store/testdb/testtable2/Metadata/schema");
+        // create the destination file object
+        File dest = new File(storePath + "/carbon.store/testdb/testtable2/schema_backup");
+        // check if the file can be renamed
+        // to the abstract path name
+        if (OriginalFile.renameTo(dest)) {
+            // display that the file is renamed
+            // to the abstract path name
+            System.out.println("File is renamed");
+        }
+        else {
+            // display that the file cannot be renamed
+            // to the abstract path name
+            System.out.println("File cannot be renamed");
+        }
+        try {
+            hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        }
+        catch (SQLException s) {
+            Boolean ret = s.getMessage().contains("Failed while reading metadata of the table");
+            assertEquals("true", ret.toString());
+        }
+        if (dest.renameTo(OriginalFile)) {
+            System.out.println("File is renamed");
+        }
+        else {
+            System.out.println("File cannot be renamed");
+        }
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 0); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable2");
     }
 }
