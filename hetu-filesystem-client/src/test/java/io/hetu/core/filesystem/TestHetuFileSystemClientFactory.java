@@ -20,6 +20,7 @@ import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 import static org.testng.Assert.assertSame;
@@ -50,7 +51,7 @@ public class TestHetuFileSystemClientFactory
         HetuFileSystemClientFactory factory = new LocalFileSystemClientFactory();
         Properties properties = new Properties();
         properties.setProperty("fs.client.type", "local");
-        try (HetuFileSystemClient fs = factory.getFileSystemClient(properties)) {
+        try (HetuFileSystemClient fs = factory.getFileSystemClient(properties, Paths.get("/"))) {
             assertSame(fs.getClass(), HetuLocalFileSystemClient.class);
         }
     }
@@ -74,7 +75,7 @@ public class TestHetuFileSystemClientFactory
         properties.setProperty("hdfs.krb5.keytab.path", getResourcePath("docker_config/user.keytab"));
         properties.setProperty("hdfs.krb5.principal", "user@HADOOP.COM");
 
-        try (HetuFileSystemClient fs = factory.getFileSystemClient(properties)) {
+        try (HetuFileSystemClient fs = factory.getFileSystemClient((properties), Paths.get("/"))) {
             assertSame(fs.getClass(), HetuHdfsFileSystemClient.class);
         }
     }

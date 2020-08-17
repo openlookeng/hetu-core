@@ -23,6 +23,7 @@ import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.metastore.HetuMetastore;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,7 +79,7 @@ public class HetuMetaStoreManager
                 HetuFileSystemClient client = null;
                 if (HETU_METASTORE_TYPE_HETU_FILE_SYSTEM.equals(hetuMetastoreType)) {
                     String profileName = config.get(HETU_METASTORE_HETU_FILE_SYSTEM_PROFILE_NAME);
-                    client = fileSystemClientManager.getFileSystemClient(profileName);
+                    client = fileSystemClientManager.getFileSystemClient(profileName, Paths.get("/"));
                 }
                 hetuMetastore = hetuMetaStoreFactory.create(hetuMetastoreType, ImmutableMap.copyOf(config), client);
             }

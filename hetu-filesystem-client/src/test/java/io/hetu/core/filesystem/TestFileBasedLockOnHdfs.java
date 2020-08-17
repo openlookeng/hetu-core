@@ -14,8 +14,8 @@
  */
 package io.hetu.core.filesystem;
 
-import io.hetu.core.common.filesystem.FileBasedLock;
 import io.hetu.core.filesystem.utils.DockerizedHive;
+import io.prestosql.spi.filesystem.FileBasedLock;
 import org.apache.hadoop.conf.Configuration;
 import org.testng.SkipException;
 import org.testng.annotations.AfterTest;
@@ -60,8 +60,8 @@ public class TestFileBasedLockOnHdfs
         }
 
         config.setBoolean("fs.hdfs.impl.disable.cache", true);
-        fs = new HetuHdfsFileSystemClient(new HdfsConfig(config));
         testLockRoot = "/tmp/test-hdfs-lock";
+        fs = new HetuHdfsFileSystemClient(new HdfsConfig(config), Paths.get(testLockRoot));
     }
 
     @Test

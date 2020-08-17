@@ -17,6 +17,8 @@ package io.hetu.core.filesystem;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 /**
@@ -32,7 +34,13 @@ public class LocalFileSystemClientFactory
     @Override
     public HetuFileSystemClient getFileSystemClient(Properties properties)
     {
-        return new HetuLocalFileSystemClient(new LocalConfig(properties));
+        return new HetuLocalFileSystemClient(new LocalConfig(properties), Paths.get("/"));
+    }
+
+    @Override
+    public HetuFileSystemClient getFileSystemClient(Properties properties, Path root)
+    {
+        return new HetuLocalFileSystemClient(new LocalConfig(properties), root);
     }
 
     @Override

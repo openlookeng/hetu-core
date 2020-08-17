@@ -81,7 +81,7 @@ public class TestHeuristicIndexClient
         folder.create();
 
         createIndexFolderStructure(folder.getRoot(), tableName, columns);
-        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
         Set<Index> emptyIndices = new HashSet<>();
 
         HeuristicIndexClient client = new HeuristicIndexClient(emptyIndices, fs, folder.getRoot().toPath());

@@ -132,11 +132,6 @@
             <artifactId>hetu-filesystem-client</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>hetu-common</artifactId>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
 
     <build>

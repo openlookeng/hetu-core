@@ -15,6 +15,7 @@
 
 package io.hetu.core.plugin.heuristicindex.index.minmax;
 
+import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Operator;
 
@@ -24,6 +25,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.Objects;
+
+import static io.hetu.core.heuristicindex.util.IndexConstants.TYPES_WHITELIST;
 
 /**
  * MinMax index implementation. It can be used to check whether a value is in or out of the given range.
@@ -200,9 +203,7 @@ public class MinMaxIndex<T>
     @Override
     public void load(InputStream in) throws IOException
     {
-        ObjectInputStream ois = new ObjectInputStream(in);
-
-        try {
+        try (ObjectInputStream ois = new SecureObjectInputStream(in, TYPES_WHITELIST)) {
             // read min value
             Object obj = ois.readObject();
             if (obj instanceof Comparable) {

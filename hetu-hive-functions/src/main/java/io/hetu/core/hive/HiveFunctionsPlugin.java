@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.hetu.core.hive.dynamicfunctions.DynamicHiveScalarFunction;
 import io.hetu.core.hive.dynamicfunctions.FunctionMetadata;
+import io.hetu.core.hive.dynamicfunctions.RecognizedFunctions;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
@@ -119,6 +120,11 @@ public class HiveFunctionsPlugin
         if (this.funcClassLoader == null) {
             return functions;
         }
+
+        for (String funcMetadataInfo : loadFunctionMetadataFromPropertiesFile()) {
+            RecognizedFunctions.addRecognizedFunction(FunctionMetadata.parseFunctionClassName(funcMetadataInfo)[1]);
+        }
+
         for (String funcMetadataInfo : loadFunctionMetadataFromPropertiesFile()) {
             try {
                 FunctionMetadata functionMetadata = new FunctionMetadata(funcMetadataInfo, this.funcClassLoader);

@@ -15,6 +15,7 @@
 
 package io.hetu.core.seedstore.filebased;
 
+import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.seedstore.Seed;
 
 import java.io.ByteArrayInputStream;
@@ -57,7 +58,8 @@ public class FileBasedSeed
             throws IOException, ClassNotFoundException
     {
         byte[] datas = Base64.getDecoder().decode(serialized);
-        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(datas))) {
+        try (ObjectInputStream ois = new SecureObjectInputStream(new ByteArrayInputStream(datas),
+                FileBasedSeed.class.getName())) {
             FileBasedSeed obj = (FileBasedSeed) ois.readObject();
             return obj;
         }

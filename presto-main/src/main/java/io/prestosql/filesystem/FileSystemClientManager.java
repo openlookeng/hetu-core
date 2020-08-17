@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,7 +61,7 @@ public class FileSystemClientManager
     /**
      * Loads pre-defined file system profiles in the etc folder.
      * These configs are loaded for clients' usage in presto-main package
-     * through {@link FileSystemClientManager#getFileSystemClient(String)}.
+     * through {@link FileSystemClientManager#getFileSystemClient(String, Path)}.
      *
      * @throws IOException when exceptions occur during reading profiles
      */
@@ -90,7 +91,7 @@ public class FileSystemClientManager
             // validate config file: type is specified and corresponding factory is available
             String configType = properties.getProperty(FS_CLIENT_TYPE);
             checkState(configType != null, "%s must be specified in %s",
-                    FS_CLIENT_TYPE, configFile.getAbsolutePath());
+                    FS_CLIENT_TYPE, configFile.getCanonicalPath());
             checkState(fileSystemFactories.containsKey(configType),
                     "Factory for file system type %s not found", configType);
 
@@ -116,21 +117,22 @@ public class FileSystemClientManager
      * @return a file system client constructed by default configurations
      * @throws IOException
      */
-    public HetuFileSystemClient getFileSystemClient()
+    public HetuFileSystemClient getFileSystemClient(Path root)
             throws IOException
     {
-        return getFileSystemClient(DEFAULT_CONFIG_NAME);
+        return getFileSystemClient(DEFAULT_CONFIG_NAME, root);
     }
 
     /**
      * Get a file system client with pre-defined profile in filesystem config folder
      *
      * @param name name of the filesystem profile defined in the filesystem config folder,
-     * or the default profile name (same as {@link FileSystemClientManager#getFileSystemClient()} if provide default name)
+     * or the default profile name (same as {@link FileSystemClientManager#getFileSystemClient(Path)} if provide default name)
+     * @param root Workspace root of the filesystem client. It will only be allowed to access filesystem within this directory.
      * @return a {@link HetuFileSystemClient}
      * @throws IOException exception thrown during constructing the client
      */
-    public HetuFileSystemClient getFileSystemClient(String name)
+    public HetuFileSystemClient getFileSystemClient(String name, Path root)
             throws IOException
     {
         if (!DEFAULT_CONFIG_NAME.equals(name) && !availableFileSystemConfigs.containsKey(name)) {
@@ -140,7 +142,7 @@ public class FileSystemClientManager
         String type = fsConfig.getProperty(FS_CLIENT_TYPE);
         HetuFileSystemClientFactory factory = fileSystemFactories.get(type);
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
-            return factory.getFileSystemClient(fsConfig);
+            return factory.getFileSystemClient(fsConfig, root);
         }
     }
 

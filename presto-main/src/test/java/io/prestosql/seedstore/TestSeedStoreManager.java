@@ -77,7 +77,7 @@ public class TestSeedStoreManager
             throws IOException
     {
         FileSystemClientManager mockFileSystemClientManager = mock(FileSystemClientManager.class);
-        when(mockFileSystemClientManager.getFileSystemClient(anyString())).thenReturn(null);
+        when(mockFileSystemClientManager.getFileSystemClient(anyString(), any())).thenReturn(null);
         seedStoreManager = new SeedStoreManager(mockFileSystemClientManager);
         SeedStore mockSeedStore = new MockSeedStore();
 

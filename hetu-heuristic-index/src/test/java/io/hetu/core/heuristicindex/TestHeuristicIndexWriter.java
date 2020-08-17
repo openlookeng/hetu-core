@@ -52,7 +52,7 @@ public class TestHeuristicIndexWriter
     {
         // Simple workflow without calling readSplit's callback
         DataSource ds = mock(DataSource.class);
-        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/"));
 
         Set<Index> indices = new HashSet<>();
         indices.add(new BloomIndex());
@@ -78,7 +78,7 @@ public class TestHeuristicIndexWriter
         try (TempFolder folder = new TempFolder()) {
             folder.create();
 
-            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
 
             Set<Index> indices = new HashSet<>();
             indices.add(new BloomIndex());
@@ -99,7 +99,7 @@ public class TestHeuristicIndexWriter
         DataSource ds = new TestDataSource();
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
 
             Set<Index> indices = new HashSet<>();
             indices.add(new BloomIndex());
@@ -145,7 +145,7 @@ public class TestHeuristicIndexWriter
         try (TempFolder folder = new TempFolder()) {
             folder.create();
 
-            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
 
             Set<Index> indices = new HashSet<>();
             indices.add(new BloomIndex());
@@ -211,7 +211,7 @@ public class TestHeuristicIndexWriter
         try (TempFolder folder = new TempFolder()) {
             folder.create();
 
-            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
 
             Set<Index> indices = new HashSet<>();
             indices.add(new BloomIndex());
@@ -274,7 +274,7 @@ public class TestHeuristicIndexWriter
         try (TempFolder folder = new TempFolder()) {
             folder.create();
 
-            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
 
             Set<Index> indices = new HashSet<>();
             indices.add(new BloomIndex());

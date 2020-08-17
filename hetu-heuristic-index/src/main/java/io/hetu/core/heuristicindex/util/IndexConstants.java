@@ -15,6 +15,9 @@
 
 package io.hetu.core.heuristicindex.util;
 
+import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.type.SqlDate;
+
 /**
  * Global constants used in hetu-heuristic-index
  */
@@ -38,6 +41,23 @@ public class IndexConstants
     public static final String INDEXSTORE_URI_KEY = "hetu.heuristicindex.indexstore.uri";
 
     public static final String INDEXSTORE_FILESYSTEM_PROFILE_KEY = "hetu.heuristicindex.indexstore.filesystem.profile";
+
+    // The canonical names of Java type classes that the supported Presto types link to
+    public static final String[] TYPES_WHITELIST = ImmutableList.of(
+            Number.class,
+            Byte.class,
+            Short.class,
+            Integer.class,
+            Long.class,
+            Float.class,
+            Double.class,
+            Character.class,
+            String.class,
+            Boolean.class,
+            SqlDate.class)
+            .stream()
+            .map(Class::getCanonicalName)
+            .toArray(String[]::new);
 
     private IndexConstants()
     {

@@ -16,19 +16,14 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>presto-spi</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>log</artifactId>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
+            <groupId>io.airlift</groupId>
+            <artifactId>security</artifactId>
         </dependency>
 
         <dependency>

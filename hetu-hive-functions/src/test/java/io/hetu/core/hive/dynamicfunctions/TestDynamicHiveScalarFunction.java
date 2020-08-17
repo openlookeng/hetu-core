@@ -43,6 +43,36 @@ public class TestDynamicHiveScalarFunction
     public void setUpClass()
             throws Exception
     {
+        RecognizedFunctions.addRecognizedFunction(
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ListStringUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.TimeOutUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.BooleanUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.MapDoubleUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.DoubleUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.EvaluateOverloadUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ShortUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ArrayListDoubleUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.FloatWrapperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.LongUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntThreeArgsUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntTwoArgsUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntFiveArgsUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.MapIntUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.MapStringUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.EmptyParameterUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntWrapperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntSixArgsUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IntFourArgsUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.BooleanWrappperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ListIntUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.LongWrapperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ByteWrapperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ListDoubleUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ShortWrapperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ByteUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.DoubleWrapperUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.FloatUDF");
         try {
             queryRunner = DistributedQueryRunner.builder(
                     testSessionBuilder().setCatalog("memory").setSchema("default").build())

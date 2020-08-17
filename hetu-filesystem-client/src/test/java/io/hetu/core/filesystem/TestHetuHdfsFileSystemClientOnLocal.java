@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
@@ -47,8 +48,9 @@ import static org.testng.Assert.assertTrue;
  */
 public class TestHetuHdfsFileSystemClientOnLocal
 {
-    private static final Path NON_EXISTING_PATH = Paths.get("/path/to/a/non/existing/file");
-    private String rootPath = "/tmp/test-hetuhdfs-local";
+    private static final Path NON_EXISTING_PATH = Paths.get("/tmp/test-hetuhdfs-local/path/to/a/non/existing/file");
+    private static final Path OUTSIDE_WORKSPACE_PATH = Paths.get("/dir/out/side/of/workspace");
+    private final String rootPath = "/tmp/test-hetuhdfs-local";
     private HetuHdfsFileSystemClient fs;
 
     private HetuHdfsFileSystemClient getLocalHdfs()
@@ -58,7 +60,7 @@ public class TestHetuHdfsFileSystemClientOnLocal
         properties.setProperty("fs.client.type", "hdfs");
         properties.setProperty("hdfs.config.resources", "");
         properties.setProperty("hdfs.authentication.type", "NONE");
-        return new HetuHdfsFileSystemClient(new HdfsConfig(properties));
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties), Paths.get(rootPath));
     }
 
     @BeforeClass
@@ -202,7 +204,7 @@ public class TestHetuHdfsFileSystemClientOnLocal
     public void testMoveFailure()
             throws IOException
     {
-        fs.move(NON_EXISTING_PATH, Paths.get("/tmp"));
+        fs.move(NON_EXISTING_PATH, Paths.get(rootPath));
     }
 
     @Test
@@ -250,7 +252,6 @@ public class TestHetuHdfsFileSystemClientOnLocal
 
     @Test
     public void testIsDirectory()
-            throws IOException
     {
         assertTrue(fs.isDirectory(Paths.get(rootPath)));
         assertFalse(fs.isDirectory(NON_EXISTING_PATH));
@@ -301,6 +302,83 @@ public class TestHetuHdfsFileSystemClientOnLocal
         Stream<Path> wkSub = fs.walk(folderInRoot);
         assertStreamContentEquals(wkRoot, Stream.of(listRoot, fileInRoot, folderInRoot, fileInSubfolder));
         assertStreamContentEquals(wkSub, Stream.of(folderInRoot, fileInSubfolder));
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedCreateDirectories()
+            throws IOException
+    {
+        fs.createDirectories(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedCreateDirectory()
+            throws IOException
+    {
+        fs.createDirectory(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedDelete()
+            throws IOException
+    {
+        fs.delete(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedDeleteIfExists()
+            throws IOException
+    {
+        fs.deleteIfExists(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedDeleteRecursively()
+            throws IOException
+    {
+        fs.deleteRecursively(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedMove()
+            throws IOException
+    {
+        fs.move(OUTSIDE_WORKSPACE_PATH, OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedNewInputStream()
+            throws IOException
+    {
+        fs.newInputStream(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedNewOutputStream()
+            throws IOException
+    {
+        fs.newOutputStream(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedGetAttribute()
+            throws IOException
+    {
+        fs.getAttribute(OUTSIDE_WORKSPACE_PATH, SupportedFileAttributes.SIZE);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedList()
+            throws IOException
+    {
+        fs.list(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedWalk()
+            throws IOException
+    {
+        fs.walk(OUTSIDE_WORKSPACE_PATH);
     }
 
     @AfterTest

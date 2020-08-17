@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.inject.Key;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SslSocketUtil;
 import io.hetu.core.seedstore.filebased.FileBasedSeed;
 import io.hetu.core.statestore.StateStoreManagerPlugin;
 import io.hetu.core.statestore.hazelcast.HazelcastConstants;
@@ -36,7 +37,6 @@ import io.prestosql.statestore.StateStoreProvider;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,10 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -65,9 +63,6 @@ public class DistributedQueryRunnerWithStateStore
         extends DistributedQueryRunner
 {
     private static final Logger log = Logger.get(DistributedQueryRunnerWithStateStore.class);
-    private static final int MIN_PORT_NUMBER = 1100;
-    private static final int MAX_PORT_NUMBER = 65535;
-    private static AtomicInteger nextPort = new AtomicInteger(6000);
     private List<StateStore> stateStores = new ArrayList<>();
     private List<StateStoreProvider> providers = new ArrayList<>();
 
@@ -97,8 +92,7 @@ public class DistributedQueryRunnerWithStateStore
     public void setupStateStore()
             throws Exception
     {
-        int port = nextPort.getAndIncrement();
-
+        int port = SslSocketUtil.getAvailablePort();
         for (TestingPrestoServer server : servers) {
             server.installPlugin(new StateStoreManagerPlugin());
             // State Store
@@ -106,9 +100,6 @@ public class DistributedQueryRunnerWithStateStore
             if (launcher instanceof EmbeddedStateStoreLauncher) {
                 Set<String> ips = Sets.newHashSet(Arrays.asList("127.0.0.1"));
                 Map<String, String> stateStoreProperties = new HashMap<>();
-                while (!availablePort(port)) {
-                    port = nextPort.getAndIncrement();
-                }
                 stateStoreProperties.put(DISCOVERY_PORT_CONFIG_NAME, port + "");
                 stateStoreProperties.putIfAbsent(HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME, HazelcastConstants.DISCOVERY_MODE_TCPIP);
                 this.stateStores.add(((EmbeddedStateStoreLauncher) launcher).launchStateStore(ips, stateStoreProperties));
@@ -167,32 +158,6 @@ public class DistributedQueryRunnerWithStateStore
             }
             provider.loadStateStore();
             this.providers.add(provider);
-        }
-    }
-
-    public static boolean availablePort(int port)
-    {
-        if (port < MIN_PORT_NUMBER || port > MAX_PORT_NUMBER) {
-            throw new IllegalArgumentException(format("Invalid port: %s, the port number must range from %s to %s", port, MIN_PORT_NUMBER, MAX_PORT_NUMBER));
-        }
-
-        ServerSocket serverSocket = null;
-        try {
-            serverSocket = new ServerSocket(port);
-            return true;
-        }
-        catch (IOException e) {
-            return false;
-        }
-        finally {
-            if (serverSocket != null) {
-                try {
-                    serverSocket.close();
-                }
-                catch (IOException e) {
-                    log.error("Get available port error.");
-                }
-            }
         }
     }
 

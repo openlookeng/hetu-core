@@ -24,8 +24,10 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import static org.testng.Assert.assertEquals;
@@ -55,7 +57,7 @@ public class TestFileBasedSeedStore
         config.put(FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR, rootDir);
         filebasedSeedStoreFactory = new FileBasedSeedStoreFactory();
         seedStore = (FileBasedSeedStore) filebasedSeedStoreFactory.create("filebased",
-                new HetuLocalFileSystemClient(new LocalConfig(null)), config);
+                new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(rootDir)), config);
         seedStore.setName(clusterName);
     }
 

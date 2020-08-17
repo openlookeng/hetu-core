@@ -93,7 +93,7 @@ public class TestHetuFsMetastore
                     .build();
 
             LocalConfig localConfig = new LocalConfig(null);
-            client = new HetuLocalFileSystemClient(localConfig);
+            client = new HetuLocalFileSystemClient(localConfig, Paths.get(path));
 
             if (!client.exists(Paths.get(path))) {
                 client.createDirectories(Paths.get(path));

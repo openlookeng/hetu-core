@@ -15,9 +15,9 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableMap;
-import io.hetu.core.common.filesystem.FileBasedLock;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
+import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;

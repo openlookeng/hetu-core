@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.hetu.core.hive.dynamicfunctions.RecognizedFunctions.isFunctionRecognized;
 import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
@@ -48,23 +49,30 @@ public class FunctionMetadata
     public FunctionMetadata(String metadata, ClassLoader classLoader)
     {
         this.classLoader = classLoader;
-        this.parseFunctionMetadata(metadata);
+        this.funcName = parseFunctionClassName(metadata)[0];
+        this.className = parseFunctionClassName(metadata)[1];
         this.initClazz();
         this.methodByName = new HashMap<>();
     }
 
-    private void parseFunctionMetadata(String metadata)
+    // Return [funcName, className]
+    public static String[] parseFunctionClassName(String metadata)
     {
         Matcher matcher = FUNCTION_METADATA_PATTERN.matcher(metadata);
         if (!matcher.matches()) {
             throw new PrestoException(NOT_SUPPORTED, format("Cannot recognize function metadata %s.", metadata));
         }
-        this.funcName = matcher.group(1).trim();
-        this.className = matcher.group(2).trim();
+
+        return new String[] {matcher.group(1).trim(), matcher.group(2).trim()};
     }
 
     private void initClazz()
     {
+        if (!isFunctionRecognized(this.className)) {
+            throw new PrestoException(FUNCTION_NOT_FOUND, format("Class name not recognized: %s. " +
+                    "Class name must be registered in the RecognizedFunctions first to avoid security risks", this.className));
+        }
+
         try {
             try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
                 this.clazz = Class.forName(this.className, false, this.classLoader);

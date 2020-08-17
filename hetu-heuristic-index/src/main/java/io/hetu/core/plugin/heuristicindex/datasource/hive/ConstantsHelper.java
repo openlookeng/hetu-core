@@ -79,6 +79,11 @@ public final class ConstantsHelper
      */
     public static final String KRB5_CONF_KEY = "java.security.krb5.conf";
 
+    /**
+     * If connection to Hive metastore should use SSL.
+     */
+    public static final String HIVE_METASTORE_SSL_ENABLED = "hive.metastore.thrift.client.ssl.enabled";
+
     private ConstantsHelper()
     {
     }

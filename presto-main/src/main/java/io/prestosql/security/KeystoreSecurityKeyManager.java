@@ -94,7 +94,7 @@ public class KeystoreSecurityKeyManager
     {
         Path keystorePath = Paths.get(config.getFileStorePath());
         String keyStr = "";
-        try (InputStream inputStream = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME).newInputStream(keystorePath)) {
+        try (InputStream inputStream = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/")).newInputStream(keystorePath)) {
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
             Key key = keyStore.getKey(keyFileName, config.getKeystorePassword().toCharArray());
@@ -145,7 +145,7 @@ public class KeystoreSecurityKeyManager
         OutputStream outputStream = null;
         HetuFileSystemClient hetuFileSystemClient;
         try {
-            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME);
+            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
             inputStream = hetuFileSystemClient.newInputStream(keystorPath);
             keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
@@ -193,7 +193,7 @@ public class KeystoreSecurityKeyManager
         OutputStream outputStream = null;
         HetuFileSystemClient hetuFileSystemClient;
         try {
-            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME);
+            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
             boolean isStoreFileExists = hetuFileSystemClient.exists(keystorPath);
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             if (isStoreFileExists) {
@@ -242,7 +242,7 @@ public class KeystoreSecurityKeyManager
         String file = config.getFileStorePath();
         HetuFileSystemClient hetuFileSystemClient;
         try {
-            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME);
+            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
 
             int lastIndex = file.lastIndexOf(File.separator);
             String tmpFileDir = file.substring(0, lastIndex);

@@ -175,7 +175,7 @@ public class PluginManager
 
         for (File file : listFiles(this.externalFunctionsPluginsDir)) {
             if (file.isDirectory()) {
-                loadPlugin(file.getAbsolutePath(), true);
+                loadPlugin(file.getCanonicalPath(), true);
             }
         }
 
