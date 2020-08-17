@@ -398,7 +398,7 @@ public class TestCarbonAllDataType
     public void testCreateTableWrongOrderPartitionBy() throws SQLException
     {
         try {
-           hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'a'], sorted_by = ARRAY[ 'd'])");
+            hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'a'])");
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
@@ -409,37 +409,6 @@ public class TestCarbonAllDataType
         }
         hetuServer.execute("drop table testdb.testtable2");
         assertEquals("true", "false");
-    }
-
-    @Test
-    public void testCreateTableSortedBy() throws SQLException
-    {
-        hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (sorted_by = ARRAY[ 'd'])");
-
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11, 12, 14)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (110, 211, 12, 4)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (120, 311, 12, 24)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (130, 411, 12, 33)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (130, 511, 12, 55)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (140, 511, 12, 114)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (150, 11, 12, 514)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (110, 11, 12, 14)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 111, 12, 714)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (120, 11, 12, 814)");
-        /*List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
-
-        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
-           add(new HashMap<String, Object>() {{    put("RESULT", 10); }});
-        }};*/
-        hetuServer.execute("INSERT INTO testdb.testtable2 select * from testdb.testtable2");
-        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
-            add(new HashMap<String, Object>() {{    put("RESULT", 20); }});
-        }};
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
-
-
-        assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table  if exists testdb.testtable2");
     }
 
     @Test
@@ -511,7 +480,6 @@ public class TestCarbonAllDataType
         CarbonFile schemaFile = FileFactory.getCarbonFile(schemaFilePath);
         boolean isTransactionalTable = schemaFile.exists();
         org.apache.carbondata.format.TableInfo tableInfo = null;
-        long modifiedTime = System.currentTimeMillis();
         if (isTransactionalTable) {
             //Step 2: read the metadata (tableInfo) of the table.
             ThriftReader.TBaseCreator createTBase = new ThriftReader.TBaseCreator()
@@ -530,7 +498,6 @@ public class TestCarbonAllDataType
                 thriftReader.open();
                 tableInfo = (org.apache.carbondata.format.TableInfo) thriftReader.read();
                 thriftReader.close();
-
                 List<ColumnSchema> partition_columns = tableInfo.getFact_table().getPartitionInfo().getPartition_columns();
                 String [] ConfigPartiotionComumns = {"c","d"};
                 String columnName;

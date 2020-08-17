@@ -73,6 +73,7 @@ import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.connector.TableAlreadyExistsException;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
@@ -796,19 +797,19 @@ public class CarbondataMetadata
         // it will get final path to create carbon table
         LocationHandle locationHandle = getCarbonDataTableCreationPath(session, tableMetadata);
         Path targetPath = locationService.getQueryWriteInfo(locationHandle).getTargetPath();
-        this.tableStorageLocation = Optional.of(targetPath.toString());
 
         AbsoluteTableIdentifier absoluteTableIdentifier = AbsoluteTableIdentifier.from(targetPath.toString(),
                 new CarbonTableIdentifier(schemaName, tableName, UUID.randomUUID().toString()));
-
-        try {
-            hdfsEnvironment.doAs(session.getUser(), () -> {
-                initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment.getConfiguration(
+        hdfsEnvironment.doAs(session.getUser(), () -> {
+            initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment.getConfiguration(
                         new HdfsEnvironment.HdfsContext(session, schemaName, tableName),
                         new Path(locationHandle.getJsonSerializableTargetPath())));
-                CarbondataMetadataUtils.createMetaDataFolderSchemaFile(hdfsEnvironment, session, columnHandles, absoluteTableIdentifier, partitionedBy,
-                        sortBy.stream().map(s -> s.getColumnName().toLowerCase(Locale.ENGLISH)).collect(toList()), targetPath.toString(), initialConfiguration);
 
+            CarbondataMetadataUtils.createMetaDataFolderSchemaFile(hdfsEnvironment, session, columnHandles, absoluteTableIdentifier, partitionedBy,
+                    sortBy.stream().map(s -> s.getColumnName().toLowerCase(Locale.ENGLISH)).collect(toList()), targetPath.toString(), initialConfiguration);
+
+            this.tableStorageLocation = Optional.of(targetPath.toString());
+            try {
                 Map<String, String> serdeParameters = initSerDeProperties(tableName);
                 Table table = buildTableObject(
                         session.getQueryId(),
@@ -833,15 +834,11 @@ public class CarbondataMetadata
                         Optional.empty(),
                         ignoreExisting,
                         new PartitionStatistics(basicStatistics, ImmutableMap.of()));
-            });
-        }
-        catch (FolderAlreadyExistException e) {
-            this.tableStorageLocation = Optional.empty();
-            throw e;
-        }
-        catch (RuntimeException ex) {
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error: creating table: %s ", ex.getMessage()), ex);
-        }
+            }
+            catch (RuntimeException ex) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error: creating table: %s ", ex.getMessage()), ex);
+            }
+        });
     }
 
     @Override
@@ -904,14 +901,19 @@ public class CarbondataMetadata
             }
         }
         //doAs is throwing exception we need to catch, it no option
+        catch (TableAlreadyExistsException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error commit %s", e.getMessage()), e);
+        }
         catch (Exception e) {
-            if ((currentState.CREATE_TABLE == currentState) || (currentState.CREATE_TABLE_AS == currentState)) {
-                try {
-                    CarbonUtil.dropDatabaseDirectory(this.tableStorageLocation.get());
-                }
-                catch (IOException | InterruptedException ioException) {
-                    throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error in commit & carbon cleanup %s", e.getMessage()), e);
-                }
+            if (tableStorageLocation.isPresent() && ((currentState.CREATE_TABLE == currentState) || (currentState.CREATE_TABLE_AS == currentState))) {
+                hdfsEnvironment.doAs(user, () -> {
+                    try {
+                        CarbonUtil.dropDatabaseDirectory(this.tableStorageLocation.get());
+                    }
+                    catch (IOException | InterruptedException ex) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error in commit & carbon cleanup %s", ex.getMessage()), e);
+                    }
+                });
             }
             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error commit %s", e.getMessage()), e);
         }
@@ -1056,24 +1058,24 @@ public class CarbondataMetadata
         // it will get final path to create carbon table
         LocationHandle locationHandle = getCarbonDataTableCreationPath(session, tableMetadata);
         Path targetPath = locationService.getTableWriteInfo(locationHandle, false).getTargetPath();
-        this.tableStorageLocation = Optional.of(targetPath.toString());
         AbsoluteTableIdentifier absoluteTableIdentifier = AbsoluteTableIdentifier.from(targetPath.toString(),
                 new CarbonTableIdentifier(schemaName, tableName, UUID.randomUUID().toString()));
-        try {
-            hdfsEnvironment.doAs(session.getUser(), () -> {
-                initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment.getConfiguration(
+
+        hdfsEnvironment.doAs(session.getUser(), () -> {
+            initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment.getConfiguration(
                                 new HdfsEnvironment.HdfsContext(session, schemaName, tableName),
                                 new Path(locationHandle.getJsonSerializableTargetPath())));
+            // Create Carbondata metadata folder and Schema file
+            CarbondataMetadataUtils.createMetaDataFolderSchemaFile(hdfsEnvironment, session, columnHandles, absoluteTableIdentifier, partitionedBy,
+                    sortBy.stream().map(s -> s.getColumnName().toLowerCase(Locale.ENGLISH)).collect(toList()), targetPath.toString(), initialConfiguration);
 
-                // Create Carbondata metadata folder and Schema file
-                CarbondataMetadataUtils.createMetaDataFolderSchemaFile(hdfsEnvironment, session, columnHandles, absoluteTableIdentifier, partitionedBy,
-                        sortBy.stream().map(s -> s.getColumnName().toLowerCase(Locale.ENGLISH)).collect(toList()), targetPath.toString(), initialConfiguration);
-
-                Path outputPath = new Path(locationHandle.getJsonSerializableTargetPath());
-                Properties schema = readSchemaForCarbon(schemaName, tableName, targetPath, columnHandles, partitionColumns);
-                // Create committer object
-                setupCommitWriter(schema, outputPath, initialConfiguration, false);
-            });
+            this.tableStorageLocation = Optional.of(targetPath.toString());
+            Path outputPath = new Path(locationHandle.getJsonSerializableTargetPath());
+            Properties schema = readSchemaForCarbon(schemaName, tableName, targetPath, columnHandles, partitionColumns);
+            // Create committer object
+            setupCommitWriter(schema, outputPath, initialConfiguration, false);
+        });
+        try {
             CarbondataOutputTableHandle result = new CarbondataOutputTableHandle(
                     schemaName,
                     tableName,
@@ -1091,10 +1093,6 @@ public class CarbondataMetadata
             LocationService.WriteInfo writeInfo = locationService.getQueryWriteInfo(locationHandle);
             metastore.declareIntentionToWrite(session, writeInfo.getWriteMode(), writeInfo.getWritePath(), schemaTableName);
             return result;
-        }
-        catch (FolderAlreadyExistException e) {
-            this.tableStorageLocation = Optional.empty();
-            throw e;
         }
         catch (RuntimeException ex) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error: creating table: %s ", ex.getMessage()), ex);
@@ -1383,6 +1381,21 @@ public class CarbondataMetadata
                 if (SegmentStatusManager.isLoadInProgressInTable(carbonTable)) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, "Table insert or overwrite in Progress");
                 }
+                try {
+                    //Simultaneous case after acquiring locks we should check table exist.
+                    //if table is not there clean the lock folders
+                    carbonTable = getCarbonTable(handle.getSchemaName(), handle.getTableName(), schema, initialConfiguration);
+                }//CarbonFileException
+                catch (RuntimeException e) {
+                    try {
+                        CarbonUtil.dropDatabaseDirectory(this.tableStorageLocation.get());
+                    }
+                    catch (IOException | InterruptedException ex) {
+                        LOG.error(format("Failed carbon cleanup db directory:  %s", ex.getMessage()));
+                    }
+                    throw new TableNotFoundException(handle.getSchemaTableName());
+                }
+
                 carbondataTableReader.deleteTableFromCarbonCache(new SchemaTableName(schemaName, target.get().getTableName()));
             });
         }
