@@ -63,6 +63,7 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1507,10 +1508,20 @@ public class TestHiveIntegrationSmokeTest
                 Session.builder(getSession())
                         .setCatalogSessionProperty(catalog, "insert_existing_partitions_behavior", "OVERWRITE")
                         .build(),
-                HiveStorageFormat.ORC);
+                HiveStorageFormat.ORC, false);
     }
 
-    private void testInsertPartitionedTableOverwriteExistingPartition(Session session, HiveStorageFormat storageFormat)
+    @Test
+    public void testInsertPartitionedTxnTableOverwriteExistingPartition()
+    {
+        testInsertPartitionedTableOverwriteExistingPartition(
+                Session.builder(getSession())
+                        .setCatalogSessionProperty(catalog, "insert_existing_partitions_behavior", "OVERWRITE")
+                        .build(),
+                HiveStorageFormat.ORC, true);
+    }
+
+    private void testInsertPartitionedTableOverwriteExistingPartition(Session session, HiveStorageFormat storageFormat, boolean transactional)
     {
         String tableName = "test_insert_partitioned_table_overwrite_existing_partition";
 
@@ -1522,6 +1533,7 @@ public class TestHiveIntegrationSmokeTest
                 "  order_status VARCHAR" +
                 ") " +
                 "WITH (" +
+                (transactional ? "transactional=true, " : "") +
                 "format = '" + storageFormat + "', " +
                 "partitioned_by = ARRAY[ 'order_status' ]" +
                 ") ";
@@ -1551,6 +1563,18 @@ public class TestHiveIntegrationSmokeTest
                     session,
                     "SELECT * from " + tableName,
                     format("SELECT orderkey, comment, orderstatus FROM orders where orderkey %% 3 = %d", i));
+            if (transactional) {
+                TableMetadata metadata = getTableMetadata("hive", session.getSchema().get(), tableName);
+                String tablePath = (String) tableMetadata.getMetadata().getProperties().get("location");
+                File file = new File(tablePath.replace("file:", ""));
+                File[] partitionsLocations = file.listFiles((a) -> a.isDirectory() && !a.getName().startsWith("."));
+                int expectedBaseCount = i + 1;
+                Arrays.stream(partitionsLocations).forEach((partition) -> {
+                    File[] baseDirectories = partition.listFiles((f) -> f.isDirectory() && f.getName().startsWith("base_"));
+                    //In case of transactional insert_overwrite base directory is written directly instead of delta.
+                    assertEquals(expectedBaseCount, baseDirectories.length);
+                });
+            }
         }
         assertUpdate(session, "DROP TABLE " + tableName);
 

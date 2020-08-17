@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.util.LoggingInvocationHandler;
 import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
 import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsRequest;
 import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsResponse;
 import org.apache.hadoop.hive.metastore.api.CheckLockRequest;
@@ -446,6 +447,13 @@ public class ThriftHiveMetastoreClient
             throws TException
     {
         client.commit_txn(new CommitTxnRequest(transactionId));
+    }
+
+    @Override
+    public void abortTransaction(long transactionId)
+            throws TException
+    {
+        client.abort_txn(new AbortTxnRequest(transactionId));
     }
 
     @Override
