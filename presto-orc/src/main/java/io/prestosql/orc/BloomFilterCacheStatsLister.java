@@ -99,4 +99,10 @@ public class BloomFilterCacheStatsLister
     {
         return cache.stats().totalLoadTime();
     }
+
+    @Managed
+    public long getSize()
+    {
+        return cache.size();
+    }
 }

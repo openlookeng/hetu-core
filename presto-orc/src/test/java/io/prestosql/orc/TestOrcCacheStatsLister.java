@@ -621,6 +621,43 @@ public class TestOrcCacheStatsLister
         }
     }
 
+    @Test(dataProvider = "orcCacheProvider")
+    public void testSize(OrcCacheProperties orcCacheProperties, OrcCacheStore orcCacheStore)
+            throws Exception
+    {
+        try (TempFile tempFile = new TempFile()) {
+            createMultiStripeFile(tempFile.getFile());
+            OrcCacheStatsListerWrapper orcCacheStatsListerWrapper = new OrcCacheStatsListerWrapper(orcCacheStore);
+            for (int run = 0; run < 3; run++) {
+                try (OrcRecordReader reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, ImmutableList.of("test"),
+                        ImmutableList.of(BIGINT), MAX_BATCH_SIZE, orcCacheStore, orcCacheProperties)) {
+                    if (run == 0) {
+                        assertEquals(orcCacheStatsListerWrapper.getBloomFilterCacheStatsLister().getSize(), 0);
+                        assertEquals(orcCacheStatsListerWrapper.getRowDataCacheStatsLister().getSize(), 0);
+                        assertEquals(orcCacheStatsListerWrapper.getRowIndexCacheStatsLister().getSize(), 0);
+                        assertEquals(orcCacheStatsListerWrapper.getStripeFooterCacheStatsLister().getSize(), 0);
+                    }
+                    else {
+                        assertEquals(orcCacheStatsListerWrapper.getBloomFilterCacheStatsLister().getSize(),
+                                orcCacheProperties.isBloomFilterCacheEnabled() ? 2 : 0);
+                        assertEquals(orcCacheStatsListerWrapper.getRowDataCacheStatsLister().getSize(),
+                                orcCacheProperties.isRowDataCacheEnabled() ? 5 : 0);
+                        assertEquals(orcCacheStatsListerWrapper.getRowIndexCacheStatsLister().getSize(),
+                                orcCacheProperties.isRowIndexCacheEnabled() ? 2 : 0);
+                        assertEquals(orcCacheStatsListerWrapper.getStripeFooterCacheStatsLister().getSize(),
+                                orcCacheProperties.isStripeFooterCacheEnabled() ? 2 : 0);
+                    }
+                    while (true) {
+                        Page page = reader.nextPage();
+                        if (page == null) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private static void createMultiStripeFile(File file)
             throws IOException, ReflectiveOperationException, SerDeException
     {
