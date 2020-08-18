@@ -16,12 +16,15 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <air.check.fail-duplicate-finder>false</air.check.fail-duplicate-finder>
+        <org.slf4j.version>1.7.30</org.slf4j.version>
+        <org.roaringbitmap.version>0.8.11</org.roaringbitmap.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+            <version>${org.slf4j.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>commons-logging</groupId>
@@ -168,7 +171,7 @@
         <dependency>
             <groupId>org.roaringbitmap</groupId>
             <artifactId>RoaringBitmap</artifactId>
-            <version>0.8.6</version>
+            <version>${org.roaringbitmap.version}</version>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>
