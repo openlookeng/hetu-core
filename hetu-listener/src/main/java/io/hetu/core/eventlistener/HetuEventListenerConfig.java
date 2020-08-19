@@ -36,6 +36,12 @@ public class HetuEventListenerConfig
 
     private int logFileCount = 1;
 
+    private String auditFile;
+
+    private int auditFileLimit;
+
+    private int auditFileCount = 1;
+
     public BaseEventListener.Type getType()
     {
         return type;
@@ -48,7 +54,7 @@ public class HetuEventListenerConfig
      * @return config object
      */
     @Config("hetu.event.listener.type")
-    @ConfigDescription("Hetu supports the following listeners: LOGGER. This property is case sensitive")
+    @ConfigDescription("Hetu supports the following listeners: LOGGER, AUDIT. This property is case sensitive")
     public HetuEventListenerConfig setType(BaseEventListener.Type typeParameter)
     {
         this.type = typeParameter;
@@ -170,6 +176,67 @@ public class HetuEventListenerConfig
     public HetuEventListenerConfig setLogFileLimit(int logFileLimit)
     {
         this.logFileLimit = logFileLimit;
+        return this;
+    }
+
+    public String getAuditFile()
+    {
+        return auditFile;
+    }
+
+    /**
+     * set auditFile
+     *
+     * @param auditFile logFile from properties file
+     * @return config object
+     */
+    @Config("hetu.event.listener.audit.file")
+    @ConfigDescription(
+            "Optional property to define absolute file path for the logger. If not set, logger will use the default "
+                    + "log file")
+    public HetuEventListenerConfig setAuditFile(String auditFile)
+    {
+        this.auditFile = auditFile;
+        return this;
+    }
+
+    @Min(1)
+    public int getAuditFileCount()
+    {
+        return auditFileCount;
+    }
+
+    /**
+     * set auditFileCount
+     *
+     * @param auditFileCount auditFileCount from properties file
+     * @return config object
+     */
+    @Config("hetu.event.listener.audit.filecount")
+    @ConfigDescription("Optional property to define the number of files to use")
+    public HetuEventListenerConfig setAuditFileCount(int auditFileCount)
+    {
+        this.auditFileCount = auditFileCount;
+        return this;
+    }
+
+    @Min(0)
+    public int getAuditFileLimit()
+    {
+        return auditFileLimit;
+    }
+
+    /**
+     * set auditFileLimit
+     *
+     * @param auditFileLimit auditFileLimit from properties file
+     * @return config object
+     */
+    @Config("hetu.event.listener.audit.limit")
+    @ConfigDescription("Optional property to define the maximum number of bytes to write to any one file")
+    public HetuEventListenerConfig setAuditFileLimit(int auditFileLimit)
+    {
+        this.auditFileLimit = auditFileLimit;
         return this;
     }
 }

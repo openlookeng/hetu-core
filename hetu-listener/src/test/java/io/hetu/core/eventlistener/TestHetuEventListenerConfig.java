@@ -35,7 +35,10 @@ public class TestHetuEventListenerConfig
                 .setListenSplitCompletion(false)
                 .setLogFile(null)
                 .setLogFileLimit(0)
-                .setLogFileCount(1));
+                .setLogFileCount(1)
+                .setAuditFile(null)
+                .setAuditFileLimit(0)
+                .setAuditFileCount(1));
     }
 
     @Test
@@ -49,6 +52,9 @@ public class TestHetuEventListenerConfig
                 .put("hetu.event.listener.logger.file", "/var/hetu-events.log")
                 .put("hetu.event.listener.logger.count", "10")
                 .put("hetu.event.listener.logger.limit", "1024")
+                .put("hetu.event.listener.audit.filecount", "10")
+                .put("hetu.event.listener.audit.limit", "1024")
+                .put("hetu.event.listener.audit.file", "/var/hetu-audit.log")
                 .build();
 
         HetuEventListenerConfig expected = new HetuEventListenerConfig().setType(BaseEventListener.Type.LOGGER)
@@ -57,7 +63,40 @@ public class TestHetuEventListenerConfig
                 .setListenSplitCompletion(true)
                 .setLogFile("/var/hetu-events.log")
                 .setLogFileCount(10)
-                .setLogFileLimit(1024);
+                .setLogFileLimit(1024)
+                .setAuditFile("/var/hetu-audit.log")
+                .setAuditFileLimit(1024)
+                .setAuditFileCount(10);
+
+        assertFullMapping(properties, expected);
+    }
+
+    @Test
+    public void testExplicitPropertyMappings2()
+    {
+        Map<String, String> properties = new ImmutableMap.Builder<String, String>().put("hetu.event.listener.type",
+                "AUDIT")
+                .put("hetu.event.listener.listen.query.creation", "true")
+                .put("hetu.event.listener.listen.query.completion", "true")
+                .put("hetu.event.listener.listen.split.completion", "true")
+                .put("hetu.event.listener.logger.file", "/var/hetu-events.log")
+                .put("hetu.event.listener.logger.count", "10")
+                .put("hetu.event.listener.logger.limit", "1024")
+                .put("hetu.event.listener.audit.filecount", "10")
+                .put("hetu.event.listener.audit.limit", "1024")
+                .put("hetu.event.listener.audit.file", "/var/hetu-audit.log")
+                .build();
+
+        HetuEventListenerConfig expected = new HetuEventListenerConfig().setType(BaseEventListener.Type.AUDIT)
+                .setListenQueryCompletion(true)
+                .setListenQueryCreation(true)
+                .setListenSplitCompletion(true)
+                .setLogFile("/var/hetu-events.log")
+                .setLogFileCount(10)
+                .setLogFileLimit(1024)
+                .setAuditFile("/var/hetu-audit.log")
+                .setAuditFileLimit(1024)
+                .setAuditFileCount(10);
 
         assertFullMapping(properties, expected);
     }
