@@ -141,7 +141,7 @@ public class FeaturesConfig
     private DataSize dynamicFilteringMaxPerDriverSize = new DataSize(10, KILOBYTE);
     private double dynamicFilteringBloomFilterFpp = 0.1D;
     // enable or disable execution plan cache functionality via Session properties
-    private boolean enableExecutionPlanCache;
+    private boolean enableExecutionPlanCache = true;
 
     private DataSize filterAndProjectMinOutputPageSize = new DataSize(500, KILOBYTE);
     private int filterAndProjectMinOutputPageRowCount = 256;
