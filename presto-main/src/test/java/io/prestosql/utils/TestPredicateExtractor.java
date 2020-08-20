@@ -38,6 +38,7 @@ import io.prestosql.sql.tree.TimeLiteral;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 
 import static org.testng.Assert.assertEquals;
 
@@ -77,7 +78,7 @@ public class TestPredicateExtractor
         // NOT is not supported
         testIsSplitFilterApplicableForOperator(
                 new NotExpression(new SymbolReference("a")),
-                false);
+                true);
 
         // Test multiple supported predicates
         // AND is supported
@@ -114,7 +115,7 @@ public class TestPredicateExtractor
 
         SqlStageExecution stage = TestUtil.getTestStage(expr);
 
-        Predicate predicate = PredicateExtractor.processComparisonExpression(expr, PredicateExtractor.getFullyQualifiedName(stage).get());
+        Predicate predicate = PredicateExtractor.processComparisonExpression(expr, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
         assertEquals(predicate.getValue(), "a");
         assertEquals(predicate.getColumnName(), "a");
         assertEquals(predicate.getTableName(), "test.null");
@@ -175,7 +176,7 @@ public class TestPredicateExtractor
 
         SqlStageExecution stage = TestUtil.getTestStage(expr);
 
-        Predicate predicate = PredicateExtractor.processComparisonExpression(expr, PredicateExtractor.getFullyQualifiedName(stage).get());
+        Predicate predicate = PredicateExtractor.processComparisonExpression(expr, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
         if (predicate == null) {
             assertEquals(null, expectedValue);
         }
@@ -211,14 +212,14 @@ public class TestPredicateExtractor
         assertEquals(lbExpression.getOperator(), LogicalBinaryExpression.Operator.AND);
 
         if (left instanceof ComparisonExpression) {
-            Predicate leftPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) left, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate leftPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) left, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(leftPredicate.getValue(), "a");
             assertEquals(leftPredicate.getColumnName(), "a");
             assertEquals(leftPredicate.getTableName(), "test.null");
         }
 
         if (right instanceof ComparisonExpression) {
-            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(rightPredicate.getValue(), "b");
             assertEquals(rightPredicate.getColumnName(), "b");
             assertEquals(rightPredicate.getTableName(), "test.null");
@@ -246,19 +247,19 @@ public class TestPredicateExtractor
             Expression rightChild = ((LogicalBinaryExpression) left).getRight();
             assertEquals(((LogicalBinaryExpression) left).getOperator(), LogicalBinaryExpression.Operator.AND);
 
-            Predicate leftPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) leftChild, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate leftPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) leftChild, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(leftPredicate.getValue(), "a");
             assertEquals(leftPredicate.getColumnName(), "a");
             assertEquals(leftPredicate.getTableName(), "test.null");
 
-            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) rightChild, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) rightChild, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(rightPredicate.getValue(), "b");
             assertEquals(rightPredicate.getColumnName(), "b");
             assertEquals(rightPredicate.getTableName(), "test.null");
         }
 
         if (right instanceof ComparisonExpression) {
-            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(rightPredicate.getValue(), "c");
             assertEquals(rightPredicate.getColumnName(), "c");
             assertEquals(rightPredicate.getTableName(), "test.null");
@@ -286,19 +287,19 @@ public class TestPredicateExtractor
             Expression rightChild = ((LogicalBinaryExpression) left).getRight();
             assertEquals(((LogicalBinaryExpression) left).getOperator(), LogicalBinaryExpression.Operator.AND);
 
-            Predicate leftPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) leftChild, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate leftPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) leftChild, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(leftPredicate.getValue(), "a");
             assertEquals(leftPredicate.getColumnName(), "a");
             assertEquals(leftPredicate.getTableName(), "test.null");
 
-            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) rightChild, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) rightChild, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(rightPredicate.getValue(), "b");
             assertEquals(rightPredicate.getColumnName(), "b");
             assertEquals(rightPredicate.getTableName(), "test.null");
         }
 
         if (right instanceof ComparisonExpression) {
-            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(rightPredicate.getValue(), "c");
             assertEquals(rightPredicate.getColumnName(), "c");
             assertEquals(rightPredicate.getTableName(), "test.null");
@@ -317,7 +318,7 @@ public class TestPredicateExtractor
         Expression right = lbExpression.getRight();
 
         if (right instanceof ComparisonExpression) {
-            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get());
+            Predicate rightPredicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) right, PredicateExtractor.getFullyQualifiedName(stage).get(), new HashMap<>());
             assertEquals(rightPredicate, null);
         }
     }
