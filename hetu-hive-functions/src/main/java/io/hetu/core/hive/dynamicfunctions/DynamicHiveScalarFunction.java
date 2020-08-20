@@ -54,28 +54,36 @@ public class DynamicHiveScalarFunction
         extends DynamicSqlScalarFunction
 {
     public static final String EVALUATE_METHOD_NAME = "evaluate";
+    private static final boolean MAX_FUNCTION_RUNNING_TIME_ENABLE = false;
+    private static final boolean MAX_FUNCTION_RUNNING_TIME_ENABLE_FOR_TEST = true;
     private static final int EVALUATE_METHOD_PARAM_LENGTH = 5;
+    private static final int FUNCTION_RUNNING_THREAD_POOL_SIZE = 100;
     private static final int MAX_FUNCTION_RUNNING_TIME_IN_SECONDS = 600;
 
+    private ExecutorService executor;
     private FunctionMetadata funcMetadata;
     private java.lang.reflect.Type[] evalParamJavaTypes;
     private java.lang.reflect.Type evalReturnJavaTypes;
     private Type[] evalParamHetuTypes;
     private Type evalReturnHetuType;
     private ClassLoader classLoader;
+    private boolean maxFuncRunningTimeEnable;
     private long maxFuncRunningTimeInSec;
 
     public DynamicHiveScalarFunction(FunctionMetadata funcMetadata)
     {
-        this(funcMetadata, DynamicHiveScalarFunction.class.getClassLoader(), MAX_FUNCTION_RUNNING_TIME_IN_SECONDS);
+        this(funcMetadata, DynamicHiveScalarFunction.class.getClassLoader(), MAX_FUNCTION_RUNNING_TIME_ENABLE,
+                MAX_FUNCTION_RUNNING_TIME_IN_SECONDS, FUNCTION_RUNNING_THREAD_POOL_SIZE);
     }
 
     public DynamicHiveScalarFunction(FunctionMetadata funcMetadata, long maxFuncRunningTimeInSec)
     {
-        this(funcMetadata, DynamicHiveScalarFunction.class.getClassLoader(), maxFuncRunningTimeInSec);
+        this(funcMetadata, DynamicHiveScalarFunction.class.getClassLoader(), MAX_FUNCTION_RUNNING_TIME_ENABLE_FOR_TEST,
+                maxFuncRunningTimeInSec, FUNCTION_RUNNING_THREAD_POOL_SIZE);
     }
 
-    public DynamicHiveScalarFunction(FunctionMetadata funcMetadata, ClassLoader classLoader, long maxFuncRunningTimeInSec)
+    public DynamicHiveScalarFunction(FunctionMetadata funcMetadata, ClassLoader classLoader, boolean maxFuncRunningTimeEnable,
+                                     long maxFuncRunningTimeInSec, int functionRunningThreadPoolSize)
     {
         super(new Signature(
                 funcMetadata.getFunctionName(),
@@ -87,18 +95,23 @@ public class DynamicHiveScalarFunction
                 EVALUATE_METHOD_PARAM_LENGTH);
         this.evalReturnJavaTypes = funcMetadata.getGenericReturnType(EVALUATE_METHOD_NAME);
         this.classLoader = classLoader;
-        this.maxFuncRunningTimeInSec = maxFuncRunningTimeInSec;
+        this.maxFuncRunningTimeEnable = maxFuncRunningTimeEnable;
+        if (maxFuncRunningTimeEnable) {
+            this.maxFuncRunningTimeInSec = maxFuncRunningTimeInSec;
+            this.executor = Executors.newFixedThreadPool(functionRunningThreadPoolSize);
+        }
     }
 
     public DynamicHiveScalarFunction(FunctionMetadata funcMetadata, java.lang.reflect.Type[] genericParameterTypes,
             java.lang.reflect.Type genericReturnType)
     {
         this(funcMetadata, genericParameterTypes, genericReturnType, DynamicHiveScalarFunction.class.getClassLoader(),
-                MAX_FUNCTION_RUNNING_TIME_IN_SECONDS);
+                MAX_FUNCTION_RUNNING_TIME_ENABLE, MAX_FUNCTION_RUNNING_TIME_IN_SECONDS, FUNCTION_RUNNING_THREAD_POOL_SIZE);
     }
 
     public DynamicHiveScalarFunction(FunctionMetadata funcMetadata, java.lang.reflect.Type[] genericParameterTypes,
-            java.lang.reflect.Type genericReturnType, ClassLoader classLoader, long maxFuncRunningTimeInSec)
+            java.lang.reflect.Type genericReturnType, ClassLoader classLoader, boolean maxFuncRunningTimeEnable,
+                                     long maxFuncRunningTimeInSec, int functionRunningThreadPoolSize)
     {
         super(new Signature(
                 funcMetadata.getFunctionName(),
@@ -109,7 +122,11 @@ public class DynamicHiveScalarFunction
         this.evalParamJavaTypes = genericParameterTypes;
         this.evalReturnJavaTypes = genericReturnType;
         this.classLoader = classLoader;
-        this.maxFuncRunningTimeInSec = maxFuncRunningTimeInSec;
+        this.maxFuncRunningTimeEnable = maxFuncRunningTimeEnable;
+        if (maxFuncRunningTimeEnable) {
+            this.maxFuncRunningTimeInSec = maxFuncRunningTimeInSec;
+            this.executor = Executors.newFixedThreadPool(functionRunningThreadPoolSize);
+        }
     }
 
     @Override
@@ -229,23 +246,30 @@ public class DynamicHiveScalarFunction
 
     private Object invokeFunction(Method method, Object[] hiveObjs)
     {
-        ExecutorService executor = Executors.newFixedThreadPool(1);
-        Future<Object> future = executor.submit(() -> {
+        if (!maxFuncRunningTimeEnable) {
+            return getResult(method, hiveObjs);
+        }
+        else {
+            Future<Object> future = executor.submit(() ->
+                    getResult(method, hiveObjs));
             try {
-                return method.invoke(this.funcMetadata.getInstance(), hiveObjs);
+                return future.get(this.maxFuncRunningTimeInSec, TimeUnit.SECONDS);
             }
             catch (Exception e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Cannot invoke %s for function %s," +
-                        " with exception: %s.", EVALUATE_METHOD_NAME, funcMetadata.getInstance(), e));
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Failed to get results for method %s of" +
+                        "  function %s, with exception: %s.", EVALUATE_METHOD_NAME, funcMetadata.getInstance(), e));
             }
-        });
-        executor.shutdown();
+        }
+    }
+
+    private Object getResult(Method method, Object[] hiveObjs)
+    {
         try {
-            return future.get(this.maxFuncRunningTimeInSec, TimeUnit.SECONDS);
+            return method.invoke(this.funcMetadata.getInstance(), hiveObjs);
         }
         catch (Exception e) {
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Failed to get results for method %s of" +
-                    "  function %s, with exception: %s.", EVALUATE_METHOD_NAME, funcMetadata.getInstance(), e));
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Cannot invoke %s for function %s," +
+                    " with exception: %s.", EVALUATE_METHOD_NAME, funcMetadata.getInstance(), e));
         }
     }
 

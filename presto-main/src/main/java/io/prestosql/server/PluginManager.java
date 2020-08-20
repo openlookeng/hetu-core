@@ -219,7 +219,9 @@ public class PluginManager
             }
             if (HIVE_FUNCTIONS_PLUGIN.equals(name)) {
                 plugin.setExternalFunctionsDir(this.config.getExternalFunctionsDir());
+                plugin.setMaxFunctionRunningTimeEnable(this.config.getMaxFunctionRunningTimeEnable());
                 plugin.setMaxFunctionRunningTimeInSec(this.config.getMaxFunctionRunningTimeInSec());
+                plugin.setFunctionRunningThreadPoolSize(this.config.getFunctionRunningThreadPoolSize());
             }
             installPlugin(plugin);
         }
