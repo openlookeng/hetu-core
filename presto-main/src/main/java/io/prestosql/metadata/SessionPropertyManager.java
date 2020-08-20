@@ -83,8 +83,8 @@ public final class SessionPropertyManager
     public SessionPropertyManager(List<PropertyMetadata<?>> systemSessionProperties, HetuConfig hetuConfig)
     {
         SessionPropertyManager.hetuConfig = hetuConfig;
-        this.addSystemSessionProperties(systemSessionProperties);
         this.loadConfigToService(hetuConfig);
+        this.addSystemSessionProperties(systemSessionProperties);
     }
 
     public void addSystemSessionProperties(List<PropertyMetadata<?>> systemSessionProperties)

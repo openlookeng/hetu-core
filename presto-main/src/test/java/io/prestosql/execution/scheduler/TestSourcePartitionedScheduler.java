@@ -17,6 +17,7 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import io.prestosql.Session;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsAndCosts;
@@ -89,6 +90,7 @@ import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUT
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.testing.TestingHandles.TEST_TABLE_HANDLE;
+import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.testing.assertions.PrestoExceptionAssert.assertPrestoExceptionThrownBy;
 import static java.lang.Integer.min;
 import static java.util.Objects.requireNonNull;
@@ -108,6 +110,7 @@ public class TestSourcePartitionedScheduler
     private final LocationFactory locationFactory = new MockLocationFactory();
     private final InMemoryNodeManager nodeManager = new InMemoryNodeManager();
     private final FinalizerService finalizerService = new FinalizerService();
+    private static final Session session = testSessionBuilder().build();
     SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
 
     public TestSourcePartitionedScheduler()
@@ -324,7 +327,7 @@ public class TestSourcePartitionedScheduler
                     Iterables.getOnlyElement(plan.getSplitSources().keySet()),
                     Iterables.getOnlyElement(plan.getSplitSources().values()),
                     new DynamicSplitPlacementPolicy(nodeScheduler.createNodeSelector(CONNECTOR_ID), stage::getAllTasks),
-                    2, new HeuristicIndexerManager(new FileSystemClientManager()));
+                    2, session, new HeuristicIndexerManager(new FileSystemClientManager()));
             scheduler.schedule();
         }).hasErrorCode(NO_NODES_AVAILABLE);
     }
@@ -449,7 +452,7 @@ public class TestSourcePartitionedScheduler
         SplitSource splitSource = Iterables.getOnlyElement(plan.getSplitSources().values());
         SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeScheduler.createNodeSelector(splitSource.getCatalogName()), stage::getAllTasks);
         return newSourcePartitionedSchedulerAsStageScheduler(stage, sourceNode, splitSource,
-                placementPolicy, splitBatchSize, new HeuristicIndexerManager(new FileSystemClientManager()));
+                placementPolicy, splitBatchSize, session, new HeuristicIndexerManager(new FileSystemClientManager()));
     }
 
     private static StageExecutionPlan createPlan(ConnectorSplitSource splitSource)

@@ -20,6 +20,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
@@ -27,9 +28,7 @@ import io.prestosql.execution.scheduler.FixedSourcePartitionedScheduler.Bucketed
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
-import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
-import io.prestosql.spi.service.PropertyService;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.SplitSource;
 import io.prestosql.split.SplitSource.SplitBatch;
@@ -54,6 +53,7 @@ import static com.google.common.util.concurrent.Futures.nonCancellationPropagati
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
+import static io.prestosql.SystemSessionProperties.isHeuristicIndexFilterEnabled;
 import static io.prestosql.execution.scheduler.ScheduleResult.BlockedReason.MIXED_SPLIT_QUEUES_FULL_AND_WAITING_FOR_SOURCE;
 import static io.prestosql.execution.scheduler.ScheduleResult.BlockedReason.NO_ACTIVE_DRIVER_GROUP;
 import static io.prestosql.execution.scheduler.ScheduleResult.BlockedReason.SPLIT_QUEUES_FULL;
@@ -95,6 +95,7 @@ public class SourcePartitionedScheduler
     private final int splitBatchSize;
     private final PlanNodeId partitionedNode;
     private final boolean groupedExecution;
+    private final Session session;
     private final HeuristicIndexerManager heuristicIndexerManager;
 
     private final Map<Lifespan, ScheduleGroup> scheduleGroups = new HashMap<>();
@@ -110,12 +111,14 @@ public class SourcePartitionedScheduler
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
             boolean groupedExecution,
+            Session session,
             HeuristicIndexerManager heuristicIndexerManager)
     {
         this.stage = requireNonNull(stage, "stage is null");
         this.partitionedNode = requireNonNull(partitionedNode, "partitionedNode is null");
         this.splitSource = requireNonNull(splitSource, "splitSource is null");
         this.splitPlacementPolicy = requireNonNull(splitPlacementPolicy, "splitPlacementPolicy is null");
+        this.session = requireNonNull(session, "session is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
 
         checkArgument(splitBatchSize > 0, "splitBatchSize must be at least one");
@@ -141,10 +144,11 @@ public class SourcePartitionedScheduler
             SplitSource splitSource,
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
+            Session session,
             HeuristicIndexerManager heuristicIndexerManager)
     {
         SourcePartitionedScheduler sourcePartitionedScheduler = new SourcePartitionedScheduler(stage, partitionedNode, splitSource,
-                splitPlacementPolicy, splitBatchSize, false, heuristicIndexerManager);
+                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager);
         sourcePartitionedScheduler.startLifespan(Lifespan.taskWide(), NOT_PARTITIONED);
         sourcePartitionedScheduler.noMoreLifespans();
 
@@ -184,10 +188,11 @@ public class SourcePartitionedScheduler
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
             boolean groupedExecution,
+            Session session,
             HeuristicIndexerManager heuristicIndexerManager)
     {
         return new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy,
-                splitBatchSize, groupedExecution, heuristicIndexerManager);
+                splitBatchSize, groupedExecution, session, heuristicIndexerManager);
     }
 
     @Override
@@ -219,12 +224,11 @@ public class SourcePartitionedScheduler
         int overallSplitAssignmentCount = 0;
         ImmutableSet.Builder<RemoteTask> overallNewTasks = ImmutableSet.builder();
         List<ListenableFuture<?>> overallBlockedFutures = new ArrayList<>();
+
         boolean anyBlockedOnPlacements = false;
         boolean anyBlockedOnNextSplitBatch = false;
         boolean anyNotBlocked = false;
-
-        boolean applyFilter = PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)
-                && PredicateExtractor.isSplitFilterApplicable(stage);
+        boolean applyFilter = isHeuristicIndexFilterEnabled(session) && PredicateExtractor.isSplitFilterApplicable(stage);
 
         for (Entry<Lifespan, ScheduleGroup> entry : scheduleGroups.entrySet()) {
             Lifespan lifespan = entry.getKey();
@@ -247,7 +251,7 @@ public class SourcePartitionedScheduler
                     SplitBatch nextSplits = getFutureValue(scheduleGroup.nextSplitBatchFuture);
                     scheduleGroup.nextSplitBatchFuture = null;
 
-                    //add split filter to filter out split has no valid rows
+                    // add split filter to filter out splits that do not contain valid rows
                     List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(PredicateExtractor.getExpression(stage),
                             PredicateExtractor.getFullyQualifiedName(stage), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 

@@ -74,4 +74,9 @@ public interface ConnectorSession
     {
         return new Duration(0, TimeUnit.MILLISECONDS);
     }
+
+    default boolean isHeuristicIndexFilterEnabled()
+    {
+        return true;
+    }
 }
