@@ -135,7 +135,7 @@ public class CarbondataHetuCompactorUtil
             }
 
             // if size of a segment is greater than the Major compaction size. then ignore it.
-            if (sizeOfOneSegmentAcrossPartition > (majorVacuumSize * 1024 * 1024)) {
+            if (sizeOfOneSegmentAcrossPartition > (majorVacuumSize * 1024 * 1024 * 1024)) {
                 // if already 2 segments have been found for merging then stop scan here and merge.
                 if (segmentsToBeMerged.size() > 1) {
                     break;
