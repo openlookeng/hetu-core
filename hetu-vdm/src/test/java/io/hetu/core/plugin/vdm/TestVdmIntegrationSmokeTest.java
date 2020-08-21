@@ -189,4 +189,9 @@ public class TestVdmIntegrationSmokeTest
     public void testColumnsInReverseOrder()
     {
     }
+
+    @Override
+    public void testLikePredicate()
+    {
+    }
 }
