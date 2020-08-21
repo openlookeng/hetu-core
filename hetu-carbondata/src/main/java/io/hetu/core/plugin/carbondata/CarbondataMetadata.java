@@ -1441,7 +1441,12 @@ public class CarbondataMetadata
             try {
                 carbonLoadModel = MapredCarbonOutputFormat.getLoadModel(initialConfiguration);
                 ThreadLocalSessionInfo.unsetAll();
-                SegmentFileStore.writeSegmentFile(carbonLoadModel.getCarbonDataLoadSchema().getCarbonTable(),
+                /*
+                CarbonOutputCommitter.commitJob() is expecting segment files inside tmp folder.
+                Since, Carbondata doesn't provide any api to write segment in tmp folder,
+                therefore we are implementing writeSegment api in hetu.
+                 */
+                CarbondataMetadataUtils.writeSegmentFile(carbonLoadModel.getCarbonDataLoadSchema().getCarbonTable(),
                         carbonLoadModel.getSegmentId(), String.valueOf(carbonLoadModel.getFactTimeStamp()));
                 CarbonTableOutputFormat.setLoadModel(initialConfiguration, carbonLoadModel);
             }
