@@ -28,6 +28,7 @@ import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.AllNodes;
 import io.prestosql.metadata.Catalog;
+import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
@@ -110,7 +111,7 @@ public class DistributedQueryRunner
         return new Builder(defaultSession);
     }
 
-    DistributedQueryRunner(
+    public DistributedQueryRunner(
             Session defaultSession,
             int nodeCount,
             Map<String, String> extraProperties,
@@ -485,6 +486,14 @@ public class DistributedQueryRunner
             throwIfUnchecked(e);
             throw new RuntimeException(e);
         }
+    }
+
+    public CatalogManager getCatalogManager()
+    {
+        for (TestingPrestoServer server : servers) {
+            return server.getCatalogManager();
+        }
+        return null;
     }
 
     public static class Builder

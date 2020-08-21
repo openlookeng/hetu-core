@@ -589,6 +589,8 @@ public class CarbondataMetadata
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while cleaning up delta files", ex);
             }
 
+            addToAutoVacuumMap(session);
+
             return new CarbondataVacuumTableHandle(insertTableHandle.getSchemaName(),
                     insertTableHandle.getTableName(),
                     insertTableHandle.getInputColumns(),
@@ -1673,8 +1675,7 @@ public class CarbondataMetadata
     @Override
     public List<ConnectorVacuumTableInfo> getTablesForVacuum()
     {
-        LOG.debug("Carbondata does not support auto-vacuum");
-        return ImmutableList.of();
+        return CarbondataAutoVacuumThread.getAutoVacuumTableList(this.getMetastore());
     }
 
     public void submitCleanupTasks()
@@ -1720,5 +1721,23 @@ public class CarbondataMetadata
     protected boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
     {
         return false;
+    }
+
+    @Override
+    public void cleanupQuery(ConnectorSession session)
+    {
+        super.cleanupQuery(session);
+        if ((currentState == State.VACUUM) &&
+                (!session.getSource().get().isEmpty()) &&
+                session.getSource().get().equals("auto-vacuum")) {
+            CarbondataAutoVacuumThread.removeTableFromVacuumTablesMap(table.get().getDatabaseName() + "." + table.get().getTableName());
+        }
+    }
+
+    public void addToAutoVacuumMap(ConnectorSession session)
+    {
+        if ((!session.getSource().get().isEmpty()) && session.getSource().get().equals("auto-vacuum")) {
+            CarbondataAutoVacuumThread.addTableToVacuumTablesMap(table.get().getDatabaseName() + "." + table.get().getTableName());
+        }
     }
 }

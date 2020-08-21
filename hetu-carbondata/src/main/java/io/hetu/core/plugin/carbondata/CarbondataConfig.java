@@ -28,6 +28,7 @@ public class CarbondataConfig
     private long minorVacuumSegCount = Long.parseLong(CarbonCommonConstants.DEFAULT_SEGMENT_LEVEL_THRESHOLD.split(",")[0]);
     private long majorVacuumSegSize = 1L;
     private int vacuumServiceThreads = 2;
+    private boolean autoVacuumEnable;
     private CarbondataStorageFormat carbondataStorageFormat = CarbondataStorageFormat.CARBON;
 
     @NotNull
@@ -81,5 +82,18 @@ public class CarbondataConfig
     public int getCarbondataVacuumServiceThreads()
     {
         return vacuumServiceThreads;
+    }
+
+    @Config("carbondata.auto-vacuum-enabled")
+    @ConfigDescription("carbondata auto vacuum default value is true.")
+    public CarbondataConfig setAutoVacuumEnable(boolean autoVacuumEnable)
+    {
+        this.autoVacuumEnable = autoVacuumEnable;
+        return this;
+    }
+
+    public boolean getAutoVacuumEnable()
+    {
+        return autoVacuumEnable;
     }
 }

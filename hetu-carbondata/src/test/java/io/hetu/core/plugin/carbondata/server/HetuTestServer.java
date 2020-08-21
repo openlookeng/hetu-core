@@ -17,13 +17,14 @@ package io.hetu.core.plugin.carbondata.server;
 
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.plugin.carbondata.CarbondataPlugin;
-import io.hetu.core.plugin.carbondata.impl.CarbondataTableReader;
 import io.prestosql.Session;
 import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.jdbc.PrestoStatement;
+import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.plugin.hive.HivePlugin;
 import io.prestosql.spi.security.Identity;
+import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.tests.DistributedQueryRunner;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.commons.lang.StringUtils;
@@ -71,11 +72,22 @@ public class HetuTestServer
     {
     }
 
+    public void startServer(String dbName, Map<String, String> properties, Map<String, String> configProperties) throws Exception
+    {
+        queryRunner = new DistributedQueryRunner(createSession(), 4, hetuProperties, configProperties,  new SqlParserOptions(), "testing", Optional.empty());
+        this.dbName = dbName;
+        startServer(properties);
+    }
+
     public void startServer(String dbName, Map<String, String> properties) throws Exception
     {
         queryRunner = new DistributedQueryRunner(createSession(), 4, hetuProperties);
-
         this.dbName = dbName;
+        startServer(properties);
+    }
+
+    public void startServer(Map<String, String> properties) throws Exception
+    {
         carbonProperties.putAll(properties);
 
         logger.info("------------ Starting Presto Server -------------");
@@ -196,5 +208,9 @@ public class HetuTestServer
     {
         queryRunner.installPlugin(new HivePlugin("hive"));
         queryRunner.createCatalog("hive", "hive", hiveProperties);
+    }
+
+    public CatalogManager getCatalog() {
+        return queryRunner.getCatalogManager();
     }
 }
