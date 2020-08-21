@@ -41,6 +41,7 @@ import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_PATH;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILL_ENABLED;
 import static io.prestosql.sql.analyzer.RegexLibrary.JONI;
 import static io.prestosql.sql.analyzer.RegexLibrary.RE2J;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -114,9 +115,11 @@ public class TestFeaturesConfig
                 .setSkipRedundantSort(true)
                 .setPredicatePushdownUseTableProperties(true)
                 .setEnableDynamicFiltering(false)
-                .setDynamicFilteringMaxPerDriverRowCount(100)
+                .setDynamicFilteringMaxPerDriverRowCount(10000)
                 .setDynamicFilteringDataType(BLOOM_FILTER)
-                .setDynamicFilteringMaxPerDriverSize(new DataSize(10, KILOBYTE))
+                .setDynamicFilteringWaitTime(new Duration(0, MILLISECONDS))
+                .setDynamicFilteringMaxSize(1000000)
+                .setDynamicFilteringMaxPerDriverSize(new DataSize(1, MEGABYTE))
                 .setDynamicFilteringBloomFilterFpp(0.1)
                 .setQueryPushDown(true)
                 .setPushLimitDown(true)
@@ -201,6 +204,8 @@ public class TestFeaturesConfig
                 .put("optimizer.push-limit-through-union", "false")
                 .put("optimizer.push-limit-through-semi-join", "false")
                 .put("optimizer.push-limit-through-outer-join", "false")
+                .put("dynamic-filtering-wait-time", "200ms")
+                .put("dynamic-filtering-max-size", "10000")
                 .put("dynamic-filtering-max-per-driver-row-count", "256")
                 .put("dynamic-filtering-data-type", "HASHSET")
                 .put("dynamic-filtering-max-per-driver-size", "64kB")
@@ -282,6 +287,8 @@ public class TestFeaturesConfig
                 .setEnableExecutionPlanCache(false)
                 .setDynamicFilteringMaxPerDriverRowCount(256)
                 .setDynamicFilteringDataType(HASHSET)
+                .setDynamicFilteringWaitTime(new Duration(200, MILLISECONDS))
+                .setDynamicFilteringMaxSize(10000)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
                 .setDynamicFilteringBloomFilterFpp(0.001);
         assertFullMapping(properties, expected);
