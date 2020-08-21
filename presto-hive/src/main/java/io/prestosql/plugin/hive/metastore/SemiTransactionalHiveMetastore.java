@@ -1062,7 +1062,7 @@ public class SemiTransactionalHiveMetastore
         return getTimeVar(configuration, TXN_TIMEOUT, MILLISECONDS) / 2;
     }
 
-    public synchronized Optional<ValidTxnWriteIdList> getValidWriteIds(ConnectorSession session, HiveTableHandle tableHandle)
+    public synchronized Optional<ValidTxnWriteIdList> getValidWriteIds(ConnectorSession session, HiveTableHandle tableHandle, boolean isVacuum)
     {
         String queryId = session.getQueryId();
         checkState(currentQueryId.equals(Optional.of(queryId)), "Invalid query id %s while current query is", queryId, currentQueryId);
@@ -1076,7 +1076,7 @@ public class SemiTransactionalHiveMetastore
                     .get());
         }
 
-        return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle, queryId));
+        return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle, queryId, isVacuum));
     }
 
     public synchronized Optional<Long> getTableWriteId(ConnectorSession session, HiveTableHandle tableHandle, HiveACIDWriteType writeType)

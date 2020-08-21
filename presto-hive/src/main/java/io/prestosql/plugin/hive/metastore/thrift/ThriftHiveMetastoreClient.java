@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.util.LoggingInvocationHandler;
 import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
 import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsRequest;
 import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsResponse;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
+import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.thrift.TException;
@@ -481,7 +483,7 @@ public class ThriftHiveMetastoreClient
     }
 
     @Override
-    public String getValidWriteIds(List<String> tableList, long currentTransactionId)
+    public String getValidWriteIds(List<String> tableList, long currentTransactionId, boolean isVacuum)
             throws TException
     {
         // Pass currentTxn as 0L to get the recent snapshot of valid transactions in Hive
@@ -489,10 +491,26 @@ public class ThriftHiveMetastoreClient
         // deletes deleta directories for valid transactions that existed at the time transaction is opened
         ValidTxnList validTransactions = TxnUtils.createValidReadTxnList(client.get_open_txns(), 0L);
         GetValidWriteIdsRequest request = new GetValidWriteIdsRequest(tableList, validTransactions.toString());
+        List<TableValidWriteIds> tblValidWriteIds = client.get_valid_write_ids(request).getTblValidWriteIds();
+        if (isVacuum) {
+            return createValidTxnWriteIdListForVacuum(currentTransactionId, tblValidWriteIds).toString();
+        }
         return TxnUtils.createValidTxnWriteIdList(
                 currentTransactionId,
-                client.get_valid_write_ids(request).getTblValidWriteIds())
+                tblValidWriteIds)
                 .toString();
+    }
+
+    /**
+     * Creates the validTxnWriteIdList which consists of all valid commits less than minOpenWriteId
+     */
+    private static ValidTxnWriteIdList createValidTxnWriteIdListForVacuum(Long currentTxnId, List<TableValidWriteIds> validIds)
+    {
+        ValidTxnWriteIdList validTxnWriteIdList = new ValidTxnWriteIdList(currentTxnId);
+        for (TableValidWriteIds tableWriteIds : validIds) {
+            validTxnWriteIdList.addTableValidWriteIdList(TxnUtils.createValidCompactWriteIdList(tableWriteIds));
+        }
+        return validTxnWriteIdList;
     }
 
     @Override

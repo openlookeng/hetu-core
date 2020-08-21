@@ -1565,7 +1565,7 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId, boolean isVacuum)
     {
         try {
             return retry()
@@ -1576,7 +1576,8 @@ public class ThriftHiveMetastore
                                     tables.stream()
                                             .map(table -> format("%s.%s", table.getSchemaName(), table.getTableName()))
                                             .collect(toImmutableList()),
-                                    currentTransactionId);
+                                    currentTransactionId,
+                                    isVacuum);
                         }
                     }));
         }

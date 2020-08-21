@@ -59,7 +59,7 @@ public class HiveTransaction
         return heartbeatTask;
     }
 
-    public ValidTxnWriteIdList getValidWriteIds(HiveMetastore metastore, HiveTableHandle tableHandle, String queryId)
+    public ValidTxnWriteIdList getValidWriteIds(HiveMetastore metastore, HiveTableHandle tableHandle, String queryId, boolean isVacuum)
     {
         //If the update or delete would have locked exclusive lock, then there is no need to lock again.
         if (isSharedLockNeeded(tableHandle)) {
@@ -77,7 +77,8 @@ public class HiveTransaction
                 metastore.getValidWriteIds(
                         identity,
                         ImmutableList.of(schemaTableName),
-                        transactionId)));
+                        transactionId,
+                        isVacuum)));
     }
 
     //If the query is on the same table, on which update/delete happening separate lock not required.

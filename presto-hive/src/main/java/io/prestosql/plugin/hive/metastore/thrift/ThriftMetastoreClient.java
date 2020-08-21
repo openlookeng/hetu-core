@@ -169,7 +169,7 @@ public interface ThriftMetastoreClient
     LockResponse checkLock(long lockId)
             throws TException;
 
-    String getValidWriteIds(List<String> tableList, long currentTransactionId)
+    String getValidWriteIds(List<String> tableList, long currentTransactionId, boolean isVacuum)
             throws TException;
 
     String get_config_value(String name, String defaultValue)
