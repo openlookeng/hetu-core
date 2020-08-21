@@ -84,8 +84,8 @@ public final class HiveSessionProperties
     private static final String S3_SELECT_PUSHDOWN_ENABLED = "s3_select_pushdown_enabled";
     private static final String TEMPORARY_STAGING_DIRECTORY_ENABLED = "temporary_staging_directory_enabled";
     private static final String TEMPORARY_STAGING_DIRECTORY_PATH = "temporary_staging_directory_path";
-    private static final String DYNAMIC_FILTERING_FILTER_ROWS = "dynamic_filtering_filter_rows";
     private static final String DYNAMIC_FILTERING_SPLIT_FILTERING = "dynamic_filtering_partition_filtering";
+    private static final String DYNAMIC_FILTERING_ROW_FILTERING_THRESHOLD = "dynamic_filtering_filter_rows_threshold";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -352,10 +352,10 @@ public final class HiveSessionProperties
                         "Temporary staging directory location",
                         hiveConfig.getTemporaryStagingDirectoryPath(),
                         false),
-                booleanProperty(
-                        DYNAMIC_FILTERING_FILTER_ROWS,
-                        "Filtering rows using dynamic filter",
-                        false,
+                integerProperty(
+                        DYNAMIC_FILTERING_ROW_FILTERING_THRESHOLD,
+                        "Only enable row filtering with dynamic filter if the filter size is below this threshold",
+                        hiveConfig.getDynamicFilteringRowFilteringThreshold(),
                         false),
                 booleanProperty(
                         DYNAMIC_FILTERING_SPLIT_FILTERING,
@@ -601,9 +601,9 @@ public final class HiveSessionProperties
         return session.getProperty(TEMPORARY_STAGING_DIRECTORY_PATH, String.class);
     }
 
-    public static boolean isDynamicFilteringFilterRows(ConnectorSession session)
+    public static int getDynamicFilteringRowFilteringThreshold(ConnectorSession session)
     {
-        return session.getProperty(DYNAMIC_FILTERING_FILTER_ROWS, Boolean.class);
+        return session.getProperty(DYNAMIC_FILTERING_ROW_FILTERING_THRESHOLD, Integer.class);
     }
 
     public static boolean isDynamicFilteringSplitFilteringEnabled(ConnectorSession session)

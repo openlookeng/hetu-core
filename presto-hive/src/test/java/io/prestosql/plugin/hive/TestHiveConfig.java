@@ -133,6 +133,7 @@ public class TestHiveConfig
                 .setTableCreatesWithLocationAllowed(true)
                 .setTlsEnabled(false)
                 .setDynamicFilterPartitionFilteringEnabled(false)
+                .setDynamicFilteringRowFilteringThreshold(2000)
                 .setOrcCacheStatsMetricCollectionEnabled(false));
     }
 
@@ -164,6 +165,7 @@ public class TestHiveConfig
                 .put("hive.dfs.verify-checksum", "false")
                 .put("hive.dfs.domain-socket-path", "/foo")
                 .put("hive.dynamic-filter-partition-filtering", "true")
+                .put("hive.dynamic-filtering-row-filtering-threshold", "10000")
                 .put("hive.s3-file-system-type", "EMRFS")
                 .put("hive.config.resources", "/foo.xml,/bar.xml")
                 .put("hive.max-initial-splits", "10")
@@ -346,6 +348,7 @@ public class TestHiveConfig
                 .setTableCreatesWithLocationAllowed(false)
                 .setTlsEnabled(true)
                 .setDynamicFilterPartitionFilteringEnabled(true)
+                .setDynamicFilteringRowFilteringThreshold(10000)
                 .setOrcCacheStatsMetricCollectionEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
