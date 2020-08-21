@@ -224,26 +224,6 @@ public class HanaConfig
     }
 
     /**
-     * set Sql Rewrite configuration properties file path
-     *
-     * @param sqlConfigFilePath sql Configuration File absolute Path
-     * @return HanaConfig
-     */
-    @Config("hana.query.versionconfigfile")
-    @ConfigDescription("Get the sql rewrite configuration absolute path from hana.config." + " It's set to be the resource file path by default")
-    public HanaConfig setSqlConfigFilePath(String sqlConfigFilePath)
-    {
-        this.sqlConfigFilePath = sqlConfigFilePath;
-        if (this.sqlConfigFilePath != null) {
-            isDefaultPath = false;
-        }
-        else {
-            this.sqlConfigFilePath = "";
-        }
-        return this;
-    }
-
-    /**
      * get the Sql rewrite configuration properties file path default set to be resource file path
      *
      * @return String the usable file path

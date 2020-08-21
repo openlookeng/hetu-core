@@ -52,7 +52,6 @@ public class TestHanaConfig
                 .put("hana.table-types", tableTypes)
                 .put("hana.schema-pattern", schemaPattern)
                 .put("hana.query.pushdown.enabled", "false")
-                .put("hana.query.versionconfigfile", "/etc/hetu/plugin/hana/")
                 .put("hana.query.bypassDataSourceTimeZone", "false")
                 .put("hana.query.datasourceTimeZoneKey", "America/Chicago")
                 .build();
@@ -66,7 +65,6 @@ public class TestHanaConfig
                 .setTableTypes(tableTypes)
                 .setSchemaPattern(schemaPattern)
                 .setQueryPushDownEnabled(false)
-                .setSqlConfigFilePath("/etc/hetu/plugin/hana/")
                 .setByPassDataSourceTimeZone(false)
                 .setDataSourceTimeZoneKey("America/Chicago");
         assertFullMapping(properties, expected);
