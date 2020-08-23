@@ -123,7 +123,7 @@ public class TestFeaturesConfig
                 .setPushLimitThroughOuterJoin(true)
                 .setPushLimitThroughSemiJoin(true)
                 .setPushLimitThroughUnion(true)
-                .setEnableExecutionPlanCache(false)
+                .setEnableExecutionPlanCache(true)
                 .setImplicitConversionEnabled(false));
     }
 
@@ -195,7 +195,7 @@ public class TestFeaturesConfig
                 .put("optimizer.skip-redundant-sort", "false")
                 .put("optimizer.predicate-pushdown-use-table-properties", "false")
                 .put("enable-dynamic-filtering", "true")
-                .put("experimental.enable-execution-plan-cache", "true")
+                .put("experimental.enable-execution-plan-cache", "false")
                 .put("hetu.query-pushdown", "false")
                 .put("optimizer.push-limit-down", "false")
                 .put("optimizer.push-limit-through-union", "false")
@@ -279,7 +279,7 @@ public class TestFeaturesConfig
                 .setPushLimitThroughUnion(false)
                 .setPushLimitThroughSemiJoin(false)
                 .setPushLimitThroughOuterJoin(false)
-                .setEnableExecutionPlanCache(true)
+                .setEnableExecutionPlanCache(false)
                 .setDynamicFilteringMaxPerDriverRowCount(256)
                 .setDynamicFilteringDataType(HASHSET)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
