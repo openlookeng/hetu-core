@@ -66,6 +66,7 @@ public class TestDataCenterConfig
                 .setMetadataCacheEnabled(true)
                 .setCompressionEnabled(false)
                 .setMaxAnticipatedDelay(new Duration(10, TimeUnit.MINUTES))
+                .setUpdateThreshold(new Duration(1, TimeUnit.MINUTES))
                 .setMaxIdleConnections(20));
     }
 
@@ -104,6 +105,7 @@ public class TestDataCenterConfig
                 .put("dc.metadata.cache.enabled", "false")
                 .put("dc.http-compression", "true")
                 .put("dc.max.anticipated.delay", "5s")
+                .put("hetu.dc.catalog.update.threshold", "2m")
                 .put("dc.httpclient.maximum.idle.connections", "10")
                 .build();
 
@@ -138,6 +140,7 @@ public class TestDataCenterConfig
                 .setMetadataCacheEnabled(false)
                 .setCompressionEnabled(true)
                 .setMaxAnticipatedDelay(new Duration(5, TimeUnit.SECONDS))
+                .setUpdateThreshold(new Duration(2, TimeUnit.MINUTES))
                 .setMaxIdleConnections(10);
 
         ConfigAssertions.assertFullMapping(properties, expected);
