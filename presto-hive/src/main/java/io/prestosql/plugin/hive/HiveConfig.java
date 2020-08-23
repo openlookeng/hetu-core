@@ -199,6 +199,9 @@ public class HiveConfig
 
     private boolean tlsEnabled;
 
+    private Optional<Duration> vacuumCleanupInterval = Optional.of(new Duration(1, MINUTES));
+    private int vacuumCleanupThreads = 2;
+
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
     {
@@ -1648,5 +1651,32 @@ public class HiveConfig
     {
         this.orcCacheStatsMetricCollectionEnabled = orcCacheStatsMetricCollectionEnabled;
         return this;
+    }
+
+    @Config("hive.vacuum-cleanup-recheck-interval")
+    @ConfigDescription("Interval after which vacuum cleanup task will be resubmitted")
+    public HiveConfig setVacuumCleanupRecheckInterval(Duration interval)
+    {
+        this.vacuumCleanupInterval = Optional.ofNullable(interval);
+        return this;
+    }
+
+    @NotNull
+    public Optional<Duration> getVacuumCleanupRecheckInterval()
+    {
+        return vacuumCleanupInterval;
+    }
+
+    @Config("hive.vacuum-cleanup-threads")
+    @ConfigDescription("Number of threads to run in the vacuum cleanup service")
+    public HiveConfig setVacuumCleanupThreads(int vacuumCleanupThreads)
+    {
+        this.vacuumCleanupThreads = vacuumCleanupThreads;
+        return this;
+    }
+
+    public int getVacuumCleanupThreads()
+    {
+        return vacuumCleanupThreads;
     }
 }

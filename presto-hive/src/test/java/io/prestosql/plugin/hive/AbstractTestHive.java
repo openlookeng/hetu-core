@@ -585,12 +585,14 @@ public abstract class AbstractTestHive
     protected ExecutorService executor;
 
     private ScheduledExecutorService heartbeatService;
+    private ScheduledExecutorService vacuumCleanupService;
 
     @BeforeClass
     public void setupClass()
     {
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
         heartbeatService = newScheduledThreadPool(1);
+        vacuumCleanupService = newScheduledThreadPool(1);
     }
 
     @AfterClass(alwaysRun = true)
@@ -603,6 +605,10 @@ public abstract class AbstractTestHive
         if (heartbeatService != null) {
             heartbeatService.shutdownNow();
             heartbeatService = null;
+        }
+        if (vacuumCleanupService != null) {
+            vacuumCleanupService.shutdownNow();
+            vacuumCleanupService = null;
         }
     }
 
@@ -736,10 +742,12 @@ public abstract class AbstractTestHive
                 true,
                 1000,
                 Optional.empty(),
+                Optional.empty(),
                 TYPE_MANAGER,
                 locationService,
                 partitionUpdateCodec,
                 newFixedThreadPool(2),
+                vacuumCleanupService,
                 heartbeatService,
                 new HiveTypeTranslator(),
                 TEST_SERVER_VERSION,

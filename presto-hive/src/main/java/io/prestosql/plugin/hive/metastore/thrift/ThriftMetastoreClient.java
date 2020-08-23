@@ -25,6 +25,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
@@ -177,5 +179,8 @@ public interface ThriftMetastoreClient
             throws TException;
 
     long getTableWriteId(String dbName, String tableName, long transactionId)
+            throws TException;
+
+    ShowLocksResponse showLocks(ShowLocksRequest rqst)
             throws TException;
 }

@@ -35,6 +35,8 @@ import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -812,6 +814,12 @@ public class CachingHiveMetastore
     public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
     {
         return delegate.getValidWriteIds(identity, tables, currentTransactionId);
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+    {
+        return delegate.showLocks(rqst);
     }
 
     @Override

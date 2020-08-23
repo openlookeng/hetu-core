@@ -61,6 +61,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
@@ -1031,6 +1033,12 @@ public class FileHiveMetastore
                 tables.get(0).getSchemaName(),
                 tables.get(0).getTableName(),
                 currentTransactionId - 1);
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+    {
+        return new ShowLocksResponse();
     }
 
     @Override

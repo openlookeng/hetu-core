@@ -22,6 +22,8 @@ import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 
 import java.util.List;
 import java.util.Map;
@@ -141,6 +143,11 @@ public interface HiveMetastore
     }
 
     default String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default ShowLocksResponse showLocks(ShowLocksRequest rqst)
     {
         throw new UnsupportedOperationException();
     }

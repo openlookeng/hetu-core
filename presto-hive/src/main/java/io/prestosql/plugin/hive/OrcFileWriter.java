@@ -31,6 +31,7 @@ import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.Type;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
@@ -162,7 +163,8 @@ public class OrcFileWriter
             }
             catch (IOException e) {
                 if (e instanceof AlreadyBeingCreatedException
-                        || (e instanceof RemoteException && ((RemoteException) e).unwrapRemoteException(AlreadyBeingCreatedException.class) != e)) {
+                        || (e instanceof RemoteException && ((RemoteException) e).unwrapRemoteException(AlreadyBeingCreatedException.class) != e)
+                        || (e instanceof FileAlreadyExistsException)) {
                     //Ignore the exception as same file is being created by another task in parallel.
                     return;
                 }

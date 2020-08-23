@@ -1649,7 +1649,12 @@ public class HiveMetadata
                 vacuumTableHandle.getInputColumns(), vacuumTableHandle.getPageSinkMetadata(),
                 vacuumTableHandle.getLocationHandle(), vacuumTableHandle.getBucketProperty(),
                 vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false);
-        return finishInsert(session, insertTableHandle, fragments, computedStatistics);
+        List<PartitionUpdate> partitionUpdates = new ArrayList<>();
+        Optional<ConnectorOutputMetadata> connectorOutputMetadata =
+                finishInsert(session, insertTableHandle, fragments, computedStatistics, partitionUpdates);
+
+        metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
+        return connectorOutputMetadata;
     }
 
     protected Partition buildPartitionObject(ConnectorSession session, Table table, PartitionUpdate partitionUpdate)
@@ -2515,6 +2520,7 @@ public class HiveMetadata
     public void commit()
     {
         metastore.commit();
+        metastore.submitCleanupTasks();
     }
 
     @Override

@@ -67,6 +67,8 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
@@ -1604,6 +1606,22 @@ public class ThriftHiveMetastore
             if (e.getMessage().contains("Invalid method name")) {
                 throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, "Transactional tables support require Hive metastore version at least 3.0");
             }
+            throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, e);
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+    {
+        try {
+            try (ThriftMetastoreClient metastoreClient = clientProvider.createMetastoreClient()) {
+                return metastoreClient.showLocks(rqst);
+            }
+        }
+        catch (TException e) {
             throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, e);
         }
         catch (Exception e) {

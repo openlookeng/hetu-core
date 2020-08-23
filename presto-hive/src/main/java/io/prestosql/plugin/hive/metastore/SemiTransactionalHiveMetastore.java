@@ -31,9 +31,13 @@ import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveErrorCode;
 import io.prestosql.plugin.hive.HiveTableHandle;
 import io.prestosql.plugin.hive.HiveType;
+import io.prestosql.plugin.hive.HiveVacuumTableHandle;
 import io.prestosql.plugin.hive.LocationHandle.WriteMode;
 import io.prestosql.plugin.hive.PartitionNotFoundException;
 import io.prestosql.plugin.hive.PartitionStatistics;
+import io.prestosql.plugin.hive.PartitionUpdate;
+import io.prestosql.plugin.hive.VacuumCleaner;
+import io.prestosql.plugin.hive.VacuumTableInfoForCleaner;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
@@ -51,6 +55,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -94,6 +100,7 @@ import static io.prestosql.plugin.hive.util.Statistics.ReduceOperator.SUBTRACT;
 import static io.prestosql.plugin.hive.util.Statistics.merge;
 import static io.prestosql.plugin.hive.util.Statistics.reduce;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.TRANSACTION_CONFLICT;
 import static io.prestosql.spi.security.PrincipalType.USER;
@@ -113,6 +120,8 @@ public class SemiTransactionalHiveMetastore
     private final HiveMetastore delegate;
     private final HdfsEnvironment hdfsEnvironment;
     private final Executor renameExecutor;
+    private final ScheduledExecutorService vacuumCleanUpExecutor;
+    private final Optional<Duration> configuredVacuumCleanupInterval;
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
     private final ScheduledExecutorService heartbeatExecutor;
@@ -139,10 +148,14 @@ public class SemiTransactionalHiveMetastore
     @GuardedBy("this")
     private Optional<HiveTransaction> currentHiveTransaction = Optional.empty();
 
+    private List<VacuumCleaner> vacuumCleanerTasks = new ArrayList<>();
+
     public SemiTransactionalHiveMetastore(
             HdfsEnvironment hdfsEnvironment,
             HiveMetastore delegate,
             Executor renameExecutor,
+            ScheduledExecutorService vacuumCleanUpExecutor,
+            Optional<Duration> vacuumCleanupInterval,
             boolean skipDeletionForAlter,
             boolean skipTargetCleanupOnRollback,
             Optional<Duration> hiveTransactionHeartbeatInterval,
@@ -151,6 +164,8 @@ public class SemiTransactionalHiveMetastore
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.renameExecutor = requireNonNull(renameExecutor, "renameExecutor is null");
+        this.vacuumCleanUpExecutor = requireNonNull(vacuumCleanUpExecutor, "cleanUpExecutor is null");
+        this.configuredVacuumCleanupInterval = requireNonNull(vacuumCleanupInterval, "vacuumCleanupInterval is null");
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
         this.heartbeatExecutor = heartbeatService;
@@ -976,6 +991,13 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
+    public void submitCleanupTasks()
+    {
+        if (vacuumCleanerTasks.size() > 0) {
+            vacuumCleanerTasks.forEach(c -> c.submitVacuumCleanupTask());
+        }
+    }
+
     public synchronized void rollback()
     {
         try {
@@ -1230,6 +1252,31 @@ public class SemiTransactionalHiveMetastore
 
             // Clean up empty staging directories (that may recursively contain empty directories)
             committer.deleteEmptyStagingDirectories(declaredIntentionsToWrite);
+        }
+    }
+
+    public void initiateVacuumCleanupTasks(HiveVacuumTableHandle vacuumTableHandle,
+                                                                          ConnectorSession session,
+                                                                          List<PartitionUpdate> partitionUpdates)
+    {
+        if (vacuumTableHandle.getRanges() != null && vacuumTableHandle.getRanges().size() > 0) {
+            HdfsContext hdfsContext = new HdfsContext(session, vacuumTableHandle.getSchemaName(), vacuumTableHandle.getTableName());
+
+            VacuumTableInfoForCleaner info;
+            long maxId = Long.MIN_VALUE;
+            for (HiveVacuumTableHandle.Range range : vacuumTableHandle.getRanges()) {
+                if (maxId < range.getMax()) {
+                    maxId = range.getMax();
+                }
+            }
+            for (int index = 0; index < partitionUpdates.size(); index++) {
+                info = new VacuumTableInfoForCleaner(vacuumTableHandle.getSchemaName(),
+                        vacuumTableHandle.getTableName(),
+                        partitionUpdates.get(index).getName(),
+                        maxId,
+                        partitionUpdates.get(index).getTargetPath());
+                vacuumCleanerTasks.add(new VacuumCleaner(info, this, hdfsEnvironment, hdfsContext));
+            }
         }
     }
 
@@ -3066,5 +3113,29 @@ public class SemiTransactionalHiveMetastore
     private interface ExclusiveOperation
     {
         void execute(HiveMetastore delegate, HdfsEnvironment hdfsEnvironment);
+    }
+
+    public ScheduledExecutorService getVacuumCleanUpExecutor()
+    {
+        return vacuumCleanUpExecutor;
+    }
+
+    public long getVacuumCleanupInterval()
+    {
+        return configuredVacuumCleanupInterval.map(Duration::toMillis)
+                .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Vacuum cleanup interval is not set correctly"));
+    }
+
+    public ShowLocksResponse showLocks(VacuumTableInfoForCleaner tableInfo)
+    {
+        ShowLocksRequest rqst = new ShowLocksRequest();
+
+        rqst.setDbname(tableInfo.getDbName());
+        rqst.setTablename(tableInfo.getTableName());
+        if (tableInfo.getPartitionName().length() > 0) {
+            rqst.setPartname(tableInfo.getPartitionName());
+        }
+
+        return delegate.showLocks(rqst);
     }
 }

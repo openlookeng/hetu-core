@@ -37,6 +37,8 @@ import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 
 import javax.inject.Inject;
 
@@ -425,6 +427,12 @@ public class BridgingHiveMetastore
     public long getTableWriteId(String dbName, String tableName, long transactionId)
     {
         return delegate.getTableWriteId(dbName, tableName, transactionId);
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+    {
+        return delegate.showLocks(rqst);
     }
 
     /**
