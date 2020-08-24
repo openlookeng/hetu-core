@@ -12,7 +12,9 @@ connection-url=jdbc:mysql://localhost:3306
 connection-user=root
 connection-password=123456
 ```
-openLooKeng 可以开启密码加密功能，这些密码就可以被加密存储.
+openLooKeng 可以开启密码加密功能，这些密码就可以被加密存储。
+
+建议RSA Key的长度为3072 bit，最低2048 bit。
 
 原理
 -------------------------

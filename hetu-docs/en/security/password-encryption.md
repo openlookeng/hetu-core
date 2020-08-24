@@ -25,6 +25,8 @@ The asymmetric encryption algorithm (RSA) is used for encrypting password.
 
 The user saves the secret key and gives the public key to openLooKeng to decrypt the encrypted ciphertext.
 
+The key suggested size of RSA is 3072 bits, the minimum is 2048 bits.
+
 Configuration
 -------------------------
 
