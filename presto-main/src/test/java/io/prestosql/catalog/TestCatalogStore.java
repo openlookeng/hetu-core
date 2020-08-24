@@ -156,6 +156,7 @@ public class TestCatalogStore
         // create catalog.
         CatalogInfo catalogInfo = new CatalogInfo("hive",
                 "hadoop-hive2",
+                "",
                 "admin",
                 0,
                 UUID.randomUUID().toString(),

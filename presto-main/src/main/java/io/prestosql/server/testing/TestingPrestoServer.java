@@ -61,6 +61,7 @@ import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.protocol.SmileModule;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlManager;
+import io.prestosql.security.PasswordSecurityModule;
 import io.prestosql.server.NodeStateChangeHandler;
 import io.prestosql.server.PluginManager;
 import io.prestosql.server.ServerMainModule;
@@ -232,6 +233,7 @@ public class TestingPrestoServer
                 .add(new EventModule())
                 .add(new TraceTokenModule())
                 .add(new ServerSecurityModule())
+                .add(new PasswordSecurityModule())
                 .add(new ServerMainModule(parserOptions))
                 .add(new TestingWarningCollectorModule())
                 .add(binder -> {

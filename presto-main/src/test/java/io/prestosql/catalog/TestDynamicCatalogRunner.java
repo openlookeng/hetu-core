@@ -23,6 +23,7 @@ import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.plugin.tpch.TpchPlugin;
 import io.prestosql.server.testing.TestingPrestoServer;
+import io.prestosql.spi.security.SecurityKeyManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -80,14 +81,18 @@ public class TestDynamicCatalogRunner
     final String testResources = Resources.getResource("dynamiccatalog").getPath();
     String localPath;
     String sharePath;
+    String storePath;
 
     TestingPrestoServer server;
+    SecurityKeyManager securityKeyManager;
+    CatalogStoreUtil catalogStoreUtil;
 
     public TestDynamicCatalogRunner()
             throws Exception
     {
         localPath = testResources + File.separator + "local";
         sharePath = testResources + File.separator + "share";
+        storePath = testResources + File.separator + "keys" + File.separator + "keystore.jks";
 
         prepareDirectory(localPath);
         prepareDirectory(sharePath);
@@ -95,6 +100,10 @@ public class TestDynamicCatalogRunner
                 .put("catalog.dynamic-enabled", "true")
                 .put("catalog.config-dir", localPath)
                 .put("catalog.share.config-dir", sharePath)
+                .put("security.key.manager-type", "keystore")
+                .put("security.key.keystore-password", "password")
+                .put("security.key.store-file-path", storePath)
+                .put("security.password.decryption-type", "RSA")
                 .build();
 
         server = new TestingPrestoServer(properties);
@@ -108,7 +117,8 @@ public class TestDynamicCatalogRunner
             server.installPlugin(new HetuFileSystemClientPlugin());
             server.getInstance(Key.get(FileSystemClientManager.class)).loadFactoryConfigs();
         }
-        server.getInstance(Key.get(CatalogStoreUtil.class));
+        securityKeyManager = server.getInstance(Key.get(SecurityKeyManager.class));
+        catalogStoreUtil = server.getInstance(Key.get(CatalogStoreUtil.class));
     }
 
     private void prepareDirectory(String directory)
@@ -136,7 +146,7 @@ public class TestDynamicCatalogRunner
             multipartEntity.addPart("globalConfigurationFiles", propertiesFile);
         });
 
-        CatalogInfo catalogInfo = new CatalogInfo(catalogName, connectorName, "admin", 0, UUID.randomUUID().toString(), properties);
+        CatalogInfo catalogInfo = new CatalogInfo(catalogName, connectorName, "", "admin", 0, UUID.randomUUID().toString(), properties);
         StringBody catalogInfoBody = new StringBody(CATALOG_INFO_CODEC.toJson(catalogInfo));
         multipartEntity.addPart("catalogInformation", catalogInfoBody);
 

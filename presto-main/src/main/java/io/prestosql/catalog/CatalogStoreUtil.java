@@ -15,11 +15,17 @@
 
 package io.prestosql.catalog;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.security.CipherTextDecryptUtil;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
+import static io.prestosql.spi.HetuConstant.ENCRYPTED_PROPERTIES;
 import static java.util.Objects.requireNonNull;
 
 public class CatalogStoreUtil
@@ -30,15 +36,17 @@ public class CatalogStoreUtil
     private String localConfigurationDir;
     private String shareConfigurationDir;
     private int maxCatalogFileSize;
+    private CipherTextDecryptUtil cipherTextDecryptUtil;
 
     @Inject
-    private CatalogStoreUtil(FileSystemClientManager fileSystemClientManager, DynamicCatalogConfig dynamicCatalogConfig)
+    private CatalogStoreUtil(FileSystemClientManager fileSystemClientManager, DynamicCatalogConfig dynamicCatalogConfig, CipherTextDecryptUtil cipherTextDecryptUtil)
     {
         requireNonNull(dynamicCatalogConfig, "dynamicCatalogConfig is null");
         this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClientManager is null");
         this.localConfigurationDir = dynamicCatalogConfig.getCatalogConfigurationDir();
         this.shareConfigurationDir = dynamicCatalogConfig.getCatalogShareConfigurationDir();
         this.maxCatalogFileSize = (int) dynamicCatalogConfig.getCatalogMaxFileSize().toBytes();
+        this.cipherTextDecryptUtil = cipherTextDecryptUtil;
     }
 
     public CatalogStore getLocalCatalogStore()
@@ -55,5 +63,38 @@ public class CatalogStoreUtil
         return new ShareCatalogStore(shareConfigurationDir,
                 fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME),
                 maxCatalogFileSize);
+    }
+
+    private Set<String> splitEncryptedProperties(String encryptedPropertyNamesValue)
+    {
+        if (encryptedPropertyNamesValue == null || encryptedPropertyNamesValue.isEmpty()) {
+            return ImmutableSet.of();
+        }
+        String[] encryptedPropertyNameArray = encryptedPropertyNamesValue.split(",");
+        Set<String> encryptedPropertyNames = new HashSet<>();
+        for (String encryptedPropertyName : encryptedPropertyNameArray) {
+            encryptedPropertyNames.add(encryptedPropertyName.trim());
+        }
+        return encryptedPropertyNames;
+    }
+
+    /**
+     * Decrypt the encrypted properties, and
+     * "encrypted.properties"
+     *
+     * @param decryptKeyName the key name.
+     * @param properties the properties of catalog.
+     */
+    public void decryptEncryptedProperties(String decryptKeyName, Map<String, String> properties)
+    {
+        String encryptedPropertiesValue = properties.remove(ENCRYPTED_PROPERTIES);
+        Set<String> encryptedProperties = splitEncryptedProperties(encryptedPropertiesValue);
+        encryptedProperties.forEach(propertyName -> {
+            String cipherText = properties.get(propertyName);
+            if (cipherText != null) {
+                String plainText = cipherTextDecryptUtil.decrypt(decryptKeyName, cipherText);
+                properties.put(propertyName, plainText);
+            }
+        });
     }
 }

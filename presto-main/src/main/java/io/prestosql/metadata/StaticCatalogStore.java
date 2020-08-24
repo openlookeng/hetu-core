@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import io.airlift.log.Logger;
+import io.prestosql.catalog.CatalogStoreUtil;
 import io.prestosql.connector.ConnectorManager;
 
 import javax.inject.Inject;
@@ -41,20 +42,22 @@ public class StaticCatalogStore
     private final File catalogConfigurationDir;
     private final Set<String> disabledCatalogs;
     private final AtomicBoolean catalogsLoading = new AtomicBoolean();
+    private final CatalogStoreUtil catalogStoreUtil;
 
     @Inject
-    public StaticCatalogStore(ConnectorManager connectorManager, StaticCatalogStoreConfig config)
+    public StaticCatalogStore(ConnectorManager connectorManager, StaticCatalogStoreConfig config, CatalogStoreUtil catalogStoreUtil)
     {
         this(connectorManager,
                 config.getCatalogConfigurationDir(),
-                firstNonNull(config.getDisabledCatalogs(), ImmutableList.of()));
+                firstNonNull(config.getDisabledCatalogs(), ImmutableList.of()), catalogStoreUtil);
     }
 
-    public StaticCatalogStore(ConnectorManager connectorManager, File catalogConfigurationDir, List<String> disabledCatalogs)
+    public StaticCatalogStore(ConnectorManager connectorManager, File catalogConfigurationDir, List<String> disabledCatalogs, CatalogStoreUtil catalogStoreUtil)
     {
         this.connectorManager = connectorManager;
         this.catalogConfigurationDir = catalogConfigurationDir;
         this.disabledCatalogs = ImmutableSet.copyOf(disabledCatalogs);
+        this.catalogStoreUtil = catalogStoreUtil;
     }
 
     public void loadCatalogs()
@@ -93,6 +96,7 @@ public class StaticCatalogStore
         log.info("-- Loading catalog %s --", file);
 
         Map<String, String> properties = new HashMap<>(loadProperties(file));
+        catalogStoreUtil.decryptEncryptedProperties(catalogName, properties);
 
         String connectorName = properties.remove("connector.name");
         checkState(connectorName != null, "Catalog configuration %s does not contain connector.name", file.getAbsoluteFile());
