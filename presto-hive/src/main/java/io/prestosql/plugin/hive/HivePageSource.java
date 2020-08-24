@@ -21,38 +21,23 @@ import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.HivePageSourceProvider.BucketAdaptation;
 import io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMapping;
-import io.prestosql.plugin.hive.coercions.DoubleToFloatCoercer;
-import io.prestosql.plugin.hive.coercions.FloatToDoubleCoercer;
-import io.prestosql.plugin.hive.coercions.IntegerNumberToVarcharCoercer;
-import io.prestosql.plugin.hive.coercions.IntegerNumberUpscaleCoercer;
-import io.prestosql.plugin.hive.coercions.VarcharToIntegerNumberCoercer;
-import io.prestosql.plugin.hive.coercions.VarcharToVarcharCoercer;
+import io.prestosql.plugin.hive.coercions.HiveCoercer;
+import io.prestosql.plugin.hive.orc.OrcSelectivePageSource;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.block.ArrayBlock;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.block.ColumnarArray;
-import io.prestosql.spi.block.ColumnarMap;
-import io.prestosql.spi.block.ColumnarRow;
-import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.block.LazyBlockLoader;
-import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.type.DecimalType;
-import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
-import io.prestosql.spi.type.VarcharType;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.joda.time.DateTimeZone;
 
@@ -74,32 +59,8 @@ import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_CURSOR_ERROR;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_INVALID_BUCKET_FILES;
 import static io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMappingKind.PREFILLED;
 import static io.prestosql.plugin.hive.HiveSessionProperties.getDynamicFilteringRowFilteringThreshold;
-import static io.prestosql.plugin.hive.HiveType.HIVE_BYTE;
-import static io.prestosql.plugin.hive.HiveType.HIVE_DOUBLE;
-import static io.prestosql.plugin.hive.HiveType.HIVE_FLOAT;
-import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
-import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
-import static io.prestosql.plugin.hive.HiveType.HIVE_SHORT;
-import static io.prestosql.plugin.hive.HiveUtil.extractStructFieldTypes;
-import static io.prestosql.plugin.hive.HiveUtil.floatPartitionKey;
-import static io.prestosql.plugin.hive.HiveUtil.integerPartitionKey;
-import static io.prestosql.plugin.hive.HiveUtil.filterRows;
-import static io.prestosql.plugin.hive.HiveUtil.isArrayType;
-import static io.prestosql.plugin.hive.HiveUtil.isMapType;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
-import static io.prestosql.plugin.hive.HiveUtil.isRowType;
 import static io.prestosql.plugin.hive.HiveUtil.typedPartitionKey;
-import static io.prestosql.plugin.hive.coercions.DecimalCoercers.createDecimalToDecimalCoercer;
-import static io.prestosql.plugin.hive.coercions.DecimalCoercers.createDecimalToDoubleCoercer;
-import static io.prestosql.plugin.hive.coercions.DecimalCoercers.createDecimalToRealCoercer;
-import static io.prestosql.plugin.hive.coercions.DecimalCoercers.createDoubleToDecimalCoercer;
-import static io.prestosql.plugin.hive.coercions.DecimalCoercers.createRealToDecimalCoercer;
-import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.block.ColumnarArray.toColumnarArray;
-import static io.prestosql.spi.block.ColumnarMap.toColumnarMap;
-import static io.prestosql.spi.block.ColumnarRow.toColumnarRow;
-import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.spi.type.RealType.REAL;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -115,12 +76,14 @@ public class HivePageSource
     private final TypeManager typeManager;
     private final List<Optional<Function<Block, Block>>> coercers;
     private final int rowFilteringThreshold;
+    protected boolean eligibleForRowFiltering;
 
     private final ConnectorPageSource delegate;
 
     private final List<HivePartitionKey> partitionKeys;
     private final Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier;
     private final long waitUntil;
+    private boolean isSelectiveRead;
 
     public HivePageSource(
             List<ColumnMapping> columnMappings,
@@ -132,7 +95,6 @@ public class HivePageSource
             ConnectorSession session,
             List<HivePartitionKey> partitionKeys)
     {
-        requireNonNull(columnMappings, "columnMappings is null");
         requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
 
@@ -162,7 +124,7 @@ public class HivePageSource
             types[columnIndex] = type;
 
             if (columnMapping.getCoercionFrom().isPresent()) {
-                coercers.add(Optional.of(createCoercer(typeManager, columnMapping.getCoercionFrom().get(), columnMapping.getHiveColumnHandle().getHiveType())));
+                coercers.add(Optional.of(HiveCoercer.createCoercer(typeManager, columnMapping.getCoercionFrom().get(), columnMapping.getHiveColumnHandle().getHiveType())));
             }
             else {
                 coercers.add(Optional.empty());
@@ -173,63 +135,7 @@ public class HivePageSource
             }
         }
         this.coercers = coercers.build();
-    }
-
-    private static Function<Block, Block> createCoercer(TypeManager typeManager, HiveType fromHiveType, HiveType toHiveType)
-    {
-        Type fromType = typeManager.getType(fromHiveType.getTypeSignature());
-        Type toType = typeManager.getType(toHiveType.getTypeSignature());
-
-        if (toType instanceof VarcharType && fromType instanceof VarcharType) {
-            return new VarcharToVarcharCoercer((VarcharType) fromType, (VarcharType) toType);
-        }
-        if (toType instanceof VarcharType && (fromHiveType.equals(HIVE_BYTE) || fromHiveType.equals(HIVE_SHORT) || fromHiveType.equals(HIVE_INT) || fromHiveType.equals(HIVE_LONG))) {
-            return new IntegerNumberToVarcharCoercer<>(fromType, (VarcharType) toType);
-        }
-        if (fromType instanceof VarcharType && (toHiveType.equals(HIVE_BYTE) || toHiveType.equals(HIVE_SHORT) || toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG))) {
-            return new VarcharToIntegerNumberCoercer<>((VarcharType) fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_BYTE) && toHiveType.equals(HIVE_SHORT) || toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG)) {
-            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_SHORT) && toHiveType.equals(HIVE_INT) || toHiveType.equals(HIVE_LONG)) {
-            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_INT) && toHiveType.equals(HIVE_LONG)) {
-            return new IntegerNumberUpscaleCoercer<>(fromType, toType);
-        }
-        if (fromHiveType.equals(HIVE_FLOAT) && toHiveType.equals(HIVE_DOUBLE)) {
-            return new FloatToDoubleCoercer();
-        }
-        if (fromHiveType.equals(HIVE_DOUBLE) && toHiveType.equals(HIVE_FLOAT)) {
-            return new DoubleToFloatCoercer();
-        }
-        if (fromType instanceof DecimalType && toType instanceof DecimalType) {
-            return createDecimalToDecimalCoercer((DecimalType) fromType, (DecimalType) toType);
-        }
-        if (fromType instanceof DecimalType && toType == DOUBLE) {
-            return createDecimalToDoubleCoercer((DecimalType) fromType);
-        }
-        if (fromType instanceof DecimalType && toType == REAL) {
-            return createDecimalToRealCoercer((DecimalType) fromType);
-        }
-        if (fromType == DOUBLE && toType instanceof DecimalType) {
-            return createDoubleToDecimalCoercer((DecimalType) toType);
-        }
-        if (fromType == REAL && toType instanceof DecimalType) {
-            return createRealToDecimalCoercer((DecimalType) toType);
-        }
-        if (isArrayType(fromType) && isArrayType(toType)) {
-            return new ListCoercer(typeManager, fromHiveType, toHiveType);
-        }
-        if (isMapType(fromType) && isMapType(toType)) {
-            return new MapCoercer(typeManager, fromHiveType, toHiveType);
-        }
-        if (isRowType(fromType) && isRowType(toType)) {
-            return new StructCoercer(typeManager, fromHiveType, toHiveType);
-        }
-
-        throw new PrestoException(NOT_SUPPORTED, format("Unsupported coercion from %s to %s", fromHiveType, toHiveType));
+        this.isSelectiveRead = delegate instanceof OrcSelectivePageSource;
     }
 
     private static Page extractColumns(Page page, int[] columns)
@@ -322,6 +228,10 @@ public class HivePageSource
                     }
                 }
                 dataPage = new Page(rowsToKeep.size(), adaptedBlocks);
+            }
+
+            if (isSelectiveRead) { //FixMe(Rajeev) : Check way to optimize for prefilled fields.
+                return dataPage;
             }
 
             int batchSize = dataPage.getPositionCount();
@@ -478,131 +388,6 @@ public class HivePageSource
             }
         }
         return result;
-    }
-
-    private static class ListCoercer
-            implements Function<Block, Block>
-    {
-        private final Function<Block, Block> elementCoercer;
-
-        public ListCoercer(TypeManager typeManager, HiveType fromHiveType, HiveType toHiveType)
-        {
-            requireNonNull(typeManager, "typeManage is null");
-            requireNonNull(fromHiveType, "fromHiveType is null");
-            requireNonNull(toHiveType, "toHiveType is null");
-            HiveType fromElementHiveType = HiveType.valueOf(((ListTypeInfo) fromHiveType.getTypeInfo()).getListElementTypeInfo().getTypeName());
-            HiveType toElementHiveType = HiveType.valueOf(((ListTypeInfo) toHiveType.getTypeInfo()).getListElementTypeInfo().getTypeName());
-            this.elementCoercer = fromElementHiveType.equals(toElementHiveType) ? null : createCoercer(typeManager, fromElementHiveType, toElementHiveType);
-        }
-
-        @Override
-        public Block apply(Block block)
-        {
-            if (elementCoercer == null) {
-                return block;
-            }
-            ColumnarArray arrayBlock = toColumnarArray(block);
-            Block elementsBlock = elementCoercer.apply(arrayBlock.getElementsBlock());
-            boolean[] valueIsNull = new boolean[arrayBlock.getPositionCount()];
-            int[] offsets = new int[arrayBlock.getPositionCount() + 1];
-            for (int i = 0; i < arrayBlock.getPositionCount(); i++) {
-                valueIsNull[i] = arrayBlock.isNull(i);
-                offsets[i + 1] = offsets[i] + arrayBlock.getLength(i);
-            }
-            return ArrayBlock.fromElementBlock(arrayBlock.getPositionCount(), Optional.of(valueIsNull), offsets, elementsBlock);
-        }
-    }
-
-    private static class MapCoercer
-            implements Function<Block, Block>
-    {
-        private final Type toType;
-        private final Function<Block, Block> keyCoercer;
-        private final Function<Block, Block> valueCoercer;
-
-        public MapCoercer(TypeManager typeManager, HiveType fromHiveType, HiveType toHiveType)
-        {
-            requireNonNull(typeManager, "typeManage is null");
-            requireNonNull(fromHiveType, "fromHiveType is null");
-            this.toType = requireNonNull(toHiveType, "toHiveType is null").getType(typeManager);
-            HiveType fromKeyHiveType = HiveType.valueOf(((MapTypeInfo) fromHiveType.getTypeInfo()).getMapKeyTypeInfo().getTypeName());
-            HiveType fromValueHiveType = HiveType.valueOf(((MapTypeInfo) fromHiveType.getTypeInfo()).getMapValueTypeInfo().getTypeName());
-            HiveType toKeyHiveType = HiveType.valueOf(((MapTypeInfo) toHiveType.getTypeInfo()).getMapKeyTypeInfo().getTypeName());
-            HiveType toValueHiveType = HiveType.valueOf(((MapTypeInfo) toHiveType.getTypeInfo()).getMapValueTypeInfo().getTypeName());
-            this.keyCoercer = fromKeyHiveType.equals(toKeyHiveType) ? null : createCoercer(typeManager, fromKeyHiveType, toKeyHiveType);
-            this.valueCoercer = fromValueHiveType.equals(toValueHiveType) ? null : createCoercer(typeManager, fromValueHiveType, toValueHiveType);
-        }
-
-        @Override
-        public Block apply(Block block)
-        {
-            ColumnarMap mapBlock = toColumnarMap(block);
-            Block keysBlock = keyCoercer == null ? mapBlock.getKeysBlock() : keyCoercer.apply(mapBlock.getKeysBlock());
-            Block valuesBlock = valueCoercer == null ? mapBlock.getValuesBlock() : valueCoercer.apply(mapBlock.getValuesBlock());
-            boolean[] valueIsNull = new boolean[mapBlock.getPositionCount()];
-            int[] offsets = new int[mapBlock.getPositionCount() + 1];
-            for (int i = 0; i < mapBlock.getPositionCount(); i++) {
-                valueIsNull[i] = mapBlock.isNull(i);
-                offsets[i + 1] = offsets[i] + mapBlock.getEntryCount(i);
-            }
-            return ((MapType) toType).createBlockFromKeyValue(Optional.of(valueIsNull), offsets, keysBlock, valuesBlock);
-        }
-    }
-
-    private static class StructCoercer
-            implements Function<Block, Block>
-    {
-        private final List<Optional<Function<Block, Block>>> coercers;
-        private final Block[] nullBlocks;
-
-        public StructCoercer(TypeManager typeManager, HiveType fromHiveType, HiveType toHiveType)
-        {
-            requireNonNull(typeManager, "typeManage is null");
-            requireNonNull(fromHiveType, "fromHiveType is null");
-            requireNonNull(toHiveType, "toHiveType is null");
-            List<HiveType> fromFieldTypes = extractStructFieldTypes(fromHiveType);
-            List<HiveType> toFieldTypes = extractStructFieldTypes(toHiveType);
-            ImmutableList.Builder<Optional<Function<Block, Block>>> coercers = ImmutableList.builder();
-            this.nullBlocks = new Block[toFieldTypes.size()];
-            for (int i = 0; i < toFieldTypes.size(); i++) {
-                if (i >= fromFieldTypes.size()) {
-                    nullBlocks[i] = toFieldTypes.get(i).getType(typeManager).createBlockBuilder(null, 1).appendNull().build();
-                    coercers.add(Optional.empty());
-                }
-                else if (!fromFieldTypes.get(i).equals(toFieldTypes.get(i))) {
-                    coercers.add(Optional.of(createCoercer(typeManager, fromFieldTypes.get(i), toFieldTypes.get(i))));
-                }
-                else {
-                    coercers.add(Optional.empty());
-                }
-            }
-            this.coercers = coercers.build();
-        }
-
-        @Override
-        public Block apply(Block block)
-        {
-            ColumnarRow rowBlock = toColumnarRow(block);
-            Block[] fields = new Block[coercers.size()];
-            int[] ids = new int[rowBlock.getField(0).getPositionCount()];
-            for (int i = 0; i < coercers.size(); i++) {
-                Optional<Function<Block, Block>> coercer = coercers.get(i);
-                if (coercer.isPresent()) {
-                    fields[i] = coercer.get().apply(rowBlock.getField(i));
-                }
-                else if (i < rowBlock.getFieldCount()) {
-                    fields[i] = rowBlock.getField(i);
-                }
-                else {
-                    fields[i] = new DictionaryBlock(nullBlocks[i], ids);
-                }
-            }
-            boolean[] valueIsNull = new boolean[rowBlock.getPositionCount()];
-            for (int i = 0; i < rowBlock.getPositionCount(); i++) {
-                valueIsNull[i] = rowBlock.isNull(i);
-            }
-            return RowBlock.fromFieldBlocks(valueIsNull.length, Optional.of(valueIsNull), fields);
-        }
     }
 
     private static final class CoercionLazyBlockLoader

@@ -41,6 +41,14 @@ public interface TupleDomainFilter
 
     boolean testBytes(byte[] buffer, int offset, int length);
 
+    boolean testDouble(double value);
+
+    boolean testLength(int length);
+
+    boolean testDecimal(long low, long high);
+
+    boolean testFloat(float value);
+
     abstract class AbstractTupleDomainFilter
             implements TupleDomainFilter
     {
@@ -67,6 +75,28 @@ public interface TupleDomainFilter
         }
 
         public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean testDouble(double value)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean testLength(int length)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean testDecimal(long low, long high)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean testFloat(float value)
         {
             throw new UnsupportedOperationException();
         }
@@ -103,6 +133,30 @@ public interface TupleDomainFilter
         {
             return toStringHelper(this).toString();
         }
+
+        @Override
+        public boolean testDouble(double value)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testLength(int length)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testDecimal(long low, long high)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testFloat(float value)
+        {
+            return false;
+        }
     }
 
     class IsNull
@@ -136,6 +190,30 @@ public interface TupleDomainFilter
         {
             return toStringHelper(this).toString();
         }
+
+        @Override
+        public boolean testDouble(double value)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testLength(int length)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testDecimal(long low, long high)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean testFloat(float value)
+        {
+            return false;
+        }
     }
 
     class IsNotNull
@@ -168,6 +246,30 @@ public interface TupleDomainFilter
         public String toString()
         {
             return toStringHelper(this).toString();
+        }
+
+        @Override
+        public boolean testDouble(double value)
+        {
+            return true;
+        }
+
+        @Override
+        public boolean testLength(int length)
+        {
+            return true;
+        }
+
+        @Override
+        public boolean testDecimal(long low, long high)
+        {
+            return true;
+        }
+
+        @Override
+        public boolean testFloat(float value)
+        {
+            return true;
         }
     }
 
@@ -294,6 +396,121 @@ public interface TupleDomainFilter
             return toStringHelper(this)
                     .add("lower", lower)
                     .add("upper", upper)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class AbstractRange
+            extends AbstractTupleDomainFilter
+    {
+        protected final boolean lowerUnbounded;
+        protected final boolean lowerExclusive;
+        protected final boolean upperUnbounded;
+        protected final boolean upperExclusive;
+
+        private AbstractRange(boolean lowerUnbounded, boolean lowerExclusive, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            this.lowerUnbounded = lowerUnbounded;
+            this.lowerExclusive = lowerExclusive;
+            this.upperUnbounded = upperUnbounded;
+            this.upperExclusive = upperExclusive;
+        }
+    }
+
+    class DoubleRange
+            extends AbstractRange
+    {
+        private final double lower;
+        private final double upper;
+
+        private DoubleRange(double lower, boolean lowerUnbounded, boolean lowerExclusive, double upper, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            super(lowerUnbounded, lowerExclusive, upperUnbounded, upperExclusive, nullAllowed);
+            checkArgument(lowerUnbounded || !Double.isNaN(lower));
+            checkArgument(upperUnbounded || !Double.isNaN(upper));
+            this.lower = lower;
+            this.upper = upper;
+        }
+
+        public static DoubleRange of(double lower, boolean lowerUnbounded, boolean lowerExclusive, double upper, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            return new DoubleRange(lower, lowerUnbounded, lowerExclusive, upper, upperUnbounded, upperExclusive, nullAllowed);
+        }
+
+        public double getLower()
+        {
+            return lower;
+        }
+
+        public double getUpper()
+        {
+            return upper;
+        }
+
+        @Override
+        public boolean testDouble(double value)
+        {
+            if (Double.isNaN(value)) {
+                return false;
+            }
+            if (!lowerUnbounded) {
+                if (value < lower) {
+                    return false;
+                }
+                if (lowerExclusive && lower == value) {
+                    return false;
+                }
+            }
+            if (!upperUnbounded) {
+                if (value > upper) {
+                    return false;
+                }
+                if (upperExclusive && value == upper) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(lower, lowerUnbounded, lowerExclusive, upper, upperUnbounded, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+
+            DoubleRange other = (DoubleRange) obj;
+            return this.lower == other.lower &&
+                    this.lowerUnbounded == other.lowerUnbounded &&
+                    this.lowerExclusive == other.lowerExclusive &&
+                    this.upper == other.upper &&
+                    this.upperUnbounded == other.upperUnbounded &&
+                    this.upperExclusive == other.upperExclusive &&
+                    this.nullAllowed == other.nullAllowed;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("lower", lower)
+                    .add("lowerUnbounded", lowerUnbounded)
+                    .add("lowerExclusive", lowerExclusive)
+                    .add("upper", upper)
+                    .add("upperUnbounded", upperUnbounded)
+                    .add("upperExclusive", upperExclusive)
                     .add("nullAllowed", nullAllowed)
                     .toString();
         }
@@ -455,6 +672,12 @@ public interface TupleDomainFilter
         }
 
         @Override
+        public boolean testLength(int length)
+        {
+            return !singleValue || lower.length == length;
+        }
+
+        @Override
         public int hashCode()
         {
             return Objects.hash(lower, lowerExclusive, upper, upperExclusive, nullAllowed);
@@ -606,6 +829,54 @@ public interface TupleDomainFilter
         }
 
         @Override
+        public boolean testLength(int length)
+        {
+            for (TupleDomainFilter filter : filters) {
+                if (filter.testLength(length)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean testDouble(double value)
+        {
+            if (Double.isNaN(value)) {
+                return false;
+            }
+
+            for (TupleDomainFilter filter : filters) {
+                if (filter.testDouble(value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean testDecimal(long low, long high)
+        {
+            for (TupleDomainFilter filter : filters) {
+                if (filter.testDecimal(low, high)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean testFloat(float value)
+        {
+            for (TupleDomainFilter filter : filters) {
+                if (filter.testFloat(value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
         public boolean equals(Object o)
         {
             if (this == o) {
@@ -632,6 +903,185 @@ public interface TupleDomainFilter
         {
             return toStringHelper(this)
                     .add("filters", filters)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class LongDecimalRange
+            extends AbstractRange
+    {
+        private final long lowerLow;
+        private final long lowerHigh;
+        private final long upperLow;
+        private final long upperHigh;
+
+        private LongDecimalRange(long lowerLow, long lowerHigh, boolean lowerUnbounded, boolean lowerExclusive, long upperLow, long upperHigh, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            super(lowerUnbounded, lowerExclusive, upperUnbounded, upperExclusive, nullAllowed);
+            this.lowerLow = lowerLow;
+            this.lowerHigh = lowerHigh;
+            this.upperLow = upperLow;
+            this.upperHigh = upperHigh;
+        }
+
+        public static LongDecimalRange of(long lowerLow, long lowerHigh, boolean lowerUnbounded, boolean lowerExclusive, long upperLow, long upperHigh, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            return new LongDecimalRange(lowerLow, lowerHigh, lowerUnbounded, lowerExclusive, upperLow, upperHigh, upperUnbounded, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean testDecimal(long valueLow, long valueHigh)
+        {
+            if (!lowerUnbounded) {
+                int result = compare(valueLow, valueHigh, lowerLow, lowerHigh);
+                if (result < 0) {
+                    return false;
+                }
+                if (lowerExclusive && result == 0) {
+                    return false;
+                }
+            }
+            if (!upperUnbounded) {
+                int result = compare(valueLow, valueHigh, upperLow, upperHigh);
+                if (result > 0) {
+                    return false;
+                }
+                if (upperExclusive && result == 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(lowerLow, lowerHigh, lowerUnbounded, lowerExclusive, upperLow, upperHigh, upperUnbounded, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+
+            LongDecimalRange other = (LongDecimalRange) obj;
+            return this.lowerLow == other.lowerLow &&
+                    this.lowerHigh == other.lowerHigh &&
+                    this.lowerUnbounded == other.lowerUnbounded &&
+                    this.lowerExclusive == other.lowerExclusive &&
+                    this.upperLow == other.upperLow &&
+                    this.upperHigh == other.upperHigh &&
+                    this.upperUnbounded == other.upperUnbounded &&
+                    this.upperExclusive == other.upperExclusive &&
+                    this.nullAllowed == other.nullAllowed;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("lowerLow", lowerLow)
+                    .add("lowerHigh", lowerHigh)
+                    .add("lowerUnbounded", lowerUnbounded)
+                    .add("lowerExclusive", lowerExclusive)
+                    .add("upperLow", upperLow)
+                    .add("upperHigh", upperHigh)
+                    .add("upperUnbounded", upperUnbounded)
+                    .add("upperExclusive", upperExclusive)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class FloatRange
+            extends AbstractRange
+    {
+        private final float lower;
+        private final float upper;
+
+        private FloatRange(float lower, boolean lowerUnbounded, boolean lowerExclusive, float upper, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            super(lowerUnbounded, lowerExclusive, upperUnbounded, upperExclusive, nullAllowed);
+            checkArgument(lowerUnbounded || !Float.isNaN(lower));
+            checkArgument(upperUnbounded || !Float.isNaN(upper));
+            this.lower = lower;
+            this.upper = upper;
+        }
+
+        public static FloatRange of(float lower, boolean lowerUnbounded, boolean lowerExclusive, float upper, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
+        {
+            return new FloatRange(lower, lowerUnbounded, lowerExclusive, upper, upperUnbounded, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean testFloat(float value)
+        {
+            if (Float.isNaN(value)) {
+                return false;
+            }
+            if (!lowerUnbounded) {
+                if (value < lower) {
+                    return false;
+                }
+                if (lowerExclusive && lower == value) {
+                    return false;
+                }
+            }
+            if (!upperUnbounded) {
+                if (value > upper) {
+                    return false;
+                }
+                if (upperExclusive && value == upper) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(lower, lowerUnbounded, lowerExclusive, upper, upperUnbounded, upperExclusive, nullAllowed);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+
+            FloatRange other = (FloatRange) obj;
+            return this.lower == other.lower &&
+                    this.lowerUnbounded == other.lowerUnbounded &&
+                    this.lowerExclusive == other.lowerExclusive &&
+                    this.upper == other.upper &&
+                    this.upperUnbounded == other.upperUnbounded &&
+                    this.upperExclusive == other.upperExclusive &&
+                    this.nullAllowed == other.nullAllowed;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("lower", lower)
+                    .add("lowerUnbounded", lowerUnbounded)
+                    .add("lowerExclusive", lowerExclusive)
+                    .add("upper", upper)
+                    .add("upperUnbounded", upperUnbounded)
+                    .add("upperExclusive", upperExclusive)
                     .add("nullAllowed", nullAllowed)
                     .toString();
         }
