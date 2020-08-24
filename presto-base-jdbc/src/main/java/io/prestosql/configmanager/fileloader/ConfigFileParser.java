@@ -18,11 +18,8 @@ import io.airlift.log.Logger;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
-import java.net.URLDecoder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -76,79 +73,31 @@ public final class ConfigFileParser
 
     public void reloadConfigRewriteMap()
     {
-        if (absFilePathWithFileName != null) {
-            InputStream inputStream;
+        InputStream inputStream;
+        // to find it in jar file properties
+        // UT and runtime pass way
+        inputStream = this.getClass().getClassLoader().getResourceAsStream(fileName);
+        isYamlFileInJar = true;
+        if (inputStream == null) {
+            logger.debug("yaml config path error...");
+        }
+        else {
+            // parser the yaml file and save to matcherMap
+            this.yaml = new Yaml();
             try {
-                // to find properties file in a specific directory
-                // runtime pass way1
-                inputStream = new FileInputStream(new File(absFilePathWithFileName));
-                logger.info("find yaml file in ConfigFileParser for a abs path: %s", absFilePathWithFileName);
+                this.yamlMaps = new ConcurrentHashMap<>(yaml.load(inputStream));
             }
-            catch (IOException e1) {
-                logger.warn(e1.getMessage());
-                logger.warn("can not find file: %s in the abs path, find in jar file path..", absFilePathWithFileName);
-                try {
-                    // find file in the jar file path
-                    // runtime pass way2
-                    String jarAbsPath = getJarFileAbsPath();
-                    if (jarAbsPath != null) {
-                        Path pathNew = Paths.get(jarAbsPath, fileName);
-                        absFilePathWithFileName = pathNew.toString();
-                        inputStream = new FileInputStream(new File(pathNew.toString()));
-                    }
-                    else {
-                        throw new IOException("jarAbsPath is unexpected valued null...");
-                    }
-                }
-                catch (IOException e2) {
-                    logger.warn(e2.getMessage());
-                    logger.warn("can not find file: %s in the abs jar path, find in jar..", absFilePathWithFileName);
-                    // to find it in jar file properties
-                    // UT pass way
-                    inputStream = this.getClass().getClassLoader().getResourceAsStream(fileName);
-                    isYamlFileInJar = true;
-                }
+            catch (ClassCastException cls) {
+                logger.info("Error format in the yaml config file!");
+                this.yamlMaps = new ConcurrentHashMap<>(Collections.emptyMap());
             }
-            if (inputStream == null) {
-                logger.error("yaml config path error...");
+            try {
+                inputStream.close();
             }
-            else {
-                // parser the yaml file and save to matcherMap
-                this.yaml = new Yaml();
-                try {
-                    this.yamlMaps = new ConcurrentHashMap<>(yaml.load(inputStream));
-                }
-                catch (ClassCastException cls) {
-                    logger.error("error format in the yaml file!!!!");
-                    this.yamlMaps = new ConcurrentHashMap<>(Collections.emptyMap());
-                }
-                try {
-                    inputStream.close();
-                }
-                catch (IOException e) {
-                    logger.error(e.getMessage());
-                }
+            catch (IOException e) {
+                logger.debug("error closing stream in config load.");
             }
         }
-    }
-
-    private String getJarFileAbsPath()
-    {
-        URL url = this.getClass().getProtectionDomain().getCodeSource().getLocation();
-        String filePath;
-        try {
-            filePath = URLDecoder.decode(url.getPath(), "utf-8");
-            if (filePath.endsWith(".jar")) {
-                filePath = filePath.substring(0, filePath.lastIndexOf("/") + 1);
-            }
-            File file = new File(filePath);
-            filePath = file.getCanonicalPath();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            return null;
-        }
-        return filePath;
     }
 
     /**
