@@ -545,7 +545,7 @@ public class LogicalPlanner
 
             RelationPlan plan = deletePlan.getPlan();
 
-            Optional<NewTableLayout> newTableLayout = metadata.getInsertLayout(session, handle);
+            Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, handle);
 
             return createTableWriterPlan(
                     analysis,
