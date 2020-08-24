@@ -48,7 +48,7 @@ import static java.lang.Double.doubleToLongBits;
 import static java.util.Objects.requireNonNull;
 
 public class DoubleSelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<Long>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(DoubleSelectiveColumnReader.class).instanceSize();
 
@@ -368,7 +368,7 @@ public class DoubleSelectiveColumnReader
     }
 
     @Override
-    public Block getBlock(int[] positions, int positionCount)
+    public Block<Long> getBlock(int[] positions, int positionCount)
     {
         checkArgument(outputPositionCount > 0, "outputPositionCount must be greater than zero");
         checkState(outputRequired, "This stream reader doesn't produce output");

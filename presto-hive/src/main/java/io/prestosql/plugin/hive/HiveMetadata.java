@@ -1976,7 +1976,11 @@ public class HiveMetadata
                     .orElseThrow(() -> new TableNotFoundException(hiveTable.getSchemaTableName()));
 
             if (hmsTable.getStorage().getStorageFormat().getSerDe().equalsIgnoreCase(HiveStorageFormat.ORC.getSerDe())) {
-                predicate = hiveTable.getEnforcedConstraint();
+                ImmutableMap.Builder<ColumnHandle, Domain> pushedDown = ImmutableMap.builder();
+                pushedDown.putAll(hiveTable.getCompactEffectivePredicate().getDomains().get().entrySet().stream()
+                        .collect(toMap(e -> (ColumnHandle) e.getKey(), e -> e.getValue())));
+
+                predicate = predicate.intersect(withColumnDomains(pushedDown.build()));
             }
         }
 
@@ -2059,7 +2063,8 @@ public class HiveMetadata
                 .forEach(predicateColumnNames::add);
 
         List<TupleDomain<HiveColumnHandle>> newEffectivePredicates = null;
-        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)
+                && HiveSessionProperties.isOrcDisjunctPredicatePushdownEnabled(session)) {
             newEffectivePredicates = builder.build();
 
             newEffectivePredicates.stream().forEach(nfp ->

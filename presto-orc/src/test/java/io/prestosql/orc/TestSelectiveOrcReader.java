@@ -26,6 +26,7 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.SqlDate;
 import io.prestosql.spi.type.SqlDecimal;
+import io.prestosql.spi.type.SqlTimestamp;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -37,22 +38,30 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.cycle;
 import static com.google.common.collect.Iterables.limit;
 import static com.google.common.collect.Lists.newArrayList;
 import static io.prestosql.orc.OrcTester.HIVE_STORAGE_TIME_ZONE;
+import static io.prestosql.orc.OrcTester.mapType;
 import static io.prestosql.orc.OrcTester.quickSelectiveOrcTester;
+import static io.prestosql.orc.TupleDomainFilter.IS_NOT_NULL;
 import static io.prestosql.orc.TupleDomainFilter.IS_NULL;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.CharType.createCharType;
 import static io.prestosql.spi.type.DateType.DATE;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.testing.DateTimeTestingUtils.sqlTimestampOf;
+import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static java.util.Collections.nCopies;
 import static java.util.stream.Collectors.toList;
 import static org.testng.Assert.assertEquals;
@@ -63,6 +72,7 @@ public class TestSelectiveOrcReader
 
     private static final DecimalType DECIMAL_TYPE_PRECISION_2 = DecimalType.createDecimalType(2, 1);
     private static final DecimalType DECIMAL_TYPE_PRECISION_4 = DecimalType.createDecimalType(4, 2);
+    private static final DecimalType DECIMAL_TYPE_PRECISION_20 = DecimalType.createDecimalType(20, 2);
     private static final CharType CHAR_10 = createCharType(10);
 
     @BeforeClass
@@ -91,7 +101,12 @@ public class TestSelectiveOrcReader
     public void testLongSequenceWithHoles()
             throws Exception
     {
-        testRoundTripNumeric(skipEvery(5, intsBetween(0, 31_234)), BigintRange.of(10, 100, false));
+        BigintRange filters1 = BigintRange.of(10, 100, false);
+        BigintRange filters2 = BigintRange.of(200, 300, false);
+        testRoundTripNumeric(intsBetween(0, 100), TupleDomainFilter.BigintMultiRange.of(ImmutableList.of(filters1, filters2), true));
+        long[] values = new long[]{1, 2, 3, 4};
+        TupleDomainFilter.BigintValues filter3 = TupleDomainFilter.BigintValues.of(values, true);
+        testRoundTripNumeric(intsBetween(0, 100), filter3);
     }
 
     @Test
@@ -123,6 +138,10 @@ public class TestSelectiveOrcReader
                 .map(SqlDate::new)
                 .collect(toList());
 
+        List<SqlTimestamp> timestamps = longValues.stream()
+                .map(timestamp -> sqlTimestampOf(timestamp & Integer.MAX_VALUE, SESSION))
+                .collect(toList());
+
         tester.testRoundTrip(BIGINT, longValues, ImmutableList.of(ImmutableMap.of(0, filter)));
 
         tester.testRoundTrip(INTEGER, intValues, ImmutableList.of(ImmutableMap.of(0, filter)));
@@ -130,6 +149,8 @@ public class TestSelectiveOrcReader
         tester.testRoundTrip(SMALLINT, shortValues, ImmutableList.of(ImmutableMap.of(0, filter)));
 
         tester.testRoundTrip(DATE, dateValues, ImmutableList.of(ImmutableMap.of(0, filter)));
+
+        tester.testRoundTrip(TIMESTAMP, timestamps, ImmutableList.of(ImmutableMap.of(0, filter)));
 
         List<Integer> reversedIntValues = new ArrayList<>(intValues);
         Collections.reverse(reversedIntValues);
@@ -248,6 +269,24 @@ public class TestSelectiveOrcReader
         tester.testRoundTrip(DECIMAL_TYPE_PRECISION_2, decimalSequence("-30", "1", 60, 2, 1), filters);
     }
 
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testUnknowType()
+            throws Exception
+    {
+        tester.testRoundTrip(mapType(INTEGER, INTEGER), createList(1, i -> createMap(1)));
+    }
+
+    private static <T> List<T> createList(int size, Function<Integer, T> createElement)
+    {
+        return IntStream.range(0, size).mapToObj(createElement::apply).collect(toList());
+    }
+
+    private static Map<Integer, Integer> createMap(int seed)
+    {
+        int mapSize = Math.abs(seed) % 7 + 1;
+        return IntStream.range(0, mapSize).boxed().collect(toImmutableMap(Function.identity(), i -> i + seed));
+    }
+
     private static List<SqlDecimal> decimalSequence(String start, String step, int items, int precision, int scale)
     {
         BigInteger decimalStep = new BigInteger(step);
@@ -258,5 +297,44 @@ public class TestSelectiveOrcReader
             nextValue = nextValue.add(decimalStep);
         }
         return values;
+    }
+
+    @Test
+    public void testDoubleSequence()
+            throws Exception
+    {
+        List<Map<Integer, TupleDomainFilter>> filters = ImmutableList.of(
+                ImmutableMap.of(0, TupleDomainFilter.DoubleRange.of(0, false, false, 1_000, false, false, false)),
+                ImmutableMap.of(0, IS_NULL),
+                ImmutableMap.of(0, IS_NOT_NULL));
+
+        tester.testRoundTrip(DOUBLE, doubleSequence(0, 0.1, 20), filters);
+    }
+
+    @Test
+    public void testDoubleNaNInfinity()
+            throws Exception
+    {
+        List<Map<Integer, TupleDomainFilter>> filters = ImmutableList.of(
+                ImmutableMap.of(0, TupleDomainFilter.DoubleRange.of(0, false, false, 1_000, false, false, false)),
+                ImmutableMap.of(0, IS_NULL),
+                ImmutableMap.of(0, IS_NOT_NULL));
+
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(1000.0, -1.0, Double.POSITIVE_INFINITY), filters);
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(-1000.0, Double.NEGATIVE_INFINITY, 1.0), filters);
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(0.0, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY), filters);
+
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(Double.NaN, -1.0, 1.0), filters);
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(Double.NaN, -1.0, Double.POSITIVE_INFINITY), filters);
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(Double.NaN, Double.NEGATIVE_INFINITY, 1.0), filters);
+        tester.testRoundTrip(DOUBLE, ImmutableList.of(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY), filters);
+    }
+
+    private static List<Double> doubleSequence(double start, double step, int items)
+    {
+        return IntStream.range(0, items)
+                .mapToDouble(i -> start + i * step)
+                .boxed()
+                .collect(ImmutableList.toImmutableList());
     }
 }

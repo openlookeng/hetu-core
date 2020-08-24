@@ -57,7 +57,7 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class SliceDirectSelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceDirectSelectiveColumnReader.class).instanceSize();
     private static final int ONE_GIGABYTE = toIntExact(new DataSize(1, GIGABYTE).toBytes());
@@ -109,15 +109,15 @@ public class SliceDirectSelectiveColumnReader
         this.orcType = orcType;
         this.isCharType = orcType.getOrcTypeKind() == OrcType.OrcTypeKind.CHAR;
         this.maxCodePointCount = orcType.getLength().orElse(-1);
-        checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
+        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
         return readOr(offset, positions, positionCount,
-                (filter == null) ? null : ImmutableList.of(filter),
+                (this.filter == null) ? null : ImmutableList.of(this.filter),
                 null);
     }
 
@@ -236,41 +236,40 @@ public class SliceDirectSelectiveColumnReader
             else {
                 int length = lengthVector[lengthIndex];
                 int dataOffset = outputRequired ? offset : 0;
-                if (true) { /* Fixme(Nitin): Why this check is needed? */
+                if (true /* filters.get(0).testLength(length) */) {
                     if (dataStream != null) {
                         dataStream.skip(dataToSkip);
                         dataToSkip = 0;
                         dataStream.next(data, dataOffset, dataOffset + length);
-
                         if ((accumulator != null && accumulator.get(position))
                                 || filters == null || filters.get(0).testBytes(data, dataOffset, length)) {
                             if (accumulator != null) {
                                 accumulator.set(position);
                             }
                         }
-
-                        if (outputRequired) {
-                            int truncatedLength = computeTruncatedLength(dataAsSlice, dataOffset, length, maxCodePointCount, isCharType);
-                            offsets[outputPositionCount + 1] = offset + truncatedLength;
-                            if (nullsAllowed && isNullVector != null) {
-                                nulls[outputPositionCount] = false;
-                            }
-                        }
-                        outputPositions[outputPositionCount] = position;
-                        outputPositionCount++;
                     }
                     else {
-                        if (outputRequired) {
-                            offsets[outputPositionCount + 1] = offset;
-                            if (nullsAllowed && isNullVector != null) {
-                                nulls[outputPositionCount] = false;
+                        if ((accumulator != null && accumulator.get(position))
+                                || filters == null || filters.get(0).testBytes("".getBytes(), 0, 0)) {
+                            if (accumulator != null) {
+                                accumulator.set(position);
                             }
                         }
-
-                        /* Fixme(Rajeev): This may also need to evaluate filter condition? */
-                        outputPositions[outputPositionCount] = position;
-                        outputPositionCount++;
                     }
+
+                    if (outputRequired) {
+                        int truncatedLength = 0;
+                        if (dataStream != null) {
+                            truncatedLength = computeTruncatedLength(dataAsSlice, dataOffset, length, maxCodePointCount, isCharType);
+                        }
+
+                        offsets[outputPositionCount + 1] = offset + truncatedLength;
+                        if (nullsAllowed && isNullVector != null) {
+                            nulls[outputPositionCount] = false;
+                        }
+                    }
+                    outputPositions[outputPositionCount] = position;
+                    outputPositionCount++;
                 }
                 else {
                     dataToSkip += length;
@@ -316,15 +315,14 @@ public class SliceDirectSelectiveColumnReader
             else {
                 int length = lengthVector[lengthIndex];
                 int dataOffset = outputRequired ? offset : 0;
-                if (true) { /* Fixme(Nitin): Why this check is needed? */
+                if (isCharType || filters.get(0).testLength(length)) {
                     if (dataStream != null) {
                         dataStream.skip(dataToSkip);
                         dataToSkip = 0;
                         dataStream.next(data, dataOffset, dataOffset + length);
-
-                        if (filters == null || filters.get(0).testBytes(data, dataOffset, length)) {
+                        int truncatedLength = computeTruncatedLength(dataAsSlice, dataOffset, length, maxCodePointCount, isCharType);
+                        if (filters == null || filters.get(0).testBytes(data, dataOffset, truncatedLength)) {
                             if (outputRequired) {
-                                int truncatedLength = computeTruncatedLength(dataAsSlice, dataOffset, length, maxCodePointCount, isCharType);
                                 offsets[outputPositionCount + 1] = offset + truncatedLength;
                                 if (nullsAllowed && isNullVector != null) {
                                     nulls[outputPositionCount] = false;
@@ -335,16 +333,16 @@ public class SliceDirectSelectiveColumnReader
                         }
                     }
                     else {
-                        if (outputRequired) {
-                            offsets[outputPositionCount + 1] = offset;
-                            if (nullsAllowed && isNullVector != null) {
-                                nulls[outputPositionCount] = false;
+                        if (filters == null || filters.get(0).testBytes("".getBytes(), 0, 0)) {
+                            if (outputRequired) {
+                                offsets[outputPositionCount + 1] = offset;
+                                if (nullsAllowed && isNullVector != null) {
+                                    nulls[outputPositionCount] = false;
+                                }
                             }
+                            outputPositions[outputPositionCount] = position;
+                            outputPositionCount++;
                         }
-
-                        /* Fixme(Rajeev): This may also need to evaluate filter condition? */
-                        outputPositions[outputPositionCount] = position;
-                        outputPositionCount++;
                     }
                 }
                 else {

@@ -35,8 +35,8 @@ import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 //TODO: Rajeev: To be combined with LongSelectiveColumnReader
-abstract class AbstractLongSelectiveColumnReader
-        implements SelectiveColumnReader
+abstract class AbstractLongSelectiveColumnReader<T>
+        implements SelectiveColumnReader<T>
 {
     protected final boolean outputRequired;
     @Nullable
@@ -63,7 +63,7 @@ abstract class AbstractLongSelectiveColumnReader
     }
 
     @Override
-    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    public Block<T> mergeBlocks(List<Block<T>> blocks, int positionCount)
     {
         if (outputType == BIGINT) {
             LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);

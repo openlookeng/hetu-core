@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -272,6 +275,25 @@ public class HiveTableHandle
     {
         return additionalCompactEffectivePredicate.isPresent()
                 && additionalCompactEffectivePredicate.get().size() > 0;
+    }
+
+    private String formatPredicate(Function<Domain, String> printer, TupleDomain<HiveColumnHandle> predicate)
+    {
+        return predicate.getDomains().get().entrySet().stream()
+                .map(filter -> filter.getKey().getColumnName() + " <- " + printer.apply(filter.getValue()))
+                .collect(Collectors.joining(" AND ", "{", "}"));
+    }
+
+    @Override
+    public String getAdditionalFilterConditions(Function<Domain, String> printer)
+    {
+        if (additionalCompactEffectivePredicate.isPresent()) {
+            return additionalCompactEffectivePredicate.get().stream()
+                    .map(predicate -> "[ " + formatPredicate(printer, predicate) + " ]")
+                    .collect(Collectors.joining(" OR "));
+        }
+
+        return "";
     }
 
     @Override

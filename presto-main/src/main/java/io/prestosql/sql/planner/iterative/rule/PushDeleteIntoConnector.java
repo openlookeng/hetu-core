@@ -25,6 +25,7 @@ import io.prestosql.sql.planner.plan.TableScanNode;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.Patterns.delete;
+import static io.prestosql.sql.planner.plan.Patterns.exchange;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.tableFinish;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
@@ -34,22 +35,34 @@ public class PushDeleteIntoConnector
         implements Rule<TableFinishNode>
 {
     private static final Capture<TableScanNode> TABLE_SCAN = newCapture();
-    private static final Pattern<TableFinishNode> PATTERN =
+    private static final Pattern<TableFinishNode> PATTERN_WITHOUT_EXCAHNGE =
             tableFinish().with(source().matching(
                     delete().with(source().matching(
                             tableScan().capturedAs(TABLE_SCAN)))));
 
-    private final Metadata metadata;
+    private static final Pattern<TableFinishNode> PATTERN_WITH_EXCAHNGE =
+            tableFinish().with(source().matching(
+                    exchange().with(source().matching(
+                            delete().with(source().matching(
+                                    tableScan().capturedAs(TABLE_SCAN)))))));
 
-    public PushDeleteIntoConnector(Metadata metadata)
+    private final Metadata metadata;
+    private final boolean withExchange;
+
+    public PushDeleteIntoConnector(Metadata metadata, boolean withExchange)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.withExchange = withExchange;
     }
 
     @Override
     public Pattern<TableFinishNode> getPattern()
     {
-        return PATTERN;
+        if (withExchange) {
+            return PATTERN_WITH_EXCAHNGE;
+        }
+
+        return PATTERN_WITHOUT_EXCAHNGE;
     }
 
     @Override

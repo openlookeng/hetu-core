@@ -46,7 +46,7 @@ import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.util.Objects.requireNonNull;
 
 public class BooleanSelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<Byte>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(BooleanSelectiveColumnReader.class).instanceSize();
 
@@ -84,7 +84,7 @@ public class BooleanSelectiveColumnReader
             LocalMemoryContext systemMemoryContext)
     {
         requireNonNull(filter, "filter is null");
-        checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
+        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
         this.columnDesc = requireNonNull(columnDesc, "stream is null");
         this.filter = filter.orElse(null);
         this.outputRequired = outputRequired;
@@ -158,7 +158,7 @@ public class BooleanSelectiveColumnReader
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -171,7 +171,7 @@ public class BooleanSelectiveColumnReader
             ensureValuesCapacity(positionCount, nullsAllowed && presentStream != null);
         }
 
-        if (filter != null) {
+        if (this.filter != null) {
             ensureOutputPositionsCapacity(positionCount);
         }
         else {
@@ -188,7 +188,7 @@ public class BooleanSelectiveColumnReader
         if (dataStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
         }
-        else if (filter == null) {
+        else if (this.filter == null) {
             streamPosition = readNoFilter(positions, positionCount);
         }
         else {
@@ -211,7 +211,7 @@ public class BooleanSelectiveColumnReader
                 }
                 else {
                     boolean value = dataStream.nextBit();
-                    if (filter == null || filter.testBoolean(value)) {
+                    if (this.filter == null || this.filter.testBoolean(value)) {
                         if (outputRequired) {
                             values[outputPositionCount] = (byte) (value ? 1 : 0);
                             if (nullsAllowed && presentStream != null) {
@@ -440,7 +440,7 @@ public class BooleanSelectiveColumnReader
     }
 
     @Override
-    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    public Block<Byte> mergeBlocks(List<Block<Byte>> blocks, int positionCount)
     {
         byte[] valuesCopy = new byte[positionCount];
         boolean[] nullsCopy = new boolean[positionCount];

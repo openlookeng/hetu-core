@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -31,8 +32,8 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.compactOffsets;
 import static io.prestosql.spi.block.BlockUtil.compactSlice;
 
-public class VariableWidthBlock<T>
-        extends AbstractVariableWidthBlock<T>
+public class VariableWidthBlock
+        extends AbstractVariableWidthBlock<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VariableWidthBlock.class).instanceSize();
 
@@ -233,5 +234,29 @@ public class VariableWidthBlock<T>
             validPositions[i] = validPositions[i] && filter.test(value);
         }
         return validPositions;
+    }
+
+    @Override
+    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        int matchCount = 0;
+        for (int i = 0; i < positionCount; i++) {
+            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset]) {
+                continue;
+            }
+
+            byte[] value = slice.slice(offsets[i + arrayOffset], offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]).getBytes();
+            if (test.apply(value)) {
+                matchedPositions[matchCount++] = positions[i];
+            }
+        }
+
+        return matchCount;
+    }
+
+    @Override
+    public byte[] get(int position)
+    {
+        return slice.slice(offsets[position + arrayOffset], offsets[position + arrayOffset + 1] - offsets[position + arrayOffset]).getBytes();
     }
 }

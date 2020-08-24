@@ -18,6 +18,7 @@ import io.prestosql.spi.util.BloomFilter;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static io.prestosql.spi.block.DictionaryId.randomDictionaryId;
@@ -87,7 +88,7 @@ public interface Block<T>
     /**
      * Gets an object in the value at {@code position}.
      */
-    default <T> T getObject(int position, Class<T> clazz)
+    default <R> R getObject(int position, Class<R> clazz)
     {
         throw new UnsupportedOperationException(getClass().getName());
     }
@@ -332,5 +333,11 @@ public interface Block<T>
     {
         //by default we will not filter anything
         return validPositions;
+    }
+
+    default int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        System.arraycopy(positions, positionCount, matchedPositions, positionCount, positionCount);
+        return positionCount;
     }
 }

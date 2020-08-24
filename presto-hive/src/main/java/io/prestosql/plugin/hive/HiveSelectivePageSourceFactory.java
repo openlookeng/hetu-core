@@ -13,10 +13,9 @@
  */
 package io.prestosql.plugin.hive;
 
-import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.plugin.hive.coercions.HiveCoercer;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import org.apache.hadoop.conf.Configuration;
@@ -44,9 +43,10 @@ public interface HiveSelectivePageSourceFactory
             TupleDomain<HiveColumnHandle> domainPredicate,
             Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates,
             DateTimeZone hiveStorageTimeZone,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
-            boolean splitCacheable);
+            boolean splitCacheable,
+            List<HivePageSourceProvider.ColumnMapping> columnMappings,
+            Map<Integer, HiveCoercer> coercers);
 }

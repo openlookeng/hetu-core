@@ -13,15 +13,21 @@
  */
 package io.prestosql.orc.reader;
 
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 
 import java.io.IOException;
 
 public interface ColumnReader<T>
-            extends AbstractColumnReader
+            extends AbstractColumnReader //Fixme(nitin): merge
 {
     Block<T> readBlock()
             throws IOException;
 
     void prepareNextRead(int batchSize);
+
+    default boolean filterTest(TupleDomainFilter filter, T value) /* FixMe(Nitin): Remove Default, force all readers to enforce */
+    {
+        throw new IllegalArgumentException("Unsupported type for pushdown");
+    }
 }

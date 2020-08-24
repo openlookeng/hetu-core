@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.stream.BooleanInputStream;
@@ -47,7 +48,7 @@ import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.util.Objects.requireNonNull;
 
 public class BooleanColumnReader
-        implements ColumnReader<Boolean>
+        implements ColumnReader<Byte>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(BooleanColumnReader.class).instanceSize();
 
@@ -223,5 +224,11 @@ public class BooleanColumnReader
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + sizeOf(nullVector);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Byte value)
+    {
+        return filter.testBoolean(value != 0);
     }
 }

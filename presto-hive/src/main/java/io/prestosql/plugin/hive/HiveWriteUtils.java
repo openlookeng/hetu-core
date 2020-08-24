@@ -326,7 +326,7 @@ public final class HiveWriteUtils
         if (isArrayType(type)) {
             Type elementType = type.getTypeParameters().get(0);
 
-            Block<T> arrayBlock = block.getObject(position, Block.class);
+            Block arrayBlock = block.getObject(position, Block.class);
 
             List<Object> list = new ArrayList<>(arrayBlock.getPositionCount());
             for (int i = 0; i < arrayBlock.getPositionCount(); i++) {
@@ -1093,7 +1093,7 @@ public final class HiveWriteUtils
         @Override
         public <T> void setField(Block<T> block, int position)
         {
-            Block mapBlock = block.getObject(position, Block.class);
+            Block<T> mapBlock = block.getObject(position, Block.class);
             Map<Object, Object> map = new HashMap<>(mapBlock.getPositionCount() * 2);
             for (int i = 0; i < mapBlock.getPositionCount(); i += 2) {
                 Object key = getField(keyType, mapBlock, i);

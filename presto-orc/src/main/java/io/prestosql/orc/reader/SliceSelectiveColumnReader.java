@@ -43,7 +43,7 @@ import static io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT
 import static java.util.Objects.requireNonNull;
 
 public class SliceSelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceSelectiveColumnReader.class).instanceSize();
 
@@ -111,10 +111,10 @@ public class SliceSelectiveColumnReader
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
-        return currentReader.read(offset, positions, positionCount);
+        return currentReader.read(offset, positions, positionCount, null);
     }
 
     @Override
@@ -134,18 +134,6 @@ public class SliceSelectiveColumnReader
     {
         return currentReader.getBlock(positions, positionCount);
     }
-
-//    @Override
-//    public BlockLease getBlockView(int[] positions, int positionCount)
-//    {
-//        return currentReader.getBlockView(positions, positionCount);
-//    }
-//
-//    @Override
-//    public void throwAnyError(int[] positions, int positionCount)
-//    {
-//        currentReader.throwAnyError(positions, positionCount);
-//    }
 
     public static int computeTruncatedLength(Slice slice, int offset, int length, int maxCodePointCount, boolean isCharType)
     {

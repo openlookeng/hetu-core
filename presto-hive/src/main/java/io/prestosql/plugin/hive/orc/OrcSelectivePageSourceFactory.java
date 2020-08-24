@@ -37,16 +37,17 @@ import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveConfig;
+import io.prestosql.plugin.hive.HivePageSourceProvider;
 import io.prestosql.plugin.hive.HiveSelectivePageSourceFactory;
+import io.prestosql.plugin.hive.HiveSessionProperties;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveUtil;
+import io.prestosql.plugin.hive.coercions.HiveCoercer;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -75,6 +76,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -157,11 +160,12 @@ public class OrcSelectivePageSourceFactory
             TupleDomain<HiveColumnHandle> domainPredicate,
             Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates,
             DateTimeZone hiveStorageTimeZone,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
-            boolean splitCacheable)
+            boolean splitCacheable,
+            List<HivePageSourceProvider.ColumnMapping> columnMappings,
+            Map<Integer, HiveCoercer> coercers)
     {
         if (!HiveUtil.isDeserializerClass(schema, OrcSerde.class)) {
             return Optional.empty();
@@ -185,7 +189,7 @@ public class OrcSelectivePageSourceFactory
 
             return Optional.of(createOrcPageSource(
                     hdfsEnvironment,
-                    session.getUser(),
+                    session,
                     configuration,
                     path,
                     start,
@@ -207,14 +211,15 @@ public class OrcSelectivePageSourceFactory
                     getOrcLazyReadSmallRanges(session),
                     isOrcBloomFiltersEnabled(session),
                     stats,
-                    dynamicFilter,
                     deleteDeltaLocations,
                     startRowOffsetOfFile,
                     indexes,
                     orcCacheStore,
                     orcCacheProperties,
                     additionPredicates.orElseGet(() -> ImmutableList.of()),
-                    positions));
+                    positions,
+                    columnMappings,
+                    coercers));
 
             /* Todo(Nitin): For Append Pattern
             appendPredicates.get().stream().forEach(newDomainPredicate ->
@@ -242,7 +247,6 @@ public class OrcSelectivePageSourceFactory
                             getOrcLazyReadSmallRanges(session),
                             isOrcBloomFiltersEnabled(session),
                             stats,
-                            dynamicFilter,
                             deleteDeltaLocations,
                             startRowOffsetOfFile,
                             indexes,
@@ -258,7 +262,7 @@ public class OrcSelectivePageSourceFactory
 
         return Optional.of(createOrcPageSource(
                 hdfsEnvironment,
-                session.getUser(),
+                session,
                 configuration,
                 path,
                 start,
@@ -280,19 +284,20 @@ public class OrcSelectivePageSourceFactory
                 getOrcLazyReadSmallRanges(session),
                 isOrcBloomFiltersEnabled(session),
                 stats,
-                dynamicFilter,
                 deleteDeltaLocations,
                 startRowOffsetOfFile,
                 indexes,
                 orcCacheStore,
                 orcCacheProperties,
                 ImmutableList.of(),
-                null));
+                null,
+                columnMappings,
+                coercers));
     }
 
     public static OrcSelectivePageSource createOrcPageSource(
             HdfsEnvironment hdfsEnvironment,
-            String sessionUser,
+            ConnectorSession session,
             Configuration configuration,
             Path path,
             long start,
@@ -314,17 +319,18 @@ public class OrcSelectivePageSourceFactory
             boolean lazyReadSmallRanges,
             boolean orcBloomFiltersEnabled,
             FileFormatDataSourceStats stats,
-            Map<ColumnHandle, DynamicFilter> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
             List<TupleDomain<HiveColumnHandle>> additionalDomainPredicates,
-            List<Integer> positions)
+            List<Integer> positions,
+            List<HivePageSourceProvider.ColumnMapping> columnMappings,
+            Map<Integer, HiveCoercer> coercers)
     {
         checkArgument(!domainPredicate.isNone(), "Unexpected NONE domain");
-
+        String sessionUser = session.getUser();
         OrcDataSource orcDataSource;
         try {
             //Always create a lazy Stream. HDFS stream opened only when required.
@@ -401,6 +407,7 @@ public class OrcSelectivePageSourceFactory
             additionalDomainPredicates.stream()
                     .forEach(ap -> ap.getDomains().get().forEach((k, v) -> additionalPredicateDomains.merge(k, v, (v1, v2) -> v1.union(v2))));
 
+            Map<String, List<Domain>> orDomains = new ConcurrentHashMap<>();
             for (HiveColumnHandle column : columns) {
                 OrcColumn orcColumn = null;
                 if (useOrcColumnNames || isFullAcid) {
@@ -425,6 +432,7 @@ public class OrcSelectivePageSourceFactory
                     domain = additionalPredicateDomains.get(column);
                     if (domain != null) {
                         predicateBuilder.addOrColumn(orcColumn.getColumnId(), domain);
+                        orDomains.computeIfAbsent(column.getName(), l -> new ArrayList<>()).add(domain);
                     }
                 }
                 else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase("row__id")) {
@@ -486,7 +494,10 @@ public class OrcSelectivePageSourceFactory
                     orcCacheProperties,
                     Optional.empty(),
                     orFilters,
-                    positions);
+                    positions,
+                    HiveSessionProperties.isOrcPushdownDataCacheEnabled(session),
+                    Maps.transformValues(coercers, Function.class::cast),
+                    orDomains);
 
             OrcDeletedRows deletedRows = new OrcDeletedRows(
                     path.getName(),
@@ -508,7 +519,10 @@ public class OrcSelectivePageSourceFactory
 //                    deletedRows,
 //                    isFullAcid && indexes.isPresent(),
                     systemMemoryUsage,
-                    stats);
+                    stats,
+                    session,
+                    columnMappings,
+                    typeManager);
         }
         catch (Exception e) {
             try {

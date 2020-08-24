@@ -28,6 +28,7 @@ import io.prestosql.orc.metadata.OrcType;
 import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
 import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
@@ -315,7 +316,9 @@ public class OrcReader
             OrcCacheProperties orcCacheProperties,
             Optional<OrcWriteValidation> writeValidation,
             Map<Integer, List<TupleDomainFilter>> additionalFilters,
-            List<Integer> positions) throws OrcCorruptionException
+            List<Integer> positions, boolean useDataCache,
+            Map<Integer, Function<Block, Block>> coercer,
+            Map<String, List<Domain>> orDomains) throws OrcCorruptionException
     {
         return new OrcSelectiveRecordReader(
                 outputColumns,
@@ -352,7 +355,10 @@ public class OrcReader
                 orcCacheStore,
                 orcCacheProperties,
                 additionalFilters,
-                positions);
+                positions,
+                useDataCache,
+                coercer,
+                orDomains);
     }
 
     public static OrcDataSource wrapWithCacheIfTiny(OrcDataSource dataSource, DataSize maxCacheSize)

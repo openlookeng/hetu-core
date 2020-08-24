@@ -18,12 +18,18 @@ import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcSelectiveRecordReader;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
+import io.prestosql.plugin.hive.HiveColumnHandle;
+import io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMapping;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_BAD_DATA;
@@ -40,17 +46,31 @@ public class OrcSelectivePageSource
     private final FileFormatDataSourceStats stats;
 
     private boolean closed;
+    private final Type[] types;
 
     public OrcSelectivePageSource(
             OrcSelectiveRecordReader recordReader,
             OrcDataSource orcDataSource,
             AggregatedMemoryContext systemMemoryContext,
-            FileFormatDataSourceStats stats)
+            FileFormatDataSourceStats stats,
+            ConnectorSession session,
+            List<ColumnMapping> columnMappings,
+            TypeManager typeManager)
     {
         this.recordReader = requireNonNull(recordReader, "recordReader is null");
         this.orcDataSource = requireNonNull(orcDataSource, "orcDataSource is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
         this.stats = requireNonNull(stats, "stats is null");
+
+        types = new Type[columnMappings.size()];
+        for (int columnIndex = 0; columnIndex < columnMappings.size(); columnIndex++) {
+            ColumnMapping columnMapping = columnMappings.get(columnIndex);
+            HiveColumnHandle column = columnMapping.getHiveColumnHandle();
+
+            String name = column.getName();
+            Type type = typeManager.getType(column.getTypeSignature());
+            types[columnIndex] = type;
+        }
     }
 
     @Override
@@ -78,7 +98,9 @@ public class OrcSelectivePageSource
             Page page = recordReader.getNextPage();
             if (page == null) {
                 close();
+                return null;
             }
+
             return page;
         }
         catch (PrestoException e) {

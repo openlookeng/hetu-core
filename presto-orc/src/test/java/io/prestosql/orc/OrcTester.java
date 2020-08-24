@@ -559,7 +559,10 @@ public class OrcTester
                 new OrcCacheProperties(),
                 Optional.empty(),
                 new HashMap<>(),
-                null);
+                null,
+                false,
+                ImmutableMap.of(),
+                ImmutableMap.of());
     }
 
     private static List<String> makeColumnNames(int columns)
@@ -611,6 +614,9 @@ public class OrcTester
                         return false;
                     }
                 }
+                else if (type == TIMESTAMP) {
+                    return filter.testLong(((SqlTimestamp) value).getMillisUtc());
+                }
                 else if (type == VARCHAR) {
                     return filter.testBytes(((String) value).getBytes(), 0, ((String) value).length());
                 }
@@ -627,6 +633,11 @@ public class OrcTester
                     BigDecimal bigDecimal = ((SqlDecimal) value).toBigDecimal();
                     if (decimalType.isShort()) {
                         return filter.testLong(bigDecimal.unscaledValue().longValue());
+                    }
+                }
+                else if (type == DOUBLE) {
+                    if (!filter.testDouble((double) value)) {
+                        return false;
                     }
                 }
                 else {
@@ -1377,7 +1388,7 @@ public class OrcTester
         return METADATA.getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(elementType.getTypeSignature())));
     }
 
-    private static Type mapType(Type keyType, Type valueType)
+    public static Type mapType(Type keyType, Type valueType)
     {
         return METADATA.getParameterizedType(StandardTypes.MAP, ImmutableList.of(TypeSignatureParameter.of(keyType.getTypeSignature()), TypeSignatureParameter.of(valueType.getTypeSignature())));
     }

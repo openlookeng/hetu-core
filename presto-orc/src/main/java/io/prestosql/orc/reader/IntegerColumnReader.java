@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.IntArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
@@ -50,7 +51,7 @@ public class IntegerColumnReader
     }
 
     @Override
-    public Block<Integer> readBlock()
+    public Block readBlock()
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -132,5 +133,11 @@ public class IntegerColumnReader
         int[] result = unpackIntNulls(intNonNullValueTemp, isNull);
 
         return new IntArrayBlock(nextBatchSize, Optional.of(isNull), result);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Integer value)
+    {
+        return filter.testLong(value);
     }
 }

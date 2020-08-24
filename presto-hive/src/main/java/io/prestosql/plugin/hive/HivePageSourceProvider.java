@@ -41,6 +41,7 @@ import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -132,12 +133,20 @@ public class HivePageSourceProvider
         Configuration configuration = hdfsEnvironment.getConfiguration(
                 new HdfsEnvironment.HdfsContext(session, hiveSplit.getDatabase(), hiveSplit.getTable()), path);
 
-        List<IndexMetadata> indexes = null;
+        List<IndexMetadata> indexes = new ArrayList<>();
         if (indexCache != null && session.isHeuristicIndexFilterEnabled()) {
-            indexes = indexCache.getIndices(
-                    session.getCatalog().orElse(null),
-                    hiveTable.getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
-                    hiveTable.getPartitionColumns());
+            indexes.addAll(this.indexCache.getIndices(session
+                    .getCatalog().orElse(null), hiveTable
+                    .getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
+                    hiveTable.getPartitionColumns()));
+
+            if (hiveTable.getAdditionalCompactEffectivePredicate().isPresent() && hiveTable.getAdditionalCompactEffectivePredicate().get().size() > 0) {
+                hiveTable.getAdditionalCompactEffectivePredicate().get().forEach(orPredicate ->
+                        indexes.addAll(this.indexCache.getIndices(session
+                        .getCatalog().orElse(null), hiveTable
+                        .getSchemaTableName().toString(), hiveSplit, orPredicate, hiveTable
+                        .getPartitionColumns())));
+            }
         }
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);

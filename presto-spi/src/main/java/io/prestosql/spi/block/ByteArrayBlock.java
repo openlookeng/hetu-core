@@ -20,6 +20,7 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -27,8 +28,8 @@ import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
-public class ByteArrayBlock<T>
-        implements Block<T>
+public class ByteArrayBlock
+        implements Block<Byte>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ByteArrayBlock.class).instanceSize();
 
@@ -232,5 +233,33 @@ public class ByteArrayBlock<T>
             validPositions[i] = validPositions[i] && filter.test(values[i]);
         }
         return validPositions;
+    }
+
+    @Override
+    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        checkReadablePosition(positions[positionCount - 1]);
+
+        int matchCount = 0;
+        for (int i = 0; i < positionCount; i++) {
+            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset]) {
+                continue;
+            }
+            if (test.apply(values[positions[i] + arrayOffset])) {
+                matchedPositions[matchCount++] = positions[i];
+            }
+        }
+
+        return matchCount;
+    }
+
+    @Override
+    public Byte get(int position)
+    {
+        if (valueIsNull != null && valueIsNull[position + arrayOffset]) {
+            return null;
+        }
+
+        return values[position + arrayOffset];
     }
 }

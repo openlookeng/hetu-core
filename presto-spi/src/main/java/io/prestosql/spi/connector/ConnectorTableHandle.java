@@ -13,7 +13,10 @@
  */
 package io.prestosql.spi.connector;
 
+import io.prestosql.spi.predicate.Domain;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
+import java.util.function.Function;
 
 public interface ConnectorTableHandle
 {
@@ -89,5 +92,10 @@ public interface ConnectorTableHandle
     default boolean hasAdditionalFiltersPushdown()
     {
         return false;
+    }
+
+    default String getAdditionalFilterConditions(Function<Domain, String> printer)
+    {
+        return "";
     }
 }

@@ -271,7 +271,6 @@ public class AutoVacuumScanner
             return connectorMetadata.getTablesForVacuum();
         }
         catch (UnsupportedOperationException e) {
-            log.error("Catalog[%s] does not support auto vacuum scan", catalog.getCatalogName());
             return null;
         }
         catch (Exception e) {

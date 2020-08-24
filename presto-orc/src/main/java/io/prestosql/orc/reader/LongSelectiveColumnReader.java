@@ -44,7 +44,7 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static java.util.Objects.requireNonNull;
 
 public class LongSelectiveColumnReader
-        extends AbstractLongSelectiveColumnReader
+        extends AbstractLongSelectiveColumnReader<Long>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongSelectiveColumnReader.class).instanceSize();
 
@@ -87,7 +87,7 @@ public class LongSelectiveColumnReader
     // positions: Array of position from which data to be read;
     // positionCount: Number of position in the positions array.
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -103,7 +103,7 @@ public class LongSelectiveColumnReader
 
         // If there is filter on this column then require space to store position. Number of position can not be more
         // positionCount
-        if (filter != null) {
+        if (this.filter != null) {
             ensureOutputPositionsCapacity(positionCount);
         }
         else {
@@ -137,7 +137,7 @@ public class LongSelectiveColumnReader
                         if (outputRequired) {
                             nulls[outputPositionCount] = true;
                         }
-                        if (filter != null) {
+                        if (this.filter != null) {
                             outputPositions[outputPositionCount] = position;
                         }
                         outputPositionCount++;
@@ -145,7 +145,7 @@ public class LongSelectiveColumnReader
                 }
                 else {
                     long value = dataStream.next();
-                    if (filter == null || filter.testLong(value)) {
+                    if (this.filter == null || this.filter.testLong(value)) {
                         if (outputRequired) {
                             values[outputPositionCount] = value;
                             if (nullsAllowed && presentStream != null) {

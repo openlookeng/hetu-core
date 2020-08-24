@@ -57,12 +57,14 @@ public final class SelectiveColumnReaders
                 return new TimestampSelectiveColumnReader(column, filter, hiveStorageTimeZone, outputType.isPresent(), systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
             case DECIMAL:
                 if (orcType.getPrecision().get() > MAX_SHORT_PRECISION) {
-                    throw new IllegalArgumentException("Unsupported type: LONG DECIMAL");
+                    return new LongDecimalSelectiveColumnReader(orcType, column, filter, outputType, systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
                 }
                 return new ShortDecimalSelectiveColumnReader(orcType, column, filter, outputType, systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
-            case BYTE:
-            case FLOAT:
             case DOUBLE:
+                return new DoubleSelectiveColumnReader(column, filter, outputType.isPresent(), systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
+            case FLOAT:
+                return new FloatSelectiveColumnReader(column, filter, outputType.isPresent(), systemMemoryContext.newLocalMemoryContext(SelectiveColumnReader.class.getSimpleName()));
+            case BYTE:
             case LIST:
             case STRUCT:
             case UNION:
@@ -71,11 +73,18 @@ public final class SelectiveColumnReaders
         }
     }
 
-    public static SelectiveColumnReader wrapWithCachingStreamReader(SelectiveColumnReader original,
-                                                                    OrcColumn column,
-                                                                    OrcPredicate predicate,
-                                                                    Cache<OrcRowDataCacheKey, Block> cache)
+    public static SelectiveColumnReader wrapWithResultCachingStreamReader(SelectiveColumnReader original,
+                                                                          OrcColumn column,
+                                                                          OrcPredicate predicate,
+                                                                          Cache<OrcRowDataCacheKey, Block> cache)
     {
-        return new SelectiveCachingColumnReader(cache, original, column, predicate);
+        return new ResultCachingSelectiveColumnReader(cache, original, column, predicate);
+    }
+
+    public static SelectiveColumnReader wrapWithDataCachingStreamReader(ColumnReader original,
+                                                                        OrcColumn column,
+                                                                        Cache<OrcRowDataCacheKey, Block> cache)
+    {
+        return new DataCachingSelectiveColumnReader(original, column, cache);
     }
 }

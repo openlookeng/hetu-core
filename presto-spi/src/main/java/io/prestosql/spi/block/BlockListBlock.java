@@ -21,8 +21,8 @@ import java.util.function.BiConsumer;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
-public class BlockListBlock
-        implements Block
+public class BlockListBlock<T>
+        implements Block<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ArrayBlock.class).instanceSize();
     private final Block[] blocks;
@@ -197,20 +197,22 @@ public class BlockListBlock
         int blockIdx = lookupBlockForPosition(positionOffset);
         Block[] newBlocks = new Block[blockCount];
         int newBlockCount = 0;
-        int newPositionCount = length;
+        int newPositionCount = 0;
         Block block;
 
-        for (int i = blockIdx; i < blockCount && newPositionCount > 0; i++, newBlockCount++) {
-            block = blocks[blockIdx];
+        for (int i = blockIdx; i < blockCount && length > 0; i++) {
+            block = blocks[i];
 
             /* if region is within the block return the block else wrap the candidate blocks */
             if (block.getPositionCount() > (positionOffset - positionMap[blockIdx]) + length) {
-                newBlocks[i] = block.getRegion(positionOffset - positionMap[blockIdx], length);
-                newPositionCount -= length;
+                newBlocks[newBlockCount++] = block.getRegion(positionOffset - positionMap[blockIdx], length);
+                newPositionCount += length;
+                length -= length;
             }
             else {
-                newBlocks[i] = block;
-                newPositionCount -= block.getPositionCount();
+                newBlocks[newBlockCount++] = block;
+                newPositionCount += block.getPositionCount();
+                length -= block.getPositionCount();
             }
         }
 
@@ -290,10 +292,10 @@ public class BlockListBlock
     }
 
     @Override
-    public <T> T getObject(int position, Class<T> clazz)
+    public <R> R getObject(int position, Class<R> clazz)
     {
         int blockIdx = lookupBlockForPosition(position);
-        return blocks[blockIdx].getObject(position - positionMap[blockIdx], clazz);
+        return (R) blocks[blockIdx].getObject(position - positionMap[blockIdx], clazz);
     }
 
     @Override
@@ -310,5 +312,12 @@ public class BlockListBlock
         int blockIdx = lookupBlockForPosition(position);
         return blocks[blockIdx].bytesCompare(position - positionMap[blockIdx], offset, length,
                 otherSlice, otherOffset, otherLength);
+    }
+
+    @Override
+    public T get(int position)
+    {
+        int blockIdx = lookupBlockForPosition(position);
+        return (T) blocks[blockIdx].get(position - positionMap[blockIdx]);
     }
 }

@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.List;
 
-public interface SelectiveColumnReader
+public interface SelectiveColumnReader<T>
         extends AbstractColumnReader
 {
     /**
@@ -30,9 +30,10 @@ public interface SelectiveColumnReader
      ** @param positions Monotonically increasing positions to read
      ** @param positionCount Number of valid positions in the positions array; may be less than the
      **                      size of the array
-     ** @return the number of positions that passed the filter
+     ** @param filter
+     * @return the number of positions that passed the filter
      **/
-    int read(int offset, int[] positions, int positionCount)
+    int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException;
 
     /**
@@ -49,15 +50,15 @@ public interface SelectiveColumnReader
      **                  from getReadPositions()
      ** @param positionCount Number of valid positions in the positions array; may be less than the
      **/
-    Block getBlock(int[] positions, int positionCount);
+    Block<T> getBlock(int[] positions, int positionCount);
 
     default int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filter, BitSet accumulator)
             throws IOException
     {
-        return read(offset, positions, positionCount);
+        return read(offset, positions, positionCount, null);
     }
 
-    default Block mergeBlocks(List<Block> blocks, int positionCount)
+    default Block<T> mergeBlocks(List<Block<T>> blocks, int positionCount)
     {
         return blocks.get(0);
     }

@@ -92,7 +92,7 @@ public class IndexCache
                     .map(HiveColumnHandle::getName)
                     .map(String::toLowerCase).forEach(column -> {
                         String indexCacheKeyPath = Paths.get(tableFqn, column, pathUri.getPath()).toString();
-                        IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime, "bitmap");
+                        IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime, "bitmap", "bloom");
                         // check if cache contains the key
                         List<IndexMetadata> predicateIndexes = cache.getIfPresent(indexCacheKey);
 

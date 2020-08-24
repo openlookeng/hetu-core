@@ -115,7 +115,8 @@ public class OrcRecordReader
                 indexes,
                 domains,
                 orcCacheStore,
-                orcCacheProperties);
+                orcCacheProperties,
+                ImmutableMap.of());
 
         setColumnReadersParam(createColumnReaders(readColumns, readTypes,
                 systemMemoryUsage.newAggregatedMemoryContext(),

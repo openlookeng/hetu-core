@@ -46,8 +46,8 @@ import static io.prestosql.orc.metadata.Stream.StreamKind.SECONDARY;
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static java.util.Objects.requireNonNull;
 
-public abstract class AbstractDecimalSelectiveColumnReader
-        implements SelectiveColumnReader
+public abstract class AbstractDecimalSelectiveColumnReader<T>
+        implements SelectiveColumnReader<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(AbstractDecimalSelectiveColumnReader.class).instanceSize();
 
@@ -135,11 +135,11 @@ public abstract class AbstractDecimalSelectiveColumnReader
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
         return readOr(offset, positions, positionCount,
-                (filter == null) ? null : ImmutableList.of(filter),
+                (this.filter == null) ? null : ImmutableList.of(this.filter),
                 null);
     }
 
@@ -231,7 +231,7 @@ public abstract class AbstractDecimalSelectiveColumnReader
     }
 
     @Override
-    public Block getBlock(int[] positions, int positionCount)
+    public Block<T> getBlock(int[] positions, int positionCount)
     {
         checkArgument(outputPositionCount > 0, "outputPositionCount must be greater than zero");
         checkState(outputRequired, "This stream reader doesn't produce output");
@@ -264,9 +264,8 @@ public abstract class AbstractDecimalSelectiveColumnReader
 
     private void ensureValuesCapacity(int capacity, boolean nullAllowed)
     {
-        int valuesCapacity = valuesPerPosition * capacity;
-        if (values == null || values.length < valuesCapacity) {
-            values = new long[valuesCapacity];
+        if (values == null || values.length < capacity) {
+            values = new long[valuesPerPosition * capacity];
         }
 
         if (nullAllowed) {
@@ -278,7 +277,7 @@ public abstract class AbstractDecimalSelectiveColumnReader
 
     abstract void copyValues(int[] positions, int positionsCount, long[] valuesCopy, boolean[] nullsCopy);
 
-    abstract Block makeBlock(int positionCount, boolean includeNulls, boolean[] nulls, long[] values);
+    abstract Block<T> makeBlock(int positionCount, boolean includeNulls, boolean[] nulls, long[] values);
 
     abstract void compactValues(int[] positions, int positionCount, boolean compactNulls);
 

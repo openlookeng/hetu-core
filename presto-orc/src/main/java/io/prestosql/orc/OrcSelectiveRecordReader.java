@@ -13,6 +13,7 @@
  */
 package io.prestosql.orc;
 
+import com.google.common.collect.PeekingIterator;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
@@ -25,6 +26,8 @@ import io.prestosql.orc.metadata.PostScript;
 import io.prestosql.orc.metadata.StripeInformation;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 import io.prestosql.orc.metadata.statistics.StripeStatistics;
+import io.prestosql.orc.reader.ColumnReader;
+import io.prestosql.orc.reader.ColumnReaders;
 import io.prestosql.orc.reader.SelectiveColumnReader;
 import io.prestosql.orc.reader.SelectiveColumnReaders;
 import io.prestosql.spi.Page;
@@ -39,14 +42,18 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.orc.reader.SelectiveColumnReaders.createColumnReader;
+import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 public class OrcSelectiveRecordReader
@@ -57,17 +64,17 @@ public class OrcSelectiveRecordReader
 
     private final List<Integer> excludePositions;
     private final List<Integer> columnReaderOrder;
+    private final Map<Integer, TupleDomainFilter> filters;
     private int[] positions;
     List<Integer> outputColumns;
     Map<Integer, Type> includedColumns;
-    private int finalPositionCount;
-    private int[] finalPositions;
 
     private final Map<Integer, Object> constantValues;
     Set<Integer> colReaderWithFilter;
     Set<Integer> colReaderWithORFilter;
     Set<Integer> colReaderWithoutFilter;
     Map<Integer, List<TupleDomainFilter>> additionalFilters;
+    Map<Integer, Function<Block, Block>> coercers;
 
     public OrcSelectiveRecordReader(
             List<Integer> outputColumns,
@@ -104,7 +111,10 @@ public class OrcSelectiveRecordReader
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
             Map<Integer, List<TupleDomainFilter>> additionalFilters,
-            List<Integer> positions)
+            List<Integer> positions,
+            boolean useDataCache,
+            Map<Integer, Function<Block, Block>> coercers,
+            Map<String, List<Domain>> orDomains)
             throws OrcCorruptionException
     {
         super(fileReadColumns,
@@ -134,7 +144,8 @@ public class OrcSelectiveRecordReader
                 indexes,
                 domains,
                 orcCacheStore,
-                orcCacheProperties);
+                orcCacheProperties,
+                orDomains);
 
         int fieldCount = orcTypes.get(OrcColumnId.ROOT_COLUMN).getFieldCount();
         this.columnReaderOrder = new ArrayList<>(fieldCount);
@@ -143,15 +154,21 @@ public class OrcSelectiveRecordReader
         this.includedColumns = includedColumns;
         this.excludePositions = positions;
 
+        this.filters = filters;
         this.additionalFilters = additionalFilters;
         this.constantValues = requireNonNull(constantValues, "constantValues is null");
+        this.coercers = requireNonNull(coercers, "coercers is null");
+
+        for (Map.Entry<Integer, Function<Block, Block>> entry : coercers.entrySet()) {
+            checkArgument(!filters.containsKey(entry.getKey()), "Coercions for columns with range filters are not yet supported");
+        }
 
         setColumnReadersParam(createColumnReaders(fileColumns,
                 systemMemoryUsage.newAggregatedMemoryContext(),
                 new OrcBlockFactory(exceptionTransform, true),
                 orcCacheStore, orcCacheProperties,
                 predicate, filters, hiveStorageTimeZone,
-                outputColumns, includedColumns, orcTypes));
+                outputColumns, includedColumns, orcTypes, useDataCache));
     }
 
     public Page getNextPage()
@@ -162,6 +179,7 @@ public class OrcSelectiveRecordReader
             return null;
         }
 
+        matchingRowsInBatchArray = null;
         initializePositions(batchSize);
 
         int[] positionsToRead = this.positions;
@@ -172,7 +190,7 @@ public class OrcSelectiveRecordReader
         if (positionCount != 0) {
             for (Integer columnIdx : colReaderWithFilter) {
                 if (columnReaders[columnIdx] != null) {
-                    positionCount = columnReaders[columnIdx].read(getNextRowInGroup(), positionsToRead, positionCount);
+                    positionCount = columnReaders[columnIdx].read(getNextRowInGroup(), positionsToRead, positionCount, filters.get(columnIdx));
                     if (positionCount == 0) {
                         break;
                     }
@@ -196,13 +214,13 @@ public class OrcSelectiveRecordReader
 
             int[] newPositions = positionsToRead.clone();
             positionCount = updateExcludePositions(positionsToRead, positionCount, accumulator, newPositions);
-            positionsToRead = newPositions;
+            positionsToRead = Arrays.copyOf(newPositions, positionCount);
         }
 
         if (positionCount != 0) {
             for (Integer columnIdx : colReaderWithoutFilter) {
                 if (columnReaders[columnIdx] != null) {
-                    positionCount = columnReaders[columnIdx].read(getNextRowInGroup(), positionsToRead, positionCount);
+                    positionCount = columnReaders[columnIdx].read(getNextRowInGroup(), positionsToRead, positionCount, null);
                     if (positionCount == 0) {
                         break;
                     }
@@ -233,6 +251,9 @@ public class OrcSelectiveRecordReader
             else {
                 Block block = getColumnReaders()[columnIndex].getBlock(positionsToRead, positionCount);
                 updateMaxCombinedBytesPerRow(columnIndex, block);
+                if (coercers.containsKey(i)) {
+                    block = coercers.get(i).apply(block);
+                }
                 blocks[i] = block;
             }
         }
@@ -246,7 +267,38 @@ public class OrcSelectiveRecordReader
 
     private void initializePositions(int batchSize)
     {
+        // currentPosition to currentBatchSize
+        StripeInformation stripe = stripes.get(currentStripe);
+
+        if (matchingRowsInBatchArray == null && stripeMatchingRows.containsKey(stripe)) {
+            long currentPositionInStripe = currentPosition - currentStripePosition;
+
+            PeekingIterator<Integer> matchingRows = stripeMatchingRows.get(stripe);
+            List<Integer> matchingRowsInBlock = new ArrayList<>();
+
+            while (matchingRows.hasNext()) {
+                Integer row = matchingRows.peek();
+                if (row >= currentPositionInStripe && row < currentPositionInStripe + batchSize) {
+                    matchingRowsInBlock.add(toIntExact(Long.valueOf(row) - currentPositionInStripe));
+                    matchingRows.next();
+                }
+                else if (row >= currentPositionInStripe + currentBatchSize) {
+                    break;
+                }
+            }
+
+            matchingRowsInBatchArray = new int[matchingRowsInBlock.size()];
+            IntStream.range(0, matchingRowsInBlock.size()).forEach(
+                    i -> matchingRowsInBatchArray[i] = matchingRowsInBlock.get(i));
+            log.debug("Find matching rows from stripe. Matching row count for the block = %d", matchingRowsInBatchArray.length);
+        }
+
         if (positions == null || positions.length < batchSize) {
+            if (matchingRowsInBatchArray != null) {
+                positions = matchingRowsInBatchArray;
+                return;
+            }
+
             positions = new int[batchSize];
             for (int i = 0; i < batchSize; i++) {
                 positions[i] = i;
@@ -284,7 +336,8 @@ public class OrcSelectiveRecordReader
             DateTimeZone hiveStorageTimeZone,
             List<Integer> outputColumns,
             Map<Integer, Type> includedColumns,
-            ColumnMetadata<OrcType> orcTypes)
+            ColumnMetadata<OrcType> orcTypes,
+            boolean useDataCache)
             throws OrcCorruptionException
     {
         int fieldCount = orcTypes.get(OrcColumnId.ROOT_COLUMN).getFieldCount();
@@ -298,16 +351,28 @@ public class OrcSelectiveRecordReader
                 int columnIndex = i;
                 OrcColumn column = fileColumns.get(columnIndex);
                 boolean outputRequired = outputColumns.contains(i);
-                SelectiveColumnReader columnReader = createColumnReader(
-                        orcTypes.get(column.getColumnId()),
-                        column,
-                        Optional.ofNullable(filters.get(i)),
-                        outputRequired ? Optional.of(includedColumns.get(i)) : Optional.empty(),
-                        hiveStorageTimeZone,
-                        systemMemoryContext);
-                if (orcCacheProperties.isRowDataCacheEnabled()) {
-                    columnReader = SelectiveColumnReaders.wrapWithCachingStreamReader(columnReader, column,
-                            predicate, orcCacheStore.getRowDataCache());
+                SelectiveColumnReader columnReader = null;
+
+                if (useDataCache && orcCacheProperties.isRowDataCacheEnabled()) {
+                    ColumnReader cr = ColumnReaders.createColumnReader(
+                            includedColumns.get(i),
+                            column,
+                            systemMemoryContext,
+                            blockFactory.createNestedBlockFactory(block -> blockLoaded(columnIndex, block)));
+                    columnReader = SelectiveColumnReaders.wrapWithDataCachingStreamReader(cr, column, orcCacheStore.getRowDataCache());
+                }
+                else {
+                    columnReader = createColumnReader(
+                            orcTypes.get(column.getColumnId()),
+                            column,
+                            Optional.ofNullable(filters.get(i)),
+                            outputRequired ? Optional.of(includedColumns.get(i)) : Optional.empty(),
+                            hiveStorageTimeZone,
+                            systemMemoryContext);
+                    if (orcCacheProperties.isRowDataCacheEnabled()) {
+                        columnReader = SelectiveColumnReaders.wrapWithResultCachingStreamReader(columnReader, column,
+                                predicate, orcCacheStore.getRowDataCache());
+                    }
                 }
                 columnReaders[columnIndex] = columnReader;
                 if (filters.get(i) != null) {

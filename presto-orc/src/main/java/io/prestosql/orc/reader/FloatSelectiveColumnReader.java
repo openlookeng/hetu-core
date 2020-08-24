@@ -46,7 +46,7 @@ import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
 public class FloatSelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<Integer>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(FloatSelectiveColumnReader.class).instanceSize();
     private static final Block NULL_BLOCK = REAL.createBlockBuilder(null, 1).appendNull().build();

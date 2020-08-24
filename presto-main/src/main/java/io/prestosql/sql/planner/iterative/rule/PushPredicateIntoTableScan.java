@@ -57,7 +57,6 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.intersection;
-import static io.prestosql.SystemSessionProperties.isPushTableWriteThroughUnion;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.metadata.TableLayoutResult.computeEnforced;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
@@ -170,7 +169,7 @@ public class PushPredicateIntoTableScan
 
         AtomicInteger i = new AtomicInteger(0);
         additionalPredicates.stream().forEach(er -> {
-            log.warn("[%d]- Enforced [%s]\n\tRemaining [%s]", i.getAndIncrement(),
+            log.debug("[%d]- Enforced [%s]\n\tRemaining [%s]", i.getAndIncrement(),
                     er.getTupleDomain(), er.getRemainingExpression());
         });
 
@@ -184,10 +183,10 @@ public class PushPredicateIntoTableScan
 
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
-        Boolean isPushDownEnabled = isPushTableWriteThroughUnion(session);
-
         Constraint constraint;
-        List<Constraint> additionalConstraints = orDomains.stream().map(d -> new Constraint(d))
+        List<Constraint> additionalConstraints = orDomains.stream()
+                .filter(d -> !d.isAll() && !d.isNone())
+                .map(d -> new Constraint(d))
                 .collect(Collectors.toList());
 
         if (pruneWithPredicateExpression) {
@@ -220,7 +219,6 @@ public class PushPredicateIntoTableScan
                 return Optional.of(new ValuesNode(idAllocator.getNextId(), node.getOutputSymbols(), ImmutableList.of()));
             }
 
-            constraint.setPushDownEnabled(isPushDownEnabled);
             Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints);
 
             if (!result.isPresent()) {
@@ -257,7 +255,8 @@ public class PushPredicateIntoTableScan
                 newTable,
                 node.getOutputSymbols(),
                 node.getAssignments(),
-                computeEnforced(newDomain, remainingFilter));
+                computeEnforced(newDomain, remainingFilter),
+                Optional.of(deterministicPredicate));
 
         // The order of the arguments to combineConjuncts matters:
         // * Unenforced constraints go first because they can only be simple column references,

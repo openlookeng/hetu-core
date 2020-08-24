@@ -33,7 +33,7 @@ import java.util.Optional;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.rescale;
 
 public class LongDecimalSelectiveColumnReader
-        extends AbstractDecimalSelectiveColumnReader
+        extends AbstractDecimalSelectiveColumnReader<long[]>
 {
     public LongDecimalSelectiveColumnReader(
             OrcType orcType,
@@ -233,7 +233,7 @@ public class LongDecimalSelectiveColumnReader
     }
 
     @Override
-    protected Block makeBlock(int positionCount, boolean includeNulls, boolean[] nulls, long[] values)
+    protected Block<long[]> makeBlock(int positionCount, boolean includeNulls, boolean[] nulls, long[] values)
     {
         return new Int128ArrayBlock(positionCount, Optional.ofNullable(includeNulls ? nulls : null), values);
     }

@@ -181,7 +181,10 @@ public class BenchmarkSelectiveColumnReaders
                     new OrcCacheProperties(),
                     Optional.empty(),
                     new HashMap<>(),
-                    new ArrayList<>());
+                    new ArrayList<>(),
+                    false,
+                    ImmutableMap.of(),
+                    ImmutableMap.of());
         }
     }
 

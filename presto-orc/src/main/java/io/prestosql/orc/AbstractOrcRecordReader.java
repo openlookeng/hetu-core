@@ -36,7 +36,8 @@ import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 import io.prestosql.orc.metadata.statistics.StripeStatistics;
 import io.prestosql.orc.reader.AbstractColumnReader;
 import io.prestosql.orc.reader.CachingColumnReader;
-import io.prestosql.orc.reader.SelectiveCachingColumnReader;
+import io.prestosql.orc.reader.DataCachingSelectiveColumnReader;
+import io.prestosql.orc.reader.ResultCachingSelectiveColumnReader;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.StreamSourceMeta;
 import io.prestosql.spi.Page;
@@ -153,7 +154,8 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             Optional<List<IndexMetadata>> indexes,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
-            OrcCacheProperties orcCacheProperties)
+            OrcCacheProperties orcCacheProperties,
+            Map<String, List<Domain>> orDomains)
             throws OrcCorruptionException
     {
         requireNonNull(readColumns, "readColumns is null");
@@ -183,6 +185,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
 
         // it is possible that old versions of orc use 0 to mean there are no row groups
         checkArgument(rowsInRowGroup > 0, "rowsInRowGroup must be greater than zero");
+        checkArgument(orDomains != null, "orDomain map cannot be null");
 
         // sort stripes by file position
         List<StripeInfo> stripeInfos = new ArrayList<>();
@@ -225,14 +228,12 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             for (int i = 0; i < stripeInfos.size(); i++) {
                 StripeInfo info = stripeInfos.get(i);
                 StripeInformation stripe = info.getStripe();
-                if (splitContainsStripe(splitOffset, splitLength, stripe) && isStripeIncluded(stripe, info.getStats(), predicate)) {
+                if (splitContainsStripe(splitOffset, splitLength, stripe)
+                        && isStripeIncluded(stripe, info.getStats(), predicate)
+                        && !filterStripeUsingIndex(stripe, stripeOffsetToIndex, domains, orDomains)) {
                     stripes.add(stripe);
                     stripeFilePositions.add(fileRowCount);
                     totalRowCount += stripe.getNumberOfRows();
-
-                    if (!stripeOffsetToIndex.isEmpty()) {
-                        stripeIndexes.put(stripe, stripeOffsetToIndex.get(stripe.getOffset()));
-                    }
                 }
                 fileRowCount += stripe.getNumberOfRows();
             }
@@ -240,37 +241,6 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         this.totalRowCount = totalRowCount;
         this.stripes = stripes.build();
         this.stripeFilePositions = stripeFilePositions.build();
-
-        // now that we know which stripes will be read, apply indexes on them if applicable
-        // i.e. if an index exists for the pushed down predicates
-        // once the indexes are applied, for each stripe we will have the rows inside
-        // the stripe that matched the predicates
-        stripeIndexes.entrySet().stream().forEach(stripeIndex -> {
-            Map<Index, Domain> indexDomainMap = new HashMap<>();
-
-            for (Map.Entry<String, Domain> domainEntry : domains.entrySet()) {
-                String columnName = domainEntry.getKey();
-                Domain columnDomain = domainEntry.getValue();
-
-                // if the index exists, there should only be one index for this column within this stripe
-                List<IndexMetadata> indexMetadata = stripeIndex.getValue().stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
-                if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
-                    continue;
-                }
-
-                Index index = indexMetadata.get(0).getIndex();
-                indexDomainMap.put(index, columnDomain);
-            }
-
-            if (!indexDomainMap.isEmpty()) {
-                Iterator<Integer> thisStripeMatchingRows = indexDomainMap.entrySet().iterator().next().getKey().getMatches(indexDomainMap);
-
-                if (thisStripeMatchingRows != null) {
-                    PeekingIterator<Integer> peekingIterator = Iterators.peekingIterator(thisStripeMatchingRows);
-                    stripeMatchingRows.put(stripeIndex.getKey(), peekingIterator);
-                }
-            }
-        });
 
         orcDataSource = wrapWithCacheIfTinyStripes(orcDataSource, this.stripes, maxMergeDistance, tinyStripeThreshold);
         this.orcDataSource = orcDataSource;
@@ -312,6 +282,69 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         else {
             nextBatchSize = initialBatchSize;
         }
+    }
+
+    private boolean filterStripeUsingIndex(StripeInformation stripe, Map<Long, List<IndexMetadata>> stripeOffsetToIndex,
+                                           Map<String, Domain> and, Map<String, List<Domain>> or)
+    {
+        if (stripeOffsetToIndex.isEmpty()) {
+            return false;
+        }
+
+        List<IndexMetadata> stripeIndex = stripeOffsetToIndex.get(Long.valueOf(stripe.getOffset()));
+        Map<Index, Domain> andDomainMap = new HashMap<>();
+        Map<Index, Domain> orDomainMap = new HashMap<>();
+
+        for (Map.Entry<String, Domain> domainEntry : and.entrySet()) {
+            String columnName = domainEntry.getKey();
+            Domain columnDomain = domainEntry.getValue();
+
+            // if the index exists, there should only be one index for this column within this stripe
+            List<IndexMetadata> indexMetadata = stripeIndex.stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
+            if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
+                continue;
+            }
+
+            Index index = indexMetadata.get(0).getIndex();
+            andDomainMap.put(index, columnDomain);
+        }
+
+        for (Map.Entry<String, List<Domain>> domainEntry : or.entrySet()) {
+            String columnName = domainEntry.getKey();
+            List<Domain> columnDomain = domainEntry.getValue();
+
+            // if the index exists, there should only be one index for this column within this stripe
+            List<IndexMetadata> indexMetadata = stripeIndex.stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
+            if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
+                continue;
+            }
+
+            Index index = indexMetadata.get(0).getIndex();
+            orDomainMap.put(index, columnDomain.get(0));
+        }
+
+        if (!andDomainMap.isEmpty()) {
+            Iterator<Integer> thisStripeMatchingRows = ((andDomainMap.entrySet().iterator().next()).getKey()).getMatches(andDomainMap);
+            if (thisStripeMatchingRows.hasNext()) {
+                PeekingIterator<Integer> peekingIterator = Iterators.peekingIterator(thisStripeMatchingRows);
+                if (peekingIterator.peek() != null) {
+                    this.stripeMatchingRows.put(stripe, peekingIterator);
+                }
+                return false;
+            }
+            return true;
+        }
+        if (!orDomainMap.isEmpty()) {
+            for (Map.Entry<Index, Domain> indexDomainEntry : orDomainMap.entrySet()) {
+                Iterator<Integer> thisStripeMatchingRows = (indexDomainEntry.getKey()).getMatches(indexDomainEntry.getValue());
+                if (thisStripeMatchingRows.hasNext()) {
+                    /* any one matched; then include the stripe */
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     private static OptionalInt getFixedWidthRowSize(List<Type> columnTypes)
@@ -642,7 +675,9 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         InputStreamSources rowGroupStreamSources = currentRowGroup.getStreamSources();
         for (AbstractColumnReader columnReader : columnReaders) {
             if (columnReader != null) {
-                if (columnReader instanceof CachingColumnReader || columnReader instanceof SelectiveCachingColumnReader) {
+                if (columnReader instanceof CachingColumnReader
+                        || columnReader instanceof ResultCachingSelectiveColumnReader
+                        || columnReader instanceof DataCachingSelectiveColumnReader) {
                     StreamSourceMeta streamSourceMeta = new StreamSourceMeta();
                     streamSourceMeta.setDataSourceId(orcDataSource.getId());
                     streamSourceMeta.setStripeOffset(stripes.get(currentStripe).getOffset());

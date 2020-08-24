@@ -31,7 +31,6 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.block.VariableWidthBlock;
-import io.prestosql.spi.type.Chars;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
@@ -59,7 +58,7 @@ import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 public class SliceDictionarySelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceDictionarySelectiveColumnReader.class).instanceSize();
 
@@ -120,15 +119,15 @@ public class SliceDictionarySelectiveColumnReader
         this.isCharType = orcType.getOrcTypeKind() == CHAR;
         this.outputRequired = outputType.isPresent();
         this.orcType = orcType;
-        checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
+        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
         return readOr(offset, positions, positionCount,
-                (filter == null) ? null : ImmutableList.of(filter),
+                (this.filter == null) ? null : ImmutableList.of(this.filter),
                 null);
     }
 
@@ -229,18 +228,10 @@ public class SliceDictionarySelectiveColumnReader
             }
             else {
                 int index = toIntExact(dataStream.next());
-                int length = stripeDictionaryLength[index];
-
-                if (true) { /* Fixme(Nitin): Why this condition here?
-                                (accumulator != null && accumulator.get(position)) || filters == null
-                             */
-                    int currentPosLength = dictionaryBlock.getSliceLength(index);
+                int currentPosLength = dictionaryBlock.getSliceLength(index);
+                if (filters.get(0).testLength(currentPosLength)) {
                     Slice data = dictionaryBlock.getSlice(index, 0, currentPosLength);
-                    if (isCharType) {
-                        data = Chars.padSpaces(data, maxCodePointCount);
-                    }
-                    Slice finalData = data;
-                    if (filters == null || filters.get(0).testBytes(finalData.getBytes(), 0, length)) {
+                    if (filters == null || filters.get(0).testBytes(data.getBytes(), 0, currentPosLength)) {
                         if (outputRequired) {
                             values[outputPositionCount] = index;
                         }
@@ -277,19 +268,11 @@ public class SliceDictionarySelectiveColumnReader
             }
             else {
                 int index = toIntExact(dataStream.next());
-                int length = stripeDictionaryLength[index];
-
-                if (true) { /* Fixme(Nitin): Why this condition here?
-                                (accumulator != null && accumulator.get(position)) || filters == null
-                             */
-                    int currentPosLength = dictionaryBlock.getSliceLength(index);
+                int currentPosLength = dictionaryBlock.getSliceLength(index);
+                if (filters.get(0).testLength(currentPosLength)) {
                     Slice data = dictionaryBlock.getSlice(index, 0, currentPosLength);
-                    if (isCharType) {
-                        data = Chars.padSpaces(data, maxCodePointCount);
-                    }
-                    Slice finalData = data;
                     if ((accumulator != null && accumulator.get(position))
-                            || filters == null || filters.get(0).testBytes(finalData.getBytes(), 0, length)) {
+                            || filters == null || filters.get(0).testBytes(data.getBytes(), 0, currentPosLength)) {
                         if (accumulator != null) {
                             accumulator.set(position);
                         }

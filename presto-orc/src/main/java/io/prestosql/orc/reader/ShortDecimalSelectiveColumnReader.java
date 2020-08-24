@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class ShortDecimalSelectiveColumnReader
-        extends AbstractDecimalSelectiveColumnReader
+        extends AbstractDecimalSelectiveColumnReader<Short>
 {
     public ShortDecimalSelectiveColumnReader(
             OrcType orcType,
@@ -216,7 +216,7 @@ public class ShortDecimalSelectiveColumnReader
     }
 
     @Override
-    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    public Block<Short> mergeBlocks(List<Block<Short>> blocks, int positionCount)
     {
         LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);
         blocks.stream().forEach(block -> {

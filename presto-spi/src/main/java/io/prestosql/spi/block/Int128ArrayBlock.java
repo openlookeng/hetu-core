@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -30,7 +31,7 @@ import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
 public class Int128ArrayBlock
-        implements Block<Long>
+        implements Block<long[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(Int128ArrayBlock.class).instanceSize();
     public static final int INT128_BYTES = Long.BYTES + Long.BYTES;
@@ -243,5 +244,37 @@ public class Int128ArrayBlock
             validPositions[i] = validPositions[i] && filter.test(value);
         }
         return validPositions;
+    }
+
+    @Override
+    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        int matchCount = 0;
+        long[] val = new long[2];
+        for (int i = 0; i < positionCount; i++) {
+            if (valueIsNull != null && valueIsNull[positions[i] + positionOffset]) {
+                continue;
+            }
+            val[0] = values[(positions[i] + positionOffset) * 2];
+            val[1] = values[((positions[i] + positionOffset) * 2) + 1];
+            if (test.apply(val)) {
+                matchedPositions[matchCount++] = positions[i];
+            }
+        }
+
+        return matchCount;
+    }
+
+    @Override
+    public long[] get(int position)
+    {
+        long[] val = new long[2];
+        if (valueIsNull != null && valueIsNull[position + positionOffset]) {
+            return null;
+        }
+        val[0] = values[(position + positionOffset) * 2];
+        val[1] = values[((position + positionOffset) * 2) + 1];
+
+        return val;
     }
 }

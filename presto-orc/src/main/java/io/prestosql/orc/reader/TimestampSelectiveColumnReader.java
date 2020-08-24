@@ -51,7 +51,7 @@ import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static java.util.Objects.requireNonNull;
 
 public class TimestampSelectiveColumnReader
-        implements SelectiveColumnReader
+        implements SelectiveColumnReader<Long>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(TimestampSelectiveColumnReader.class).instanceSize();
     private static final Block NULL_BLOCK = TIMESTAMP.createBlockBuilder(null, 1).appendNull().build();
@@ -141,11 +141,11 @@ public class TimestampSelectiveColumnReader
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException
     {
         return readOr(offset, positions, positionCount,
-                (filter == null) ? null : ImmutableList.of(filter),
+                (this.filter == null) ? null : ImmutableList.of(this.filter),
                 null);
     }
 
@@ -426,7 +426,7 @@ public class TimestampSelectiveColumnReader
     }
 
     @Override
-    public Block mergeBlocks(List<Block> blocks, int positionCount)
+    public Block mergeBlocks(List<Block<Long>> blocks, int positionCount)
     {
         LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);
         blocks.stream().forEach(block -> {

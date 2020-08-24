@@ -21,8 +21,6 @@ import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.RealType;
 
-import java.util.function.Function;
-
 import static io.prestosql.spi.type.DecimalConversions.doubleToLongDecimal;
 import static io.prestosql.spi.type.DecimalConversions.doubleToShortDecimal;
 import static io.prestosql.spi.type.DecimalConversions.longDecimalToDouble;
@@ -43,7 +41,7 @@ public final class DecimalCoercers
 {
     private DecimalCoercers() {}
 
-    public static Function<Block, Block> createDecimalToDecimalCoercer(DecimalType fromType, DecimalType toType)
+    public static HiveCoercer createDecimalToDecimalCoercer(DecimalType fromType, DecimalType toType)
     {
         if (fromType.isShort()) {
             if (toType.isShort()) {
@@ -148,7 +146,7 @@ public final class DecimalCoercers
         }
     }
 
-    public static Function<Block, Block> createDecimalToDoubleCoercer(DecimalType fromType)
+    public static HiveCoercer createDecimalToDoubleCoercer(DecimalType fromType)
     {
         if (fromType.isShort()) {
             return new ShortDecimalToDoubleCoercer(fromType);
@@ -193,7 +191,7 @@ public final class DecimalCoercers
         }
     }
 
-    public static Function<Block, Block> createDecimalToRealCoercer(DecimalType fromType)
+    public static HiveCoercer createDecimalToRealCoercer(DecimalType fromType)
     {
         if (fromType.isShort()) {
             return new ShortDecimalToRealCoercer(fromType);
@@ -238,7 +236,7 @@ public final class DecimalCoercers
         }
     }
 
-    public static Function<Block, Block> createDoubleToDecimalCoercer(DecimalType toType)
+    public static HiveCoercer createDoubleToDecimalCoercer(DecimalType toType)
     {
         if (toType.isShort()) {
             return new DoubleToShortDecimalCoercer(toType);
@@ -280,7 +278,7 @@ public final class DecimalCoercers
         }
     }
 
-    public static Function<Block, Block> createRealToDecimalCoercer(DecimalType toType)
+    public static HiveCoercer createRealToDecimalCoercer(DecimalType toType)
     {
         if (toType.isShort()) {
             return new RealToShortDecimalCoercer(toType);

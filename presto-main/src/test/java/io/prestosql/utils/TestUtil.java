@@ -120,7 +120,8 @@ public class TestUtil
                 makeTableHandle(TupleDomain.none()),
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
-                TupleDomain.none());
+                TupleDomain.none(),
+                Optional.empty());
         PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());
         FilterNode filterNode = planBuilder.filter(expr, tableScanNode);
 

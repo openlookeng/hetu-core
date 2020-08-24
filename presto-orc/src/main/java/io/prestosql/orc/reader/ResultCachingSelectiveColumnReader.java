@@ -36,8 +36,8 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.function.BiConsumer;
 
-public class SelectiveCachingColumnReader
-        implements SelectiveColumnReader
+public class ResultCachingSelectiveColumnReader<T>
+        implements SelectiveColumnReader<T>
 {
     private static final Logger log = Logger.get(SelectiveColumnReader.class);
     private final Cache<OrcRowDataCacheKey, Block> cache;
@@ -52,12 +52,14 @@ public class SelectiveCachingColumnReader
     private int readSize;
     private int totalPositionCount;
     private Block cachedBlock;
-    private List<Block> accumulatorBlocks;
+    private int[] positions;
+
+    private List<Block<T>> accumulatorBlocks;
     private OrcSelectiveRowDataCacheKey cacheKey;
 
-    public SelectiveCachingColumnReader(Cache<OrcRowDataCacheKey, Block> cache,
-                                        SelectiveColumnReader delegate, OrcColumn column,
-                                        OrcPredicate predicate)
+    public ResultCachingSelectiveColumnReader(Cache<OrcRowDataCacheKey, Block> cache,
+                                              SelectiveColumnReader delegate, OrcColumn column,
+                                              OrcPredicate predicate)
     {
         this.cache = cache;
         this.delegate = delegate;
@@ -67,16 +69,17 @@ public class SelectiveCachingColumnReader
     }
 
     @Override
-    public int read(int offset, int[] positions, int positionCount) throws IOException
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter) throws IOException
     {
         if (cachedBlock != null) {
             this.readSize = Integer.min(positionCount, (cachedBlock.getPositionCount() - this.offset));
             this.offset += this.readSize;
+            this.positions = positions;
 
             return this.readSize;
         }
 
-        return delegate.read(offset, positions, positionCount);
+        return delegate.read(offset, positions, positionCount, null);
     }
 
     @Override
@@ -86,6 +89,7 @@ public class SelectiveCachingColumnReader
         if (cachedBlock != null) {
             this.readSize = Integer.min(positionCount, (cachedBlock.getPositionCount() - this.offset));
             this.offset += this.readSize;
+            this.positions = positions;
 
             if (this.readSize > 0) {
                 accumulator.set(offset, offset + this.readSize);
@@ -99,6 +103,10 @@ public class SelectiveCachingColumnReader
     @Override
     public int[] getReadPositions()
     {
+        if (cachedBlock != null) {
+            return this.positions;
+        }
+
         return delegate.getReadPositions();
     }
 
@@ -192,7 +200,7 @@ public class SelectiveCachingColumnReader
         return delegate.getRetainedSizeInBytes();
     }
 
-    private Block mergeAccumulatedBlocks(List<Block> accumulatedBlocks)
+    private Block mergeAccumulatedBlocks(List<Block<T>> accumulatedBlocks)
     {
         /* Fixme(Nitin): merge all accumulated blocks in single array */
         if (accumulatedBlocks.size() > 0) {
@@ -201,7 +209,7 @@ public class SelectiveCachingColumnReader
                     totalPositionCount);
         }
 
-        return new Block() {
+        return new Block<T>() {
             @Override
             public void writePositionTo(int position, BlockBuilder blockBuilder)
             {

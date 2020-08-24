@@ -41,9 +41,9 @@ import static io.prestosql.spi.block.BlockUtil.compactOffsets;
 import static io.prestosql.spi.block.BlockUtil.compactSlice;
 import static java.lang.Math.min;
 
-public class VariableWidthBlockBuilder<T>
-        extends AbstractVariableWidthBlock<T>
-        implements BlockBuilder<T>
+public class VariableWidthBlockBuilder
+        extends AbstractVariableWidthBlock<byte[]>
+        implements BlockBuilder<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VariableWidthBlockBuilder.class).instanceSize();
 
