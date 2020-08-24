@@ -334,6 +334,11 @@ public class BloomFilter
                 -Math.log1p(-fractionOfBitsSet) * bitSize / numHashFunctions, RoundingMode.HALF_UP);
     }
 
+    public boolean isEmpty()
+    {
+        return bitSet.bitCount() == 0;
+    }
+
     /**
      * Serialize current BloomFilter into an OutputStream
      *
@@ -413,8 +418,10 @@ public class BloomFilter
          */
         public void set(int index)
         {
-            data[index >>> 6] |= (1L << index);
-            bitCount++;
+            if (!get(index)) {
+                data[index >>> 6] |= (1L << index);
+                bitCount++;
+            }
         }
 
         /**

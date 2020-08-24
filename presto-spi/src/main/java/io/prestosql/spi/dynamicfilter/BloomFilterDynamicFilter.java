@@ -121,6 +121,12 @@ public class BloomFilterDynamicFilter
         return clone;
     }
 
+    @Override
+    public boolean isEmpty()
+    {
+        return bloomFilterDeserialized.isEmpty();
+    }
+
     private BloomFilter deserializeBloomFilter(byte[] bloomFilterSerialized)
     {
         try (ByteArrayInputStream bis = new ByteArrayInputStream(bloomFilterSerialized)) {

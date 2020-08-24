@@ -1002,10 +1002,9 @@ public final class HiveUtil
             final ColumnHandle columnHandle = dynamicFilter.getColumnHandle();
 
             // If the dynamic filter contains no data there can't be any match
-            // FIXME: Currently approximate element count is inaccurate after serialization
-            // if (dynamicFilter.getSize() == 0) {
-            //     return true;
-            // }
+            if (dynamicFilter.isEmpty()) {
+                return true;
+            }
 
             // No need to check non-partition columns
             if (!((HiveColumnHandle) columnHandle).isPartitionKey()) {
