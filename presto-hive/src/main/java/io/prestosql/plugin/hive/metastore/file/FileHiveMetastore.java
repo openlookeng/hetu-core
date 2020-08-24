@@ -1025,7 +1025,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId, boolean isVacuum)
     {
         // <schema>.<table>:<highWatermark>:<minOpenWriteId>::<AbortedTxns>
         return format("%d$%s.%s:%d:9223372036854775807::",

@@ -142,7 +142,7 @@ public interface HiveMetastore
         throw new UnsupportedOperationException();
     }
 
-    default String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    default String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId, boolean isVacuum)
     {
         throw new UnsupportedOperationException();
     }

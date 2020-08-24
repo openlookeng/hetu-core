@@ -440,7 +440,7 @@ public class MockThriftMetastoreClient
     }
 
     @Override
-    public String getValidWriteIds(List<String> tableList, long currentTransactionId)
+    public String getValidWriteIds(List<String> tableList, long currentTransactionId, boolean isVacuum)
             throws TException
     {
         throw new UnsupportedOperationException();

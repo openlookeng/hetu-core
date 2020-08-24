@@ -30,9 +30,11 @@ import io.prestosql.plugin.hive.metastore.StorageFormat;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.type.TestingTypeManager;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.testing.TestingConnectorSession;
@@ -486,6 +488,59 @@ public class TestBackgroundHiveSplitLoader
     }
 
     @Test
+    public void testFullAcidTableVacuumWithOpenTxns()
+            throws Exception
+    {
+        java.nio.file.Path tablePath = Files.createTempDirectory("TestBackgroundHiveSplitLoader");
+        Table table = table(
+                tablePath.toString(),
+                ImmutableList.of(),
+                Optional.empty(),
+                ImmutableMap.of("transactional", "true"));
+
+        List<String> filePaths = ImmutableList.of(
+                tablePath + "/delta_0000001_0000001_0000/_orc_acid_version",
+                tablePath + "/delta_0000001_0000001_0000/bucket_00000",
+                tablePath + "/delta_0000002_0000002_0000/_orc_acid_version",
+                tablePath + "/delta_0000002_0000002_0000/bucket_00000",
+                tablePath + "/delta_0000003_0000003_0000/_orc_acid_version",
+                tablePath + "/delta_0000003_0000003_0000/bucket_00000");
+
+        try {
+            for (String path : filePaths) {
+                File file = new File(path);
+                assertTrue(file.getParentFile().exists() || file.getParentFile().mkdirs(), "Failed creating directory " + file.getParentFile());
+                createOrcAcidFile(file);
+            }
+
+            // ValidWriteIdsList is of format <currentTxn>$<schema>.<table>:<highWatermark>:<minOpenWriteId>::<AbortedTxns>
+            // This writeId list has high watermark transaction=3
+            ValidReaderWriteIdList validWriteIdsList = new ValidReaderWriteIdList(format("4$%s.%s:1:2::", table.getDatabaseName(), table.getTableName()));
+
+            ImmutableMap<String, Object> queryInfo = ImmutableMap.of(
+                    "FULL", false,
+                    "vacuumHandle", new ConnectorVacuumTableHandle() {});
+            BackgroundHiveSplitLoader backgroundHiveSplitLoader = backgroundHiveSplitLoader(
+                    createTestHdfsEnvironment(new HiveConfig()),
+                    TupleDomain.all(),
+                    Optional.empty(),
+                    table,
+                    Optional.empty(),
+                    Optional.of(validWriteIdsList),
+                    Optional.of(QueryType.VACUUM),
+                    queryInfo);
+
+            HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
+            backgroundHiveSplitLoader.start(hiveSplitSource);
+            List<HiveSplit> splits = drainSplits(hiveSplitSource);
+            assertEquals(1, splits.size());
+        }
+        finally {
+            MoreFiles.deleteRecursively(tablePath, ALLOW_INSECURE);
+        }
+    }
+
+    @Test
     public void testHive2VersionedFullAcidTableFails()
             throws Exception
     {
@@ -652,6 +707,19 @@ public class TestBackgroundHiveSplitLoader
             Optional<HiveBucketHandle> bucketHandle,
             Optional<ValidWriteIdList> validWriteIds)
     {
+        return backgroundHiveSplitLoader(hdfsEnvironment, compactEffectivePredicate, hiveBucketFilter, table, bucketHandle, validWriteIds, Optional.empty(), Collections.emptyMap());
+    }
+
+    private static BackgroundHiveSplitLoader backgroundHiveSplitLoader(
+            HdfsEnvironment hdfsEnvironment,
+            TupleDomain<HiveColumnHandle> compactEffectivePredicate,
+            Optional<HiveBucketing.HiveBucketFilter> hiveBucketFilter,
+            Table table,
+            Optional<HiveBucketHandle> bucketHandle,
+            Optional<ValidWriteIdList> validWriteIds,
+            Optional<QueryType> queryType, Map<String,
+            Object> queryInfo)
+    {
         List<HivePartitionMetadata> hivePartitionMetadatas =
                 ImmutableList.of(
                         new HivePartitionMetadata(
@@ -676,8 +744,8 @@ public class TestBackgroundHiveSplitLoader
                 false,
                 validWriteIds,
                 null,
-                Optional.empty(),
-                Collections.emptyMap(), null);
+                queryType,
+                queryInfo, null);
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoader(List<LocatedFileStatus> files, DirectoryLister directoryLister)

@@ -418,9 +418,9 @@ public class BridgingHiveMetastore
     }
 
     @Override
-    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId, boolean isVacuum)
     {
-        return delegate.getValidWriteIds(identity, tables, currentTransactionId);
+        return delegate.getValidWriteIds(identity, tables, currentTransactionId, isVacuum);
     }
 
     @Override
