@@ -99,4 +99,10 @@ public class StripeFooterCacheStatsLister
     {
         return cache.stats().totalLoadTime();
     }
+
+    @Managed
+    public long getSize()
+    {
+        return cache.size();
+    }
 }

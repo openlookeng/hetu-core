@@ -24,6 +24,7 @@ import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
+import org.apache.carbondata.core.exception.CarbonFileException;
 import org.apache.carbondata.core.index.IndexFilter;
 import org.apache.carbondata.core.index.IndexStoreManager;
 import org.apache.carbondata.core.indexstore.PartitionSpec;
@@ -141,15 +142,20 @@ public class CarbondataTableReader
         if (carbonTableCacheModel != null &&
                 carbonTableCacheModel.getCarbonTable().isTransactionalTable()) {
             CarbonTable carbonTable = carbonTableCacheModel.getCarbonTable();
-            long latestTime = FileFactory.getCarbonFile(CarbonTablePath
-                            .getSchemaFilePath(
-                                    carbonTable.getTablePath()),
-                    config).getLastModifiedTime();
-            carbonTableCacheModel.setCurrentSchemaTime(latestTime);
-            if (!carbonTableCacheModel.isValid()) {
-                // Invalidate datamaps
-                IndexStoreManager.getInstance()
-                        .clearIndex(carbonTableCacheModel.getCarbonTable().getAbsoluteTableIdentifier());
+            try {
+                long latestTime = FileFactory.getCarbonFile(CarbonTablePath
+                                .getSchemaFilePath(
+                                        carbonTable.getTablePath()),
+                        config).getLastModifiedTime();
+                carbonTableCacheModel.setCurrentSchemaTime(latestTime);
+                if (!carbonTableCacheModel.isValid()) {
+                    // Invalidate datamaps
+                    IndexStoreManager.getInstance()
+                            .clearIndex(carbonTableCacheModel.getCarbonTable().getAbsoluteTableIdentifier());
+                }
+            }
+            catch (CarbonFileException e) {
+                carbonCache.get().remove(schemaTableName);
             }
         }
     }

@@ -167,4 +167,10 @@ public class FullConnectorSession
     {
         return SystemSessionProperties.getDynamicFilteringWaitTime(session);
     }
+
+    @Override
+    public boolean isHeuristicIndexFilterEnabled()
+    {
+        return SystemSessionProperties.isHeuristicIndexFilterEnabled(session);
+    }
 }

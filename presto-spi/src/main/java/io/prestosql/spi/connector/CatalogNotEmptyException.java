@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,31 +12,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive;
+package io.prestosql.spi.connector;
 
 import io.prestosql.spi.PrestoException;
 
-import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
+import static io.prestosql.spi.StandardErrorCode.CATALOG_NOT_EMPTY;
 import static java.lang.String.format;
 
-public class SchemaAlreadyExistsException
+public class CatalogNotEmptyException
         extends PrestoException
 {
-    private final String schemaName;
+    private final String catalogName;
 
-    public SchemaAlreadyExistsException(String schemaName)
+    public CatalogNotEmptyException(String catalogName)
     {
-        this(schemaName, format("Schema already exists: '%s'", schemaName));
+        this(catalogName, format("Catalog not empty: '%s'", catalogName));
     }
 
-    public SchemaAlreadyExistsException(String schemaName, String message)
+    public CatalogNotEmptyException(String catalogName, String message)
     {
-        super(ALREADY_EXISTS, message);
-        this.schemaName = schemaName;
+        super(CATALOG_NOT_EMPTY, message);
+        this.catalogName = catalogName;
     }
 
-    public String getSchemaName()
+    public String getCatalogName()
     {
-        return schemaName;
+        return catalogName;
     }
 }

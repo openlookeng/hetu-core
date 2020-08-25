@@ -51,7 +51,7 @@
         <dep.logback.version>1.2.3</dep.logback.version>
         <dep.jmxutils.version>1.21</dep.jmxutils.version>
         <dep.gcs.version>1.9.10</dep.gcs.version>
-        <dep.prestosql.apache.hadoop.version>3.2.0-3</dep.prestosql.apache.hadoop.version>
+        <dep.prestosql.apache.hadoop.version>3.2.0-8</dep.prestosql.apache.hadoop.version>
         <carbon.version>2.0.1</carbon.version>
         <dep.prestosql.version>316</dep.prestosql.version>
         <dep.hetu.version>010</dep.hetu.version>
@@ -942,7 +942,19 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
-                <version>3.8.1</version>
+                <version>3.10</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>3.11.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.codehaus.jettison</groupId>
+                <artifactId>jettison</artifactId>
+                <version>1.4.0</version>
             </dependency>
 
             <dependency>
@@ -955,6 +967,12 @@
                 <groupId>com.google.errorprone</groupId>
                 <artifactId>error_prone_annotations</artifactId>
                 <version>2.3.2</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-pool2</artifactId>
+                <version>2.8.0</version>
             </dependency>
 
             <dependency>

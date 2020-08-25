@@ -72,6 +72,7 @@ import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
+import io.prestosql.spi.connector.TableAlreadyExistsException;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.connector.ViewNotFoundException;
 import io.prestosql.spi.predicate.Domain;
@@ -1648,7 +1649,12 @@ public class HiveMetadata
                 vacuumTableHandle.getInputColumns(), vacuumTableHandle.getPageSinkMetadata(),
                 vacuumTableHandle.getLocationHandle(), vacuumTableHandle.getBucketProperty(),
                 vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false);
-        return finishInsert(session, insertTableHandle, fragments, computedStatistics);
+        List<PartitionUpdate> partitionUpdates = new ArrayList<>();
+        Optional<ConnectorOutputMetadata> connectorOutputMetadata =
+                finishInsert(session, insertTableHandle, fragments, computedStatistics, partitionUpdates);
+
+        metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
+        return connectorOutputMetadata;
     }
 
     protected Partition buildPartitionObject(ConnectorSession session, Table table, PartitionUpdate partitionUpdate)
@@ -1863,8 +1869,15 @@ public class HiveMetadata
     @Override
     public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        throw new PrestoException(NOT_SUPPORTED, "This connector only supports delete where one or more partitions" +
-                " are deleted entirely for Non-Transactional tables");
+        HiveTableHandle handle = (HiveTableHandle) tableHandle;
+        if (AcidUtils.isInsertOnlyTable(handle.getTableParameters().get())) {
+            throw new PrestoException(NOT_SUPPORTED, "Attempt to do delete on table " + handle.getTableName() +
+                    " that is insert-only transactional");
+        }
+        else {
+            throw new PrestoException(NOT_SUPPORTED, "This connector only supports delete where one or more partitions" +
+                    " are deleted entirely for Non-Transactional tables");
+        }
     }
 
     @Override
@@ -2507,6 +2520,7 @@ public class HiveMetadata
     public void commit()
     {
         metastore.commit();
+        metastore.submitCleanupTasks();
     }
 
     @Override

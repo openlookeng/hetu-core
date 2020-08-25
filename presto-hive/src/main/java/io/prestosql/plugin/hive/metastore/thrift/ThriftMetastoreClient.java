@@ -25,6 +25,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
@@ -155,6 +157,9 @@ public interface ThriftMetastoreClient
     void commitTransaction(long transactionId)
             throws TException;
 
+    void abortTransaction(long transactionId)
+            throws TException;
+
     void sendTransactionHeartbeat(long transactionId)
             throws TException;
 
@@ -164,7 +169,7 @@ public interface ThriftMetastoreClient
     LockResponse checkLock(long lockId)
             throws TException;
 
-    String getValidWriteIds(List<String> tableList, long currentTransactionId)
+    String getValidWriteIds(List<String> tableList, long currentTransactionId, boolean isVacuum)
             throws TException;
 
     String get_config_value(String name, String defaultValue)
@@ -174,5 +179,8 @@ public interface ThriftMetastoreClient
             throws TException;
 
     long getTableWriteId(String dbName, String tableName, long transactionId)
+            throws TException;
+
+    ShowLocksResponse showLocks(ShowLocksRequest rqst)
             throws TException;
 }

@@ -107,7 +107,7 @@ public class PageConsumer
         // is the a repeated request for the last results?
         if (token == lastToken) {
             if (lastResult == null) {
-                throw new WebApplicationException(Response.Status.GONE);
+                return this.standardRunning;
             }
             return lastResult;
         }

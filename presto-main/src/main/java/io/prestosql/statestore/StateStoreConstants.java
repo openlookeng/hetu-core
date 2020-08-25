@@ -106,6 +106,21 @@ public class StateStoreConstants
     public static final long DEFAULT_ACQUIRED_LOCK_TIME_MS = 1000L;
 
     /**
+     * Hazelcast
+     */
+    public static final String HAZELCAST = "hazelcast";
+
+    /**
+     * Hazelcast discovery port property name
+     */
+    public static final String HAZELCAST_DISCOVERY_PORT_PROPERTY_NAME = "hazelcast.discovery.port";
+
+    /**
+     * Hazelcast default discovery port
+     */
+    public static final String DEFAULT_HAZELCAST_DISCOVERY_PORT = "5701";
+
+    /**
      * Hazelcast discovery mode property name
      */
     public static final String DISCOVERY_MODE_PROPERTY_NAME = "hazelcast.discovery.mode";

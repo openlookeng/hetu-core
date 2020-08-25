@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static org.testng.Assert.assertTrue;
 
 /**
@@ -35,6 +36,7 @@ public class TestHazelcastStateStoreBootstrapper
 {
     private static final String LOCALHOST = "127.0.0.1";
     private static final String PORT = "5707";
+    private static final String PORT2 = "5715";
 
     /**
      * Test Bootstrap
@@ -46,7 +48,7 @@ public class TestHazelcastStateStoreBootstrapper
         config.put(DISCOVERY_MODE_CONFIG_NAME, "tcp-ip");
         config.put("state-store.cluster", "cluster-" + UUID.randomUUID());
         config.put("hazelcast.cp-system.member-count", "3");
-        config.put("hazelcast.tcp-ip.port", PORT);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, PORT);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         StateStore stateStore = bootstrapper.bootstrap(ImmutableSet.of(LOCALHOST), config);
@@ -63,6 +65,7 @@ public class TestHazelcastStateStoreBootstrapper
         Map<String, String> config = new HashMap<>(0);
         config.put(DISCOVERY_MODE_CONFIG_NAME, "multicast");
         config.put("state-store.cluster", "cluster");
+        config.put(DISCOVERY_PORT_CONFIG_NAME, PORT2);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         StateStore stateStore = bootstrapper.bootstrap(ImmutableSet.of(LOCALHOST), config);

@@ -245,7 +245,7 @@ public class HiveSplitManager
                 executor,
                 splitLoaderConcurrency,
                 recursiveDfsWalkerEnabled,
-                metastore.getValidWriteIds(session, hiveTable)
+                metastore.getValidWriteIds(session, hiveTable, queryType.map(t -> t == QueryType.VACUUM).orElse(false))
                         .map(validTxnWriteIdList -> validTxnWriteIdList.getTableValidWriteIdList(table.getDatabaseName() + "." + table.getTableName())),
                 dynamicFilterSupplier,
                 queryType,

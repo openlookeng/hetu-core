@@ -26,6 +26,7 @@ import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
+import io.prestosql.utils.HetuConfig;
 
 import javax.inject.Inject;
 
@@ -141,12 +142,13 @@ public final class SystemSessionProperties
     public static final String DYNAMIC_FILTERING_BLOOM_FILTER_FPP = "dynamic_filtering_bloom_filter_fpp";
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
     public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
+    public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
     public SystemSessionProperties()
     {
-        this(new QueryManagerConfig(), new TaskManagerConfig(), new MemoryManagerConfig(), new FeaturesConfig());
+        this(new QueryManagerConfig(), new TaskManagerConfig(), new MemoryManagerConfig(), new FeaturesConfig(), new HetuConfig());
     }
 
     @Inject
@@ -154,7 +156,8 @@ public final class SystemSessionProperties
             QueryManagerConfig queryManagerConfig,
             TaskManagerConfig taskManagerConfig,
             MemoryManagerConfig memoryManagerConfig,
-            FeaturesConfig featuresConfig)
+            FeaturesConfig featuresConfig,
+            HetuConfig hetuConfig)
     {
         sessionProperties = ImmutableList.of(
                 stringProperty(
@@ -635,6 +638,11 @@ public final class SystemSessionProperties
                         ENABLE_EXECUTION_PLAN_CACHE,
                         "Enable execution plan caching",
                         featuresConfig.isEnableExecutionPlanCache(),
+                        false),
+                booleanProperty(
+                        ENABLE_HEURISTICINDEX_FILTER,
+                        "Enable heuristic index filter",
+                        hetuConfig.isFilterEnabled(),
                         false));
     }
 
@@ -1122,5 +1130,10 @@ public final class SystemSessionProperties
     public static boolean isExecutionPlanCacheEnabled(Session session)
     {
         return session.getSystemProperty(ENABLE_EXECUTION_PLAN_CACHE, Boolean.class);
+    }
+
+    public static boolean isHeuristicIndexFilterEnabled(Session session)
+    {
+        return session.getSystemProperty(ENABLE_HEURISTICINDEX_FILTER, Boolean.class);
     }
 }

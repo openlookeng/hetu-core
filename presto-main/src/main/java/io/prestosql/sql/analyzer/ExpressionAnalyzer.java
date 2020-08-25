@@ -1203,6 +1203,27 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitBetweenPredicate(BetweenPredicate node, StackableAstVisitorContext<Context> context)
         {
+            if (SystemSessionProperties.isImplicitConversionEnabled(session)) {
+                Type valueType = process(node.getValue(), context);
+                Type minType = process(node.getMin(), context);
+                Type maxType = process(node.getMax(), context);
+                // Same type or digital type or character type, don't need to convert
+                if (!((valueType.getTypeSignature().getBase().equals(minType.getTypeSignature().getBase()) && valueType.getTypeSignature().getBase().equals(maxType.getTypeSignature().getBase()))
+                        || (TypeCoercion.isDigitalTypeBase(valueType) && TypeCoercion.isDigitalTypeBase(minType) && TypeCoercion.isDigitalTypeBase(maxType))
+                        || (TypeCoercion.isCharacterTypeBase(valueType) && TypeCoercion.isCharacterTypeBase(minType) && TypeCoercion.isCharacterTypeBase(maxType)))) {
+                    // The min type is different from the value type and the min type can be converted to value type, then do the conversion
+                    if (!valueType.getTypeSignature().getBase().equals(minType.getTypeSignature().getBase())
+                            && typeCoercion.canCoerceWithCast(minType, valueType)) {
+                        node.setMin(new Cast(node.getMin(), valueType.getTypeSignature().toString()));
+                    }
+                    // The max type is different from the value type and the max type can be converted to value type, then do the conversion
+                    if (!valueType.getTypeSignature().getBase().equals(maxType.getTypeSignature().getBase())
+                            && typeCoercion.canCoerceWithCast(maxType, valueType)) {
+                        node.setMax(new Cast(node.getMax(), valueType.getTypeSignature().toString()));
+                    }
+                }
+            }
+
             return getOperator(context, node, OperatorType.BETWEEN, node.getValue(), node.getMin(), node.getMax());
         }
 

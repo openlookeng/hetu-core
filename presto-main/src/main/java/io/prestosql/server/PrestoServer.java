@@ -44,6 +44,7 @@ import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.protocol.SmileModule;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AccessControlModule;
+import io.prestosql.security.PasswordSecurityModule;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.server.security.ServerSecurityModule;
@@ -109,6 +110,7 @@ public class PrestoServer
                 new HttpEventModule(),
                 new ServerSecurityModule(),
                 new AccessControlModule(),
+                new PasswordSecurityModule(),
                 new EventListenerModule(),
                 new ServerMainModule(sqlParserOptions),
                 new NodeStateChangeModule(),
@@ -125,8 +127,9 @@ public class PrestoServer
             logLocation(log, "Etc directory", Paths.get("etc"));
 
             injector.getInstance(PluginManager.class).loadPlugins();
-            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetatstore();
-            injector.getInstance(FileSystemClientManager.class).loadFactoryConfigs();
+            FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
+            fileSystemClientManager.loadFactoryConfigs();
+            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetatstore(fileSystemClientManager);
             injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogScanner.class).start();

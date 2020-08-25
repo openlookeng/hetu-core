@@ -14,12 +14,10 @@
  */
 package io.prestosql.connector;
 
-import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.execution.TaskSource;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
-import io.prestosql.spi.PrestoTransportException;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Use;
 
@@ -30,8 +28,6 @@ import java.util.Set;
 
 public class DataCenterUtility
 {
-    private static final Logger log = Logger.get(DataCenterUtility.class);
-
     private DataCenterUtility() {}
 
     /**
@@ -85,12 +81,7 @@ public class DataCenterUtility
         MetadataManager metadataManager = (MetadataManager) metadata;
         DataCenterConnectorManager dataCenterConnectorManager = metadataManager.getDataCenterConnectorManager();
         if (dataCenterConnectorManager != null) {
-            try {
-                dataCenterConnectorManager.loadAllDCCatalogs();
-            }
-            catch (PrestoTransportException ignore) {
-                log.warn(ignore, "Can not connect to remote data center");
-            }
+            dataCenterConnectorManager.loadAllDCCatalogs();
         }
     }
 

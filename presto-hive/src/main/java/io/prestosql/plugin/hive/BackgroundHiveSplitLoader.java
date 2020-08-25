@@ -46,6 +46,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidCompactorWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.SymlinkTextInputFormat;
@@ -452,12 +453,19 @@ public class BackgroundHiveSplitLoader
         long min = Long.MAX_VALUE;
         long max = Long.MIN_VALUE;
         if (AcidUtils.isTransactionalTable(table.getParameters())) {
-            AcidUtils.Directory directory = hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () -> AcidUtils.getAcidState(
-                    path,
-                    configuration,
-                    validWriteIds.orElseThrow(() -> new IllegalStateException("No validWriteIds present")),
-                    false,
-                    true));
+            boolean isVacuum = queryType.map(type -> type == QueryType.VACUUM).orElse(false);
+            AcidUtils.Directory directory = hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () -> {
+                ValidWriteIdList writeIdList = validWriteIds.orElseThrow(() -> new IllegalStateException("No validWriteIds present"));
+                if (isVacuum) {
+                    writeIdList = new ValidCompactorWriteIdList(writeIdList.writeToString());
+                }
+                return AcidUtils.getAcidState(
+                        path,
+                        configuration,
+                        writeIdList,
+                        false,
+                        true);
+            });
 
             if (AcidUtils.isFullAcidTable(table.getParameters())) {
                 // From Hive version >= 3.0, delta/base files will always have file '_orc_acid_version' with value >= '2'.
@@ -472,7 +480,6 @@ public class BackgroundHiveSplitLoader
 
             readPaths = new ArrayList<>();
 
-            boolean isVacuum = queryType.map(type -> type == QueryType.VACUUM).orElse(false);
             boolean isFullVacuum = isVacuum ? Boolean.valueOf(queryInfo.get("FULL").toString()) : false;
 
             if (isFullVacuum) {
@@ -542,10 +549,11 @@ public class BackgroundHiveSplitLoader
 
             if (isVacuum && !readPaths.isEmpty()) {
                 Object vacuumHandle = queryInfo.get("vacuumHandle");
-                requireNonNull(vacuumHandle, "VacuumHandle should not be null");
-                HiveVacuumTableHandle hiveVacuumTableHandle = (HiveVacuumTableHandle) vacuumHandle;
-                //TODO: optimize including multiple ranges based on number of delta files  in case of minor compaction.
-                hiveVacuumTableHandle.addRange(new Range(min, max));
+                if (vacuumHandle != null && vacuumHandle instanceof HiveVacuumTableHandle) {
+                    requireNonNull(vacuumHandle, "VacuumHandle should not be null");
+                    HiveVacuumTableHandle hiveVacuumTableHandle = (HiveVacuumTableHandle) vacuumHandle;
+                    hiveVacuumTableHandle.addRange(new Range(min, max));
+                }
             }
         }
         else {

@@ -15,6 +15,7 @@
 package io.hetu.core.metastore;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreFactory;
 import io.hetu.core.metastore.jdbc.JdbcHetuMetastoreFactory;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
@@ -25,6 +26,7 @@ public class HetuMetastorePlugin
     @Override
     public Iterable<HetuMetaStoreFactory> getHetuMetaStoreFactories()
     {
-        return ImmutableList.of(new JdbcHetuMetastoreFactory(HetuMetastorePlugin.class.getClassLoader()));
+        return ImmutableList.of(new JdbcHetuMetastoreFactory(HetuMetastorePlugin.class.getClassLoader()),
+                new HetuFsMetastoreFactory(HetuMetastorePlugin.class.getClassLoader()));
     }
 }

@@ -31,15 +31,19 @@ import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveErrorCode;
 import io.prestosql.plugin.hive.HiveTableHandle;
 import io.prestosql.plugin.hive.HiveType;
+import io.prestosql.plugin.hive.HiveVacuumTableHandle;
 import io.prestosql.plugin.hive.LocationHandle.WriteMode;
 import io.prestosql.plugin.hive.PartitionNotFoundException;
 import io.prestosql.plugin.hive.PartitionStatistics;
-import io.prestosql.plugin.hive.TableAlreadyExistsException;
+import io.prestosql.plugin.hive.PartitionUpdate;
+import io.prestosql.plugin.hive.VacuumCleaner;
+import io.prestosql.plugin.hive.VacuumTableInfoForCleaner;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.connector.TableAlreadyExistsException;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.spi.security.RoleGrant;
@@ -51,6 +55,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -94,6 +100,7 @@ import static io.prestosql.plugin.hive.util.Statistics.ReduceOperator.SUBTRACT;
 import static io.prestosql.plugin.hive.util.Statistics.merge;
 import static io.prestosql.plugin.hive.util.Statistics.reduce;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.TRANSACTION_CONFLICT;
 import static io.prestosql.spi.security.PrincipalType.USER;
@@ -113,6 +120,8 @@ public class SemiTransactionalHiveMetastore
     private final HiveMetastore delegate;
     private final HdfsEnvironment hdfsEnvironment;
     private final Executor renameExecutor;
+    private final ScheduledExecutorService vacuumCleanUpExecutor;
+    private final Optional<Duration> configuredVacuumCleanupInterval;
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
     private final ScheduledExecutorService heartbeatExecutor;
@@ -139,10 +148,14 @@ public class SemiTransactionalHiveMetastore
     @GuardedBy("this")
     private Optional<HiveTransaction> currentHiveTransaction = Optional.empty();
 
+    private List<VacuumCleaner> vacuumCleanerTasks = new ArrayList<>();
+
     public SemiTransactionalHiveMetastore(
             HdfsEnvironment hdfsEnvironment,
             HiveMetastore delegate,
             Executor renameExecutor,
+            ScheduledExecutorService vacuumCleanUpExecutor,
+            Optional<Duration> vacuumCleanupInterval,
             boolean skipDeletionForAlter,
             boolean skipTargetCleanupOnRollback,
             Optional<Duration> hiveTransactionHeartbeatInterval,
@@ -151,6 +164,8 @@ public class SemiTransactionalHiveMetastore
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.renameExecutor = requireNonNull(renameExecutor, "renameExecutor is null");
+        this.vacuumCleanUpExecutor = requireNonNull(vacuumCleanUpExecutor, "cleanUpExecutor is null");
+        this.configuredVacuumCleanupInterval = requireNonNull(vacuumCleanupInterval, "vacuumCleanupInterval is null");
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
         this.heartbeatExecutor = heartbeatService;
@@ -955,6 +970,8 @@ public class SemiTransactionalHiveMetastore
         try {
             switch (state) {
                 case EMPTY:
+                    //release locks if any.
+                    commitTransaction();
                     break;
                 case SHARED_OPERATION_BUFFERED:
                     commitShared();
@@ -974,11 +991,20 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
+    public void submitCleanupTasks()
+    {
+        if (vacuumCleanerTasks.size() > 0) {
+            vacuumCleanerTasks.forEach(c -> c.submitVacuumCleanupTask());
+        }
+    }
+
     public synchronized void rollback()
     {
         try {
             switch (state) {
                 case EMPTY:
+                    //release locks if any.
+                    abortTransaction();
                 case EXCLUSIVE_OPERATION_BUFFERED:
                     break;
                 case SHARED_OPERATION_BUFFERED:
@@ -1002,27 +1028,29 @@ public class SemiTransactionalHiveMetastore
 
         synchronized (this) {
             checkState(
-                    !currentQueryId.isPresent() && !hiveTransactionSupplier.isPresent(),
+                    !currentQueryId.isPresent(),
                     "Query already begun: %s while starting query %s",
                     currentQueryId,
                     queryId);
             currentQueryId = Optional.of(queryId);
 
-            hiveTransactionSupplier = Optional.of(() -> {
-                long heartbeatInterval = configuredTransactionHeartbeatInterval
-                        .map(Duration::toMillis)
-                        .orElseGet(this::getServerExpectedHeartbeatIntervalMillis);
-                long transactionId = delegate.openTransaction(identity);
-                log.debug("Using hive transaction %s for query %s", transactionId, queryId);
+            if (!hiveTransactionSupplier.isPresent()) {
+                hiveTransactionSupplier = Optional.of(() -> {
+                    long heartbeatInterval = configuredTransactionHeartbeatInterval
+                            .map(Duration::toMillis)
+                            .orElseGet(this::getServerExpectedHeartbeatIntervalMillis);
+                    long transactionId = delegate.openTransaction(identity);
+                    log.debug("Using hive transaction %s for query %s", transactionId, queryId);
 
-                ScheduledFuture<?> heartbeatTask = heartbeatExecutor.scheduleAtFixedRate(
-                        () -> delegate.sendTransactionHeartbeat(identity, transactionId),
-                        0,
-                        heartbeatInterval,
-                        MILLISECONDS);
+                    ScheduledFuture<?> heartbeatTask = heartbeatExecutor.scheduleAtFixedRate(
+                            () -> delegate.sendTransactionHeartbeat(identity, transactionId),
+                            0,
+                            heartbeatInterval,
+                            MILLISECONDS);
 
-                return new HiveTransaction(identity, queryId, transactionId, heartbeatTask);
-            });
+                    return new HiveTransaction(identity, transactionId, heartbeatTask);
+                });
+            }
         }
     }
 
@@ -1034,7 +1062,7 @@ public class SemiTransactionalHiveMetastore
         return getTimeVar(configuration, TXN_TIMEOUT, MILLISECONDS) / 2;
     }
 
-    public synchronized Optional<ValidTxnWriteIdList> getValidWriteIds(ConnectorSession session, HiveTableHandle tableHandle)
+    public synchronized Optional<ValidTxnWriteIdList> getValidWriteIds(ConnectorSession session, HiveTableHandle tableHandle, boolean isVacuum)
     {
         String queryId = session.getQueryId();
         checkState(currentQueryId.equals(Optional.of(queryId)), "Invalid query id %s while current query is", queryId, currentQueryId);
@@ -1048,7 +1076,7 @@ public class SemiTransactionalHiveMetastore
                     .get());
         }
 
-        return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle));
+        return Optional.of(currentHiveTransaction.get().getValidWriteIds(delegate, tableHandle, queryId, isVacuum));
     }
 
     public synchronized Optional<Long> getTableWriteId(ConnectorSession session, HiveTableHandle tableHandle, HiveACIDWriteType writeType)
@@ -1065,29 +1093,50 @@ public class SemiTransactionalHiveMetastore
                     .get());
         }
 
-        return Optional.of(currentHiveTransaction.get().getTableWriteId(delegate, tableHandle, writeType));
+        return Optional.of(currentHiveTransaction.get().getTableWriteId(delegate, tableHandle, writeType, queryId));
     }
 
     public synchronized void cleanupQuery(ConnectorSession session)
     {
         String queryId = session.getQueryId();
-        HiveIdentity identity = new HiveIdentity(session);
         checkState(currentQueryId.equals(Optional.of(queryId)), "Invalid query id %s while current query is", queryId, currentQueryId);
-        Optional<HiveTransaction> transaction = currentHiveTransaction;
         currentQueryId = Optional.empty();
-        currentHiveTransaction = Optional.empty();
-        hiveTransactionSupplier = Optional.empty();
+    }
+
+    private void commitTransaction()
+    {
+        Optional<HiveTransaction> transaction = currentHiveTransaction;
 
         if (!transaction.isPresent()) {
             return;
         }
 
         long transactionId = transaction.get().getTransactionId();
+        // Any failure around aborted transactions, etc would be handled by Hive Metastore commit and PrestoException will be thrown
+        delegate.commitTransaction(transaction.get().getIdentity(), transactionId);
+
+        currentHiveTransaction = Optional.empty();
+        hiveTransactionSupplier = Optional.empty();
         ScheduledFuture<?> heartbeatTask = transaction.get().getHeartbeatTask();
         heartbeatTask.cancel(true);
+    }
 
+    private void abortTransaction()
+    {
+        Optional<HiveTransaction> transaction = currentHiveTransaction;
+
+        if (!transaction.isPresent()) {
+            return;
+        }
+
+        long transactionId = transaction.get().getTransactionId();
         // Any failure around aborted transactions, etc would be handled by Hive Metastore commit and PrestoException will be thrown
-        delegate.commitTransaction(identity, transactionId);
+        delegate.abortTransaction(transaction.get().getIdentity(), transactionId);
+
+        currentHiveTransaction = Optional.empty();
+        hiveTransactionSupplier = Optional.empty();
+        ScheduledFuture<?> heartbeatTask = transaction.get().getHeartbeatTask();
+        heartbeatTask.cancel(true);
     }
 
     @GuardedBy("this")
@@ -1152,6 +1201,8 @@ public class SemiTransactionalHiveMetastore
             committer.executeAlterPartitionOperations();
             committer.executeAddPartitionOperations();
             committer.executeUpdateStatisticsOperations();
+            //finally commit the transaction
+            commitTransaction();
         }
         catch (Throwable t) {
             committer.cancelUnstartedAsyncRenames();
@@ -1201,6 +1252,31 @@ public class SemiTransactionalHiveMetastore
 
             // Clean up empty staging directories (that may recursively contain empty directories)
             committer.deleteEmptyStagingDirectories(declaredIntentionsToWrite);
+        }
+    }
+
+    public void initiateVacuumCleanupTasks(HiveVacuumTableHandle vacuumTableHandle,
+                                                                          ConnectorSession session,
+                                                                          List<PartitionUpdate> partitionUpdates)
+    {
+        if (vacuumTableHandle.getRanges() != null && vacuumTableHandle.getRanges().size() > 0) {
+            HdfsContext hdfsContext = new HdfsContext(session, vacuumTableHandle.getSchemaName(), vacuumTableHandle.getTableName());
+
+            VacuumTableInfoForCleaner info;
+            long maxId = Long.MIN_VALUE;
+            for (HiveVacuumTableHandle.Range range : vacuumTableHandle.getRanges()) {
+                if (maxId < range.getMax()) {
+                    maxId = range.getMax();
+                }
+            }
+            for (int index = 0; index < partitionUpdates.size(); index++) {
+                info = new VacuumTableInfoForCleaner(vacuumTableHandle.getSchemaName(),
+                        vacuumTableHandle.getTableName(),
+                        partitionUpdates.get(index).getName(),
+                        maxId,
+                        partitionUpdates.get(index).getTargetPath());
+                vacuumCleanerTasks.add(new VacuumCleaner(info, this, hdfsEnvironment, hdfsContext));
+            }
         }
     }
 
@@ -1356,9 +1432,9 @@ public class SemiTransactionalHiveMetastore
             Table table = tableAndMore.getTable();
             Path targetPath = new Path(table.getStorage().getLocation());
             Path currentPath = tableAndMore.getCurrentLocation().get();
-            cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, false));
             if (!targetPath.equals(currentPath)) {
-                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, tableAndMore.getFileNames().get());
+                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, tableAndMore.getFileNames().get(),
+                        cleanUpTasksForAbort);
             }
             updateStatisticsOperations.add(new UpdateStatisticsOperation(
                     table.getSchemaTableName(),
@@ -1499,9 +1575,9 @@ public class SemiTransactionalHiveMetastore
             Partition partition = partitionAndMore.getPartition();
             Path targetPath = new Path(partition.getStorage().getLocation());
             Path currentPath = partitionAndMore.getCurrentLocation();
-            cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, false));
             if (!targetPath.equals(currentPath)) {
-                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, partitionAndMore.getFileNames());
+                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, partitionAndMore.getFileNames(),
+                        cleanUpTasksForAbort);
             }
             updateStatisticsOperations.add(new UpdateStatisticsOperation(
                     partition.getSchemaTableName(),
@@ -1719,6 +1795,9 @@ public class SemiTransactionalHiveMetastore
     {
         checkHoldsLock();
 
+        //Abort transaction, if any
+        abortTransaction();
+
         for (DeclaredIntentionToWrite declaredIntentionToWrite : declaredIntentionsToWrite) {
             switch (declaredIntentionToWrite.getMode()) {
                 case STAGE_AND_MOVE_TO_TARGET_DIRECTORY:
@@ -1898,7 +1977,8 @@ public class SemiTransactionalHiveMetastore
             HdfsContext context,
             Path currentPath,
             Path targetPath,
-            List<String> fileNames)
+            List<String> fileNames,
+            List<DirectoryCleanUpTask> cleanUpTasksForAbort)
     {
         FileSystem fileSystem;
         try {
@@ -1928,6 +2008,7 @@ public class SemiTransactionalHiveMetastore
                     if (!fileSystem.rename(source, target)) {
                         throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target));
                     }
+                    cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
                 }
                 catch (IOException e) {
                     throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target), e);
@@ -2032,7 +2113,7 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    private static void renameDirectory(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenPathDoesntExist)
+    private static void renameDirectory(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenRenameSuccess)
     {
         if (pathExists(context, hdfsEnvironment, target)) {
             throw new PrestoException(HIVE_PATH_ALREADY_EXISTS,
@@ -2043,14 +2124,11 @@ public class SemiTransactionalHiveMetastore
             createDirectory(context, hdfsEnvironment, target.getParent());
         }
 
-        // The runnable will assume that if rename fails, it will be okay to delete the directory (if the directory is empty).
-        // This is not technically true because a race condition still exists.
-        runWhenPathDoesntExist.run();
-
         try {
             if (!hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
                 throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename %s to %s: rename returned false", source, target));
             }
+            runWhenRenameSuccess.run();
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename %s to %s", source, target), e);
@@ -3035,5 +3113,29 @@ public class SemiTransactionalHiveMetastore
     private interface ExclusiveOperation
     {
         void execute(HiveMetastore delegate, HdfsEnvironment hdfsEnvironment);
+    }
+
+    public ScheduledExecutorService getVacuumCleanUpExecutor()
+    {
+        return vacuumCleanUpExecutor;
+    }
+
+    public long getVacuumCleanupInterval()
+    {
+        return configuredVacuumCleanupInterval.map(Duration::toMillis)
+                .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Vacuum cleanup interval is not set correctly"));
+    }
+
+    public ShowLocksResponse showLocks(VacuumTableInfoForCleaner tableInfo)
+    {
+        ShowLocksRequest rqst = new ShowLocksRequest();
+
+        rqst.setDbname(tableInfo.getDbName());
+        rqst.setTablename(tableInfo.getTableName());
+        if (tableInfo.getPartitionName().length() > 0) {
+            rqst.setPartname(tableInfo.getPartitionName());
+        }
+
+        return delegate.showLocks(rqst);
     }
 }

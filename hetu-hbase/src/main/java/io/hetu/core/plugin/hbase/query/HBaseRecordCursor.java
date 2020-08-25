@@ -22,7 +22,7 @@ import io.hetu.core.plugin.hbase.split.HBaseSplit;
 import io.hetu.core.plugin.hbase.utils.serializers.HBaseRowSerializer;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.type.Type;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 

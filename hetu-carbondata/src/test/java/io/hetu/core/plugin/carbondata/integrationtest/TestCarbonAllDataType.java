@@ -40,6 +40,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -51,6 +53,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestCarbonAllDataType
@@ -63,6 +66,7 @@ public class TestCarbonAllDataType
     private String storePath = rootPath + "/target/store";
     private String systemPath = rootPath + "/target/system";
     private HetuTestServer hetuServer = new HetuTestServer();
+    private String carbonStoreLocation = storePath + "/carbon.store";
 
     public TestCarbonAllDataType() throws Exception
     {
@@ -80,7 +84,7 @@ public class TestCarbonAllDataType
         map.put("hive.metastore", "file");
         map.put("hive.allow-drop-table", "true");
         map.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
-        map.put("carbondata.store-location", "file://" + storePath + "/carbon.store");
+        map.put("carbondata.store-location", "file://" + carbonStoreLocation);
         map.put("carbondata.minor-compaction-seg-count", "4");
         map.put("carbondata.major-compaction-seg-size", "1");
 
@@ -398,7 +402,7 @@ public class TestCarbonAllDataType
     public void testCreateTableWrongOrderPartitionBy() throws SQLException
     {
         try {
-           hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'a'], sorted_by = ARRAY[ 'd'])");
+            hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'a'])");
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
@@ -409,37 +413,6 @@ public class TestCarbonAllDataType
         }
         hetuServer.execute("drop table testdb.testtable2");
         assertEquals("true", "false");
-    }
-
-    @Test
-    public void testCreateTableSortedBy() throws SQLException
-    {
-        hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (sorted_by = ARRAY[ 'd'])");
-
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11, 12, 14)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (110, 211, 12, 4)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (120, 311, 12, 24)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (130, 411, 12, 33)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (130, 511, 12, 55)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (140, 511, 12, 114)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (150, 11, 12, 514)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (110, 11, 12, 14)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 111, 12, 714)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (120, 11, 12, 814)");
-        /*List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
-
-        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
-           add(new HashMap<String, Object>() {{    put("RESULT", 10); }});
-        }};*/
-        hetuServer.execute("INSERT INTO testdb.testtable2 select * from testdb.testtable2");
-        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
-            add(new HashMap<String, Object>() {{    put("RESULT", 20); }});
-        }};
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
-
-
-        assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table  if exists testdb.testtable2");
     }
 
     @Test
@@ -487,6 +460,7 @@ public class TestCarbonAllDataType
     @Test
     public void testDropTable() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.testtable2");
         hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
         hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
 
@@ -510,7 +484,6 @@ public class TestCarbonAllDataType
         CarbonFile schemaFile = FileFactory.getCarbonFile(schemaFilePath);
         boolean isTransactionalTable = schemaFile.exists();
         org.apache.carbondata.format.TableInfo tableInfo = null;
-        long modifiedTime = System.currentTimeMillis();
         if (isTransactionalTable) {
             //Step 2: read the metadata (tableInfo) of the table.
             ThriftReader.TBaseCreator createTBase = new ThriftReader.TBaseCreator()
@@ -529,7 +502,6 @@ public class TestCarbonAllDataType
                 thriftReader.open();
                 tableInfo = (org.apache.carbondata.format.TableInfo) thriftReader.read();
                 thriftReader.close();
-
                 List<ColumnSchema> partition_columns = tableInfo.getFact_table().getPartitionInfo().getPartition_columns();
                 String [] ConfigPartiotionComumns = {"c","d"};
                 String columnName;
@@ -897,5 +869,106 @@ public class TestCarbonAllDataType
         }
 
         hetuServer.execute("DROP TABLE testdb.myECTable");
+    }
+
+    @Test
+    public void testCreateDropTableDifferentLocation() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable2");
+
+        // creating table with same name
+        try {
+            if (!FileFactory.isFileExist( storePath + "/carbon.store/mytestDb/")) {
+                FileFactory.mkdirs( storePath + "/carbon.store/mytestDb");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        String location = "'" + "file:///" + storePath + "/carbon.store/mytestDb" + "')" ;
+        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON', location = " + location);
+        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable2");
+    }
+
+    @Test
+    public void testCheckingCarbonCacheUpdate() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 0); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        File OriginalFile = new File(storePath + "/carbon.store/testdb/testtable2/Metadata/schema");
+        // create the destination file object
+        File dest = new File(storePath + "/carbon.store/testdb/testtable2/schema_backup");
+        // check if the file can be renamed
+        // to the abstract path name
+        if (OriginalFile.renameTo(dest)) {
+            // display that the file is renamed
+            // to the abstract path name
+            System.out.println("File is renamed");
+        }
+        else {
+            // display that the file cannot be renamed
+            // to the abstract path name
+            System.out.println("File cannot be renamed");
+        }
+        try {
+            hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        }
+        catch (SQLException s) {
+            Boolean ret = s.getMessage().contains("Failed while reading metadata of the table");
+            assertEquals("true", ret.toString());
+        }
+        if (dest.renameTo(OriginalFile)) {
+            System.out.println("File is renamed");
+        }
+        else {
+            System.out.println("File cannot be renamed");
+        }
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 0); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+        hetuServer.execute("drop table testdb.testtable2");
+    }
+
+    @Test
+    public void validateMetadataEntriesAfterInsert() throws SQLException, IOException
+    {
+        String tableName = "testtablestatus";
+        hetuServer.execute(String.format("CREATE TABLE testdb.%s (a int, b int)", tableName));
+        hetuServer.execute(String.format("INSERT INTO testdb.%s VALUES(1, 2)", tableName));
+
+        // Verify number of segment files inside Metadata Folder
+        String tablePath = carbonStoreLocation + "/" + "testdb" + "/" + tableName;
+        String segmentDir = tablePath + "/Metadata/segments";
+        File folder = new File(segmentDir);
+        assertEquals(folder.listFiles().length, 1);
+
+        // Segment file entry should be inside table status file
+        String tableStatusFilePath = tablePath + "/Metadata/tablestatus";
+        String content = new String(Files.readAllBytes(Paths.get(tableStatusFilePath)));
+        assertTrue(content.contains(folder.listFiles()[0].getName()));
+
+        hetuServer.execute("DROP TABLE testdb.testTableStatus");
     }
 }

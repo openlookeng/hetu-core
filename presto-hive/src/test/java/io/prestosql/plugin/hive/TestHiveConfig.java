@@ -133,7 +133,10 @@ public class TestHiveConfig
                 .setTableCreatesWithLocationAllowed(true)
                 .setTlsEnabled(false)
                 .setDynamicFilterPartitionFilteringEnabled(false)
-                .setOrcCacheStatsMetricCollectionEnabled(false));
+                .setDynamicFilteringRowFilteringThreshold(2000)
+                .setOrcCacheStatsMetricCollectionEnabled(false)
+                .setVacuumCleanupRecheckInterval(new Duration(1, TimeUnit.MINUTES))
+                .setVacuumCleanupThreads(2));
     }
 
     @Test
@@ -164,6 +167,7 @@ public class TestHiveConfig
                 .put("hive.dfs.verify-checksum", "false")
                 .put("hive.dfs.domain-socket-path", "/foo")
                 .put("hive.dynamic-filter-partition-filtering", "true")
+                .put("hive.dynamic-filtering-row-filtering-threshold", "10000")
                 .put("hive.s3-file-system-type", "EMRFS")
                 .put("hive.config.resources", "/foo.xml,/bar.xml")
                 .put("hive.max-initial-splits", "10")
@@ -247,6 +251,8 @@ public class TestHiveConfig
                 .put("hive.metastore.thrift.client.ssl.enabled", "true")
                 .put("hive.table-creates-with-location-allowed", "false")
                 .put("hive.orc-cache-stats-metric-collection.enabled", "true")
+                .put("hive.vacuum-cleanup-recheck-interval", "5s")
+                .put("hive.vacuum-cleanup-threads", "5")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -346,7 +352,10 @@ public class TestHiveConfig
                 .setTableCreatesWithLocationAllowed(false)
                 .setTlsEnabled(true)
                 .setDynamicFilterPartitionFilteringEnabled(true)
-                .setOrcCacheStatsMetricCollectionEnabled(true);
+                .setDynamicFilteringRowFilteringThreshold(10000)
+                .setOrcCacheStatsMetricCollectionEnabled(true)
+                .setVacuumCleanupRecheckInterval(new Duration(5, TimeUnit.SECONDS))
+                .setVacuumCleanupThreads(5);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

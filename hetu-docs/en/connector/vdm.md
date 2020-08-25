@@ -14,12 +14,24 @@ The VDM connector supports to:
 
 VDM uses openLooKeng metastore to store its database information. It can be stored either on HDFS or relational database, depending on the implementation of openLooKeng metastore. 
 
-Therefore metastore must be configured first. Here is a example of using RDBMS as metastore, create `etc/hetu-metastore.properties`:
-
-    hetu.metastore.type=jdbc
-    hetu.meatstore.db.url=jdbc:mysql://....
-    hetu.metastore.db.user=root
-    hetu.metastore.db.password=123456
+Therefore metastore must be configured first. 
+* Here is an example of using RDBMS as metastore, create `etc/hetu-metastore.properties`:
+```
+hetu.metastore.type=jdbc
+hetu.meatstore.db.url=jdbc:mysql://....
+hetu.metastore.db.user=root
+hetu.metastore.db.password=123456
+```
+* Here is an example of using HDFS as metastore，create `etc/hetu-metastore.properties`：
+```
+# the type of metastore storage
+hetu.metastore.type=hetufilesystem
+# profile name of hetu file system
+hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
+#the path of metastore storage in the hetu file system
+hetu.metastore.hetufilesystem.path=/etc/openlookeng/metastore
+```    
+Check [filesystem](../develop/filesystem.md) for more information.
 
 For user interface, the connector can be accessed from JDBC or command line interface. Currently VDM only supports schemas and views. Tables are NOT supported.
 

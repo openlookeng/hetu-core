@@ -35,4 +35,5 @@ public class HetuConstant
     public static final String MULTI_COORDINATOR_ENABLED = "hetu.multi-coordinator.enabled";
     public static final String SPLIT_CACHE_MAP_ENABLED = "hetu.split-cache-map.enabled";
     public static final String SPLIT_CACHE_STATE_UPDATE_INTERVAL = "hetu.split-cache-map.state-update-interval";
+    public static final String ENCRYPTED_PROPERTIES = "encrypted-properties";
 }

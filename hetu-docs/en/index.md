@@ -25,7 +25,7 @@ headless: true
     - [Java Keystores and Truststores]({{< relref "./docs/security/tls.md" >}})
     - [Built-in System Access Control]({{< relref "./docs/security/built-in-system-access-control.md" >}})
     - [Secure Internal Communication]({{< relref "./docs/security/internal-communication.md" >}})
-
+    - [Password Encryption]({{< relref "./docs/security/password-encryption.md" >}})
 - [Administration]("#")
     - [Web Interface]({{< relref "./docs/admin/web-interface.md" >}})
     - [Tuning openLooKeng]({{< relref "./docs/admin/tuning.md" >}})

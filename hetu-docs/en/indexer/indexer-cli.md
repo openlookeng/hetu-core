@@ -11,7 +11,8 @@ For example, `<path to installtion directory>/bin/index` and must be executed fr
 Usage: index [-v] [--debug] [--disableLocking] --table=<table>
          [-c=<configDirPath>] [--column=<columns>[,<columns>...]]...
          [--partition=<partitions>[,<partitions>...]]...
-         [--type=<indexTypes>[,<indexTypes>...]]... <command>
+         [--type=<indexTypes>[,<indexTypes>...]]...
+         [-I=<indexproperties>[,<indexproperties>...]]<command>
 
 Using this index tool, you can CREATE, SHOW and DELETE indexes.
 

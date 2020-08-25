@@ -90,9 +90,11 @@ public class SplitUtils
             // the SplitFilterFactory will return a SplitFilter that has the applicable indexes
             // based on the predicate, but no filtering has been performed yet
             Predicate predicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) expression, fullQualifiedTableName);
-            SplitFilter splitFilter = splitFilterFactory.getFilter(predicate, splitsToReturn);
-            // do filter on splits to remove invalid splits from filteredSplits
-            splitsToReturn = splitFilter.filter(splitsToReturn, predicate.getValue());
+            if (predicate != null) {
+                SplitFilter splitFilter = splitFilterFactory.getFilter(predicate, splitsToReturn);
+                // do filter on splits to remove invalid splits from filteredSplits
+                splitsToReturn = splitFilter.filter(splitsToReturn, predicate.getValue());
+            }
         }
 
         if (expression instanceof LogicalBinaryExpression) {

@@ -54,11 +54,13 @@ public class HiveMetadataFactory
     private final LocationService locationService;
     private final JsonCodec<PartitionUpdate> partitionUpdateCodec;
     private final BoundedExecutor renameExecution;
+    private final ScheduledExecutorService vacuumCleanupService;
     private final TypeTranslator typeTranslator;
     private final String prestoVersion;
     private final AccessControlMetadataFactory accessControlMetadataFactory;
     private final Optional<Duration> hiveTransactionHeartbeatInterval;
     private final ScheduledExecutorService heartbeatService;
+    private final Optional<Duration> vacuumCleanupInterval;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -68,6 +70,7 @@ public class HiveMetadataFactory
             HdfsEnvironment hdfsEnvironment,
             HivePartitionManager partitionManager,
             @ForHive ExecutorService executorService,
+            @ForHiveVacuumCleanUp ScheduledExecutorService vacuumCleanUpService,
             @ForHiveTransactionHeartbeats ScheduledExecutorService heartbeatService,
             TypeManager typeManager,
             LocationService locationService,
@@ -90,10 +93,12 @@ public class HiveMetadataFactory
                 hiveConfig.getTableCreatesWithLocationAllowed(),
                 hiveConfig.getPerTransactionMetastoreCacheMaximumSize(),
                 hiveConfig.getHiveTransactionHeartbeatInterval(),
+                hiveConfig.getVacuumCleanupRecheckInterval(),
                 typeManager,
                 locationService,
                 partitionUpdateCodec,
                 executorService,
+                vacuumCleanUpService,
                 heartbeatService,
                 typeTranslator,
                 nodeVersion.toString(),
@@ -114,10 +119,12 @@ public class HiveMetadataFactory
             boolean tableCreatesWithLocationAllowed,
             long perTransactionCacheMaximumSize,
             Optional<Duration> hiveTransactionHeartbeatInterval,
+            Optional<Duration> vacuumCleanupInterval,
             TypeManager typeManager,
             LocationService locationService,
             JsonCodec<PartitionUpdate> partitionUpdateCodec,
             ExecutorService executorService,
+            ScheduledExecutorService vacuumCleanupService,
             ScheduledExecutorService heartbeatService,
             TypeTranslator typeTranslator,
             String prestoVersion,
@@ -142,6 +149,7 @@ public class HiveMetadataFactory
         this.prestoVersion = requireNonNull(prestoVersion, "prestoVersion is null");
         this.accessControlMetadataFactory = requireNonNull(accessControlMetadataFactory, "accessControlMetadataFactory is null");
         this.hiveTransactionHeartbeatInterval = requireNonNull(hiveTransactionHeartbeatInterval, "hiveTransactionHeartbeatInterval is null");
+        this.vacuumCleanupInterval = requireNonNull(vacuumCleanupInterval, "vacuumCleanupInterval is null");
 
         if (!allowCorruptWritesForTesting && !timeZone.equals(DateTimeZone.getDefault())) {
             log.warn("Hive writes are disabled. " +
@@ -151,6 +159,7 @@ public class HiveMetadataFactory
         }
 
         renameExecution = new BoundedExecutor(executorService, maxConcurrentFileRenames);
+        this.vacuumCleanupService = requireNonNull(vacuumCleanupService, "vacuumCleanupService is null");
         this.heartbeatService = requireNonNull(heartbeatService, "heartbeatService is null");
     }
 
@@ -161,6 +170,8 @@ public class HiveMetadataFactory
                 hdfsEnvironment,
                 CachingHiveMetastore.memoizeMetastore(this.metastore, perTransactionCacheMaximumSize), // per-transaction cache
                 renameExecution,
+                vacuumCleanupService,
+                vacuumCleanupInterval,
                 skipDeletionForAlter,
                 skipTargetCleanupOnRollback,
                 hiveTransactionHeartbeatInterval,

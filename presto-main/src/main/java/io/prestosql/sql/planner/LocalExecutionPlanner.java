@@ -2106,7 +2106,7 @@ public class LocalExecutionPlanner
                     .map(OptionalInt::of).orElse(OptionalInt.empty());
 
             boolean buildOuter = node.getType() == RIGHT || node.getType() == FULL;
-            int partitionCount = buildContext.getDriverInstanceCount().orElse(1);
+            int taskCount = buildContext.getDriverInstanceCount().orElse(1);
 
             Optional<JoinFilterFunctionFactory> filterFunctionFactory = node.getFilter()
                     .map(filterExpression -> compileJoinFilterFunction(
@@ -2148,7 +2148,7 @@ public class LocalExecutionPlanner
                             buildChannels.stream()
                                     .map(buildSource.getTypes()::get)
                                     .collect(toImmutableList()),
-                            partitionCount,
+                            taskCount,
                             buildSource.getLayout(),
                             buildOuter),
                     buildOutputTypes);
@@ -2156,7 +2156,7 @@ public class LocalExecutionPlanner
             ImmutableList.Builder<OperatorFactory> factoriesBuilder = new ImmutableList.Builder();
             factoriesBuilder.addAll(buildSource.getOperatorFactories());
 
-            createDynamicFilter(node, context, partitionCount).ifPresent(
+            createDynamicFilter(node, context, taskCount).ifPresent(
                     filter -> {
                         List<DynamicFilterSourceOperator.Channel> filterBuildChannels = filter
                                 .getBuildChannels()
@@ -2173,7 +2173,7 @@ public class LocalExecutionPlanner
                                 new DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory(
                                         buildContext.getNextOperatorId(),
                                         node.getId(),
-                                        filter.getTupleDomainConsumer(),
+                                        filter.getValueConsumer(), /** the consumer to process all values collected to build the dynamic filter */
                                         filterBuildChannels,
                                         getDynamicFilteringMaxPerDriverValueCount(buildContext.getSession()),
                                         getDynamicFilteringMaxPerDriverSize(buildContext.getSession()),
@@ -2195,7 +2195,7 @@ public class LocalExecutionPlanner
                     searchFunctionFactories,
                     10_000,
                     pagesIndexFactory,
-                    spillEnabled && !buildOuter && partitionCount > 1,
+                    spillEnabled && !buildOuter && taskCount > 1,
                     singleStreamSpillerFactory);
 
             factoriesBuilder.add(hashBuilderOperatorFactory);

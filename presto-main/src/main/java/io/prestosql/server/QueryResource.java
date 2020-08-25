@@ -16,6 +16,7 @@ package io.prestosql.server;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.http.server.HttpServerInfo;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.dispatcher.DispatchManager;
@@ -35,6 +36,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
@@ -58,15 +60,17 @@ public class QueryResource
     private static final DataSize ZERO_BYTES = new DataSize(0, DataSize.Unit.BYTE);
     private static final Duration ZERO_MILLIS = new Duration(0, TimeUnit.MILLISECONDS);
 
+    private final HttpServerInfo httpServerInfo;
     // TODO There should be a combined interface for this
     private final DispatchManager dispatchManager;
     private final QueryManager queryManager;
 
     @Inject
-    public QueryResource(DispatchManager dispatchManager, QueryManager queryManager)
+    public QueryResource(DispatchManager dispatchManager, QueryManager queryManager, HttpServerInfo httpServerInfo)
     {
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
+        this.httpServerInfo = requireNonNull(httpServerInfo, "httpServerInfo is null");
     }
 
     @GET
@@ -88,23 +92,34 @@ public class QueryResource
     {
         requireNonNull(queryId, "queryId is null");
 
-        try {
-            QueryInfo queryInfo = queryManager.getFullQueryInfo(queryId);
-            return Response.ok(queryInfo).build();
-        }
-        catch (NoSuchElementException ignored) {
+        BasicQueryInfo basicQueryInfo = getBasicQueryInfo(queryId);
+
+        if (basicQueryInfo == null) {
+            return Response.status(Status.GONE).build();
         }
 
-        try {
-            DispatchQuery query = dispatchManager.getQuery(queryId);
-            if (query.isDone()) {
-                return Response.ok(toFullQueryInfo(query)).build();
+        if (isQueryUriLocal(basicQueryInfo)) {
+            // handle local query
+            try {
+                QueryInfo queryInfo = queryManager.getFullQueryInfo(queryId);
+                return Response.ok(queryInfo).build();
             }
+            catch (NoSuchElementException ignored) {
+            }
+            try {
+                DispatchQuery query = dispatchManager.getQuery(queryId);
+                if (query.isDone()) {
+                    return Response.ok(toFullQueryInfo(query)).build();
+                }
+            }
+            catch (NoSuchElementException ignored) {
+            }
+            return Response.status(Status.GONE).build();
         }
-        catch (NoSuchElementException ignored) {
+        else {
+            // redirect remote query
+            return ClientBuilder.newBuilder().build().target(basicQueryInfo.getSelf()).request().get();
         }
-
-        return Response.status(Status.GONE).build();
     }
 
     @DELETE
@@ -251,5 +266,20 @@ public class QueryResource
                 Optional.empty(),
                 true,
                 info.getResourceGroupId(), false);
+    }
+
+    private BasicQueryInfo getBasicQueryInfo(QueryId queryId)
+    {
+        return dispatchManager.getQueries()
+                .stream()
+                .filter(info -> info.getQueryId().equals(queryId))
+                .findAny()
+                .orElse(null);
+    }
+
+    private boolean isQueryUriLocal(BasicQueryInfo basicQueryInfo)
+    {
+        String localhost = httpServerInfo.getHttpUri() != null ? httpServerInfo.getHttpUri().getHost() : httpServerInfo.getHttpsUri().getHost();
+        return basicQueryInfo.getSelf().getHost().equals(localhost);
     }
 }

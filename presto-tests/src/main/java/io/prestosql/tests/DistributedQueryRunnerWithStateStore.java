@@ -48,7 +48,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.hetu.core.statestore.hazelcast.HazelcastConstants.PORT_CONFIG_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -109,7 +109,7 @@ public class DistributedQueryRunnerWithStateStore
                 while (!availablePort(port)) {
                     port = nextPort.getAndIncrement();
                 }
-                stateStoreProperties.put(PORT_CONFIG_NAME, port + "");
+                stateStoreProperties.put(DISCOVERY_PORT_CONFIG_NAME, port + "");
                 stateStoreProperties.putIfAbsent(HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME, HazelcastConstants.DISCOVERY_MODE_TCPIP);
                 this.stateStores.add(((EmbeddedStateStoreLauncher) launcher).launchStateStore(ips, stateStoreProperties));
             }
@@ -161,7 +161,7 @@ public class DistributedQueryRunnerWithStateStore
             if (provider instanceof LocalStateStoreProvider) {
                 Map<String, String> stateStoreProperties = new HashMap<>();
                 stateStoreProperties.putIfAbsent(HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME, HazelcastConstants.DISCOVERY_MODE_TCPIP);
-                stateStoreProperties.put(PORT_CONFIG_NAME, port + "");
+                stateStoreProperties.put(DISCOVERY_PORT_CONFIG_NAME, port + "");
                 ((LocalStateStoreProvider) provider).setStateStore("hazelcast", stateStoreProperties);
                 ((LocalStateStoreProvider) provider).createStateCollections();
             }

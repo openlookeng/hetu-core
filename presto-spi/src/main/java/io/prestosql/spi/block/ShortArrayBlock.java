@@ -13,6 +13,7 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -222,5 +223,14 @@ public class ShortArrayBlock
         if (position < 0 || position >= getPositionCount()) {
             throw new IllegalArgumentException("position is not valid");
         }
+    }
+
+    @Override
+    public boolean[] filter(BloomFilter filter, boolean[] validPositions)
+    {
+        for (int i = 0; i < values.length; i++) {
+            validPositions[i] = validPositions[i] && filter.test(values[i]);
+        }
+        return validPositions;
     }
 }

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -73,7 +74,7 @@ public class TestHazelcastClusterLifecycleListener
         Map<String, String> config = new HashMap<>(0);
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", TEST_CLUSTER_NAME);
-        config.put("hazelcast.tcp-ip.port", PORT1);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, PORT1);
 
         MockSeedStore mockSeedStore = new MockSeedStore();
         mockSeedStore.add(seeds);
@@ -88,7 +89,7 @@ public class TestHazelcastClusterLifecycleListener
         Map<String, String> config = new HashMap<>(0);
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", TEST_CLUSTER_NAME);
-        config.put("hazelcast.tcp-ip.port", port);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, port);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         return bootstrapper.bootstrap(ImmutableSet.of(MEMBER_1_ADDRESS, MEMBER_2_ADDRESS), config);

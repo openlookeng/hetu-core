@@ -63,7 +63,6 @@ public class TestingOracleServer
             passWd = properties.get("connection.password");
             dockerImage = properties.get("docker.image");
             port = Integer.parseInt(properties.get("connection.port"));
-            LOG.info("configurations:\n" + connectionUrl + "\n" + user + "\n" + passWd + "\n" + dockerImage + "\n" + port);
         }
         catch (IOException e) {
             LOG.warn("Failed to load properties for file %s", file);

@@ -24,8 +24,11 @@ import static io.prestosql.tempto.query.QueryExecutor.query;
 import static io.prestosql.tests.TestGroups.HIVE_TRANSACTIONAL;
 import static io.prestosql.tests.TestGroups.STORAGE_FORMATS;
 import static io.prestosql.tests.utils.QueryExecutors.onHive;
+import static io.prestosql.tests.utils.QueryExecutors.onPresto;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
-public class TestInsertOnlyAcidTableRead
+public class TestInsertOnlyAcidTable
         extends HiveProductTest
 {
     @Test(groups = {STORAGE_FORMATS, HIVE_TRANSACTIONAL}, dataProvider = "isTablePartitioned")
@@ -56,6 +59,40 @@ public class TestInsertOnlyAcidTableRead
 
             onHive().executeQuery("INSERT OVERWRITE TABLE " + tableName + hivePartitionString + " SELECT 3");
             assertThat(query(selectFromOnePartitionsSql)).containsOnly(row(3));
+        }
+        finally {
+            onHive().executeQuery("DROP TABLE " + tableName);
+        }
+    }
+
+    @Test(groups = {STORAGE_FORMATS, HIVE_TRANSACTIONAL}, dataProvider = "isTablePartitioned")
+    public void testDeleteFromInsertOnlyAcidTable(boolean isPartitioned)
+    {
+        if (getHiveVersionMajor() < 3) {
+            throw new SkipException("Presto Hive transactional tables are supported with Hive version 3 or above");
+        }
+
+        String tableName = "test_insert_only_table_delete";
+        onHive().executeQuery("DROP TABLE IF EXISTS " + tableName);
+        onHive().executeQuery("CREATE TABLE " + tableName + " (col INT) " +
+                (isPartitioned ? "PARTITIONED BY (part_col INT) " : "") +
+                "STORED AS ORC " +
+                "TBLPROPERTIES ('transactional_properties'='insert_only', 'transactional'='true') ");
+
+        try {
+            String predicate = isPartitioned ? " WHERE part_col = 2 " : "";
+
+            onHive().executeQuery("INSERT INTO " + tableName + " VALUES(1,2)");
+
+            String selectFromOnePartitionsSql = "SELECT col FROM " + tableName + predicate + " ORDER BY COL";
+            assertThat(query(selectFromOnePartitionsSql)).containsOnly(row(1));
+
+            onPresto().executeQuery("DELETE FROM " + tableName + " WHERE col = 1");
+            fail("expected exception");
+        }
+        catch (RuntimeException e) {
+            assertEquals(e.getMessage().split(":")[2], " Attempt to do delete on table " +
+                                         tableName + " that is insert-only transactional");
         }
         finally {
             onHive().executeQuery("DROP TABLE " + tableName);

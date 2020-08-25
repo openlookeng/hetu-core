@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.metastore.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.metastore.util.MetastoreUtil;
 
 import java.util.LinkedHashMap;
@@ -47,14 +49,18 @@ public class CatalogEntity
     /**
      * construction
      *
-     * @param name       name
-     * @param owner      owner
+     * @param name name
+     * @param owner owner
      * @param createTime create time
-     * @param comment    comment
+     * @param comment comment
      * @param parameters parameters of catalog
      */
-    public CatalogEntity(String name, String owner, long createTime, String comment,
-                         Map<String, String> parameters)
+    @JsonCreator
+    public CatalogEntity(@JsonProperty("name") String name,
+            @JsonProperty("owner") String owner,
+            @JsonProperty("createTime") long createTime,
+            @JsonProperty("comment") String comment,
+            @JsonProperty("parameters") Map<String, String> parameters)
     {
         this.name = requireNonNull(name, "catalog name is null");
         this.owner = owner;
@@ -63,6 +69,7 @@ public class CatalogEntity
         this.parameters = parameters;
     }
 
+    @JsonProperty
     public String getName()
     {
         return name;
@@ -73,6 +80,7 @@ public class CatalogEntity
         this.name = name;
     }
 
+    @JsonProperty
     public String getComment()
     {
         return comment;
@@ -83,6 +91,7 @@ public class CatalogEntity
         this.comment = comment;
     }
 
+    @JsonProperty
     public long getCreateTime()
     {
         return createTime;
@@ -93,6 +102,7 @@ public class CatalogEntity
         this.createTime = createTime;
     }
 
+    @JsonProperty
     public Map<String, String> getParameters()
     {
         return parameters;
@@ -103,6 +113,7 @@ public class CatalogEntity
         this.parameters = parameters;
     }
 
+    @JsonProperty
     public String getOwner()
     {
         return owner;

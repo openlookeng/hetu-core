@@ -37,6 +37,8 @@ import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 
 import javax.inject.Inject;
 
@@ -392,6 +394,12 @@ public class BridgingHiveMetastore
     }
 
     @Override
+    public void abortTransaction(HiveIdentity identity, long transactionId)
+    {
+        delegate.abortTransaction(identity, transactionId);
+    }
+
+    @Override
     public void sendTransactionHeartbeat(HiveIdentity identity, long transactionId)
     {
         delegate.sendTransactionHeartbeat(identity, transactionId);
@@ -410,15 +418,21 @@ public class BridgingHiveMetastore
     }
 
     @Override
-    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId, boolean isVacuum)
     {
-        return delegate.getValidWriteIds(identity, tables, currentTransactionId);
+        return delegate.getValidWriteIds(identity, tables, currentTransactionId, isVacuum);
     }
 
     @Override
     public long getTableWriteId(String dbName, String tableName, long transactionId)
     {
         return delegate.getTableWriteId(dbName, tableName, transactionId);
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+    {
+        return delegate.showLocks(rqst);
     }
 
     /**

@@ -45,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -85,7 +86,7 @@ public class TestStateStoreLauncherAndProvider
                 "state-store.name=test\n" +
                 "state-store.cluster=test-cluster\n" +
                 "hazelcast.discovery.mode=tcp-ip\n" +
-                "hazelcast.tcp-ip.port=7980\n");
+                "hazelcast.discovery.port=7980\n");
         configWriter.close();
     }
 
@@ -128,7 +129,7 @@ public class TestStateStoreLauncherAndProvider
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
         when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
-        when(mockSeedStoreManager.addSeedToSeedStore("localhost")).thenReturn(seeds);
+        when(mockSeedStoreManager.addSeed("localhost", true)).thenReturn(seeds);
 
         InternalCommunicationConfig mockInternalCommunicationConfig = mock(InternalCommunicationConfig.class);
         HttpServerInfo mockHttpServerInfo = mock(HttpServerInfo.class);
@@ -147,7 +148,7 @@ public class TestStateStoreLauncherAndProvider
         // mock "remove" second instance from cluster (delete from seed store)
         seeds.remove(mockSeed2);
         when(mockSeed1.getLocation()).thenReturn("127.0.0.1:7980");
-        when(mockSeedStoreManager.addSeedToSeedStore("localhost")).thenReturn(seeds);
+        when(mockSeedStoreManager.addSeed("localhost", true)).thenReturn(seeds);
 
         ((HazelcastStateStore) second).shutdown();
         // Allow the first node to handle failure
@@ -161,7 +162,7 @@ public class TestStateStoreLauncherAndProvider
         Map<String, String> config = new HashMap<>();
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", "test-cluster");
-        config.put("hazelcast.tcp-ip.port", "7981");
+        config.put(DISCOVERY_PORT_CONFIG_NAME, "7981");
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         return bootstrapper.bootstrap(ImmutableSet.of("127.0.0.1:7980", "127.0.0.1:7981"), config);
@@ -261,7 +262,7 @@ public class TestStateStoreLauncherAndProvider
         Map<String, String> config = new HashMap<>();
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", "test-cluster");
-        config.put("hazelcast.tcp-ip.port", port);
+        config.put(DISCOVERY_PORT_CONFIG_NAME, port);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
         return bootstrapper.bootstrap(ImmutableSet.of("127.0.0.1:" + port), config);

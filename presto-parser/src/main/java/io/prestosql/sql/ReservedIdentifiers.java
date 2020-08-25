@@ -149,4 +149,18 @@ public final class ReservedIdentifiers
             return true;
         }
     }
+
+    public static Set<String> sqlKeywords()
+    {
+        ImmutableSet.Builder<String> names = ImmutableSet.builder();
+        Vocabulary vocabulary = SqlBaseLexer.VOCABULARY;
+        for (int i = 0; i <= vocabulary.getMaxTokenType(); i++) {
+            String name = nullToEmpty(vocabulary.getLiteralName(i));
+            Matcher matcher = IDENTIFIER.matcher(name);
+            if (matcher.matches()) {
+                names.add(matcher.group(1));
+            }
+        }
+        return names.build();
+    }
 }

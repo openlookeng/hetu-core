@@ -17,6 +17,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.drift.TException;
 import io.airlift.drift.client.DriftClient;
 import io.airlift.units.Duration;
@@ -61,7 +62,6 @@ import static io.prestosql.plugin.thrift.util.ThriftExceptions.toPrestoException
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.function.Function.identity;
 
 public class ThriftMetadata
         implements ConnectorMetadata
@@ -167,7 +167,20 @@ public class ThriftMetadata
     @Override
     public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        return listTables(session, prefix.getSchema()).stream().collect(toImmutableMap(identity(), schemaTableName -> getRequiredTableMetadata(schemaTableName).getColumns()));
+        List<SchemaTableName> tableNames = prefix.toOptionalSchemaTableName()
+                .<List<SchemaTableName>>map(ImmutableList::of)
+                .orElseGet(() -> listTables(session, prefix.getSchema()));
+
+        ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
+        for (SchemaTableName tableName : tableNames) {
+            try {
+                columns.put(tableName, getRequiredTableMetadata(tableName).getColumns());
+            }
+            catch (TableNotFoundException e) {
+                // when list the column information of the table, ignore the exception.
+            }
+        }
+        return columns.build();
     }
 
     @Override

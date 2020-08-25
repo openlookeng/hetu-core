@@ -31,19 +31,22 @@ import static java.util.Objects.requireNonNull;
 public class HiveTransaction
 {
     private final HiveIdentity identity;
-    private final String queryId;
     private final long transactionId;
     private final ScheduledFuture<?> heartbeatTask;
     private final Map<HiveTableHandle, AtomicBoolean> locksMap = new HashMap<>();
 
     private final Map<SchemaTableName, ValidTxnWriteIdList> validHiveTransactionsForTable = new HashMap<>();
 
-    public HiveTransaction(HiveIdentity identity, String queryId, long transactionId, ScheduledFuture<?> heartbeatTask)
+    public HiveTransaction(HiveIdentity identity, long transactionId, ScheduledFuture<?> heartbeatTask)
     {
         this.identity = requireNonNull(identity, "identity is null");
-        this.queryId = requireNonNull(queryId, "queryId is null");
         this.transactionId = transactionId;
         this.heartbeatTask = requireNonNull(heartbeatTask, "heartbeatTask is null");
+    }
+
+    public HiveIdentity getIdentity()
+    {
+        return identity;
     }
 
     public long getTransactionId()
@@ -56,7 +59,7 @@ public class HiveTransaction
         return heartbeatTask;
     }
 
-    public ValidTxnWriteIdList getValidWriteIds(HiveMetastore metastore, HiveTableHandle tableHandle)
+    public ValidTxnWriteIdList getValidWriteIds(HiveMetastore metastore, HiveTableHandle tableHandle, String queryId, boolean isVacuum)
     {
         //If the update or delete would have locked exclusive lock, then there is no need to lock again.
         if (isSharedLockNeeded(tableHandle)) {
@@ -74,7 +77,8 @@ public class HiveTransaction
                 metastore.getValidWriteIds(
                         identity,
                         ImmutableList.of(schemaTableName),
-                        transactionId)));
+                        transactionId,
+                        isVacuum)));
     }
 
     //If the query is on the same table, on which update/delete happening separate lock not required.
@@ -99,7 +103,7 @@ public class HiveTransaction
         }
     }
 
-    public Long getTableWriteId(HiveMetastore metastore, HiveTableHandle tableHandle, HiveACIDWriteType writeType)
+    public Long getTableWriteId(HiveMetastore metastore, HiveTableHandle tableHandle, HiveACIDWriteType writeType, String queryId)
     {
         DataOperationType operationType = DataOperationType.INSERT;
         boolean semiSharedLock = false;

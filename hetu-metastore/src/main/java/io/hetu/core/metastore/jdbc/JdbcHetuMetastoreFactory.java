@@ -17,6 +17,7 @@ package io.hetu.core.metastore.jdbc;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.metastore.HetuMetastore;
 
@@ -37,7 +38,7 @@ public class JdbcHetuMetastoreFactory
     }
 
     @Override
-    public HetuMetastore create(String name, Map<String, String> config)
+    public HetuMetastore create(String name, Map<String, String> config, HetuFileSystemClient client)
     {
         requireNonNull(config, "config is null");
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {

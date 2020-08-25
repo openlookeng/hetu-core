@@ -342,8 +342,10 @@ public class SqlQueryScheduler
             SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeSelector, stage::getAllTasks);
 
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());
+
             stageSchedulers.put(stageId, newSourcePartitionedSchedulerAsStageScheduler(stage, planNodeId, splitSource,
-                    placementPolicy, splitBatchSize, heuristicIndexerManager));
+                    placementPolicy, splitBatchSize, session, heuristicIndexerManager));
+
             bucketToPartition = Optional.of(new int[1]);
         }
         else if (partitioningHandle.equals(SCALED_WRITER_DISTRIBUTION)) {
@@ -404,6 +406,7 @@ public class SqlQueryScheduler
                         getConcurrentLifespansPerNode(session),
                         nodeScheduler.createNodeSelector(catalogName),
                         connectorPartitionHandles,
+                        session,
                         heuristicIndexerManager));
             }
             else {

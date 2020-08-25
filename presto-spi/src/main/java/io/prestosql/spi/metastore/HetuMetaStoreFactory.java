@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.metastore;
 
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
+
 import java.util.Map;
 
 public interface HetuMetaStoreFactory
@@ -30,7 +32,8 @@ public interface HetuMetaStoreFactory
      *
      * @param name name of the hetu metastore
      * @param config hetu metastore configurations
+     * @param client hetu file system client
      * @return created hetu metastore
      */
-    HetuMetastore create(String name, Map<String, String> config);
+    HetuMetastore create(String name, Map<String, String> config, HetuFileSystemClient client);
 }

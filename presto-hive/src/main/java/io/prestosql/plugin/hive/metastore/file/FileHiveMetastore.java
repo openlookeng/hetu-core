@@ -30,8 +30,6 @@ import io.prestosql.plugin.hive.HivePartition;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.PartitionNotFoundException;
 import io.prestosql.plugin.hive.PartitionStatistics;
-import io.prestosql.plugin.hive.SchemaAlreadyExistsException;
-import io.prestosql.plugin.hive.TableAlreadyExistsException;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.metastore.Column;
@@ -48,8 +46,10 @@ import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnNotFoundException;
+import io.prestosql.spi.connector.SchemaAlreadyExistsException;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.connector.TableAlreadyExistsException;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.security.ConnectorIdentity;
 import io.prestosql.spi.security.RoleGrant;
@@ -61,6 +61,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
@@ -97,6 +99,7 @@ import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.security.PrincipalType.ROLE;
 import static io.prestosql.spi.security.PrincipalType.USER;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -127,6 +130,7 @@ public class FileHiveMetastore
     private final JsonCodec<List<PermissionMetadata>> permissionsCodec = JsonCodec.listJsonCodec(PermissionMetadata.class);
     private final JsonCodec<List<String>> rolesCodec = JsonCodec.listJsonCodec(String.class);
     private final JsonCodec<List<RoleGrant>> roleGrantsCodec = JsonCodec.listJsonCodec(RoleGrant.class);
+    private long txnId = 1L;
 
     public static FileHiveMetastore createTestingFileHiveMetastore(File catalogDirectory)
     {
@@ -989,11 +993,16 @@ public class FileHiveMetastore
     @Override
     public long openTransaction(HiveIdentity identity)
     {
-        return 0;
+        return txnId++;
     }
 
     @Override
     public void commitTransaction(HiveIdentity identity, long transactionId)
+    {
+    }
+
+    @Override
+    public void abortTransaction(HiveIdentity identity, long transactionId)
     {
     }
 
@@ -1016,10 +1025,20 @@ public class FileHiveMetastore
     }
 
     @Override
-    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId)
+    public String getValidWriteIds(HiveIdentity identity, List<SchemaTableName> tables, long currentTransactionId, boolean isVacuum)
     {
-        /* doNothing */
-        return "";
+        // <schema>.<table>:<highWatermark>:<minOpenWriteId>::<AbortedTxns>
+        return format("%d$%s.%s:%d:9223372036854775807::",
+                currentTransactionId,
+                tables.get(0).getSchemaName(),
+                tables.get(0).getTableName(),
+                currentTransactionId - 1);
+    }
+
+    @Override
+    public ShowLocksResponse showLocks(ShowLocksRequest rqst)
+    {
+        return new ShowLocksResponse();
     }
 
     @Override

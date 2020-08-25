@@ -37,6 +37,7 @@ import java.util.Set;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -125,6 +126,24 @@ public class TestDynamicFilterUtil
 
         when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId))).thenReturn(mockRegisterSet);
         when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockRegisterSet);
+
+        // In statestore, set and map are destroyed and set to null after query finishes, however, in the UT we just assume the set and map to be empty.
+        doAnswer(i -> {
+            workers.clear();
+            return null;
+        }).when(mockWorkersSet).destroy();
+        doAnswer(i -> {
+            finishSet.clear();
+            return null;
+        }).when(mockFinishSet).destroy();
+        doAnswer(i -> {
+            partial.clear();
+            return null;
+        }).when(mockPartialSet).destroy();
+        doAnswer(i -> {
+            registerSet.clear();
+            return null;
+        }).when(mockRegisterSet).destroy();
 
         return stateStore;
     }

@@ -8,15 +8,36 @@ In order to dynamically change the catalogs on-the-fly, openLooKeng introduced d
     catalog.dynamic-enabled=true
 
 Then configure the filesystems used to store dynamic catalog information in `hdfs-config-catalog.properties`
-and `local-config-catalog.properties`. Check the filesystem doc for more information.
+and `local-config-catalog.properties`. Check the [filesystem doc](../develop/filesystem.md) for more information.
 
+* Add a `hdfs-config-catalog.properties` file in the `etc/filesystem/` directory, if this directory does not exist, please create it.
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=NONE
+fs.hdfs.impl.disable.cache=true
+```
+If HDFS enable the Kerberos, then
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=KERBEROS
+hdfs.krb5.conf.path=/opt/openlookeng/config/krb5.conf
+hdfs.krb5.keytab.path=/opt/openlookeng/config/user.keytab
+hdfs.krb5.principal=openlookeng@HADOOP.COM # replace openlookeng@HADOOP.COM to your principal 
+fs.hdfs.impl.disable.cache=true
+```
+* Add a `local-config-catalog.properties` file in the `etc/filesystem/` directory.
+```
+fs.client.type=local
+```
 ## Usage
 
-The catalog operations are done through a RESTful API on the openLooKeng coordinator. A http request has the following shape (hive connector as an example):
+The catalog operations are done through a RESTful API on the openLooKeng coordinator. A http request has the following shape (hive connector as an example), the form of POST/PUT body is `multipart/form-data`:
 
     request: POST/DELETE/PUT
     
-    header: ``X-Presto-User: admin``
+    header: `X-Presto-User: admin`
     
     form: 'catalogInformation={
             "catalogName" : "hive",
@@ -105,7 +126,6 @@ In `etc/node.properties`:
 
 ## Impact on queries
 
-- After a catalog is added, queries may fail during the scanning period.
-- After a catalog is deleted, queries that are being executed may fail. They may be able to finish during the scanning period.
-- Queries in progress may fail when the catalog is being updated. After the catalog is updated, queries may fail during the scanning period.
+- After a catalog is deleted, queries that are being executed may fail. 
+- Queries in progress may fail when the catalog is being updated. 
 

@@ -19,12 +19,13 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.client.QueryData;
 import io.prestosql.client.StatementClient;
-import jline.console.completer.Completer;
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.LineReader;
+import org.jline.reader.ParsedLine;
 
 import java.io.Closeable;
 import java.util.List;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -95,34 +96,6 @@ public class TableNameCompleter
         }
     }
 
-    @Override
-    public int complete(String buffer, int cursor, List<CharSequence> candidates)
-    {
-        if (cursor <= 0) {
-            return cursor;
-        }
-        int blankPos = findLastBlank(buffer.substring(0, cursor));
-        String prefix = buffer.substring(blankPos + 1, cursor);
-        String schemaName = queryRunner.getSession().getSchema();
-
-        if (schemaName != null) {
-            List<String> functionNames = functionCache.getIfPresent(schemaName);
-            List<String> tableNames = tableCache.getIfPresent(schemaName);
-
-            SortedSet<String> sortedCandidates = new TreeSet<>();
-            if (functionNames != null) {
-                sortedCandidates.addAll(filterResults(functionNames, prefix));
-            }
-            if (tableNames != null) {
-                sortedCandidates.addAll(filterResults(tableNames, prefix));
-            }
-
-            candidates.addAll(sortedCandidates);
-        }
-
-        return blankPos + 1;
-    }
-
     private static int findLastBlank(String buffer)
     {
         for (int i = buffer.length() - 1; i >= 0; i--) {
@@ -148,5 +121,30 @@ public class TableNameCompleter
     public void close()
     {
         executor.shutdownNow();
+    }
+
+    @Override
+    public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates)
+    {
+        String buffer = line.word().substring(0, line.wordCursor());
+        int blankPos = findLastBlank(buffer);
+        String prefix = buffer.substring(blankPos + 1);
+        String schemaName = queryRunner.getSession().getSchema();
+
+        if (schemaName != null) {
+            List<String> functionNames = functionCache.getIfPresent(schemaName);
+            List<String> tableNames = tableCache.getIfPresent(schemaName);
+
+            if (functionNames != null) {
+                for (String name : filterResults(functionNames, prefix)) {
+                    candidates.add(new Candidate(name));
+                }
+            }
+            if (tableNames != null) {
+                for (String name : filterResults(tableNames, prefix)) {
+                    candidates.add(new Candidate(name));
+                }
+            }
+        }
     }
 }
