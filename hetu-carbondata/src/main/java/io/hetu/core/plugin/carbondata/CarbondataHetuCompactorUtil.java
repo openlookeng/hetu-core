@@ -201,11 +201,21 @@ public class CarbondataHetuCompactorUtil
             }
         }
 
-        if (unMergedSegments.size() != 0) {
-            return unMergedSegments;
+        if (isUserDefinedMinorSegCountUsed) {
+            if (unMergedSegments.size() != 0 && unMergedSegments.size() == minorVacuumSegCount) {
+                return unMergedSegments;
+            }
+            else {
+                return new ArrayList<>(0);
+            }
         }
         else {
-            return new ArrayList<>(0);
+            if (unMergedSegments.size() != 0) {
+                return unMergedSegments;
+            }
+            else {
+                return new ArrayList<>(0);
+            }
         }
     }
 

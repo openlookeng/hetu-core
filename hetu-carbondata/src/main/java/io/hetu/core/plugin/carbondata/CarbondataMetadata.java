@@ -209,7 +209,7 @@ public class CarbondataMetadata
     private long minorVacuumSegCount;
     private long majorVacuumSegSize;
     private List<Segment> segmentFilesToBeUpdatedLatest = new ArrayList<>();
-    private List<LoadMetadataDetails> segmentsMerged = new ArrayList<>();
+    private List<List<LoadMetadataDetails>> segmentsMerged = new ArrayList<>();
 
     private enum State {
         INSERT,
@@ -554,23 +554,41 @@ public class CarbondataMetadata
                     .map(segmentInfoCodec::fromJson)
                     .collect(toList());
 
-            Set<String> segmentIdSet = new HashSet<>();
+            Map<String, Set<String>> mergedSegmentInfoUtilListMap = new HashMap<>();
+
             for (CarbondataSegmentInfoUtil segment : mergedSegmentInfoUtilList) {
-                segmentIdSet.addAll(segment.getSourceSegmentIdSet());
-            }
-
-            Set<String> segmentNameSet = new HashSet<>();
-            for (String segmentId : segmentIdSet) {
-                segmentNameSet.add(Segment.getSegment(segmentId, (LoadMetadataDetails[]) carbonLoadModel
-                        .getLoadMetadataDetails().toArray())
-                        .getSegmentFileName());
-            }
-
-            for (LoadMetadataDetails load : carbonLoadModel.getLoadMetadataDetails()) {
-                if (load.isCarbonFormat() && load.getSegmentStatus() == SegmentStatus.SUCCESS
-                        && loadIsMergedInWorker(load.getSegmentFile(), segmentNameSet)) {
-                    segmentsMerged.add(load);
+                if (mergedSegmentInfoUtilListMap.containsKey(segment.getDestinationSegment())) {
+                    Set<String> sourceSegments = mergedSegmentInfoUtilListMap.get(segment.getDestinationSegment());
+                    sourceSegments.addAll(segment.getSourceSegmentIdSet());
+                    mergedSegmentInfoUtilListMap.put(segment.getDestinationSegment(), sourceSegments);
                 }
+                else {
+                    mergedSegmentInfoUtilListMap.put(segment.getDestinationSegment(), segment.getSourceSegmentIdSet());
+                }
+            }
+
+            List<CarbondataSegmentInfoUtil> newMergedSegmentInfoUtilList = new ArrayList<>();
+
+            for (Map.Entry<String, Set<String>> entrySet : mergedSegmentInfoUtilListMap.entrySet()) {
+                CarbondataSegmentInfoUtil seg = new CarbondataSegmentInfoUtil(entrySet.getKey(), entrySet.getValue());
+                newMergedSegmentInfoUtilList.add(seg);
+            }
+
+            Set<Set<String>> segmentIdSuperSet = new HashSet<>();
+            for (CarbondataSegmentInfoUtil segment : newMergedSegmentInfoUtilList) {
+                Set<String> tempSet = segment.getSourceSegmentIdSet();
+                segmentIdSuperSet.add(tempSet);
+            }
+
+            for (Set<String> segmentIDSet : segmentIdSuperSet) {
+                List<LoadMetadataDetails> segmentsMergedList = new ArrayList<>();
+                for (LoadMetadataDetails load : carbonLoadModel.getLoadMetadataDetails()) {
+                    if (load.isCarbonFormat() && load.getSegmentStatus() == SegmentStatus.SUCCESS
+                            && loadIsMergedInWorker(load.getLoadName(), segmentIDSet)) {
+                        segmentsMergedList.add(load);
+                    }
+                }
+                segmentsMerged.add(segmentsMergedList);
             }
 
             if (this.carbonTable.isHivePartitionTable()) {
@@ -596,7 +614,7 @@ public class CarbondataMetadata
                 segmentFileName = segmentFileName + CarbonTablePath.SEGMENT_EXT;
             }
             else {
-                for (CarbondataSegmentInfoUtil segmentInfo : mergedSegmentInfoUtilList) {
+                for (CarbondataSegmentInfoUtil segmentInfo : newMergedSegmentInfoUtilList) {
                     String mergedLoadNumber = segmentInfo.getDestinationSegment();
                     try {
                         String segmentFileName = SegmentFileStore.writeSegmentFile(carbonTable, mergedLoadNumber, String.valueOf(carbonLoadModel.getFactTimeStamp()));
@@ -1189,12 +1207,22 @@ public class CarbondataMetadata
 
     private void takeUpdateCompactionLock() throws RuntimeException
     {
-        if (updateLock.lockWithRetries() &&
-                compactionLock.lockWithRetries()) {
-            LOG.info("Successfully able to get update and compaction locks");
+        try {
+            if (updateLock.lockWithRetries() &&
+                    compactionLock.lockWithRetries()) {
+                LOG.info("Successfully able to get update and compaction locks");
+            }
+            else {
+                throw new RuntimeException("Unable to get update and compaction locks");
+            }
         }
-        else {
-            throw new RuntimeException("Unable to get update and compaction locks");
+        catch (RuntimeException e) {
+            /*
+            * Using try-catch here to ensure that update lock is released if compaction lock is not taken.
+            * */
+            LOG.error("Exception in taking update and compaction locks", e);
+            releaseLocks();
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while taking locks", e);
         }
     }
 
@@ -1472,23 +1500,27 @@ public class CarbondataMetadata
                 * this conditional check ensures that if two vacuums are called one after the other,
                 * the second one will not throw any exception and just fall through
                 * */
-                String mergedLoadNumber = CarbonDataMergerUtil.getMergedLoadName(segmentsMerged).split("_")[1];
-                String segmentFileName = SegmentFileStore.writeSegmentFile(
-                        carbonTable,
-                        mergedLoadNumber,
-                        String.valueOf(carbonLoadModel.getFactTimeStamp()));
-
-                boolean updateMergeStatus = CarbonDataMergerUtil.updateLoadMetadataWithMergeStatus(
-                        segmentsMerged,
-                        carbonTable.getMetadataPath(),
-                        mergedLoadNumber,
-                        carbonLoadModel,
-                        compactionType.equals(CarbondataConstants.MajorCompaction) ? CompactionType.MAJOR : CompactionType.MINOR,
-                        segmentFileName,
-                        null);
-
-                if (!updateMergeStatus) {
-                    throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error in updating load metadata with merge status");
+                for (List<LoadMetadataDetails> segmentsMergedList : segmentsMerged) {
+                    /*
+                    * If there are nX segments that may be merged, then segmentsMerged has n lists, one for each of the X segments
+                    * that are merged. This ensures that the tablestatus is correctly updated with the merged segment name.
+                    * */
+                    String mergedLoadNumber = CarbonDataMergerUtil.getMergedLoadName(segmentsMergedList).split("_")[1];
+                    String segmentFileName = SegmentFileStore.writeSegmentFile(
+                            carbonTable,
+                            mergedLoadNumber,
+                            String.valueOf(carbonLoadModel.getFactTimeStamp()));
+                    boolean updateMergeStatus = CarbonDataMergerUtil.updateLoadMetadataWithMergeStatus(
+                            segmentsMergedList,
+                            carbonTable.getMetadataPath(),
+                            mergedLoadNumber,
+                            carbonLoadModel,
+                            compactionType.equals(CarbondataConstants.MajorCompaction) ? CompactionType.MAJOR : CompactionType.MINOR,
+                            segmentFileName,
+                            null);
+                    if (!updateMergeStatus) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error in updating load metadata with merge status");
+                    }
                 }
             }
         }
