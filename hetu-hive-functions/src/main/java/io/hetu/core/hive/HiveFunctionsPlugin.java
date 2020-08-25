@@ -55,7 +55,9 @@ public class HiveFunctionsPlugin
 
     private String funcPropFilePath;
     private ClassLoader funcClassLoader;
+    private boolean maxFunctionRunningTimeEnable;
     private long maxFuncRunningTimeInSec;
+    private int functionRunningThreadPoolSize;
 
     public HiveFunctionsPlugin(String propFilePath, ClassLoader classLoader)
     {
@@ -156,8 +158,8 @@ public class HiveFunctionsPlugin
     private DynamicHiveScalarFunction createDynamicHiveScalarFunction(FunctionMetadata funcMetadata, Method method)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(this.funcClassLoader)) {
-            return new DynamicHiveScalarFunction(funcMetadata, method.getGenericParameterTypes(),
-                    method.getGenericReturnType(), this.funcClassLoader, this.maxFuncRunningTimeInSec);
+            return new DynamicHiveScalarFunction(funcMetadata, method.getGenericParameterTypes(), method.getGenericReturnType(),
+                    this.funcClassLoader, this.maxFunctionRunningTimeEnable, this.maxFuncRunningTimeInSec, this.functionRunningThreadPoolSize);
         }
     }
 
@@ -173,5 +175,17 @@ public class HiveFunctionsPlugin
     public void setMaxFunctionRunningTimeInSec(long time)
     {
         this.maxFuncRunningTimeInSec = time;
+    }
+
+    @Override
+    public void setMaxFunctionRunningTimeEnable(boolean enable)
+    {
+        this.maxFunctionRunningTimeEnable = enable;
+    }
+
+    @Override
+    public void setFunctionRunningThreadPoolSize(int size)
+    {
+        this.functionRunningThreadPoolSize = size;
     }
 }

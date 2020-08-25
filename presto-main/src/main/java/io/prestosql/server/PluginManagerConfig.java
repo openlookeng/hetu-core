@@ -28,7 +28,9 @@ public class PluginManagerConfig
     private File installedPluginsDir = new File("plugin");
     private File externalFunctionsPluginsDir = new File("externalFunctionsPlugin");
     private File externalFunctionsDir = new File("externalFunctions");
+    private boolean maxFunctionRunningTimeEnable;
     private long maxFunctionRunningTimeInSec = 600;
+    private int functionRunningThreadPoolSize = 100;
     private List<String> plugins;
     private String mavenLocalRepository = ArtifactResolver.USER_LOCAL_REPO;
     private List<String> mavenRemoteRepository = ImmutableList.of(ArtifactResolver.MAVEN_CENTRAL_URI);
@@ -69,6 +71,18 @@ public class PluginManagerConfig
         return this;
     }
 
+    public boolean getMaxFunctionRunningTimeEnable()
+    {
+        return this.maxFunctionRunningTimeEnable;
+    }
+
+    @Config("max-function-running-time-enable")
+    public PluginManagerConfig setMaxFunctionRunningTimeEnable(boolean maxFunctionRunningTimeEnable)
+    {
+        this.maxFunctionRunningTimeEnable = maxFunctionRunningTimeEnable;
+        return this;
+    }
+
     public long getMaxFunctionRunningTimeInSec()
     {
         return this.maxFunctionRunningTimeInSec;
@@ -78,6 +92,18 @@ public class PluginManagerConfig
     public PluginManagerConfig setMaxFunctionRunningTimeInSec(long time)
     {
         this.maxFunctionRunningTimeInSec = time;
+        return this;
+    }
+
+    public int getFunctionRunningThreadPoolSize()
+    {
+        return this.functionRunningThreadPoolSize;
+    }
+
+    @Config("function-running-thread-pool-size")
+    public PluginManagerConfig setFunctionRunningThreadPoolSize(int functionRunningThreadPoolSize)
+    {
+        this.functionRunningThreadPoolSize = functionRunningThreadPoolSize;
         return this;
     }
 
