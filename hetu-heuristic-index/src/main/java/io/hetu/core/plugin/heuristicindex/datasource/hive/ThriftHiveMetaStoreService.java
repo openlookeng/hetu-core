@@ -30,6 +30,8 @@ import org.apache.thrift.transport.TSaslClientTransport;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
 import javax.security.auth.Subject;
@@ -48,6 +50,7 @@ import java.net.Proxy;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +76,8 @@ import static org.apache.hadoop.security.SecurityUtil.getServerPrincipal;
  */
 public class ThriftHiveMetaStoreService
 {
+    private static final Logger LOG = LoggerFactory.getLogger(ThriftHiveMetaStoreService.class);
+
     private static final String KERBEROS_LOGIN_MODULE = "com.sun.security.auth.module.Krb5LoginModule";
     private static final String COMMA_SEPARATOR = ",";
     private static final int TIMEOUT_MILLIS = 5000;
@@ -110,16 +115,23 @@ public class ThriftHiveMetaStoreService
     {
         setProperties(requireNonNull(properties));
 
-        for (String uri : metastoreUris) {
+        Iterator<String> iterator = metastoreUris.iterator();
+        while (iterator.hasNext()) {
+            String uri = iterator.next();
             String metastoreUriTrimmed = uri.replace("thrift://", "");
             String[] metastoreUriSplits = metastoreUriTrimmed.split(":");
             this.metaStoreHost = metastoreUriSplits[0];
             this.metaStorePort = Integer.parseInt(metastoreUriSplits[1]);
             try {
                 this.client = createClient(metaStoreHost, metaStorePort, hiveMetastoreServicePrincipal);
+                return;
             }
             catch (TTransportException e) {
-                throw new IllegalStateException("Could not connect to metastore at " + metaStoreHost, e);
+                LOG.info("Could not connect to metastore {}:{}", metaStoreHost, metaStorePort);
+                LOG.debug(e.getMessage());
+                if (!iterator.hasNext()) {
+                    throw new IllegalStateException("Could not connect to any metastore: " + metastoreUris);
+                }
             }
         }
     }
@@ -152,7 +164,7 @@ public class ThriftHiveMetaStoreService
      * Get metadata from ThriftHiveMetaStore
      *
      * @param databaseName - name of the database for requested metadata
-     * @param tableName    - name of the table for requested metadata
+     * @param tableName - name of the table for requested metadata
      * @return TableMetadata
      */
     public TableMetadata getTableMetadata(String databaseName, String tableName)
@@ -173,7 +185,8 @@ public class ThriftHiveMetaStoreService
     }
 
     private ThriftHiveMetastoreClient createClient(String host, int port,
-                                                   String principal) throws TTransportException
+            String principal)
+            throws TTransportException
     {
         TTransport rawTransport = createRaw(host, port);
         if (isAuthEnabled) {
@@ -188,7 +201,8 @@ public class ThriftHiveMetaStoreService
         }
     }
 
-    private TTransport createRaw(String host, int port) throws TTransportException
+    private TTransport createRaw(String host, int port)
+            throws TTransportException
     {
         HostAndPort address = HostAndPort.fromParts(host, port);
         Optional<SSLContext> sslContext = Optional.empty();
@@ -224,7 +238,7 @@ public class ThriftHiveMetaStoreService
     }
 
     private TTransport authenticate(TTransport rawTransport, String hiveMetastoreHost,
-                                    String hiveMetastorePrincipal)
+            String hiveMetastorePrincipal)
     {
         TTransport saslTransport = null;
         try {
@@ -297,7 +311,7 @@ public class ThriftHiveMetaStoreService
             @Override
             public AppConfigurationEntry[] getAppConfigurationEntry(String name)
             {
-                return new AppConfigurationEntry[]{
+                return new AppConfigurationEntry[] {
                         new AppConfigurationEntry(KERBEROS_LOGIN_MODULE,
                                 AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, options)
                 };
