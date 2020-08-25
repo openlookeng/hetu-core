@@ -153,6 +153,8 @@ import io.prestosql.transaction.ForTransactionManager;
 import io.prestosql.transaction.InMemoryTransactionManager;
 import io.prestosql.transaction.TransactionManager;
 import io.prestosql.transaction.TransactionManagerConfig;
+import io.prestosql.vacuum.AutoVacuumConfig;
+import io.prestosql.vacuum.AutoVacuumScanner;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
@@ -315,6 +317,11 @@ public class CoordinatorModule
 
         binder.bind(ScheduledExecutorService.class).annotatedWith(ForScheduler.class)
                 .toInstance(newSingleThreadScheduledExecutor(threadsNamed("stage-scheduler")));
+
+        install(installModuleIf(
+                AutoVacuumConfig.class,
+                config -> config.isAutoVacuumEnabled(),
+                binder1 -> binder1.bind(AutoVacuumScanner.class).in(Scopes.SINGLETON)));
 
         // query execution
         binder.bind(ExecutorService.class).annotatedWith(ForQueryExecution.class)
