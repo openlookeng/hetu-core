@@ -13,10 +13,8 @@
  */
 package io.prestosql.split;
 
-import com.google.inject.Inject;
 import io.prestosql.Session;
 import io.prestosql.connector.CatalogName;
-import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -32,20 +30,12 @@ import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.connector.DataCenterUtility.loadDCCatalogForQueryFlow;
 import static java.util.Objects.requireNonNull;
 
 public class PageSourceManager
         implements PageSourceProvider
 {
     private final ConcurrentMap<CatalogName, ConnectorPageSourceProvider> pageSourceProviders = new ConcurrentHashMap<>();
-    private final Metadata metadata;
-
-    @Inject
-    public PageSourceManager(Metadata metadata)
-    {
-        this.metadata = metadata;
-    }
 
     public void addConnectorPageSourceProvider(CatalogName catalogName, ConnectorPageSourceProvider pageSourceProvider)
     {
@@ -65,8 +55,6 @@ public class PageSourceManager
         requireNonNull(columns, "columns is null");
         checkArgument(split.getCatalogName().equals(table.getCatalogName()), "mismatched split and table");
         CatalogName catalogName = split.getCatalogName();
-
-        loadDCCatalogForQueryFlow(session, metadata, catalogName.getCatalogName());
 
         ConnectorPageSourceProvider provider = getPageSourceProvider(catalogName);
 

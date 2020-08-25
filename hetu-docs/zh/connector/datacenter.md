@@ -25,9 +25,9 @@ connection-password=password
 | `dc.application.name.prefix`| 添加到任何指定的ApplicationName客户端信息属性的前缀，该前缀用于设置openLooKeng查询的源名称。如果没有设置此属性或ApplicationName，则查询的源将是hetu-dc。| `hetu-dc`|
 | `dc.extra.credentials`| 连接外部服务的额外凭证。ExtraCredentials是一个键值对列表。示例：**foo:bar;abc:xyz**将创建凭证**abc=xyz**和**foo=bar**。| |
 | `dc.http-client-timeout`| 客户端持续重试取数据的时间，默认值为10分钟| `10.00m`|
-| `dc.http-compression`| 是否使用gzip压缩响应体，默认值为true| `false`|
-| `dc.http-request-connectTimeout`| HTTP请求连接超时，默认值为1分钟| `30.00s`|
-| `dc.http-request-readTimeout`| HTTP请求读取超时，默认为2分钟| `30.00s`|
+| `dc.http-compression`| 是否使用gzip压缩响应体，默认值为false| `false`|
+| `dc.http-request-connectTimeout`| HTTP请求连接超时，默认值为30秒| `30.00s`|
+| `dc.http-request-readTimeout`| HTTP请求读取超时，默认为30秒| `30.00s`|
 | `dc.httpclient.maximum.idle.connections`| HTTP客户端保持打开的最大空闲连接| `20`|
 | `dc.httpproxy`| HTTP代理主机和端口。示例：**localhost:8888**| |
 | `dc.kerberos.config.path`| Kerberos配置文件| |

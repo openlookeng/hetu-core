@@ -15,12 +15,16 @@
 package io.prestosql.connector;
 
 import io.prestosql.Session;
+import io.prestosql.execution.TaskSource;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Use;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public class DataCenterUtility
 {
@@ -81,6 +85,42 @@ public class DataCenterUtility
         }
     }
 
+    /**
+     * Utility method to load all DC catalog from updateTask.
+     *
+     * @param metadata session
+     * @param sources task source
+     */
+    public static void loadDCCatalogForUpdateTask(Metadata metadata, List<TaskSource> sources)
+    {
+        if (metadata instanceof MetadataManager) {
+            // try to load dc catalog
+            DataCenterConnectorManager dataCenterConnectorManager = ((MetadataManager) metadata).getDataCenterConnectorManager();
+            Set<String> catalogNames = new HashSet<>();
+            sources.stream().forEach(source -> {
+                source.getSplits().stream()
+                        .forEach(split ->
+                        {
+                            String catalogName = split.getSplit().getCatalogName().getCatalogName();
+                            if (catalogName.contains(".")
+                                    && dataCenterConnectorManager.isDCCatalog(catalogName.substring(0, catalogName.indexOf(".")))) {
+                                catalogNames.add(catalogName);
+                            }
+                        });
+            });
+            catalogNames.stream()
+                    .forEach(catalogName -> {
+                        dataCenterConnectorManager.loadDCCatalog(catalogName);
+                    });
+        }
+    }
+
+    /**
+     * Utility method to check whether a catalog is cross-dc catalog.
+     *
+     * @param metadata session
+     * @param catalogName catalog name
+     */
     public static boolean isDCCatalog(Metadata metadata, String catalogName)
     {
         MetadataManager metadataManager = (MetadataManager) metadata;

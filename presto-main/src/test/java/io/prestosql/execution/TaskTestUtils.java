@@ -108,7 +108,7 @@ public final class TaskTestUtils
     {
         Metadata metadata = createTestMetadataManager();
 
-        PageSourceManager pageSourceManager = new PageSourceManager(metadata);
+        PageSourceManager pageSourceManager = new PageSourceManager();
         pageSourceManager.addConnectorPageSourceProvider(CONNECTOR_ID, new TestingPageSourceProvider());
 
         // we don't start the finalizer so nothing will be collected, which is ok for a test
