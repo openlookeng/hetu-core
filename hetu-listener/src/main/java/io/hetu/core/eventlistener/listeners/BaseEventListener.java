@@ -61,6 +61,10 @@ public abstract class BaseEventListener
     {
         Type type = config.getType();
 
+        if (type == Type.AUDIT) {
+            return new AuditEventLogger(config);
+        }
+
         if (type == null || (!config.isListenQueryCreation() && !config.isListenQueryCompletion()
                 && !config.isListenSplitCompletion())) {
             // Do not listen anything
@@ -132,6 +136,7 @@ public abstract class BaseEventListener
         /**
          * logger enum
          */
-        LOGGER
+        LOGGER,
+        AUDIT
     }
 }
