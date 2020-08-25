@@ -917,7 +917,7 @@ public class Query
             log.warn("Query %s in state %s has no failure info", queryInfo.getQueryId(), state);
             executionFailure = toFailure(new RuntimeException(format("Query is %s (reason unknown)", state)));
         }
-        FailureInfo failure = executionFailure.toFailureInfo();
+        FailureInfo failure = executionFailure.toFailureInfoWithoutStack();
 
         ErrorCode errorCode;
         if (queryInfo.getErrorCode() != null) {
