@@ -26,22 +26,24 @@ public class DropCache
 {
     private final QualifiedName tableName;
     private final boolean exists;
+    private final Optional<Expression> where;
 
     public DropCache(QualifiedName tableName, boolean exists)
     {
-        this(Optional.empty(), tableName, exists);
+        this(Optional.empty(), tableName, exists, Optional.empty());
     }
 
-    public DropCache(NodeLocation location, QualifiedName tableName, boolean exists)
+    public DropCache(NodeLocation location, QualifiedName tableName, boolean exists, Optional<Expression> where)
     {
-        this(Optional.of(location), tableName, exists);
+        this(Optional.of(location), tableName, exists, where);
     }
 
-    private DropCache(Optional<NodeLocation> location, QualifiedName tableName, boolean exists)
+    private DropCache(Optional<NodeLocation> location, QualifiedName tableName, boolean exists, Optional<Expression> where)
     {
         super(location);
         this.tableName = tableName;
         this.exists = exists;
+        this.where = where;
     }
 
     public QualifiedName getTableName()
@@ -52,6 +54,11 @@ public class DropCache
     public boolean isExists()
     {
         return exists;
+    }
+
+    public Optional<Expression> getWhere()
+    {
+        return where;
     }
 
     @Override
@@ -83,7 +90,8 @@ public class DropCache
         }
         DropCache o = (DropCache) obj;
         return Objects.equals(tableName, o.tableName)
-                && (exists == o.exists);
+                && (exists == o.exists)
+                && Objects.equals(where, o.where);
     }
 
     @Override
@@ -92,6 +100,7 @@ public class DropCache
         return toStringHelper(this)
                 .add("tableName", tableName)
                 .add("exists", exists)
+                .add("where", (where.isPresent() ? where.get().toString() : "null"))
                 .toString();
     }
 }

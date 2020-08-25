@@ -77,10 +77,33 @@ public class SplitCacheMap
         return tableCacheInfoMap.containsKey(tableName.toString());
     }
 
-    public void dropCache(QualifiedName tableName)
+    public void dropCache(QualifiedName tableName, Optional<String> predicateString)
     {
-        this.droppedCaches.add(tableName.toString());
-        this.tableCacheInfoMap.remove(tableName.toString());
+        if (!predicateString.isPresent()) {
+            this.droppedCaches.add(tableName.toString());
+            this.tableCacheInfoMap.remove(tableName.toString());
+            return;
+        }
+
+        boolean dropFlag = false;
+        TableCacheInfo tableCacheInfo = tableCacheInfoMap.get(tableName.toString());
+        Set<CachePredicate> cachePredicates = tableCacheInfo.getPredicates();
+        for (CachePredicate cachePredicate : cachePredicates) {
+            if (cachePredicate.getCachePredicateString().equalsIgnoreCase(predicateString.get())) {
+                tableCacheInfo.removeCachedPredicate(cachePredicate);
+                dropFlag = true;
+                break;
+            }
+        }
+
+        if (!dropFlag) {
+            throw new RuntimeException(String.format("Cache predicate '%s' does not exist", predicateString.get()));
+        }
+
+        if (tableCacheInfo.getPredicates().isEmpty()) {
+            this.droppedCaches.add(tableName.toString());
+            this.tableCacheInfoMap.remove(tableName.toString());
+        }
     }
 
     public void dropCache()

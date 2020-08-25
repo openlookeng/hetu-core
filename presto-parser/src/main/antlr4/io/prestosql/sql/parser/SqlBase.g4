@@ -51,7 +51,8 @@ statement
     | CACHE TABLE tableName=qualifiedName
         (WHERE booleanExpression)?
         (WITH properties)?                #cacheTable
-    | DROP CACHE (IF EXISTS)? qualifiedName                            #dropCache
+    | DROP CACHE (IF EXISTS)? qualifiedName
+        (WHERE booleanExpression)?                                     #dropCache
     | SHOW CACHE qualifiedName?                            #showCache
     | INSERT INTO qualifiedName columnAliases? query                   #insertInto
     | INSERT OVERWRITE (TABLE)? qualifiedName columnAliases? query                   #insertOverwrite

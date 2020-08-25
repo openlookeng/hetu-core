@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -195,7 +196,7 @@ public class TestSplitCacheStateUpdater
             TableCacheInfo deserTable2Cache = objectMapper.readerFor(TableCacheInfo.class).readValue(testStateMap.get(table2QN.toString()));
             assertEquals(deserTable2Cache, splitCacheMap.tableCacheInfoMap().get(table2QN.toString()));
 
-            splitCacheMap.dropCache(table1QN);
+            splitCacheMap.dropCache(table1QN, Optional.empty());
             assertFalse(splitCacheMap.cacheExists(table1QN));
 
             Thread.sleep(2000);

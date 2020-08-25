@@ -25,11 +25,17 @@ CACHE TABLE table_name WHERE condition
 ``` sql 
     CACHE TABLE store_sales where ss_sold_date_sk > 20200220;
 ```
+缓存拥有复杂 condition 的数据
+```sql
+    CACHE TABLE store_sales WHERE location = 'CA' AND ss_sold_date_sk > 20200220;
+```
  
 
 ## 限制
 
-目前只有Hive连接器支持此功能。 有关更多详细信息，请参见连接器文档。
+- 目前只有Hive连接器支持此功能。 有关更多详细信息，请参见连接器文档。
+- 目前 `WHERE` 中不支持 `LIKE` 字段。
+- 目前不支持 `WHERE` 中的 `OR` 运算符。
 
 ## 另请参见
 

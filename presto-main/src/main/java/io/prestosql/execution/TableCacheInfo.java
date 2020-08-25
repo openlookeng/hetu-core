@@ -100,6 +100,13 @@ public class TableCacheInfo
     }
 
     @JsonIgnore
+    public void removeCachedPredicate(CachePredicate cachePredicate)
+    {
+        this.predicates.remove(cachePredicate);
+        this.lastUpdated = LocalDateTime.now();
+    }
+
+    @JsonIgnore
     public Set<TupleDomain<ColumnMetadata>> getCachePredicateTupleDomains()
     {
         return ImmutableSet.copyOf(this.predicates
@@ -118,7 +125,7 @@ public class TableCacheInfo
     public String showPredicates()
     {
         StringBuilder predicatesToShow = new StringBuilder();
-        this.predicates.forEach(cachePredicate -> predicatesToShow.append(cachePredicate.getCachePredicateString()).append(System.lineSeparator()));
+        this.predicates.stream().map(CachePredicate::getCachePredicateString).forEach(cachePredicateString -> predicatesToShow.append(cachePredicateString).append(System.lineSeparator()));
         predicatesToShow.append(System.lineSeparator());
         return predicatesToShow.toString();
     }

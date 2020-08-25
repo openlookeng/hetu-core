@@ -75,7 +75,7 @@ import static java.util.Locale.ENGLISH;
 import static org.testng.Assert.fail;
 
 @Test(singleThreaded = true)
-public class TestRowFilterCoumnMaskingRewrite
+public class TestRowFilterColumnMaskingRewrite
 {
     private static final String TPCH_CATALOG = "tpch";
     private static final CatalogName TPCH_CATALOG_NAME = new CatalogName(TPCH_CATALOG);

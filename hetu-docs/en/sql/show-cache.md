@@ -6,7 +6,7 @@ Synopsis
 --------
 
 ``` sql
-SHOW CACHE
+SHOW CACHE;
 ```
 
 Description

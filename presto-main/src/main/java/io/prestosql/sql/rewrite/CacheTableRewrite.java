@@ -54,7 +54,6 @@ import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Values;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -139,10 +138,8 @@ final class CacheTableRewrite
 
             TableMetadata tableMetadata = metadata.getTableMetadata(session, metadata.getTableHandle(session, qualifiedTableName).get());
 
-            List<TupleDomain<ColumnMetadata>> tupleDomains = getTupleDomains(tableMetadata, cache.getWhere().get());
-
-            tupleDomains.stream().forEach(columnMetadataTupleDomain ->
-                    splitCacheMap.addCache(tableName, columnMetadataTupleDomain, predicate.toString()));
+            TupleDomain<ColumnMetadata> columnMetadataTupleDomain = translateToTupleDomain(tableMetadata, predicate);
+            splitCacheMap.addCache(tableName, columnMetadataTupleDomain, predicate.toString());
 
             // Construct a response to indicate success
             return simpleQuery(
@@ -152,7 +149,7 @@ final class CacheTableRewrite
                             new Values(ImmutableList.of(new StringLiteral("OK"))),
                             "Cache Result",
                             ImmutableList.of("result")));
-                    // return a no-op value node, see SHOW CATALOGS flow, return "success"
+            // return a no-op value node, see SHOW CATALOGS flow, return "success"
         }
 
         @Override
@@ -165,25 +162,6 @@ final class CacheTableRewrite
         protected Node visitNode(Node node, Void context)
         {
             return node;
-        }
-
-        private List<TupleDomain<ColumnMetadata>> getTupleDomains(TableMetadata tableMetadata, Expression whereClause)
-        {
-            List<TupleDomain<ColumnMetadata>> tupleDomains = new ArrayList<>();
-            if (whereClause instanceof LogicalBinaryExpression) {
-                Expression leftSide = ((LogicalBinaryExpression) whereClause).getLeft();
-                Expression rightSide = ((LogicalBinaryExpression) whereClause).getRight();
-                if (leftSide instanceof LogicalBinaryExpression) {
-                    tupleDomains.addAll(getTupleDomains(tableMetadata, leftSide));
-                }
-                else if (rightSide instanceof LogicalBinaryExpression) {
-                    tupleDomains.addAll(getTupleDomains(tableMetadata, rightSide));
-                }
-            }
-            else {
-                tupleDomains.add(translateToTupleDomain(tableMetadata, whereClause));
-            }
-            return tupleDomains;
         }
 
         private TupleDomain<ColumnMetadata> translateToTupleDomain(TableMetadata tableMetadata, Expression whereClause)
@@ -227,10 +205,16 @@ final class CacheTableRewrite
                 }
             }
             else if (whereClause instanceof LogicalBinaryExpression) {
-                // Does not support caching multi-level partitioned tables
-                throw new PrestoException(GENERIC_USER_ERROR, "Only one predicate for cache table feature is permitted");
+                LogicalBinaryExpression predicate = (LogicalBinaryExpression) whereClause;
+                Expression leftExpression = predicate.getLeft();
+                Expression rightExpression = predicate.getRight();
+                TupleDomain<ColumnMetadata> leftDomain = translateToTupleDomain(tableMetadata, leftExpression);
+                TupleDomain<ColumnMetadata> rightDomain = translateToTupleDomain(tableMetadata, rightExpression);
+                switch (predicate.getOperator()) {
+                    case AND:
+                        return leftDomain.intersect(rightDomain);
+                }
             }
-
             // create a Type entry for the converted Identifier
             types = TypeProvider.copyOf(symbolMapping);
             // Use SimplifyExpressions class to rewrite the replacement predicate into a new expression

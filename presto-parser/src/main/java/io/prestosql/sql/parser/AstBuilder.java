@@ -336,7 +336,7 @@ class AstBuilder
     @Override
     public Node visitDropCache(SqlBaseParser.DropCacheContext context)
     {
-        return new DropCache(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
+        return new DropCache(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null, visitIfPresent(context.booleanExpression(), Expression.class));
     }
 
     @Override
