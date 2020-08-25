@@ -366,6 +366,37 @@ public class TestCarbonAllDataType
         assertEquals(actualResult.toString(), expectedResult.toString());
     }
 
+    @Test(dependsOnMethods = {"testInsertOverwriteEmptyTable"})
+    public void testInsertExistingPartitionsOverwriteEmptyTable() throws SQLException
+    {
+        hetuServer.execute("INSERT OVERWRITE testdb.testtable VALUES (12, current_date , 'china' , 'KASHYAP', " +
+                "'phone706', 'ASD86717', 15008.00,500.414,11.655, " +
+                "timestamp '2001-08-29 13:09:03',smallint '12',true)");
+
+        hetuServer.execute("set session carbondata.insert_existing_partitions_behavior = 'overwrite'");
+        hetuServer.execute("INSERT INTO testdb.testtable VALUES (2, current_date , 'india' , 'Jacob', " +
+                "'phone754', 'ASD8643', 15008.00,500.414,11.655, " +
+                "timestamp '2001-08-29 13:09:03',smallint '12',true)");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT COUNT(*) AS RESULT FROM testdb.testtable");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT ID,COUNTRY,NAME FROM testdb.testtable");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{
+                put("ID", 2);
+                put("COUNTRY", "india");
+                put("NAME", "Jacob");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
     @Test
     public void testCreateTable() throws SQLException
     {
