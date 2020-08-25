@@ -1002,4 +1002,18 @@ public class TestCarbonAllDataType
 
         hetuServer.execute("DROP TABLE testdb.testTableStatus");
     }
+
+    @Test
+    public void testShowCreateTable() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.showcreatetable (a int, b int)");
+        try {
+            hetuServer.execute("SHOW CREATE TABLE  testdb.showcreatetable");
+        }
+        catch (RuntimeException e){
+            hetuServer.execute("DROP TABLE testdb.showcreatetable");
+            Assert.fail("Failed while executing show create table");
+        }
+        hetuServer.execute("DROP TABLE IF EXISTS testdb.showcreatetable");
+    }
 }
