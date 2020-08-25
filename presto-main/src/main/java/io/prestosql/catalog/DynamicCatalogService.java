@@ -37,7 +37,6 @@ import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.CONFLICT;
 import static javax.ws.rs.core.Response.Status.CREATED;
 import static javax.ws.rs.core.Response.Status.FOUND;
-import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 import static javax.ws.rs.core.Response.Status.NO_CONTENT;
 import static javax.ws.rs.core.Response.Status.UNAUTHORIZED;
@@ -115,7 +114,7 @@ public class DynamicCatalogService
                     isExistInRemoteStore = dynamicCatalogStore.listCatalogNames(shareCatalogStore).contains(catalogName);
                 }
                 catch (IOException ex) {
-                    throw badRequest(INTERNAL_SERVER_ERROR, "Failed to list existing catalogs");
+                    throw badRequest(BAD_REQUEST, "Failed to list existing catalogs");
                 }
 
                 if (catalogManager.getCatalog(catalogName).isPresent() || isExistInRemoteStore) {
@@ -127,7 +126,7 @@ public class DynamicCatalogService
                     securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
                 }
                 catch (SecurityKeyException e) {
-                    throw badRequest(INTERNAL_SERVER_ERROR, e.getMessage());
+                    throw badRequest(BAD_REQUEST, e.getMessage());
                 }
 
                 // create catalog
@@ -135,11 +134,7 @@ public class DynamicCatalogService
                     // load catalog and store related configuration files to share file system.
                     dynamicCatalogStore.loadCatalogAndCreateShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
                 }
-                catch (PrestoException ex) {
-                    deleteSecurityKey(catalogName);
-                    throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
-                }
-                catch (IllegalArgumentException ex) {
+                catch (PrestoException | IllegalArgumentException ex) {
                     deleteSecurityKey(catalogName);
                     throw badRequest(BAD_REQUEST, ex.getMessage());
                 }
@@ -149,7 +144,7 @@ public class DynamicCatalogService
             }
         }
         catch (IOException ex) {
-            throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
+            throw badRequest(BAD_REQUEST, ex.getMessage());
         }
 
         return Response.status(CREATED).build();
@@ -193,7 +188,7 @@ public class DynamicCatalogService
                     isExistInRemoteStore = dynamicCatalogStore.listCatalogNames(shareCatalogStore).contains(catalogName);
                 }
                 catch (IOException ex) {
-                    throw badRequest(INTERNAL_SERVER_ERROR, "Failed to list existing catalogs");
+                    throw badRequest(BAD_REQUEST, "Failed to list existing catalogs");
                 }
 
                 if (!isExistInRemoteStore) {
@@ -209,7 +204,7 @@ public class DynamicCatalogService
                         securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
                     }
                     catch (SecurityKeyException e) {
-                        throw badRequest(INTERNAL_SERVER_ERROR, e.getMessage());
+                        throw badRequest(BAD_REQUEST, e.getMessage());
                     }
                 }
 
@@ -218,13 +213,7 @@ public class DynamicCatalogService
                     // update the catalog and update related configuration files in the share file system.
                     dynamicCatalogStore.updateCatalogAndShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
                 }
-                catch (PrestoException ex) {
-                    if (updateKey) {
-                        rollbackKey(catalogName, preSecurityKey);
-                    }
-                    throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
-                }
-                catch (IllegalArgumentException ex) {
+                catch (PrestoException | IllegalArgumentException ex) {
                     if (updateKey) {
                         rollbackKey(catalogName, preSecurityKey);
                     }
@@ -236,7 +225,7 @@ public class DynamicCatalogService
             }
         }
         catch (IOException ex) {
-            throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
+            throw badRequest(BAD_REQUEST, ex.getMessage());
         }
 
         return Response.status(CREATED).build();
@@ -261,7 +250,7 @@ public class DynamicCatalogService
                     isExistInRemoteStore = dynamicCatalogStore.listCatalogNames(shareCatalogStore).contains(catalogName);
                 }
                 catch (IOException ex) {
-                    throw badRequest(INTERNAL_SERVER_ERROR, "Failed to list existing catalogs");
+                    throw badRequest(BAD_REQUEST, "Failed to list existing catalogs");
                 }
 
                 if (!isExistInRemoteStore) {
@@ -279,7 +268,7 @@ public class DynamicCatalogService
             }
         }
         catch (IOException ex) {
-            throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
+            throw badRequest(BAD_REQUEST, ex.getMessage());
         }
 
         return Response.status(NO_CONTENT).build();
@@ -300,7 +289,7 @@ public class DynamicCatalogService
             return Response.ok(catalogNames).build();
         }
         catch (IOException ex) {
-            throw badRequest(INTERNAL_SERVER_ERROR, ex.getMessage());
+            throw badRequest(BAD_REQUEST, ex.getMessage());
         }
     }
 }

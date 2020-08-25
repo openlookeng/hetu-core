@@ -32,6 +32,7 @@ public class DynamicCatalogConfig
     private String catalogShareConfigurationDir;
     private Duration catalogScannerInterval = Duration.valueOf("5s");
     private DataSize catalogMaxFileSize = new DataSize(128, KILOBYTE);
+    private int catalogMaxFileNumber = 10;
 
     @Config("catalog.dynamic-enabled")
     @ConfigDescription("Whether to enable dynamic catalog.")
@@ -99,5 +100,18 @@ public class DynamicCatalogConfig
     public DataSize getCatalogMaxFileSize()
     {
         return catalogMaxFileSize;
+    }
+
+    @Config("catalog.max-file-number")
+    @ConfigDescription("Maximum file number, default value is 10.")
+    public DynamicCatalogConfig setCatalogMaxFileNumber(int catalogMaxFileNumber)
+    {
+        this.catalogMaxFileNumber = catalogMaxFileNumber;
+        return this;
+    }
+
+    public int getCatalogMaxFileNumber()
+    {
+        return catalogMaxFileNumber;
     }
 }

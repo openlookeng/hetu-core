@@ -147,7 +147,7 @@ public class CatalogFileInputStream
                 totalLen += len;
             }
             if (totalLen > maxFileSizeInBytes) {
-                throw new IllegalArgumentException("The file size exceeds the upper limit");
+                throw new IOException("The file size exceeds the upper limit");
             }
             baos.flush();
             return baos;

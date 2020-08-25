@@ -45,15 +45,15 @@ import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.GLOBAL
 import static io.prestosql.catalog.DynamicCatalogService.badRequest;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
-import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 
 @Path("/v1/catalog")
 public class CatalogResource
 {
     private static final JsonCodec<CatalogInfo> CATALOG_INFO_CODEC = JsonCodec.jsonCodec(CatalogInfo.class);
-
+    private static final String FILE_NAME_REGEX = "[^\\s\\\\/:\\*\\?\\\"<>\\|](\\x20|[^\\s\\\\/:\\*\\?\\\"<>\\|])*[^\\s\\\\/:\\*\\?\\\"<>\\|\\.]$";
     private final DynamicCatalogService service;
     private final int catalogMaxFileSizeInBytes;
+    private final int catalogMaxFileNumber;
 
     @Inject
     public CatalogResource(DynamicCatalogService service, DynamicCatalogConfig config)
@@ -61,22 +61,25 @@ public class CatalogResource
         requireNonNull(config, "config is null");
         this.service = requireNonNull(service, "service is null");
         catalogMaxFileSizeInBytes = (int) config.getCatalogMaxFileSize().toBytes();
+        catalogMaxFileNumber = config.getCatalogMaxFileNumber();
     }
 
     private void putInputStreams(CatalogFileInputStream.Builder builder, List<FormDataBodyPart> configFileBodyParts, CatalogFileInputStream.CatalogFileType fileType)
             throws IOException
     {
         if (configFileBodyParts != null) {
+            if (configFileBodyParts.size() > catalogMaxFileNumber) {
+                throw new IOException("The number of config file is greater than " + catalogMaxFileNumber);
+            }
             for (FormDataBodyPart bodyPart : configFileBodyParts) {
                 BodyPartEntity bodyPartEntity = (BodyPartEntity) bodyPart.getEntity();
                 String fileName = bodyPart.getContentDisposition().getFileName();
+                if (!fileName.matches(FILE_NAME_REGEX)) {
+                    builder.close();
+                    throw new IOException("The file name is not correct.");
+                }
                 InputStream bodyPartInputStream = bodyPartEntity.getInputStream();
-                try {
-                    builder.put(fileName, fileType, bodyPartInputStream);
-                }
-                catch (IOException e) {
-                    throw e;
-                }
+                builder.put(fileName, fileType, bodyPartInputStream);
             }
         }
     }
@@ -136,7 +139,7 @@ public class CatalogResource
                     new HttpRequestSessionContext(servletRequest));
         }
         catch (IOException ex) {
-            throw badRequest(INTERNAL_SERVER_ERROR, "Files are not invalid");
+            throw badRequest(BAD_REQUEST, ex.getMessage());
         }
         finally {
             closeInputStreams(catalogConfigFileBodyParts);
@@ -160,7 +163,7 @@ public class CatalogResource
                     new HttpRequestSessionContext(servletRequest));
         }
         catch (IOException ex) {
-            throw badRequest(INTERNAL_SERVER_ERROR, "Files are not invalid");
+            throw badRequest(BAD_REQUEST, ex.getMessage());
         }
         finally {
             closeInputStreams(catalogConfigFileBodyParts);
