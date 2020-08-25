@@ -22,15 +22,20 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.split.SplitSource;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.testng.Assert.assertEquals;
@@ -70,8 +75,9 @@ public class TestSplitUtils
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
         HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
-        List<Split> filteredSplits = SplitUtils.getFilteredSplit(PredicateExtractor.getExpression(stage),
-                PredicateExtractor.getFullyQualifiedName(stage), nextSplits, indexerManager);
+        PredicateExtractor.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = PredicateExtractor.getExpression(stage);
+        List<Split> filteredSplits = SplitUtils.getFilteredSplit(pair.first,
+                PredicateExtractor.getFullyQualifiedName(stage), pair.second, nextSplits, indexerManager);
         assertNotNull(filteredSplits);
         assertEquals(filteredSplits.size(), 4);
     }

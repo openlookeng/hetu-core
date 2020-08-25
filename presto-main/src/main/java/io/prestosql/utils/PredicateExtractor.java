@@ -17,7 +17,9 @@ package io.prestosql.utils;
 import io.airlift.log.Logger;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
@@ -31,6 +33,7 @@ import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.LongLiteral;
+import io.prestosql.sql.tree.NotExpression;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.TimeLiteral;
@@ -39,13 +42,27 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 
 public class PredicateExtractor
 {
     private static final Logger LOG = Logger.get(PredicateExtractor.class);
+
+    public static class Tuple<T1, T2>
+    {
+        public final T1 first;
+        public final T2 second;
+
+        public Tuple(T1 v1, T2 v2)
+        {
+            first = v1;
+            second = v2;
+        }
+    }
 
     private PredicateExtractor()
     {
@@ -125,22 +142,35 @@ public class PredicateExtractor
         if (predicate instanceof InPredicate) {
             return true;
         }
+        if (predicate instanceof NotExpression) {
+            return true;
+        }
 
         return false;
     }
 
-    public static Optional<Expression> getExpression(SqlStageExecution stage)
+    /**
+     * Get the expression and column name assignment map, in case some columns are
+     * renamed which results in index not loading correctly.
+     *
+     * @param stage stage object
+     * @return Pair of: Expression and a column name assignment map
+     */
+    public static Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> getExpression(SqlStageExecution stage)
     {
         Optional<FilterNode> filterNodeOptional = getFilterNode(stage);
 
         if (!filterNodeOptional.isPresent()) {
-            return Optional.empty();
+            return new Tuple<>(Optional.empty(), new HashMap<>());
         }
 
         FilterNode filterNode = filterNodeOptional.get();
-        Expression predicate = filterNode.getPredicate();
-
-        return Optional.of(predicate);
+        if (filterNode.getSource() instanceof TableScanNode) {
+            TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
+            Expression predicate = filterNode.getPredicate();
+            return new Tuple<>(Optional.of(predicate), tableScanNode.getAssignments());
+        }
+        return new Tuple<>(Optional.empty(), new HashMap<>());
     }
 
     public static Optional<String> getFullyQualifiedName(SqlStageExecution stage)
@@ -158,7 +188,7 @@ public class PredicateExtractor
         return Optional.of(fullQualifiedTableName);
     }
 
-    public static Predicate processComparisonExpression(ComparisonExpression comparisonExpression, String fullQualifiedTableName)
+    protected static Predicate processComparisonExpression(ComparisonExpression comparisonExpression, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
     {
         Predicate pred = null;
         switch (comparisonExpression.getOperator()) {
@@ -167,7 +197,7 @@ public class PredicateExtractor
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
-                pred = buildPredicate(comparisonExpression, fullQualifiedTableName);
+                pred = buildPredicate(comparisonExpression, fullQualifiedTableName, assignments);
                 break;
             default:
                 LOG.warn("ComparisonExpression %s, not supported", comparisonExpression.getOperator().toString());
@@ -176,7 +206,7 @@ public class PredicateExtractor
         return pred;
     }
 
-    private static Predicate buildPredicate(ComparisonExpression expression, String fullQualifiedTableName)
+    private static Predicate buildPredicate(ComparisonExpression expression, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
     {
         Predicate predicate = new Predicate();
         predicate.setTableName(fullQualifiedTableName);
@@ -190,6 +220,10 @@ public class PredicateExtractor
             return null;
         }
         String columnName = ((SymbolReference) leftExpression).getName();
+        Symbol columnSymbol = new Symbol(columnName);
+        if (assignments.containsKey(columnSymbol)) {
+            columnName = assignments.get(columnSymbol).getColumnName();
+        }
         predicate.setColumnName(columnName);
 
         // Get column value type

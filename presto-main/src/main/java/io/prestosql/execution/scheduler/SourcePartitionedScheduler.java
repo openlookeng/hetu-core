@@ -28,11 +28,14 @@ import io.prestosql.execution.scheduler.FixedSourcePartitionedScheduler.Bucketed
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.SplitSource;
 import io.prestosql.split.SplitSource.SplitBatch;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.utils.PredicateExtractor;
 import io.prestosql.utils.SplitUtils;
 
@@ -43,6 +46,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -251,9 +255,10 @@ public class SourcePartitionedScheduler
                     SplitBatch nextSplits = getFutureValue(scheduleGroup.nextSplitBatchFuture);
                     scheduleGroup.nextSplitBatchFuture = null;
 
-                    // add split filter to filter out splits that do not contain valid rows
-                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(PredicateExtractor.getExpression(stage),
-                            PredicateExtractor.getFullyQualifiedName(stage), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
+                    // add split filter to filter out split has no valid rows
+                    PredicateExtractor.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = PredicateExtractor.getExpression(stage);
+                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(pair.first,
+                            PredicateExtractor.getFullyQualifiedName(stage), pair.second, nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
                     pendingSplits.addAll(filteredSplit);
                     if (nextSplits.isLastBatch()) {
