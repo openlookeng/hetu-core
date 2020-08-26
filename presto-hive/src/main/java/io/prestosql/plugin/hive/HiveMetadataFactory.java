@@ -54,13 +54,16 @@ public class HiveMetadataFactory
     private final LocationService locationService;
     private final JsonCodec<PartitionUpdate> partitionUpdateCodec;
     private final BoundedExecutor renameExecution;
-    private final ScheduledExecutorService vacuumCleanupService;
+    private final ScheduledExecutorService hiveVacuumService;
     private final TypeTranslator typeTranslator;
     private final String prestoVersion;
     private final AccessControlMetadataFactory accessControlMetadataFactory;
     private final Optional<Duration> hiveTransactionHeartbeatInterval;
     private final ScheduledExecutorService heartbeatService;
-    private final Optional<Duration> vacuumCleanupInterval;
+    private final Optional<Duration> vacuumCleanupRecheckInterval;
+    private final int vacuumDeltaNumThreshold;
+    private final double vacuumDeltaPercentThreshold;
+    private final boolean autoVacuumEnabled;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -70,7 +73,7 @@ public class HiveMetadataFactory
             HdfsEnvironment hdfsEnvironment,
             HivePartitionManager partitionManager,
             @ForHive ExecutorService executorService,
-            @ForHiveVacuumCleanUp ScheduledExecutorService vacuumCleanUpService,
+            @ForHiveVacuum ScheduledExecutorService hiveVacuumService,
             @ForHiveTransactionHeartbeats ScheduledExecutorService heartbeatService,
             TypeManager typeManager,
             LocationService locationService,
@@ -98,11 +101,14 @@ public class HiveMetadataFactory
                 locationService,
                 partitionUpdateCodec,
                 executorService,
-                vacuumCleanUpService,
+                hiveVacuumService,
                 heartbeatService,
                 typeTranslator,
                 nodeVersion.toString(),
-                accessControlMetadataFactory);
+                accessControlMetadataFactory,
+                hiveConfig.getVacuumDeltaNumThreshold(),
+                hiveConfig.getVacuumDeltaPercentThreshold(),
+                hiveConfig.getAutoVacuumEnabled());
     }
 
     public HiveMetadataFactory(
@@ -119,16 +125,19 @@ public class HiveMetadataFactory
             boolean tableCreatesWithLocationAllowed,
             long perTransactionCacheMaximumSize,
             Optional<Duration> hiveTransactionHeartbeatInterval,
-            Optional<Duration> vacuumCleanupInterval,
+            Optional<Duration> vacuumCleanupRecheckInterval,
             TypeManager typeManager,
             LocationService locationService,
             JsonCodec<PartitionUpdate> partitionUpdateCodec,
             ExecutorService executorService,
-            ScheduledExecutorService vacuumCleanupService,
+            ScheduledExecutorService hiveVacuumService,
             ScheduledExecutorService heartbeatService,
             TypeTranslator typeTranslator,
             String prestoVersion,
-            AccessControlMetadataFactory accessControlMetadataFactory)
+            AccessControlMetadataFactory accessControlMetadataFactory,
+            int vacuumDeltaNumThreshold,
+            double vacuumDeltaPercentThreshold,
+            boolean autoVacuumEnabled)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
         this.skipDeletionForAlter = skipDeletionForAlter;
@@ -149,7 +158,7 @@ public class HiveMetadataFactory
         this.prestoVersion = requireNonNull(prestoVersion, "prestoVersion is null");
         this.accessControlMetadataFactory = requireNonNull(accessControlMetadataFactory, "accessControlMetadataFactory is null");
         this.hiveTransactionHeartbeatInterval = requireNonNull(hiveTransactionHeartbeatInterval, "hiveTransactionHeartbeatInterval is null");
-        this.vacuumCleanupInterval = requireNonNull(vacuumCleanupInterval, "vacuumCleanupInterval is null");
+        this.vacuumCleanupRecheckInterval = requireNonNull(vacuumCleanupRecheckInterval, "vacuumCleanupInterval is null");
 
         if (!allowCorruptWritesForTesting && !timeZone.equals(DateTimeZone.getDefault())) {
             log.warn("Hive writes are disabled. " +
@@ -159,8 +168,11 @@ public class HiveMetadataFactory
         }
 
         renameExecution = new BoundedExecutor(executorService, maxConcurrentFileRenames);
-        this.vacuumCleanupService = requireNonNull(vacuumCleanupService, "vacuumCleanupService is null");
+        this.hiveVacuumService = requireNonNull(hiveVacuumService, "hiveVacuumService is null");
         this.heartbeatService = requireNonNull(heartbeatService, "heartbeatService is null");
+        this.vacuumDeltaNumThreshold = vacuumDeltaNumThreshold;
+        this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
+        this.autoVacuumEnabled = autoVacuumEnabled;
     }
 
     @Override
@@ -170,8 +182,8 @@ public class HiveMetadataFactory
                 hdfsEnvironment,
                 CachingHiveMetastore.memoizeMetastore(this.metastore, perTransactionCacheMaximumSize), // per-transaction cache
                 renameExecution,
-                vacuumCleanupService,
-                vacuumCleanupInterval,
+                hiveVacuumService,
+                vacuumCleanupRecheckInterval,
                 skipDeletionForAlter,
                 skipTargetCleanupOnRollback,
                 hiveTransactionHeartbeatInterval,
@@ -192,6 +204,10 @@ public class HiveMetadataFactory
                 typeTranslator,
                 prestoVersion,
                 new MetastoreHiveStatisticsProvider(metastore),
-                accessControlMetadataFactory.create(metastore));
+                accessControlMetadataFactory.create(metastore),
+                autoVacuumEnabled,
+                vacuumDeltaNumThreshold,
+                vacuumDeltaPercentThreshold,
+                hiveVacuumService);
     }
 }

@@ -192,6 +192,10 @@ public class HiveConfig
 
     private boolean orcCacheStatsMetricCollectionEnabled;
 
+    private int vacuumDeltaNumThreshold = 10;
+    private double vacuumDeltaPercentThreshold = 0.1;
+    private boolean autoVacuumEnabled;
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -199,8 +203,8 @@ public class HiveConfig
 
     private boolean tlsEnabled;
 
-    private Optional<Duration> vacuumCleanupInterval = Optional.of(new Duration(1, MINUTES));
-    private int vacuumCleanupThreads = 2;
+    private Optional<Duration> vacuumCleanupRecheckInterval = Optional.of(new Duration(1, MINUTES));
+    private int vacuumServiceThreads = 2;
 
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
@@ -1657,26 +1661,67 @@ public class HiveConfig
     @ConfigDescription("Interval after which vacuum cleanup task will be resubmitted")
     public HiveConfig setVacuumCleanupRecheckInterval(Duration interval)
     {
-        this.vacuumCleanupInterval = Optional.ofNullable(interval);
+        this.vacuumCleanupRecheckInterval = Optional.ofNullable(interval);
         return this;
     }
 
     @NotNull
     public Optional<Duration> getVacuumCleanupRecheckInterval()
     {
-        return vacuumCleanupInterval;
+        return vacuumCleanupRecheckInterval;
     }
 
-    @Config("hive.vacuum-cleanup-threads")
-    @ConfigDescription("Number of threads to run in the vacuum cleanup service")
-    public HiveConfig setVacuumCleanupThreads(int vacuumCleanupThreads)
+    @Config("hive.vacuum-service-threads")
+    @ConfigDescription("Number of threads to run in the vacuum service")
+    public HiveConfig setVacuumServiceThreads(int vacuumServiceThreads)
     {
-        this.vacuumCleanupThreads = vacuumCleanupThreads;
+        this.vacuumServiceThreads = vacuumServiceThreads;
         return this;
     }
 
-    public int getVacuumCleanupThreads()
+    public int getVacuumServiceThreads()
     {
-        return vacuumCleanupThreads;
+        return vacuumServiceThreads;
+    }
+
+    @Config("hive.vacuum-delta-num-threshold")
+    @ConfigDescription("Maximum number of delta directories to allow without compacting it")
+    public HiveConfig setVacuumDeltaNumThreshold(int vacuumDeltaNumThreshold)
+    {
+        this.vacuumDeltaNumThreshold = vacuumDeltaNumThreshold;
+        return this;
+    }
+
+    @Min(2)
+    public int getVacuumDeltaNumThreshold()
+    {
+        return vacuumDeltaNumThreshold;
+    }
+
+    @Config("hive.vacuum-delta-percent-threshold")
+    @ConfigDescription("Maximum percent of delta directories to allow without compacting it")
+    public HiveConfig setVacuumDeltaPercentThreshold(double vacuumDeltaPercentThreshold)
+    {
+        this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
+        return this;
+    }
+
+    @DecimalMin("0.1")
+    @DecimalMax("1.0")
+    public double getVacuumDeltaPercentThreshold()
+    {
+        return vacuumDeltaPercentThreshold;
+    }
+
+    @Config("hive.auto-vacuum-enabled")
+    public HiveConfig setAutoVacuumEnabled(boolean autoVacuumEnabled)
+    {
+        this.autoVacuumEnabled = autoVacuumEnabled;
+        return this;
+    }
+
+    public boolean getAutoVacuumEnabled()
+    {
+        return autoVacuumEnabled;
     }
 }

@@ -57,7 +57,7 @@ public class VacuumCleaner
         this.hdfsContext = hdfsContext;
         this.metastore = metastore;
 
-        this.executorService = this.metastore.getVacuumCleanUpExecutor();
+        this.executorService = this.metastore.getVacuumExecutorService();
         this.cleanupInterval = this.metastore.getVacuumCleanupInterval();
         this.configuration = hdfsEnvironment.getConfiguration(hdfsContext, this.vacuumTableInfo.getDirectoryPath());
     }

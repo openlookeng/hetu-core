@@ -166,13 +166,13 @@ public class CarbondataModule
         configBinder(binder).bindConfig(ParquetFileWriterConfig.class);
     }
 
-    @ForCarbonVacuumCleanUp
+    @ForCarbonVacuum
     @Singleton
     @Provides
-    public ScheduledExecutorService createCarbonVacuumCleanUpExecutor(HiveCatalogName catalogName, CarbondataConfig carbonConfig)
+    public ScheduledExecutorService createCarbonVacuumServiceExecutor(HiveCatalogName catalogName, CarbondataConfig carbonConfig)
     {
         return newScheduledThreadPool(
-                carbonConfig.getVacuumCleanupThreads(),
-                daemonThreadsNamed("carbon-vacuum-cleanup-" + catalogName + "-%s"));
+                carbonConfig.getVacuumServiceThreads(),
+                daemonThreadsNamed("carbon-vacuum-service-" + catalogName + "-%s"));
     }
 }

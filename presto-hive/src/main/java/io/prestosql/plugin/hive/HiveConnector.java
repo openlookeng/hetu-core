@@ -219,4 +219,12 @@ public class HiveConnector
             log.error(e, "Error shutting down connector");
         }
     }
+
+    @Override
+    public ConnectorMetadata getConnectorMetadata()
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return new ClassLoaderSafeConnectorMetadata(metadataFactory.get(), classLoader);
+        }
+    }
 }

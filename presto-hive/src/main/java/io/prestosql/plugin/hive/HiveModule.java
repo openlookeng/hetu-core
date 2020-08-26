@@ -146,14 +146,14 @@ public class HiveModule
         return newCachedThreadPool(daemonThreadsNamed("hive-" + catalogName + "-%s"));
     }
 
-    @ForHiveVacuumCleanUp
+    @ForHiveVacuum
     @Singleton
     @Provides
-    public ScheduledExecutorService createHiveVacuumCleanUpExecutor(HiveCatalogName catalogName, HiveConfig hiveConfig)
+    public ScheduledExecutorService createHiveVacuumServiceExecutor(HiveCatalogName catalogName, HiveConfig hiveConfig)
     {
         return newScheduledThreadPool(
-                hiveConfig.getVacuumCleanupThreads(),
-                daemonThreadsNamed("hive-vacuum-cleanup-" + catalogName + "-%s"));
+                hiveConfig.getVacuumServiceThreads(),
+                daemonThreadsNamed("hive-vacuum-service-" + catalogName + "-%s"));
     }
 
     @ForHiveTransactionHeartbeats
