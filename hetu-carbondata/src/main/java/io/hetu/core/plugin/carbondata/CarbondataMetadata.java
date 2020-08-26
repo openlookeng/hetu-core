@@ -43,6 +43,7 @@ import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveTypeName;
 import io.prestosql.plugin.hive.HiveUpdateTableHandle;
 import io.prestosql.plugin.hive.HiveWriterFactory;
+import io.prestosql.plugin.hive.HiveWrittenPartitions;
 import io.prestosql.plugin.hive.LocationHandle;
 import io.prestosql.plugin.hive.LocationService;
 import io.prestosql.plugin.hive.PartitionStatistics;
@@ -627,7 +628,13 @@ public class CarbondataMetadata
                     }
                 }
             }
-            return Optional.empty();
+
+            List<String> allSourceSegmentNames = new ArrayList<>();
+            for (CarbondataSegmentInfoUtil segment : mergedSegmentInfoUtilList) {
+                allSourceSegmentNames.addAll(segment.getSourceSegmentIdSet());
+            }
+
+            return Optional.of(new HiveWrittenPartitions(allSourceSegmentNames));
         });
     }
 
