@@ -64,6 +64,7 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,6 +74,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -149,6 +151,12 @@ public class SemiTransactionalHiveMetastore
     private Optional<HiveTransaction> currentHiveTransaction = Optional.empty();
 
     private List<VacuumCleaner> vacuumCleanerTasks = new ArrayList<>();
+    //In case of transaction tables, multiple vacuum operations can run in parallel creating the exact same data.
+    //But during rename, since both source and destination are directories (ex: base/delta/delete_delta),
+    // due to race condition rename on directories may result in corrupted directories.
+    //ex: base_000000/base_000000/bucket_00000
+    //To avoid this, in case of vacuum rename should happen at file level instead of directory level.
+    private boolean isVacuumIncluded;
 
     public SemiTransactionalHiveMetastore(
             HdfsEnvironment hdfsEnvironment,
@@ -489,11 +497,13 @@ public class SemiTransactionalHiveMetastore
             String tableName,
             Path currentLocation,
             List<String> fileNames,
-            PartitionStatistics statisticsUpdate)
+            PartitionStatistics statisticsUpdate,
+            boolean isVacuum)
     {
         // Data can only be inserted into partitions and unpartitioned tables. They can never be inserted into a partitioned table.
         // Therefore, this method assumes that the table is unpartitioned.
         setShared();
+        isVacuumIncluded |= isVacuum;
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Action<TableAndMore> oldTableAction = tableActions.get(schemaTableName);
         if (oldTableAction == null) {
@@ -795,9 +805,11 @@ public class SemiTransactionalHiveMetastore
             List<String> partitionValues,
             Path currentLocation,
             List<String> fileNames,
-            PartitionStatistics statisticsUpdate)
+            PartitionStatistics statisticsUpdate,
+            boolean isVacuum)
     {
         setShared();
+        isVacuumIncluded |= isVacuum;
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(schemaTableName, k -> new HashMap<>());
         Action<PartitionAndMore> oldPartitionAction = partitionActionsOfTable.get(partitionValues);
@@ -1289,7 +1301,7 @@ public class SemiTransactionalHiveMetastore
         // For file system changes, only operations outside of writing paths (as specified in declared intentions to write)
         // need to MOVE_BACKWARD tasks scheduled. Files in writing paths are handled by rollbackShared().
         private final List<DirectoryDeletionTask> deletionTasksForFinish = new ArrayList<>();
-        private final List<DirectoryCleanUpTask> cleanUpTasksForAbort = new ArrayList<>();
+        private final List<DirectoryCleanUpTask> cleanUpTasksForAbort = new CopyOnWriteArrayList<>();
         private final List<DirectoryRenameTask> renameTasksForAbort = new ArrayList<>();
 
         // Metastore
@@ -1434,7 +1446,7 @@ public class SemiTransactionalHiveMetastore
             Path currentPath = tableAndMore.getCurrentLocation().get();
             if (!targetPath.equals(currentPath)) {
                 asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, tableAndMore.getFileNames().get(),
-                        cleanUpTasksForAbort);
+                        cleanUpTasksForAbort, isVacuumIncluded);
             }
             updateStatisticsOperations.add(new UpdateStatisticsOperation(
                     table.getSchemaTableName(),
@@ -1577,7 +1589,7 @@ public class SemiTransactionalHiveMetastore
             Path currentPath = partitionAndMore.getCurrentLocation();
             if (!targetPath.equals(currentPath)) {
                 asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, partitionAndMore.getFileNames(),
-                        cleanUpTasksForAbort);
+                        cleanUpTasksForAbort, isVacuumIncluded);
             }
             updateStatisticsOperations.add(new UpdateStatisticsOperation(
                     partition.getSchemaTableName(),
@@ -1978,7 +1990,8 @@ public class SemiTransactionalHiveMetastore
             Path currentPath,
             Path targetPath,
             List<String> fileNames,
-            List<DirectoryCleanUpTask> cleanUpTasksForAbort)
+            List<DirectoryCleanUpTask> cleanUpTasksForAbort,
+            boolean isFileLevelRename)
     {
         FileSystem fileSystem;
         try {
@@ -1999,14 +2012,26 @@ public class SemiTransactionalHiveMetastore
                     return;
                 }
                 try {
-                    if (fileSystem.exists(target)) {
-                        throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target));
+                    List<Path> toRename = ImmutableList.of(source);
+                    boolean isFileRename = false;
+                    if (isFileLevelRename) {
+                        FileStatus sourceStat = fileSystem.getFileStatus(source);
+                        if (sourceStat.isDirectory()) {
+                            toRename = Arrays.stream(fileSystem.listStatus(source)).map(stat -> stat.getPath()).collect(Collectors.toList());
+                            isFileRename = true;
+                        }
                     }
-                    if (!fileSystem.exists(target.getParent())) {
-                        fileSystem.mkdirs(target.getParent());
-                    }
-                    if (!fileSystem.rename(source, target)) {
-                        throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target));
+                    for (Path file : toRename) {
+                        Path destFilePath = new Path(targetPath, ((isFileRename) ? fileName + "/" : "") + file.getName());
+                        if (fileSystem.exists(destFilePath)) {
+                            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", file, destFilePath));
+                        }
+                        if (!fileSystem.exists(destFilePath.getParent())) {
+                            fileSystem.mkdirs(destFilePath.getParent());
+                        }
+                        if (!fileSystem.rename(file, destFilePath)) {
+                            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", file, destFilePath));
+                        }
                     }
                     cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
                 }

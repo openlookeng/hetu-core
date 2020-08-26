@@ -1271,7 +1271,8 @@ public class CarbondataMetadata
                 handle.getTableName(),
                 partitionUpdate.getWritePath(),
                 partitionUpdate.getFileNames(),
-                partitionStatistics);
+                partitionStatistics,
+                false);
         markSegmentsForDelete(session, table);
     }
 
@@ -1293,7 +1294,8 @@ public class CarbondataMetadata
                     partitionValues,
                     partitionUpdate.getWritePath(),
                     partitionUpdate.getFileNames(),
-                    partitionStatistics);
+                    partitionStatistics,
+                    false);
         }
         else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.APPEND) {
             Partition partition = buildPartitionObject(session, table, partitionUpdate);

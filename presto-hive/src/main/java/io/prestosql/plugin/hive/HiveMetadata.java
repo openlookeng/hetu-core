@@ -106,6 +106,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -1483,7 +1484,7 @@ public class HiveMetadata
                                                           Collection<Slice> fragments,
                                                           Collection<ComputedStatistics> computedStatistics)
     {
-        return finishInsert(session, insertHandle, fragments, computedStatistics, null);
+        return finishInsertInternal(session, insertHandle, fragments, computedStatistics, null, false);
     }
 
     public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session,
@@ -1492,11 +1493,22 @@ public class HiveMetadata
                                                           Collection<ComputedStatistics> computedStatistics,
                                                           List<PartitionUpdate> partitions)
     {
+        return finishInsertInternal(session, insertHandle, fragments, computedStatistics, partitions, false);
+    }
+
+    private Optional<ConnectorOutputMetadata> finishInsertInternal(ConnectorSession session,
+            ConnectorInsertTableHandle insertHandle,
+            Collection<Slice> fragments,
+            Collection<ComputedStatistics> computedStatistics,
+            List<PartitionUpdate> partitions,
+            boolean isVacuum)
+    {
         HiveInsertTableHandle handle = (HiveInsertTableHandle) insertHandle;
 
         List<PartitionUpdate> partitionUpdates = fragments.stream()
                 .map(Slice::getBytes)
                 .map(partitionUpdateCodec::fromJson)
+                .sorted(Comparator.comparing(PartitionUpdate::getName)) //sort partition updates to ensure same sequence of rename in case of
                 .collect(toList());
 
         HiveStorageFormat tableStorageFormat = handle.getTableStorageFormat();
@@ -1549,7 +1561,8 @@ public class HiveMetadata
                             handle.getTableName(),
                             partitionUpdate.getWritePath(),
                             partitionUpdate.getFileNames(),
-                            partitionStatistics);
+                            partitionStatistics,
+                            isVacuum);
                 }
                 else {
                     throw new IllegalArgumentException("Unsupported update mode: " + partitionUpdate.getUpdateMode());
@@ -1570,7 +1583,8 @@ public class HiveMetadata
                         partitionValues,
                         partitionUpdate.getWritePath(),
                         partitionUpdate.getFileNames(),
-                        partitionStatistics);
+                        partitionStatistics,
+                        isVacuum);
             }
             else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.NEW || partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.OVERWRITE) {
                 finishInsertInNewPartition(session, handle, table, columnTypes, partitionUpdate, partitionComputedStatistics);
@@ -1651,7 +1665,7 @@ public class HiveMetadata
                 vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false);
         List<PartitionUpdate> partitionUpdates = new ArrayList<>();
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
-                finishInsert(session, insertTableHandle, fragments, computedStatistics, partitionUpdates);
+                finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates, true);
 
         metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
         return connectorOutputMetadata;
