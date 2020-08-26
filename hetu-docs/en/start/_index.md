@@ -3,6 +3,8 @@
 
 This document provides guidance for users to quickly deploy and start the openLooKeng service on the local host. For details about the installation requirements and deployment mode, see [Installation](../installation/_index.md).
 
+A demo environment is also available. <a href = "https://tryme.openlookeng.io/" target = "_blank"><font size = 5><strong>Try now</strong></font></a>.
+
 ## Preparing the Environment
 
 * Select Linux as the operating system.

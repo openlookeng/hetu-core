@@ -2,6 +2,8 @@
 # 快速入门
 本文档旨在指导用户快速在本地机器上部署并启动openLooKeng服务，更详细的安装要求和部署方式请参考[安装](../installation/_index.md)。
 
+同时我们也为您准备了体验环境，欢迎您<a href = "https://tryme.openlookeng.io/" target = "_blank"><font size = 5><strong>体验</strong></font></a>。
+
 ## 环境准备
 
 * 操作系统选择 Linux
