@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestBloomFilter
@@ -105,5 +106,15 @@ public class TestBloomFilter
         for (String value : values) {
             assertTrue(deserializedBloomFilter.test(value.getBytes()), "Value should exist in deserialized BloomFilter");
         }
+
+        BloomFilter bloomFilter1 = new BloomFilter(COUNT, 0.01);
+        assertTrue(bloomFilter1.isEmpty());
+        bloomFilter1.add(0L);
+        assertFalse(bloomFilter1.isEmpty());
+        ByteArrayOutputStream out1 = new ByteArrayOutputStream();
+        bloomFilter1.writeTo(out1);
+
+        BloomFilter deserializedBloomFilter1 = BloomFilter.readFrom(new ByteArrayInputStream(out1.toByteArray()));
+        assertFalse(deserializedBloomFilter1.isEmpty());
     }
 }

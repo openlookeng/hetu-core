@@ -57,4 +57,10 @@ public class HashSetDynamicFilter
         clone.setMax(min);
         return clone;
     }
+
+    @Override
+    public boolean isEmpty()
+    {
+        return valueSet.size() == 0;
+    }
 }

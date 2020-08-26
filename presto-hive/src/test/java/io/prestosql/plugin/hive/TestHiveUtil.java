@@ -121,6 +121,12 @@ public class TestHiveUtil
 
         dayFilter.add(0L);
         assertFalse(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should not filter partition if partition value is in dynamicFilter");
+
+        Set<DynamicFilter> dynamicFilters1 = new HashSet<>();
+        BloomFilter dayFilter1 = new BloomFilter(1024 * 1024, 0.01);
+        dynamicFilters1.add(new BloomFilterDynamicFilter("1", dayColumn, dayFilter1, DynamicFilter.Type.GLOBAL));
+        dayFilter1.add(0L);
+        assertFalse(isPartitionFiltered(partitions, dynamicFilters1, typeManager), "Should not filter partition if partition value is in dynamicFilter");
     }
 
     @Test

@@ -98,6 +98,13 @@ public abstract class DynamicFilter
     public abstract DynamicFilter clone();
 
     /**
+     * Determine whether the current DynamicFilter is empty
+     *
+     * @return true if it is empty, otherwise return false
+     */
+    public abstract boolean isEmpty();
+
+    /**
      * Get minimum value of current dynamic filter
      *
      * @return minimum value, or null if not set
