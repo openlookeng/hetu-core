@@ -138,7 +138,7 @@ public class TestCatalogStore
 
         // create file system client.
         FileSystemClientManager fileSystemClientManager = server.getInstance(Key.get(FileSystemClientManager.class));
-        HetuFileSystemClient client = fileSystemClientManager.getFileSystemClient("local-config-catalog");
+        HetuFileSystemClient client = fileSystemClientManager.getFileSystemClient("local-config-catalog", Paths.get(orgBaseDirectory));
 
         // create hive.properties file.
         CatalogFilePath orgCatalogPath = new CatalogFilePath(orgBaseDirectory, catalogName);

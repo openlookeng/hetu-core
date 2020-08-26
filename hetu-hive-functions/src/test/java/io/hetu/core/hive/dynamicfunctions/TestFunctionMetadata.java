@@ -17,6 +17,7 @@ package io.hetu.core.hive.dynamicfunctions;
 
 import io.hetu.core.hive.dynamicfunctions.examples.udf.IsEmptyUDF;
 import io.prestosql.spi.PrestoException;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.lang.reflect.ParameterizedType;
@@ -27,6 +28,16 @@ import static org.testng.Assert.assertTrue;
 
 public class TestFunctionMetadata
 {
+    @BeforeClass
+    public void setUpRecognizedFunctions()
+    {
+        RecognizedFunctions.addRecognizedFunction(
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.MapStringUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IsEmptyUDF1",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.ListStringUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.IsEmptyUDF");
+    }
+
     @Test
     public void testGetFunctionNameWithOneSpace()
     {

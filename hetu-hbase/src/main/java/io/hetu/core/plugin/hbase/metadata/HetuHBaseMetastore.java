@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.hbase.metadata;
 
+import com.google.common.collect.ImmutableMap;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnectorId;
 import io.hetu.core.plugin.hbase.utils.Constants;
@@ -33,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class HetuHBaseMetastore
         implements HBaseMetastore
@@ -44,13 +46,12 @@ public class HetuHBaseMetastore
 
     private final Map<String, HBaseTable> hbaseTables = new ConcurrentHashMap<>();
     private HetuMetastore hetuMetastore;
-    private boolean hasAllTables;
+    private final AtomicBoolean hasAllTables = new AtomicBoolean(false);
     private String catalogName;
 
     public HetuHBaseMetastore(HetuMetastore hetuMetastore)
     {
         this.hetuMetastore = hetuMetastore;
-        this.hasAllTables = false;
         this.catalogName = CATALOG_NAME + HBaseConnectorId.getConnectorId();
     }
 
@@ -122,27 +123,29 @@ public class HetuHBaseMetastore
     @Override
     public Map<String, HBaseTable> getAllHBaseTables()
     {
-        if (hasAllTables) {
-            return hbaseTables;
-        }
-        Map<String, HBaseTable> hbaseTablesTemp = new ConcurrentHashMap<>();
-
-        List<DatabaseEntity> dbs = hetuMetastore.getAllDatabases(catalogName);
-
-        for (DatabaseEntity db : dbs) {
-            List<TableEntity> tables = hetuMetastore.getAllTables(db.getCatalogName(), db.getName());
-            for (TableEntity table : tables) {
-                HBaseTable hBaseTable = getHBaseTableFromHetuMetastore(table.getCatalogName(), table.getDatabaseName(),
-                        table.getName());
-                hbaseTablesTemp.put(hBaseTable.getFullTableName(), hBaseTable);
+        synchronized (hbaseTables) {
+            if (hasAllTables.get()) {
+                return ImmutableMap.copyOf(hbaseTables);
             }
+            Map<String, HBaseTable> hbaseTablesTemp = new ConcurrentHashMap<>();
+
+            List<DatabaseEntity> dbs = hetuMetastore.getAllDatabases(catalogName);
+
+            for (DatabaseEntity db : dbs) {
+                List<TableEntity> tables = hetuMetastore.getAllTables(db.getCatalogName(), db.getName());
+                for (TableEntity table : tables) {
+                    HBaseTable hBaseTable = getHBaseTableFromHetuMetastore(table.getCatalogName(), table.getDatabaseName(),
+                            table.getName());
+                    hbaseTablesTemp.put(hBaseTable.getFullTableName(), hBaseTable);
+                }
+            }
+
+            hbaseTables.clear();
+            hbaseTables.putAll(hbaseTablesTemp);
+            hasAllTables.set(true);
+
+            return ImmutableMap.copyOf(hbaseTables);
         }
-
-        hbaseTables.clear();
-        hbaseTables.putAll(hbaseTablesTemp);
-        hasAllTables = true;
-
-        return hbaseTables;
     }
 
     @Override

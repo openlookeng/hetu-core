@@ -47,7 +47,6 @@ public class TestHeuristicIndexFactory
 {
     private static final Logger LOG = LoggerFactory.getLogger(TestHeuristicIndexFactory.class);
 
-    private static HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
     private String datastoreTypeKey = "connector.name";
     private String emptyDataSourceId = "empty";
 
@@ -68,14 +67,14 @@ public class TestHeuristicIndexFactory
             indexes.add(new MinMaxIndex());
             indexes.add(new BloomIndex());
 
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
+
             HeuristicIndexWriter writer = new HeuristicIndexWriter(dataSource, indexes, fs, folder.getRoot().toPath());
 
             String table = "csv.schemaName.tableName";
             String[] columns = new String[] {"0", "2"};
             String[] partitons = new String[] {"p=bar"};
             writer.createIndex(table, columns, partitons, "bloom", "minmax");
-
-            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
 
             IndexClient client = new HeuristicIndexFactory().getIndexClient(fs, folder.getRoot().toPath());
             List<IndexMetadata> splits = client.readSplitIndex(table);
@@ -119,8 +118,8 @@ public class TestHeuristicIndexFactory
 
         Properties dsProps = new Properties();
         Properties ixProps = new Properties();
-        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
         Path root = Paths.get("/tmp");
+        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), root);
 
         // Empty data source type
         dsProps.setProperty(datastoreTypeKey, "");

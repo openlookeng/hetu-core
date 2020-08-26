@@ -50,8 +50,6 @@ import static io.prestosql.client.OkHttpUtil.tokenAuth;
 @Singleton
 public class DataCenterStatementClientFactory
 {
-    private static final String INVALID_PASSWORD = "***empty***";
-
     private static final long KEEP_ALIVE_DURATION = 5L;
 
     private DataCenterStatementClientFactory()
@@ -140,7 +138,7 @@ public class DataCenterStatementClientFactory
                 Optional.ofNullable(config.getHttpProxy() != null ? fromString(config.getHttpProxy()) : null));
 
         String password = config.getConnectionPassword();
-        if (password != null && !password.isEmpty() && !INVALID_PASSWORD.equals(password)) {
+        if (password != null && !password.isEmpty()) {
             if (!isUseSecureConnection) {
                 throw new RuntimeException("Authentication using username/password requires SSL to be enabled");
             }

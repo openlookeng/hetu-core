@@ -103,7 +103,7 @@ public class IndexCommandUtils
 
             for (HetuFileSystemClientFactory factory : availableFactories) {
                 if (fsType.equalsIgnoreCase(factory.getName())) {
-                    return new IndexStore(factory.getFileSystemClient(fsConfig), root);
+                    return new IndexStore(factory.getFileSystemClient(fsConfig, root), root);
                 }
             }
 

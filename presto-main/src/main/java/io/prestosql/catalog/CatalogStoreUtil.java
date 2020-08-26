@@ -21,6 +21,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.security.CipherTextDecryptUtil;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +54,7 @@ public class CatalogStoreUtil
             throws IOException
     {
         return new LocalCatalogStore(localConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(LOCAL_FS_CLIENT_CONFIG_NAME),
+                fileSystemClientManager.getFileSystemClient(LOCAL_FS_CLIENT_CONFIG_NAME, Paths.get(localConfigurationDir)),
                 maxCatalogFileSize);
     }
 
@@ -61,7 +62,7 @@ public class CatalogStoreUtil
             throws IOException
     {
         return new ShareCatalogStore(shareConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME),
+                fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get(shareConfigurationDir)),
                 maxCatalogFileSize);
     }
 

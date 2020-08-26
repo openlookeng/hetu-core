@@ -15,6 +15,7 @@
 package io.prestosql.spi.filesystem;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
 /**
@@ -38,6 +39,9 @@ public interface HetuFileSystemClientFactory
      * @throws IOException If any IOException occur reading property files or setup filesystem client.
      */
     HetuFileSystemClient getFileSystemClient(Properties properties)
+            throws IOException;
+
+    HetuFileSystemClient getFileSystemClient(Properties properties, Path root)
             throws IOException;
 
     String getName();

@@ -28,6 +28,7 @@ import io.prestosql.spi.seedstore.SeedStoreFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.security.InvalidParameterException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -114,7 +115,7 @@ public class SeedStoreManager
             checkState(seedStoreFactory != null, "SeedStoreFactory %s is not registered", seedStoreFactory);
             try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStoreFactory.getClass().getClassLoader())) {
                 seedStore = seedStoreFactory.create(seedStoreType,
-                        fileSystemClientManager.getFileSystemClient(filesystemProfile),
+                        fileSystemClientManager.getFileSystemClient(filesystemProfile, Paths.get("/")),
                         ImmutableMap.copyOf(config));
             }
             try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStore.getClass().getClassLoader())) {

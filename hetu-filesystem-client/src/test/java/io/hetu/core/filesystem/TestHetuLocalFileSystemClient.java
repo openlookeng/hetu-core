@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -46,7 +47,8 @@ import static org.testng.Assert.assertTrue;
  */
 public class TestHetuLocalFileSystemClient
 {
-    private static final Path NON_EXISTING_PATH = Paths.get("/path/to/a/non/existing/file");
+    private static final Path OUTSIDE_WORKSPACE_PATH = Paths.get("/dir/out/side/of/workspace");
+    private Path nonExistingPath;
     HetuFileSystemClient fs;
     TempFolder tFolder;
 
@@ -56,7 +58,8 @@ public class TestHetuLocalFileSystemClient
     {
         tFolder = new TempFolder();
         tFolder.create();
-        fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()));
+        nonExistingPath = Paths.get(tFolder.getRoot().getAbsolutePath(), "/path/to/a/non/existing/file");
+        fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), tFolder.getRoot().toPath());
     }
 
     @Test
@@ -109,8 +112,8 @@ public class TestHetuLocalFileSystemClient
     public void testDeleteNoSuchFile()
             throws IOException
     {
-        assertFalse(fs.exists(NON_EXISTING_PATH));
-        fs.delete(NON_EXISTING_PATH);
+        assertFalse(fs.exists(nonExistingPath));
+        fs.delete(nonExistingPath);
     }
 
     @Test(expectedExceptions = DirectoryNotEmptyException.class)
@@ -184,7 +187,7 @@ public class TestHetuLocalFileSystemClient
     public void testMoveFailure()
             throws IOException
     {
-        fs.move(NON_EXISTING_PATH, Paths.get("/tmp"));
+        fs.move(nonExistingPath, tFolder.getRoot().toPath());
     }
 
     @Test
@@ -209,14 +212,14 @@ public class TestHetuLocalFileSystemClient
     public void testReadNoSuchFile()
             throws IOException
     {
-        fs.newInputStream(NON_EXISTING_PATH);
+        fs.newInputStream(nonExistingPath);
     }
 
     @Test(expectedExceptions = NoSuchFileException.class)
     public void testWriteParentDirNotExist()
             throws IOException
     {
-        fs.newOutputStream(NON_EXISTING_PATH);
+        fs.newOutputStream(nonExistingPath);
     }
 
     @Test(expectedExceptions = FileAlreadyExistsException.class)
@@ -236,7 +239,7 @@ public class TestHetuLocalFileSystemClient
     public void testIsDirectory()
     {
         assertTrue(fs.isDirectory(tFolder.getRoot().toPath()));
-        assertFalse(fs.isDirectory(NON_EXISTING_PATH));
+        assertFalse(fs.isDirectory(nonExistingPath));
     }
 
     @Test
@@ -260,12 +263,88 @@ public class TestHetuLocalFileSystemClient
     public void testGetPropertiesFailureNotExist()
             throws IOException
     {
-        fs.getAttribute(NON_EXISTING_PATH, "size");
+        fs.getAttribute(nonExistingPath, "size");
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedCreateDirectories()
+            throws IOException
+    {
+        fs.createDirectories(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedCreateDirectory()
+            throws IOException
+    {
+        fs.createDirectory(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedDelete()
+            throws IOException
+    {
+        fs.delete(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedDeleteIfExists()
+            throws IOException
+    {
+        fs.deleteIfExists(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedDeleteRecursively()
+            throws IOException
+    {
+        fs.deleteRecursively(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedMove()
+            throws IOException
+    {
+        fs.move(OUTSIDE_WORKSPACE_PATH, OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedNewInputStream()
+            throws IOException
+    {
+        fs.newInputStream(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedNewOutputStream()
+            throws IOException
+    {
+        fs.newOutputStream(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedGetAttribute()
+            throws IOException
+    {
+        fs.getAttribute(OUTSIDE_WORKSPACE_PATH, SupportedFileAttributes.SIZE);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedList()
+            throws IOException
+    {
+        fs.list(OUTSIDE_WORKSPACE_PATH);
+    }
+
+    @Test(expectedExceptions = AccessDeniedException.class)
+    public void testAccessDeniedWalk()
+            throws IOException
+    {
+        fs.walk(OUTSIDE_WORKSPACE_PATH);
     }
 
     @AfterTest
     public void tearDown()
-            throws IOException
     {
         tFolder.close();
     }

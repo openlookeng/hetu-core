@@ -14,7 +14,7 @@
  */
 package io.hetu.core.filesystem;
 
-import io.hetu.core.common.filesystem.FileBasedLock;
+import io.prestosql.spi.filesystem.FileBasedLock;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -43,8 +43,8 @@ public class TestFileBasedLockOnLocal
     public void prepare()
             throws IOException
     {
-        fs = new HetuLocalFileSystemClient(new LocalConfig(null));
         testLockRoot = "/tmp/test-local-lock";
+        fs = new HetuLocalFileSystemClient(new LocalConfig(null), Paths.get(testLockRoot));
     }
 
     @Test

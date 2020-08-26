@@ -18,9 +18,11 @@ package io.hetu.core.plugin.heuristicindex.datasource.hive;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
+import io.hetu.core.common.util.SslSocketUtil;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastoreClient;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil;
+import io.prestosql.spi.PrestoException;
 import org.apache.hadoop.hive.thrift.client.TUGIAssumingTransport;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -49,6 +51,7 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -62,9 +65,11 @@ import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper
 import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.HIVE_METASTORE_AUTH_TYPE;
 import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.HIVE_METASTORE_KRB5_CONF;
 import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.HIVE_METASTORE_SERVICE_PRINCIPAL;
+import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.HIVE_METASTORE_SSL_ENABLED;
 import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.HIVE_METASTORE_URI;
 import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.HIVE_WIRE_ENCRYPTION_ENABLED;
 import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.KRB5_CONF_KEY;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.net.Proxy.Type.SOCKS;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
@@ -105,6 +110,8 @@ public class ThriftHiveMetaStoreService
     private String hiveUserKeytab;
 
     private List<String> metastoreUris;
+
+    private boolean isSslEnabled;
 
     /**
      * Constructor for ThriftHiveMetaStoreService
@@ -147,7 +154,7 @@ public class ThriftHiveMetaStoreService
         this.hiveMetastoreServicePrincipal = properties.getProperty(HIVE_METASTORE_SERVICE_PRINCIPAL);
         this.hiveConfigResources = properties.getProperty(HIVE_CONFIG_RESOURCES);
         this.isHdfsWireEncryptionEnabled = Boolean.valueOf(
-                properties.getProperty(HIVE_WIRE_ENCRYPTION_ENABLED));
+                properties.getProperty(HIVE_WIRE_ENCRYPTION_ENABLED, "false"));
         this.hiveUserKeytab = properties.getProperty(HDFS_KEYTAB_FILEPATH);
         // hive.metastore.uri=thrift://IP_ADDRESS:PORT
         this.metastoreUris = Arrays.asList(properties.getProperty(HIVE_METASTORE_URI).split(COMMA_SEPARATOR));
@@ -158,6 +165,7 @@ public class ThriftHiveMetaStoreService
                 System.setProperty(KRB5_CONF_KEY, krb5ConfPath);
             }
         }
+        this.isSslEnabled = Boolean.valueOf(properties.getProperty(HIVE_METASTORE_SSL_ENABLED, "false"));
     }
 
     /**
@@ -205,35 +213,40 @@ public class ThriftHiveMetaStoreService
             throws TTransportException
     {
         HostAndPort address = HostAndPort.fromParts(host, port);
-        Optional<SSLContext> sslContext = Optional.empty();
-        Optional<HostAndPort> socksProxy = Optional.empty();
-        Proxy proxy = socksProxy.map(socksAddress -> new Proxy(SOCKS,
-                InetSocketAddress.createUnresolved(socksAddress.getHost(), socksAddress.getPort()))).orElse(Proxy.NO_PROXY);
-        Socket socket = new Socket(proxy);
         try {
-            socket.connect(new InetSocketAddress(address.getHost(), address.getPort()), TIMEOUT_MILLIS);
-            socket.setSoTimeout(TIMEOUT_MILLIS);
-            if (sslContext.isPresent()) {
-                // SSL will connect to the SOCKS address when present
-                HostAndPort sslConnectAddress = socksProxy.orElse(address);
-                socket = sslContext.get()
-                        .getSocketFactory()
-                        .createSocket(socket, sslConnectAddress.getHost(), sslConnectAddress.getPort(), true);
-            }
-            return new TSocket(socket);
-        }
-        catch (SocketException t) {
-            // something went wrong, close the socket and rethrow
+            Optional<SSLContext> sslContext = SslSocketUtil.buildSslContext(this.isSslEnabled);
+            Optional<HostAndPort> socksProxy = Optional.empty();
+            Proxy proxy = socksProxy.map(socksAddress -> new Proxy(SOCKS,
+                    InetSocketAddress.createUnresolved(socksAddress.getHost(), socksAddress.getPort()))).orElse(Proxy.NO_PROXY);
+            Socket socket = new Socket(proxy);
             try {
-                socket.close();
+                socket.connect(new InetSocketAddress(address.getHost(), address.getPort()), TIMEOUT_MILLIS);
+                socket.setSoTimeout(TIMEOUT_MILLIS);
+                if (sslContext.isPresent()) {
+                    // SSL will connect to the SOCKS address when present
+                    HostAndPort sslConnectAddress = socksProxy.orElse(address);
+                    socket = sslContext.get()
+                            .getSocketFactory()
+                            .createSocket(socket, sslConnectAddress.getHost(), sslConnectAddress.getPort(), true);
+                }
+                return new TSocket(socket);
+            }
+            catch (SocketException t) {
+                // something went wrong, close the socket and rethrow
+                try {
+                    socket.close();
+                }
+                catch (IOException e) {
+                    t.addSuppressed(e);
+                }
+                throw new TTransportException(t);
             }
             catch (IOException e) {
-                t.addSuppressed(e);
+                throw new TTransportException(e);
             }
-            throw new TTransportException(t);
         }
-        catch (IOException e) {
-            throw new TTransportException(e);
+        catch (GeneralSecurityException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, e.getMessage());
         }
     }
 

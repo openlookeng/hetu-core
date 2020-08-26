@@ -57,8 +57,8 @@ public class HeuristicIndexerManager
             String fsProfile = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE);
             String indexStoreRoot = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI);
 
-            HetuFileSystemClient fs = fileSystemClientManager.getFileSystemClient(fsProfile);
             Path root = Paths.get(indexStoreRoot);
+            HetuFileSystemClient fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
 
             indexClient = factory.getIndexClient(fs, root);
             LOG.info("Heuristic Indexer Client created on %s at %s", fsProfile, indexStoreRoot);

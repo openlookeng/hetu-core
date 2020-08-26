@@ -14,7 +14,6 @@
  */
 package io.hetu.core.filesystem;
 
-import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -43,7 +42,7 @@ import static java.nio.file.StandardOpenOption.CREATE_NEW;
  * @since 2020-03-30
  */
 public class HetuHdfsFileSystemClient
-        implements HetuFileSystemClient
+        extends AbstractWorkspaceFileSystemClient
 {
     private FileSystem hdfs;
     private Configuration config;
@@ -52,10 +51,12 @@ public class HetuHdfsFileSystemClient
      * Instantiate an HetuHdfsFileSystemClient instance with the passed in parameters
      *
      * @param config {@link HdfsConfig} object to configure the client
+     * @param root The workspace root directory
      */
-    public HetuHdfsFileSystemClient(HdfsConfig config)
+    public HetuHdfsFileSystemClient(HdfsConfig config, Path root)
             throws IOException
     {
+        super(root);
         this.hdfs = FileSystem.get(config.getHadoopConfig());
     }
 
@@ -74,6 +75,7 @@ public class HetuHdfsFileSystemClient
     public Path createDirectories(Path dir)
             throws IOException
     {
+        validate(dir);
         org.apache.hadoop.fs.Path hdfsPath = toHdfsPath(dir);
         unwrapHdfsExceptions(() -> getHdfs().mkdirs(hdfsPath));
         return dir;
@@ -83,6 +85,7 @@ public class HetuHdfsFileSystemClient
     public Path createDirectory(Path dir)
             throws IOException
     {
+        validate(dir);
         org.apache.hadoop.fs.Path hdfsParent = toHdfsPath(dir).getParent();
         checkFileExists(hdfsParent);
 
@@ -97,6 +100,7 @@ public class HetuHdfsFileSystemClient
     public void delete(Path path)
             throws IOException
     {
+        validate(path);
         org.apache.hadoop.fs.Path hdfsPath = toHdfsPath(path);
         checkFileExists(hdfsPath);
         unwrapHdfsExceptions(() -> getHdfs().delete(hdfsPath, false));
@@ -106,6 +110,7 @@ public class HetuHdfsFileSystemClient
     public boolean deleteIfExists(Path path)
             throws IOException
     {
+        validate(path);
         org.apache.hadoop.fs.Path hdfsPath = toHdfsPath(path);
         return unwrapHdfsExceptions(() -> getHdfs().delete(hdfsPath, false));
     }
@@ -114,6 +119,7 @@ public class HetuHdfsFileSystemClient
     public boolean deleteRecursively(Path path)
             throws IOException
     {
+        validate(path);
         org.apache.hadoop.fs.Path hdfsPath = toHdfsPath(path);
         return unwrapHdfsExceptions(() -> getHdfs().delete(hdfsPath, true));
     }
@@ -134,6 +140,8 @@ public class HetuHdfsFileSystemClient
     public void move(Path source, Path target)
             throws IOException
     {
+        validate(source);
+        validate(target);
         org.apache.hadoop.fs.Path hdfsSource = toHdfsPath(source);
         org.apache.hadoop.fs.Path hdfsTarget = toHdfsPath(target);
         checkFileExists(hdfsSource);
@@ -144,6 +152,7 @@ public class HetuHdfsFileSystemClient
     public InputStream newInputStream(Path path)
             throws IOException
     {
+        validate(path);
         org.apache.hadoop.fs.Path hdfsPath = toHdfsPath(path);
         return unwrapHdfsExceptions(() -> getHdfs().open(hdfsPath));
     }
@@ -152,6 +161,7 @@ public class HetuHdfsFileSystemClient
     public OutputStream newOutputStream(Path path, OpenOption... options)
             throws IOException
     {
+        validate(path);
         // Throw exception if parent directory does not exist: keep same behavior as Files.newOutPutStream
         checkFileExists(toHdfsPath(path.getParent()));
         org.apache.hadoop.fs.Path hdfsPath = toHdfsPath(path);
@@ -170,6 +180,7 @@ public class HetuHdfsFileSystemClient
     public Object getAttribute(Path path, String attribute)
             throws IOException
     {
+        validate(path);
         if (!SupportedFileAttributes.SUPPORTED_ATTRIBUTES.contains(attribute)) {
             throw new IllegalArgumentException(
                     String.format("Attribute [%s] is not supported.", attribute));
@@ -202,6 +213,7 @@ public class HetuHdfsFileSystemClient
     public Stream<Path> list(Path dir)
             throws IOException
     {
+        validate(dir);
         FileStatus[] files = unwrapHdfsExceptions(() -> getHdfs().listStatus(toHdfsPath(dir)));
         Stream<FileStatus> sfiles = Stream.of(files);
         return sfiles.map(fileStatus -> {
@@ -214,6 +226,7 @@ public class HetuHdfsFileSystemClient
     public Stream<Path> walk(Path dir)
             throws IOException
     {
+        validate(dir);
         try {
             Stream<Path> children = list(dir).flatMap(path -> {
                 try {

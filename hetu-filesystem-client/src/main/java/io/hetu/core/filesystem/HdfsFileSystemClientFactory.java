@@ -18,6 +18,8 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 /**
@@ -34,7 +36,14 @@ public class HdfsFileSystemClientFactory
     public HetuFileSystemClient getFileSystemClient(Properties properties)
             throws IOException
     {
-        return new HetuHdfsFileSystemClient(new HdfsConfig(properties));
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties), Paths.get("/"));
+    }
+
+    @Override
+    public HetuFileSystemClient getFileSystemClient(Properties properties, Path root)
+            throws IOException
+    {
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties), root);
     }
 
     @Override

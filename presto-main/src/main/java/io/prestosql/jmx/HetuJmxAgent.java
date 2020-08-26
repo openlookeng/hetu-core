@@ -15,6 +15,7 @@
 package io.prestosql.jmx;
 
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SslSocketUtil;
 
 import javax.inject.Inject;
 import javax.management.MBeanServer;
@@ -27,7 +28,6 @@ import javax.net.ServerSocketFactory;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.rmi.registry.LocateRegistry;
@@ -56,7 +56,7 @@ public class HetuJmxAgent
 
         int jmxRegistryPort;
         if (config.getRmiRegistryPort() == null) {
-            jmxRegistryPort = getAvailablePort();
+            jmxRegistryPort = SslSocketUtil.getAvailablePort();
         }
         else {
             jmxRegistryPort = config.getRmiRegistryPort();
@@ -116,19 +116,6 @@ public class HetuJmxAgent
 
         LOG.info(builder.toString());
         return new JMXServiceURL(builder.toString());
-    }
-
-    private int getAvailablePort()
-            throws IOException
-    {
-        int availablePort;
-
-        try (ServerSocket socket = new ServerSocket()) {
-            socket.bind(new InetSocketAddress(0));
-            availablePort = socket.getLocalPort();
-        }
-
-        return availablePort;
     }
 
     private class RMIServerSocketFactoryImpl

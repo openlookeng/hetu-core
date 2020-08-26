@@ -14,12 +14,11 @@
  */
 package io.hetu.core.filesystem;
 
-import io.prestosql.spi.filesystem.HetuFileSystemClient;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -35,16 +34,18 @@ import java.util.stream.Stream;
  * @since 2020-03-30
  */
 public class HetuLocalFileSystemClient
-        implements HetuFileSystemClient
+        extends AbstractWorkspaceFileSystemClient
 {
-    public HetuLocalFileSystemClient(LocalConfig config)
+    public HetuLocalFileSystemClient(LocalConfig config, Path root)
     {
+        super(root);
     }
 
     @Override
     public Path createDirectories(Path dir)
             throws IOException
     {
+        validate(dir);
         return Files.createDirectories(dir);
     }
 
@@ -52,6 +53,7 @@ public class HetuLocalFileSystemClient
     public Path createDirectory(Path dir)
             throws IOException
     {
+        validate(dir);
         return Files.createDirectory(dir);
     }
 
@@ -65,6 +67,7 @@ public class HetuLocalFileSystemClient
     public void delete(Path path)
             throws IOException
     {
+        validate(path);
         Files.delete(path);
     }
 
@@ -80,6 +83,7 @@ public class HetuLocalFileSystemClient
     public boolean deleteIfExists(Path path)
             throws IOException
     {
+        validate(path);
         return Files.deleteIfExists(path);
     }
 
@@ -87,6 +91,7 @@ public class HetuLocalFileSystemClient
     public boolean deleteRecursively(Path path)
             throws FileSystemException
     {
+        validate(path);
         if (!exists(path)) {
             return false;
         }
@@ -140,6 +145,8 @@ public class HetuLocalFileSystemClient
     public void move(Path source, Path target)
             throws IOException
     {
+        validate(source);
+        validate(target);
         Files.move(source, target);
     }
 
@@ -147,6 +154,10 @@ public class HetuLocalFileSystemClient
     public InputStream newInputStream(Path path)
             throws IOException
     {
+        // Need inline check to pass security check
+        if (!path.toAbsolutePath().startsWith(root)) {
+            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
+        }
         return Files.newInputStream(path);
     }
 
@@ -154,6 +165,10 @@ public class HetuLocalFileSystemClient
     public OutputStream newOutputStream(Path path, OpenOption... options)
             throws IOException
     {
+        // Need inline check to pass security check
+        if (!path.toAbsolutePath().startsWith(root)) {
+            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
+        }
         return Files.newOutputStream(path, options);
     }
 
@@ -161,6 +176,7 @@ public class HetuLocalFileSystemClient
     public Object getAttribute(Path path, String attribute)
             throws IOException
     {
+        validate(path);
         if (!SupportedFileAttributes.SUPPORTED_ATTRIBUTES.contains(attribute)) {
             throw new IllegalArgumentException(
                     String.format(Locale.ROOT, "Attribute [%s] is not supported.", attribute));
@@ -182,6 +198,7 @@ public class HetuLocalFileSystemClient
     public Stream<Path> list(Path dir)
             throws IOException
     {
+        validate(dir);
         return Files.list(dir);
     }
 
@@ -189,6 +206,7 @@ public class HetuLocalFileSystemClient
     public Stream<Path> walk(Path dir)
             throws IOException
     {
+        validate(dir);
         return Files.walk(dir);
     }
 
