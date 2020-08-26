@@ -13,8 +13,8 @@
  */
 package io.hetu.core.sql.migration.tool;
 
+import io.hetu.core.sql.migration.Constants;
 import io.hetu.core.sql.migration.SqlSyntaxType;
-import io.hetu.core.sql.migration.parser.Constants;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment;
 import io.prestosql.sql.parser.SqlParser;
@@ -25,11 +25,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Locale;
 import java.util.Optional;
 
 import static com.google.common.io.Files.asCharSource;
-import static io.hetu.core.sql.migration.parser.Constants.UNSUPPORTED;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -46,8 +46,10 @@ public class TestImpalaSqlMigrate
     {
         sqlParser = new SqlParser();
         parsingOptions = new ParsingOptions(DecimalLiteralTreatment.AS_DECIMAL);
-        ConvertionOptions convertionOptions = new ConvertionOptions(SqlSyntaxType.IMPALA, false);
-        sqlConverter = SqlConverterFactory.getSqlConverter(convertionOptions);
+        SessionProperties sessionProperties = new SessionProperties();
+        sessionProperties.setSourceType(SqlSyntaxType.IMPALA);
+        sessionProperties.setParsingOptions(false);
+        sqlConverter = SqlConverterFactory.getSqlConverter(sessionProperties);
     }
 
     @Test
@@ -132,7 +134,7 @@ public class TestImpalaSqlMigrate
                 "   format = 'Parquet',\n" +
                 "   location = '/user/tmp'\n" +
                 ")";
-        assertSuccess(sql2, expectedSql2);
+        assertWarning(sql2, expectedSql2);
 
         // Test negative sql - row format is not supported
         String negativeSql1 = "CREATE TABLE tbl_row_format (id INT, name STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY 'char'";
@@ -205,7 +207,7 @@ public class TestImpalaSqlMigrate
                 "   location = '/USER/TEST',\n" +
                 "   format = 'Avro'\n" +
                 ")";
-        assertSuccess(sql, expectedSql);
+        assertWarning(sql, expectedSql);
 
         String sql2 = "CREATE EXTERNAL TABLE T2 LIKE PARQUET '/user/test/impala' COMMENT 'HETU' STORED AS AVRO LOCATION '/USER/TEST'";
         assertUnsupported(sql2, Optional.of("PARQUET"));
@@ -302,19 +304,32 @@ public class TestImpalaSqlMigrate
     }
 
     @Test
+    public void testAlterColumn()
+    {
+        // add kudu column
+        String sql1 = "ALTER TABLE t1 ADD COLUMN IF NOT EXISTS n1 INT COMMENT 'NEW 1'";
+        String sql2 = "ALTER TABLE t1 ADD COLUMN n1 INT COMMENT 'NEW 1'";
+        String expectedSql2 = "ALTER TABLE t1 ADD COLUMN n1 INT COMMENT 'NEW 1'";
+        // using add columns but only passed on column, it will be equal to add single column
+        String sql3 = "ALTER TABLE t1 ADD COLUMNS (n1 INT) COMMENT 'NEW 1'";
+        String sql4 = "ALTER TABLE t1 ADD COLUMNS (n1 INT COMMENT 'NEW 1')";
+        assertUnsupported(sql1, Optional.of("EXISTS"));
+
+        assertSuccess(sql2, expectedSql2);
+        assertFailed(sql3);
+        assertSuccess(sql4, sql2);
+    }
+
+    @Test
     public void testNegativeAlterTable()
     {
         // add columns
         String sql1 = "ALTER TABLE T1 ADD COLUMNS (N1 INT COMMENT 'NEW 1', N2 INT COMMENT 'NEW 2')";
-        assertUnsupported(sql1, Optional.of("Add Column"));
+        assertUnsupported(sql1, Optional.of("Multiple columns"));
 
         // replace column
         String sql2 = "ALTER TABLE t1 REPLACE COLUMNS (n1 INT COMMENT 'NEW 1', n2 INT COMMENT 'NEW 1')";
         assertUnsupported(sql2, Optional.of("Replace Column"));
-
-        // add kudu column
-        String sql3 = "ALTER TABLE t1 ADD COLUMN IF NOT EXISTS n1 INT COMMENT 'NEW 1'";
-        assertUnsupported(sql3, Optional.of("Add Column"));
 
         // set owner
         String sql4 = "ALTER TABLE t1 SET OWNER USER test";
@@ -498,7 +513,7 @@ public class TestImpalaSqlMigrate
         assertUnsupported(sql3, Optional.of("GRANT"));
 
         String sql4 = "GRANT CREATE ON TABLE table_name TO ROLE role_name WITH GRANT OPTION";
-        assertUnsupported(sql4, Optional.of("GRANT CREATE"));
+        assertUnsupported(sql4, Optional.of("CREATE"));
 
         String sql5 = "GRANT SELECT ON DATABASE db_name TO ROLE role_name WITH GRANT OPTION";
         assertUnsupported(sql5, Optional.of("GRANT"));
@@ -527,7 +542,7 @@ public class TestImpalaSqlMigrate
         assertUnsupported(sql3, Optional.of("REVOKE"));
 
         String sql4 = "REVOKE CREATE ON TABLE table_name FROM ROLE role_name";
-        assertUnsupported(sql4, Optional.of("REVOKE CREATE"));
+        assertUnsupported(sql4, Optional.of("CREATE"));
 
         String sql5 = "REVOKE SELECT ON DATABASE db_name FROM ROLE role_name";
         assertUnsupported(sql5, Optional.of("REVOKE"));
@@ -566,21 +581,21 @@ public class TestImpalaSqlMigrate
     public void testShowRoleGrant()
     {
         String sql = "SHOW ROLE GRANT GROUP TEST";
-        assertUnsupported(sql, Optional.of("SHOW ROLE GRANT GROUP"));
+        assertUnsupported(sql, Optional.of("GROUP"));
     }
 
     @Test
     public void testShowGrantRole()
     {
         String sql = "SHOW GRANT ROLE R1";
-        assertUnsupported(sql, Optional.of("SHOW GRANT ROLE"));
+        assertUnsupported(sql, Optional.of("GRANT ROLE"));
     }
 
     @Test
     public void testShowGrantUser()
     {
         String sql = "SHOW GRANT USER TEST";
-        assertUnsupported(sql, Optional.of("SHOW GRANT USER"));
+        assertUnsupported(sql, Optional.of("GRANT USER"));
     }
 
     @Test
@@ -595,7 +610,7 @@ public class TestImpalaSqlMigrate
         assertSuccess(sql2, expectedSql2);
 
         String sql3 = "COMMENT ON DATABASE TEST IS NULL";
-        assertUnsupported(sql3, Optional.of("COMMENT ON DATABASE/COLUMN"));
+        assertUnsupported(sql3, Optional.of("DATABASE/COLUMN"));
     }
 
     @Test
@@ -613,7 +628,7 @@ public class TestImpalaSqlMigrate
     public void testSet()
     {
         String sql1 = "SET MEM_LIMIT=10";
-        assertUnsupported(sql1, Optional.of("SET QUERY OPTION"));
+        assertUnsupported(sql1, Optional.of("IDENTIFIER"));
 
         String sql2 = "SET";
         String sql3 = "SET ALL";
@@ -639,7 +654,7 @@ public class TestImpalaSqlMigrate
     @Test
     public void testLoadData()
     {
-        String sql = "LOAD DATA INPATH '/USER/HIVE' INTO TABLE TEST PARTITION(ID=10, NAME='HUAWEI')";
+        String sql = "LOAD DATA INPATH '/USER/HIVE' INTO TABLE TEST PARTITION(ID=10, NAME='test')";
         assertUnsupported(sql, Optional.of("LOAD DATA"));
     }
 
@@ -805,12 +820,32 @@ public class TestImpalaSqlMigrate
         }
     }
 
+    @Test
+    public void testExecuteCommand()
+            throws IOException
+    {
+        String sqlFile = getClass().getClassLoader().getResource("impala-batch-test.sql").getFile();
+        String query = asCharSource(new File(sqlFile), UTF_8).read();
+        SessionProperties sessionProperties = new SessionProperties();
+        sessionProperties.setSourceType(SqlSyntaxType.IMPALA);
+        sessionProperties.setConsolePrintEnable(true);
+        sessionProperties.setParsingOptions(true);
+        Console console = new Console();
+        console.executeCommand(query, "./testExecuteCommand", sessionProperties);
+    }
+
     private void assertSuccess(String inputSql, String expectedSql)
     {
         JSONObject result = sqlConverter.convert(inputSql);
         assertEquals(getConvertedSql(result), expectedSql);
         assertEquals(getConversionStatus(result), Constants.SUCCESS);
         checkCanParsedByHetu(getConvertedSql(result));
+    }
+
+    private void assertFailed(String inputSql)
+    {
+        JSONObject result = sqlConverter.convert(inputSql);
+        assertEquals(getConversionStatus(result), Constants.FAILED);
     }
 
     private void assertWarning(String inputSql, String expectedSql)
@@ -824,10 +859,9 @@ public class TestImpalaSqlMigrate
     private void assertUnsupported(String inputSql, Optional<String> unsupportedKeyWords)
     {
         JSONObject result = sqlConverter.convert(inputSql);
-        assertEquals(getConversionStatus(result), Constants.FAIL);
+        assertEquals(getConversionStatus(result), Constants.UNSUPPORTED);
         try {
             String msg = result.get(Constants.MESSAGE).toString();
-            assertTrue(msg.toLowerCase(Locale.ENGLISH).contains(UNSUPPORTED.toLowerCase(Locale.ENGLISH)));
             if (unsupportedKeyWords.isPresent()) {
                 assertTrue(msg.toLowerCase(Locale.ENGLISH).contains(unsupportedKeyWords.get().toLowerCase(Locale.ENGLISH)));
             }

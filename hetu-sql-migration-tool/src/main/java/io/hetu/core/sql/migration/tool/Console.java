@@ -20,10 +20,10 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.airline.Command;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
+import io.hetu.core.sql.migration.Constants;
 import io.hetu.core.sql.migration.SqlMigrationException;
 import io.hetu.core.sql.migration.SqlSyntaxType;
-import io.hetu.core.sql.migration.parser.Constants;
-import io.prestosql.cli.CsvPrinter;
+import io.hetu.core.sql.util.SqlResultHandleUtils;
 import io.prestosql.cli.InputReader;
 import io.prestosql.cli.ThreadInterruptor;
 import io.prestosql.sql.parser.ParsingException;
@@ -36,18 +36,10 @@ import org.jline.reader.UserInterruptException;
 
 import javax.inject.Inject;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,10 +50,10 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.io.Files.asCharSource;
 import static com.google.common.util.concurrent.Uninterruptibles.awaitUninterruptibly;
+import static io.hetu.core.sql.migration.Constants.HIVE;
+import static io.hetu.core.sql.migration.Constants.IMPALA;
 import static io.prestosql.cli.Completion.commandCompleter;
-import static io.prestosql.cli.CsvPrinter.CsvOutputFormat.NO_HEADER;
 import static io.prestosql.sql.parser.StatementSplitter.squeezeStatement;
-import static java.lang.Integer.parseInt;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ENGLISH;
@@ -73,8 +65,6 @@ public class Console
 {
     private static final Logger log = Logger.get(Console.class);
 
-    private static final int BUFFER_SIZE = 16384;
-    private static final int HISTORY_SIZE = 10000;
     private static final String PROMPT_NAME = "lk";
     private static final String COMMAND_EXIT = "exit";
     private static final String COMMAND_QUIT = "quit";
@@ -83,13 +73,16 @@ public class Console
     private static final Set<String> STATEMENT_SPLITTER = ImmutableSet.of(";", "\\G");
     private static final Duration EXIT_DELAY = new Duration(1, SECONDS);
 
-    private static final Pattern HISTORY_INDEX_PATTERN = Pattern.compile("!\\d+");
+    private static final Pattern SET_COMMAND_PATTERN = Pattern.compile("![\\w ]+");
+    private static final String CHANGE_TYPE_COMMAND = "chtype";
 
     @Inject
     public CliOptions cliOptions = new CliOptions();
 
     public boolean run()
     {
+        SessionProperties session = new SessionProperties();
+
         boolean hasQuery = cliOptions.execute != null;
         boolean isFromFile = !isNullOrEmpty(cliOptions.sqlFile);
 
@@ -128,27 +121,22 @@ public class Console
             awaitUninterruptibly(exited, EXIT_DELAY.toMillis(), MILLISECONDS);
         }));
 
-        // default source type is Hive
-        SqlSyntaxType sourceType = SqlSyntaxType.HIVE;
-
+        // set source type
         if (cliOptions.sourceType != null && !cliOptions.sourceType.isEmpty()) {
-            switch (cliOptions.sourceType.toLowerCase(ENGLISH)) {
-                case "hive":
-                    sourceType = SqlSyntaxType.HIVE;
-                    break;
-                case "impala":
-                    sourceType = SqlSyntaxType.IMPALA;
-                    break;
-                default:
-                    System.out.println(format("Error: Migration tool doesn't support type: %s", cliOptions.sourceType));
-                    return false;
+            if (!setSourceType(cliOptions.sourceType.toLowerCase(ENGLISH), session)) {
+                System.out.println(format("Error: Migration tool doesn't support type: %s", cliOptions.sourceType));
+                return false;
             }
+        }
+        else {
+            // by default, set source type to hive
+            setSourceType(HIVE, session);
         }
 
         // get migration config
         MigrationConfig migrationConfig;
         try {
-            migrationConfig = new MigrationConfig(cliOptions.configFile);
+            session.setMigrationConfig(new MigrationConfig(cliOptions.configFile));
         }
         catch (IOException e) {
             System.out.println(format("Error: Read config file[%s] failed: %s", cliOptions.configFile, e.getMessage()));
@@ -179,22 +167,23 @@ public class Console
                     }
                 }
             }
-            return executeCommand(query, sourceType, outputFile, migrationConfig, cliOptions.execute != null);
+            session.setConsolePrintEnable(cliOptions.execute != null);
+            return executeCommand(query, outputFile, session);
         }
 
-        runConsole(sourceType, exiting, migrationConfig);
+        runConsole(session, exiting);
         return true;
     }
 
-    private void runConsole(SqlSyntaxType sourceType, AtomicBoolean exiting, MigrationConfig migrationConfig)
+    private void runConsole(SessionProperties session, AtomicBoolean exiting)
     {
         try (InputReader reader = new InputReader(getHistoryFile(), commandCompleter())) {
             StringBuilder buffer = new StringBuilder();
             while (!exiting.get()) {
                 // setup prompt
                 String commandPrompt = PROMPT_NAME;
-                if (sourceType != null) {
-                    commandPrompt += ":" + sourceType.name();
+                if (session.getSourceType() != null) {
+                    commandPrompt += ":" + session.getSourceType().name();
                 }
 
                 // read a line of input from user
@@ -228,18 +217,13 @@ public class Console
                 if (buffer.length() == 0) {
                     String controlCommand = line.trim();
 
-                    if (HISTORY_INDEX_PATTERN.matcher(controlCommand).matches()) {
-                        int historyIndex = parseInt(controlCommand.substring(1));
-                        History history = reader.getHistory();
-                        if ((historyIndex <= 0) || (historyIndex > history.index())) {
-                            System.err.println("The index number of history command does not exist.");
+                    if (controlCommand.endsWith(";")) {
+                        controlCommand = controlCommand.substring(0, controlCommand.length() - 1).trim();
+                        if (SET_COMMAND_PATTERN.matcher(controlCommand).matches()) {
+                            controlCommand = controlCommand.replaceAll(" +", " ");
+                            setSessionProperties(controlCommand.replace("!", ""), session);
                             continue;
                         }
-                        line = history.get(historyIndex - 1).toString();
-                        System.out.println(commandPrompt + line);
-                    }
-                    else if (controlCommand.endsWith(";")) {
-                        controlCommand = controlCommand.substring(0, controlCommand.length() - 1).trim();
                     }
 
                     switch (controlCommand.toLowerCase(ENGLISH)) {
@@ -269,8 +253,7 @@ public class Console
                 // execute any complete statements
                 String sql = buffer.toString();
                 StatementSplitter splitter = new StatementSplitter(sql, STATEMENT_SPLITTER);
-                ConvertionOptions convertionOptions = new ConvertionOptions(sourceType, migrationConfig.isConvertDecimalAsDouble());
-                SqlSyntaxConverter sqlConverter = SqlConverterFactory.getSqlConverter(convertionOptions);
+                SqlSyntaxConverter sqlConverter = SqlConverterFactory.getSqlConverter(session);
                 for (StatementSplitter.Statement split : splitter.getCompleteStatements()) {
                     reader.getHistory().add(squeezeStatement(split.statement()) + split.terminator());
                     JSONObject result = sqlConverter.convert(split.statement());
@@ -289,6 +272,48 @@ public class Console
         }
         catch (ParsingException | SqlMigrationException e) {
             System.out.println(format("Failed to migrate the sql due to error: %s", e.getMessage()));
+        }
+    }
+
+    private boolean setSourceType(String sourceType, SessionProperties sessionProperties)
+    {
+        if (sourceType == null || sourceType.isEmpty()) {
+            return false;
+        }
+        switch (sourceType.toLowerCase(ENGLISH)) {
+            case HIVE:
+                sessionProperties.setSourceType(SqlSyntaxType.HIVE);
+                break;
+            case IMPALA:
+                sessionProperties.setSourceType(SqlSyntaxType.IMPALA);
+                break;
+            default:
+                return false;
+        }
+        return true;
+    }
+
+    private void setSessionProperties(String controlCommand, SessionProperties session)
+    {
+        if (controlCommand == null || controlCommand.isEmpty()) {
+            return;
+        }
+
+        String[] commandStrs = controlCommand.split(" ");
+
+        switch (commandStrs[0].toLowerCase(ENGLISH)) {
+            case CHANGE_TYPE_COMMAND:
+                if (commandStrs.length != 2) {
+                    System.out.println("You have to specify the input sql type. e.g. !chtype hive");
+                    break;
+                }
+                String targetType = commandStrs[1].toLowerCase(ENGLISH);
+                if (!setSourceType(targetType, session)) {
+                    System.out.println(format("Unable to change type to %s. Because it is invalid or unsupported.", targetType));
+                }
+                break;
+            default:
+                System.out.println(format("Command %s is not supported", commandStrs[0]));
         }
     }
 
@@ -322,17 +347,16 @@ public class Console
         return Paths.get(nullToEmpty(USER_HOME.value()), ".presto_history");
     }
 
-    private boolean executeCommand(String query, SqlSyntaxType sourceType, String outputFile, MigrationConfig migrationConfig, boolean isConsolePrintEnable)
+    public boolean executeCommand(String query, String outputFile, SessionProperties session)
     {
         JSONArray output = new JSONArray();
         try {
             StatementSplitter splitter = new StatementSplitter(query);
-            ConvertionOptions convertionOptions = new ConvertionOptions(sourceType, migrationConfig.isConvertDecimalAsDouble());
-            SqlSyntaxConverter sqlConverter = SqlConverterFactory.getSqlConverter(convertionOptions);
+            SqlSyntaxConverter sqlConverter = SqlConverterFactory.getSqlConverter(session);
             for (StatementSplitter.Statement split : splitter.getCompleteStatements()) {
                 JSONObject result = sqlConverter.convert(split.statement());
                 output.put(result);
-                if (isConsolePrintEnable) {
+                if (session.isConsolePrintEnable()) {
                     consolePrint(result);
                 }
             }
@@ -340,8 +364,7 @@ public class Console
 
             // write the result to file if output file was specified
             if (outputFile != null) {
-                writeToSqlFile(output, outputFile);
-                writeToCsvFile(output, outputFile);
+                SqlResultHandleUtils.writeToHtmlFile(output, outputFile);
             }
             return true;
         }
@@ -349,97 +372,5 @@ public class Console
             log.error(format("Failed to migrate the sql due to error:", e.getMessage()));
         }
         return false;
-    }
-
-    private static boolean writeToSqlFile(JSONArray jsonArray, String outputFile)
-    {
-        BufferedWriter writer = null;
-        try {
-            OutputStream out = new FileOutputStream(outputFile + ".sql");
-            writer = new BufferedWriter(new OutputStreamWriter(out, UTF_8), BUFFER_SIZE);
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONObject result = jsonArray.getJSONObject(i);
-                if (!result.get(Constants.STATUS).toString().equals(Constants.FAIL)) {
-                    writer.write(result.get(Constants.CONVERTED_SQL).toString() + ";");
-                    writer.newLine();
-                }
-            }
-        }
-        catch (JSONException | IOException e) {
-            log.error(format("Failed to save the convert result as a sql file"));
-        }
-        finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                }
-                catch (IOException e) {
-                    log.error(format("Write file[%s.sql] failed: %s", outputFile, e.getMessage()));
-                }
-            }
-        }
-        log.info(format("Result is saved to %s.sql", outputFile));
-        return true;
-    }
-
-    private static boolean writeToCsvFile(JSONArray jsonArray, String outputFile)
-    {
-        // create an file output stream
-        BufferedWriter writer = null;
-        try {
-            OutputStream out = new FileOutputStream(outputFile + ".csv");
-            writer = new BufferedWriter(new OutputStreamWriter(out, UTF_8), BUFFER_SIZE);
-            CsvPrinter csvPrinter = new CsvPrinter(new ArrayList<>(), writer, NO_HEADER);
-            List<List<String>> csvData = jsonToCsv(jsonArray, true);
-            for (List<String> row : csvData) {
-                csvPrinter.printRows(Collections.singletonList(row), false);
-            }
-            csvPrinter.finish();
-        }
-        catch (JSONException | IOException e) {
-            log.error(format("Failed to save the convert result as a csv file"));
-        }
-        finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                }
-                catch (IOException e) {
-                    log.error(format("Write file[%s.csv] failed: %s", outputFile, e.getMessage()));
-                }
-            }
-        }
-        log.info(format("Result is saved to %s.csv", outputFile));
-        return true;
-    }
-
-    private static List<List<String>> jsonToCsv(JSONArray jsonArray, boolean isWithHeader)
-            throws JSONException
-    {
-        List<List<String>> csvRows = new ArrayList<>(jsonArray.length());
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONObject row = jsonArray.getJSONObject(i);
-
-            // add header
-            if (isWithHeader) {
-                Iterator<String> keys = row.keys();
-                List<String> header = new ArrayList<>();
-                while (keys.hasNext()) {
-                    header.add(keys.next());
-                }
-                csvRows.add(header);
-                isWithHeader = false;
-            }
-
-            // add data row
-            List<String> dataRow = new ArrayList<>();
-            Iterator<String> keys = row.keys();
-            while (keys.hasNext()) {
-                dataRow.add(row.getString(keys.next()));
-            }
-            csvRows.add(dataRow);
-        }
-
-        return csvRows;
     }
 }

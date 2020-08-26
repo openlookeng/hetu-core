@@ -17,12 +17,13 @@ package io.hetu.core.sql.migration.parser;
 import io.hetu.core.migration.source.hive.HiveSqlBaseListener;
 import io.hetu.core.migration.source.hive.HiveSqlLexer;
 import io.hetu.core.migration.source.hive.HiveSqlParser;
-import io.hetu.core.sql.migration.tool.ConvertionOptions;
+import io.hetu.core.sql.migration.Constants;
 import io.prestosql.sql.SqlFormatter;
 import io.prestosql.sql.parser.CaseInsensitiveStream;
 import io.prestosql.sql.parser.ErrorHandler;
 import io.prestosql.sql.parser.IdentifierSymbol;
 import io.prestosql.sql.parser.ParsingException;
+import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.sql.tree.Statement;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -40,6 +41,7 @@ import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.Pair;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
@@ -94,7 +96,7 @@ public class HiveParser
         enhancedErrorHandlerEnabled = options.isEnhancedErrorHandlerEnabled();
     }
 
-    public JSONObject invokeParser(String sql, Function<HiveSqlParser, ParserRuleContext> parseFunction, ConvertionOptions convertionOptions)
+    public JSONObject invokeParser(String sql, Function<HiveSqlParser, ParserRuleContext> parseFunction, ParsingOptions parsingOptions)
     {
         try {
             HiveSqlLexer lexer = new HiveSqlLexer(new CaseInsensitiveStream(CharStreams.fromString(sql)));
@@ -134,7 +136,9 @@ public class HiveParser
 
             String convertedSql = "";
             String conversionStatus = "";
-            String conversionInfo = "";
+            String errorMessage = "";
+            JSONArray diffArray = new JSONArray();
+            HiveAstBuilder hiveAstBuilder = null;
             try {
                 ParserRuleContext tree;
                 try {
@@ -148,36 +152,60 @@ public class HiveParser
                     tree = parseFunction.apply(parser);
                 }
 
-                HiveAstBuilder hiveAstBuilder = new HiveAstBuilder(convertionOptions);
+                hiveAstBuilder = new HiveAstBuilder(parsingOptions);
                 Statement statement = (Statement) hiveAstBuilder.visit(tree);
-                convertedSql = SqlFormatter.formatSql(statement, Optional.empty());
-                if (hiveAstBuilder.getConversionInfo().isEmpty()) {
-                    conversionStatus = Constants.SUCCESS;
+                if (statement == null) {
+                    conversionStatus = Constants.FAILED;
+                    errorMessage = "The input sql is not valid or empty.";
                 }
                 else {
-                    conversionStatus = Constants.WARNING;
-                    conversionInfo = String.join(",", hiveAstBuilder.getConversionInfo());
+                    convertedSql = SqlFormatter.formatSql(statement, Optional.empty());
+                    if (hiveAstBuilder.getParserDiffsList().isEmpty()) {
+                        conversionStatus = Constants.SUCCESS;
+                    }
+                    else {
+                        conversionStatus = Constants.SUCCESS;
+                        for (ParserDiffs diffs : hiveAstBuilder.getParserDiffsList()) {
+                            if (diffs.getDiffType().equals(DiffType.DELETED) || diffs.getDiffType().equals(DiffType.FUNCTION_WARNING)) {
+                                conversionStatus = Constants.WARNING;
+                            }
+                            diffArray.put(diffs.toJsonObject());
+                        }
+                    }
                 }
             }
-            catch (ParsingException | IllegalArgumentException | UnsupportedOperationException e) {
-                conversionInfo = e.getMessage();
-                conversionStatus = Constants.FAIL;
+            catch (UnsupportedException e) {
+                // handle the unsupported keywords
+                conversionStatus = Constants.UNSUPPORTED;
+                if (hiveAstBuilder != null) {
+                    for (ParserDiffs diffs : hiveAstBuilder.getParserDiffsList()) {
+                        if (diffs.getDiffType().equals(DiffType.UNSUPPORTED)) {
+                            diffArray.put(diffs.toJsonObject());
+                            errorMessage += diffs.getMessage().isPresent() ? diffs.getMessage().get() : "";
+                        }
+                    }
+                }
+                if (errorMessage.isEmpty()) {
+                    errorMessage = e.getMessage();
+                }
+            }
+            catch (IllegalArgumentException | UnsupportedOperationException | ParsingException e) {
+                errorMessage = e.getMessage();
+                conversionStatus = Constants.FAILED;
             }
 
             // Construct json format result
             JSONObject result = new JSONObject();
-            try {
-                result.put(Constants.ORIGINAL_SQL, sql);
-                result.put(Constants.ORIGINAL_SQL_TYPE, HIVE);
-                result.put(Constants.CONVERTED_SQL, convertedSql);
-                result.put(Constants.STATUS, conversionStatus);
-                result.put(Constants.MESSAGE, conversionInfo);
-            }
-            catch (JSONException e) {
-                throw new ParsingException("Construct parsing result failed." + e.getMessage());
-            }
-
+            result.put(Constants.ORIGINAL_SQL, sql);
+            result.put(Constants.ORIGINAL_SQL_TYPE, HIVE);
+            result.put(Constants.CONVERTED_SQL, convertedSql);
+            result.put(Constants.STATUS, conversionStatus);
+            result.put(Constants.MESSAGE, errorMessage);
+            result.put(Constants.DIFFS, diffArray);
             return result;
+        }
+        catch (JSONException e) {
+            throw new ParsingException("Construct parsing result failed." + e.getMessage());
         }
         catch (StackOverflowError e) {
             throw new ParsingException("statement is too large (stack overflow while parsing)");

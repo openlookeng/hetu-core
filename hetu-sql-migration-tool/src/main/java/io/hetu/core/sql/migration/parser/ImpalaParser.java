@@ -16,12 +16,13 @@ package io.hetu.core.sql.migration.parser;
 import io.hetu.core.migration.source.impala.ImpalaSqlBaseListener;
 import io.hetu.core.migration.source.impala.ImpalaSqlLexer;
 import io.hetu.core.migration.source.impala.ImpalaSqlParser;
-import io.hetu.core.sql.migration.tool.ConvertionOptions;
+import io.hetu.core.sql.migration.Constants;
 import io.prestosql.sql.SqlFormatter;
 import io.prestosql.sql.parser.CaseInsensitiveStream;
 import io.prestosql.sql.parser.ErrorHandler;
 import io.prestosql.sql.parser.IdentifierSymbol;
 import io.prestosql.sql.parser.ParsingException;
+import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.sql.tree.Statement;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -39,6 +40,7 @@ import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.Pair;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
@@ -93,7 +95,7 @@ public class ImpalaParser
         enhancedErrorHandlerEnabled = options.isEnhancedErrorHandlerEnabled();
     }
 
-    public JSONObject invokeParser(String sql, Function<ImpalaSqlParser, ParserRuleContext> parseFunction, ConvertionOptions convertionOptions)
+    public JSONObject invokeParser(String sql, Function<ImpalaSqlParser, ParserRuleContext> parseFunction, ParsingOptions parsingOptions)
     {
         try {
             ImpalaSqlLexer lexer = new ImpalaSqlLexer(new CaseInsensitiveStream(CharStreams.fromString(sql)));
@@ -133,7 +135,9 @@ public class ImpalaParser
 
             String convertedSql = "";
             String conversionStatus = "";
-            String conversionInfo = "";
+            String errorMessage = "";
+            JSONArray diffArray = new JSONArray();
+            ImpalaAstBuilder impalaAstBuilder = null;
             try {
                 ParserRuleContext tree;
                 try {
@@ -150,42 +154,61 @@ public class ImpalaParser
                     tree = parseFunction.apply(parser);
                 }
 
-                ImpalaAstBuilder impalaAstBuilder = new ImpalaAstBuilder(convertionOptions);
+                impalaAstBuilder = new ImpalaAstBuilder(parsingOptions);
                 Statement statement = (Statement) impalaAstBuilder.visit(tree);
                 if (statement == null) {
-                    conversionStatus = Constants.FAIL;
-                    conversionInfo = "The input sql is not valid or empty.";
+                    conversionStatus = Constants.FAILED;
+                    errorMessage = "The input sql is not valid or empty.";
                 }
                 else {
                     convertedSql = SqlFormatter.formatSql(statement, Optional.empty());
-                    if (impalaAstBuilder.getConversionInfo().isEmpty()) {
+                    if (impalaAstBuilder.getParserDiffsList().isEmpty()) {
                         conversionStatus = Constants.SUCCESS;
                     }
                     else {
-                        conversionStatus = Constants.WARNING;
-                        conversionInfo = String.join(",", impalaAstBuilder.getConversionInfo());
+                        conversionStatus = Constants.SUCCESS;
+                        for (ParserDiffs diffs : impalaAstBuilder.getParserDiffsList()) {
+                            if (diffs.getDiffType().equals(DiffType.DELETED) || diffs.getDiffType().equals(DiffType.FUNCTION_WARNING)) {
+                                conversionStatus = Constants.WARNING;
+                            }
+                            diffArray.put(diffs.toJsonObject());
+                        }
                     }
                 }
             }
-            catch (ParsingException | IllegalArgumentException | UnsupportedOperationException e) {
-                conversionInfo = e.getMessage();
-                conversionStatus = Constants.FAIL;
+            catch (UnsupportedException e) {
+                // handle the unsupported keywords
+                conversionStatus = Constants.UNSUPPORTED;
+                if (impalaAstBuilder != null) {
+                    for (ParserDiffs diffs : impalaAstBuilder.getParserDiffsList()) {
+                        if (diffs.getDiffType().equals(DiffType.UNSUPPORTED)) {
+                            diffArray.put(diffs.toJsonObject());
+                            errorMessage += diffs.getMessage().isPresent() ? diffs.getMessage().get() : "";
+                        }
+                    }
+                }
+                if (errorMessage.isEmpty()) {
+                    errorMessage = e.getMessage();
+                }
+            }
+            catch (IllegalArgumentException | UnsupportedOperationException | ParsingException e) {
+                errorMessage = e.getMessage();
+                conversionStatus = Constants.FAILED;
             }
 
             // Construct json format result
             JSONObject result = new JSONObject();
-            try {
-                result.put(Constants.ORIGINAL_SQL, sql);
-                result.put(Constants.ORIGINAL_SQL_TYPE, IMPALA);
-                result.put(Constants.CONVERTED_SQL, convertedSql);
-                result.put(Constants.STATUS, conversionStatus);
-                result.put(Constants.MESSAGE, conversionInfo);
-            }
-            catch (JSONException e) {
-                throw new ParsingException("Construct parsing result failed." + e.getMessage());
-            }
 
+            result.put(Constants.ORIGINAL_SQL, sql);
+            result.put(Constants.ORIGINAL_SQL_TYPE, IMPALA.getValue());
+            result.put(Constants.CONVERTED_SQL, convertedSql);
+            result.put(Constants.STATUS, conversionStatus);
+            result.put(Constants.MESSAGE, errorMessage);
+            result.put(Constants.DIFFS, diffArray);
             return result;
+        }
+        catch (JSONException e) {
+            throw new ParsingException("Construct parsing result failed." + e.getMessage());
         }
         catch (StackOverflowError e) {
             throw new ParsingException("statement is too large (stack overflow while parsing)");

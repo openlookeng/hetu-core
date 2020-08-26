@@ -12,20 +12,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.sql.migration;
+package io.hetu.core.sql.migration.parser;
 
-public enum SqlSyntaxType
+public enum DiffType
 {
-    HIVE("Hive"), IMPALA("Impala"), PRESTO("Presto");
-    private String value;
+    DELETED(0, "deleted"),
+    MODIFIED(1, "modified"),
+    INSERTED(2, "inserted"),
+    FUNCTION_WARNING(3, "warning"),
+    UNSUPPORTED(4, "unsupported");
 
-    SqlSyntaxType(String value)
+    DiffType(int code, String value)
     {
+        this.code = code;
         this.value = value;
+    }
+
+    public int getCode()
+    {
+        return code;
     }
 
     public String getValue()
     {
         return value;
     }
+
+    private int code;
+    private String value;
 }

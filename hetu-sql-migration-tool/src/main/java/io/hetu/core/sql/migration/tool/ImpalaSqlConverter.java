@@ -15,25 +15,26 @@ package io.hetu.core.sql.migration.tool;
 
 import io.hetu.core.migration.source.impala.ImpalaSqlParser;
 import io.hetu.core.sql.migration.parser.ImpalaParser;
+import io.prestosql.sql.parser.ParsingOptions;
 import org.codehaus.jettison.json.JSONObject;
 
 public class ImpalaSqlConverter
         extends SqlSyntaxConverter
 {
     private ImpalaParser impalaParser;
-    private ConvertionOptions convertionOptions;
+    private ParsingOptions parsingOptions;
     private static ImpalaSqlConverter hiveSqlConverter;
 
-    private ImpalaSqlConverter(ConvertionOptions convertionOptions)
+    private ImpalaSqlConverter(ParsingOptions parsingOptions)
     {
         this.impalaParser = new ImpalaParser();
-        this.convertionOptions = convertionOptions;
+        this.parsingOptions = parsingOptions;
     }
 
-    public static synchronized ImpalaSqlConverter getImpalaSqlConverter(ConvertionOptions convertionOptions)
+    public static synchronized ImpalaSqlConverter getImpalaSqlConverter(ParsingOptions parsingOptions)
     {
         if (hiveSqlConverter == null) {
-            hiveSqlConverter = new ImpalaSqlConverter(convertionOptions);
+            hiveSqlConverter = new ImpalaSqlConverter(parsingOptions);
         }
 
         return hiveSqlConverter;
@@ -42,6 +43,6 @@ public class ImpalaSqlConverter
     @Override
     public JSONObject convert(String sql)
     {
-        return impalaParser.invokeParser(sql, ImpalaSqlParser::singleStatement, convertionOptions);
+        return impalaParser.invokeParser(sql, ImpalaSqlParser::singleStatement, parsingOptions);
     }
 }

@@ -84,7 +84,7 @@ statement
     | ALTER TABLE qualifiedName CLUSTERED BY columnAliases (SORTED BY columnAliases)? INTO expression BUCKETS                                   #alterTableStorage
     | ALTER TABLE qualifiedName SKEWED BY columnAliases ON  expression (',' expression)* (STORED_AS DIRECTORIES)?                               #alterTableSkewed
     | ALTER TABLE qualifiedName NOT SKEWED                                                                                                      #alterTableNotSkewed
-    | ALTER TABLE qualifiedName NOT STORED AS DIRECTORIES                                                                                       #alterTableNotAsDirectories
+    | ALTER TABLE qualifiedName NOT STORED_AS DIRECTORIES                                                                                       #alterTableNotAsDirectories
     | ALTER TABLE qualifiedName SET SKEWED LOCATION properties                                                                                  #alterTableSetSkewedLocation
     | ALTER TABLE qualifiedName ADD CONSTRAINT identifier
         (PRIMARY KEY columnAliases DISABLE NOVALIDATE
@@ -93,7 +93,7 @@ statement
     | ALTER TABLE qualifiedName CHANGE COLUMN identifier identifier type
         CONSTRAINT identifier (NOT NULL ENABLE | DEFAULT defaultValue ENABLE | CHECK expression ENABLE)                                         #alterTableChangeConstraint
     | ALTER TABLE qualifiedName DROP CONSTRAINT identifier                                                                                      #alterTableDropConstraint
-    | ALTER TABLE qualifiedName ADD (IF NOT EXISTS)? PARTITION properties (LOCATION string)? (',' PARTITION properties (LOCATION string)?)*     #alterTableAddPartition
+    | ALTER TABLE qualifiedName ADD (IF NOT EXISTS)? PARTITION properties (LOCATION string) (PARTITION properties (LOCATION string)?)*          #alterTableAddPartition
     | ALTER TABLE qualifiedName PARTITION properties RENAME TO PARTITION properties                                                             #alterTableRenamePartition
     | ALTER TABLE qualifiedName EXCHANGE PARTITION properties WITH TABLE qualifiedName                                                          #alterTableExchangePartition
     | ALTER TABLE qualifiedName RECOVER PARTITIONS                                                                                              #alterTableRecoverPartitions
@@ -152,8 +152,8 @@ statement
         ((ADD | DROP | SYNC) PARTITIONS)?                              #msckRepairTable
     | SHOW (SCHEMAS | DATABASES)
         (LIKE pattern=string)?                                         #showSchemas
-    | SHOW COLUMNS (FROM | IN) tableName=qualifiedName
-        ((FROM | IN) dbName=qualifiedName)?
+    | SHOW COLUMNS inTable=(FROM | IN) tableName=qualifiedName
+        (inDatabase=(FROM | IN) dbName=qualifiedName)?
         (LIKE)? (pattern=string)?                                      #showColumns
     | SHOW CURRENT? ROLES                                              #showRoles
     | (DESCRIBE | DESC) (EXTENDED | FORMATTED)? describeName

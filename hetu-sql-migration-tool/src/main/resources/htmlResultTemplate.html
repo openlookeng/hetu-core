@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .tooltip {
+            position: absolute;
+            display: inline-block;
+            text-align: center;
+            left: 28em;
+            top: 2.5em;
+        }
+
+        .tooltip .toolTipText {
+            visibility: hidden;
+            width: 600px;
+            background-color: #f6f8fa;
+            border: #e4e5e6 solid 2px;
+            text-align: left;
+            padding: 0.5em;
+            border-radius: 6px;
+
+            position: absolute;
+            z-index: 1;
+            white-space: pre-wrap;
+        }
+
+        .tooltip:hover .toolTipText {
+            visibility: visible;
+        }
+
+        .summary {
+            margin-right: 1em;
+            border-radius: 0.5em;
+            padding: 0.3em;
+            font-size: 1.2em;
+            color: white;
+            cursor: pointer;
+        }
+        .summary.total {
+            border: rgba(0,0,0,1) solid 2px;
+            color:black;
+        }
+        .summary.total:hover {
+            background-color: rgba(0,0,0,.8);
+            color:white;
+        }
+        .summary.total.active {
+            background-color: rgba(0,0,0,1);
+            color:white;
+        }
+        .summary.success {
+            border: rgba(0,128,0,1) solid 2px;
+            color:black;
+        }
+        .summary.success:hover {
+            background-color: rgba(0,128,0,.8);
+            color:white;
+        }
+        .summary.success.active {
+            background-color: rgba(0,128,0,1);
+            color:white;
+        }
+
+        .summary.warning {
+            border: rgba(255,100,0,1) solid 2px;
+            color:black;
+        }
+        .summary.warning:hover {
+            background-color: rgba(255,100,0,.8);
+            color:white;
+        }
+        .summary.warning.active {
+            background-color: rgba(255,100,0,1);
+            color:white;
+        }
+
+        .summary.unsupported {
+            border: rgba(255,0,0,1) solid 2px;
+            color:black;
+        }
+        .summary.unsupported:hover {
+            background-color: rgba(255,0,0,.8);
+            color:white;
+        }
+        .summary.unsupported.active {
+            background-color: rgba(255,0,0,1);
+            color:white;
+        }
+
+        .summary.failure {
+            border: rgba(255,0,0,1) solid 2px;
+            color:black;
+        }
+        .summary.failure:hover {
+            background-color: rgba(255,0,0,.8);
+            color:white;
+        }
+        .summary.failure.active {
+            background-color: rgba(255,0,0,1);
+            color:white;
+        }
+
+        .summary .name:after {
+            content: ':'
+        }
+
+        #sqlTable {
+            border-collapse: collapse;
+            width: 100%;
+            border: 1px solid #ddd;
+        }
+
+        #sqlTable th {
+            text-align: left;
+            padding: 0.5em 1em;
+        }
+
+        #sqlTable td {
+            text-align: left;
+            padding: 0.5em 1em;
+            font-family: monospace;
+        }
+
+        #sqlTable td ul {
+            padding-left: 1em;
+        }
+
+        #sqlTable tr {
+            border-bottom: 1px solid #ddd;
+        }
+
+        #sqlTable tr.header,
+        #sqlTable tr:hover {
+            background-color: #f1f1f1;
+        }
+        #page{
+            list-style: none;
+            padding-left:0px;
+        }
+        #page li{
+            display: inline-block;
+            padding-right: 10px;
+        }
+
+        #page .gotoText{
+            width: 60px;
+        }
+
+        .top{
+            position: relative;
+            margin-top: 30px;
+        }
+        .top .btn-generate{
+            position: absolute;
+            top: -0.3em;
+            right: 0;
+            border-radius: 0.5em;
+            padding: 0.3em;
+            font-size: 1.2em;
+            color: white;
+            cursor: pointer;
+            background-color: rgba(0, 76, 255,.5);
+            color:black;
+            border: rgba(0, 76, 255,1) solid 2px;
+        }
+        .top .btn-generate:hover {
+            background-color: rgba(0, 76, 255,1);
+            color:white;
+        }
+
+        button{
+            background-color: #fff;
+            border: 1px solid #ddd;
+            outline: none;
+            padding: 0.3em;
+        }
+        .modal{
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            background: rgba(0,0,0,.5);
+            top: 0;
+            z-index: 10;
+            display: none;
+        }
+        .modal-main{
+            width: 960px;
+            height: 600px;
+            margin: 200px auto;
+            background: #f6f8fa;
+            border-radius: 10px;
+        }
+        textarea{
+            width: 100%;
+            height: 370px;
+            resize: none;
+        }
+        .modal-content {
+            padding: 0 30px 20px;
+            border-bottom 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+        .modal-footer .btn-part {
+            text-align: center;
+        }
+        .modal-footer .btn-part button{
+            margin:20px 10px auto;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .modal-footer .btn-part .copy {
+            color: #fff;
+            background: linear-gradient(to bottom, #5cb85c 0,#419641 100%);
+        }
+        .modal-header {
+            border-bottom: 1px solid #ddd;
+            padding: 20px 30px;
+            position: relative;
+        }
+        .modal-header h3 {
+            margin: 0;
+        }
+        .modal-header span.icon {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            cursor: pointer;
+        }
+        button.active{
+            color: #0561ef;
+            border: 1px solid #0561ef;
+        }
+    </style>
+</head>
+
+<body>
+<div style="padding:10px">
+    <h1>SQL Conversion Result</h1>
+    <div class="tooltip">
+        <svg t="1598238319758" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1190" width="25" height="25">
+            <path d="M505.181 742.018c-26.499 0-47.972 21.481-47.972 47.968s21.474 47.977 47.972 47.977c26.48 0 47.948-21.488 47.948-47.977s-21.469-47.968-47.948-47.968z"
+                  p-id="1191"></path>
+            <path d="M505.181 70.128c-246.883 0-447.689 200.826-447.689 447.683 0 246.874 200.806 447.705 447.689 447.705 246.849 0 447.683-200.83 447.683-447.705 0-246.858-200.836-447.683-447.683-447.683zM505.181 901.273c-211.46 0-383.455-172.045-383.455-383.459 0-211.431 171.995-383.436 383.455-383.436 211.391 0 383.455 172.003 383.455 383.436 0 211.417-172.064 383.459-383.455 383.459z"
+                  p-id="1192"></path>
+            <path d="M505.162 231.205c-88.146 0-159.892 71.093-159.892 158.448 0 17.648 14.347 31.981 31.981 31.981 17.675 0 31.985-14.332 31.985-31.981 0-52.987 42.167-94.498 95.946-94.498 52.873 0 95.926 43.366 95.926 96.677 0 21.324-26.753 48.058-52.634 73.965-35.309 35.267-75.282 75.237-75.282 127.563v54.067c0 17.663 14.341 31.985 31.989 31.985 17.634 0 31.97-14.363 31.97-32.016v-54.071c0-25.807 28.719-54.524 56.54-82.282 35.074-35.074 71.383-71.346 71.383-119.221-0.002-88.573-71.718-160.617-159.914-160.617z"
+                  p-id="1193"></path>
+        </svg>
+        <span class="toolTipText">This page allows you review the conversion details and pick up sql results.
+You can filter out results with different status, such as success, warning, unsupported, failure, by clicking below buttons.
+You can review the conversion results and select the ones you accept by checking the check box at the last column. By default, all success and warning rows are checked.
+Finally, you can click the button "Generate Output" to extract all the selected sql results to a text box.
+In the text box, click the "copy" button to copy the text to clipboard and then past to anywhere you like.
+
+*Note*
+This page is a static page, all actions you made on this page will be gone after reloading page.
+    </span>
+    </div>
+    <div class="top">
+        <p>
+        <span class="summary total active" onclick="filter('total',0)">
+            <span class="name">Total</span>
+            <span id="summary-total" class="value"></span>
+        </span>
+            <span class="summary success" onclick="filter('Success',1)" title="SQLs are converted successfully.">
+            <span class="name">Successes</span>
+            <span id="summary-success" class="value"></span>
+        </span>
+            <span class="summary warning" onclick="filter('Warning',2)" title="SQLs are converted but with some limitations or functional warnings.">
+            <span class="name">Warnings</span>
+            <span id="summary-warning" class="value"></span>
+        </span>
+            <span class="summary unsupported" onclick="filter('Unsupported',3)" title="SQLs with any attributes or keywords are not able to be converted.">
+            <span class="name">Unsupported</span>
+            <span id="summary-unsupported" class="value"></span>
+        </span>
+            <span class="summary failure" onclick="filter('Failed',4)" title="SQLs is not valid or causing exceptions during converting.">
+            <span class="name">Failed</span>
+            <span id="summary-failure" class="value"></span>
+        </span>
+        </p>
+        <p>
+        <span class="btn-generate" onclick="generateOutput()" title="Extract all your selections to a text box">
+            <span class="name">Generate Output</span>
+        </span>
+        </p>
+    </div>
+    <table id="sqlTable">
+        <thead>
+        <tr class="header">
+            <th width="5%">Type</th>
+            <th width="35%">Original</th>
+            <th width="35%">Converted</th>
+            <th width="5%">Result</th>
+            <th width="20%">Message</th>
+            <th><input id="selectAll" type="checkbox" title="Select/deselect all items in current page"></th>
+        </tr>
+        </thead>
+        <tbody id="content"></tbody>
+    </table>
+    <ul id="page">
+        <li>
+            <button class="liBtn" id="firstPage" onclick="firstPage()"><<</button>
+        </li>
+        <li>
+            <button class="liBtn" id="previousPage" onclick="previousPage()"><</button>
+        </li>
+        <li>
+            <button class="liBtn" id="nextPage" onclick="nextPage()">></button>
+        </li>
+        <li>
+            <button class="liBtn" id="lastPage" onclick="lastPage()">>></button>
+        </li>
+        <li>Current: <span id="currentPageNum"></span></button></li>
+        <li>Total: <span id="totalPageNum"></span></button></li>
+        <li>Go to: <input type="text" class="gotoText" id="goTo" onkeypress="return onKeyPress(event)"></li>
+        <li>Page size:
+            <select id="setPageSize" onChange="setPageSize()">
+                <option value=5>5</option>
+                <option value=10 selected="selected">10</option>
+                <option value=25>25</option>
+                <option value=50>50</option>
+                <option value=100>100</option>
+            </select>
+        </li>
+
+    </ul>
+</div>
+
+<div class="modal" id="modal">
+    <div class="modal-main">
+        <div class="modal-header">
+            <h3>Outputs</h3>
+            <span class="icon" id="iconClose">
+                <svg t="1598344900889" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2133" width="24" height="24"><path d="M216.91904 188.61056l648.2176 648.25856M198.81472 206.71488L740.9664 748.9024l106.06592 106.07104c23.36768 23.36768 59.5712-12.83584 36.20864-36.1984L341.08928 276.5824 235.02336 170.50624c-23.36768-23.36256-59.5712 12.84096-36.20864 36.20864z" p-id="2134"></path><path d="M865.13664 188.61056L216.91904 836.86912M847.03232 170.50624C666.32192 351.232 485.59616 531.95776 304.88064 712.69376l-106.06592 106.07616c-23.36256 23.36256 12.84096 59.5712 36.20352 36.1984L777.16992 312.7808l106.07104-106.07104c23.35744-23.36256-12.84096-59.56608-36.20864-36.20352z" p-id="2135"></path></svg>
+            </span>
+        </div>
+        <div class="modal-content">
+            <div class="">
+                <p>Output generated according to your selection; success: <span id="selection-success" style="color:green"></span> warning: <span id="selection-warning"
+                                                                                                                                                  style="color:#f56d05"></span></p>
+            </div>
+            <textarea id="copyText"></textarea>
+        </div>
+        <div class="modal-footer">
+            <div class="btn-part">
+                <button id="copy" class="copy" title="copy to clipboard">copy</button>
+                <button id="cancel">cancel</button>
+            </div>
+            <p id="copy-msg" align="center" style="color:green;text-align:center;margin 5px"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+let data = ${conversionResultData}$;
+
+let success = 0,
+    warning = 0,
+    failure = 0,
+    unsupported = 0,
+    pageIndex = 1,
+    totalPageNum = 1,
+    tableData = data;
+let pageSize = 10;
+let currentStatus = "total"
+let selectAll = document.getElementById("selectAll");
+let tbody = document.getElementById("content");
+let pages = document.getElementById("page");
+initPage();
+
+function initPage() {
+    countTotalPageNum();
+    document.getElementById("currentPageNum").innerText = pageIndex;
+    document.getElementById("totalPageNum").innerText = totalPageNum;
+}
+
+
+function setPageSize() {
+    console.log(document.getElementById("setPageSize").value);
+    pageSize = parseInt(document.getElementById("setPageSize").value);
+    countTotalPageNum();
+    // refresh page and table
+    pageIndex = 1;
+    document.getElementById("currentPageNum").innerText = pageIndex;
+    document.getElementById("totalPageNum").innerText = totalPageNum;
+
+    initTable(tableData.slice(0, pageSize));
+}
+
+function onKeyPress(e) {
+    let keyCode = null;
+    if (e.which) {
+        keyCode = e.which;
+    } else {
+        keyCode = e.keyCode;
+    }
+    if (keyCode == 13) {
+        //console.log(document.getElementById("goTo").value);
+        let gotoNum = parseInt(document.getElementById("goTo").value);
+        if (gotoNum >= 1 && gotoNum <= totalPageNum) {
+            changePage(gotoNum, 0);
+        }
+    }
+}
+
+function countTotalPageNum() {
+    totalPageNum = Math.ceil(tableData.length / pageSize);
+}
+
+function firstPage() {
+    if (pageIndex > 1) {
+        changePage(1, 1);
+    }
+}
+
+function previousPage() {
+    if (pageIndex > 1) {
+        changePage(pageIndex - 1, 2);
+    }
+}
+
+function nextPage() {
+    if (pageIndex < totalPageNum) {
+        changePage(pageIndex + 1, 3);
+    }
+}
+
+function lastPage() {
+    if (pageIndex < totalPageNum) {
+        changePage(totalPageNum, 4);
+    }
+}
+
+function changePage(index, btnIndex) {
+    let btnList = document.getElementsByClassName("liBtn");
+    for (let i = 0; i < btnList.length; i++) {
+        btnList[i].setAttribute('class', btnList[i].getAttribute("class").replace(' active', ''));
+    }
+    if (btnIndex > 0 && btnIndex < btnList.length) {
+        btnList[btnIndex - 1].setAttribute('class', btnList[btnIndex - 1].getAttribute('class').concat(' active'));
+    }
+
+    pageIndex = index;
+    document.getElementById("currentPageNum").innerText = pageIndex;
+    initTable(tableData.slice((index - 1) * pageSize, index * pageSize));
+}
+for (let i = 0, len = data.length; i < len; i++) {
+    if (data[i].status === "Success" || data[i].status === "Warning") {
+        data[i].checked = true;
+    } else {
+        data[i].checked = false;
+    }
+    switch (data[i].status) {
+        case "Success":
+            success++;
+            break;
+        case "Warning":
+            warning++;
+            break;
+        case "Unsupported":
+            unsupported++;
+            break;
+        case "Failed":
+            failure++;
+            break;
+    }
+}
+selectAll.checked = success + warning >0 ? '' : 'checked';
+document.getElementById("summary-total").innerText = success + warning + unsupported + failure;
+document.getElementById("summary-success").innerText = success;
+document.getElementById("summary-warning").innerText = warning;
+document.getElementById("summary-unsupported").innerText = unsupported;
+document.getElementById("summary-failure").innerText = failure;
+
+initTable(tableData.slice(0, pageSize));
+
+function initTable(data) {
+    let totalNum = 0,
+        str = '';
+    let checkedNum = 0;
+    for (let entry of data) {
+        if (entry.status == 'Success' || entry.status == 'Warning') {
+            totalNum++;
+        }
+        if (entry.checked) {
+            checkedNum++;
+        }
+        // handle the differences
+        sqlStrWithMarks = formatSqlDiffs(entry);
+
+        // handle messages
+        let msgText = '';
+        if (!entry.message || 0 == entry.message.length) {
+            // extract messages
+            msgText = sqlStrWithMarks[2];
+        } else {
+            msgText = '<li>' + entry.message + '</li>'
+        }
+
+        msgText = '<ul>' + msgText + '</ul>'
+
+        if (sqlStrWithMarks[1].length > 0) {
+            str += '<tr><td>' + entry.originalSqlType + '</td><td>' + sqlStrWithMarks[0] + '</td><td>' + sqlStrWithMarks[1] + '</td><td>' + entry.status + '</td>' +
+                '<td>' + msgText + '</td><td><input type="checkbox"';
+            str += entry.checked ? 'checked' : '';
+            str += ' title="Include this into final output"></td></tr>'
+        } else {
+            str += '<tr><td>' + entry.originalSqlType + '</td><td>' + sqlStrWithMarks[0] + '</td><td>' + sqlStrWithMarks[1] + '</td><td>' + entry.status + '</td>' +
+                '<td>' + msgText + '</td><td></td></tr>';
+        }
+    }
+    tbody.innerHTML = str;
+    inputBind();
+    selectAll.checked = checkedNum != 0 && checkedNum == totalNum;
+}
+
+function formatSqlDiffs(entry) {
+    let sqlStrWithMarks = [];
+    let originalSql = entry.originalSql;
+    let convertedSql = entry.convertedSql;
+    let msgText = "";
+
+    // handle special chars like '<', '>'
+    originalSql = originalSql.replace(/</g, '&lt;');
+    originalSql = originalSql.replace(/>/g, '&gt;');
+
+    for (let diff of entry.diffs) {
+        if (diff.message && diff.message.length > 0) {
+            msgText += '<li>' + diff.message + '</li>';
+        }
+        switch (diff.diffType) {
+            case 'deleted':
+                if (diff.source && diff.source.length > 0) {
+                    originalSql = originalSql.replace(diff.source, '<span style="color:red"><s>' + diff.source + '</s></span>')
+                }
+                break;
+            case 'modified':
+                if (diff.source && diff.source.length > 0) {
+                    originalSql = originalSql.replace(diff.source, '<span style="color:blue">' + diff.source + '</span>')
+                }
+                if (diff.target && diff.target.length > 0) {
+                    convertedSql = convertedSql.replace(diff.target, '<span style="color:blue">' + diff.target + '</span>')
+                }
+                break;
+            case 'inserted':
+                if (diff.target && diff.target.length > 0) {
+                    convertedSql = convertedSql.replace(diff.target, '<span style="color:green">' + diff.target + '</span>')
+                }
+                break;
+            case 'warning':
+                if (diff.source && diff.source.length > 0) {
+                    originalSql = originalSql.replace(diff.source, '<span style="color:#ffcc00">' + diff.source + '</span>')
+                }
+                if (diff.target && diff.target.length > 0) {
+                    convertedSql = convertedSql.replace(diff.target, '<span style="color:#ffcc00">' + diff.target + '</span>')
+                }
+                break;
+            case 'unsupported':
+                if (diff.source && diff.source.length > 0) {
+                    originalSql = originalSql.replace(diff.source, '<span style="color:#993333">' + diff.source + '</span>')
+                }
+                break;
+            default:
+                console.log('error: unknown diff type ${diff.diffType}')
+        }
+    }
+    // handle line break
+    originalSql = originalSql.replace(/\r\n/g, "<br>");
+    convertedSql = convertedSql.replace(/\n/g, "<br>");
+
+    sqlStrWithMarks.push(originalSql);
+    sqlStrWithMarks.push(convertedSql);
+    sqlStrWithMarks.push(msgText);
+    return sqlStrWithMarks;
+}
+
+let spanList = document.getElementsByClassName('summary');
+
+function filter(match, index) {
+    pageIndex = 1;
+    tableData = [];
+    if (match === 'total') {
+        tableData = data;
+        initTable(tableData.slice(0, pageSize))
+    } else {
+        for (let entry of data) {
+            if (entry.status === match) {
+                tableData.push(entry);
+            }
+        }
+        initTable(tableData.slice(0, pageSize))
+    }
+
+    // refresh total page number
+    countTotalPageNum();
+
+    for (let j = 0, len = spanList.length; j < len; j++) {
+        spanList[j].setAttribute('class', spanList[j].getAttribute("class").replace(' active', ''));
+    }
+    spanList[index].setAttribute('class', spanList[index].getAttribute('class').concat(' active'));
+    initPage();
+}
+
+function generateOutput() {
+    document.getElementById('copyText').innerHTML = '';
+    let str = '';
+    let success = 0;
+    let warning = 0;
+    for (let entry of data) {
+        if (entry.checked) {
+            if (entry.convertedSql.length > 0) {
+                if (entry.status == 'Success') {
+                    success++;
+                } else if (entry.status == 'Warning') {
+                    warning++;
+                } else {
+                    console.error("You have selected unsupported or failure cases, ignored.")
+                }
+                str += entry.convertedSql + ";" + "\n\n";
+            }
+        }
+    }
+    document.getElementById('copyText').innerHTML = str;
+    document.getElementById("selection-success").innerText = success;
+    document.getElementById("selection-warning").innerText = warning;
+    document.getElementById("modal").style.height = document.documentElement.offsetHeight + 'px';
+    document.getElementById("cancel").innerText = "cancel";
+    document.getElementById("copy-msg").innerText = "";
+    document.getElementById("modal").style.display = "block";
+}
+document.getElementById("copy").onclick = function() {
+    document.getElementById('copyText').select();
+    document.execCommand('Copy');
+    document.getElementById("copy-msg").innerText = "Copy to clipboard successfully.";
+    document.getElementById("cancel").innerText = "close";
+}
+document.getElementById("cancel").onclick = function() {
+    document.getElementById("modal").style.display = "none";
+}
+document.getElementById("iconClose").onclick = function() {
+    document.getElementById("modal").style.display = "none";
+}
+
+//selectALL
+selectAll.onclick = function() {
+    let inputCheck = document.querySelectorAll("tbody input");
+    let len = tableData.slice((pageIndex - 1) * pageSize).length;
+    len = len >= pageSize ? pageSize : len;
+    for (let i = 0; i < len; i++) {
+        tableData[(pageIndex - 1) * pageSize + i].checked = selectAll.checked;
+    }
+    for (let i = 0, len = inputCheck.length; i < len; i++) {
+        inputCheck[i].checked = selectAll.checked;
+    }
+}
+
+function inputBind() {
+    let inputCheck = document.querySelectorAll("tbody input");
+    for (let i = 0, len = inputCheck.length; i < len; i++) {
+        inputCheck[i].onclick = function() {
+            tableData[(pageIndex - 1) * pageSize + i].checked = inputCheck[i].checked;
+            for (let i = 0, len = inputCheck.length; i < len; i++) {
+                if (!inputCheck[i].checked) {
+                    selectAll.checked = false;
+                    return
+                }
+            }
+            selectAll.checked = true;
+        }
+    }
+}
+</script>
+</body>
+
+</html>

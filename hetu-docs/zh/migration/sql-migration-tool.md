@@ -10,7 +10,7 @@ SQL迁移工具帮助用户将SQL语法转换为ANSI 2003 的SQL语法。目前�
 该工具支持交互模式运行。例如：
 
 ```shell
-java -jar hetu-sql-migration-tool-010.jar --sourceType hive
+./sql-migration-cli-010-executable.jar --type hive
 ```
 
 ```sql
@@ -26,13 +26,14 @@ INSERT INTO table1
 
 | 参数名称| 描述|
 |----------|----------|
-| `sourceType`| 输入SQL语句的类型，如`hive`、`impala`。可选参数，默认值为`hive`。|
+| `--type` or `-t`| 输入SQL语句的类型，如`hive`、`impala`。可选参数，默认值为`hive`。|
 
 
 下面是一些常用的命令：
 
 | 命令| 描述|
 |----------|----------|
+| `!chtype value`| 修改当前会话的源sql类型|
 | `exit`或`quit`| 退出交互模式|
 | `history`| 获得前面的输入语句|
 | `help`| 替换帮助信息|
@@ -43,10 +44,10 @@ INSERT INTO table1
 
 | 参数名称| 描述|
 |----------|----------|
-| `file`| 包含SQL语句的文件，以“;”分隔。文件中的所有SQL都可以进行批量转换。|
-| `sourceType`| 输入SQL语句的类型，如`hive`、`impala`。可选参数，默认值为`hive`。|
-| `output`| 转换后SQL结果的存放目录。|
-| `config`| SQL迁移工具的配置文件。|
+| `--file` or `-f`| 包含SQL语句的文件，以“;”分隔。文件中的所有SQL都可以进行批量转换。|
+| `--type` or `-t`| 输入SQL语句的类型，如`hive`、`impala`。可选参数，默认值为`hive`。|
+| `--output` or `-o`| 转换后SQL结果的存放目录。|
+| `--config` or `-c`| SQL迁移工具的配置文件。|
 
 *提示：*
 
@@ -56,21 +57,15 @@ INSERT INTO table1
 
 
 ```shell
-    java -jar hetu-sql-migration-tool-010.jar --file /home/Query01.sql --output ./
+    ./sql-migration-cli-010-executable.jar --file /home/Query01.sql --output ./
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
     INFO: Migration Completed.
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
-    INFO: Result is saved to .//Query01_1590485230193.sql
-    May 26, 2020 5:27:10 PM io.airlift.log.Logger info
-    INFO: Result is saved to .//Query01_1590485230193.csv
+    INFO: Result is saved to .//Query01_1590485230193.html
 ```
 
 
-当指定`file`时，必须提供参数`output`。转换后的结果会保存为`output`目录下的两个文件：
-
-1. “.sql”文件保存转换成功的SQL语句。
-
-2. “.csv”文件保存所有转换的中间结果，包括原始SQL、转换后的SQL、源SQL类型、状态和消息。
+当指定`file`时，必须提供参数`output`。转换后的结果会保存在`output`目录下的html文件中，用户可以使用任意浏览器打开该html文件查看详细转化结果。
 
 **执行模式**
 
@@ -78,7 +73,7 @@ INSERT INTO table1
 
 
 ```shell
-java -jar hetu-sql-migration-tool-010.jar --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --sourceType hive
+./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --type hive
 
 
 ==========converted result==========
@@ -100,7 +95,7 @@ INSERT INTO t1
 convertDecimalLiteralsAsDouble=true
 
 
-java -jar hetu-sql-migration-tool-010.jar --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
+./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
 
 
 ==========converted result==========
@@ -236,6 +231,7 @@ SELECT (DECIMAL '2.0' * 3)
 | SHOW TABLES            | 不支持带多个通配符的语句                    | [DELETE](../sql/show-tables.md)                       |
 | ADD COMMENTS           | 不支持给数据库和列添加评论                  | [COMMENT](../sql/comment.md)                       |
 | SET SESSION            | 仅支持 "SET" 和 "SET ALL"                                          | [SET SESSION](../sql/set-session.md)                       |
+| ADD COLUMNS            | 不支持在一条语句添加多列，也不支持设置kudu属性                          | [ALTER TABLE](../sql/alter-table.md)                       |
 
 
 由于特性差异，如下Impala语句暂不支持：
@@ -244,7 +240,6 @@ SELECT (DECIMAL '2.0' * 3)
 | ------------------------ |
 | ALTER SCHEMA    |
 | CREATE KUDU TABLE |
-| ADD COLUMNS      |
 | REPLACE COLUMNS       |
 | DROP SINGLE COLUMN           |
 | ALTER TABLE OWNER           |

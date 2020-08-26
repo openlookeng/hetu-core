@@ -22,15 +22,15 @@ public class SqlConverterFactory
 {
     private SqlConverterFactory() {}
 
-    public static SqlSyntaxConverter getSqlConverter(ConvertionOptions convertionOptions) throws SqlMigrationException
+    public static SqlSyntaxConverter getSqlConverter(SessionProperties session) throws SqlMigrationException
     {
-        switch (convertionOptions.getSourceType()) {
+        switch (session.getSourceType()) {
             case HIVE:
-                return HiveSqlConverter.getHiveSqlConverter(convertionOptions);
+                return HiveSqlConverter.getHiveSqlConverter(session.getParsingOptions());
             case IMPALA:
-                return ImpalaSqlConverter.getImpalaSqlConverter(convertionOptions);
+                return ImpalaSqlConverter.getImpalaSqlConverter(session.getParsingOptions());
             default:
-                throw new SqlMigrationException(format("Migration tool doesn't support type: %s", convertionOptions.getSourceType()));
+                throw new SqlMigrationException(format("Migration tool doesn't support type: %s", session.getSourceType()));
         }
     }
 }
