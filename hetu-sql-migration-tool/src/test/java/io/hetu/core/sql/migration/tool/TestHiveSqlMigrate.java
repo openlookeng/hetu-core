@@ -15,6 +15,7 @@
 package io.hetu.core.sql.migration.tool;
 
 import io.hetu.core.sql.migration.SqlSyntaxType;
+import io.hetu.core.sql.migration.parser.Constants;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment;
 import io.prestosql.sql.parser.SqlParser;
@@ -25,11 +26,15 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.util.Locale;
+import java.util.Optional;
 
 import static com.google.common.io.Files.asCharSource;
 import static io.hetu.core.sql.migration.parser.Constants.FAIL;
+import static io.hetu.core.sql.migration.parser.Constants.UNSUPPORTED;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 public class TestHiveSqlMigrate
@@ -632,6 +637,9 @@ public class TestHiveSqlMigrate
         assertEquals(getConvertedSql(result), expectedSql);
         assertEquals(getConversionStatus(result), "Success");
         checkCanParsedByHetu(getConvertedSql(result));
+
+        sql = "SHOW FUNCTIONS LIKE 'YEAR'";
+        assertUnsupported(sql, Optional.of("LIKE"));
     }
 
     @Test
@@ -861,6 +869,142 @@ public class TestHiveSqlMigrate
         assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
     }
 
+    @Test
+    public void testDigitalIdentifer()
+    {
+        String sql = "select sum(b.8_0cs) from t1";
+        assertUnsupported(sql, Optional.of("identifiers must not start with a digit"));
+    }
+
+    @Test
+    public void testLateralView()
+    {
+        String sql = "SELECT C1,C2 FROM T1 LATERAL VIEW EXPLODE(COL1) MYTABLE1 AS MYCOL1 LATERAL VIEW EXPLODE(COL2) MYTABLE2 AS MYCOL2";
+        assertUnsupported(sql, Optional.of("LATERAL VIEW"));
+    }
+
+    @Test
+    public void testDescribeFunction()
+    {
+        String sql = "DESCRIBE FUNCTION GET_JSON_OBJECT";
+        assertUnsupported(sql, Optional.of("Describe Function"));
+
+        sql = "DESC FUNCTION EXTENDED GET_JSON_OBJECT";
+        assertUnsupported(sql, Optional.of("Describe Function"));
+    }
+
+    @Test
+    public void testBitArithmetic()
+    {
+        String sql = "select ~3";
+        assertUnsupported(sql, Optional.of("Bit arithmetic"));
+
+        sql = "select 2 & 3";
+        assertUnsupported(sql, Optional.of("Bit arithmetic"));
+
+        sql = "select 2 | 3";
+        assertUnsupported(sql, Optional.of("Bit arithmetic"));
+
+        sql = "select 2 ^ 3";
+        assertUnsupported(sql, Optional.of("Bit arithmetic"));
+    }
+
+    @Test
+    public void testNonArithmetic()
+    {
+        String sql = "select * from t1 where name is !null";
+        String expectedSql = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (name IS NOT NULL)\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "select * from t1 where id ! between 10 and 20";
+        expectedSql = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (NOT (id BETWEEN 10 AND 20))\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "select * from t1 where id ! in (10,20)";
+        expectedSql = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (NOT (id IN (10, 20)))\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "select * from t1 where id1 ! in (select id2 from t2)";
+        expectedSql = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (NOT (id1 IN (SELECT id2\n" +
+                "FROM\n" +
+                "  t2\n" +
+                ")))\n";
+        assertSuccess(sql, expectedSql);
+    }
+
+    @Test
+    public void testExpressionPredicated()
+    {
+        String sql = "SELECT * FROM T1 WHERE GET_JSON_OBJECT(REPORT_EVT_CONTENT, '$.PAIRRESULT')<>-1 IS NULL";
+        assertUnsupported(sql, Optional.of("Unsupported statement"));
+
+        sql = "SELECT * FROM T1 WHERE ID=AGE=20";
+        assertUnsupported(sql, Optional.of("Unsupported statement"));
+
+        sql = "SELECT * FROM T1 WHERE PT_D BETWEEN 10 AND PT_D=30 AND ID > 50";
+        assertUnsupported(sql, Optional.of("Unsupported statement"));
+    }
+
+    @Test
+    public void testQuery()
+    {
+        // test "sort by"
+        String sql = "SELECT C1 FROM T1 GROUP BY NAME SORT BY CNT";
+        assertUnsupported(sql, Optional.of("SORT BY"));
+
+        // test "GROUPING SETS"
+        sql = "SELECT C1 FROM T1 GROUP BY URL GROUPING SETS ((ID, NAME), (ID, SEX))";
+        String expectedSql = "SELECT C1\n" +
+                "FROM\n" +
+                "  T1\n" +
+                "GROUP BY URL, GROUPING SETS ((ID, NAME), (ID, SEX))\n";
+        assertSuccess(sql, expectedSql);
+
+        // test function "current_date()"
+        sql = "select current_date()";
+        expectedSql = "SELECT current_date\n" +
+                "\n";
+        assertSuccess(sql, expectedSql);
+
+        // test like, rlike, regexp
+        sql = "select * from t1 where name !like 'hetu'";
+        expectedSql = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (NOT (name LIKE 'hetu'))\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "select * from t1 where name !rlike 'hetu'";
+        assertUnsupported(sql, Optional.of("rlike"));
+
+        sql = "select * from t1 where name !regexp 'hetu'";
+        assertUnsupported(sql, Optional.of("regexp"));
+
+        // test "=="
+        sql = "select * from t1 where id == 10";
+        expectedSql = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (id = 10)\n";
+        assertSuccess(sql, expectedSql);
+
+        // test "\'"
+        sql = "SELECT REGEXP_REPLACE(EXT_FIELD, '[]|\\\"|\\'', '') AS CONTENT FROM ADS";
+        assertUnsupported(sql, Optional.of("Unsupported string"));
+    }
+
     private String getConvertedSql(JSONObject result)
     {
         String convertedSql = "";
@@ -894,6 +1038,30 @@ public class TestHiveSqlMigrate
         }
         catch (Exception e) {
             fail("The converted SQL can not be parsed by Presto");
+        }
+    }
+
+    private void assertSuccess(String inputSql, String expectedSql)
+    {
+        JSONObject result = sqlConverter.convert(inputSql);
+        assertEquals(getConvertedSql(result), expectedSql);
+        assertEquals(getConversionStatus(result), Constants.SUCCESS);
+        checkCanParsedByHetu(getConvertedSql(result));
+    }
+
+    private void assertUnsupported(String inputSql, Optional<String> unsupportedKeyWords)
+    {
+        JSONObject result = sqlConverter.convert(inputSql);
+        assertEquals(getConversionStatus(result), Constants.FAIL);
+        try {
+            String msg = result.get(Constants.MESSAGE).toString();
+            assertTrue(msg.toLowerCase(Locale.ENGLISH).contains(UNSUPPORTED.toLowerCase(Locale.ENGLISH)));
+            if (unsupportedKeyWords.isPresent()) {
+                assertTrue(msg.toLowerCase(Locale.ENGLISH).contains(unsupportedKeyWords.get().toLowerCase(Locale.ENGLISH)));
+            }
+        }
+        catch (JSONException e) {
+            fail("Get converted sql failed");
         }
     }
 }

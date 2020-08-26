@@ -185,6 +185,7 @@ statement
     | (DESCRIBE | DESC) (EXTENDED | FORMATTED)? qualifiedName
         (PARTITION properties)?
         (identifier (('.' identifier) | ('.' '$' identifier '$'))*)?                        #describePartition
+    | (DESCRIBE | DESC) FUNCTION EXTENDED? functionName=expression                          #describeFunction
     | CREATE TEMPORARY MACRO identifier '(' (tableElement (',' tableElement)*)? ')' expression    #createMacro
     | DROP TEMPORARY MACRO (IF EXISTS)? identifier                                          #dropMacro
     | SHOW LOCKS (DATABASE | SCHEMA)? identifier (PARTITION properties)? EXTENDED?          #showLocks
@@ -330,7 +331,9 @@ property
 queryNoWith:
       queryTerm
       (ORDER BY sortItem (',' sortItem)*)?
-      (CLUSTERED BY clusteredBy | (DISTRIBUTE BY distributeBy)? (SORTED BY sortedBy)?)?
+      (CLUSTER BY clusteredBy)?
+      (DISTRIBUTE BY distributeBy)?
+      (SORT BY sortedBy)?
       (LIMIT (offset=INTEGER_VALUE',')? rows=INTEGER_VALUE)?
     ;
 
@@ -354,13 +357,18 @@ sortItem
 querySpecification
     : SELECT setQuantifier? selectItem (',' selectItem)*
       (FROM relation (',' relation)*)?
+      (LATERAL VIEW lateralView)*
       (WHERE where=booleanExpression)?
       (GROUP BY groupBy)?
       (HAVING having=booleanExpression)?
     ;
 
 groupBy
-    : setQuantifier? groupingElement (',' groupingElement)*
+    : setQuantifier? groupingElement ((',')? groupingElement)*
+    ;
+
+lateralView
+    : qualifiedName '(' (expression (',' expression)*)? ')' qualifiedName AS identifier (',' identifier)*
     ;
 
 groupingElement
@@ -391,16 +399,28 @@ selectItem
     ;
 
 relation
-    : left=relation
-      ( CROSS JOIN right=sampledRelation
-      | joinType JOIN rightRelation=relation joinCriteria
-      )                                           #joinRelation
-    | sampledRelation                             #relationDefault
+    : left=relation (crossJoin | innerJoin | outerJoin | semiJoin)           #joinRelation
+    | sampledRelation                                                        #relationDefault
+    ;
+
+crossJoin
+    : CROSS JOIN right=sampledRelation joinCriteria?
+    ;
+
+innerJoin
+    : INNER? JOIN right=sampledRelation joinCriteria?
+    ;
+
+outerJoin
+    : joinType JOIN rightRelation=relation joinCriteria
+    ;
+
+semiJoin
+    : LEFT SEMI JOIN rightRelation=relation joinCriteria
     ;
 
 joinType
-    : INNER?
-    | LEFT OUTER?
+    : LEFT OUTER?
     | RIGHT OUTER?
     | FULL OUTER?
     ;
@@ -434,27 +454,33 @@ expression
 
 booleanExpression
     : valueExpression predicate[$valueExpression.ctx]?             #predicated
-    | NOT booleanExpression                                        #logicalNot
+    | (NOT | NON) booleanExpression                                #logicalNot
     | left=booleanExpression operator=AND right=booleanExpression  #logicalBinary
     | left=booleanExpression operator=OR right=booleanExpression   #logicalBinary
+    | booleanExpression
+        (EQ valueExpression | IS (NOT | NON)? NULL)                #expressionPredicated
     ;
 
 // workaround for https://github.com/antlr/antlr4/issues/780
 predicate[ParserRuleContext value]
     : comparisonOperator right=valueExpression                            #comparison
     | comparisonOperator comparisonQuantifier '(' query ')'               #quantifiedComparison
-    | NOT? BETWEEN lower=valueExpression AND upper=valueExpression        #between
-    | NOT? IN '(' expression (',' expression)* ')'                        #inList
-    | NOT? IN '(' query ')'                                               #inSubquery
-    | NOT? LIKE pattern=valueExpression (ESCAPE escape=valueExpression)?  #like
-    | IS NOT? NULL                                                        #nullPredicate
-    | IS NOT? DISTINCT FROM right=valueExpression                         #distinctFrom
+    | (NOT | NON)? BETWEEN lower=valueExpression AND upper=valueExpression        #between
+    | (NOT | NON)? IN '(' expression (',' expression)* ')'                        #inList
+    | (NOT | NON)? IN '(' query ')'                                               #inSubquery
+    | (NOT | NON)? LIKE pattern=valueExpression                                   #like
+    | (NOT | NON)? RLIKE pattern=valueExpression                                  #rlike
+    | (NOT | NON)? REGEXP pattern=valueExpression                                 #regexp
+    | IS (NOT | NON)? NULL                                                        #nullPredicate
+    | IS (NOT | NON)? DISTINCT FROM right=valueExpression                         #distinctFrom
     ;
 
 valueExpression
     : primaryExpression                                                                 #valueExpressionDefault
     | operator=(MINUS | PLUS) valueExpression                                           #arithmeticUnary
     | left=valueExpression operator=(ASTERISK | SLASH | PERCENT) right=valueExpression  #arithmeticBinary
+    | left=valueExpression operator=(BITAND | BITOR | BITXOR) right=valueExpression     #arithmeticBit
+    | BITNOT valueExpression                                                            #arithmeticBit
     | left=valueExpression operator=(PLUS | MINUS) right=valueExpression                #arithmeticBinary
     | left=valueExpression CONCAT right=valueExpression                                 #concatenation
     ;
@@ -485,13 +511,9 @@ primaryExpression
     | value=primaryExpression '[' index=valueExpression ']'                               #subscript
     | identifier                                                                          #columnReference
     | base=primaryExpression '.' fieldName=identifier                                     #dereference
-    | name=CURRENT_DATE                                                                   #specialDateTimeFunction
-    | name=CURRENT_TIME ('(' precision=INTEGER_VALUE ')')?                                #specialDateTimeFunction
-    | name=CURRENT_TIMESTAMP ('(' precision=INTEGER_VALUE ')')?                           #specialDateTimeFunction
-    | name=LOCALTIME ('(' precision=INTEGER_VALUE ')')?                                   #specialDateTimeFunction
-    | name=LOCALTIMESTAMP ('(' precision=INTEGER_VALUE ')')?                              #specialDateTimeFunction
-    | name=CURRENT_USER                                                                   #currentUser
-    | name=CURRENT_PATH                                                                   #currentPath
+    | name=CURRENT_DATE ('(' ')')?                                                        #specialDateTimeFunction
+    | name=CURRENT_TIMESTAMP ('(' ')')?                                                   #specialDateTimeFunction
+    | name=CURRENT_USER '(' ')'                                                           #currentUser
     | SUBSTRING '(' valueExpression FROM valueExpression (FOR valueExpression)? ')'       #substring
     | NORMALIZE '(' valueExpression (',' normalForm)? ')'                                 #normalize
     | EXTRACT '(' identifier FROM valueExpression ')'                                     #extract
@@ -625,20 +647,20 @@ nonReserved
     | BERNOULLI
     | CALL | CASCADE | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CURRENT | CONF | CHANGE | CHECK | COLLECTION | COMPACTIONS
     | DATA | DATABASE | DATABASES | DATE | DAY | DAYS | DEFINER | DESC | DISTRIBUTED | DEFAULT | DIRECTORY | DIRECTORIES
-    | EXCLUDING | EXPLAIN | EXCHANGE | EXPORT
-    | FETCH | FILTER | FIRST | FOLLOWING | FORMAT | FUNCTION | FUNCTIONS | FIELDS | FOREIGN
+    | ENABLE | EXCLUDING | EXPLAIN | EXCHANGE | EXPORT
+    | FETCH | FILE | FILTER | FIRST | FOLLOWING | FORMAT | FUNCTIONS| FIELDS | FOREIGN
     | GRANT | GRANTED | GRANTS | GRAPHVIZ | GROUP
     | HOUR | HOURS
     | IF | INCLUDING | INPUT | INTERVAL | INVOKER | IO | ISOLATION | IGNORE | IMPORT | INDEX | INDEXES | ITEMS
     | JSON
     | KEY | KEYS
-    | LAST | LATERAL | LEVEL | LIMIT | LOGICAL | LOAD | LOCAL | LINES | LOAD | LOCAL | LOCKS
+    | LAST | LATERAL | LEVEL | LIMIT | LOCATION | LOGICAL | LOAD | LOCAL | LINES | LOAD | LOCAL | LOCKS
     | MAP | MINUTE | MINUTES | MONTH | MONTHS | MERGE | MSCK
     | NEXT | NFC | NFD | NFKC | NFKD | NO | NONE | NULLIF | NULLS
     | OFFSET | ONLY | OPTION | ORDINALITY | OUTPUT | OVER | OFFLINE
     | PARTITION | PARTITIONS | PATH | POSITION | PRECEDING | PRIVILEGES | PROPERTIES | PROTECTION | PRIMARY | PRINCIPALS
     | RANGE | READ | RENAME | REPEATABLE | REPLACE | RESET | RESTRICT | REVOKE | ROLE | ROLES | ROLLBACK | ROW | ROWS | REBUILD | RECOVER
-    | S | SCHEMA | SCHEMAS | SECOND | SECONDS | SECURITY | SERIALIZABLE | SESSION | SET | SETS
+    | S | SCHEMA | SCHEMAS | SECOND | SECONDS | SECURITY | SERIALIZABLE | SESSION | SET | SETS | SORT
     | SHOW | SOME | START | STATS | STRUCT | SUBSTRING | SYSTEM
     | T | TABLES | TABLESAMPLE  | TRANSACTION | TRANSACTIONS | TRANSACTIONAL | TEXT | TIES | TIME | TIMESTAMP | TO | TRY_CAST | TYPE | TRUNCATE
     | UNBOUNDED | UNCOMMITTED | UNIONTYPE | USE | USER | UNARCHIVE | UNIQUE
@@ -669,7 +691,9 @@ BETWEEN: 'BETWEEN';
 PARTITIONED: 'PARTITIONED';
 TEMPORARY: 'TEMPORARY';
 EXTERNAL: 'EXTERNAL';
+CLUSTER: 'CLUSTER';
 CLUSTERED: 'CLUSTERED';
+SORT: 'SORT';
 SORTED: 'SORTED';
 DISTRIBUTE: 'DISTRIBUTE';
 BUCKETS: 'BUCKETS';
@@ -872,6 +896,7 @@ RELOAD: 'RELOAD';
 RELY: 'RELY';
 RECURSIVE: 'RECURSIVE';
 REFERENCES: 'REFERENCES';
+REGEXP: 'REGEXP';
 RENAME: 'RENAME';
 REPEATABLE: 'REPEATABLE';
 REPAIR: 'REPAIR';
@@ -882,6 +907,7 @@ RESET: 'RESET';
 RESTRICT: 'RESTRICT';
 REVOKE: 'REVOKE';
 RIGHT: 'RIGHT';
+RLIKE: 'RLIKE';
 ROLE: 'ROLE';
 ROLES: 'ROLES';
 ROLLBACK: 'ROLLBACK';
@@ -894,6 +920,7 @@ SECOND: 'SECOND';
 SECONDS: 'SECONDS';
 SECURITY: 'SECURITY';
 SELECT: 'SELECT';
+SEMI: 'SEMI';
 SERDEPROPERTIES: 'SERDEPROPERTIES';
 SERDE: 'SERDE';
 SERIALIZABLE: 'SERIALIZABLE';
@@ -954,7 +981,7 @@ YEAR: 'YEAR';
 YEARS: 'YEARS';
 ZONE: 'ZONE';
 
-EQ  : '=';
+EQ  : '=' | '==';
 NEQ : '<>' | '!=';
 LT  : '<';
 LTE : '<=';
@@ -967,10 +994,15 @@ ASTERISK: '*';
 SLASH: '/';
 PERCENT: '%';
 CONCAT: '||';
+NON: '!';
+BITAND: '&';
+BITOR: '|';
+BITXOR: '^';
+BITNOT: '~';
 
 STRING
-    : '\'' ( ~'\'' | '\'\'' | '\\\'')* '\''
-    | '"' ( ~'"' | '""' | '\\"' )* '"'
+    : '\'' (~'\'' | '\\' | ('\\' '\''))* '\''
+    | '"' (~'"' | '\\' | '\\"')* '"'
     ;
 
 // Note: we allow any character inside the binary literal and validate
@@ -986,12 +1018,10 @@ INTEGER_VALUE
 
 DECIMAL_VALUE
     : DIGIT+ '.' DIGIT*
-    | '.' DIGIT+
     ;
 
 DOUBLE_VALUE
     : DIGIT+ ('.' DIGIT*)? EXPONENT
-    | '.' DIGIT+ EXPONENT
     ;
 
 IDENTIFIER
