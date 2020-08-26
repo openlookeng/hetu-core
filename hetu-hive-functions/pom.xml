@@ -65,7 +65,6 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>testing</artifactId>
-            <version>0.183</version>
             <scope>test</scope>
         </dependency>
 

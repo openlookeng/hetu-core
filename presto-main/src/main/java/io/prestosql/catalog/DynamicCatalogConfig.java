@@ -76,13 +76,13 @@ public class DynamicCatalogConfig
 
     @Config("catalog.scanner-interval")
     @ConfigDescription("Interval for scanning catalogs in the shared file system, default value is 5s.")
-    @MinDuration("5s")
     public DynamicCatalogConfig setCatalogScannerInterval(Duration catalogScannerInterval)
     {
         this.catalogScannerInterval = catalogScannerInterval;
         return this;
     }
 
+    @MinDuration("5s")
     public Duration getCatalogScannerInterval()
     {
         return catalogScannerInterval;
@@ -90,13 +90,13 @@ public class DynamicCatalogConfig
 
     @Config("catalog.max-file-size")
     @ConfigDescription("Maximum file size, default value is 128k.")
-    @MaxDataSize("10MB")
     public DynamicCatalogConfig setCatalogMaxFileSize(DataSize catalogMaxFileSize)
     {
         this.catalogMaxFileSize = catalogMaxFileSize;
         return this;
     }
 
+    @MaxDataSize("10MB")
     public DataSize getCatalogMaxFileSize()
     {
         return catalogMaxFileSize;

@@ -62,11 +62,10 @@ public class SimpleHttpResponseHandler<T>
                         cause = new PrestoException(REMOTE_TASK_ERROR, format("Expected response from %s is empty", uri));
                     }
                     else {
-                        cause = new PrestoException(REMOTE_TASK_ERROR, format("Expected response code from %s to be %s, but was %s: %s%n%s",
+                        cause = new PrestoException(REMOTE_TASK_ERROR, format("Expected response code from %s to be %s, but was %s%n%s",
                                 uri,
                                 HttpStatus.OK.code(),
                                 response.getStatusCode(),
-                                response.getStatusMessage(),
                                 createErrorMessage(response)));
                     }
                 }
@@ -85,18 +84,16 @@ public class SimpleHttpResponseHandler<T>
     private String createErrorMessage(BaseResponse<T> response)
     {
         if (response instanceof JsonResponseWrapper) {
-            return format("Expected response code from %s to be %s, but was %s: %s%n%s",
+            return format("Expected response code from %s to be %s, but was %s%n%s",
                     uri,
                     OK.code(),
                     response.getStatusCode(),
-                    response.getStatusMessage(),
                     unwrapJsonResponse(response).getResponseBody());
         }
         return format("Expected response code from %s to be %s, but was %s: %s",
                 uri,
                 OK.code(),
                 response.getStatusCode(),
-                response.getStatusMessage(),
                 new String(response.getResponseBytes()));
     }
 

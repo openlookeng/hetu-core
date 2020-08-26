@@ -171,7 +171,7 @@ public class CarbondataSplitManager
             Configuration configuration = this.hdfsEnvironment.getConfiguration(
                     new HdfsEnvironment.HdfsContext(session, schemaTableName.getSchemaName(),
                             schemaTableName.getTableName()), new Path(location));
-            configuration = carbonTableReader.updateS3Properties(configuration);
+//            configuration = carbonTableReader.updateS3Properties(configuration);
             // set the hadoop configuration to thread local, so that FileFactory can use it.
             ThreadLocalSessionInfo.setConfigurationToCurrentThread(configuration);
             CarbondataTableCacheModel cache =

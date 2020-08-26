@@ -50,6 +50,19 @@
         <dependency>
             <groupId>io.airlift.drift</groupId>
             <artifactId>drift-transport-netty</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-all</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>4.1.46.Final</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>

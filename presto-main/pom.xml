@@ -128,6 +128,11 @@
 
         <dependency>
             <groupId>io.airlift</groupId>
+            <artifactId>event-http</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
             <artifactId>http-server</artifactId>
         </dependency>
 
@@ -159,6 +164,16 @@
         <dependency>
             <groupId>io.airlift.resolver</groupId>
             <artifactId>resolver</artifactId>
+            <exclusions>
+                <exclusion>
+                    <artifactId>netty</artifactId>
+                    <groupId>io.netty</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>async-http-client</artifactId>
+                    <groupId>com.ning</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

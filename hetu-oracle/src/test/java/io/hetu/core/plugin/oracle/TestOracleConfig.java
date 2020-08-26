@@ -35,7 +35,7 @@ public class TestOracleConfig
 {
     private static final int NUMBER_DEFAULT_SCALE = 2;
 
-    private static final int NUMBER_DEFAULT_SCALE_ASSERT = -1;
+    private static final int NUMBER_DEFAULT_SCALE_ASSERT = 0;
 
     /**
      * testOraclePropertyMappings

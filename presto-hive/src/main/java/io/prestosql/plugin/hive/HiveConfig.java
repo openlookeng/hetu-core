@@ -80,7 +80,7 @@ public class HiveConfig
     private boolean allowCorruptWritesForTesting;
 
     private Duration metastoreCacheTtl = new Duration(0, TimeUnit.SECONDS);
-    private Duration metastoreRefreshInterval = new Duration(0, TimeUnit.SECONDS);
+    private Duration metastoreRefreshInterval = new Duration(1, TimeUnit.SECONDS);
     private long metastoreCacheMaximumSize = 10000;
     private long perTransactionMetastoreCacheMaximumSize = 1000;
     private int maxMetastoreRefreshThreads = 100;
@@ -423,12 +423,11 @@ public class HiveConfig
     }
 
     @NotNull
-    public Duration getMetastoreCacheTtl()
+    public @MinDuration("0ms") Duration getMetastoreCacheTtl()
     {
         return metastoreCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("hive.metastore-cache-ttl")
     public HiveConfig setMetastoreCacheTtl(Duration metastoreCacheTtl)
     {
@@ -437,12 +436,11 @@ public class HiveConfig
     }
 
     @NotNull
-    public Duration getMetastoreRefreshInterval()
+    public @MinDuration("1ms") Duration getMetastoreRefreshInterval()
     {
         return metastoreRefreshInterval;
     }
 
-    @MinDuration("1ms")
     @Config("hive.metastore-refresh-interval")
     public HiveConfig setMetastoreRefreshInterval(Duration metastoreRefreshInterval)
     {
@@ -450,12 +448,12 @@ public class HiveConfig
         return this;
     }
 
+    @Min(1)
     public long getMetastoreCacheMaximumSize()
     {
         return metastoreCacheMaximumSize;
     }
 
-    @Min(1)
     @Config("hive.metastore-cache-maximum-size")
     public HiveConfig setMetastoreCacheMaximumSize(long metastoreCacheMaximumSize)
     {
@@ -463,12 +461,12 @@ public class HiveConfig
         return this;
     }
 
+    @Min(1)
     public long getPerTransactionMetastoreCacheMaximumSize()
     {
         return perTransactionMetastoreCacheMaximumSize;
     }
 
-    @Min(1)
     @Config("hive.per-transaction-metastore-cache-maximum-size")
     public HiveConfig setPerTransactionMetastoreCacheMaximumSize(long perTransactionMetastoreCacheMaximumSize)
     {
@@ -1377,12 +1375,11 @@ public class HiveConfig
     }
 
     @NotNull
-    public Duration getOrcFileTailCacheTtl()
+    public @MinDuration("0ms") Duration getOrcFileTailCacheTtl()
     {
         return orcFileTailCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("hive.orc.file-tail.cache.ttl")
     @ConfigDescription("Orc file tail cache TTL.")
     public HiveConfig setOrcFileTailCacheTtl(Duration orcFileTailCacheTtl)
@@ -1418,12 +1415,12 @@ public class HiveConfig
         return this;
     }
 
+    @MinDuration("0ms")
     public Duration getOrcStripeFooterCacheTtl()
     {
         return orcStripeFooterCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("hive.orc.stripe-footer.cache.ttl")
     @ConfigDescription("Orc strip footer cache TTL.")
     public HiveConfig setOrcStripeFooterCacheTtl(Duration orcStripeFooterCacheTtl)
@@ -1432,12 +1429,12 @@ public class HiveConfig
         return this;
     }
 
+    @Min(0)
     public long getOrcStripeFooterCacheLimit()
     {
         return orcStripeFooterCacheLimit;
     }
 
-    @Min(0)
     @Config("hive.orc.stripe-footer.cache.limit")
     @ConfigDescription("Orc stripe footer cache limit.")
     public HiveConfig setOrcStripeFooterCacheLimit(long orcStripeFooterCacheLimit)
@@ -1459,12 +1456,12 @@ public class HiveConfig
         return this;
     }
 
+    @MinDuration("0ms")
     public Duration getOrcRowIndexCacheTtl()
     {
         return orcRowIndexCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("hive.orc.row-index.cache.ttl")
     public HiveConfig setOrcRowIndexCacheTtl(Duration orcRowIndexCacheTtl)
     {
@@ -1472,12 +1469,12 @@ public class HiveConfig
         return this;
     }
 
+    @Min(0)
     public long getOrcRowIndexCacheLimit()
     {
         return orcRowIndexCacheLimit;
     }
 
-    @Min(0)
     @Config("hive.orc.row-index.cache.limit")
     public HiveConfig setOrcRowIndexCacheLimit(long orcRowIndexCacheLimit)
     {
@@ -1498,12 +1495,12 @@ public class HiveConfig
         return this;
     }
 
+    @MinDuration("0ms")
     public Duration getOrcBloomFiltersCacheTtl()
     {
         return orcBloomFiltersCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("hive.orc.bloom-filters.cache.ttl")
     public HiveConfig setOrcBloomFiltersCacheTtl(Duration orcBloomFiltersCacheTtl)
     {
@@ -1511,12 +1508,12 @@ public class HiveConfig
         return this;
     }
 
+    @Min(0)
     public long getOrcBloomFiltersCacheLimit()
     {
         return orcBloomFiltersCacheLimit;
     }
 
-    @Min(0)
     @Config("hive.orc.bloom-filters.cache.limit")
     public HiveConfig setOrcBloomFiltersCacheLimit(long orcBloomFiltersCacheLimit)
     {
@@ -1537,12 +1534,12 @@ public class HiveConfig
         return this;
     }
 
+    @MinDuration("0ms")
     public Duration getOrcRowDataCacheTtl()
     {
         return orcRowDataCacheTtl;
     }
 
-    @MinDuration("0ms")
     @Config("hive.orc.row-data.block.cache.ttl")
     @ConfigDescription("Orc Row data block cache TTL.")
     public HiveConfig setOrcRowDataCacheTtl(Duration orcRowDataCacheTtl)
@@ -1630,7 +1627,6 @@ public class HiveConfig
         return dynamicFilterPartitionFilteringEnabled;
     }
 
-    @Min(1)
     @Config("hive.dynamic-filtering-row-filtering-threshold")
     @ConfigDescription("Filter out hive rows early if the dynamic filter size is below the threshold")
     public HiveConfig setDynamicFilteringRowFilteringThreshold(int dynamicFilteringRowFilteringThreshold)
@@ -1639,6 +1635,7 @@ public class HiveConfig
         return this;
     }
 
+    @Min(1)
     public int getDynamicFilteringRowFilteringThreshold()
     {
         return dynamicFilteringRowFilteringThreshold;
