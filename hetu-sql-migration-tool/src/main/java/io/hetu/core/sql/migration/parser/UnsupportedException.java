@@ -12,20 +12,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.sql.migration;
+package io.hetu.core.sql.migration.parser;
 
-public enum SqlSyntaxType
+import io.prestosql.sql.parser.ParsingException;
+
+public class UnsupportedException
+        extends ParsingException
 {
-    HIVE("Hive"), IMPALA("Impala"), PRESTO("Presto");
-    private String value;
-
-    SqlSyntaxType(String value)
+    public UnsupportedException(String message, int line, int charPositionInLine)
     {
-        this.value = value;
+        super(message, null, line, charPositionInLine);
     }
 
-    public String getValue()
+    public UnsupportedException(String message)
     {
-        return value;
+        this(message, 1, 0);
     }
 }

@@ -15,6 +15,7 @@
 package io.hetu.core.sql.util;
 
 import io.hetu.core.sql.migration.parser.ErrorType;
+import io.hetu.core.sql.migration.parser.UnsupportedException;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.tree.NodeLocation;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -57,8 +58,13 @@ public class AstBuilderUtils
         return new ParsingException(message, null, context.getStart().getLine(), context.getStart().getCharPositionInLine());
     }
 
-    public static ParsingException parseError(ErrorType errorType, String errorMessage, ParserRuleContext context)
+    public static UnsupportedException unsupportedError(ErrorType errorType, String errorMessage, ParserRuleContext context)
     {
-        return new ParsingException(errorType.getValue() + ": " + errorMessage, null, context.getStart().getLine(), context.getStart().getCharPositionInLine());
+        return new UnsupportedException(errorType.getValue() + ": " + errorMessage, context.getStart().getLine(), context.getStart().getCharPositionInLine());
+    }
+
+    public static UnsupportedException unsupportedError(ErrorType errorType, String errorMessage)
+    {
+        return new UnsupportedException(errorType.getValue() + ": " + errorMessage);
     }
 }

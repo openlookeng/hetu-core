@@ -10,7 +10,7 @@ SQL Migration tool helps user to transform SQL Syntax to ANSI 2003 SQL syntax. C
 This tool can be run in interactive mode. The example is like:
 
 ```shell
-java -jar hetu-sql-migration-tool-010.jar --sourceType hive
+./sql-migration-cli-010-executable.jar --type hive
 ```
 
 ```sql
@@ -26,13 +26,14 @@ INSERT INTO table1
 
 | Parameter    | Description                                                  |
 | ------------ | ------------------------------------------------------------ |
-| `sourceType` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
+| `--type` or `-t` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
 
 
 Here are some frequently used command:
 
 | Command          | Description                          |
 | ---------------- | ------------------------------------ |
+| `!chtype value;` | change the source sql type of current session          |
 | `exit` or `quit` | to exit the interactive mode         |
 | `history`        | to get the previous input statements |
 | `help`           | displace the help information        |
@@ -45,10 +46,10 @@ This tool also can take parameters and running in batch mode. It has five parame
 
 | Parameter    | Description                                                  |
 | ------------ | ------------------------------------------------------------ |
-| `file`       | A file that contains SQL statements,  separated by \";\".  All of the SQLs in the file can be converted in batch process. |
-| `sourceType` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
-| `output`     | the directory to save the converted SQL results.             |
-| `config`     | the config file of SQL Migration Tool.                       |
+| `--file` or `-f`       | A file that contains SQL statements,  separated by \";\".  All of the SQLs in the file can be converted in batch process. |
+| `--source` or `-s` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
+| `--output` or `-o`     | the directory to save the converted SQL results. The result file's naming convention will be the input file's name + timestamp + .html suffix.             |
+| `--config` or `-c`     | the config file of SQL Migration Tool.                       |
 
 *Tip:*
 
@@ -57,21 +58,15 @@ This tool also can take parameters and running in batch mode. It has five parame
 Here is an example of batch mode usage:
 
 ```shell
-    java -jar hetu-sql-migration-tool-010.jar --file /home/Query01.sql --output ./
+    ./sql-migration-cli-010-executable.jar --file /home/Query01.sql --output ./
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
     INFO: Migration Completed.
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
-    INFO: Result is saved to .//Query01_1590485230193.sql
-    May 26, 2020 5:27:10 PM io.airlift.log.Logger info
-    INFO: Result is saved to .//Query01_1590485230193.csv
+    INFO: Result is saved to .//Query01_1590485230193.html
 ```
 
-When `file` is specified, parameter `output` must be provided. The converted result will be saved into two files in `output` directory:
-
-1. The ".sql" file saves the successfully converted SQL statements.
-
-2. The ".csv" file saves all the intermediate results of conversion, including original SQL, converted SQL, source SQL type, status and message.
-
+When `file` is specified, parameter `output` must be provided. The converted result will be a html file in `output` directory. 
+You can open that html file via any web browser, and then review the conversion details. 
 
 
 **Execute mode**
@@ -80,7 +75,7 @@ It is possible to execute a query directly with the command and have the tool ex
 
 
 ```shell
-java -jar hetu-sql-migration-tool-010.jar --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --sourceType hive
+./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --source hive
 
 
 ==========converted result==========
@@ -101,7 +96,7 @@ file name "config.properties" with content as below:
 convertDecimalLiteralsAsDouble=true
 
 
-java -jar hetu-sql-migration-tool-010.jar --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
+./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
 
 
 ==========converted result==========
@@ -239,6 +234,7 @@ Below Impala statements are partially supported, which mean some keywords or att
 | SHOW TABLES            | statement with more than one wildcard is not supported                    | [DELETE](../sql/show-tables.md)                       |
 | ADD COMMENTS           | Adding comments to databases or columns is not supported                  | [COMMENT](../sql/comment.md)                       |
 | SET SESSION            | Only support "SET" and "SET ALL"                                          | [SET SESSION](../sql/set-session.md)                       |
+| ADD COLUMNS            | ADD multiple columns within single statement is not supported, kudu properties are not supported.    | [ALTER TABLE](../sql/alter-table.md)                       |
 
 
 Below Impala statements are not supported, because of feature differences:
@@ -247,7 +243,6 @@ Below Impala statements are not supported, because of feature differences:
 | ------------------------ |
 | ALTER SCHEMA    |
 | CREATE KUDU TABLE |
-| ADD COLUMNS      |
 | REPLACE COLUMNS       |
 | DROP SINGLE COLUMN           |
 | ALTER TABLE OWNER           |

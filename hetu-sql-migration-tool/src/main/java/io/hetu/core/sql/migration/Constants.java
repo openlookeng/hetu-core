@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.sql.migration.parser;
+package io.hetu.core.sql.migration;
 
 public final class Constants
 {
@@ -21,10 +21,11 @@ public final class Constants
     public static final String CONVERTED_SQL = "convertedSql";
     public static final String STATUS = "status";
     public static final String MESSAGE = "message";
+    public static final String DIFFS = "diffs";
 
     public static final String SUCCESS = "Success";
     public static final String WARNING = "Warning";
-    public static final String FAIL = "Fail";
+    public static final String FAILED = "Failed";
     public static final String UNSUPPORTED = "Unsupported";
 
     // key words for properties
@@ -33,6 +34,9 @@ public final class Constants
     public static final String FORMAT = "format";
     public static final String LOCATION = "location";
     public static final String TRANSACTIONAL = "transactional";
+
+    public static final String HIVE = "hive";
+    public static final String IMPALA = "impala";
 
     private Constants()
     {

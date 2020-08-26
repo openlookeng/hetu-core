@@ -15,7 +15,6 @@
 package io.hetu.core.sql.migration.tool;
 
 import io.hetu.core.sql.migration.SqlSyntaxType;
-import io.hetu.core.sql.migration.parser.Constants;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment;
 import io.prestosql.sql.parser.SqlParser;
@@ -26,12 +25,16 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Locale;
 import java.util.Optional;
 
 import static com.google.common.io.Files.asCharSource;
-import static io.hetu.core.sql.migration.parser.Constants.FAIL;
-import static io.hetu.core.sql.migration.parser.Constants.UNSUPPORTED;
+import static io.hetu.core.sql.migration.Constants.FAILED;
+import static io.hetu.core.sql.migration.Constants.MESSAGE;
+import static io.hetu.core.sql.migration.Constants.SUCCESS;
+import static io.hetu.core.sql.migration.Constants.UNSUPPORTED;
+import static io.hetu.core.sql.migration.Constants.WARNING;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -47,9 +50,11 @@ public class TestHiveSqlMigrate
     public void setup() throws Exception
     {
         sqlParser = new SqlParser();
-        parsingOptions = new ParsingOptions(DecimalLiteralTreatment.AS_DECIMAL);
-        ConvertionOptions convertionOptions = new ConvertionOptions(SqlSyntaxType.HIVE, false);
-        sqlConverter = SqlConverterFactory.getSqlConverter(convertionOptions);
+        parsingOptions = new io.prestosql.sql.parser.ParsingOptions(DecimalLiteralTreatment.AS_DECIMAL);
+        SessionProperties sessionProperties = new SessionProperties();
+        sessionProperties.setSourceType(SqlSyntaxType.HIVE);
+        sessionProperties.setParsingOptions(false);
+        sqlConverter = SqlConverterFactory.getSqlConverter(sessionProperties);
     }
 
     @Test
@@ -60,13 +65,10 @@ public class TestHiveSqlMigrate
                 "WITH (\n" +
                 "   location = '/user'\n" +
                 ")";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Warning");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertWarning(sql, expectedSql);
 
         String sql2 = "CREATE SCHEMA IF NOT EXISTS S1 COMMENT 'hetu' LOCATION '/user' WITH DBPROPERTIES(NAME='user', ID=9)";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), "Fail");
+        assertUnsupported(sql2, Optional.of("WITH DBPROPERTIES"));
     }
 
     @Test
@@ -74,32 +76,30 @@ public class TestHiveSqlMigrate
     {
         String sql1 = "drop schema S1 RESTRICT";
         String expectedSql = "DROP SCHEMA S1 RESTRICT";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), expectedSql);
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql1, expectedSql);
 
         String sql2 = "drop schema S1 CASCADE";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), "Fail");
+        assertUnsupported(sql2, Optional.of("CASCADE"));
     }
 
     @Test
     public void testAlterSchema()
     {
         String sql1 = "ALTER SCHEMA S1 SET LOCATION '/USER/HIVE'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql1)), FAIL);
+        assertUnsupported(sql1, Optional.of("ALTER SCHEMA"));
 
         String sql2 = "ALTER SCHEMA S1 SET OWNER USER TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), FAIL);
+        assertUnsupported(sql2, Optional.of("ALTER SCHEMA"));
 
         String sql3 = "ALTER SCHEMA S1 SET DBPROPERTIES(NAME='HETU')";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql3)), FAIL);
+        assertUnsupported(sql3, Optional.of("ALTER SCHEMA"));
     }
 
     @Test
     public void testDescribeSchema()
     {
         String sql = "DESCRIBE SCHEMA EXTENDED TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("DESCRIBE SCHEMA"));
     }
 
     @Test
@@ -132,22 +132,19 @@ public class TestHiveSqlMigrate
                 "   location = 'hdfs://xxx',\n" +
                 "   transactional = true\n" +
                 ")";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
 
         String sql2 = "create table constraints1(id1 integer UNIQUE disable novalidate, id2 integer NOT NULL,usr string DEFAULT current_user(), price double CHECK (price > 0 AND price <= 1000))";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), FAIL);
+        assertUnsupported(sql2, Optional.of("UNIQUE"));
 
         String sql3 = "create table constraints2(id1 integer, id2 integer, constraint c1_unique UNIQUE(id1) disable novalidate)";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql3)), FAIL);
+        assertUnsupported(sql3, Optional.of("CONSTRAINT"));
 
         String sql4 = "create table constraints3(id1 integer, id2 integer,constraint c1_check CHECK(id1 + id2 > 0))";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql4)), FAIL);
+        assertUnsupported(sql4, Optional.of("CONSTRAINT"));
 
         String sql5 = "create temporary table temporary_table (id1 integer, id2 integer)";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql5)), FAIL);
+        assertUnsupported(sql5, Optional.of("TEMPORARY"));
 
         String sql6 = "CREATE TRANSACTIONAL TABLE transactional_table_test(key string, value string) PARTITIONED BY(ds string) STORED AS ORC";
         expectedSql = "CREATE TABLE transactional_table_test (\n" +
@@ -160,20 +157,17 @@ public class TestHiveSqlMigrate
                 "   partitioned_by = ARRAY['ds'],\n" +
                 "   format = 'ORC'\n" +
                 ")";
-        result = sqlConverter.convert(sql6);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql6, expectedSql);
     }
 
     @Test
     public void testCreateTableWithIllegalType() throws Exception
     {
         String sql1 = "create table t1 (a struct<b:int>)";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql1)), "Fail");
+        assertUnsupported(sql1, Optional.of("struct"));
 
         String sql2 = "create table t1 (a uniontype<int, string>)";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), "Fail");
+        assertFailed(sql2);
     }
 
     @Test
@@ -186,13 +180,10 @@ public class TestHiveSqlMigrate
                 "WITH (\n" +
                 "   format = 'ORC'\n" +
                 ")";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql1, expectedSql);
 
         String sql2 = "create table t1 (id int) STORED AS illegalType";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), "Fail");
+        assertUnsupported(sql2, Optional.of("illegalType"));
     }
 
     @Test
@@ -205,10 +196,7 @@ public class TestHiveSqlMigrate
                 "WITH (\n" +
                 "   location = 'hdfs://xxx'\n" +
                 ")";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -220,23 +208,18 @@ public class TestHiveSqlMigrate
                 ", NAME\n" +
                 "FROM\n" +
                 "  T1\n";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
     public void testDropTable() throws Exception
     {
         String sql1 = "drop table IF EXISTS p2";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), "DROP TABLE IF EXISTS p2");
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        String expectedSql = "DROP TABLE IF EXISTS p2";
+        assertSuccess(sql1, expectedSql);
 
         String sql2 = "drop table IF EXISTS p2 purge";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), "Fail");
+        assertUnsupported(sql2, Optional.of("PURGE"));
     }
 
     @Test
@@ -246,10 +229,7 @@ public class TestHiveSqlMigrate
         String expectedSql1 = "INSERT INTO t1\n" +
                 " VALUES \n" +
                 "  ROW (10, 'NAME')\n";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), expectedSql1);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql1, expectedSql1);
 
         String sql2 = "INSERT INTO TABLE T2 SELECT ID, NAME FROM T1";
         String expectedSql2 = "INSERT INTO t2\n" +
@@ -258,10 +238,7 @@ public class TestHiveSqlMigrate
                 ", NAME\n" +
                 "FROM\n" +
                 "  T1\n";
-        result = sqlConverter.convert(sql2);
-        assertEquals(getConvertedSql(result), expectedSql2);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql2, expectedSql2);
     }
 
     @Test
@@ -274,10 +251,7 @@ public class TestHiveSqlMigrate
                 ", NAME\n" +
                 "FROM\n" +
                 "  T1\n";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -287,10 +261,7 @@ public class TestHiveSqlMigrate
         String expectedSql = "UPDATE t1 SET\n" +
                 "name='BOO'\n" +
                 "WHERE (ID = 2000)\n";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -298,10 +269,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "DELETE FROM T1 WHERE ID > 10";
         String expectedSql = "DELETE FROM T1 WHERE (ID > 10)";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -309,82 +277,76 @@ public class TestHiveSqlMigrate
     {
         String sql1 = "ALTER TABLE T1 RENAME TO T2";
         String expectedSql1 = "ALTER TABLE t1 RENAME TO t2";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), expectedSql1);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql1, expectedSql1);
 
         String sql2 = "ALTER TABLE T1 SET TBLPROPERTIES (\"COMMENT\"=\"HETU\")";
         String expectedSql2 = "COMMENT ON TABLE t1 IS 'HETU'";
-        result = sqlConverter.convert(sql2);
-        assertEquals(getConvertedSql(result), expectedSql2);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql2, expectedSql2);
     }
 
     @Test
     public void testAlterTableUnsupported()
     {
         String sql1 = "ALTER TABLE TEST PARTITION (DT='2008-08-08', COUNTRY='US') SET SERDE 'ORG.APACHE.HADOOP.HIVE.SERDE2.OPENCSVSERDE' WITH SERDEPROPERTIES ('field.delim' = ',')";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql1)), FAIL);
+        assertUnsupported(sql1, Optional.of("SET SERDE"));
 
         String sql2 = "ALTER TABLE TEST CLUSTERED BY (ID) SORTED BY (NAME) INTO 3 BUCKETS";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), FAIL);
+        assertUnsupported(sql2, Optional.of("STORAGE PROPERTIES"));
 
         String sql3 = "ALTER TABLE TEST SKEWED BY (ID) ON ('HUAWEI')";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql3)), FAIL);
+        assertUnsupported(sql3, Optional.of("SKEWED"));
 
         String sql4 = "ALTER TABLE TEST NOT SKEWED";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql4)), FAIL);
+        assertUnsupported(sql4, Optional.of("NOT SKEWED"));
 
         String sql5 = "ALTER TABLE TEST NOT STORED AS DIRECTORIES";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql5)), FAIL);
+        assertUnsupported(sql5, Optional.of("NOT STORED AS DIRECTORIES"));
 
         String sql6 = "ALTER TABLE TEST SET SKEWED LOCATION(name='/usr/hive')";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql6)), FAIL);
+        assertUnsupported(sql6, Optional.of("SET SKEWED LOCATION"));
 
         String sql7 = "ALTER TABLE PAGE_VIEW ADD PARTITION (DT='2008-08-08', COUNTRY='US') LOCATION '/PATH/TO/US/PART080808' PARTITION (DT='2008-08-09', COUNTRY='US') LOCATION '/PATH/TO/US/PART080809'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql7)), FAIL);
+        assertUnsupported(sql7, Optional.of("ADD PARTITION"));
 
         String sql8 = "ALTER TABLE PAGE_VIEW DROP PARTITION (DT='2008-08-08', COUNTRY='US') IGNORE PROTECTION";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql8)), FAIL);
+        assertUnsupported(sql8, Optional.of("DROP PARTITION"));
 
         String sql9 = "ALTER TABLE T1 ADD CONSTRAINT TEST PRIMARY KEY (ID, NAME) DISABLE NOVALIDATE";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql9)), FAIL);
+        assertUnsupported(sql9, Optional.of("ADD CONSTRAINT"));
 
         String sql10 = "ALTER TABLE T1 CHANGE COLUMN ID1 ID2 INT CONSTRAINT TEST NOT NULL ENABLE";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql10)), FAIL);
+        assertUnsupported(sql10, Optional.of("CHANGE COLUMN"));
 
         String sql11 = "ALTER TABLE T1 DROP CONSTRAINT TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql11)), FAIL);
+        assertUnsupported(sql11, Optional.of("DROP CONSTRAINT"));
     }
 
     @Test
     public void testShowTableExtended()
     {
         String sql = "show table extended like part_table";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW TABLE EXTENDED"));
     }
 
     @Test
     public void testShowTableProperties()
     {
         String sql = "SHOW TBLPROPERTIES TBLNAME('FOO')";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW TBLPROPERTIES"));
     }
 
     @Test
     public void testTruncateTable()
     {
         String sql = "TRUNCATE TABLE TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("TRUNCATE TABLE"));
     }
 
     @Test
     public void testMsckRepairTable()
     {
         String sql = "MSCK REPAIR TABLE TEST ADD PARTITIONS";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("MSCK"));
     }
 
     @Test
@@ -392,10 +354,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "alter table t100 add columns (name string comment 'hetu') RESTRICT";
         String expectedSql = "ALTER TABLE t100 ADD COLUMN name string COMMENT 'hetu'";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -406,24 +365,15 @@ public class TestHiveSqlMigrate
                 "SELECT ID\n" +
                 "FROM\n" +
                 "  T1\n";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(sqlConverter.convert(sql)), expectedSql);
-        assertEquals(getConversionStatus(result), "Warning");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertWarning(sql, expectedSql);
     }
 
     @Test
     public void testDropView() throws Exception
     {
-        String sql = "CREATE VIEW V1 COMMENT 'HETU' AS SELECT (ID) FROM T1";
-        String expectedSql = "CREATE VIEW V1 AS\n" +
-                "SELECT ID\n" +
-                "FROM\n" +
-                "  T1\n";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Warning");
-        checkCanParsedByHetu(getConvertedSql(result));
+        String sql = "DROP VIEW TEST";
+        String expectedSql = "DROP VIEW test";
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -434,20 +384,17 @@ public class TestHiveSqlMigrate
                 "SELECT *\n" +
                 "FROM\n" +
                 "  T1\n";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), expectedSql1);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql1, expectedSql1);
 
         String sql2 = "ALTER VIEW V1 SET TBLPROPERTIES (\"COMMENT\"=\"HETU\")";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), "Fail");
+        assertUnsupported(sql2, Optional.of("SET TBLPROPERTIES"));
     }
 
     @Test
     public void testShowViews()
     {
         String sql = "SHOW VIEWS IN D1 LIKE 'test*'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW VIEWS"));
     }
 
     @Test
@@ -455,10 +402,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "CREATE ROLE TEST";
         String expectedSql = "CREATE ROLE TEST";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -466,10 +410,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "DROP ROLE TEST";
         String expectedSql = "DROP ROLE TEST";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -477,10 +418,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "GRANT ROLE admin TO USER TEST";
         String expectedSql = "GRANT admin TO USER TEST";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -488,10 +426,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "revoke role admin from user test";
         String expectedSql = "REVOKE admin FROM USER test";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -499,10 +434,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SET ROLE ALL";
         String expectedSql = "SET ROLE ALL";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -510,10 +442,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "grant select on t100 to user test";
         String expectedSql = "GRANT select ON TABLE t100 TO USER test";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -521,10 +450,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "REVOKE SELECT ON T100 FROM USER TEST";
         String expectedSql = "REVOKE SELECT ON TABLE t100 FROM USER TEST";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -532,10 +458,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW GRANT ON TABLE T1";
         String expectedSql = "SHOW GRANTS ON TABLE t1";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -546,10 +469,7 @@ public class TestHiveSqlMigrate
                 "SELECT *\n" +
                 "FROM\n" +
                 "  T1\n";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -557,10 +477,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW CREATE TABLE T1";
         String expectedSql = "SHOW CREATE TABLE T1";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Warning");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertWarning(sql, expectedSql);
     }
 
     @Test
@@ -568,10 +485,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW TABLES FROM TEST";
         String expectedSql = "SHOW TABLES FROM TEST";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -579,10 +493,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW SCHEMAS";
         String expectedSql = "SHOW SCHEMAS";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -590,10 +501,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW COLUMNS FROM DB.TB1";
         String expectedSql = "SHOW COLUMNS FROM DB.TB1";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -601,20 +509,14 @@ public class TestHiveSqlMigrate
     {
         String sql1 = "DESC TEST";
         String expectedSql1 = "SHOW COLUMNS FROM TEST";
-        JSONObject result = sqlConverter.convert(sql1);
-        assertEquals(getConvertedSql(result), expectedSql1);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql1, expectedSql1);
 
         String sql2 = "DESCRIBE DB.TB1";
         String expectedSql2 = "SHOW COLUMNS FROM DB.TB1";
-        result = sqlConverter.convert(sql2);
-        assertEquals(getConvertedSql(result), expectedSql2);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql2, expectedSql2);
 
         String sql3 = "DESCRIBE DEFAULT.SRC_THRIFT LINTSTRING.$ELEM$.MYINT";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql3)), FAIL);
+        assertUnsupported(sql3, Optional.of("DESCRIBE TABLE OPTION"));
     }
 
     @Test
@@ -622,10 +524,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW ROLES";
         String expectedSql = "SHOW ROLES";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -633,10 +532,7 @@ public class TestHiveSqlMigrate
     {
         String sql = "SHOW FUNCTIONS";
         String expectedSql = "SHOW FUNCTIONS";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
 
         sql = "SHOW FUNCTIONS LIKE 'YEAR'";
         assertUnsupported(sql, Optional.of("LIKE"));
@@ -647,13 +543,10 @@ public class TestHiveSqlMigrate
     {
         String sql = "SET";
         String expectedSql = "SHOW SESSION";
-        JSONObject result = sqlConverter.convert(sql);
-        assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), "Success");
-        checkCanParsedByHetu(getConvertedSql(result));
+        assertSuccess(sql, expectedSql);
 
         String sql2 = "SET PATH='/USR/HIVE/TST'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql2)), FAIL);
+        assertUnsupported(sql2, Optional.of("SET PROPERTY"));
     }
 
     @Test
@@ -673,175 +566,175 @@ public class TestHiveSqlMigrate
     public void testCreateMaterializedView()
     {
         String sql = "CREATE MATERIALIZED VIEW TEST STORED AS 'org.apache.hadoop.hive.druid.DruidStorageHandler' AS SELECT * FROM T1";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("CREATE MATERIALIZED VIEW"));
     }
 
     @Test
     public void testDropMaterializedView()
     {
         String sql = "DROP MATERIALIZED VIEW TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("DROP MATERIALIZED VIEW"));
     }
 
     @Test
     public void testAlterMaterializedView()
     {
         String sql = "ALTER MATERIALIZED VIEW TEST ENABLE REWRITE";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("ALTER MATERIALIZED VIEW"));
     }
 
     @Test
     public void testShowMaterializedViews()
     {
         String sql = "SHOW MATERIALIZED VIEWS IN DB1";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW MATERIALIZED VIEW"));
     }
 
     @Test
     public void testCreateFunction()
     {
         String sql = "CREATE FUNCTION XXOO_LOWER AS 'TEST.QL.LOWERUDF' USING JAR 'HDFS:///PATH/TO/HIVE_FUNC/LOWER.JAR'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("CREATE FUNCTION"));
     }
 
     @Test
     public void testDropFunction()
     {
         String sql = "DROP FUNCTION TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("DROP FUNCTION"));
     }
 
     @Test
     public void testReloadFunctions()
     {
         String sql = "RELOAD FUNCTIONS";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("RELOAD FUNCTION"));
     }
 
     @Test
     public void testCreateIndex()
     {
         String sql = "CREATE INDEX INDEX_STUDENTID ON TABLE STUDENT_3(STUDENTID) AS 'ORG.APACHE.HADOOP.HIVE.QL.INDEX.COMPACT.COMPACTINDEXHANDLER' WITH DEFERRED REBUILD IN TABLE INDEX_TABLE_STUDENT";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("CREATE INDEX"));
     }
 
     @Test
     public void testDropIndex()
     {
         String sql = "DROP INDEX INDEX_STUDENTID ON STUDENT_3";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("DROP INDEX"));
     }
 
     @Test
     public void testAlterIndex()
     {
         String sql = "ALTER INDEX INDEX_STUDENTID ON STUDENT_3 REBUILD";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("ALTER INDEX"));
     }
 
     @Test
     public void testShowIndex()
     {
         String sql = "SHOW INDEX ON STUDENT_3";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW INDEX"));
     }
 
     @Test
     public void testShowPartitions()
     {
         String sql = "SHOW PARTITIONS TEST_PARTITION WHERE ID > 10 LIMIT 3";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW PARTITIONS"));
     }
 
     @Test
     public void testDescribePartition()
     {
         String sql = "DESCRIBE FORMATTED DEFAULT.SRC_TABLE PARTITION (PART_COL = 100) COLUMNA";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("DESCRIBE PARTITIONS"));
     }
 
     @Test
     public void testCreateMacro()
     {
         String sql = "CREATE TEMPORARY MACRO STRING_LEN_PLUS_TWO(X STRING) LENGTH(X) + 2";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("CREATE MACRO"));
     }
 
     @Test
     public void testDropMacro()
     {
         String sql = "DROP TEMPORARY MACRO TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("DROP MACRO"));
     }
 
     @Test
     public void testShowRoleGrant()
     {
         String sql = "SHOW ROLE GRANT USER TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW ROLE GRANT"));
     }
 
     @Test
     public void testShowPrincipals()
     {
         String sql = "SHOW PRINCIPALS TEST";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW PRINCIPALS"));
     }
 
     @Test
     public void testInsertFilesystem()
     {
         String sql = "INSERT OVERWRITE DIRECTORY '/USER/HIVE/TEST' SELECT * FROM T1";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("INSERT FILESYSTEM"));
     }
 
     @Test
     public void testShowLocks()
     {
         String sql = "show locks t_real_user";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW LOCKS"));
     }
 
     @Test
     public void testShowConf()
     {
         String sql = "SHOW CONF 'hive.exec.parallel'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW CONF"));
     }
 
     @Test
     public void testShowTransactions()
     {
         String sql = "SHOW TRANSACTIONS";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW TRANSACTIONS"));
     }
 
     @Test
     public void testShowCompactions()
     {
         String sql = "SHOW COMPACTIONS";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("SHOW COMPACTIONS"));
     }
 
     @Test
     public void testAbortTransactions()
     {
         String sql = "ABORT TRANSACTIONS 0001";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("ABORT TRANSACTIONS"));
     }
 
     @Test
     public void testLoadData()
     {
         String sql = "LOAD DATA LOCAL INPATH '/PATH/TO/LOCAL/FILES' OVERWRITE  INTO TABLE TEST PARTITION (COUNTRY='CHINA')";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("LOAD DATA"));
     }
 
     @Test
     public void testResetSession()
     {
         String sql = "RESET";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("RESET"));
     }
 
     @Test
@@ -852,28 +745,28 @@ public class TestHiveSqlMigrate
                 "ON SUB.ID = CUSTOMER.ID\n" +
                 "WHEN MATCHED THEN UPDATE SET NAME = SUB.NAME, STATE = SUB.NEW_STATE\n" +
                 "WHEN NOT MATCHED THEN INSERT VALUES (SUB.ID, SUB.NAME, SUB.STATE)";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("MERGE"));
     }
 
     @Test
     public void testExport()
     {
         String sql = "EXPORT TABLE DEPARTMENT TO 'HDFS_EXPORTS_LOCATION/DEPARTMENT'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("EXPORT TABLE"));
     }
 
     @Test
     public void testImport()
     {
         String sql = "IMPORT TABLE IMPORTED_DEPT FROM 'HDFS_EXPORTS_LOCATION/DEPARTMENT'";
-        assertEquals(getConversionStatus(sqlConverter.convert(sql)), FAIL);
+        assertUnsupported(sql, Optional.of("IMPORT TABLE"));
     }
 
     @Test
     public void testDigitalIdentifer()
     {
         String sql = "select sum(b.8_0cs) from t1";
-        assertUnsupported(sql, Optional.of("identifiers must not start with a digit"));
+        assertUnsupported(sql, Optional.of("[DIGIT IDENTIFIER] is not supported"));
     }
 
     @Test
@@ -1005,6 +898,20 @@ public class TestHiveSqlMigrate
         assertUnsupported(sql, Optional.of("Unsupported string"));
     }
 
+    @Test
+    public void testExecuteCommand()
+            throws IOException
+    {
+        String sqlFile = getClass().getClassLoader().getResource("hive-batch-test.sql").getFile();
+        String query = asCharSource(new File(sqlFile), UTF_8).read();
+        SessionProperties sessionProperties = new SessionProperties();
+        sessionProperties.setSourceType(SqlSyntaxType.HIVE);
+        sessionProperties.setConsolePrintEnable(true);
+        sessionProperties.setParsingOptions(true);
+        Console console = new Console();
+        console.executeCommand(query, "./testExecuteCommand-hive", sessionProperties);
+    }
+
     private String getConvertedSql(JSONObject result)
     {
         String convertedSql = "";
@@ -1041,21 +948,34 @@ public class TestHiveSqlMigrate
         }
     }
 
+    private void assertFailed(String inputSql)
+    {
+        JSONObject result = sqlConverter.convert(inputSql);
+        assertEquals(getConversionStatus(result), FAILED);
+    }
+
+    private void assertWarning(String inputSql, String expectedSql)
+    {
+        JSONObject result = sqlConverter.convert(inputSql);
+        assertEquals(getConvertedSql(result), expectedSql);
+        assertEquals(getConversionStatus(result), WARNING);
+        checkCanParsedByHetu(getConvertedSql(result));
+    }
+
     private void assertSuccess(String inputSql, String expectedSql)
     {
         JSONObject result = sqlConverter.convert(inputSql);
         assertEquals(getConvertedSql(result), expectedSql);
-        assertEquals(getConversionStatus(result), Constants.SUCCESS);
+        assertEquals(getConversionStatus(result), SUCCESS);
         checkCanParsedByHetu(getConvertedSql(result));
     }
 
     private void assertUnsupported(String inputSql, Optional<String> unsupportedKeyWords)
     {
         JSONObject result = sqlConverter.convert(inputSql);
-        assertEquals(getConversionStatus(result), Constants.FAIL);
+        assertEquals(getConversionStatus(result), UNSUPPORTED);
         try {
-            String msg = result.get(Constants.MESSAGE).toString();
-            assertTrue(msg.toLowerCase(Locale.ENGLISH).contains(UNSUPPORTED.toLowerCase(Locale.ENGLISH)));
+            String msg = result.get(MESSAGE).toString();
             if (unsupportedKeyWords.isPresent()) {
                 assertTrue(msg.toLowerCase(Locale.ENGLISH).contains(unsupportedKeyWords.get().toLowerCase(Locale.ENGLISH)));
             }

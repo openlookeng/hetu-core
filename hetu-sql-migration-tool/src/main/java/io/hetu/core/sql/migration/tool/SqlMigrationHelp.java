@@ -21,12 +21,13 @@ public final class SqlMigrationHelp
     public static String getHelpText()
     {
         return "" +
-                "This command line is to convert other sql syntax (e.g. Hive)to openLooKeng syntax.\n" +
+                "This command line is to convert other sql syntax (e.g. Hive)to ANSI SQL:2003 syntax.\n" +
                 "In thi cli, you can input the sql statement end with ';' and get the converted sql promptly.\n" +
                 "Supported commands:\n" +
                 "QUIT\n" +
                 "EXIT\n" +
-                "HISTORY\n" +
+                "HISTORY    - show the history inputs.\n" +
+                "!chtype typeValue;      - change the input sql syntax type of current session to typeValue. e.g. !chtype hive; change it to hive" +
                 "\n" +
                 "";
     }

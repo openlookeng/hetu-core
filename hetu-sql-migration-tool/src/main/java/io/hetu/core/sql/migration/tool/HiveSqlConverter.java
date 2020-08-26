@@ -16,25 +16,26 @@ package io.hetu.core.sql.migration.tool;
 
 import io.hetu.core.migration.source.hive.HiveSqlParser;
 import io.hetu.core.sql.migration.parser.HiveParser;
+import io.prestosql.sql.parser.ParsingOptions;
 import org.codehaus.jettison.json.JSONObject;
 
 public class HiveSqlConverter
         extends SqlSyntaxConverter
 {
     private HiveParser hiveSqlParser;
-    private ConvertionOptions convertionOptions;
+    private ParsingOptions parsingOptions;
     private static HiveSqlConverter hiveSqlConverter;
 
-    private HiveSqlConverter(ConvertionOptions convertionOptions)
+    private HiveSqlConverter(ParsingOptions parsingOptions)
     {
         this.hiveSqlParser = new HiveParser();
-        this.convertionOptions = convertionOptions;
+        this.parsingOptions = parsingOptions;
     }
 
-    public static synchronized HiveSqlConverter getHiveSqlConverter(ConvertionOptions convertionOptions)
+    public static synchronized HiveSqlConverter getHiveSqlConverter(ParsingOptions parsingOptions)
     {
         if (hiveSqlConverter == null) {
-            hiveSqlConverter = new HiveSqlConverter(convertionOptions);
+            hiveSqlConverter = new HiveSqlConverter(parsingOptions);
         }
 
         return hiveSqlConverter;
@@ -43,6 +44,6 @@ public class HiveSqlConverter
     @Override
     public JSONObject convert(String sql)
     {
-        return hiveSqlParser.invokeParser(sql, HiveSqlParser::singleStatement, convertionOptions);
+        return hiveSqlParser.invokeParser(sql, HiveSqlParser::singleStatement, parsingOptions);
     }
 }
