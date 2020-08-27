@@ -29,7 +29,6 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkState;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class FileSystemClientManager
@@ -53,9 +52,7 @@ public class FileSystemClientManager
 
     public void addFileSystemClientFactories(HetuFileSystemClientFactory factory)
     {
-        if (fileSystemFactories.putIfAbsent(factory.getName(), factory) != null) {
-            throw new IllegalArgumentException(format("Factory for %s filesystem is already registered", factory.getName()));
-        }
+        fileSystemFactories.putIfAbsent(factory.getName(), factory);
     }
 
     /**

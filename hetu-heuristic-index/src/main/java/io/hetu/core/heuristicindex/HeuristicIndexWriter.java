@@ -14,6 +14,8 @@
  */
 package io.hetu.core.heuristicindex;
 
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.filesystem.FileBasedLock;
@@ -30,6 +32,7 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -38,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -54,6 +58,8 @@ public class HeuristicIndexWriter
         implements IndexWriter
 {
     private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexWriter.class);
+    private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
+            new LocalConfig(new Properties()), Paths.get("/"));
 
     private static final String PART_FILE_SUFFIX = ".part";
 
@@ -109,6 +115,10 @@ public class HeuristicIndexWriter
         String databaseName = parts[DATABASE_NAME_INDEX];
         String tableName = parts[TABLE_NAME_INDEX];
 
+        Path tmpPath = Files.createTempDirectory("tmp-indexwriter-");
+        String strTmpPath = tmpPath.toString();
+        LOG.info("Local folder to hold temp index files: " + strTmpPath);
+
         Set<String> indexedColumns = ConcurrentHashMap.newKeySet();
 
         // the index files will first be stored in partFiles so that a file is
@@ -116,21 +126,21 @@ public class HeuristicIndexWriter
         Set<String> partFiles = ConcurrentHashMap.newKeySet();
 
         // lock table so multiple callers can't index the same table
-        Path tableIndexDirPath = root.resolve(table);
+        Path tableIndexDirPath = Paths.get(strTmpPath, root.toString(), table);
 
         Lock lock = null;
         if (lockingEnabled) {
-            lock = new FileBasedLock(fs, tableIndexDirPath);
+            lock = new FileBasedLock(LOCAL_FS_CLIENT, tableIndexDirPath);
             // cleanup hook in case regular execution is interrupted
             Lock finalLock = lock;
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 cleanPartFiles(partFiles);
                 finalLock.unlock();
                 try {
-                    fs.close();
+                    LOCAL_FS_CLIENT.close();
                 }
                 catch (IOException e) {
-                    throw new UncheckedIOException("Error closing FileSystem Client: " + fs.getClass().getName(), e);
+                    throw new UncheckedIOException("Error closing FileSystem Client: " + LOCAL_FS_CLIENT.getClass().getName(), e);
                 }
             }));
             lock.lock();
@@ -167,10 +177,10 @@ public class HeuristicIndexWriter
                         String lastModifiedFileName = IndexConstants.LAST_MODIFIED_FILE_PREFIX + lastModified;
                         Path lastModifiedFilePath = Paths.get(uriIndexDirPath, lastModifiedFileName);
                         try {
-                            if (!fs.exists(Paths.get(uriIndexDirPath))) {
-                                fs.createDirectories(Paths.get(uriIndexDirPath));
+                            if (!LOCAL_FS_CLIENT.exists(Paths.get(uriIndexDirPath))) {
+                                LOCAL_FS_CLIENT.createDirectories(Paths.get(uriIndexDirPath));
                             }
-                            try (OutputStream outputStream = fs.newOutputStream(lastModifiedFilePath)) {
+                            try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(lastModifiedFilePath)) {
                                 outputStream.write(0);
                             }
                         }
@@ -214,7 +224,7 @@ public class HeuristicIndexWriter
                             splitIndex.addValues(values);
 
                             LOG.debug("writing split index to: {}", indexFilePath);
-                            try (OutputStream outputStream = fs.newOutputStream(indexFilePath)) {
+                            try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(indexFilePath)) {
                                 splitIndex.persist(outputStream);
                             }
                             catch (IOException e) {
@@ -227,7 +237,7 @@ public class HeuristicIndexWriter
                                 String dataFileName = indexFileNamePrefix + "data";
                                 Path dataFilePath = Paths.get(uriIndexDirPath, dataFileName);
                                 LOG.debug("writing split data to: {}", dataFilePath);
-                                try (OutputStream outputStream = fs.newOutputStream(dataFilePath)) {
+                                try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(dataFilePath)) {
                                     for (int i = 0; i < values.length; i++) {
                                         outputStream.write(values[i] == null ? "NULL".getBytes() : values[i].toString().getBytes());
                                         outputStream.write('\n');
@@ -262,13 +272,31 @@ public class HeuristicIndexWriter
                 Path originalDir = Paths.get(original);
                 Path partDir = Paths.get(original + PART_FILE_SUFFIX);
 
-                if (!fs.exists(partDir)) {
+                if (!LOCAL_FS_CLIENT.exists(partDir)) {
                     continue;
                 }
 
+                // Download index from indexstore
+                Path originalOnTarget = Paths.get(original.replaceFirst(strTmpPath, ""));
+                if (fs.exists(originalOnTarget)) {
+                    try {
+                        try (Stream<Path> tarsOnRemote = fs.walk(originalOnTarget).filter(p -> p.toString().contains(".tar"))) {
+                            for (Path tarFile : (Iterable<Path>) tarsOnRemote::iterator) {
+                                LOG.debug("Fetching index from target filesystem to local temp: " + tarFile);
+                                IndexServiceUtils.unArchive(fs, LOCAL_FS_CLIENT, tarFile, tmpPath);
+                                LOCAL_FS_CLIENT.createDirectories(Paths.get(strTmpPath, tarFile.getParent().toString()));
+                                Files.createFile(Paths.get(strTmpPath, tarFile.toString().replaceAll("\\.tar", "")));
+                            }
+                        }
+                    }
+                    catch (IOException e) {
+                        throw new UncheckedIOException("error unarchiving file from remote", e);
+                    }
+                }
+
                 // 1. no original
-                if (!fs.exists(originalDir)) {
-                    fs.move(partDir, originalDir);
+                if (!LOCAL_FS_CLIENT.exists(originalDir)) {
+                    LOCAL_FS_CLIENT.move(partDir, originalDir);
                 }
                 else {
                     long previousLastModifiedTime = getLastModifiedTime(originalDir);
@@ -276,31 +304,34 @@ public class HeuristicIndexWriter
 
                     // 2. expired original
                     if (previousLastModifiedTime != newLastModifiedTime) {
-                        if (fs.exists(originalDir)) {
+                        if (LOCAL_FS_CLIENT.exists(originalDir)) {
                             LOG.debug("Removing expired index at {}.", originalDir);
-                            fs.deleteRecursively(originalDir);
+                            LOCAL_FS_CLIENT.deleteRecursively(originalDir);
                         }
-                        fs.move(partDir, originalDir);
+                        LOCAL_FS_CLIENT.move(partDir, originalDir);
                     }
                     else {
                         // 3. merge
-                        try (Stream<Path> children = fs.list(partDir)) {
+                        try (Stream<Path> children = LOCAL_FS_CLIENT.list(partDir)) {
                             for (Path child : (Iterable<Path>) children::iterator) {
                                 String childName = child.getFileName().toString();
                                 Path newPath = originalDir.resolve(childName);
                                 LOG.debug("Moving {} to {}.", child, newPath);
                                 // file "lastModified=..." with same name may exist
-                                fs.deleteIfExists(newPath);
-                                fs.move(child, newPath);
+                                LOCAL_FS_CLIENT.deleteIfExists(newPath);
+                                LOCAL_FS_CLIENT.move(child, newPath);
                             }
 
                             // should be empty now
-                            fs.deleteRecursively(partDir);
+                            LOCAL_FS_CLIENT.deleteRecursively(partDir);
                         }
                     }
                 }
 
                 LOG.debug("Created index at {}.", originalDir);
+
+                fs.deleteRecursively(originalOnTarget);
+                IndexServiceUtils.archiveTar(LOCAL_FS_CLIENT, fs, originalDir, originalOnTarget);
             }
 
             for (String indexedColumn : indexedColumns) {
@@ -313,6 +344,9 @@ public class HeuristicIndexWriter
             if (lock != null) {
                 lock.unlock();
             }
+
+            LOG.info("Deleting local tmp folder: " + strTmpPath);
+            LOCAL_FS_CLIENT.deleteRecursively(tmpPath);
         }
     }
 
@@ -324,7 +358,7 @@ public class HeuristicIndexWriter
             for (String partFile : partFiles) {
                 String partDir = partFile + PART_FILE_SUFFIX;
                 try {
-                    if (fs.exists(Paths.get(partDir)) && !fs.deleteRecursively(Paths.get(partDir))) {
+                    if (LOCAL_FS_CLIENT.exists(Paths.get(partDir)) && !LOCAL_FS_CLIENT.deleteRecursively(Paths.get(partDir))) {
                         failedDeletes.add(partDir);
                     }
                 }
@@ -344,7 +378,7 @@ public class HeuristicIndexWriter
 
     private long getLastModifiedTime(Path path) throws IOException
     {
-        try (Stream<Path> children = fs.list(path).filter(this::notDirectory)) {
+        try (Stream<Path> children = LOCAL_FS_CLIENT.list(path).filter(this::notDirectory)) {
             for (Path child : (Iterable<Path>) children::iterator) {
                 Path filenamePath = child.getFileName();
                 if (filenamePath != null) {
@@ -366,6 +400,6 @@ public class HeuristicIndexWriter
 
     private boolean notDirectory(Path path)
     {
-        return !fs.isDirectory(path);
+        return !LOCAL_FS_CLIENT.isDirectory(path);
     }
 }

@@ -15,6 +15,9 @@
 package io.hetu.core.heuristicindex.util;
 
 import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -22,6 +25,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
@@ -31,14 +37,17 @@ import static org.testng.Assert.assertTrue;
 
 public class TestIndexServiceUtils
 {
+    private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
+            new LocalConfig(new Properties()), Paths.get("/tmp"));
+
     @Test
     public void testGetPath()
     {
-        String[] input1 = new String[]{"abc", "efg_s", "f5%3132d", "dfs_s"};
+        String[] input1 = new String[] {"abc", "efg_s", "f5%3132d", "dfs_s"};
         String expected1 = "efg_s";
         checkStringEquals(IndexServiceUtils.getPath(input1, "_s"), expected1);
 
-        String[] input2 = new String[]{"random", "character"};
+        String[] input2 = new String[] {"random", "character"};
         String expected2 = "character";
         checkStringEquals(IndexServiceUtils.getPath(input2, "cter"), expected2);
 
@@ -121,10 +130,33 @@ public class TestIndexServiceUtils
         assertEquals("table", parts[2]);
     }
 
+    @Test
+    public void testArchiveAndUnarchive()
+            throws IOException
+    {
+        try (TempFolder folder = new TempFolder()) {
+            String lastModifiedStr = IndexConstants.LAST_MODIFIED_FILE_PREFIX + "123456";
+            folder.create();
+            folder.newFile("testIndex");
+            folder.newFile(lastModifiedStr);
+            IndexServiceUtils.archiveTar(LOCAL_FS_CLIENT, LOCAL_FS_CLIENT, folder.getRoot().toPath(), folder.getRoot().toPath());
+            Path tarFile = folder.getRoot().toPath().resolve(lastModifiedStr + ".tar");
+            // current file structure: folderRoot/testIndex, folderRoot/lastModified=123456, folderRoot/lastModified=123456.tar (containing testIndex)
+            assertTrue(Files.exists(tarFile));
+
+            File unArchiveDir = folder.newFolder();
+            IndexServiceUtils.unArchive(LOCAL_FS_CLIENT, LOCAL_FS_CLIENT, tarFile, unArchiveDir.toPath());
+            // current file structure: folderRoot/testIndex, folderRoot/lastModified=123456, folderRoot/lastModified=123456.tar (containing testIndex),
+            // folderRoot/<unArchiveDirName>/tmp/<folderRootName>/testIndex
+            assertTrue(Files.exists(unArchiveDir.toPath()));
+            assertTrue(Files.exists(Paths.get(unArchiveDir.getAbsolutePath(), folder.getRoot().getAbsolutePath(), "testIndex")));
+        }
+    }
+
     @DataProvider(name = "invalidTableNames")
     public static Object[][] invalidTableNames()
     {
-        return new Object[][]{{"schema.table", false}, {".schema.table", false}, {" .schema.table", false},
+        return new Object[][] {{"schema.table", false}, {".schema.table", false}, {" .schema.table", false},
                 {"table", false}};
     }
 

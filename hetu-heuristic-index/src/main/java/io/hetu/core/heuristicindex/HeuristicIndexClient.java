@@ -15,6 +15,8 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.filesystem.FileBasedLock;
@@ -30,12 +32,14 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
@@ -53,6 +57,8 @@ public class HeuristicIndexClient
         implements IndexClient
 {
     private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexClient.class);
+    private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
+            new LocalConfig(new Properties()), Paths.get("/"));
 
     private HetuFileSystemClient fs;
     private Path root;
@@ -121,13 +127,13 @@ public class HeuristicIndexClient
         // get the absolute path to the file being read
         Path absolutePath = Paths.get(root.toString(), path);
 
-        try (Stream<Path> children = fs.list(absolutePath).filter(this::notDirectory)) {
+        try (Stream<Path> children = fs.list(absolutePath)) {
             for (Path child : (Iterable<Path>) children::iterator) {
                 Path filenamePath = child.getFileName();
                 if (filenamePath != null) {
                     String filename = filenamePath.toString();
                     if (filename.startsWith(IndexConstants.LAST_MODIFIED_FILE_PREFIX)) {
-                        String timeStr = filename.substring(filename.lastIndexOf('=') + 1).toLowerCase(Locale.ENGLISH);
+                        String timeStr = filename.replaceAll("\\D", "");
                         return Long.parseLong(timeStr);
                     }
                 }
@@ -186,7 +192,7 @@ public class HeuristicIndexClient
 
     private boolean notDirectory(Path path)
     {
-        return !fs.isDirectory(path);
+        return !LOCAL_FS_CLIENT.isDirectory(path);
     }
 
     /**
@@ -210,52 +216,74 @@ public class HeuristicIndexClient
         // get the absolute path to the file being read
         Path absolutePath = Paths.get(root.toString(), path);
 
-        try (Stream<Path> children = fs.walk(absolutePath).filter(this::notDirectory)) {
-            for (Path child : (Iterable<Path>) children::iterator) {
-                LOG.debug("Processing file {}.", child);
+        if (!fs.exists(absolutePath)) {
+            return result.build();
+        }
 
-                Path childFilePath = child.getFileName();
-                if (childFilePath == null) {
-                    throw new IllegalStateException("Path cannot be resolved: " + child);
-                }
-                String filename = childFilePath.toString();
+        try (Stream<Path> tarsOnRemote = fs.walk(absolutePath).filter(p -> p.toString().contains(".tar"))) {
+            for (Path tarFile : (Iterable<Path>) tarsOnRemote::iterator) {
+                Path localTmpDir = Files.createTempDirectory("tmp-index-dump-").toAbsolutePath();
+                LOG.debug("Fetching index from remote filesystem to local: " + tarFile);
+                IndexServiceUtils.unArchive(fs, LOCAL_FS_CLIENT, tarFile, localTmpDir);
+                Path tarReadPath = Paths.get(localTmpDir.toString(), absolutePath.toString());
 
-                if (!filename.contains(".")) {
-                    continue;
-                }
+                try (Stream<Path> children = LOCAL_FS_CLIENT.walk(tarReadPath).filter(this::notDirectory)) {
+                    for (Path child : (Iterable<Path>) children::iterator) {
+                        LOG.debug("Processing file {}.", child);
 
-                String indexType = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ENGLISH);
+                        Path childFilePath = child.getFileName();
+                        if (childFilePath == null) {
+                            throw new IllegalStateException("Path cannot be resolved: " + child);
+                        }
+                        String filename = childFilePath.toString();
 
-                if (filterIndexTypes != null && filterIndexTypes.length != 0) {
-                    // check if indexType matches any of the indexTypes expected to be loaded
-                    boolean found = false;
-                    for (int i = 0; i < filterIndexTypes.length; i++) {
-                        if (filterIndexTypes[i].equalsIgnoreCase(indexType)) {
-                            found = true;
-                            break;
+                        if (!filename.contains(".")) {
+                            continue;
+                        }
+
+                        String indexType = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ENGLISH);
+
+                        if (filterIndexTypes != null && filterIndexTypes.length != 0) {
+                            // check if indexType matches any of the indexTypes expected to be loaded
+                            boolean found = false;
+                            for (int i = 0; i < filterIndexTypes.length; i++) {
+                                if (filterIndexTypes[i].equalsIgnoreCase(indexType)) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            if (!found) {
+                                continue;
+                            }
+                        }
+
+                        Index index = indexTypesMap.get(indexType);
+                        if (index != null) {
+                            try {
+                                Constructor<? extends Index> constructor = index.getClass().getConstructor();
+                                index = constructor.newInstance();
+                            }
+                            catch (InstantiationException | IllegalAccessException | InvocationTargetException
+                                    | NoSuchMethodException e) {
+                                throw new IOException(e);
+                            }
+                            try (InputStream is = LOCAL_FS_CLIENT.newInputStream(child)) {
+                                index.load(is);
+                            }
+                            LOG.debug("Loaded {} index from {}.", index.getId(), child);
+                            if (localTmpDir != null) {
+                                // remove the temp folder path at the beginning
+                                result.put(child.toString().replaceAll(localTmpDir.toString(), ""), index);
+                            }
+                            else {
+                                result.put(child.toString(), index);
+                            }
                         }
                     }
-
-                    if (!found) {
-                        continue;
-                    }
                 }
-
-                Index index = indexTypesMap.get(indexType);
-                if (index != null) {
-                    try {
-                        Constructor<? extends Index> constructor = index.getClass().getConstructor();
-                        index = constructor.newInstance();
-                    }
-                    catch (InstantiationException | IllegalAccessException | InvocationTargetException
-                            | NoSuchMethodException e) {
-                        throw new IOException(e);
-                    }
-                    try (InputStream is = fs.newInputStream(child)) {
-                        index.load(is);
-                    }
-                    LOG.debug("Loaded {} index from {}.", index.getId(), child);
-                    result.put(child.toString(), index);
+                finally {
+                    LOCAL_FS_CLIENT.deleteRecursively(localTmpDir);
                 }
             }
         }

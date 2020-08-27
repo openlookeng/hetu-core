@@ -22,6 +22,8 @@ import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -169,7 +171,7 @@ public class TestHeuristicIndexWriter
             newFiles.forEach(f -> LOG.info(f.toString()));
 
             // should be the minmax index file and lastmodified file
-            assertEquals(newFiles.size(), 2);
+            assertEquals(newFiles.size(), 1);
 
             // all files should be different
             for (Path previousFile : previousFiles) {
@@ -234,8 +236,9 @@ public class TestHeuristicIndexWriter
                     .filter(Files::isRegularFile).collect(Collectors.toSet());
             newFiles.forEach(f -> LOG.info(f.toString()));
 
-            // should be the minmax index file and lastmodified file
-            assertEquals(newFiles.size(), 3);
+            // Expect one tar file, containing two minmax index entries
+            assertEquals(newFiles.size(), 1);
+            assertTarEntry(newFiles.iterator().next(), 2);
 
             // previous files should still be there
             for (Path previousFile : previousFiles) {
@@ -290,7 +293,9 @@ public class TestHeuristicIndexWriter
                     .filter(Files::isRegularFile).collect(Collectors.toSet());
             files.forEach(f -> LOG.info(f.toString()));
 
-            assertEquals(files.size(), 3);
+            // Expect one tar file, containing two minmax index entries
+            assertEquals(files.size(), 1);
+            assertTarEntry(files.iterator().next(), 2);
         }
     }
 
@@ -318,6 +323,20 @@ public class TestHeuristicIndexWriter
             Object[] values = new Object[] {"test", "dsfdfs", "random"};
             callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis());
         }
+    }
+
+    private void assertTarEntry(Path pathToTarFile, int expectedEntryCount)
+            throws IOException
+    {
+        int entryCount = 0;
+        try (TarArchiveInputStream i = new TarArchiveInputStream(Files.newInputStream(pathToTarFile))) {
+            ArchiveEntry entry;
+            while ((entry = i.getNextEntry()) != null) {
+                entryCount++;
+            }
+        }
+
+        assertEquals(entryCount, expectedEntryCount);
     }
 
     class FilesystemAndRoot

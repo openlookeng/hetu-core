@@ -200,7 +200,7 @@ public class IndexCommand
                 LOG.debug("Error occurred, please check the stacktrace for details: ", e);
             }
             else {
-                LOG.info("Error occurred. Enabled -v option for more details. %s", e.getMessage());
+                LOG.info("Error occurred. Enabled -v option for more details. {}", e.getMessage());
             }
         }
 

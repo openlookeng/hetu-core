@@ -36,9 +36,9 @@ import java.util.stream.Stream;
 public class HetuLocalFileSystemClient
         extends AbstractWorkspaceFileSystemClient
 {
-    public HetuLocalFileSystemClient(LocalConfig config, Path root)
+    public HetuLocalFileSystemClient(LocalConfig config, Path allowAccessRoot)
     {
-        super(root);
+        super(allowAccessRoot);
     }
 
     @Override
