@@ -703,6 +703,17 @@
       <version>${dep.jetty.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>1.11</version>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>
