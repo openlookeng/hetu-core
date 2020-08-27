@@ -28,6 +28,8 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Optional;
@@ -50,7 +52,7 @@ import static io.prestosql.utils.StateUtils.removeState;
  */
 public class StateUpdater
 {
-    private static final Logger log = Logger.get(StateUpdater.class);
+    private static final Logger LOG = Logger.get(StateUpdater.class);
 
     private final StateStoreProvider stateStoreProvider;
     private final Duration updateInterval;
@@ -79,7 +81,7 @@ public class StateUpdater
                 updateStates();
             }
             catch (Exception e) {
-                log.error("Error updating query states: " + e.getMessage());
+                LOG.error("Error updating query states: " + e.getMessage());
             }
         }, updateInterval.toMillis(), updateInterval.toMillis(), TimeUnit.MILLISECONDS);
     }
@@ -143,6 +145,11 @@ public class StateUpdater
                 return;
             }
 
+            long start = System.currentTimeMillis();
+            LOG.debug("UpdateStates starts at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
+                    start,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
+
             for (String stateCollectionName : states.keySet()) {
                 StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(stateCollectionName);
                 Set<QueryId> finishedQueries = new HashSet<>();
@@ -155,7 +162,7 @@ public class StateUpdater
                             ((StateMap) stateCollection).put(state.getBasicQueryInfo().getQueryId().getId(), stateJson);
                             break;
                         default:
-                            log.error("Unsupported state collection type: %s", stateCollection.getType());
+                            LOG.error("Unsupported state collection type: %s", stateCollection.getType());
                     }
 
                     if (state.getBasicQueryInfo().getState() == QueryState.FINISHED || state.getBasicQueryInfo().getState() == QueryState.FAILED) {
@@ -166,6 +173,12 @@ public class StateUpdater
                 // No need to update states for finished queries
                 unregisterFinishedQueries(stateCollectionName, finishedQueries);
             }
+
+            long end = System.currentTimeMillis();
+            LOG.debug("updateStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
+                    end,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
+                    end - start);
         }
     }
 
@@ -200,7 +213,7 @@ public class StateUpdater
 
         synchronized (states) {
             StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(stateCollectionName);
-            removeState(stateCollection, Optional.of(query.getBasicQueryInfo().getQueryId()), log);
+            removeState(stateCollection, Optional.of(query.getBasicQueryInfo().getQueryId()), LOG);
             states.remove(stateCollectionName, query);
         }
     }
