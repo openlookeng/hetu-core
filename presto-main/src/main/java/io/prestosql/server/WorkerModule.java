@@ -22,6 +22,8 @@ import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.server.security.NoOpWebUIAuthenticator;
+import io.prestosql.server.security.WebUIAuthenticator;
 import io.prestosql.statestore.NoOpStateStoreLauncher;
 import io.prestosql.statestore.StateStoreLauncher;
 import io.prestosql.transaction.NoOpTransactionManager;
@@ -55,6 +57,8 @@ public class WorkerModule
         }));
 
         binder.bind(StateStoreLauncher.class).to(NoOpStateStoreLauncher.class).in(Scopes.SINGLETON);
+
+        binder.bind(WebUIAuthenticator.class).to(NoOpWebUIAuthenticator.class).in(Scopes.SINGLETON);
     }
 
     @Provides

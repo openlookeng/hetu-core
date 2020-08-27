@@ -771,7 +771,7 @@ public class Query
         return new Column(name, signature.toString(), toClientTypeSignature(signature));
     }
 
-    private static ClientTypeSignature toClientTypeSignature(TypeSignature signature)
+    public static ClientTypeSignature toClientTypeSignature(TypeSignature signature)
     {
         return new ClientTypeSignature(signature.getBase(), signature.getParameters().stream()
                 .map(Query::toClientTypeSignatureParameter)

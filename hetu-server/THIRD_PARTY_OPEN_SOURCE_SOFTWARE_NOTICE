@@ -280,3 +280,32 @@ Copyright notice:
 Those files are obtained from airlift version 200, the author of JsonKeySerde.java is Palo Alto, CA <dain@iq80.com>
 Copyright 2012 Proofpoint, Inc.
 Copyright 2010 Proofpoint, Inc.
+
+
+Software: EvictingDeque.java, ForQueryInfoClient.java, BackgroundCacheLoader.java, ClientSessionFactory.java,
+ ExecutionClient.java, Execution.java, InvalidQueryException.java, QueryClient.java, QueryExecutionAuthorizer.java,
+ QueryInfoClient.java, QueryRunner.java, ColumnCache.java, ColumnCache.java, SchemaCache.java, CSVPersistentOutput.java,
+ PersistentJobOutputFactory.java, PersistentJobOutput.java, CsvOutputBuilder.java, FileTooLargeException.java,
+ JobOutputBuilder.java, OutputBuilderFactory.java, FileTooLargeException.java, JobOutputBuilder.java,
+ OutputBuilderFactory.java, ExecutionStatus.java, ExecutionRequest.java, Job.java, JobState.java, Table.java, UserInfo.java,
+ CreateSavedQueryBuilder.java, SavedQuery.java, UserSavedQuery.java, FilesResource.java, PreviewResponse.java,
+ QueryResource.java, ResultsPreviewResource.java, TablesResource.java, UIExecuteResource.java, UserResource.java,
+ ExpiringFileStore.java, JobHistoryStore.java, LocalJobHistoryStore.java, ActiveJobsStore.java, InMemoryActiveJobsStore.java,
+ InMemoryQueryStore.java, QueryStore.java, alt.js, QueryActions.js, ResultPreviewActions.js, RunActions.js,
+ TabActions.js, TableActions.js, UserActions.js, AllRunningQueries.jsx, Column.jsx, ColumnsPreview.jsx, DataPreview.jsx,
+ Header.jsx, MySavedQueries.jsx, QueryEditor.jsx, QueryInformation.jsx, ResultsTable.jsx, RunsTable.jsx, RunStateConstants.js,
+ TabConstants.js, UpdateWidthMixin.js, QueryStore.js, ResultsPreviewStore.js, RunStore.js, TableStore.js, TabStore.js,
+ UserStore.js, checkresults.js, FluxCollection.js, fqn.js, logError.js, QueryApiUtils.js, ResultsPreviewApiUtils.js,
+ RunApiUtils.js, TableApiUtils.js, UserApiUtils.js, xhr.js
+Licence: Apache License v2.0
+ Please see above.
+Copyright notice:
+ Above files are obtained from airpal project from airbnb and modified as required.
+ Copyright 2013-present, Airbnb, Inc.
+
+Software: InternalPrincipal.java, WebUIAuthenticator.java, NoOpWebUIAuthenticator.java, UiAuthenticator.java,
+ InternalAuthenticationManager.java
+Licence: Apache License v2.0
+ Please see above.
+Copyright notice:
+ Above files (partially/fully) are obtained from presto 334 version. Author - Dain Sundstrom <dain@iq80.com>

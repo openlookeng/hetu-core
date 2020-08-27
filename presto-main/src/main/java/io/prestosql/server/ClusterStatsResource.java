@@ -19,6 +19,7 @@ import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.memory.ClusterMemoryManager;
+import io.prestosql.memory.MemoryInfo;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.NodeState;
 
@@ -64,6 +65,7 @@ public class ClusterStatsResource
                 .filter(node -> node.isCoordinator())
                 .count();
         long totalAvailableProcessors = clusterMemoryManager.getTotalAvailableProcessors();
+        long totalClusterMemory = clusterMemoryManager.getClusterMemoryBytes();
 
         long runningDrivers = 0;
         double memoryReservation = 0;
@@ -71,6 +73,14 @@ public class ClusterStatsResource
         long totalInputRows = dispatchManager.getStats().getConsumedInputRows().getTotalCount();
         long totalInputBytes = dispatchManager.getStats().getConsumedInputBytes().getTotalCount();
         long totalCpuTimeSecs = dispatchManager.getStats().getConsumedCpuTimeSecs().getTotalCount();
+        double avgProcessCpuLoad = clusterMemoryManager.getWorkerMemoryInfo().entrySet().stream()
+                .map(entry -> entry.getValue().map(MemoryInfo::getProcessCpuLoad))
+                .mapToDouble(d -> d.orElse(0.0))
+                .average().getAsDouble();
+        double avgSystemCpuLoad = clusterMemoryManager.getWorkerMemoryInfo().entrySet().stream()
+                .map(entry -> entry.getValue().map(MemoryInfo::getSystemCpuLoad))
+                .mapToDouble(d -> d.orElse(0.0))
+                .average().getAsDouble();
 
         for (BasicQueryInfo query : dispatchManager.getQueries()) {
             if (query.getState() == QueryState.QUEUED) {
@@ -104,9 +114,12 @@ public class ClusterStatsResource
                 runningDrivers,
                 totalAvailableProcessors,
                 memoryReservation,
+                totalClusterMemory,
                 totalInputRows,
                 totalInputBytes,
-                totalCpuTimeSecs);
+                totalCpuTimeSecs,
+                avgProcessCpuLoad,
+                avgSystemCpuLoad);
     }
 
     @GET
@@ -140,10 +153,13 @@ public class ClusterStatsResource
         private final long totalAvailableProcessors;
 
         private final double reservedMemory;
+        private final long totalMemory;
 
         private final long totalInputRows;
         private final long totalInputBytes;
         private final long totalCpuTimeSecs;
+        private final double processCpuLoad;
+        private final double systemCpuLoad;
 
         @JsonCreator
         public ClusterStats(
@@ -155,9 +171,12 @@ public class ClusterStatsResource
                 @JsonProperty("runningDrivers") long runningDrivers,
                 @JsonProperty("totalAvailableProcessors") long totalAvailableProcessors,
                 @JsonProperty("reservedMemory") double reservedMemory,
+                @JsonProperty("totalMemory") long totalMemory,
                 @JsonProperty("totalInputRows") long totalInputRows,
                 @JsonProperty("totalInputBytes") long totalInputBytes,
-                @JsonProperty("totalCpuTimeSecs") long totalCpuTimeSecs)
+                @JsonProperty("totalCpuTimeSecs") long totalCpuTimeSecs,
+                @JsonProperty("processCpuLoad") double processCpuLoad,
+                @JsonProperty("systemCpuLoad") double systemCpuLoad)
         {
             this.runningQueries = runningQueries;
             this.blockedQueries = blockedQueries;
@@ -167,9 +186,12 @@ public class ClusterStatsResource
             this.runningDrivers = runningDrivers;
             this.totalAvailableProcessors = totalAvailableProcessors;
             this.reservedMemory = reservedMemory;
+            this.totalMemory = totalMemory;
             this.totalInputRows = totalInputRows;
             this.totalInputBytes = totalInputBytes;
             this.totalCpuTimeSecs = totalCpuTimeSecs;
+            this.processCpuLoad = processCpuLoad;
+            this.systemCpuLoad = systemCpuLoad;
         }
 
         @JsonProperty
@@ -221,6 +243,12 @@ public class ClusterStatsResource
         }
 
         @JsonProperty
+        public long getTotalMemory()
+        {
+            return totalMemory;
+        }
+
+        @JsonProperty
         public long getTotalInputRows()
         {
             return totalInputRows;
@@ -236,6 +264,18 @@ public class ClusterStatsResource
         public long getTotalCpuTimeSecs()
         {
             return totalCpuTimeSecs;
+        }
+
+        @JsonProperty
+        public double getProcessCpuLoad()
+        {
+            return processCpuLoad;
+        }
+
+        @JsonProperty
+        public double getSystemCpuLoad()
+        {
+            return systemCpuLoad;
         }
     }
 }

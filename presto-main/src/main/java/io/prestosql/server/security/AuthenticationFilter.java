@@ -15,6 +15,9 @@ package io.prestosql.server.security;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.queryeditorui.security.UiAuthenticator;
+import io.prestosql.server.InternalAuthenticationManager;
+import io.prestosql.spi.security.BasicPrincipal;
 
 import javax.inject.Inject;
 import javax.servlet.Filter;
@@ -29,9 +32,11 @@ import javax.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.security.Principal;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.io.ByteStreams.copy;
@@ -44,11 +49,15 @@ public class AuthenticationFilter
         implements Filter
 {
     private final List<Authenticator> authenticators;
+    private final InternalAuthenticationManager internalAuthenticationManager;
+    private final WebUIAuthenticator uiAuthenticator;
 
     @Inject
-    public AuthenticationFilter(List<Authenticator> authenticators)
+    public AuthenticationFilter(List<Authenticator> authenticators, InternalAuthenticationManager internalAuthenticationManager, WebUIAuthenticator uiAuthenticator)
     {
         this.authenticators = ImmutableList.copyOf(authenticators);
+        this.internalAuthenticationManager = requireNonNull(internalAuthenticationManager, "internalAuthenticationManager is null");
+        this.uiAuthenticator = uiAuthenticator;
     }
 
     @Override
@@ -64,12 +73,40 @@ public class AuthenticationFilter
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         HttpServletResponse response = (HttpServletResponse) servletResponse;
 
+        if (internalAuthenticationManager.isInternalRequest(request)) {
+            Principal principal = internalAuthenticationManager.authenticateInternalRequest(request);
+            if (principal == null) {
+                response.sendError(SC_UNAUTHORIZED);
+                return;
+            }
+            nextFilter.doFilter(withPrincipal(request, principal), response);
+            return;
+        }
+
         // skip authentication if non-secure or not configured
         if (!request.isSecure() || authenticators.isEmpty()) {
             nextFilter.doFilter(request, response);
             return;
         }
 
+        if (isWebUi(request)) {
+            Optional<String> authenticatedUser = uiAuthenticator.getAuthenticatedUsername(request);
+            if (authenticatedUser.isPresent()) {
+                // if the authenticated user is requesting the login page, send them directly to the ui
+                if (request.getPathInfo().equals(UiAuthenticator.LOGIN_FORM)) {
+                    response.sendRedirect(UiAuthenticator.UI_LOCATION);
+                    return;
+                }
+                // authentication succeeded
+                nextFilter.doFilter(withPrincipal(request, new BasicPrincipal(authenticatedUser.get())), response);
+                return;
+            }
+        }
+        // skip authentication for login/logout page
+        if (isSkipAuth(request)) {
+            nextFilter.doFilter(request, response);
+            return;
+        }
         // try to authenticate, collecting errors and authentication headers
         Set<String> messages = new LinkedHashSet<>();
         Set<String> authenticateHeaders = new LinkedHashSet<>();
@@ -95,14 +132,43 @@ public class AuthenticationFilter
         // authentication failed
         skipRequestBody(request);
 
-        for (String value : authenticateHeaders) {
-            response.addHeader(WWW_AUTHENTICATE, value);
+        // skip authentication if non-secure or not configured
+        if (isWebUi(request)) {
+            URI redirectUri = UiAuthenticator.buildLoginFormURI(URI.create(request.getRequestURI()));
+            response.sendRedirect(redirectUri.toString());
+            return;
+        }
+        else {
+            for (String value : authenticateHeaders) {
+                response.addHeader(WWW_AUTHENTICATE, value);
+            }
         }
 
         if (messages.isEmpty()) {
             messages.add("Unauthorized");
         }
         response.sendError(SC_UNAUTHORIZED, Joiner.on(" | ").join(messages));
+    }
+
+    public static boolean isWebUi(HttpServletRequest request)
+    {
+        String pathInfo = request.getPathInfo();
+        String referer = request.getHeader("referer");
+        boolean isWebUi = pathInfo.equals("/") ||
+                pathInfo.equals("/ui") ||
+                pathInfo.matches("/ui/.*") ||
+                referer != null && referer.matches(".*/ui/.*");
+        return isWebUi;
+    }
+
+    private boolean isSkipAuth(HttpServletRequest request)
+    {
+        String pathInfo = request.getPathInfo();
+        return pathInfo.matches("/ui/login.html.*") ||
+                pathInfo.matches("/ui/assets/.*") ||
+                pathInfo.matches("/ui/vendor/.*") ||
+                pathInfo.matches("/ui/api/login.*") && request.getMethod().equals("POST") ||
+                pathInfo.matches("/ui/api/logout.*") && request.getMethod().equals("POST");
     }
 
     private static ServletRequest withPrincipal(HttpServletRequest request, Principal principal)

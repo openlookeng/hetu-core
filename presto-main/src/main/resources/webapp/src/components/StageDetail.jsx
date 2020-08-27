@@ -669,7 +669,7 @@ export class StageDetail extends React.Component {
                             <div className="col-xs-8"/>
                             <div className="col-xs-2 stage-dropdown">
                                 <div className="input-group-btn">
-                                    <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <button type="button" className="btn btn-default dropdown-toggle selectStage" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         Select Stage <span className="caret"/>
                                     </button>
                                     <ul className="dropdown-menu">

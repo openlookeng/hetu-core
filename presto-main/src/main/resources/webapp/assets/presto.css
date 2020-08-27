@@ -16,28 +16,27 @@
 /** ======================== **/
 
 body {
-    padding-top: 20px;
-    padding-bottom: 20px;
+    background: #f1f1f1;
 }
 
 h2 {
-    color: #fff;
+    color: #000;
 }
 
 h3 {
-    color: #dadada;
+    color: #000;
 }
 
 h1 small, h2 small, h3 small, h4 small, h5 small, h6 small {
-    color: #888;
+    color: #000;
 }
 
 pre {
     margin: 0;
     padding: 5px;
-    color: #999;
-    background-color: #2C2F38;
-    border: none;
+    color: #000;
+    background-color: #f7f5f5;
+
 }
 
 /** Boostrap overrides **/
@@ -45,8 +44,14 @@ pre {
 
 .container {
     min-width: 960px;
-    width: auto !important;
+    width: 1200px !important;
     max-width: 1200px;
+    color: #000;
+    background: #e6e6e6;
+}
+
+.glyphicon {
+    color: #0e5201;
 }
 
 .modal-lg {
@@ -58,7 +63,6 @@ pre {
 .modal-content {
     border: 1px solid #333;
     background-color: rgba(0, 0, 0, 0.85);
-    padding-bottom: 20px;
 }
 
 .modal-header {
@@ -68,7 +72,7 @@ pre {
 
 .modal-header .close {
     text-shadow: none;
-    color: #fff;
+    color: #000;
     font-size: 36px;
     opacity: 0.5;
     margin-right: -8px;
@@ -81,7 +85,14 @@ pre {
 
 /* To make the table striping less stark */
 .table-striped > tbody > tr:nth-of-type(odd) {
-    background-color: #353944;
+    background-color: #F7F5F5;
+}
+.selectStage {
+    background-color:#F7F5F5;
+}
+.btn:focus, .btn:active:focus, .btn.active:focus, .btn.focus, .btn:active.focus, .btn.active.focus {
+    outline: thin dotted;
+    outline: 0px auto -webkit-focus-ring-color;
 }
 
 .table > tbody > tr {
@@ -110,8 +121,8 @@ pre {
 
 .dropdown-menu > li > .selected {
     font-weight: 500;
-    color: #fff;
-    background-color: #6d6d6d;
+    color: #424242;
+    background-color: #ddd;
 }
 
 .dropdown-menu > li > .selected:hover {
@@ -127,11 +138,11 @@ pre {
 }
 
 .font-white {
-    color: #fff;
+    color: #000;
 }
 
 .font-light {
-    color: #d6f3fb;
+    color: #092ff1;
 }
 
 .italic-uppercase {
@@ -150,7 +161,7 @@ pre {
 
 .h3-hr {
     margin: 0;
-    border-top-color: #dedede;
+    border-top-color: #000;
 }
 
 .h4-hr {
@@ -170,7 +181,7 @@ pre {
 }
 
 .navbar-brand {
-    color: #fff;
+    color: #000;
     text-transform: uppercase;
     font-size: 24px;
     padding-left: 30px;
@@ -178,9 +189,9 @@ pre {
 }
 
 .navbar img {
-    width: 40px;
+    width: 150px;
     height: auto;
-    padding-top: 17px;
+    padding-top: 30px;
 }
 
 .navbar-cluster-info {
@@ -188,12 +199,12 @@ pre {
     box-sizing: border-box;
     padding: 15px;
     position: relative;
-    color: #666;
+    color: #000;
     font-size: 11px;
 }
 
 .navbar-cluster-info .text {
-    color: #fff;
+    color: #000;
     font-size: 16px;
 }
 
@@ -265,6 +276,18 @@ pre {
     margin-top: 20px;
 }
 
+.header-inline-links tbody td button {
+    background: #e6e6e6;
+    border-color: #000;
+    color: #000;
+}
+
+.header-inline-links tbody td button:hover {
+    background: #e6e6e6;
+    border-color: #000;
+    color: #000;
+}
+
 /** ===================== **/
 /** Cluster Overview Page **/
 /** ===================== **/
@@ -278,6 +301,7 @@ pre {
     margin: -15px 0 0 0;
     padding: 15px 0 0 0;
     height: 375px;
+    background-color: #000;
 }
 
 .stat-line-end {
@@ -313,8 +337,8 @@ pre {
 
 .stat-title > .text {
     padding: 5px;
-    background-color: #3e3e3e;
-    color: #ccc;
+    background-color: #333333;
+    color: #fff;
 }
 
 .sparkline {
@@ -345,18 +369,11 @@ pre {
 
 #query-list-title {
     font-size: 22px;
-    background-color: #696E77;
+    background-color: #fff;
     padding: 3px 3px 3px 7px;
     text-transform: uppercase;
-    color: #fff;
-    border-top: 1px solid #9DA4AF;
-}
-
-#query-list {
-    padding: 5px 0 0 15px;
-    border-bottom: 1px #424242 solid;
-    border-left: 1px #424242 solid;
-    border-right: 1px #424242 solid;
+    color: #000;
+    border: 1px solid #cccccc;
 }
 
 .error-message {
@@ -367,8 +384,8 @@ pre {
 .query {
     border-bottom: 1px #424242 solid;
     margin-bottom: 0px;
-    margin-left: -15px;
-    padding-left: 15px;
+    margin-right: 15px;
+    padding-top: 5px;
 }
 
 .query-snippet {
@@ -389,6 +406,7 @@ pre {
 .progress-bar {
     padding: 4px;
     min-width: 14%;
+    color: #fff;
 }
 
 .tinystat-row {
@@ -405,8 +423,7 @@ pre {
 }
 
 .query-header {
-    padding: 4px 0 4px 0;
-    background-color: #1b1b1b;
+    background-color: #cccccc;
     margin: 0;
 }
 
@@ -415,14 +432,20 @@ pre {
     margin-right: -35px;
     padding: 8px 0 8px 0;
 }
-
+.query-header div a {
+    color: #162fea;
+}
 .query-header-timestamp {
     text-align: right;
-    color: #b1b1b1;
+    color: #000;
 }
 
 .query-progress-container {
     padding: 0;
+}
+
+.reactable-data > tr >td > a {
+    color: #092ff1;
 }
 
 /** Query List Toolbar **/
@@ -433,9 +456,10 @@ pre {
 }
 
 .toolbar-col {
-    background-color: #454a58;
-    margin-top: -5px;
+    background-color: #e6e6e6;
+    margin-top: 5px;
     padding: 5px;
+    border-bottom: 1px solid #222;
 }
 
 .toolbar-row .form-control {
@@ -444,19 +468,40 @@ pre {
 
 .toolbar-row .input-group-btn .btn:focus {
     outline: none;
-    background-color: #5bc0de;
-    border: 1px #529eb5 solid;
+    border: 1px #000 solid;
+    color: #000;
+}
+
+.toolbar-row .input-group-btn .btn:hover {
+    color: #000;
 }
 
 .toolbar-row .input-group-btn .active:focus {
     outline: none;
-    background-color: #277F98;
-    border: 1px #529eb5 solid;
 }
 
 .toolbar-row .input-group-btn .active {
-    background-color: #277F98;
-    border: 1px #529eb5 solid;
+    background-color: #dddddd;
+    border: 1px #141313 solid;
+    font-weight: 100;
+    box-shadow: none;
+}
+
+.toolbar-row .input-group-btn .active .glyphicon {
+    color: #0b6b11 !important;
+    border: 1px solid #555555;
+}
+
+.toolbar-row .input-group-btn button {
+    color: #000;
+    background-color: #e6e6e6;
+    border: 1px solid #000;
+    font-weight: 100;
+}
+
+.toolbar-row .input-group-btn button .glyphicon {
+    border: 1px solid #000;
+    color: #e6e6e6 !important;
 }
 
 .style-radio {
@@ -468,25 +513,24 @@ pre {
 
 .filter-addon {
     color: #000;
-    background-color: #fff;
+    background-color: #e6e6e6;
     border: none;
-    border-top: 2px solid #454A58;
-    border-bottom: 3px solid #454A58;
 }
 
 .toolbar-row .input-group .form-control {
     margin-top: 2px;
     margin-bottom: -2px;
     width: 98%;
+    border: 1px solid #000;
 }
 
 .toolbar-row .dropdown-menu li a {
-    color: #424242;
+    color: #000;
 }
 
 .toolbar-row .dropdown-menu li .selected {
-    background-color: #418194;
-    color: #fff;
+    background-color: #ddd;
+    color: #000;
     font-weight: 500;
 }
 
@@ -497,9 +541,8 @@ pre {
     font-size: 12px;
     line-height: 1.5;
     position: relative;
-    color: #fff;
-    background-color: #4ba1bb;
-    border-color: #46b8da;
+    color: #000;
+    font-weight: 100;
 }
 
 .error-type-dropdown-menu {
@@ -523,8 +566,13 @@ pre {
 /** ================== **/
 
 #query-detail {
-    color: #cecece;
+    color: #000;
     font-size: 16px;
+    margin-top: 30px;
+    z-index: -1;
+}
+#live-plan-container, #stage-performance-header {
+    margin-top: 30px;
 }
 
 #tasks {
@@ -534,6 +582,8 @@ pre {
 #query-detail pre {
     margin-top: 5px;
     border: 1px #3a3a3a solid;
+    background: #F7F5F5;
+    color: #000;
 }
 
 /** Summary Section **/
@@ -546,11 +596,11 @@ pre {
 }
 
 .info-text {
-    color: #fff;
+    color: #000;
 }
 
 .table > tbody > tr > .info-sparkline-text {
-    color: #fff;
+    color: #000;
     border-top: none;
     text-align: right;
     padding-top: 0;
@@ -584,13 +634,15 @@ pre {
     margin-left: -8px;
     padding-left: 8px;
 }
-
+.table .single-stage-table {
+    background: #F7F5F5;
+}
 .single-stage-table > tbody > tr > td {
     border-top: none;
 }
 
 .stage-table .stage-table-stat-header {
-    color: #fff;
+    color: #000;
 }
 
 .stage-table {
@@ -612,7 +664,7 @@ pre {
 }
 
 .stage-table .stage-table-chart-header {
-    color: #fff;
+    color: #000;
     text-align: center;
 }
 
@@ -630,7 +682,7 @@ pre {
     text-align: right;
     text-transform: uppercase;
     font-style: italic;
-    color: #757575;
+    color: #000;
     width: 80px;
 }
 
@@ -647,7 +699,7 @@ pre {
 }
 
 .histogram-container {
-    padding-top: 10px;
+    padding-top: 1px;
 }
 
 .table > tbody > tr > td .expand-charts-container {
@@ -655,8 +707,8 @@ pre {
 }
 
 .expand-charts-button {
-    padding: 45px 3px 45px 4px;
-    background-color: #3A3F4C;
+    padding: 51px 3px 43px 4px;
+    background-color: #ddd;
 }
 
 .expanded-chart-title {
@@ -674,15 +726,16 @@ pre {
 
 .graph-container {
     padding: 15px;
-    background-color: #1b1b1b;
     height: 1000px;
     overflow: scroll;
     width: 100%;
+    color: #000;
 }
 
 .graph-container svg {
     display: block;
     margin: 0 auto;
+    background-color: #e6e6e6;
 }
 
 .graph-container .label {
@@ -720,7 +773,7 @@ pre {
 }
 
 .clusters rect {
-    fill: #e0e0e0;
+    fill: #2b2b2b;
 }
 
 .node .stage-stats rect {
@@ -730,6 +783,27 @@ pre {
 
 .node rect {
     fill: #404040;
+    width: 256px;
+    x: -125px;
+}
+.stage-stats .label g {
+    transform: translate(-124,-113);
+    -ms-transform: translate(-124,-113); 	/* IE 9 */
+    -moz-transform: translate(-124,-113); 	/* Firefox */
+    -webkit-transform: translate(-124,-113); /* Safari 和 Chrome */
+    -o-transform: translate(-124,-113); 	/* Opera */
+}
+.stage-stats .label g foreignObject{
+    width: 252px;
+    height: 243px;
+    font-size: 18px;
+}
+
+.stage-stats .label g foreignObject div h3 {
+    margin-top: 0px;
+    font-size: 30px;
+    padding-bottom: 5px;
+    background: #fff;
 }
 
 text {
@@ -749,6 +823,10 @@ text {
 
 g .cluster:hover {
     cursor: pointer;
+}
+
+#plan-canvas .edgeLabel foreignObject div{
+    color: #000 !important
 }
 
 /** ============== **/
@@ -815,4 +893,20 @@ g .operator-stats:hover {
 
 .stack-traces {
     font-size: 11px;
+}
+
+.queryListContainer {
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+}
+
+.queryListContainer .query .row {
+    width: 100%;
+    margin-left: 0px;
+    margin-right: 0px;
+}
+
+.queryListContainer .query .row .col-xs-12{
+    padding-left: 0px;
+    padding-right: 0px;
 }
