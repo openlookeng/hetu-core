@@ -2,7 +2,7 @@
 
 # 系统访问控制
 
-openLooKeng 将向协调节点进行身份验证的主体的概念与负责运行查询的用户名分开。
+openLooKeng 将向协调节点进行身份验证的主体与负责运行查询的用户名的概念区分开。
 
 例如，在运行 openLooKeng CLI 时，可以使用 `--user` 选项来指定 openLooKeng 用户名。
 

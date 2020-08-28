@@ -6,7 +6,7 @@ ORC Cache功能可以通过缓存频繁访问的数据来提高查询性能。OR
 
 单击该[链接](https://orc.apache.org/specification/ORCv1/)以了解ORC规范。
 
-可以使用`CACHE TABLE` SQL命令来配置工作节点应为其缓存行数据的表和分区。
+可以使用`CACHE TABLE` SQL命令来配置工作节点缓存行数据的表和分区。
 
 以下各节简要说明了整个行数据缓存实现的工作方式。
 
