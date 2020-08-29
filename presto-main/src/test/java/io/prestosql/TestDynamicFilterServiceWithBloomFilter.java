@@ -96,6 +96,11 @@ public class TestDynamicFilterServiceWithBloomFilter
                 ImmutableMap.of(new Symbol("name"), mockColumnHandle));
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set when dynamic filters are not available");
 
+        // register dynamic filter
+        for (int i = 1; i <= 4; i++) {
+            mockDynamicFilterRegister(filterId, session.getQueryId().toString(), "d" + i);
+        }
+
         mockDynamicFilterSourceOperator("w1", "d1", filterId, session.getQueryId().toString(), Arrays.asList("1", "2"));
         mockDynamicFilterSourceOperator("w1", "d2", filterId, session.getQueryId().toString(), Arrays.asList("3", "4"));
         mockDynamicFilterSourceOperator("w2", "d3", filterId, session.getQueryId().toString(), Arrays.asList("5", "6"));
@@ -164,8 +169,6 @@ public class TestDynamicFilterServiceWithBloomFilter
 
     private void mockDynamicFilterSourceOperator(String workerId, String driverId, String filterId, String queryId, List<String> values)
     {
-        ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId))).add(driverId);
-
         BloomFilter bloomFilter = new BloomFilter(1024 * 1024, 0.1);
         for (String val : values) {
             bloomFilter.add(val.getBytes());
@@ -183,5 +186,10 @@ public class TestDynamicFilterServiceWithBloomFilter
         catch (IOException e) {
             Assert.fail("could not register finish filter, Exception happened:" + e.getMessage());
         }
+    }
+
+    private void mockDynamicFilterRegister(String filterId, String queryId, String driverId)
+    {
+        ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId))).add(driverId);
     }
 }
