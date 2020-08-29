@@ -18,6 +18,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.checkpoint.InvalidCheckpointException;
@@ -78,6 +80,8 @@ import static java.util.Objects.requireNonNull;
 
 public class StripeReader
 {
+    private static final Logger log = Logger.get(StripeReader.class);
+
     private final OrcDataSource orcDataSource;
     private final ZoneId storageTimeZone;
     private final Optional<OrcDecompressor> decompressor;
@@ -131,8 +135,9 @@ public class StripeReader
             try {
                 stripeFooter = orcCacheStore.getStripeFooterCache().get(cacheKey, () -> this.readStripeFooter(stripe, systemMemoryUsage));
             }
-            catch (ExecutionException e) {
-                throw new IOException(e.getCause());
+            catch (UncheckedExecutionException | ExecutionException executionException) {
+                log.warn(executionException.getCause(), "Error while caching ORC stripe footer");
+                stripeFooter = readStripeFooter(stripe, systemMemoryUsage);
             }
         }
         else {
@@ -230,8 +235,9 @@ public class StripeReader
                     try {
                         rowGroupIndexes = orcCacheStore.getRowIndexCache().get(indexCacheKey, () -> metadataReader.readRowIndexes(hiveWriterVersion, new OrcInputStream(streamsData.get(entry.getKey()))));
                     }
-                    catch (ExecutionException e) {
-                        throw new IOException(e.getCause());
+                    catch (UncheckedExecutionException | ExecutionException executionException) {
+                        log.warn(executionException.getCause(), "Error while caching row group indexes. Falling back to default flow");
+                        rowGroupIndexes = metadataReader.readRowIndexes(hiveWriterVersion, new OrcInputStream(streamsData.get(entry.getKey())));
                     }
                 }
                 else {
@@ -441,8 +447,9 @@ public class StripeReader
                     try {
                         bloomFilters.put(stream.getColumnId(), orcCacheStore.getBloomFiltersCache().get(bloomFilterCacheKey, () -> metadataReader.readBloomFilterIndexes(inputStream)));
                     }
-                    catch (ExecutionException e) {
-                        throw new IOException(e.getCause());
+                    catch (UncheckedExecutionException | ExecutionException executionException) {
+                        log.warn(executionException.getCause(), "Error while caching bloom filters. Falling back to default flow");
+                        bloomFilters.put(stream.getColumnId(), metadataReader.readBloomFilterIndexes(inputStream));
                     }
                 }
                 else {
@@ -462,8 +469,9 @@ public class StripeReader
                     try {
                         bloomFilters.put(entry.getKey().getColumnId(), orcCacheStore.getBloomFiltersCache().get(bloomFilterCacheKey, () -> metadataReader.readBloomFilterIndexes(inputStream)));
                     }
-                    catch (ExecutionException e) {
-                        throw new IOException(e.getCause());
+                    catch (UncheckedExecutionException | ExecutionException executionException) {
+                        log.warn(executionException.getCause(), "Error while caching bloom filters. Falling back to default flow");
+                        bloomFilters.put(entry.getKey().getColumnId(), metadataReader.readBloomFilterIndexes(inputStream));
                     }
                 }
                 else {
@@ -492,8 +500,9 @@ public class StripeReader
                     try {
                         rowGroupIndexes = orcCacheStore.getRowIndexCache().get(indexCacheKey, () -> metadataReader.readRowIndexes(hiveWriterVersion, inputStream));
                     }
-                    catch (ExecutionException e) {
-                        throw new IOException(e.getCause());
+                    catch (UncheckedExecutionException | ExecutionException executionException) {
+                        log.warn(executionException.getCause(), "Error while caching row group indexes. Falling back to default flow");
+                        rowGroupIndexes = metadataReader.readRowIndexes(hiveWriterVersion, inputStream);
                     }
                 }
                 else {
