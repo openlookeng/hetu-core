@@ -13,8 +13,8 @@
  */
 package io.hetu.core.transport.execution.buffer;
 
-import io.airlift.compress.lz4.Lz4Compressor;
-import io.airlift.compress.lz4.Lz4Decompressor;
+import io.airlift.compress.zstd.ZstdCompressor;
+import io.airlift.compress.zstd.ZstdDecompressor;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.spiller.SpillCipher;
 
@@ -46,7 +46,7 @@ public class PagesSerdeFactory
     private PagesSerde createPagesSerdeInternal(Optional<SpillCipher> spillCipher)
     {
         if (compressionEnabled) {
-            return new PagesSerde(blockEncodingSerde, Optional.of(new Lz4Compressor()), Optional.of(new Lz4Decompressor()), spillCipher);
+            return new PagesSerde(blockEncodingSerde, Optional.of(new ZstdCompressor()), Optional.of(new ZstdDecompressor()), spillCipher);
         }
 
         return new PagesSerde(blockEncodingSerde, Optional.empty(), Optional.empty(), spillCipher);

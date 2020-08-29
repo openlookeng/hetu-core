@@ -50,7 +50,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
@@ -87,7 +86,6 @@ public class PagePublisherQueryRunner
     private final AtomicBoolean finishedExecuting = new AtomicBoolean(false);
     private final AtomicBoolean finishedPublishing = new AtomicBoolean(false);
     private final AtomicBoolean error = new AtomicBoolean(false);
-    private final AtomicReference<DataCenterQueryResults> failedResult = new AtomicReference<>();
     private final List<PageConsumer> consumersList = new CopyOnWriteArrayList<>();
     private Query query;
 
@@ -132,6 +130,7 @@ public class PagePublisherQueryRunner
         this.queryResults = new LinkedBlockingQueue<>(maxSubscribersLimit);
         this.consumers = new HashMap<>(maxSubscribersLimit);
         this.stateStoreProvider = stateStoreProvider;
+        this.executor.execute(this::start);
     }
 
     public String getSlug()
@@ -177,29 +176,33 @@ public class PagePublisherQueryRunner
         return queryId;
     }
 
-    public void start()
+    public synchronized void start()
     {
         if (this.query == null) {
             // Not dispatched yet
-            synchronized (this) {
-                if (this.query == null) {
-                    try {
-                        waitForDispatched(this.queryId, slug, this.sessionContext, this.statement);
-                        this.query = getQuery(this.queryId, slug);
-                        ResultsProducer fetcher = new ResultsProducer(this.queryManager, this.query, this.queryResults, this.running, this.started, this.finishedExecuting, this.error, this.failedResult, this.wait, this.targetResultSize);
-                        ResultsPublisher publisher = new ResultsPublisher(this.query, this.queryResults, this.running, this.finishedExecuting, this.finishedPublishing, this.error, this.failedResult, this.consumersList);
-                        this.executor.execute(fetcher);
-                        this.executor.execute(publisher);
-                    }
-                    catch (Throwable t) {
-                        this.stop();
-                    }
-                }
+            try {
+                waitForDispatched(this.queryId, slug, this.sessionContext, this.statement);
+                this.query = getQuery(this.queryId, slug);
+                ResultsProducer fetcher = new ResultsProducer(this.queryManager,
+                        this.query,
+                        this.consumersList,
+                        this.queryResults,
+                        this.running,
+                        this.started,
+                        this.finishedExecuting,
+                        this.finishedPublishing,
+                        this.error,
+                        this.wait,
+                        this.targetResultSize);
+                this.executor.execute(fetcher);
+            }
+            catch (Throwable t) {
+                this.stop();
             }
         }
     }
 
-    private synchronized Query getQuery(QueryId queryId, String slug)
+    private Query getQuery(QueryId queryId, String slug)
     {
         // this is the first time the query has been accessed on this coordinator
         Session session;
@@ -259,8 +262,8 @@ public class PagePublisherQueryRunner
         if (!this.globalQueryId.equals(queryId)) {
             throw new IllegalArgumentException("queryId does not match with the expected queryId:" + this.globalQueryId);
         }
-        if (!this.started.get() && this.running.get()) {
-            // Cannot register after the query has started
+
+        if (this.running.get()) {
             synchronized (this) {
                 if (!this.consumers.containsKey(clientId)) {
                     PageConsumer consumer = new PageConsumer(RUNNING_RESULTS, FINISHED_RESULTS, FAILED_RESULTS, this.pageConsumerTimeout);
@@ -271,29 +274,29 @@ public class PagePublisherQueryRunner
         }
     }
 
-    public synchronized PageConsumer getConsumer(String clientId)
+    public PageConsumer getConsumer(String clientId)
     {
         return this.consumers.get(clientId);
     }
 
-    public synchronized void add(String clientId, PageSubscriber subscriber)
+    public void add(String clientId, PageSubscriber subscriber)
     {
-        // if this query already failed, then return failed result.
         if (this.error.get()) {
             subscriber.send(this.query, FAILED_RESULTS);
+            return;
+        }
+
+        PageConsumer consumer = this.consumers.get(clientId);
+        if (consumer != null) {
+            consumer.add(this.query, subscriber, this.queryResults);
+
+            if (this.finishedPublishing.get() && this.queryResults.isEmpty()) {
+                consumer.setState(this.query, PageConsumer.State.FINISHED);
+            }
         }
         else {
-            PageConsumer consumer = this.consumers.get(clientId);
-            if (consumer != null) {
-                if (this.query == null) {
-                    this.executor.execute(this::start);
-                }
-                consumer.add(subscriber);
-            }
-            else {
-                // let client to close this split
-                subscriber.send(this.query, FINISHED_RESULTS);
-            }
+            // let client to close this split
+            subscriber.send(this.query, FINISHED_RESULTS);
         }
     }
 
@@ -303,37 +306,69 @@ public class PagePublisherQueryRunner
         private final Query query;
         private final QueryId queryId;
         private final QueryManager queryManager;
+        private final List<PageConsumer> consumers;
         private final BlockingQueue<DataCenterQueryResults> resultsQueue;
         private final AtomicBoolean running;
         private final AtomicBoolean started;
         private final AtomicBoolean finishedExecuting;
+        private final AtomicBoolean finishedPublishing;
         private final AtomicBoolean error;
-        private final AtomicReference<DataCenterQueryResults> failedResult;
         private final Duration wait;
         private final DataSize targetResultSize;
 
         public ResultsProducer(QueryManager queryManager,
                 Query query,
+                List<PageConsumer> consumers,
                 BlockingQueue<DataCenterQueryResults> resultsQueue,
                 AtomicBoolean running,
                 AtomicBoolean started,
                 AtomicBoolean finishedExecuting,
+                AtomicBoolean finishedPublishing,
                 AtomicBoolean error,
-                AtomicReference<DataCenterQueryResults> failedResult,
                 Duration wait,
                 DataSize targetResultSize)
         {
             this.query = query;
             this.queryId = query.getQueryId();
             this.resultsQueue = resultsQueue;
+            this.consumers = consumers;
             this.queryManager = queryManager;
             this.running = running;
             this.started = started;
             this.finishedExecuting = finishedExecuting;
+            this.finishedPublishing = finishedPublishing;
             this.error = error;
-            this.failedResult = failedResult;
             this.wait = wait;
             this.targetResultSize = targetResultSize;
+        }
+
+        private void error()
+        {
+            this.error.set(true);
+            for (PageConsumer consumer : this.consumers) {
+                consumer.setState(this.query, PageConsumer.State.ERROR);
+            }
+        }
+
+        private void finished()
+        {
+            this.finishedExecuting.set(true);
+
+            // wait for result queue is empty
+            while (this.running.get() && !this.resultsQueue.isEmpty()) {
+                try {
+                    Thread.sleep(1);
+                }
+                catch (InterruptedException ignore) {
+                    // ignore this exception and continue to wait
+                }
+            }
+
+            // No results to send and query finished
+            for (PageConsumer consumer : this.consumers) {
+                consumer.setState(this.query, PageConsumer.State.FINISHED);
+            }
+            this.finishedPublishing.set(true);
         }
 
         @Override
@@ -349,14 +384,11 @@ public class PagePublisherQueryRunner
                     results = queryResultsFuture.get();
                 }
                 catch (InterruptedException | ExecutionException e) {
-                    this.failedResult.set(new DataCenterQueryResults("", URI.create(""), null, null, null, null,
-                            new StatementStats("FAILED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
-                            Collections.emptyList(), null, true));
-                    this.error.set(true);
+                    error();
                     return;
                 }
-                if (results == null || !this.running.get()) {
-                    this.finishedExecuting.set(true);
+                if (results == null) {
+                    finished();
                     return;
                 }
 
@@ -365,8 +397,7 @@ public class PagePublisherQueryRunner
 
                 // If query is failed, broadcast and stop the query runner
                 if ("FAILED".equals(results.getStats().getState())) {
-                    this.failedResult.set(results);
-                    this.error.set(true);
+                    error();
                     return;
                 }
                 // If query is successful and has valid data, add query results to queue so that
@@ -394,94 +425,9 @@ public class PagePublisherQueryRunner
                     lastToken = Long.parseLong(nextToken.toString());
                 }
                 else {
-                    this.finishedExecuting.set(true);
+                    finished();
                     return;
                 }
-            }
-        }
-    }
-
-    public static class ResultsPublisher
-            implements Runnable
-    {
-        private final Query query;
-        private final BlockingQueue<DataCenterQueryResults> resultsQueue;
-        private final AtomicBoolean running;
-        private final AtomicBoolean finishedExecuting;
-        private final AtomicBoolean finishedPublishing;
-        private final AtomicBoolean error;
-        private final List<PageConsumer> consumers;
-        private int nextIndex;
-
-        public ResultsPublisher(Query query,
-                BlockingQueue<DataCenterQueryResults> resultsQueue,
-                AtomicBoolean running,
-                AtomicBoolean finishedExecuting,
-                AtomicBoolean finishedPublishing,
-                AtomicBoolean error,
-                AtomicReference<DataCenterQueryResults> failedResult,
-                List<PageConsumer> consumers)
-        {
-            this.query = query;
-            this.resultsQueue = resultsQueue;
-            this.running = running;
-            this.finishedExecuting = finishedExecuting;
-            this.finishedPublishing = finishedPublishing;
-            this.error = error;
-            this.consumers = consumers;
-        }
-
-        @Override
-        public void run()
-        {
-            while (this.running.get()) {
-                if (this.error.get()) {
-                    for (PageConsumer consumer : this.consumers) {
-                        consumer.setState(this.query, PageConsumer.State.ERROR);
-                    }
-                    return;
-                }
-                if (this.finishedExecuting.get() && this.resultsQueue.isEmpty()) {
-                    // No results to send and query finished
-                    for (PageConsumer consumer : this.consumers) {
-                        consumer.setState(this.query, PageConsumer.State.FINISHED);
-                    }
-                    this.finishedPublishing.set(true);
-                    return;
-                }
-                else if (!this.resultsQueue.isEmpty()) {
-                    // Poll only if there is a consumer
-                    PageConsumer consumer = this.nextConsumer(Math.min(2, this.consumers.size()));
-                    if (consumer != null) {
-                        DataCenterQueryResults results = this.resultsQueue.poll();
-                        if (results != null) {
-                            consumer.consume(query, results);
-                        }
-                    }
-                    else if (this.consumers.isEmpty()) {
-                        // no subscribers
-                        this.running.set(false);
-                        return;
-                    }
-                }
-            }
-        }
-
-        private PageConsumer nextConsumer(int maxAttempts)
-        {
-            if (maxAttempts <= 0 || this.consumers.isEmpty()) {
-                return null;
-            }
-            this.nextIndex = (this.nextIndex + 1) % this.consumers.size();
-            PageConsumer consumer = this.consumers.get(this.nextIndex);
-            if (consumer.hasRoom()) {
-                return consumer;
-            }
-            else {
-                if (consumer.isFinished() || !consumer.isActive()) {
-                    this.consumers.remove(this.nextIndex);
-                }
-                return nextConsumer(maxAttempts - 1);
             }
         }
     }

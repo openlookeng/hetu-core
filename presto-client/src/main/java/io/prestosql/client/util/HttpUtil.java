@@ -164,9 +164,7 @@ public class HttpUtil
         Request.Builder builder = new Request.Builder();
         builder.addHeader(PRESTO_USER, session.getUser())
                 .addHeader(USER_AGENT, USER_AGENT_VALUE);
-        if (!session.isCompressionEnabled()) { // close compression
-            builder.addHeader(ACCEPT_ENCODING_HEADER, "");
-        }
+        builder.addHeader(ACCEPT_ENCODING_HEADER, "");
         return builder.url(url);
     }
 
