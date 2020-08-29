@@ -172,7 +172,7 @@ public class CarbondataModule
     public ScheduledExecutorService createCarbonVacuumServiceExecutor(HiveCatalogName catalogName, CarbondataConfig carbonConfig)
     {
         return newScheduledThreadPool(
-                carbonConfig.getVacuumServiceThreads(),
+                carbonConfig.getCarbondataVacuumServiceThreads(),
                 daemonThreadsNamed("carbon-vacuum-service-" + catalogName + "-%s"));
     }
 }

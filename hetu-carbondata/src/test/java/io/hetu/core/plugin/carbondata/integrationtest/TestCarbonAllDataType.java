@@ -79,6 +79,9 @@ public class TestCarbonAllDataType
         String dataPath = rootPath + "/src/test/resources/alldatatype.csv";
 
         CarbonProperties.getInstance().addProperty(CarbonCommonConstants.CARBON_WRITTEN_BY_APPNAME, "HetuTest");
+        CarbonProperties.getInstance().addProperty(CarbonCommonConstants.MAX_QUERY_EXECUTION_TIME, "0");
+        CarbonProperties.getInstance().addProperty(CarbonCommonConstants.CARBON_SEGMENT_LOCK_FILES_PRESERVE_HOURS, "0");
+        CarbonProperties.getInstance().addProperty(CarbonCommonConstants.CARBON_INVISIBLE_SEGMENTS_PRESERVE_COUNT, "1");
 
         Map<String, String> map = new HashMap<String, String>();
         map.put("hive.metastore", "file");
@@ -1015,5 +1018,246 @@ public class TestCarbonAllDataType
             Assert.fail("Failed while executing show create table");
         }
         hetuServer.execute("DROP TABLE IF EXISTS testdb.showcreatetable");
+    }
+
+    @Test
+    public void testAutoCleanupInUpdate() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup1");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup1 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup1 AND WAIT");
+        //TimeUnit.SECONDS.sleep(2);
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+        }
+        hetuServer.execute("UPDATE testdb.testtableAutoCleanup1 SET a=232 WHERE b=511");
+        try {
+            Thread.sleep(10000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_3", false), false);
+        }
+        catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup1");
+    }
+
+    @Test
+    public void testAutoCleanupInVacuum() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup2");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup2 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (130, 411)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup2 AND WAIT");
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+
+        }
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup2 AND WAIT");
+        try {
+
+            Thread.sleep(20000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_3", false), false);
+        } catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup2");
+    }
+
+    @Test
+    public void testAutoCleanupInDelete() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup3");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup3 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup3 AND WAIT");
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+
+        }
+        hetuServer.execute("DELETE FROM testdb.testtableAutoCleanup3 WHERE a=130");
+        try {
+            Thread.sleep(10000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_3", false), false);
+        } catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup3");
+    }
+
+    @Test
+    public void testAutoCleanupInInsert() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup4");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup4 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup4 AND WAIT");
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+
+        }
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (130, 511)");
+        try {
+            Thread.sleep(10000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_3", false), false);
+        } catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup4");
+    }
+
+    @Test
+    public void testFullAutoCleanupInUpdate() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup5");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup5 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup5 AND WAIT");
+        //TimeUnit.SECONDS.sleep(2);
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+
+        }
+        hetuServer.execute("UPDATE testdb.testtableAutoCleanup5 SET a=232 WHERE b=511");
+        try {
+            Thread.sleep(10000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_3", false), false);
+        }
+        catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup5");
+    }
+
+    @Test
+    public void testFullAutoCleanupInVacuum() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup6");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup6 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (130, 411)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup6 FULL AND WAIT");
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+
+        }
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup6 FULL AND WAIT");
+        try {
+            Thread.sleep(20000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_3", false), false);
+        } catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup6");
+    }
+
+    @Test
+    public void testFullAutoCleanupInDelete() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup7");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup7 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup7 FULL AND WAIT");
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+
+        }
+        hetuServer.execute("DELETE FROM testdb.testtableAutoCleanup7 WHERE a=130");
+        try {
+            Thread.sleep(10000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_3", false), false);
+        } catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup7");
+    }
+
+    @Test
+    public void testFullAutoCleanupInInsert() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup8");
+        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup8 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableAutoCleanup8 FULL AND WAIT");
+        try {
+            Thread.sleep(65000);
+        }
+        catch (InterruptedException e) {
+        }
+        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (130, 511)");
+        try {
+            Thread.sleep(10000);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_3", false), false);
+        } catch (IOException | InterruptedException exception) {
+
+        }
+        hetuServer.execute("drop table testdb.testtableAutoCleanup8");
     }
 }

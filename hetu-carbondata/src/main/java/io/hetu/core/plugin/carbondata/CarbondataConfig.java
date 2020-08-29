@@ -14,9 +14,11 @@
 package io.hetu.core.plugin.carbondata;
 
 import io.airlift.configuration.Config;
+import io.airlift.configuration.ConfigDescription;
 import io.prestosql.plugin.hive.HiveConfig;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 public class CarbondataConfig
@@ -25,6 +27,7 @@ public class CarbondataConfig
     private String storeLocation = "";
     private long minorVacuumSegCount = Long.parseLong(CarbonCommonConstants.DEFAULT_SEGMENT_LEVEL_THRESHOLD.split(",")[0]);
     private long majorVacuumSegSize = 1L;
+    private int vacuumServiceThreads = 2;
     private CarbondataStorageFormat carbondataStorageFormat = CarbondataStorageFormat.CARBON;
 
     @NotNull
@@ -64,5 +67,19 @@ public class CarbondataConfig
     public long getMajorVacuumSegSize()
     {
         return majorVacuumSegSize;
+    }
+
+    @Config("carbondata.vacuum-service-threads")
+    @ConfigDescription("Number of threads to run in the auto vacuum & vacuum cleanup service")
+    public CarbondataConfig setCarbondataVacuumServiceThreads(int vacuumServiceThreads)
+    {
+        this.vacuumServiceThreads = vacuumServiceThreads;
+        return this;
+    }
+
+    @Min(1)
+    public int getCarbondataVacuumServiceThreads()
+    {
+        return vacuumServiceThreads;
     }
 }

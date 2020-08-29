@@ -213,6 +213,7 @@ public class CarbondataMetadata
     private long majorVacuumSegSize;
     private List<Segment> segmentFilesToBeUpdatedLatest = new ArrayList<>();
     private List<List<LoadMetadataDetails>> segmentsMerged = new ArrayList<>();
+    private List<CarbondataAutoCleaner> autoCleanerTasks = new ArrayList<>();
 
     private enum State {
         INSERT,
@@ -360,6 +361,7 @@ public class CarbondataMetadata
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
                 super.finishInsert(session, insertHandle, fragments, computedStatistics);
         writeSegmentFileAndSetLoadModel();
+        autoCleanerTasks.add(new CarbondataAutoCleaner(table.get(), initialConfiguration, carbondataTableReader, metastore, hdfsEnvironment, user));
         return connectorOutputMetadata;
     }
 
@@ -466,6 +468,7 @@ public class CarbondataMetadata
                 updateTableHandle.getLocationHandle(), updateTableHandle.getBucketProperty(),
                 updateTableHandle.getTableStorageFormat(), updateTableHandle.getPartitionStorageFormat(), false);
 
+        autoCleanerTasks.add(new CarbondataAutoCleaner(table.get(), initialConfiguration, carbondataTableReader, metastore, hdfsEnvironment, user));
         return finishUpdateAndDelete(session, insertTableHandle, fragments, computedStatistics);
     }
 
@@ -479,6 +482,7 @@ public class CarbondataMetadata
                 deleteTableHandle.getLocationHandle(), deleteTableHandle.getBucketProperty(),
                 deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false);
 
+        autoCleanerTasks.add(new CarbondataAutoCleaner(table.get(), initialConfiguration, carbondataTableReader, metastore, hdfsEnvironment, user));
         return finishUpdateAndDelete(session, insertTableHandle, fragments, computedStatistics);
     }
 
@@ -488,7 +492,8 @@ public class CarbondataMetadata
         // Not calling carbondata's beginInsert as no need to setup committer job, just get the table handle and locks
         currentState = State.VACUUM;
         HiveInsertTableHandle insertTableHandle = super.beginInsert(session, tableHandle);
-        return hdfsEnvironment.doAs(session.getUser(), () -> {
+        this.user = session.getUser();
+        return hdfsEnvironment.doAs(user, () -> {
             SchemaTableName tableName = insertTableHandle.getSchemaTableName();
             Optional<Table> table =
                     this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
@@ -634,6 +639,7 @@ public class CarbondataMetadata
                 allSourceSegmentNames.addAll(segment.getSourceSegmentIdSet());
             }
 
+            autoCleanerTasks.add(new CarbondataAutoCleaner(table.get(), initialConfiguration, carbondataTableReader, metastore, hdfsEnvironment, user));
             return Optional.of(new HiveWrittenPartitions(allSourceSegmentNames));
         });
     }
@@ -693,6 +699,11 @@ public class CarbondataMetadata
     }
 
     private CarbonTable getCarbonTable(String dbName, String tableName, Properties schema, Configuration configuration)
+    {
+        return getCarbonTable(dbName, tableName, schema, configuration, carbondataTableReader);
+    }
+
+    static CarbonTable getCarbonTable(String dbName, String tableName, Properties schema, Configuration configuration, CarbondataTableReader carbondataTableReader)
     {
         CarbondataTableCacheModel tableCacheModel = carbondataTableReader
                 .getCarbonCache(new SchemaTableName(dbName, tableName),
@@ -956,6 +967,7 @@ public class CarbondataMetadata
         finally {
             releaseLocks();
         }
+        submitCleanupTasks();
     }
 
     @Override
@@ -1591,5 +1603,12 @@ public class CarbondataMetadata
     {
         LOG.debug("Carbondata does not support auto-vacuum");
         return ImmutableList.of();
+    }
+
+    public void submitCleanupTasks()
+    {
+        if (autoCleanerTasks.size() > 0) {
+            autoCleanerTasks.forEach(c -> c.submitCarbondataAutoCleanupTask(vacuumExecutorService));
+        }
     }
 }
