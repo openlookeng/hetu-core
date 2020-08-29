@@ -4,13 +4,15 @@
 SQL Migration tool helps user to transform SQL Syntax to ANSI 2003 SQL syntax. Currently, only Hive and Impala SQL syntax are supported.
 
 ## Usage of SQL Migration Tool
+Download `hetu-sql-migration-cli-{version number}-executable.jar`, rename it to `openlk-sql-migration-cli`, make
+it executable with `chmod +x`, then run it.
 
 **Interactive mode**
 
 This tool can be run in interactive mode. The example is like:
 
 ```shell
-./sql-migration-cli-010-executable.jar --type hive
+./openlk-sql-migration-cli --type hive
 ```
 
 ```sql
@@ -47,7 +49,7 @@ This tool also can take parameters and running in batch mode. It has five parame
 | Parameter    | Description                                                  |
 | ------------ | ------------------------------------------------------------ |
 | `--file` or `-f`       | A file that contains SQL statements,  separated by \";\".  All of the SQLs in the file can be converted in batch process. |
-| `--source` or `-s` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
+| `--type` or `-t` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
 | `--output` or `-o`     | the directory to save the converted SQL results. The result file's naming convention will be the input file's name + timestamp + .html suffix.             |
 | `--config` or `-c`     | the config file of SQL Migration Tool.                       |
 
@@ -58,7 +60,7 @@ This tool also can take parameters and running in batch mode. It has five parame
 Here is an example of batch mode usage:
 
 ```shell
-    ./sql-migration-cli-010-executable.jar --file /home/Query01.sql --output ./
+    ./openlk-sql-migration-cli --file /home/Query01.sql --output ./
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
     INFO: Migration Completed.
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
@@ -75,7 +77,7 @@ It is possible to execute a query directly with the command and have the tool ex
 
 
 ```shell
-./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --source hive
+./openlk-sql-migration-cli --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --type hive
 
 
 ==========converted result==========
@@ -96,7 +98,7 @@ file name "config.properties" with content as below:
 convertDecimalLiteralsAsDouble=true
 
 
-./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
+./openlk-sql-migration-cli --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
 
 
 ==========converted result==========

@@ -112,7 +112,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>sql-migration-cli-${project.version}-executable</finalName>
+                            <finalName>hetu-sql-migration-cli-${project.version}-executable</finalName>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>executable</shadedClassifierName>
                             <transformers>
