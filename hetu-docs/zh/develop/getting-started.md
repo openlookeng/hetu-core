@@ -32,7 +32,7 @@ openLooKeng Core有一组全面的单元测试，运行这些测试可能需要�
 * 在“SDKs”部分中，确保选择1.8 JDK（如果不存在，则创建一个）。
 * 在“Project”部分中，确保将“Project language level”设置为8.0，因为openLooKeng Core使用了一些Java 8语言功能。
 
-openLooKeng Core附带的样例配置应该可以立即用于开发。使用以下选项创建运行配置：
+openLooKeng Core附带的样例配置可以直接用于开发。使用以下选项创建运行配置：
 
 * Main Class：`io.prestosql.server.PrestoServer`
 * VM Options：`-ea -XX:+UseG1GC -XX:G1HeapRegionSize=32M -XX:+UseGCOverheadLimit -XX:+ExplicitGCInvokesConcurrent -Xmx2G -Dconfig=etc/config.properties -Dlog.levels-file=etc/log.properties`
@@ -61,7 +61,7 @@ openLooKeng Core附带的样例配置应该可以立即用于开发。使用以�
 
     presto-cli/target/hetu-cli-*-executable.jar
 
-运行用于查看集群中的节点的查询：
+查询集群中的节点信息：
 
     SELECT * FROM system.runtime.nodes;
 

@@ -4,9 +4,9 @@
 
 ## REST接口简介
 
-在openLooKeng中，所有内容都以RESTAPI的形式公开在openLooKeng中，HTTP是所有组件相互通信的方法。
+在openLooKeng中，所有内容都以REST API的形式公开在openLooKeng中，HTTP是所有组件相互通信的方法。
 
-openLooKeng RESTA PI包含若干高级资源，这些资源对应于openLooKeng安装的组件。
+openLooKeng REST API包含若干高级资源，这些资源对应于openLooKeng安装的组件。
 
 查询资源
 

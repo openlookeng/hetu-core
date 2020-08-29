@@ -142,7 +142,7 @@ bash /opt/openlookeng/bin/configuration_deploy.sh
 
 注意，如果想添加更多配置或自定义配置，可以将属性添加到模板存入到位于`/home/openlkadmin/.openlkadmin/.etc_template/coordinator`或`/home/openlkadmin/.openlkadmin/.etc_template/worker`的文件中。
 
-属性的格式必须是key=\<value>，其中key用“\<”和“>”括起，意味着它是一个动态值。例如：
+属性的格式必须是key=\<value>，其中value用“\<”和“>”括起，意味着它是一个动态值。例如：
 
 ```properties
 http-server.http.port=<http-server.http.port>

@@ -17,7 +17,7 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 * ANSI结构化查询语言（SQL） 
 
-* [ODBC 程序员's 参考](https://docs.microsoft.com/en-us/sql/odbc/reference/odbc-programmer-s-reference?view=sql-server-ver15)
+* [ODBC程序员参考文档](https://docs.microsoft.com/en-us/sql/odbc/reference/odbc-programmer-s-reference?view=sql-server-ver15)
 
 ### 支持的版本
 

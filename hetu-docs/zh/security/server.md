@@ -32,7 +32,7 @@ Kerberos需要在openLooKeng协调节点上配置。至少需要在`/etc/krb5.co
   openlookeng.example.com = OPENLOOKENG.EXAMPLE.COM
 ```
 
-Krb5.conf`的完整[文档](http://web.mit.edu/kerberos/krb5-latest/doc/admin/conf_files/kdc_conf.html )由麻省理工学院Kerberos项目托管。如果您使用Kerberos协议的不同实现方式，则需要根据您的环境修改配置。
+Krb5.conf的完整[文档](http://web.mit.edu/kerberos/krb5-latest/doc/admin/conf_files/kdc_conf.html )由麻省理工学院Kerberos项目托管。如果您使用Kerberos协议的不同实现方式，则需要根据您的环境修改配置。
 
 ### Kerberos主体和Keytab文件
 

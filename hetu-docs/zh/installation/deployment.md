@@ -2,7 +2,7 @@
 # 手动部署openLooKeng
 
 
-这是一种手动部署方法，你也可以通过脚本使用自动部署方法。（参见[自动部署openLooKeng](./deployment-auto.md)
+这是一种手动部署方法，你也可以通过脚本使用自动部署方法。（参见[自动部署openLooKeng](./deployment-auto.md)）
 
 ## 安装openLooKeng
 
@@ -12,7 +12,7 @@ openLooKeng需要一个*数据*目录来存储日志等。我们建议在安装�
 
 ## 配置openLooKeng
 
-在安装目录下创建`etc`目录。这将保持以下配置：
+在安装目录下创建`etc`目录。目录下包括以下配置：
 
 - 节点属性：每个节点特有的环境配置。
 - JVM配置：Java虚拟机的命令行选项。
