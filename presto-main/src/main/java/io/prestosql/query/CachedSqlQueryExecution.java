@@ -372,7 +372,8 @@ public class CachedSqlQueryExecution
             connectorTransactionHandleMap.put(tableHandle.getTransaction(), newTableHandle.getTransaction());
 
             // Return a new table handle with the ID, output symbols, assignments, and enforced constraints of the cached table handle
-            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint());
+            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(),
+                    node.getEnforcedConstraint(), node.getPredicate());
         }
 
         @Override

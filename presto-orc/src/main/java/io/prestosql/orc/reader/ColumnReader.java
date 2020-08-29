@@ -13,28 +13,21 @@
  */
 package io.prestosql.orc.reader;
 
-import io.prestosql.orc.metadata.ColumnEncoding;
-import io.prestosql.orc.metadata.ColumnMetadata;
-import io.prestosql.orc.stream.InputStreamSources;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 
 import java.io.IOException;
-import java.time.ZoneId;
 
 public interface ColumnReader<T>
+            extends AbstractColumnReader //Fixme(nitin): merge
 {
     Block<T> readBlock()
             throws IOException;
 
     void prepareNextRead(int batchSize);
 
-    void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
-            throws IOException;
-
-    void startRowGroup(InputStreamSources dataStreamSources)
-            throws IOException;
-
-    void close();
-
-    long getRetainedSizeInBytes();
+    default boolean filterTest(TupleDomainFilter filter, T value) /* FixMe(Nitin): Remove Default, force all readers to enforce */
+    {
+        throw new IllegalArgumentException("Unsupported type for pushdown");
+    }
 }

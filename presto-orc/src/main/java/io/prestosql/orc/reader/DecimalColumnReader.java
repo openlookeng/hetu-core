@@ -18,6 +18,7 @@ import io.airlift.slice.Slices;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.stream.BooleanInputStream;
@@ -359,5 +360,16 @@ public class DecimalColumnReader<T>
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + sizeOf(nullVector) + sizeOf(scaleVector);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, T value)
+    {
+        if (type.isShort()) {
+            return filter.testLong((Long) value);
+        }
+
+        long[] data = (long[]) value;
+        return filter.testDecimal(data[0], data[1]);
     }
 }

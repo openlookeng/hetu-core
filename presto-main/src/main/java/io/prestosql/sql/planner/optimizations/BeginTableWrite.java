@@ -236,7 +236,8 @@ public class BeginTableWrite
                         handle,
                         scan.getOutputSymbols(),
                         scan.getAssignments(),
-                        scan.getEnforcedConstraint());
+                        scan.getEnforcedConstraint(),
+                        scan.getPredicate());
             }
 
             if (node instanceof FilterNode) {

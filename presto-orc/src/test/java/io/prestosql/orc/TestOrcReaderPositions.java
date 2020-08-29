@@ -327,12 +327,36 @@ public class TestOrcReaderPositions
                 assertEquals(reader.getFileRowCount(), reader.getReaderRowCount());
                 assertEquals(reader.getFilePosition(), reader.getReaderPosition());
 
+                // Since all columns are fixed size, all batches should be of 20 rows
+                int totalReadRows = 0;
+                while (true) {
+                    Page page = reader.nextPage();
+                    if (page == null) {
+                        break;
+                    }
+
+                    assertEquals(page.getPositionCount(), 20);
+                    assertEquals(reader.getReaderPosition(), totalReadRows);
+                    assertEquals(reader.getFilePosition(), reader.getReaderPosition());
+                    totalReadRows += 20;
+                }
+
+                assertEquals(reader.getReaderPosition(), 100);
+                assertEquals(reader.getFilePosition(), reader.getReaderPosition());
+            }
+
+            try (OrcRecordReader reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, BIGINT, INITIAL_BATCH_SIZE)) {
+                assertEquals(reader.getReaderRowCount(), 100);
+                assertEquals(reader.getReaderPosition(), 0);
+                assertEquals(reader.getFileRowCount(), reader.getReaderRowCount());
+                assertEquals(reader.getFilePosition(), reader.getReaderPosition());
+
                 // The batch size should start from INITIAL_BATCH_SIZE and grow by BATCH_SIZE_GROWTH_FACTOR.
                 // For INITIAL_BATCH_SIZE = 1 and BATCH_SIZE_GROWTH_FACTOR = 2, the batchSize sequence should be
                 // 1, 2, 4, 8, 5, 20, 20, 20, 20
                 int totalReadRows = 0;
                 int nextBatchSize = INITIAL_BATCH_SIZE;
-                int expectedBatchSize = INITIAL_BATCH_SIZE;
+                int expectedBatchSize = 20;
                 int rowCountsInCurrentRowGroup = 0;
                 while (true) {
                     Page page = reader.nextPage();

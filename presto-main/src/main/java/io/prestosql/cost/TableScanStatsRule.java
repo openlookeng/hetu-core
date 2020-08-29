@@ -13,25 +13,32 @@
  */
 package io.prestosql.cost;
 
+import com.google.common.collect.ImmutableBiMap;
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Constraint;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.ColumnStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.FixedWidthType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.DomainTranslator;
+import io.prestosql.sql.planner.LiteralEncoder;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Verify.verify;
+import static io.prestosql.SystemSessionProperties.isDefaultFilterFactorEnabled;
+import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
 import static java.lang.Double.NaN;
 import static java.util.Objects.requireNonNull;
@@ -42,11 +49,15 @@ public class TableScanStatsRule
     private static final Pattern<TableScanNode> PATTERN = tableScan();
 
     private final Metadata metadata;
+    private final FilterStatsCalculator filterStatsCalculator;
+    private final DomainTranslator domainTranslator;
 
-    public TableScanStatsRule(Metadata metadata, StatsNormalizer normalizer)
+    public TableScanStatsRule(Metadata metadata, StatsNormalizer normalizer, FilterStatsCalculator filterStatsCalculator)
     {
         super(normalizer); // Use stats normalization since connector can return inconsistent stats values
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.filterStatsCalculator = requireNonNull(filterStatsCalculator, "filterStatsCalculator is null");
+        this.domainTranslator = new DomainTranslator(new LiteralEncoder(metadata));
     }
 
     @Override
@@ -59,11 +70,26 @@ public class TableScanStatsRule
     protected Optional<PlanNodeStatsEstimate> doCalculate(TableScanNode node, StatsProvider sourceStats, Lookup lookup, Session session, TypeProvider types)
     {
         // TODO Construct predicate like AddExchanges's LayoutConstraintEvaluator
-        Constraint constraint = new Constraint(metadata.getTableProperties(session, node.getTable()).getPredicate());
+        TupleDomain<ColumnHandle> predicate = metadata.getTableProperties(session, node.getTable()).getPredicate();
+        Constraint constraint = new Constraint(predicate);
 
         TableStatistics tableStatistics = metadata.getTableStatistics(session, node.getTable(), constraint);
         verify(tableStatistics != null, "tableStatistics is null for %s", node);
+
         Map<Symbol, SymbolStatsEstimate> outputSymbolStats = new HashMap<>();
+        Map<ColumnHandle, Symbol> remainingSymbols = new HashMap<>();
+        Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
+
+        boolean isPredicatesPushDown = false;
+        if (predicate.isAll()
+                && !(node.getEnforcedConstraint().isAll() || node.getEnforcedConstraint().isNone())) {
+            predicate = node.getEnforcedConstraint();
+            isPredicatesPushDown = true;
+
+            predicate.getDomains().get().entrySet().stream().forEach(e -> {
+                remainingSymbols.put(e.getKey(), new Symbol(e.getKey().getColumnName()));
+            });
+        }
 
         for (Map.Entry<Symbol, ColumnHandle> entry : node.getAssignments().entrySet()) {
             Symbol symbol = entry.getKey();
@@ -72,12 +98,46 @@ public class TableScanStatsRule
                     .map(statistics -> toSymbolStatistics(tableStatistics, statistics, types.get(symbol)))
                     .orElse(SymbolStatsEstimate.unknown());
             outputSymbolStats.put(symbol, symbolStatistics);
+            remainingSymbols.remove(entry.getValue());
         }
 
-        return Optional.of(PlanNodeStatsEstimate.builder()
+        PlanNodeStatsEstimate tableEstimates = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(tableStatistics.getRowCount().getValue())
                 .addSymbolStatistics(outputSymbolStats)
-                .build());
+                .build();
+
+        if (isPredicatesPushDown) {
+            if (remainingSymbols.size() > 0) {
+                ImmutableBiMap.Builder<ColumnHandle, Symbol> assignmentBuilder = ImmutableBiMap.builder();
+                assignments = assignmentBuilder.putAll(assignments).putAll(remainingSymbols).build();
+
+                for (Map.Entry<ColumnHandle, Symbol> entry : remainingSymbols.entrySet()) {
+                    Symbol symbol = entry.getValue();
+                    Optional<ColumnStatistics> columnStatistics = Optional.ofNullable(tableStatistics.getColumnStatistics().get(entry.getKey()));
+                    SymbolStatsEstimate symbolStatistics = columnStatistics
+                            .map(statistics -> toSymbolStatistics(tableStatistics, statistics, types.get(symbol)))
+                            .orElse(SymbolStatsEstimate.unknown());
+                    outputSymbolStats.put(symbol, symbolStatistics);
+                }
+
+                /* Refresh TableEstimates for remaining columns */
+                tableEstimates = PlanNodeStatsEstimate.builder()
+                        .setOutputRowCount(tableStatistics.getRowCount().getValue())
+                        .addSymbolStatistics(outputSymbolStats)
+                        .build();
+            }
+
+            Expression pushDownExpression = domainTranslator.toPredicate(predicate.transform(assignments :: get));
+            PlanNodeStatsEstimate estimate = filterStatsCalculator.filterStats(tableEstimates, pushDownExpression, session, types);
+            if (isDefaultFilterFactorEnabled(session) && estimate.isOutputRowCountUnknown()) {
+                PlanNodeStatsEstimate finalTableEstimates = tableEstimates;
+                estimate = tableEstimates.mapOutputRowCount(sourceRowCount -> finalTableEstimates.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);
+            }
+
+            return Optional.of(estimate);
+        }
+
+        return Optional.of(tableEstimates);
     }
 
     private static SymbolStatsEstimate toSymbolStatistics(TableStatistics tableStatistics, ColumnStatistics columnStatistics, Type type)

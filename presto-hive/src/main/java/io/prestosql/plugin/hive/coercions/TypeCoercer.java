@@ -18,12 +18,10 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.Type;
 
-import java.util.function.Function;
-
 import static java.util.Objects.requireNonNull;
 
 public abstract class TypeCoercer<F extends Type, T extends Type>
-        implements Function<Block, Block>
+        implements HiveCoercer
 {
     protected final F fromType;
     protected final T toType;

@@ -34,6 +34,7 @@ import io.prestosql.spi.type.VarcharType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -62,6 +63,7 @@ public class TupleDomainOrcPredicate
         implements OrcPredicate
 {
     private final List<ColumnDomain> columnDomains;
+    private final List<ColumnDomain> orColumnDomains;
     private final boolean orcBloomFiltersEnabled;
 
     public static TupleDomainOrcPredicateBuilder builder()
@@ -69,15 +71,17 @@ public class TupleDomainOrcPredicate
         return new TupleDomainOrcPredicateBuilder();
     }
 
-    private TupleDomainOrcPredicate(List<ColumnDomain> columnDomains, boolean orcBloomFiltersEnabled)
+    private TupleDomainOrcPredicate(List<ColumnDomain> columnDomains, List<ColumnDomain> orColumns, boolean orcBloomFiltersEnabled)
     {
         this.columnDomains = ImmutableList.copyOf(requireNonNull(columnDomains, "columnDomains is null"));
+        this.orColumnDomains = ImmutableList.copyOf(orColumns);
         this.orcBloomFiltersEnabled = orcBloomFiltersEnabled;
     }
 
     @Override
     public boolean matches(long numberOfRows, ColumnMetadata<ColumnStatistics> allColumnStatistics)
     {
+        boolean found = orColumnDomains.size() == 0;
         for (ColumnDomain column : columnDomains) {
             ColumnStatistics columnStatistics = allColumnStatistics.get(column.getColumnId());
             if (columnStatistics == null) {
@@ -90,8 +94,20 @@ public class TupleDomainOrcPredicate
             }
         }
 
+        for (ColumnDomain column : orColumnDomains) {
+            ColumnStatistics columnStatistics = allColumnStatistics.get(column.getColumnId());
+            if (columnStatistics == null) {
+                // no statistics for this column, so we can't exclude this section
+                return true;
+            }
+
+            if (columnOverlaps(column.getDomain(), numberOfRows, columnStatistics)) {
+                return true;
+            }
+        }
+
         // this section was not excluded
-        return true;
+        return found;
     }
 
     private boolean columnOverlaps(Domain predicateDomain, long numberOfRows, ColumnStatistics columnStatistics)
@@ -258,12 +274,20 @@ public class TupleDomainOrcPredicate
     public static class TupleDomainOrcPredicateBuilder
     {
         private final List<ColumnDomain> columns = new ArrayList<>();
+        private final List<ColumnDomain> orColumns = new ArrayList<>();
         private boolean bloomFiltersEnabled;
 
         public TupleDomainOrcPredicateBuilder addColumn(OrcColumnId columnId, Domain domain)
         {
             requireNonNull(domain, "domain is null");
             columns.add(new ColumnDomain(columnId, domain));
+            return this;
+        }
+
+        public TupleDomainOrcPredicateBuilder addOrColumn(OrcColumnId columnId, Domain domain)
+        {
+            requireNonNull(domain, "domain is null");
+            orColumns.add(new ColumnDomain(columnId, domain));
             return this;
         }
 
@@ -275,7 +299,7 @@ public class TupleDomainOrcPredicate
 
         public TupleDomainOrcPredicate build()
         {
-            return new TupleDomainOrcPredicate(columns, bloomFiltersEnabled);
+            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled);
         }
     }
 
@@ -301,6 +325,27 @@ public class TupleDomainOrcPredicate
         }
 
         @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            ColumnDomain that = (ColumnDomain) o;
+            return columnId.equals(that.columnId)
+                    && domain.equals(that.domain);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(columnId, domain);
+        }
+
+        @Override
         public String toString()
         {
             return toStringHelper(this)
@@ -308,5 +353,37 @@ public class TupleDomainOrcPredicate
                     .add("domain", domain)
                     .toString();
         }
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        TupleDomainOrcPredicate that = (TupleDomainOrcPredicate) o;
+        return Objects.equals(columnDomains, that.columnDomains)
+                && Objects.equals(orColumnDomains, that.orColumnDomains)
+                && orcBloomFiltersEnabled == that.orcBloomFiltersEnabled;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(columnDomains, orColumnDomains, orcBloomFiltersEnabled);
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("columnDomains", columnDomains)
+                .add("orColumnDomains", orColumnDomains)
+                .add("orcBloomFilterEnabled", orcBloomFiltersEnabled)
+                .toString();
     }
 }

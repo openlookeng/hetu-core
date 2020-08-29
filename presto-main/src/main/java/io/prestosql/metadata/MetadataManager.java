@@ -1110,6 +1110,23 @@ public final class MetadataManager
                         result.getRemainingFilter()));
     }
 
+    @Override
+    public Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table, Constraint constraint, List<Constraint> additionalConstrains)
+    {
+        CatalogName catalogName = table.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+
+        if (metadata.usesLegacyTableLayouts()) {
+            return Optional.empty();
+        }
+
+        ConnectorSession connectorSession = session.toConnectorSession(catalogName);
+        return metadata.applyFilter(connectorSession, table.getConnectorHandle(), constraint, additionalConstrains)
+                .map(result -> new ConstraintApplicationResult<>(
+                        new TableHandle(catalogName, result.getHandle(), table.getTransaction(), Optional.empty()),
+                        result.getRemainingFilter()));
+    }
+
     public Optional<ProjectionApplicationResult<TableHandle>> applyProjection(Session session, TableHandle table, List<ConnectorExpression> projections, Map<String, ColumnHandle> assignments)
     {
         CatalogName catalogName = table.getCatalogName();

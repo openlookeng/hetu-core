@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.stream.BooleanInputStream;
@@ -224,5 +225,11 @@ public class ByteColumnReader
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + sizeOf(nullVector);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Byte value)
+    {
+        return filter.testLong(value);
     }
 }

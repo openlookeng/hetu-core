@@ -422,7 +422,7 @@ public class PlanOptimizers
                         ImmutableSet.<Rule<?>>builder()
                                 .addAll(projectionPushdownRules)
                                 .add(new PushLimitIntoTableScan(metadata))
-                                .add(new PushPredicateIntoTableScan(metadata, typeAnalyzer))
+                                //.add(new PushPredicateIntoTableScan(metadata, typeAnalyzer))
                                 .add(new PushSampleIntoTableScan(metadata))
                                 .build()),
                 new IterativeOptimizer(
@@ -477,11 +477,11 @@ public class PlanOptimizers
                         ImmutableSet.of(new EliminateCrossJoins())), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
                 predicatePushDown,
                 simplifyOptimizer, // Should be always run after PredicatePushDown
-                new IterativeOptimizer(
+                /*new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer))),
+                        ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer))),*/
                 projectionPushDown,
                 new PruneUnreferencedOutputs(),
                 new IterativeOptimizer(
@@ -524,12 +524,6 @@ public class PlanOptimizers
                         .add(new InlineProjections())
                         .build()));
 
-        builder.add(new IterativeOptimizer(
-                ruleStats,
-                statsCalculator,
-                costCalculator,
-                ImmutableSet.of(new PushDeleteIntoConnector(metadata)))); // Must run before AddExchanges
-
         if (!forceSingleNode) {
             builder.add(new ReplicateSemiJoinInDelete()); // Must run before AddExchanges
             builder.add((new IterativeOptimizer(
@@ -549,6 +543,23 @@ public class PlanOptimizers
                             ImmutableSet.of(new PushTableWriteThroughUnion()))); // Must run before AddExchanges
             builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeAnalyzer)));
         }
+
+        IterativeOptimizer pushdownRule = new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                estimatedExchangesCostCalculator,
+                ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer)));
+
+        IterativeOptimizer pushdownDeleteRule = new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableSet.of(new PushDeleteIntoConnector(metadata, false))); // Must run before AddExchanges
+        IterativeOptimizer pushdownDeleteWithExchangeRule = new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableSet.of(new PushDeleteIntoConnector(metadata, true))); // Must run before AddExchanges
         //noinspection UnusedAssignment
         estimatedExchangesCostCalculator = null; // Prevent accidental use after AddExchanges
 
@@ -576,6 +587,9 @@ public class PlanOptimizers
                         .add(new PushRemoteExchangeThroughAssignUniqueId())
                         .add(new InlineProjections())
                         .build()));
+        builder.add(pushdownRule);
+        builder.add(pushdownDeleteWithExchangeRule);
+        builder.add(pushdownDeleteRule);
 
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, typeAnalyzer));

@@ -28,6 +28,7 @@ import io.prestosql.orc.metadata.OrcType;
 import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
 import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
@@ -292,6 +293,72 @@ public class OrcReader
                 domains,
                 orcCacheStore,
                 orcCacheProperties);
+    }
+
+    public OrcSelectiveRecordReader createSelectiveRecordReader(
+            List<OrcColumn> fileColumns,
+            List<OrcColumn> fileReadColumns,
+            List<Type> readTypes,
+            List<Integer> outputColumns,
+            Map<Integer, Type> includedColumns,
+            Map<Integer, TupleDomainFilter> filters,
+            Map<Integer, Object> constantValues,
+            OrcPredicate predicate,
+            long offset,
+            long length,
+            DateTimeZone hiveStorageTimeZone,
+            AggregatedMemoryContext systemMemoryUsage,
+            int initialBatchSize,
+            Function<Exception, RuntimeException> exceptionTransform, //TODO: Revisit below argument for caching and index
+            Optional<List<IndexMetadata>> indexes,
+            Map<String, Domain> domains,
+            OrcCacheStore orcCacheStore,
+            OrcCacheProperties orcCacheProperties,
+            Optional<OrcWriteValidation> writeValidation,
+            Map<Integer, List<TupleDomainFilter>> additionalFilters,
+            List<Integer> positions, boolean useDataCache,
+            Map<Integer, Function<Block, Block>> coercer,
+            Map<String, List<Domain>> orDomains) throws OrcCorruptionException
+    {
+        return new OrcSelectiveRecordReader(
+                outputColumns,
+                includedColumns,
+                requireNonNull(fileColumns, "readColumns is null"),
+                requireNonNull(fileReadColumns, "readColumns is null"),
+                requireNonNull(readTypes, "readTypes is null"),
+                filters,
+                constantValues,
+                requireNonNull(predicate, "predicate is null"),
+                footer.getNumberOfRows(),
+                footer.getStripes(),
+                footer.getFileStats(),
+                metadata.getStripeStatsList(),
+                orcDataSource,
+                offset,
+                length,
+                footer.getTypes(),
+                decompressor,
+                footer.getRowsInRowGroup(),
+                requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null"),
+                hiveWriterVersion,
+                metadataReader,
+                maxMergeDistance,
+                tinyStripeThreshold,
+                maxBlockSize,
+                footer.getUserMetadata(),
+                systemMemoryUsage,
+                writeValidation,
+                initialBatchSize,
+                exceptionTransform,
+                indexes,
+                domains,
+                orcCacheStore,
+                orcCacheProperties,
+                additionalFilters,
+                positions,
+                useDataCache,
+                coercer,
+                orDomains);
     }
 
     public static OrcDataSource wrapWithCacheIfTiny(OrcDataSource dataSource, DataSize maxCacheSize)

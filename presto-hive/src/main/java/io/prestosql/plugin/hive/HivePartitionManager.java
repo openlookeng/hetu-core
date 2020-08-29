@@ -226,7 +226,9 @@ public class HivePartitionManager
                 partitions.getEnforcedConstraint(),
                 partitions.getBucketHandle(),
                 partitions.getBucketFilter(),
-                handle.getAnalyzePartitionValues());
+                handle.getAnalyzePartitionValues(),
+                handle.getPredicateColumns(),
+                handle.getAdditionalCompactEffectivePredicate());
     }
 
     public List<HivePartition> getOrLoadPartitions(SemiTransactionalHiveMetastore metastore, HiveTableHandle table)

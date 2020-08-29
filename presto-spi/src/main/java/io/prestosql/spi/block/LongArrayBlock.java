@@ -20,6 +20,7 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -133,6 +134,9 @@ public class LongArrayBlock
 
     public Long get(int position)
     {
+        if (valueIsNull != null && valueIsNull[position + arrayOffset]) {
+            return null;
+        }
         return values[position + arrayOffset];
     }
 
@@ -283,9 +287,25 @@ public class LongArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = 0; i < values.length; i++) {
+        for (int i = arrayOffset; i < positionCount; i++) {
             validPositions[i] = validPositions[i] && filter.test(values[i]);
         }
         return validPositions;
+    }
+
+    @Override
+    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        int matchCount = 0;
+        for (int i = 0; i < positionCount; i++) {
+            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset]) {
+                continue;
+            }
+            if (test.apply(values[positions[i] + arrayOffset])) {
+                matchedPositions[matchCount++] = positions[i];
+            }
+        }
+
+        return matchCount;
     }
 }

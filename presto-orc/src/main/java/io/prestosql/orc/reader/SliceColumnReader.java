@@ -18,6 +18,7 @@ import io.airlift.slice.Slice;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind;
 import io.prestosql.orc.metadata.ColumnMetadata;
@@ -46,8 +47,8 @@ import static io.prestosql.spi.type.Varchars.byteCount;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static java.util.Objects.requireNonNull;
 
-public class SliceColumnReader<T>
-        implements ColumnReader<T>
+public class SliceColumnReader
+        implements ColumnReader<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceColumnReader.class).instanceSize();
 
@@ -159,5 +160,11 @@ public class SliceColumnReader<T>
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + directReader.getRetainedSizeInBytes() + dictionaryReader.getRetainedSizeInBytes();
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, byte[] value)
+    {
+        return filter.testBytes(value, 0, value.length);
     }
 }

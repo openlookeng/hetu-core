@@ -759,6 +759,12 @@ public class PlanPrinter
                     formatString += "grouped = %s, ";
                     arguments.add(stageExecutionStrategy.get().isScanGroupedExecution(scanNode.get().getId()));
                 }
+
+                String pushdownPredicates = printTablePushDownFilters(scanNode.get());
+                if (pushdownPredicates.length() > 0) {
+                    formatString += "pushdownFilters = %s, ";
+                    arguments.add(pushdownPredicates);
+                }
             }
 
             if (filterNode.isPresent()) {
@@ -830,6 +836,38 @@ public class PlanPrinter
                     .collect(Collectors.joining(", ", "{", "}"));
         }
 
+        private String printTablePushDownFilters(TableScanNode node)
+        {
+            StringBuilder str = new StringBuilder();
+            TupleDomain<ColumnHandle> predicate = tableInfoSupplier.apply(node).getPredicate();
+            if (!predicate.isNone() && !predicate.isAll()) {
+                if (predicate.isAll() && (!node.getEnforcedConstraint().isAll() || !node.getEnforcedConstraint().isNone())) {
+                    predicate = node.getEnforcedConstraint();
+                }
+
+                if (!predicate.isNone() && !predicate.isAll()) {
+                    str.append("[ ");
+                    str.append(predicate.getDomains().get()
+                            .entrySet().stream()
+                            .map(filter -> filter.getKey() + " <- " + formatDomain(filter.getValue().simplify()))
+                            .collect(Collectors.joining(" AND ", "{", "}")));
+                    str.append(" ]");
+                    if (node.getTable().getConnectorHandle().hasAdditionalFiltersPushdown()) {
+                        str.append("[ ");
+                        str.append(" AND ");
+                        str.append(" ]");
+                    }
+                }
+
+                if (node.getTable().getConnectorHandle().hasAdditionalFiltersPushdown()) {
+                    str.append(node.getTable().getConnectorHandle()
+                            .getAdditionalFilterConditions((domain) -> formatDomain(domain)));
+                }
+            }
+
+            return str.toString();
+        }
+
         private void printTableScanInfo(NodeRepresentation nodeOutput, TableScanNode node)
         {
             TupleDomain<ColumnHandle> predicate = tableInfoSupplier.apply(node).getPredicate();
@@ -838,6 +876,10 @@ public class PlanPrinter
                 nodeOutput.appendDetailsLine(":: NONE");
             }
             else {
+                if (predicate.isAll() && (!node.getEnforcedConstraint().isAll() || !node.getEnforcedConstraint().isNone())) {
+                    predicate = node.getEnforcedConstraint();
+                }
+
                 // first, print output columns and their constraints
                 for (Map.Entry<Symbol, ColumnHandle> assignment : node.getAssignments().entrySet()) {
                     ColumnHandle column = assignment.getValue();
@@ -849,13 +891,14 @@ public class PlanPrinter
                 if (!predicate.isAll()) {
                     Set<ColumnHandle> outputs = ImmutableSet.copyOf(node.getAssignments().values());
 
+                    TupleDomain<ColumnHandle> finalPredicate = predicate;
                     predicate.getDomains().get()
                             .entrySet().stream()
                             .filter(entry -> !outputs.contains(entry.getKey()))
                             .forEach(entry -> {
                                 ColumnHandle column = entry.getKey();
                                 nodeOutput.appendDetailsLine("%s", column);
-                                printConstraint(nodeOutput, column, predicate);
+                                printConstraint(nodeOutput, column, finalPredicate);
                             });
                 }
             }

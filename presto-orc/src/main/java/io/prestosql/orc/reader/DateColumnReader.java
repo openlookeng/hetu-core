@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.DateType;
@@ -91,5 +92,11 @@ public class DateColumnReader
         nextBatchSize = 0;
 
         return block;
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Integer value)
+    {
+        return filter.testLong(value);
     }
 }

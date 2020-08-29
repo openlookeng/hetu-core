@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.block.ShortArrayBlock;
@@ -132,5 +133,11 @@ public class ShortColumnReader
         short[] result = unpackShortNulls(shortNonNullValueTemp, isNull);
 
         return new ShortArrayBlock(nextBatchSize, Optional.of(isNull), result);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Short value)
+    {
+        return filter.testLong(value);
     }
 }

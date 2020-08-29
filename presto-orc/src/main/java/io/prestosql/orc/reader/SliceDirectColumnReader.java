@@ -54,8 +54,8 @@ import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class SliceDirectColumnReader<T>
-        implements ColumnReader<T>
+public class SliceDirectColumnReader
+        implements ColumnReader<byte[]>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceDirectColumnReader.class).instanceSize();
     private static final int ONE_GIGABYTE = toIntExact(new DataSize(1, GIGABYTE).toBytes());

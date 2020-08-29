@@ -21,11 +21,13 @@ import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.Expression;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -41,6 +43,7 @@ public class TableScanNode
     private final Map<Symbol, ColumnHandle> assignments; // symbol -> column
 
     private final TupleDomain<ColumnHandle> enforcedConstraint;
+    private final Optional<Expression> predicate;
 
     // We need this factory method to disambiguate with the constructor used for deserializing
     // from a json object. The deserializer sets some fields which are never transported
@@ -51,7 +54,7 @@ public class TableScanNode
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments)
     {
-        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all());
+        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty());
     }
 
     @JsonCreator
@@ -59,7 +62,8 @@ public class TableScanNode
             @JsonProperty("id") PlanNodeId id,
             @JsonProperty("table") TableHandle table,
             @JsonProperty("outputSymbols") List<Symbol> outputs,
-            @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments)
+            @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
+            @JsonProperty("predicate") Optional<Expression> predicate)
     {
         // This constructor is for JSON deserialization only. Do not use.
         super(id);
@@ -68,6 +72,7 @@ public class TableScanNode
         this.assignments = ImmutableMap.copyOf(requireNonNull(assignments, "assignments is null"));
         checkArgument(assignments.keySet().containsAll(outputs), "assignments does not cover all of outputs");
         this.enforcedConstraint = null;
+        this.predicate = predicate;
     }
 
     public TableScanNode(
@@ -75,7 +80,8 @@ public class TableScanNode
             TableHandle table,
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments,
-            TupleDomain<ColumnHandle> enforcedConstraint)
+            TupleDomain<ColumnHandle> enforcedConstraint,
+            Optional<Expression> predicate)
     {
         super(id);
         this.table = requireNonNull(table, "table is null");
@@ -83,6 +89,7 @@ public class TableScanNode
         this.assignments = ImmutableMap.copyOf(requireNonNull(assignments, "assignments is null"));
         checkArgument(assignments.keySet().containsAll(outputs), "assignments does not cover all of outputs");
         this.enforcedConstraint = requireNonNull(enforcedConstraint, "enforcedConstraint is null");
+        this.predicate = requireNonNull(predicate, "predicate expression cannot be empty");
     }
 
     @JsonProperty("table")
@@ -117,6 +124,12 @@ public class TableScanNode
         // enforcedConstraint can be pretty complex. As a result, it may incur a significant cost to serialize, store, and transport.
         checkState(enforcedConstraint != null, "enforcedConstraint should only be used in planner. It is not transported to workers.");
         return enforcedConstraint;
+    }
+
+    @JsonProperty("predicate")
+    public Optional<Expression> getPredicate()
+    {
+        return predicate;
     }
 
     @Override

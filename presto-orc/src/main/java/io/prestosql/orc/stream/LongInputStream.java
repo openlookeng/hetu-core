@@ -17,6 +17,9 @@ import io.prestosql.orc.checkpoint.LongStreamCheckpoint;
 
 import java.io.IOException;
 
+import static com.google.common.base.Preconditions.checkPositionIndex;
+import static java.lang.Math.toIntExact;
+
 public interface LongInputStream
         extends ValueInputStream<LongStreamCheckpoint>
 {
@@ -41,4 +44,16 @@ public interface LongInputStream
         }
         return sum;
     }
+
+    default void nextIntVector(int items, int[] vector, int offset)
+            throws IOException
+    {
+        checkPositionIndex(items + offset, vector.length);
+
+        for (int i = offset; i < items + offset; i++) {
+            vector[i] = toIntExact(next());
+        }
+    }
+
+    int getUsedCount();
 }

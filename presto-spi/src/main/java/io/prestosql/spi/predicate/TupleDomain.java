@@ -202,6 +202,27 @@ public final class TupleDomain<T>
         return withColumnDomains(intersected);
     }
 
+    /**
+     * Returns the strict intersection of the TupleDomains.
+     * The resulting TupleDomain represents the set of tuples that would be valid
+     * in both TupleDomains.
+     */
+    public TupleDomain<T> subtract(TupleDomain<T> other)
+    {
+        if (this.isNone() || other.isNone()) {
+            return none();
+        }
+
+        Map<T, Domain> intersected = new LinkedHashMap<>(this.getDomains().get());
+        for (Map.Entry<T, Domain> entry : other.getDomains().get().entrySet()) {
+            Domain intersectionDomain = intersected.get(entry.getKey());
+            if (intersectionDomain != null) {
+                intersected.put(entry.getKey(), intersectionDomain.subtract(entry.getValue()));
+            }
+        }
+        return withColumnDomains(intersected);
+    }
+
     @SafeVarargs
     public static <T> TupleDomain<T> columnWiseUnion(TupleDomain<T> first, TupleDomain<T> second, TupleDomain<T>... rest)
     {

@@ -126,6 +126,7 @@ public class OrcPageSourceFactory
     private final HdfsEnvironment hdfsEnvironment;
     private final FileFormatDataSourceStats stats;
     private final OrcCacheStore orcCacheStore;
+    private final int domainCompactionThreshold;
 
     @Inject
     public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
@@ -136,6 +137,7 @@ public class OrcPageSourceFactory
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.orcCacheStore = orcCacheStore;
+        this.domainCompactionThreshold = config.getDomainCompactionThreshold();
     }
 
     @Override
@@ -197,7 +199,8 @@ public class OrcPageSourceFactory
                 startRowOffsetOfFile,
                 indexes,
                 orcCacheStore,
-                orcCacheProperties));
+                orcCacheProperties,
+                domainCompactionThreshold));
     }
 
     public static OrcPageSource createOrcPageSource(
@@ -227,7 +230,8 @@ public class OrcPageSourceFactory
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
             OrcCacheStore orcCacheStore,
-            OrcCacheProperties orcCacheProperties)
+            OrcCacheProperties orcCacheProperties,
+            int domainCompactionThreshold)
     {
         for (HiveColumnHandle column : columns) {
             checkArgument(

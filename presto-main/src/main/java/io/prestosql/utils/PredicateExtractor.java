@@ -44,6 +44,7 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -68,52 +69,87 @@ public class PredicateExtractor
     {
     }
 
-    private static Optional<FilterNode> getFilterNode(SqlStageExecution stage)
+    private static List<PlanNode> getFilterNode(SqlStageExecution stage)
     {
         PlanFragment fragment = stage.getFragment();
         PlanNode root = fragment.getRoot();
+        List<PlanNode> result = new LinkedList<>();
 
         Queue<PlanNode> queue = new LinkedList<>();
         queue.add(root);
 
         while (!queue.isEmpty()) {
             PlanNode node = queue.poll();
-            if (node instanceof FilterNode) {
-                return Optional.of((FilterNode) node);
+            if (node instanceof FilterNode
+                    || node instanceof TableScanNode) {
+                result.add(node);
             }
 
             queue.addAll(node.getSources());
         }
 
-        return Optional.empty();
+        return result;
     }
 
     public static boolean isSplitFilterApplicable(SqlStageExecution stage)
     {
-        Optional<FilterNode> filterNodeOptional = getFilterNode(stage);
+        List<PlanNode> filterNodeOptional = getFilterNode(stage);
 
-        if (!filterNodeOptional.isPresent()) {
+        if (filterNodeOptional.isEmpty()) {
             return false;
         }
 
-        FilterNode filterNode = filterNodeOptional.get();
+        PlanNode node = filterNodeOptional.get(0);
 
-        PlanNode sourceNode = filterNode.getSource();
-        if (!(sourceNode instanceof TableScanNode)) {
-            return false;
+        if (node instanceof FilterNode) {
+            FilterNode filterNode = (FilterNode) node;
+            PlanNode sourceNode = filterNode.getSource();
+            if (!(sourceNode instanceof TableScanNode)) {
+                return false;
+            }
+
+            //if a catalog name starts with a $, it's not an normal query, could be something like show tables;
+            TableHandle table = ((TableScanNode) sourceNode).getTable();
+            String catalogName = table.getCatalogName().getCatalogName();
+            if (catalogName.startsWith("$")) {
+                return false;
+            }
+
+            /* (!(table.getConnectorHandle().isFilterSupported()
+             *   && (isSupportedExpression(filterNode.getPredicate())
+             *       || (((TableScanNode) sourceNode).getPredicate().isPresent()
+             *           && isSupportedExpression(((TableScanNode) sourceNode).getPredicate().get())))))
+             */
+            if (!table.getConnectorHandle().isFilterSupported()) {
+                return false;
+            }
+
+            if (!isSupportedExpression(filterNode.getPredicate())
+                    && (!((TableScanNode) sourceNode).getPredicate().isPresent()
+                    || !isSupportedExpression(((TableScanNode) sourceNode).getPredicate().get()))) {
+                return false;
+            }
         }
 
-        //if a catalog name starts with a $, it's not an normal query, could be something like show tables;
-        TableHandle table = ((TableScanNode) sourceNode).getTable();
-        String catalogName = table.getCatalogName().getCatalogName();
-        if (catalogName.startsWith("$")) {
-            return false;
+        if (node instanceof TableScanNode) {
+            TableScanNode tableScanNode = (TableScanNode) node;
+            //if a catalog name starts with a $, it's not an normal query, could be something like show tables;
+            TableHandle table = tableScanNode.getTable();
+            String catalogName = table.getCatalogName().getCatalogName();
+            if (catalogName.startsWith("$")) {
+                return false;
+            }
+
+            if (!table.getConnectorHandle().isFilterSupported()) {
+                return false;
+            }
+
+            if (!tableScanNode.getPredicate().isPresent()
+                    || !isSupportedExpression(tableScanNode.getPredicate().get())) {
+                return false;
+            }
         }
 
-        boolean supported = table.getConnectorHandle().isFilterSupported();
-        if (!supported || !isSupportedExpression(filterNode.getPredicate())) {
-            return false;
-        }
         return true;
     }
 
@@ -142,6 +178,7 @@ public class PredicateExtractor
         if (predicate instanceof InPredicate) {
             return true;
         }
+
         if (predicate instanceof NotExpression) {
             return true;
         }
@@ -158,31 +195,53 @@ public class PredicateExtractor
      */
     public static Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> getExpression(SqlStageExecution stage)
     {
-        Optional<FilterNode> filterNodeOptional = getFilterNode(stage);
+        List<PlanNode> filterNodeOptional = getFilterNode(stage);
 
-        if (!filterNodeOptional.isPresent()) {
+        if (filterNodeOptional.size() == 0) {
             return new Tuple<>(Optional.empty(), new HashMap<>());
         }
 
-        FilterNode filterNode = filterNodeOptional.get();
-        if (filterNode.getSource() instanceof TableScanNode) {
-            TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
-            Expression predicate = filterNode.getPredicate();
-            return new Tuple<>(Optional.of(predicate), tableScanNode.getAssignments());
+        if (filterNodeOptional.get(0) instanceof FilterNode) {
+            FilterNode filterNode = (FilterNode) filterNodeOptional.get(0);
+            if (filterNode.getSource() instanceof TableScanNode) {
+                TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
+                if (tableScanNode.getPredicate().isPresent()) {
+                    return new Tuple<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
+                }
+
+                return new Tuple<>(Optional.of(filterNode.getPredicate()), tableScanNode.getAssignments());
+            }
+
+            return new Tuple<>(Optional.empty(), new HashMap<>());
         }
+
+        if (filterNodeOptional.get(0) instanceof TableScanNode) {
+            TableScanNode tableScanNode = (TableScanNode) filterNodeOptional.get(0);
+            if (tableScanNode.getPredicate().isPresent()) {
+                return new Tuple<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
+            }
+        }
+
         return new Tuple<>(Optional.empty(), new HashMap<>());
     }
 
     public static Optional<String> getFullyQualifiedName(SqlStageExecution stage)
     {
-        Optional<FilterNode> filterNodeOptional = getFilterNode(stage);
+        List<PlanNode> filterNodeOptional = getFilterNode(stage);
 
-        if (!filterNodeOptional.isPresent()) {
+        if (filterNodeOptional.size() == 0) {
             return Optional.empty();
         }
 
-        FilterNode filterNode = filterNodeOptional.get();
-        TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
+        TableScanNode tableScanNode;
+        if (filterNodeOptional.get(0) instanceof FilterNode) {
+            FilterNode filterNode = (FilterNode) filterNodeOptional.get(0);
+            tableScanNode = (TableScanNode) filterNode.getSource();
+        }
+        else {
+            tableScanNode = (TableScanNode) filterNodeOptional.get(0);
+        }
+
         String fullQualifiedTableName = tableScanNode.getTable().getFullyQualifiedName();
 
         return Optional.of(fullQualifiedTableName);

@@ -736,10 +736,11 @@ public class TestLogicalPlanner
         assertPlan(
                 "SELECT orderkey FROM orders WHERE orderstatus='F'",
                 output(
-                        constrainedTableScanWithTableLayout(
+                        project(
+                            constrainedTableScanWithTableLayout(
                                 "orders",
                                 ImmutableMap.of("orderstatus", singleValue(createVarcharType(1), utf8Slice("F"))),
-                                ImmutableMap.of("orderkey", "orderkey"))));
+                                ImmutableMap.of("orderkey", "orderkey")))));
     }
 
     @Test

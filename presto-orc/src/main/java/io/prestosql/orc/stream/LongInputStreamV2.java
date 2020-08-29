@@ -448,4 +448,10 @@ public class LongInputStreamV2
             items -= consume;
         }
     }
+
+    @Override
+    public int getUsedCount()
+    {
+        return used;
+    }
 }

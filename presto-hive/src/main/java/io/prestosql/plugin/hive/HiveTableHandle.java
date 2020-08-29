@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -44,6 +47,9 @@ public class HiveTableHandle
     private final Optional<HiveBucketHandle> bucketHandle;
     private final Optional<HiveBucketing.HiveBucketFilter> bucketFilter;
     private final Optional<List<List<String>>> analyzePartitionValues;
+    private final Map<String, HiveColumnHandle> predicateColumns;
+    private final Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate;
+//    private final RowExpression remainingPredicate; //For Complex Expression.
 
     @JsonCreator
     public HiveTableHandle(
@@ -54,7 +60,9 @@ public class HiveTableHandle
             @JsonProperty("enforcedConstraint") TupleDomain<ColumnHandle> enforcedConstraint,
             @JsonProperty("bucketHandle") Optional<HiveBucketHandle> bucketHandle,
             @JsonProperty("bucketFilter") Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
-            @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues)
+            @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues,
+            @JsonProperty("predicateColumns") Map<String, HiveColumnHandle> predicateColumns,
+            @JsonProperty("additionaPredicates") Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate)
     {
         this(
                 schemaName,
@@ -66,7 +74,9 @@ public class HiveTableHandle
                 enforcedConstraint,
                 bucketHandle,
                 bucketFilter,
-                analyzePartitionValues);
+                analyzePartitionValues,
+                predicateColumns,
+                additionalCompactEffectivePredicate);
     }
 
     public HiveTableHandle(
@@ -86,6 +96,8 @@ public class HiveTableHandle
                 TupleDomain.all(),
                 bucketHandle,
                 Optional.empty(),
+                Optional.empty(),
+                null,
                 Optional.empty());
     }
 
@@ -99,7 +111,9 @@ public class HiveTableHandle
             TupleDomain<ColumnHandle> enforcedConstraint,
             Optional<HiveBucketHandle> bucketHandle,
             Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
-            Optional<List<List<String>>> analyzePartitionValues)
+            Optional<List<List<String>>> analyzePartitionValues,
+            Map<String, HiveColumnHandle> predicateColumns,
+            Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -111,6 +125,8 @@ public class HiveTableHandle
         this.bucketHandle = requireNonNull(bucketHandle, "bucketHandle is null");
         this.bucketFilter = requireNonNull(bucketFilter, "bucketFilter is null");
         this.analyzePartitionValues = requireNonNull(analyzePartitionValues, "analyzePartitionValues is null");
+        this.predicateColumns = predicateColumns;
+        this.additionalCompactEffectivePredicate = requireNonNull(additionalCompactEffectivePredicate, "additionalPredicates is null");
     }
 
     public HiveTableHandle withAnalyzePartitionValues(Optional<List<List<String>>> analyzePartitionValues)
@@ -125,7 +141,9 @@ public class HiveTableHandle
                 enforcedConstraint,
                 bucketHandle,
                 bucketFilter,
-                analyzePartitionValues);
+                analyzePartitionValues,
+                predicateColumns,
+                Optional.empty());
     }
 
     @JsonProperty
@@ -181,6 +199,12 @@ public class HiveTableHandle
     }
 
     @JsonProperty
+    public Map<String, HiveColumnHandle> getPredicateColumns()
+    {
+        return predicateColumns;
+    }
+
+    @JsonProperty
     public TupleDomain<ColumnHandle> getEnforcedConstraint()
     {
         return enforcedConstraint;
@@ -209,6 +233,12 @@ public class HiveTableHandle
         return new SchemaTableName(schemaName, tableName);
     }
 
+    @JsonProperty
+    public Optional<List<TupleDomain<HiveColumnHandle>>> getAdditionalCompactEffectivePredicate()
+    {
+        return additionalCompactEffectivePredicate;
+    }
+
     /**
      * Hetu execution plan caching functionality requires a method to update
      * {@link ConnectorTableHandle} from a previous execution plan with new info from
@@ -235,7 +265,35 @@ public class HiveTableHandle
                 oldHiveConnectorTableHandle.getEnforcedConstraint(),
                 oldHiveConnectorTableHandle.getBucketHandle(),
                 oldHiveConnectorTableHandle.getBucketFilter(),
-                oldHiveConnectorTableHandle.getAnalyzePartitionValues());
+                oldHiveConnectorTableHandle.getAnalyzePartitionValues(),
+                oldHiveConnectorTableHandle.getPredicateColumns(),
+                oldHiveConnectorTableHandle.getAdditionalCompactEffectivePredicate());
+    }
+
+    @Override
+    public boolean hasAdditionalFiltersPushdown()
+    {
+        return additionalCompactEffectivePredicate.isPresent()
+                && additionalCompactEffectivePredicate.get().size() > 0;
+    }
+
+    private String formatPredicate(Function<Domain, String> printer, TupleDomain<HiveColumnHandle> predicate)
+    {
+        return predicate.getDomains().get().entrySet().stream()
+                .map(filter -> filter.getKey().getColumnName() + " <- " + printer.apply(filter.getValue()))
+                .collect(Collectors.joining(" AND ", "{", "}"));
+    }
+
+    @Override
+    public String getAdditionalFilterConditions(Function<Domain, String> printer)
+    {
+        if (additionalCompactEffectivePredicate.isPresent()) {
+            return additionalCompactEffectivePredicate.get().stream()
+                    .map(predicate -> "[ " + formatPredicate(printer, predicate) + " ]")
+                    .collect(Collectors.joining(" OR "));
+        }
+
+        return "";
     }
 
     @Override

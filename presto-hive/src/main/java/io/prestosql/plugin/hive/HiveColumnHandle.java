@@ -30,6 +30,7 @@ import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
+import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
 import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
@@ -111,6 +112,11 @@ public class HiveColumnHandle
     public boolean isPartitionKey()
     {
         return columnType == PARTITION_KEY;
+    }
+
+    public boolean isRegular()
+    {
+        return columnType == REGULAR;
     }
 
     public boolean isHidden()

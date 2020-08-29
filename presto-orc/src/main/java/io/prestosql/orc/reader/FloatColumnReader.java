@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.stream.BooleanInputStream;
@@ -46,8 +47,8 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static io.prestosql.spi.type.RealType.REAL;
 import static java.util.Objects.requireNonNull;
 
-public class FloatColumnReader<T>
-        implements ColumnReader<T>
+public class FloatColumnReader
+        implements ColumnReader<Integer>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(FloatColumnReader.class).instanceSize();
 
@@ -225,5 +226,11 @@ public class FloatColumnReader<T>
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + sizeOf(nullVector);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Integer value)
+    {
+        return filter.testFloat(Float.intBitsToFloat(value));
     }
 }

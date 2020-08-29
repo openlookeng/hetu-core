@@ -49,8 +49,8 @@ import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSour
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static java.util.Objects.requireNonNull;
 
-public class TimestampColumnReader<T>
-        implements ColumnReader<T>
+public class TimestampColumnReader
+        implements ColumnReader<Long>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(TimestampColumnReader.class).instanceSize();
 

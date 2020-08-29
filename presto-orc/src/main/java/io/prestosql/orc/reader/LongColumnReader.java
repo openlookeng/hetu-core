@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
@@ -49,7 +50,7 @@ public class LongColumnReader
     }
 
     @Override
-    public Block<Long> readBlock()
+    public Block readBlock()
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -70,7 +71,7 @@ public class LongColumnReader
             }
         }
 
-        Block<Long> block;
+        Block block;
         if (dataStream == null) {
             if (presentStream == null) {
                 throw new OrcCorruptionException(column.getOrcDataSourceId(), "Value is null but present stream is missing");
@@ -131,5 +132,11 @@ public class LongColumnReader
         long[] result = unpackLongNulls(longNonNullValueTemp, isNull);
 
         return new LongArrayBlock(nextBatchSize, Optional.of(isNull), result);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Long value)
+    {
+        return filter.testLong(value);
     }
 }
