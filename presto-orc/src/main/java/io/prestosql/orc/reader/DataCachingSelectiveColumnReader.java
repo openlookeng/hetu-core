@@ -14,6 +14,7 @@
 package io.prestosql.orc.reader;
 
 import com.google.common.cache.Cache;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcDataSourceId;
@@ -37,7 +38,7 @@ import java.util.concurrent.ExecutionException;
 public class DataCachingSelectiveColumnReader<T>
         implements SelectiveColumnReader<T>
 {
-    private static final Logger log = Logger.get(CachingColumnReader.class);
+    private static final Logger log = Logger.get(DataCachingSelectiveColumnReader.class);
 
     private final Cache<OrcRowDataCacheKey, Block> cache;
     private final ColumnReader delegate;
@@ -168,8 +169,12 @@ public class DataCachingSelectiveColumnReader<T>
                 return delegate.readBlock();
             });
         }
-        catch (ExecutionException e) {
-            throw new IOException(e.getCause());
+        catch (UncheckedExecutionException | ExecutionException executionException) {
+            log.warn(executionException.getCause(), "Error while caching row group data. Falling back to default flow...");
+            delegate.startRowGroup(dataStreamSources);
+            delegate.prepareNextRead((int) rowCount);
+            cachedBlock = delegate.readBlock();
+            return cachedBlock;
         }
     }
 }

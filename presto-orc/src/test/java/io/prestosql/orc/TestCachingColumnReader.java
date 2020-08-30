@@ -77,7 +77,7 @@ public class TestCachingColumnReader
         assertEquals(cache.size(), 1);
     }
 
-    @Test(expectedExceptions = IOException.class)
+    @Test
     public void testStreamReaderThrowsException() throws IOException
     {
         ColumnReader columnReader = mock(ColumnReader.class);
@@ -88,16 +88,18 @@ public class TestCachingColumnReader
         StreamSourceMeta streamSourceMeta = new StreamSourceMeta();
         OrcDataSourceId orcDataSourceId = new OrcDataSourceId("2");
         streamSourceMeta.setDataSourceId(orcDataSourceId);
+        Block block = mock(Block.class);
         when(inputStreamSources.getStreamSourceMeta()).thenReturn(streamSourceMeta);
         when(columnReader.readBlock()).thenThrow(
-                new OrcCorruptionException(orcDataSourceId, "Value is null but stream is missing"));
+                new OrcCorruptionException(orcDataSourceId, "Value is null but stream is missing"))
+                .thenReturn(block);
 
         try {
             cachingColumnReader.startRowGroup(inputStreamSources);
         }
         catch (IOException ioEx) {
             verify(columnReader, atLeastOnce()).startRowGroup(eq(inputStreamSources));
-            verify(columnReader, times(1)).readBlock();
+            verify(columnReader, times(2)).readBlock();
             assertEquals(cache.size(), 0);
             throw ioEx;
         }

@@ -16,6 +16,8 @@ package io.prestosql.plugin.hive.orc;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.OrcCacheProperties;
@@ -72,6 +74,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -121,6 +124,8 @@ public class OrcPageSourceFactory
     public static final String ACID_COLUMN_ROW_STRUCT = "row";
 
     private static final Pattern DEFAULT_HIVE_COLUMN_NAME_PATTERN = Pattern.compile("_col\\d+");
+    private static final Logger log = Logger.get(OrcPageSourceFactory.class);
+
     private final TypeManager typeManager;
     private final boolean useOrcColumnNames;
     private final HdfsEnvironment hdfsEnvironment;
@@ -270,7 +275,13 @@ public class OrcPageSourceFactory
             OrcDataSource readerLocalDataSource = OrcReader.wrapWithCacheIfTiny(orcDataSource, tinyStripeThreshold);
             OrcFileTail fileTail;
             if (orcCacheProperties.isFileTailCacheEnabled()) {
-                fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcPageSourceFactory.createFileTail(orcDataSource));
+                try {
+                    fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcPageSourceFactory.createFileTail(orcDataSource));
+                }
+                catch (UncheckedExecutionException | ExecutionException executionException) {
+                    log.warn(executionException.getCause(), "Error while caching the Orc file tail. Falling back to default flow");
+                    fileTail = OrcPageSourceFactory.createFileTail(orcDataSource);
+                }
             }
             else {
                 fileTail = OrcPageSourceFactory.createFileTail(orcDataSource);
