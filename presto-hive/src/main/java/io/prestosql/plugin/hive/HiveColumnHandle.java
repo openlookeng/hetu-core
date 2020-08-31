@@ -53,6 +53,10 @@ public class HiveColumnHandle
     public static final int ROW_ID__COLUMN_INDEX = -13;
     public static final String UPDATE_ROW_ID_COLUMN_NAME = "$rowId";
 
+    // Ids <= MAX_PARTITION_KEY_COLUMN_INDEX, can be used for distinguishing between different partition prefilled columns.
+    // NOTE: Incase any new hidden columns added, their index should be more than below value or below value should be adjusted.
+    public static final int MAX_PARTITION_KEY_COLUMN_INDEX = -14;
+
     public enum ColumnType
     {
         PARTITION_KEY,

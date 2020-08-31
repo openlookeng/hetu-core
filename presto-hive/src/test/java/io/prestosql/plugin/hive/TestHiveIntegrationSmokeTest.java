@@ -2068,6 +2068,39 @@ public class TestHiveIntegrationSmokeTest
 
         assertQuery("SELECT * from test_metadata_delete", "SELECT orderkey, linenumber, linestatus FROM lineitem WHERE linestatus<>'O' and linenumber<>3");
 
+        Session session1 = Session.builder(getSession())
+                .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                .build();
+        assertQuery(session1, "SELECT * from test_metadata_delete", "SELECT orderkey, linenumber, linestatus FROM lineitem WHERE linestatus<>'O' and linenumber<>3");
+
+        @Language("SQL") String multiPartTable = "" +
+                "CREATE TABLE test_multi_part " +
+                "(" +
+                "  ID1 INTEGER," +
+                "  ID2 INTEGER," +
+                "  ID3 INTEGER," +
+                "  ID4 INTEGER," +
+                "  ID5 INTEGER," +
+                "  ID6 INTEGER," +
+                "  ID7 INTEGER," +
+                "  ID8 INTEGER," +
+                "  ID9 INTEGER," +
+                "  ID10 INTEGER," +
+                "  ID11 INTEGER," +
+                "  ID12 INTEGER," +
+                "  ID13 INTEGER," +
+                "  ID14 INTEGER " +
+                ") " +
+                "WITH (" +
+                PARTITIONED_BY_PROPERTY + " = ARRAY[ 'ID2','ID3','ID4','ID5','ID6','ID7','ID8','ID9','ID10','ID11','ID12','ID13','ID14']" +
+                ") ";
+
+        assertUpdate(multiPartTable);
+        assertUpdate("" +
+                        "INSERT INTO test_multi_part values(1,2,3,4,5,6,7,8,9,10,11,12,13,14) ",
+                "SELECT 1");
+        assertEquals(computeActual("SELECT *, \"$path\" FROM test_multi_part").getRowCount(), 1L);
+        assertUpdate("DROP TABLE test_multi_part");
         assertUpdate("DROP TABLE test_metadata_delete");
 
         assertFalse(getQueryRunner().tableExists(getSession(), "test_metadata_delete"));
