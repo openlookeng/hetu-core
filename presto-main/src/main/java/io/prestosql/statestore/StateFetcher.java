@@ -28,6 +28,8 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -50,7 +52,7 @@ import static io.prestosql.utils.StateUtils.removeState;
  */
 public class StateFetcher
 {
-    private static final Logger log = Logger.get(StateFetcher.class);
+    private static final Logger LOG = Logger.get(StateFetcher.class);
 
     private final StateStoreProvider stateStoreProvider;
     private final Duration fetchInterval;
@@ -81,7 +83,7 @@ public class StateFetcher
                 fetchStates();
             }
             catch (Exception e) {
-                log.error("Error fetching query states: " + e.getMessage());
+                LOG.error("Error fetching query states: " + e.getMessage());
             }
         }, fetchInterval.toMillis(), fetchInterval.toMillis(), TimeUnit.MILLISECONDS);
     }
@@ -121,7 +123,7 @@ public class StateFetcher
     }
 
     /**
-     * Update local queued query states to state store
+     * Fetch state from state store to cache store
      *
      * @throws IOException exception when failed to deserialize states
      */
@@ -133,6 +135,11 @@ public class StateFetcher
             if (stateStoreProvider.getStateStore() == null) {
                 return;
             }
+
+            long start = System.currentTimeMillis();
+            LOG.debug("fetchStates starts at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
+                    start,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
 
             DateTime currentTime = new DateTime(DateTimeZone.UTC);
             for (String stateCollectionName : stateCollections) {
@@ -159,9 +166,14 @@ public class StateFetcher
                     StateCacheStore.get().setCachedStates(stateCollectionName, queryStatesBuilder.build());
                 }
                 else {
-                    log.warn("Unsupported state collection type: %s", stateCollection.getType());
+                    LOG.warn("Unsupported state collection type: %s", stateCollection.getType());
                 }
             }
+            long end = System.currentTimeMillis();
+            LOG.debug("updateStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
+                    end,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
+                    end - start);
         }
     }
 
@@ -195,7 +207,7 @@ public class StateFetcher
             lock = stateStoreProvider.getStateStore().getLock(StateStoreConstants.HANDLE_EXPIRED_QUERY_LOCK_NAME);
             locked = lock.tryLock(StateStoreConstants.DEFAULT_ACQUIRED_LOCK_TIME_MS, TimeUnit.MILLISECONDS);
             if (locked) {
-                log.debug(String.format("EXPIRED!!! REMOVING... Id: %s, state: %s, uri: %s, query: %s",
+                LOG.debug(String.format("EXPIRED!!! REMOVING... Id: %s, state: %s, uri: %s, query: %s",
                         state.getBasicQueryInfo().getQueryId().getId(),
                         state.getBasicQueryInfo().getState().toString(),
                         state.getBasicQueryInfo().getSelf().toString(),
@@ -203,7 +215,7 @@ public class StateFetcher
 
                 // remove expired query from oom
                 StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME);
-                removeState(stateCollection, Optional.of(state.getBasicQueryInfo().getQueryId()), log);
+                removeState(stateCollection, Optional.of(state.getBasicQueryInfo().getQueryId()), LOG);
 
                 // update query to failed in stateCollection if exists
                 stateCollection = stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
@@ -220,7 +232,7 @@ public class StateFetcher
             }
         }
         catch (Exception e) {
-            log.error("Error handleExpiredQueryState: " + e.getMessage());
+            LOG.error("Error handleExpiredQueryState: " + e.getMessage());
         }
         finally {
             if (locked) {

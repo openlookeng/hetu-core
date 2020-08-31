@@ -402,7 +402,7 @@ public class DispatchManager
     }
 
     // Submit query synchronously to the distributed resource group
-    private void submitQuerySync(DispatchQuery dispatchQuery, SelectionContext selectionContext)
+    private synchronized void submitQuerySync(DispatchQuery dispatchQuery, SelectionContext selectionContext)
             throws InterruptedException, PrestoException
     {
         if (stateStoreProvider.getStateStore() == null) {
@@ -413,14 +413,14 @@ public class DispatchManager
         Lock lock = stateStoreProvider.getStateStore().getLock(StateStoreConstants.SUBMIT_QUERY_LOCK_NAME);
         // Make sure query submission is synchronized
         boolean locked = lock.tryLock(hetuConfig.getQuerySubmitTimeout().toMillis(), TimeUnit.MILLISECONDS);
-        long current;
+        long start = 0L;
         if (locked) {
             try {
-                current = System.currentTimeMillis();
+                start = System.currentTimeMillis();
                 LOG.debug("Get submit-query-lock, will submit query:%s, at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
                         dispatchQuery.getQueryId(),
-                        current,
-                        new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(current)));
+                        start,
+                        new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
                 stateFetcher.fetchStates();
                 resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
                 // Register dispatch query to StateUpdater
@@ -438,11 +438,12 @@ public class DispatchManager
             }
             finally {
                 lock.unlock();
-                current = System.currentTimeMillis();
-                LOG.debug("Release submit-query-lock, will submit query:%s, at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
+                long end = System.currentTimeMillis();
+                LOG.debug("Release submit-query-lock, query:%s, at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
                         dispatchQuery.getQueryId(),
-                        current,
-                        new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(current)));
+                        end,
+                        new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
+                        end - start);
             }
         }
         else {
