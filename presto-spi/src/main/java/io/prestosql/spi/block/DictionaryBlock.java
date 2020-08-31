@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -463,5 +464,29 @@ public class DictionaryBlock<T>
             // ignore if copy positions is not supported for the dictionary block
             return this;
         }
+    }
+
+    @Override
+    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        int matchCount = 0;
+        for (int i = 0; i < positionCount; i++) {
+            if (dictionary.isNull(getId(positions[i]))) {
+                continue;
+            }
+
+            byte[] value = dictionary.getString(positions[i], 0, 0).getBytes();
+            if (test.apply(value)) {
+                matchedPositions[matchCount++] = positions[i];
+            }
+        }
+
+        return matchCount;
+    }
+
+    @Override
+    public T get(int position)
+    {
+        return dictionary.get(getId(position));
     }
 }
