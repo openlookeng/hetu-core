@@ -1,17 +1,30 @@
-#### Hetu namespace ####
+# Copyright (C) 2020. Huawei Technologies Co., Ltd. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#### openlk namespace ####
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: hetu
+  name: openlk
 
-#### Hetu service ####
+#### openLooKeng service ####
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: hetu
-  namespace: hetu
+  name: openlk
+  namespace: openlk
 spec:
   type: NodePort
   ports:
@@ -19,20 +32,20 @@ spec:
     targetPort: 8080
     nodePort: 30321
   selector:
-    app: hetu-coordinator
+    app: openlk-coordinator
 
 #### coordinator ####
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hetu-coordinator
-  namespace: hetu
+  name: openlk-coordinator
+  namespace: openlk
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: hetu-coordinator
+      app: openlk-coordinator
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -41,16 +54,16 @@ spec:
   template:
     metadata:
       labels:
-        app: hetu-coordinator
+        app: openlk-coordinator
     spec:
       # TODO: enable if graceful shutdown is needed
       # terminationGracePeriodSeconds: 3600
       containers:
-      - name: hetu-coordinator
-        image: hetu:{{ imageTag }}
+      - name: openlk-coordinator
+        image: openlookeng:{{ imageTag }}
         imagePullPolicy: IfNotPresent
-        # Update "jvmXmx" value according to memory allocation below. Suggest 75~80% of total memory limit.
-        args: ["-t", "coordinator", "-configDir", "/custom-configs", "-jvmXmx", "1500M"]
+        # Update "jvmXmx" value according to memory allocation below. Suggest 60~70% of total memory limit.
+        args: ["-t", "coordinator", "-configDir", "/custom-configs", "-jvmXmx", "1300M"]
         resources:
           requests:
             cpu: 1
@@ -71,20 +84,20 @@ spec:
       - name: custom-configs-volume
         hostPath:
           # TODO: update to point to additional configuration and catalog folder
-          path: /hetu/hetu-core/hetu-samples/kubernetes/config-coordinator
+          path: /hetu-core/hetu-samples/kubernetes/config-coordinator
 
 #### worker ####
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hetu-worker
-  namespace: hetu
+  name: openlk-worker
+  namespace: openlk
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: hetu-worker
+      app: openlk-worker
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -93,16 +106,16 @@ spec:
   template:
     metadata:
       labels:
-        app: hetu-worker
+        app: openlk-worker
     spec:
       # TODO: enable if graceful shutdown is needed
       # terminationGracePeriodSeconds: 600
       containers:
-      - name: hetu-worker
-        image: hetu:{{ imageTag }}
+      - name: openlk-worker
+        image: openlookeng:{{ imageTag }}
         imagePullPolicy: IfNotPresent
-        # Update "jvmXmx" value according to memory allocation below. Suggest 75~80% of total memory limit.
-        args: ["-t", "worker", "-discoveryURI", "http://hetu:8080", "-configDir", "/custom-configs", "-jvmXmx", "1500M"]
+        # Update "jvmXmx" value according to memory allocation below. Suggest 60~70% of total memory limit.
+        args: ["-t", "worker", "-discoveryURI", "http://openlk:8080", "-configDir", "/custom-configs", "-jvmXmx", "1300M"]
         resources:
           requests:
             cpu: 1
@@ -123,7 +136,7 @@ spec:
       - name: custom-configs-volume
         hostPath:
           # TODO: update to point to additional configuration and catalog folder
-          path: /hetu/hetu-core/hetu-samples/kubernetes/config-worker
+          path: /hetu-core/hetu-samples/kubernetes/config-worker
 
 # TODO: enable for coordinator auto-scaling
 #### HPA for coordinator ####
@@ -131,13 +144,13 @@ spec:
 # apiVersion: autoscaling/v2beta2
 # kind: HorizontalPodAutoscaler
 # metadata:
-#   name: hetu-coordinator-scaler
-#   namespace: hetu
+#   name: openlk-coordinator-scaler
+#   namespace: openlk
 # spec:
 #   scaleTargetRef:
 #     apiVersion: apps/v1
 #     kind: Deployment
-#     name: hetu-coordinator
+#     name: openlk-coordinator
 #   minReplicas: 1
 #   maxReplicas: 2
 #   metrics:
@@ -158,13 +171,13 @@ spec:
 # apiVersion: autoscaling/v2beta2
 # kind: HorizontalPodAutoscaler
 # metadata:
-#   name: hetu-worker-scaler
-#   namespace: hetu
+#   name: openlk-worker-scaler
+#   namespace: openlk
 # spec:
 #   scaleTargetRef:
 #     apiVersion: apps/v1
 #     kind: Deployment
-#     name: hetu-worker
+#     name: openlk-worker
 #   minReplicas: 1
 #   maxReplicas: 5
 #   metrics:
