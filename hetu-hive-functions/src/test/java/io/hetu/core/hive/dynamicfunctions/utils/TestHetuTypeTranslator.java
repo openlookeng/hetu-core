@@ -22,8 +22,6 @@ import org.testng.annotations.Test;
 
 import java.util.Arrays;
 
-import static io.hetu.core.hive.dynamicfunctions.utils.HiveTypeTranslator.translateFromHiveTypeInfo;
-import static io.hetu.core.hive.dynamicfunctions.utils.HiveTypeTranslator.translateToHiveTypeInfo;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.booleanTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo;
@@ -36,38 +34,38 @@ public class TestHetuTypeTranslator
     @Test
     public void testTranslateFromHiveTypeInfoWithPrimitiveType()
     {
-        assertEquals(translateFromHiveTypeInfo(booleanTypeInfo).toString(), BOOLEAN);
+        assertEquals(HiveTypeTranslator.translateFromHiveTypeInfo(booleanTypeInfo).toString(), BOOLEAN);
     }
 
     @Test
     public void testTranslateFromHiveTypeInfoWithListType()
     {
-        assertEquals(translateFromHiveTypeInfo(getListTypeInfo(intTypeInfo)).toString(), "array(integer)");
+        assertEquals(HiveTypeTranslator.translateFromHiveTypeInfo(getListTypeInfo(intTypeInfo)).toString(), "array(integer)");
     }
 
     @Test
     public void testTranslateFromHiveTypeInfoWithMapType()
     {
-        assertEquals(translateFromHiveTypeInfo(getMapTypeInfo(intTypeInfo, intTypeInfo)).toString(),
+        assertEquals(HiveTypeTranslator.translateFromHiveTypeInfo(getMapTypeInfo(intTypeInfo, intTypeInfo)).toString(),
                 "map(integer,integer)");
     }
 
     @Test
     public void testTranslateToHiveTypeInfoWithPrimitiveType()
     {
-        assertEquals(translateToHiveTypeInfo(BooleanType.BOOLEAN), booleanTypeInfo);
+        assertEquals(HiveTypeTranslator.translateToHiveTypeInfo(BooleanType.BOOLEAN), booleanTypeInfo);
     }
 
     @Test
     public void testTranslateToHiveTypeInfoWithListType()
     {
-        assertEquals(translateToHiveTypeInfo(new ArrayParametricType().createType(Arrays.asList("integer"))), getListTypeInfo(intTypeInfo));
+        assertEquals(HiveTypeTranslator.translateToHiveTypeInfo(new ArrayParametricType().createType(Arrays.asList("integer"))), getListTypeInfo(intTypeInfo));
     }
 
     @Test
     public void testTranslateToHiveTypeInfoWithMapType()
     {
-        assertEquals(translateToHiveTypeInfo(new MapParametricType().createType(Arrays.asList("integer", "integer"))),
+        assertEquals(HiveTypeTranslator.translateToHiveTypeInfo(new MapParametricType().createType(Arrays.asList("integer", "integer"))),
                 getMapTypeInfo(intTypeInfo, intTypeInfo));
     }
 }

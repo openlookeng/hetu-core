@@ -106,7 +106,7 @@ public class Console
                 hasQuery = true;
             }
             catch (IOException e) {
-                System.out.println(format("Error: Read failed from file %s: %s", cliOptions.sqlFile, e.getMessage()));
+                System.out.println(format("Error: Read failed from input file %s", e.getMessage()));
                 return false;
             }
         }
@@ -124,7 +124,7 @@ public class Console
         // set source type
         if (cliOptions.sourceType != null && !cliOptions.sourceType.isEmpty()) {
             if (!setSourceType(cliOptions.sourceType.toLowerCase(ENGLISH), session)) {
-                System.out.println(format("Error: Migration tool doesn't support type: %s", cliOptions.sourceType));
+                System.out.println("Error: Migration tool doesn't support the sql type you choose");
                 return false;
             }
         }
@@ -139,7 +139,7 @@ public class Console
             session.setMigrationConfig(new MigrationConfig(cliOptions.configFile));
         }
         catch (IOException e) {
-            System.out.println(format("Error: Read config file[%s] failed: %s", cliOptions.configFile, e.getMessage()));
+            System.out.println(format("Error: Read config file failed: %s", e.getMessage()));
             return false;
         }
 
@@ -148,7 +148,7 @@ public class Console
             String outputFile = null;
             if (cliOptions.outputPath != null) {
                 if (!new File(cliOptions.outputPath).isDirectory()) {
-                    System.out.println(format("Error: Output is not a directory: %s", cliOptions.outputPath));
+                    System.out.println("Error: Output is not a directory");
                     return false;
                 }
 

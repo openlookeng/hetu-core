@@ -124,8 +124,9 @@ public class LocalFileRecordCursor
     {
         LocalFileTableHandle table = localFileTables.getTable(tableName);
         List<File> fileNames = localFileTables.getFiles(tableName);
+        int maxRowFromFile = localFileTables.getMaxTablesRowFromFile();
         try {
-            return new FilesReader(table.getTimestampColumn(), fileNames.iterator(), predicate);
+            return new FilesReader(table.getTimestampColumn(), fileNames.iterator(), predicate, maxRowFromFile);
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -251,12 +252,14 @@ public class LocalFileRecordCursor
         private final Iterator<File> files;
         private final Optional<Domain> domain;
         private final OptionalInt timestampOrdinalPosition;
-
+        private int maxRowFromFile;
         private BufferedReader reader;
 
-        public FilesReader(OptionalInt timestampOrdinalPosition, Iterator<File> files, TupleDomain<LocalFileColumnHandle> predicate)
+        public FilesReader(OptionalInt timestampOrdinalPosition, Iterator<File> files, TupleDomain<LocalFileColumnHandle> predicate, int maxRowFromFiles)
                 throws IOException
         {
+            this.maxRowFromFile = maxRowFromFiles;
+
             requireNonNull(files, "files is null");
             this.files = files;
 
@@ -315,7 +318,9 @@ public class LocalFileRecordCursor
         {
             List<String> fields = null;
             boolean newReader = false;
-
+            if (maxRowFromFile <= 0) {
+                throw new PrestoException(LOCAL_FILE_READ_ERROR, "Local file too large for presto.");
+            }
             while (fields == null) {
                 if (reader == null) {
                     return null;
@@ -324,6 +329,7 @@ public class LocalFileRecordCursor
                 if (line != null) {
                     fields = LINE_SPLITTER.splitToList(line);
                     if (!newReader || meetsPredicate(fields)) {
+                        maxRowFromFile--;
                         return fields;
                     }
                 }
@@ -331,6 +337,7 @@ public class LocalFileRecordCursor
                 reader = createNextReader();
                 newReader = true;
             }
+            maxRowFromFile--;
             return fields;
         }
 
