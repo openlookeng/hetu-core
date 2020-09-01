@@ -28,6 +28,7 @@ import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.InListExpression;
@@ -39,6 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
+import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN_OR_EQUAL;
 
 public class SplitUtils
 {
@@ -86,18 +90,28 @@ public class SplitUtils
         return splitsToReturn;
     }
 
-    private static List<Split> splitFilter(Expression expression, List<Split> splitsToReturn, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
+    private static List<Split> splitFilter(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
     {
+        List<Split> splitsToReturn = new ArrayList<>();
         if (expression instanceof ComparisonExpression) {
             // get filter for each predicate
             // the SplitFilterFactory will return a SplitFilter that has the applicable indexes
             // based on the predicate, but no filtering has been performed yet
             Predicate predicate = PredicateExtractor.processComparisonExpression((ComparisonExpression) expression, fullQualifiedTableName, assignments);
             if (predicate != null) {
-                SplitFilter splitFilter = splitFilterFactory.getFilter(predicate, splitsToReturn);
+                SplitFilter splitFilter = splitFilterFactory.getFilter(predicate, inputSplits);
                 // do filter on splits to remove invalid splits from filteredSplits
-                splitsToReturn = splitFilter.filter(splitsToReturn, predicate.getValue());
+                splitsToReturn = splitFilter.filter(inputSplits, predicate.getValue());
             }
+        }
+
+        if (expression instanceof BetweenPredicate) {
+            BetweenPredicate betweenPredicate = (BetweenPredicate) expression;
+            ComparisonExpression left = new ComparisonExpression(GREATER_THAN_OR_EQUAL, betweenPredicate.getValue(), betweenPredicate.getMin());
+            ComparisonExpression right = new ComparisonExpression(LESS_THAN_OR_EQUAL, betweenPredicate.getValue(), betweenPredicate.getMax());
+
+            List<Split> splitsRemain = splitFilter(left, inputSplits, fullQualifiedTableName, assignments);
+            splitsToReturn = splitFilter(right, splitsRemain, fullQualifiedTableName, assignments);
         }
 
         if (expression instanceof LogicalBinaryExpression) {
@@ -108,15 +122,16 @@ public class SplitUtils
             // if is an AND operator, the splits are first filtered using the index on nationKey,
             // the remaining splits are then filtered using the index on name column
             if ((operator == LogicalBinaryExpression.Operator.AND)) {
-                List<Split> splitsRemain = splitFilter(lbExpression.getLeft(), splitsToReturn, fullQualifiedTableName, assignments);
+                List<Split> splitsRemain = splitFilter(lbExpression.getLeft(), inputSplits, fullQualifiedTableName, assignments);
                 splitsToReturn = splitFilter(lbExpression.getRight(), splitsRemain, fullQualifiedTableName, assignments);
             }
             // select * from hive.tpch.nation where nationKey = 24 or name = 'CANADA';
             // if is an OR operator, apply filtering on nationKey, the splits that match are to be returned,
             // for splits that didn’t match the nationKey filter, the name column filter is applied, if any splits match, they will also be returned.
             else if ((operator == LogicalBinaryExpression.Operator.OR)) {
-                List<Split> splitsNotMatched = splitsToReturn;
-                splitsToReturn = splitFilter(lbExpression.getLeft(), splitsToReturn, fullQualifiedTableName, assignments);
+                List<Split> splitsNotMatched = new ArrayList<>();
+                splitsNotMatched.addAll(inputSplits);
+                splitsToReturn = splitFilter(lbExpression.getLeft(), inputSplits, fullQualifiedTableName, assignments);
 
                 splitsNotMatched.removeAll(splitsToReturn);
                 List<Split> splitsMatched = splitFilter(lbExpression.getRight(), splitsNotMatched, fullQualifiedTableName, assignments);
@@ -132,8 +147,10 @@ public class SplitUtils
             Expression valueList = ((InPredicate) expression).getValueList();
             if (valueList instanceof InListExpression) {
                 InListExpression inListExpression = (InListExpression) valueList;
-                List<Split> splitsNotMatched = splitsToReturn;
+                List<Split> splitsNotMatched = new ArrayList<>();
                 List<Split> splitsPrepareToReturn = new ArrayList<>();
+
+                splitsNotMatched.addAll(inputSplits);
 
                 for (Expression expr : inListExpression.getValues()) {
                     ComparisonExpression comparisonExpression = new ComparisonExpression(

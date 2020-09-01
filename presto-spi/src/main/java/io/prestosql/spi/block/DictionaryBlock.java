@@ -475,7 +475,7 @@ public class DictionaryBlock<T>
                 continue;
             }
 
-            byte[] value = dictionary.getString(positions[i], 0, 0).getBytes();
+            T value = dictionary.get(getId(positions[i]));
             if (test.apply(value)) {
                 matchedPositions[matchCount++] = positions[i];
             }

@@ -477,7 +477,7 @@ public class TestPredicatePushdown
                                                 "orders",
                                                 ImmutableMap.of("ORDERSTATUS", "orderstatus"))),
                                 anyTree(
-                                        filter("CAST(NAME AS varchar(1)) BETWEEN 'A' AND 'O'",
+                                        filter("CAST(\"name\" AS varchar(1)) IN ('F', 'O')",
                                                 tableScan(
                                                         "nation",
                                                         ImmutableMap.of("NAME", "name")))))));

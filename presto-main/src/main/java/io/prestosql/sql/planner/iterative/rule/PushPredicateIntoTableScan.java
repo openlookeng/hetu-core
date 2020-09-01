@@ -85,12 +85,14 @@ public class PushPredicateIntoTableScan
     private final Metadata metadata;
     private final TypeAnalyzer typeAnalyzer;
     private final DomainTranslator domainTranslator;
+    private final boolean pushPartitionsOnly;
 
-    public PushPredicateIntoTableScan(Metadata metadata, TypeAnalyzer typeAnalyzer)
+    public PushPredicateIntoTableScan(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pushPartitionsOnly)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
         this.domainTranslator = new DomainTranslator(new LiteralEncoder(metadata));
+        this.pushPartitionsOnly = pushPartitionsOnly;
     }
 
     @Override
@@ -113,7 +115,8 @@ public class PushPredicateIntoTableScan
                 context.getIdAllocator(),
                 metadata,
                 typeAnalyzer,
-                domainTranslator);
+                domainTranslator,
+                pushPartitionsOnly);
 
         if (!rewritten.isPresent() || arePlansSame(filterNode, tableScan, rewritten.get())) {
             return Result.empty();
@@ -151,7 +154,8 @@ public class PushPredicateIntoTableScan
             PlanNodeIdAllocator idAllocator,
             Metadata metadata,
             TypeAnalyzer typeAnalyzer,
-            DomainTranslator domainTranslator)
+            DomainTranslator domainTranslator,
+            boolean pushPartitionsOnly)
     {
         // don't include non-deterministic predicates
         Expression deterministicPredicate = filterDeterministicConjuncts(predicate);
@@ -162,32 +166,36 @@ public class PushPredicateIntoTableScan
                 deterministicPredicate,
                 types);
 
-        List<Expression> orSet = extractDisjuncts(decomposedPredicate.getRemainingExpression());
-        List<DomainTranslator.ExtractionResult> additionalPredicates = orSet.stream()
-                .map(e -> DomainTranslator.fromPredicate(metadata, session, e, types))
-                .collect(Collectors.toList());
-
-        AtomicInteger i = new AtomicInteger(0);
-        additionalPredicates.stream().forEach(er -> {
-            log.debug("[%d]- Enforced [%s]\n\tRemaining [%s]", i.getAndIncrement(),
-                    er.getTupleDomain(), er.getRemainingExpression());
-        });
-
         TupleDomain<ColumnHandle> newDomain = decomposedPredicate.getTupleDomain()
                 .transform(node.getAssignments()::get)
                 .intersect(node.getEnforcedConstraint());
 
-        List<TupleDomain<ColumnHandle>> orDomains = additionalPredicates.stream()
-                .map(er -> er.getTupleDomain().transform(node.getAssignments()::get))
-                .collect(Collectors.toList());
-
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
         Constraint constraint;
-        List<Constraint> additionalConstraints = orDomains.stream()
-                .filter(d -> !d.isAll() && !d.isNone())
-                .map(d -> new Constraint(d))
-                .collect(Collectors.toList());
+        List<Constraint> additionalConstraints = ImmutableList.of();
+
+        if (!pushPartitionsOnly) {
+            List<Expression> orSet = extractDisjuncts(decomposedPredicate.getRemainingExpression());
+            List<DomainTranslator.ExtractionResult> additionalPredicates = orSet.stream()
+                    .map(e -> DomainTranslator.fromPredicate(metadata, session, e, types))
+                    .collect(Collectors.toList());
+
+            AtomicInteger i = new AtomicInteger(0);
+            additionalPredicates.stream().forEach(er -> {
+                log.debug("[%d]- Enforced [%s]\n\tRemaining [%s]", i.getAndIncrement(),
+                        er.getTupleDomain(), er.getRemainingExpression());
+            });
+
+            List<TupleDomain<ColumnHandle>> orDomains = additionalPredicates.stream()
+                    .map(er -> er.getTupleDomain().transform(node.getAssignments()::get))
+                    .collect(Collectors.toList());
+
+            additionalConstraints = orDomains.stream()
+                    .filter(d -> !d.isAll() && !d.isNone())
+                    .map(d -> new Constraint(d))
+                    .collect(Collectors.toList());
+        }
 
         if (pruneWithPredicateExpression) {
             LayoutConstraintEvaluator evaluator = new LayoutConstraintEvaluator(
@@ -219,7 +227,7 @@ public class PushPredicateIntoTableScan
                 return Optional.of(new ValuesNode(idAllocator.getNextId(), node.getOutputSymbols(), ImmutableList.of()));
             }
 
-            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints);
+            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints, pushPartitionsOnly);
 
             if (!result.isPresent()) {
                 return Optional.empty();

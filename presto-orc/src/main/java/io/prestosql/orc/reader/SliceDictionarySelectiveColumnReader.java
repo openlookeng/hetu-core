@@ -277,13 +277,13 @@ public class SliceDictionarySelectiveColumnReader
                             accumulator.set(position);
                         }
                     }
-
-                    if (outputRequired) {
-                        values[outputPositionCount] = index;
-                    }
-                    outputPositions[outputPositionCount] = position;
-                    outputPositionCount++;
                 }
+
+                if (outputRequired) {
+                    values[outputPositionCount] = index;
+                }
+                outputPositions[outputPositionCount] = position;
+                outputPositionCount++;
             }
 
             streamPosition++;
