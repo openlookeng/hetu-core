@@ -61,7 +61,7 @@ public class TestCarbondataMinorConfig
         map.put("hive.allow-drop-table", "true");
         map.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
         map.put("carbondata.store-location", "file://" + storePath + "/carbon.store");
-        map.put("carbondata.minor-compaction-seg-count", "-1");
+        map.put("carbondata.minor-vacuum-seg-count", "-1");
 
         if (!FileFactory.isFileExist( storePath + "/carbon.store")) {
             FileFactory.mkdirs( storePath + "/carbon.store");

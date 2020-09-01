@@ -88,8 +88,8 @@ public class TestCarbonAllDataType
         map.put("hive.allow-drop-table", "true");
         map.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
         map.put("carbondata.store-location", "file://" + carbonStoreLocation);
-        map.put("carbondata.minor-compaction-seg-count", "4");
-        map.put("carbondata.major-compaction-seg-size", "1");
+        map.put("carbondata.minor-vacuum-seg-count", "4");
+        map.put("carbondata.major-vacuum-seg-size", "1");
 
         if (!FileFactory.isFileExist( storePath + "/carbon.store")) {
             FileFactory.mkdirs( storePath + "/carbon.store");

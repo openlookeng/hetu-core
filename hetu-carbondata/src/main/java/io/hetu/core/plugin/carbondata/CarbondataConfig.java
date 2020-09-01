@@ -43,14 +43,14 @@ public class CarbondataConfig
         return this;
     }
 
-    @Config("carbondata.minor-compaction-seg-count")
+    @Config("carbondata.minor-vacuum-seg-count")
     public CarbondataConfig setMinorVacuumSegCount(String minorVacuumSegCount)
     {
         this.minorVacuumSegCount = Long.parseLong(minorVacuumSegCount);
         return this;
     }
 
-    @Config("carbondata.major-compaction-seg-size")
+    @Config("carbondata.major-vacuum-seg-size")
     public CarbondataConfig setMajorVacuumSegSize(String majorVacuumSegSize)
     {
         this.majorVacuumSegSize = Long.parseLong(majorVacuumSegSize);
