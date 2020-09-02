@@ -24,6 +24,7 @@ import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.gcs.GoogleGcsConfigurationInitializer;
 import io.prestosql.plugin.hive.gcs.HiveGcsConfig;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
+import io.prestosql.plugin.hive.orc.OrcSelectivePageSourceFactory;
 import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
 import io.prestosql.plugin.hive.rcfile.RcFilePageSourceFactory;
 import io.prestosql.plugin.hive.s3.HiveS3Config;
@@ -102,6 +103,23 @@ public final class HiveTestUtils
                         new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
                         new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())))
                 .add(new ParquetPageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats))
+                .build();
+    }
+
+    public static Set<HiveSelectivePageSourceFactory> getDefaultHiveSelectiveFactories(HiveConfig hiveConfig)
+    {
+        FileFormatDataSourceStats stats = new FileFormatDataSourceStats();
+        HdfsEnvironment testHdfsEnvironment = createTestHdfsEnvironment(hiveConfig);
+        return ImmutableSet.<HiveSelectivePageSourceFactory>builder()
+                .add(new OrcSelectivePageSourceFactory(TYPE_MANAGER, hiveConfig, testHdfsEnvironment, stats, OrcCacheStore.builder().newCacheStore(
+                        new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
+                        new HiveConfig().getOrcStripeFooterCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcStripeFooterCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowIndexCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcRowIndexCacheTtl().toMillis()),
+                        new HiveConfig().getOrcBloomFiltersCacheLimit(),
+                        Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
+                        new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
+                        new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())))
                 .build();
     }
 

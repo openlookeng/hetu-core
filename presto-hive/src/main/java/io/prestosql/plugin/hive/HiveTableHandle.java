@@ -49,6 +49,7 @@ public class HiveTableHandle
     private final Optional<List<List<String>>> analyzePartitionValues;
     private final Map<String, HiveColumnHandle> predicateColumns;
     private final Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate;
+    private final boolean suitableToPush;
 //    private final RowExpression remainingPredicate; //For Complex Expression.
 
     @JsonCreator
@@ -62,7 +63,8 @@ public class HiveTableHandle
             @JsonProperty("bucketFilter") Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
             @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues,
             @JsonProperty("predicateColumns") Map<String, HiveColumnHandle> predicateColumns,
-            @JsonProperty("additionaPredicates") Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate)
+            @JsonProperty("additionaPredicates") Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate,
+            @JsonProperty("suitableToPush") boolean suitableToPush)
     {
         this(
                 schemaName,
@@ -76,7 +78,8 @@ public class HiveTableHandle
                 bucketFilter,
                 analyzePartitionValues,
                 predicateColumns,
-                additionalCompactEffectivePredicate);
+                additionalCompactEffectivePredicate,
+                suitableToPush);
     }
 
     public HiveTableHandle(
@@ -98,7 +101,8 @@ public class HiveTableHandle
                 Optional.empty(),
                 Optional.empty(),
                 null,
-                Optional.empty());
+                Optional.empty(),
+                false);
     }
 
     public HiveTableHandle(
@@ -113,7 +117,8 @@ public class HiveTableHandle
             Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
             Optional<List<List<String>>> analyzePartitionValues,
             Map<String, HiveColumnHandle> predicateColumns,
-            Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate)
+            Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate,
+            boolean suitableToPush)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -127,6 +132,7 @@ public class HiveTableHandle
         this.analyzePartitionValues = requireNonNull(analyzePartitionValues, "analyzePartitionValues is null");
         this.predicateColumns = predicateColumns;
         this.additionalCompactEffectivePredicate = requireNonNull(additionalCompactEffectivePredicate, "additionalPredicates is null");
+        this.suitableToPush = suitableToPush;
     }
 
     public HiveTableHandle withAnalyzePartitionValues(Optional<List<List<String>>> analyzePartitionValues)
@@ -143,7 +149,8 @@ public class HiveTableHandle
                 bucketFilter,
                 analyzePartitionValues,
                 predicateColumns,
-                Optional.empty());
+                Optional.empty(),
+                suitableToPush);
     }
 
     @JsonProperty
@@ -239,6 +246,12 @@ public class HiveTableHandle
         return additionalCompactEffectivePredicate;
     }
 
+    @JsonProperty
+    public boolean isSuitableToPush()
+    {
+        return suitableToPush;
+    }
+
     /**
      * Hetu execution plan caching functionality requires a method to update
      * {@link ConnectorTableHandle} from a previous execution plan with new info from
@@ -267,7 +280,8 @@ public class HiveTableHandle
                 oldHiveConnectorTableHandle.getBucketFilter(),
                 oldHiveConnectorTableHandle.getAnalyzePartitionValues(),
                 oldHiveConnectorTableHandle.getPredicateColumns(),
-                oldHiveConnectorTableHandle.getAdditionalCompactEffectivePredicate());
+                oldHiveConnectorTableHandle.getAdditionalCompactEffectivePredicate(),
+                oldHiveConnectorTableHandle.isSuitableToPush());
     }
 
     @Override

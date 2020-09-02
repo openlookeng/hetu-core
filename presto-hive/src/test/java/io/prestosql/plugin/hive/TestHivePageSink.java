@@ -59,6 +59,7 @@ import static io.airlift.testing.Assertions.assertGreaterThan;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveCompressionCodec.NONE;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveSelectiveFactories;
 import static io.prestosql.plugin.hive.HiveType.HIVE_DATE;
 import static io.prestosql.plugin.hive.HiveType.HIVE_DOUBLE;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
@@ -230,7 +231,7 @@ public class TestHivePageSink
                 Optional.empty(),
                 Optional.empty(), false));
         ConnectorTableHandle table = new HiveTableHandle(SCHEMA_NAME, TABLE_NAME, ImmutableMap.of(), ImmutableList.of(), Optional.empty());
-        HivePageSourceProvider provider = new HivePageSourceProvider(config, HiveTestUtils.createTestHdfsEnvironment(config), HiveTestUtils.getDefaultHiveRecordCursorProvider(config), HiveTestUtils.getDefaultHiveDataStreamFactories(config), HiveTestUtils.TYPE_MANAGER, HiveTestUtils.getNoOpIndexCache(), null);
+        HivePageSourceProvider provider = new HivePageSourceProvider(config, HiveTestUtils.createTestHdfsEnvironment(config), HiveTestUtils.getDefaultHiveRecordCursorProvider(config), HiveTestUtils.getDefaultHiveDataStreamFactories(config), HiveTestUtils.TYPE_MANAGER, HiveTestUtils.getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
         return provider.createPageSource(transaction, getSession(config), split, table, ImmutableList.copyOf(getColumnHandles()));
     }
 

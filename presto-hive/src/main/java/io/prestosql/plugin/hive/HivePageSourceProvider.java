@@ -152,7 +152,7 @@ public class HivePageSourceProvider
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
-        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+        if (hiveTable.isSuitableToPush()) {
             return createSelectivePageSource(selectivePageSourceFactories, configuration,
                     session, hiveSplit, assignUniqueIndicesToPartitionColumns(hiveColumns), hiveStorageTimeZone, typeManager,
                     dynamicFilterSupplier, hiveSplit.getDeleteDeltaLocations(),

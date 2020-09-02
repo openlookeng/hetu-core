@@ -68,6 +68,7 @@ public final class SelectiveColumnReaders
             case LIST:
             case STRUCT:
             case UNION:
+            case MAP:
             default:
                 throw new IllegalArgumentException("Unsupported type: " + column.getColumnType());
         }

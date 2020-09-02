@@ -63,6 +63,7 @@ import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
 import static io.prestosql.plugin.hive.HiveTestUtils.createTestHdfsEnvironment;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveDataStreamFactories;
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveRecordCursorProvider;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveSelectiveFactories;
 import static io.prestosql.plugin.hive.HiveTestUtils.getNoOpIndexCache;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -127,7 +128,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter3 = createDynamicFilterSupplier(filterValues, testColumnHandle3, "filter3");
 
         HiveConfig config = new HiveConfig();
-        HivePageSourceProvider provider = new HivePageSourceProvider(config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache(), null);
+        HivePageSourceProvider provider = new HivePageSourceProvider(config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
 
         TestingConnectorSession session = new TestingConnectorSession(new HiveSessionProperties(config, new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
         ConnectorTableHandle table = new HiveTableHandle("db", "table", ImmutableMap.of(), ImmutableList.of(), Optional.empty());

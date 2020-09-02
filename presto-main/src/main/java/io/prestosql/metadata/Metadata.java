@@ -377,6 +377,7 @@ public interface Metadata
     default Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table,
                                                                            Constraint constraint,
                                                                            List<Constraint> additionalConstrains,
+                                                                           Set<ColumnHandle> allColumnHandles,
                                                                            boolean pushPartitionsOnly)
     {
         return applyFilter(session, table, constraint);

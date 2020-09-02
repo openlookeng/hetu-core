@@ -47,6 +47,7 @@ import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NullLiteral;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -171,6 +172,7 @@ public class PushPredicateIntoTableScan
                 .intersect(node.getEnforcedConstraint());
 
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
+        Set<ColumnHandle> allColumnHandles = new HashSet<>();
 
         Constraint constraint;
         List<Constraint> additionalConstraints = ImmutableList.of();
@@ -195,6 +197,8 @@ public class PushPredicateIntoTableScan
                     .filter(d -> !d.isAll() && !d.isNone())
                     .map(d -> new Constraint(d))
                     .collect(Collectors.toList());
+
+            assignments.keySet().stream().forEach(allColumnHandles::add);
         }
 
         if (pruneWithPredicateExpression) {
@@ -227,7 +231,7 @@ public class PushPredicateIntoTableScan
                 return Optional.of(new ValuesNode(idAllocator.getNextId(), node.getOutputSymbols(), ImmutableList.of()));
             }
 
-            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints, pushPartitionsOnly);
+            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints, allColumnHandles, pushPartitionsOnly);
 
             if (!result.isPresent()) {
                 return Optional.empty();
