@@ -401,7 +401,8 @@
 > -   **类型：** `boolean`
 > -   **默认值：** `false`
 >
-> 此属性启用启发式索引.
+> 此属性启用启发式索引. 在会话属性中也存在一个属性`heuristicindex_filter_enabled`用来控制当前会话是否启用索引过滤功能。
+> 注意：这个会话设置仅仅用于当全局属性设置为`true`时来临时关闭/开启索引过滤功能，而不能用于全局设置关闭时开启索引。
  
 ### `hetu.heuristicindex.filter.cache.max-indices-number`
  

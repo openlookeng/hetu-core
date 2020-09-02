@@ -20,7 +20,9 @@ Additional configs used by the corresponding filesystem client can be provided. 
 Multiple profiles defining filesystem clients can be placed in ``etc/filesystem``.  Similar to catalogs, they will be loaded upon server start by a filesystem manager which also produce filesystem clients to users in ``presto-main``. Client modules can read profiles in this folder by themselves, but it is highly recommended that client modules obtain a client which is provided by the main module
 in order to prevent dependency issues.
 
-A typical use case of having multiple profiles is when multiple hdfs are used and preset. In this case create a property file for each cluster and include their own authentication information in different profiles, for example ``hdfs1.properties`` and ``hdfs2.properties``. Client code will be able to access them by specifying the profile name (file name), such as ``getFileSystemClient("hdfs1")`` from the ``FileSystemClientManager``.
+A typical use case of having multiple profiles is when multiple hdfs are used and preset. In this case create a property file for each cluster and include their own authentication information in different profiles, for example ``hdfs1.properties`` and ``hdfs2.properties``. Client code will be able to access them by specifying the profile name (file name), such as ``getFileSystemClient("hdfs1", <rootPath>)`` from the ``FileSystemClientManager``.
+
+For each local and hdfs filesystem client, it requires a root path to which the access to filesystem is limited. All access beyond this root dir will be denied. It is suggested to use the deepest directory that meets the need as the client root, in order to avoid the risk of modifying (or deleting) additional files by accident.
 
 ### Filesystem profile properties
 
