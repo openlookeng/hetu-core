@@ -172,9 +172,17 @@ bash /opt/openlookeng/bin/uninstall.sh --all
 
 ## 将openLooKeng离线部署到集群
 
-如果您无法从要安装openLooKeng的机器上访问下载URL，可以下载离线tarball并解压缩到/opt目录。
+如果您无法从要安装openLooKeng的机器上访问下载URL，可以预先下载所需文件并执行离线安装。
 
-执行以下命令部署单节点集群：
+1. 下载 `https://download.openlookeng.io/auto-install/openlookeng.tar.gz` 并将其内容解压到 `/opt` 目录。
+
+1. 创建目录 `/opt/openlookeng/resource` 并保存 openLooKeng 执行文件 `https://download.openlookeng.io/010/hetu-server-010.tar.gz` 和 `https://download.openlookeng.io/010/hetu-cli-010-executable.jar`。
+
+1. 同时将第三方依赖保存在 `/opt/openlookeng/resource` 目录下。根据本机的架构，下载 `https://download.openlookeng.io/auto-install/third-resource/x86/` 或 `https://download.openlookeng.io/auto-install/third-resource/aarch64/` 下面的全部文件。这应该包括一个 `OpenJDK` 文件和两个 `sshpass` 文件。
+
+1. 如需要部署多节点，而且有些节点的架构与本机不同，还需要下载对应架构的 `OpenJDK` 文件并保存在 `/opt/openlookeng/resource/<arch>` 目录下，其中 `<arch>` 是 `x86` 或者 `aarch64`，对应于另一架构。
+
+上面所有资源就位后，执行以下命令部署单节点集群：
 
 ```shell
 bash /opt/openlookeng/bin/install_offline.sh
