@@ -21,6 +21,7 @@ import io.airlift.log.Logger;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
@@ -28,7 +29,9 @@ import io.prestosql.spi.statestore.StateStoreBootstrapper;
 import io.prestosql.utils.HetuConfig;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.HashMap;
@@ -63,6 +66,7 @@ public class EmbeddedStateStoreLauncher
     private static final long DISCOVERY_REGISTRY_LOCK_TIMEOUT = 3000L;
     private static final int DISCOVERY_REGISTRY_RETRY_TIMES = 60;
     private static final long DISCOVERY_REGISTRY_RETRY_INTERVAL = 5000L; //5 seconds
+    private static final String LAUNCHER_LOCK_FILE_PATH = "/tmp/state-store-launcher";
 
     private final SeedStoreManager seedStoreManager;
     private final HttpServerInfo httpServerInfo;
@@ -107,16 +111,14 @@ public class EmbeddedStateStoreLauncher
                 seedStoreManager.getSeedStore().setName(properties.get(STATE_STORE_CLUSTER_PROPERTY_NAME));
                 // Clear expired seeds
                 seedStoreManager.clearExpiredSeeds();
-                // Get all seeds
-                Set<String> locations = seedStoreManager.getAllSeeds().stream().map(x -> x.getLocation()).collect(Collectors.toSet());
-                String launcherPort = getStateStoreLauncherPort(properties);
-                requireNonNull(launcherPort, "The launcher port is null");
-                // Launch state store
-                String currentLocation = getNodeUri().getHost() + ":" + launcherPort;
-                locations.add(currentLocation);
-                if (launchStateStore(locations, properties) != null) {
-                    // Add seed to seed store if and only if state store launched successfully
-                    seedStoreManager.addSeed(currentLocation, true);
+                // Use lock to control synchronization of state store launch among all coordinators
+                Lock launcherLock = new FileBasedLock(seedStoreManager.getFileSystemClient(), Paths.get(LAUNCHER_LOCK_FILE_PATH));
+                try {
+                    launcherLock.lock();
+                    launchStateStoreFromSeedStore(properties);
+                }
+                finally {
+                    launcherLock.unlock();
                 }
             }
             else {
@@ -129,6 +131,24 @@ public class EmbeddedStateStoreLauncher
         }
         else {
             LOG.info("No configuration file found, skip launching state store");
+        }
+    }
+
+    private void launchStateStoreFromSeedStore(Map<String, String> properties) throws IOException
+    {
+        // Get all seeds
+        Set<String> locations = seedStoreManager.getAllSeeds()
+                .stream()
+                .map(x -> x.getLocation())
+                .collect(Collectors.toSet());
+        String launcherPort = getStateStoreLauncherPort(properties);
+        requireNonNull(launcherPort, "The launcher port is null");
+        // Launch state store
+        String currentLocation = getNodeUri().getHost() + ":" + launcherPort;
+        locations.add(currentLocation);
+        if (launchStateStore(locations, properties) != null) {
+            // Add seed to seed store if and only if state store launched successfully
+            seedStoreManager.addSeed(currentLocation, true);
         }
     }
 

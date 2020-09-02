@@ -16,6 +16,8 @@ package io.prestosql.statestore;
 
 import com.google.common.collect.ImmutableSet;
 import io.airlift.http.server.HttpServerInfo;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStore;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStoreBootstrapper;
 import io.hetu.core.statestore.hazelcast.HazelcastStateStoreFactory;
@@ -37,9 +39,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -130,6 +134,7 @@ public class TestStateStoreLauncherAndProvider
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
         when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
         when(mockSeedStoreManager.addSeed("localhost", true)).thenReturn(seeds);
+        when(mockSeedStoreManager.getFileSystemClient()).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/")));
 
         InternalCommunicationConfig mockInternalCommunicationConfig = mock(InternalCommunicationConfig.class);
         HttpServerInfo mockHttpServerInfo = mock(HttpServerInfo.class);
