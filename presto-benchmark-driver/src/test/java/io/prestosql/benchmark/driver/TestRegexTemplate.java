@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
@@ -38,5 +39,23 @@ public class TestRegexTemplate
         assertEquals(regexTemplate.parse("tpch_sf100_orc_zlib.sql"), Optional.of(ImmutableMap.of("scale", "100", "format", "orc", "compression", "zlib")));
         assertEquals(regexTemplate.parse("tpch_sf100_orc_zlibXsql"), Optional.empty());
         assertEquals(regexTemplate.parse("tpch_sf100_orc_zlib.sqlFoo"), Optional.empty());
+    }
+
+    @Test
+    public void testSanitize()
+    {
+        Suite.OptionsJson optionsJson = new Suite.OptionsJson(ImmutableList.of("tpch.*"), new HashMap<>(), ImmutableList.of("tpch_sf100.*"));
+        Suite suite = optionsJson.toSuite("test1");
+        assertEquals(suite.getSchemaNameTemplates().get(0).parse("tpch_sf100_orc_zlibXsql"), Optional.of(ImmutableMap.of()));
+        assertEquals(suite.getSchemaNameTemplates().get(0).parse("tpcds_sf100_orc"), Optional.empty());
+        assertEquals(suite.getQueryNamePatterns().get(0).matcher("tpch_sf100_orc_zlib.sqlFoo").matches(), true);
+        assertEquals(suite.getQueryNamePatterns().get(0).matcher("tpcds_sf100_orc_zlib.sqlFoo").matches(), false);
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testInvalidRegex()
+    {
+        Suite.OptionsJson optionsJson = new Suite.OptionsJson(ImmutableList.of("tpch_sf(?<scale>.*?)_(?<format>.*?)_(?<compression>.*?)"), new HashMap<>(), ImmutableList.of("tpch_sf(?<scale>.*?)_(?<format>.*?)_(?<compression>.*?)\\.sql"));
+        Suite suite = optionsJson.toSuite("test2");
     }
 }

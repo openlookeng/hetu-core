@@ -145,13 +145,28 @@ public class Suite
         {
             ImmutableList.Builder<Pattern> queryNameTemplates = ImmutableList.builder();
             for (String q : query) {
-                queryNameTemplates.add(Pattern.compile(q));
+                queryNameTemplates.add(Pattern.compile(sanitizeString(q)));
             }
             ImmutableList.Builder<RegexTemplate> schemaNameTemplates = ImmutableList.builder();
             for (String s : schema) {
-                schemaNameTemplates.add(new RegexTemplate(s));
+                schemaNameTemplates.add(new RegexTemplate(sanitizeString(s)));
             }
             return new Suite(name, session, schemaNameTemplates.build(), queryNameTemplates.build());
+        }
+
+        private String sanitizeString(String name)
+        {
+            StringBuilder sb = new StringBuilder(name.length());
+            for (int i = 0; i < name.length(); ++i) {
+                char ch = name.charAt(i);
+                if (Character.isLetterOrDigit(ch) || ch == '.' || ch == '_' || ch == '*') {
+                    sb.append(ch);
+                }
+                else {
+                    throw new RuntimeException("Invalid regex");
+                }
+            }
+            return sb.toString();
         }
     }
 }
