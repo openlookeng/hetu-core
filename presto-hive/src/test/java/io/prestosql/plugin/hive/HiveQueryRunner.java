@@ -36,6 +36,7 @@ import org.joda.time.DateTimeZone;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -107,10 +108,14 @@ public final class HiveQueryRunner
                     .buildWithStateStore();
         }
         else {
+            Map<String, String> configProperties = new HashMap<>();
+            configProperties.put("auto-vacuum.enabled", "true");
+            configProperties.put("auto-vacuum.scan.interval", "15s");
+
             queryRunner = DistributedQueryRunner
                     .builder(createSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))))
                     .setNodeCount(4)
-                    .setCoordinatorProperties(ImmutableMap.of("auto-vacuum.enabled", "true"))
+                    .setCoordinatorProperties(configProperties)
                     .setExtraProperties(extraProperties)
                     .setBaseDataDir(baseDataDir)
                     .build();

@@ -16,11 +16,19 @@ package io.prestosql.vacuum;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
+import io.airlift.units.MaxDuration;
+import io.airlift.units.MinDuration;
+
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+
+import java.util.concurrent.TimeUnit;
 
 public class AutoVacuumConfig
 {
     private boolean autoVacuumEnabled;
-    private Duration vacuumScanInterval = Duration.valueOf("15s");
+    private Duration vacuumScanInterval = new Duration(10, TimeUnit.MINUTES);
     private int vacuumScanThreads = 3;
 
     @Config("auto-vacuum.enabled")
@@ -37,14 +45,15 @@ public class AutoVacuumConfig
     }
 
     @Config("auto-vacuum.scan.interval")
-    @ConfigDescription("Interval of auto compaction scan, default value is 15s.")
+    @ConfigDescription("Interval of auto compaction scan, default value is 10m.")
     public AutoVacuumConfig setVacuumScanInterval(Duration vacuumScanInterval)
     {
         this.vacuumScanInterval = vacuumScanInterval;
         return this;
     }
 
-    public Duration getVacuumScanInterval()
+    @NotNull
+    public @MinDuration("15s") @MaxDuration("24h") Duration getVacuumScanInterval()
     {
         return this.vacuumScanInterval;
     }
@@ -57,6 +66,8 @@ public class AutoVacuumConfig
         return this;
     }
 
+    @Min(1)
+    @Max(16)
     public int getVacuumScanThreads()
     {
         return this.vacuumScanThreads;
