@@ -33,9 +33,11 @@ import io.prestosql.spi.type.VarcharType;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -65,17 +67,20 @@ public class TupleDomainOrcPredicate
     private final List<ColumnDomain> columnDomains;
     private final List<ColumnDomain> orColumnDomains;
     private final boolean orcBloomFiltersEnabled;
+    private final Set<Integer> missingColumns;
 
     public static TupleDomainOrcPredicateBuilder builder()
     {
         return new TupleDomainOrcPredicateBuilder();
     }
 
-    private TupleDomainOrcPredicate(List<ColumnDomain> columnDomains, List<ColumnDomain> orColumns, boolean orcBloomFiltersEnabled)
+    private TupleDomainOrcPredicate(List<ColumnDomain> columnDomains, List<ColumnDomain> orColumns, boolean orcBloomFiltersEnabled,
+                                    Set<Integer> missingColumns)
     {
         this.columnDomains = ImmutableList.copyOf(requireNonNull(columnDomains, "columnDomains is null"));
         this.orColumnDomains = ImmutableList.copyOf(orColumns);
         this.orcBloomFiltersEnabled = orcBloomFiltersEnabled;
+        this.missingColumns = missingColumns;
     }
 
     @Override
@@ -107,7 +112,7 @@ public class TupleDomainOrcPredicate
         }
 
         // this section was not excluded
-        return found;
+        return found || missingColumns.size() > 0;
     }
 
     private boolean columnOverlaps(Domain predicateDomain, long numberOfRows, ColumnStatistics columnStatistics)
@@ -275,6 +280,7 @@ public class TupleDomainOrcPredicate
     {
         private final List<ColumnDomain> columns = new ArrayList<>();
         private final List<ColumnDomain> orColumns = new ArrayList<>();
+        private Set<Integer> missingColumns = new HashSet<>();
         private boolean bloomFiltersEnabled;
 
         public TupleDomainOrcPredicateBuilder addColumn(OrcColumnId columnId, Domain domain)
@@ -291,6 +297,12 @@ public class TupleDomainOrcPredicate
             return this;
         }
 
+        public TupleDomainOrcPredicateBuilder setMissingColumns(Set<Integer> missingColumns)
+        {
+            this.missingColumns = missingColumns;
+            return this;
+        }
+
         public TupleDomainOrcPredicateBuilder setBloomFiltersEnabled(boolean bloomFiltersEnabled)
         {
             this.bloomFiltersEnabled = bloomFiltersEnabled;
@@ -299,7 +311,7 @@ public class TupleDomainOrcPredicate
 
         public TupleDomainOrcPredicate build()
         {
-            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled);
+            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled, missingColumns);
         }
     }
 

@@ -88,6 +88,11 @@ public abstract class AbstractTestDistributedQueries
         return true;
     }
 
+    protected boolean supportsPushdown()
+    {
+        return false;
+    }
+
     @Test
     public void testSetSession()
     {
@@ -426,6 +431,16 @@ public abstract class AbstractTestDistributedQueries
         assertEquals(materializedRows.getMaterializedRows().get(1).getField(0), 234);
         assertEquals(materializedRows.getMaterializedRows().get(1).getField(1), 111L);
 
+        if (supportsPushdown()) {
+            Session session1 = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .build();
+            MaterializedResult materializedRows1 = computeActual(session1, "SELECT x, a FROM test_add_column ORDER BY x");
+            assertEquals(materializedRows1.getMaterializedRows().get(0).getField(0), 123);
+            assertNull(materializedRows1.getMaterializedRows().get(0).getField(1));
+            assertEquals(materializedRows1.getMaterializedRows().get(1).getField(0), 234);
+            assertEquals(materializedRows1.getMaterializedRows().get(1).getField(1), 111L);
+        }
         assertUpdate("ALTER TABLE test_add_column ADD COLUMN b double");
         assertUpdate("INSERT INTO test_add_column SELECT * FROM test_add_column_ab", 1);
         materializedRows = computeActual("SELECT x, a, b FROM test_add_column ORDER BY x");

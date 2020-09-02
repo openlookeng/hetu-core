@@ -38,7 +38,6 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import org.joda.time.DateTimeZone;
-import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,8 +58,8 @@ import static java.util.Objects.requireNonNull;
 public class OrcSelectiveRecordReader
         extends AbstractOrcRecordReader<SelectiveColumnReader>
 {
-    private static final int INSTANCE_SIZE = ClassLayout.parseClass(OrcSelectiveRecordReader.class).instanceSize();
     private static final Logger log = Logger.get(OrcSelectiveRecordReader.class);
+    private static final byte[] NULL_MARKER = new byte[0];
 
     private final List<Integer> excludePositions;
     private final List<Integer> columnReaderOrder;
@@ -75,6 +74,9 @@ public class OrcSelectiveRecordReader
     Set<Integer> colReaderWithoutFilter;
     Map<Integer, List<TupleDomainFilter>> additionalFilters;
     Map<Integer, Function<Block, Block>> coercers;
+    private final Set<Integer> missingColumns;
+    // flag indicating whether range filter on a constant column is false; no data is read in that case
+    private boolean constantFilterIsFalse;
 
     public OrcSelectiveRecordReader(
             List<Integer> outputColumns,
@@ -114,7 +116,8 @@ public class OrcSelectiveRecordReader
             List<Integer> positions,
             boolean useDataCache,
             Map<Integer, Function<Block, Block>> coercers,
-            Map<String, List<Domain>> orDomains)
+            Map<String, List<Domain>> orDomains,
+            Set<Integer> missingColumns)
             throws OrcCorruptionException
     {
         super(fileReadColumns,
@@ -158,9 +161,18 @@ public class OrcSelectiveRecordReader
         this.additionalFilters = additionalFilters;
         this.constantValues = requireNonNull(constantValues, "constantValues is null");
         this.coercers = requireNonNull(coercers, "coercers is null");
+        this.missingColumns = requireNonNull(missingColumns, "missingColumns is null");
 
         for (Map.Entry<Integer, Function<Block, Block>> entry : coercers.entrySet()) {
             checkArgument(!filters.containsKey(entry.getKey()), "Coercions for columns with range filters are not yet supported");
+        }
+
+        for (int missingColumn : missingColumns) {
+            if (!constantFilterIsFalse && containsNonNullFilter(filters.get(missingColumn))) {
+                constantFilterIsFalse = true;
+            }
+
+            this.constantValues.put(missingColumn, NULL_MARKER);
         }
 
         setColumnReadersParam(createColumnReaders(fileColumns,
@@ -171,12 +183,24 @@ public class OrcSelectiveRecordReader
                 outputColumns, includedColumns, orcTypes, useDataCache));
     }
 
+    private static boolean containsNonNullFilter(TupleDomainFilter columnFilters)
+    {
+        return columnFilters != null && !columnFilters.testNull();
+    }
+
     public Page getNextPage()
             throws IOException
     {
         int batchSize = prepareNextBatch();
         if (batchSize < 0) {
             return null;
+        }
+
+        // if there is no OR filer and constantFilterIsFalse (i.e. one of the missing column contains NOT NULL filter)
+        // is true means no record will qualify filter in current split.
+        if (constantFilterIsFalse && colReaderWithORFilter.isEmpty()) {
+            batchRead(batchSize);
+            return new Page(0);
         }
 
         matchingRowsInBatchArray = null;
@@ -199,6 +223,12 @@ public class OrcSelectiveRecordReader
                     // input to the next column
                     positionsToRead = columnReaders[columnIdx].getReadPositions();
                 }
+                else if (missingColumns.contains(columnIdx)) {
+                    if (!filters.get(columnIdx).testNull()) {
+                        positionCount = 0;
+                        break;
+                    }
+                }
             }
         }
 
@@ -209,6 +239,14 @@ public class OrcSelectiveRecordReader
             for (Integer columnIdx : colReaderWithORFilter) {
                 if (columnReaders[columnIdx] != null) {
                     localPositionCount += columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, additionalFilters.get(columnIdx), accumulator);
+                }
+                else if (missingColumns.contains(columnIdx)) {
+                    boolean condMatch = additionalFilters.get(columnIdx).get(0).testNull();
+                    for (int i = 0; i < positionCount; i++) {
+                        if (condMatch || accumulator.get(i)) {
+                            accumulator.set(i);
+                        }
+                    }
                 }
             }
 
@@ -244,9 +282,9 @@ public class OrcSelectiveRecordReader
         Block[] blocks = new Block[outputColumns.size()];
         for (int i = 0; i < outputColumns.size(); i++) {
             int columnIndex = outputColumns.get(i);
-            if (columnIndex < 0) {
+            if (columnIndex < 0 || missingColumns.contains(columnIndex)) {
                 // To fill partition key.
-                blocks[i] = RunLengthEncodedBlock.create(includedColumns.get(columnIndex), constantValues.get(columnIndex), positionCount);
+                blocks[i] = RunLengthEncodedBlock.create(includedColumns.get(columnIndex), constantValues.get(columnIndex) == NULL_MARKER ? null : constantValues.get(columnIndex), positionCount);
             }
             else {
                 Block block = getColumnReaders()[columnIndex].getBlock(positionsToRead, positionCount);
@@ -341,7 +379,7 @@ public class OrcSelectiveRecordReader
             throws OrcCorruptionException
     {
         int fieldCount = orcTypes.get(OrcColumnId.ROOT_COLUMN).getFieldCount();
-        SelectiveColumnReader[] columnReaders = new SelectiveColumnReader[fieldCount];
+        SelectiveColumnReader[] columnReaders = new SelectiveColumnReader[includedColumns.size()];
 
         colReaderWithFilter = new IntArraySet();
         colReaderWithORFilter = new IntArraySet();
@@ -384,6 +422,16 @@ public class OrcSelectiveRecordReader
                 else {
                     colReaderWithoutFilter.add(columnIndex);
                 }
+            }
+        }
+
+        // specially for alter add/drop column case:
+        for (int missingColumn : missingColumns) {
+            if (filters.get(missingColumn) != null) {
+                colReaderWithFilter.add(missingColumn);
+            }
+            else if (additionalFilters.get(missingColumn) != null && additionalFilters.get(missingColumn).size() > 0) {
+                colReaderWithORFilter.add(missingColumn);
             }
         }
 

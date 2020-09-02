@@ -91,6 +91,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -562,7 +563,8 @@ public class OrcTester
                 null,
                 false,
                 ImmutableMap.of(),
-                ImmutableMap.of());
+                ImmutableMap.of(),
+                new HashSet<>());
     }
 
     private static List<String> makeColumnNames(int columns)

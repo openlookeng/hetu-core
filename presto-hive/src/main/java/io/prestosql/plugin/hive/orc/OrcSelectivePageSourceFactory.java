@@ -72,10 +72,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -409,13 +411,20 @@ public class OrcSelectivePageSourceFactory
                     .forEach(ap -> ap.getDomains().get().forEach((k, v) -> additionalPredicateDomains.merge(k, v, (v1, v2) -> v1.union(v2))));
 
             Map<String, List<Domain>> orDomains = new ConcurrentHashMap<>();
+            Set<Integer> missingColumns = new HashSet<>();
             for (HiveColumnHandle column : columns) {
                 OrcColumn orcColumn = null;
+                int missingColumn = -1;
                 if (useOrcColumnNames || isFullAcid) {
                     orcColumn = fileColumnsByName.get(column.getName());
                 }
-                else if (column.getHiveColumnIndex() >= 0 && column.getHiveColumnIndex() < fileColumns.size()) {
-                    orcColumn = fileColumns.get(column.getHiveColumnIndex());
+                else if (column.getHiveColumnIndex() >= 0) {
+                    if (column.getHiveColumnIndex() < fileColumns.size()) {
+                        orcColumn = fileColumns.get(column.getHiveColumnIndex());
+                    }
+                    else {
+                        missingColumn = column.getHiveColumnIndex();
+                    }
                 }
 
                 Type readType = typeManager.getType(column.getTypeSignature());
@@ -447,11 +456,15 @@ public class OrcSelectivePageSourceFactory
                             .collect(Collectors.toList());
                     columnAdaptations.add(ColumnAdaptation.structColumn(structTypeInfo, adaptations));
                 }
+                else if (missingColumn >= 0) {
+                    missingColumns.add(missingColumn);
+                }
                 else {
                     columnAdaptations.add(ColumnAdaptation.nullColumn(readType));
                 }
             }
 
+            predicateBuilder.setMissingColumns(missingColumns);
             Map<Integer, Type> columnTypes = columns.stream()
                     .collect(toImmutableMap(HiveColumnHandle::getHiveColumnIndex, column -> typeManager.getType(column.getTypeSignature())));
 
@@ -498,7 +511,8 @@ public class OrcSelectivePageSourceFactory
                     positions,
                     HiveSessionProperties.isOrcPushdownDataCacheEnabled(session),
                     Maps.transformValues(coercers, Function.class::cast),
-                    orDomains);
+                    orDomains,
+                    missingColumns);
 
             OrcDeletedRows deletedRows = new OrcDeletedRows(
                     path.getName(),
