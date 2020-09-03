@@ -25,8 +25,11 @@ import io.prestosql.orc.reader.CachingColumnReader;
 import io.prestosql.orc.reader.ColumnReader;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.StreamSourceMeta;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.block.Block;
 import org.mockito.InOrder;
+import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -77,8 +80,8 @@ public class TestCachingColumnReader
         assertEquals(cache.size(), 1);
     }
 
-    @Test
-    public void testStreamReaderThrowsException() throws IOException
+    @Test(expectedExceptions = IOException.class)
+    public void testDelegateThrowsException() throws IOException
     {
         ColumnReader columnReader = mock(ColumnReader.class);
         Cache<OrcRowDataCacheKey, Block> cache = spy(CacheBuilder.newBuilder().build());
@@ -88,11 +91,10 @@ public class TestCachingColumnReader
         StreamSourceMeta streamSourceMeta = new StreamSourceMeta();
         OrcDataSourceId orcDataSourceId = new OrcDataSourceId("2");
         streamSourceMeta.setDataSourceId(orcDataSourceId);
-        Block block = mock(Block.class);
         when(inputStreamSources.getStreamSourceMeta()).thenReturn(streamSourceMeta);
-        when(columnReader.readBlock()).thenThrow(
-                new OrcCorruptionException(orcDataSourceId, "Value is null but stream is missing"))
-                .thenReturn(block);
+        when(columnReader.readBlock())
+                .thenThrow(new OrcCorruptionException(orcDataSourceId, "Value is null but stream is missing"))
+                .thenThrow(new OrcCorruptionException(orcDataSourceId, "Value is null but stream is missing"));
 
         try {
             cachingColumnReader.startRowGroup(inputStreamSources);
@@ -102,6 +104,39 @@ public class TestCachingColumnReader
             verify(columnReader, times(2)).readBlock();
             assertEquals(cache.size(), 0);
             throw ioEx;
+        }
+    }
+
+    @Test(expectedExceptions = PrestoException.class, expectedExceptionsMessageRegExp = ".*Read interrupted.*")
+    public void testCacheLoaderThrowsInterruptedException()
+            throws IOException
+    {
+        ColumnReader columnReader = mock(ColumnReader.class);
+        Cache<OrcRowDataCacheKey, Block> cache = spy(CacheBuilder.newBuilder().build());
+        CachingColumnReader cachingColumnReader = new CachingColumnReader(columnReader, column, cache);
+
+        InputStreamSources inputStreamSources = mock(InputStreamSources.class);
+        StreamSourceMeta streamSourceMeta = new StreamSourceMeta();
+        OrcDataSourceId orcDataSourceId = new OrcDataSourceId("2");
+        streamSourceMeta.setDataSourceId(orcDataSourceId);
+        when(inputStreamSources.getStreamSourceMeta()).thenReturn(streamSourceMeta);
+        when(columnReader.readBlock()).then((Answer<Block>) invocationOnMock -> {
+            Thread.currentThread().interrupt();
+            throw new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, "Read interrupted");
+        });
+
+        try {
+            cachingColumnReader.startRowGroup(inputStreamSources);
+        }
+        catch (IOException ioEx) {
+            verify(columnReader, atLeastOnce()).startRowGroup(eq(inputStreamSources));
+            verify(columnReader, times(1)).readBlock();
+            assertEquals(cache.size(), 0);
+            throw ioEx;
+        }
+        finally {
+            //clear interrupted flag status
+            Thread.interrupted();
         }
     }
 

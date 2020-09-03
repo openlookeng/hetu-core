@@ -35,6 +35,8 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import static io.prestosql.orc.OrcReader.handleCacheLoadException;
+
 public class DataCachingSelectiveColumnReader<T>
         implements SelectiveColumnReader<T>
 {
@@ -172,7 +174,8 @@ public class DataCachingSelectiveColumnReader<T>
             });
         }
         catch (UncheckedExecutionException | ExecutionException executionException) {
-            log.warn(executionException.getCause(), "Error while caching row group data. Falling back to default flow...");
+            handleCacheLoadException(executionException);
+            log.debug(executionException.getCause(), "Error while caching row group data. Falling back to default flow...");
             delegate.startRowGroup(dataStreamSources);
             delegate.prepareNextRead((int) rowCount);
             cachedBlock = delegate.readBlock();

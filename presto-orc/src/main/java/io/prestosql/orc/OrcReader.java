@@ -28,6 +28,7 @@ import io.prestosql.orc.metadata.OrcType;
 import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
 import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
@@ -433,6 +434,17 @@ public class OrcReader
         }
         catch (IOException e) {
             throw new OrcCorruptionException(e, input.getId(), "Validation failed");
+        }
+    }
+
+    public static void handleCacheLoadException(Exception executionException)
+            throws IOException
+    {
+        if (Thread.currentThread().isInterrupted()) {
+            if (executionException.getCause() instanceof PrestoException) {
+                throw (PrestoException) executionException.getCause();
+            }
+            throw new IOException(executionException.getCause());
         }
     }
 }

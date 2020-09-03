@@ -84,6 +84,7 @@ import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
+import static io.prestosql.orc.OrcReader.handleCacheLoadException;
 import static io.prestosql.orc.metadata.OrcType.OrcTypeKind.INT;
 import static io.prestosql.orc.metadata.OrcType.OrcTypeKind.LONG;
 import static io.prestosql.orc.metadata.OrcType.OrcTypeKind.STRUCT;
@@ -279,7 +280,8 @@ public class OrcPageSourceFactory
                     fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcPageSourceFactory.createFileTail(orcDataSource));
                 }
                 catch (UncheckedExecutionException | ExecutionException executionException) {
-                    log.warn(executionException.getCause(), "Error while caching the Orc file tail. Falling back to default flow");
+                    handleCacheLoadException(executionException);
+                    log.debug(executionException.getCause(), "Error while caching the Orc file tail. Falling back to default flow");
                     fileTail = OrcPageSourceFactory.createFileTail(orcDataSource);
                 }
             }
