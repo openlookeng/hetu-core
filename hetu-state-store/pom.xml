@@ -15,7 +15,6 @@
     <packaging>hetu-plugin</packaging>
 
     <properties>
-        <hazelcast.version>4.0</hazelcast.version>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
     </properties>
 
@@ -30,9 +29,9 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.hazelcast</groupId>
-            <artifactId>hazelcast</artifactId>
-            <version>${hazelcast.version}</version>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-hazelcast</artifactId>
+            <version>010</version>
         </dependency>
         <dependency>
             <groupId>org.testng</groupId>

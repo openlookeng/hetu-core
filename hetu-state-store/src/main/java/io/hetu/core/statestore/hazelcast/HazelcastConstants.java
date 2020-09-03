@@ -63,6 +63,31 @@ public final class HazelcastConstants
     public static final String DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME =
             "com.hazelcast.spi.discovery.multicast.MulticastDiscoveryStrategy";
 
+    /**
+     * Enable hazelcast kerberos authentication
+     */
+    public static final String KERBEROS_ENABLED = "hazelcast.kerberos.enable";
+
+    /**
+     * Hazelcast kerberos login context name
+     */
+    public static final String KERBEROS_LOGIN_CONTEXT_NAME = "hazelcast.kerberos.login.context.name";
+
+    /**
+     * Hazelcast kerberos service principal
+     */
+    public static final String KERBEROS_SERVICE_PRINCIPAL = "hazelcast.kerberos.service.principal";
+
+    /**
+     * Hazelcast kerberos krb5 config file
+     */
+    public static final String KRB5_CONFIG_FILE = "hazelcast.kerberos.krb5.conf";
+
+    /**
+     * Hazelcast kerberos authentication login config
+     */
+    public static final String JAAS_CONFIG_FILE = "hazelcast.kerberos.auth.login.config";
+
     private HazelcastConstants()
     {
     }

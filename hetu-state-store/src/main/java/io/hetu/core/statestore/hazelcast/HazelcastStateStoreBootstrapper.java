@@ -27,6 +27,7 @@ import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import io.airlift.slice.Slice;
+import io.hetu.core.security.authentication.kerberos.KerberosConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.statestore.CipherService;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
@@ -44,6 +45,11 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MOD
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_TCPIP;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.JAAS_CONFIG_FILE;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_ENABLED;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_LOGIN_CONTEXT_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_SERVICE_PRINCIPAL;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KRB5_CONFIG_FILE;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.MINIMUM_CP_MEMBER_COUNT;
 import static io.prestosql.spi.StandardErrorCode.CONFIGURATION_INVALID;
 import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
@@ -88,6 +94,17 @@ public class HazelcastStateStoreBootstrapper
 
         // Set discovery port
         hzConfig = setPortConfigs(config, hzConfig);
+
+        // set security config
+        if (Boolean.parseBoolean(config.get(KERBEROS_ENABLED))) {
+            hzConfig.getSecurityConfig().setEnabled(true);
+
+            KerberosConfig.setKerberosEnabled(true);
+            KerberosConfig.setLoginContextName(config.get(KERBEROS_LOGIN_CONTEXT_NAME));
+            KerberosConfig.setServicePrincipalName(config.get(KERBEROS_SERVICE_PRINCIPAL));
+            System.setProperty("java.security.krb5.conf", config.get(KRB5_CONFIG_FILE));
+            System.setProperty("java.security.auth.login.config", config.get(JAAS_CONFIG_FILE));
+        }
 
         // default discovery_mode = multicast
         if (discoveryMode == null || discoveryMode.equals(DISCOVERY_MODE_MULTICAST)) {

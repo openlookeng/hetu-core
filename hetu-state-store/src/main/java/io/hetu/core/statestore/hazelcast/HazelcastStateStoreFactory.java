@@ -22,6 +22,7 @@ import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.HazelcastInstance;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.hetu.core.security.authentication.kerberos.KerberosConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.seedstore.Seed;
@@ -46,6 +47,11 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MOD
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_MULTICAST;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_TCPIP;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.JAAS_CONFIG_FILE;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_ENABLED;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_LOGIN_CONTEXT_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_SERVICE_PRINCIPAL;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KRB5_CONFIG_FILE;
 import static io.prestosql.spi.StandardErrorCode.CONFIGURATION_INVALID;
 import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
 import static java.lang.String.format;
@@ -90,6 +96,15 @@ public class HazelcastStateStoreFactory
         SerializerConfig sc = new SerializerConfig().setImplementation(new HazelCastSliceSerializer()).setTypeClass(Slice.class);
         clientConfig.getSerializationConfig().addSerializerConfig(sc);
         clientConfig.setClusterName(clusterId);
+
+        // set security config
+        if (Boolean.parseBoolean(properties.get(KERBEROS_ENABLED))) {
+            KerberosConfig.setKerberosEnabled(true);
+            KerberosConfig.setLoginContextName(properties.get(KERBEROS_LOGIN_CONTEXT_NAME));
+            KerberosConfig.setServicePrincipalName(properties.get(KERBEROS_SERVICE_PRINCIPAL));
+            System.setProperty("java.security.krb5.conf", properties.get(KRB5_CONFIG_FILE));
+            System.setProperty("java.security.auth.login.config", properties.get(JAAS_CONFIG_FILE));
+        }
 
         final String discoveryMode = properties.get(DISCOVERY_MODE_CONFIG_NAME);
 
