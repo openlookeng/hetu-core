@@ -88,6 +88,40 @@ public final class HazelcastConstants
      */
     public static final String JAAS_CONFIG_FILE = "hazelcast.kerberos.auth.login.config";
 
+    /**
+     * Enable hazelcast SSL
+     */
+    public static final String HAZELCAST_SSL_ENABLED = "hazelcast.ssl.enabled";
+
+    /**
+     * Hazelcast SSL keystore path
+     */
+    public static final String SSL_KEYSTORE_PATH = "hazelcast.ssl.keystore.path";
+
+    /**
+     * Hazelcast SSL keystore password
+     */
+    public static final String SSL_KEYSTORE_PASSWORD = "hazelcast.ssl.keystore.password";
+
+    /**
+     * Hazelcast SSL truststore path
+     */
+    public static final String SSL_TRUSTSTORE_PATH = "hazelcast.ssl.truststore.path";
+
+    /**
+     * Hazelcast SSL truststore password
+     */
+    public static final String SSL_TRUSTSTORE_PASSWORD = "hazelcast.ssl.truststore.password";
+
+    /**
+     * Hazelcast SSL cipher suites
+     */
+    public static final String SSL_CIPHER_SUITES = "hazelcast.ssl.cipher.suites";
+    /**
+     * Hazelcast SSL protocols
+     */
+    public static final String SSL_PROTOCOLS = "hazelcast.ssl.protocols";
+
     private HazelcastConstants()
     {
     }

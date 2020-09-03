@@ -14,15 +14,18 @@
  */
 package io.hetu.core.security.authentication;
 
+import com.google.common.io.Resources;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.NetworkConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.partition.PartitionService;
 import io.hetu.core.security.authentication.kerberos.KerberosAuthenticator;
 import io.hetu.core.security.authentication.kerberos.KerberosConfig;
 import io.hetu.core.security.authentication.kerberos.KerberosTokenCredentials;
+import io.hetu.core.security.networking.ssl.SslConfig;
 import mockit.Mock;
 import mockit.MockUp;
 import org.testng.annotations.AfterSuite;
@@ -33,12 +36,14 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 
 import java.security.Principal;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.testng.Assert.assertEquals;
 
-public class TestHazelcastAuthentication
+public class TestHazelcastAuthenticationWithSsl
 {
     private static final int PORT1 = 5701;
     private static final int PORT2 = 5702;
@@ -78,6 +83,9 @@ public class TestHazelcastAuthentication
     @BeforeSuite
     public void setup()
     {
+        SslConfig.setSslEnabled(true);
+        SslConfig.setKeyStorePath(Resources.getResource("keystores").getPath() + "/keystore.jks");
+        SslConfig.setKeyStorePassword("openLooKeng@123");
         new KerberosAuthenticatorMockUp();
         KerberosConfig.setKerberosEnabled(true);
         String clusterName = "cluster-" + UUID.randomUUID();
@@ -129,5 +137,50 @@ public class TestHazelcastAuthentication
         assertEquals(clientMap.get(1), value1);
         assertEquals(clientMap.get(2), value2);
         assertEquals(clientMap.get(3), value3);
+    }
+
+    @Test
+    public void testGetSetFromHazelcastWithSsl()
+    {
+        String value1 = "111";
+        String value2 = "222";
+
+        Set<String> clusterSet1 = hazelcastInstance1.getSet("mySet");
+        clusterSet1.add(value1);
+        Set<String> clusterSet2 = hazelcastInstance2.getSet("mySet");
+        clusterSet2.add(value2);
+        Set<String> clientSet = clientInstance.getSet("mySet");
+
+        assertEquals(true, clientSet.contains(value1));
+        assertEquals(true, clientSet.contains(value2));
+        assertEquals(true, clusterSet1.contains(value2));
+        assertEquals(true, clusterSet2.contains(value1));
+    }
+
+    @Test
+    public void testGetPartitionServiceFromHazelcastWithSsl()
+    {
+        PartitionService partitionService = clientInstance.getPartitionService();
+        PartitionService partitionService1 = hazelcastInstance1.getPartitionService();
+        PartitionService partitionService2 = hazelcastInstance2.getPartitionService();
+
+        assertEquals(true, partitionService.getPartitions().size() == partitionService1.getPartitions().size());
+        assertEquals(true, partitionService1.getPartitions().size() == partitionService2.getPartitions().size());
+    }
+
+    @Test
+    public void testGetListFromHazelcastWithSsl()
+    {
+        String value1 = "111";
+        String value2 = "222";
+
+        List<String> clusterList1 = hazelcastInstance1.getList("mySet");
+        clusterList1.add(value1);
+        List<String> clusterList2 = hazelcastInstance2.getList("mySet");
+        clusterList2.add(value2);
+        List<String> clientList = clientInstance.getList("mySet");
+
+        assertEquals(value1, clientList.get(0));
+        assertEquals(value2, clientList.get(1));
     }
 }
