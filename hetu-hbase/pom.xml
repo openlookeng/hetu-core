@@ -62,10 +62,10 @@
             <version>4.1.46.Final</version>
             <scope>runtime</scope>
         </dependency>
+
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.11</version>
             <scope>runtime</scope>
         </dependency>
 
