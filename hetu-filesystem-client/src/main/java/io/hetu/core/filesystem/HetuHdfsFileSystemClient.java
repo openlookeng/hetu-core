@@ -14,6 +14,7 @@
  */
 package io.hetu.core.filesystem;
 
+import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -51,12 +52,12 @@ public class HetuHdfsFileSystemClient
      * Instantiate an HetuHdfsFileSystemClient instance with the passed in parameters
      *
      * @param config {@link HdfsConfig} object to configure the client
-     * @param root The workspace root directory
+     * @param allowAccessRoot The workspace allowAccessRoot directory
      */
-    public HetuHdfsFileSystemClient(HdfsConfig config, Path root)
+    public HetuHdfsFileSystemClient(HdfsConfig config, Path allowAccessRoot)
             throws IOException
     {
-        super(root);
+        super(allowAccessRoot);
         this.hdfs = FileSystem.get(config.getHadoopConfig());
     }
 
@@ -301,20 +302,20 @@ public class HetuHdfsFileSystemClient
             }
         }
         catch (FileNotFoundException e) {
-            throw new NoSuchFileException(e.getMessage());
+            throw new NoSuchFileException(Throwables.getStackTraceAsString(e));
         }
         catch (org.apache.hadoop.fs.FileAlreadyExistsException | AlreadyBeingCreatedException e) {
-            throw new FileAlreadyExistsException(e.getMessage());
+            throw new FileAlreadyExistsException(Throwables.getStackTraceAsString(e));
         }
         catch (PathIsNotEmptyDirectoryException e) {
-            throw new DirectoryNotEmptyException(e.getMessage());
+            throw new DirectoryNotEmptyException(Throwables.getStackTraceAsString(e));
         }
         catch (IOException e) {
             // If hdfs is used locally, an IOException will be thrown by RawLocalFileSystem
             // instead of PathIsNotEmptyDirectoryException. Check error message instead.
             String errorMsgNonEmptyForLocalUse = "Directory .* is not empty";
             if ((e.getMessage().matches(errorMsgNonEmptyForLocalUse))) {
-                throw new DirectoryNotEmptyException(e.getMessage());
+                throw new DirectoryNotEmptyException(Throwables.getStackTraceAsString(e));
             }
             else {
                 throw e;
