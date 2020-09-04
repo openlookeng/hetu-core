@@ -93,6 +93,7 @@ public class SplitUtils
     private static List<Split> splitFilter(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
     {
         List<Split> splitsToReturn = new ArrayList<>();
+        splitsToReturn.addAll(inputSplits);
         if (expression instanceof ComparisonExpression) {
             // get filter for each predicate
             // the SplitFilterFactory will return a SplitFilter that has the applicable indexes
@@ -103,6 +104,8 @@ public class SplitUtils
                 // do filter on splits to remove invalid splits from filteredSplits
                 splitsToReturn = splitFilter.filter(inputSplits, predicate.getValue());
             }
+
+            return splitsToReturn;
         }
 
         if (expression instanceof BetweenPredicate) {
@@ -112,6 +115,8 @@ public class SplitUtils
 
             List<Split> splitsRemain = splitFilter(left, inputSplits, fullQualifiedTableName, assignments);
             splitsToReturn = splitFilter(right, splitsRemain, fullQualifiedTableName, assignments);
+
+            return splitsToReturn;
         }
 
         if (expression instanceof LogicalBinaryExpression) {
@@ -141,6 +146,8 @@ public class SplitUtils
             else {
                 throw new IllegalArgumentException("Unsupported logical expression type: " + operator);
             }
+
+            return splitsToReturn;
         }
 
         if (expression instanceof InPredicate) {
@@ -164,6 +171,8 @@ public class SplitUtils
                 if (inListExpression != null) {
                     splitsToReturn = splitsPrepareToReturn;
                 }
+
+                return splitsToReturn;
             }
         }
 

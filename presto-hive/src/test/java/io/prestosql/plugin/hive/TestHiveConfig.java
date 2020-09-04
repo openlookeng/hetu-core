@@ -139,7 +139,8 @@ public class TestHiveConfig
                 .setVacuumServiceThreads(2)
                 .setVacuumDeltaNumThreshold(10)
                 .setAutoVacuumEnabled(false)
-                .setVacuumDeltaPercentThreshold(0.1));
+                .setVacuumDeltaPercentThreshold(0.1)
+                .setOrcPredicatePushdownEnabled(false));
     }
 
     @Test
@@ -259,6 +260,7 @@ public class TestHiveConfig
                 .put("hive.vacuum-delta-num-threshold", "5")
                 .put("hive.vacuum-delta-percent-threshold", "0.6")
                 .put("hive.auto-vacuum-enabled", "true")
+                .put("hive.orc-predicate-pushdown-enabled", "true")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -364,7 +366,8 @@ public class TestHiveConfig
                 .setVacuumServiceThreads(5)
                 .setVacuumDeltaNumThreshold(5)
                 .setAutoVacuumEnabled(true)
-                .setVacuumDeltaPercentThreshold(0.6);
+                .setVacuumDeltaPercentThreshold(0.6)
+                .setOrcPredicatePushdownEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

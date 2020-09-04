@@ -195,6 +195,7 @@ public class HiveConfig
     private int vacuumDeltaNumThreshold = 10;
     private double vacuumDeltaPercentThreshold = 0.1;
     private boolean autoVacuumEnabled;
+    private boolean orcPredicatePushdownEnabled;
 
     public int getMaxInitialSplits()
     {
@@ -1720,5 +1721,18 @@ public class HiveConfig
     public boolean getAutoVacuumEnabled()
     {
         return autoVacuumEnabled;
+    }
+
+    @Config("hive.orc-predicate-pushdown-enabled")
+    @ConfigDescription("Enables processing of predicates within ORC reading")
+    public HiveConfig setOrcPredicatePushdownEnabled(boolean orcPredicatePushdownEnabled)
+    {
+        this.orcPredicatePushdownEnabled = orcPredicatePushdownEnabled;
+        return this;
+    }
+
+    public boolean isOrcPredicatePushdownEnabled()
+    {
+        return orcPredicatePushdownEnabled;
     }
 }
