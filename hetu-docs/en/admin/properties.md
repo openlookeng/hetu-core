@@ -521,3 +521,34 @@ helps with cache affinity scheduling.
 > -   **Default value:** `2 seconds`
 > 
 > This property controls how frequently the split cache map is updated in state store. It is primarily applicable for HA deployment.
+
+## Auto-Vacuum
+
+> Auto-Vacuum enables the system to automatically manage vacuum jobs by constantly monitoring the tables which needs vacuum in order to maintain optimal performance.
+> Engine gets the tables from data sources that are eligible for vacuum and trigger vacuum operation for those tables.
+
+### `auto-vacuum.enabled:`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> This is to enable auto-vacuum functionality.
+> **Note:** This should be configured only in coordinator.
+
+### `auto-vacuum.scan.interval`
+
+> -   **Type:** `Duration`
+> -   **Default value:** `10m`
+>
+> It is scheduled Interval to get vacuum table info from the data sources and trigger vacuum for those tables.
+> Timer is started when the server starts and it will keep on scheduling for configured interval.
+> Min value is 15s and Max value is 24h.
+> **Note:** This should be configured only in coordinator.
+
+### `auto-vacuum.scan.threads`
+
+> -  **Type:** `integer`
+> - **Default value:** `3`
+>
+> Number of threads used for Auto vacuum functionality. Min value is 1 and Max value is 16.
+> **Note:** This should be configured only in coordinator.

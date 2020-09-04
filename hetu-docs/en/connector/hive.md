@@ -116,7 +116,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.orc.use-column-names`               | To support alter table drop column, it is recommended to add `hive.orc.use-column-names=true` in hive properties, otherwise the drop column might not work properly. | false    |
 | `hive.orc-predicate-pushdown-enabled`     | Enables pushdown processing of predicates while reading ORC file. | `false` |
 | `hive.vacuum-service-threads`             | Number of threads to run in the vacuum service.               | 2    |
-| `hive.auto-vacuum-enabled`                | Enable auto-vacuum on Hive tables. To enable auto-vacuum on engine side, add `auto-vacuum.enabled=true` in config.properties.                       | `false`  |
+| `hive.auto-vacuum-enabled`                | Enable auto-vacuum on Hive tables. To enable auto-vacuum on engine side, add `auto-vacuum.enabled=true` in config.properties of coordinator node(s). | `false`  |
 | `hive.vacuum-delta-num-threshold`         | Maximum number of delta directories to allow without compacting it. Minimum value is 2.       | 10    |
 | `hive.vacuum-delta-percent-threshold`     | Maximum percent of delta directories to allow without compacting it. Value should be in range 0.1 to 1.0      | 0.1   |
 | `hive.vacuum-cleanup-recheck-interval`    | Interval after which vacuum cleanup task will be resubmitted.     | `1 Minute`    |
