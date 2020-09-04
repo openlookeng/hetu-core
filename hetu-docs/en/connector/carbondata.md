@@ -62,7 +62,9 @@ The properties that apply to Carbondata connector security are listed in the [Ca
 
 | Property Name                             | Description                                                  | Default                                         |
 | ----------------------------------------- | :----------------------------------------------------------- | ----------------------------------------------- |
-| carbondata.store-location                 | Specifies the location of the storage for carbondata warehouse. If not specified, it uses default hive warehouse path, i.e */user/hive/warehouse/**carbon.store*** | `${hive.metastore.warehouse.dir} /carbon.store` |
+| `carbondata.store-location`                 | Specifies the location of the storage for carbondata warehouse. If not specified, it uses default hive warehouse path, i.e */user/hive/warehouse/**carbon.store*** | `${hive.metastore.warehouse.dir} /carbon.store` |
+| `carbondata.minor-vacuum-seg-count`                 | Specifies the number of segments that may be considered for Minor Vacuum on a Carbondata table. If not specified or set to a number < 2, all available segments are considered | `NONE` |
+| `carbondata.major-vacuum-seg-size`                 | Specifies the size limit (in GB) for Major Vacuum on a Carbondata table. All segments whose cumulative size is less than this threshold will be considered. If not specified, it uses default Vacuum value, i.e 1GB | `1GB` |
 | `hive.metastore`                          | The type of Hive metastore to use. openLooKeng currently supports the default Hive Thrift metastore (`thrift`). | `thrift`                                        |
 | `hive.config.resources`                   | A comma-separated list of HDFS configuration files. These files must exist on the machines running openLooKeng. Example: `/etc/hdfs-site.xml` |                                                 |
 | `hive.hdfs.authentication.type`           | HDFS authentication type. Possible values are `NONE` or `KERBEROS`. | `NONE`                                          |
@@ -218,6 +220,36 @@ Drop an existing table.
 ```sql
 DROP TABLE orders;
 ```
+
+### Vacuum
+
+Vacuum operation translates to `compaction` in Carbondata. In Carbondata there are two types of vacuum operation, `Major` and `Minor`.
+
+The following is a short description of the mapping between VACUUM and Carbondata compaction-
+
+* `VACUUM TABLE table_name FULL` translates to Major compaction which compacts segments based on a cumulative size restriction.
+
+* `VACUUM TABLE table_name ` translates to Minor compaction which compacts segments based on a count restriction.
+
+The below operation triggers Minor Vacuum on a table with name, `carbondata_table` to merge multiple segments to a single segment. 
+```sql
+VACUUM TABLE carbondata_table;
+```
+
+##### VACUUM FULL
+
+Major Vacuum merges the segments based on their sizes. As long as the total size of all segments being merged doesn't exceed a certain value, they are all compacted into a single new segment.
+```sql
+VACUUM TABLE carbondata_table FULL;
+```
+
+##### Support for AND WAIT
+Both Minor and Major Vacuum operations can be executed in a synchronous manner using the following commands-
+```sql
+VACUUM TABLE carbondata_table (FULL) AND WAIT;
+```
+
+This will also display the number of rows in the table that are being compacted.
 
 ## Carbondata Connector Limitations
 
