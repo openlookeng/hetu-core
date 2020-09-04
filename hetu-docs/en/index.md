@@ -36,6 +36,7 @@ headless: true
     - [Distributed Sort]({{< relref "./docs/admin/dist-sort.md" >}})
     - [Dynamic Catalog]({{< relref "./docs/admin/dynamic-catalog.md" >}})
     - [Cluster Node Management]({{< relref "./docs/admin/cluster-node-management.md" >}})
+    - [Dynamic Filtering]({{< relref "./docs/admin/dynamic-filters.md" >}})
 
 - [Query Optimizer]("#")
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
