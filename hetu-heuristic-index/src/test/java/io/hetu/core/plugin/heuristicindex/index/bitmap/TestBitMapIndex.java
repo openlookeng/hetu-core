@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.heuristicindex.index.bitmap;
 
+import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.type.CharType;
@@ -61,19 +62,19 @@ public class TestBitMapIndex
 
         String[] values = {"a", "y", "z", "t", "e", "f", "g"};
 
-        bitMapIndex.addValues(values);
+        bitMapIndex.addValues(ImmutableMap.of("testColumn", values));
 
         File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
-            bitMapIndex.persist(outputStream);
+            bitMapIndex.serialize(outputStream);
         }
 
-        bitMapIndex.load(new FileInputStream(tmp));
+        bitMapIndex.deserialize(new FileInputStream(tmp));
 
         Domain predicate = Domain.create(ValueSet.ofRanges(equal(createUnboundedVarcharType(), utf8Slice("y"))), false);
 
-        Iterator<Integer> res = bitMapIndex.getMatches(predicate);
+        Iterator<Integer> res = bitMapIndex.lookUp(predicate);
 
         Set<Integer> resultSet = new HashSet<>();
         while (res.hasNext()) {
@@ -96,19 +97,19 @@ public class TestBitMapIndex
 
         String[] values = {"测试", "ab", "aer", "asdasd", "%#!", ":dfs", "测试"};
 
-        bitMapIndex.addValues(values);
+        bitMapIndex.addValues(ImmutableMap.of("testColumn", values));
 
         File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
-            bitMapIndex.persist(outputStream);
+            bitMapIndex.serialize(outputStream);
         }
 
-        bitMapIndex.load(new FileInputStream(tmp));
+        bitMapIndex.deserialize(new FileInputStream(tmp));
 
         Domain predicate = Domain.create(ValueSet.ofRanges(equal(createUnboundedVarcharType(), utf8Slice(":dfs"))), false);
 
-        Iterator<Integer> res = bitMapIndex.getMatches(predicate);
+        Iterator<Integer> res = bitMapIndex.lookUp(predicate);
 
         Set<Integer> resultSet = new HashSet<>();
         while (res.hasNext()) {
@@ -131,19 +132,19 @@ public class TestBitMapIndex
 
         Object[] values = {8, 4, 4, 8, 51, null, 8, 1, 8, 2, 4, 7, 6, 1};
 
-        bitMapIndex.addValues(values);
+        bitMapIndex.addValues(ImmutableMap.of("testColumn", values));
 
         File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
-            bitMapIndex.persist(outputStream);
+            bitMapIndex.serialize(outputStream);
         }
 
-        bitMapIndex.load(new FileInputStream(tmp));
+        bitMapIndex.deserialize(new FileInputStream(tmp));
 
         Domain predicate = Domain.create(ValueSet.ofRanges(equal(IntegerType.INTEGER, 8L)), false);
 
-        Iterator<Integer> res = bitMapIndex.getMatches(predicate);
+        Iterator<Integer> res = bitMapIndex.lookUp(predicate);
 
         Set<Integer> resultSet = new HashSet<>();
         while (res.hasNext()) {
@@ -168,18 +169,18 @@ public class TestBitMapIndex
         for (int i = 1; i < 1000000; i++) {
             values[i] = r.nextInt(999999999);
         }
-        bitMapIndex.addValues(values);
+        bitMapIndex.addValues(ImmutableMap.of("testColumn", values));
 
         File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
-            bitMapIndex.persist(outputStream);
+            bitMapIndex.serialize(outputStream);
         }
 
-        bitMapIndex.load(new FileInputStream(tmp));
+        bitMapIndex.deserialize(new FileInputStream(tmp));
 
         Domain predicate = Domain.create(ValueSet.ofRanges(equal(IntegerType.INTEGER, 8L)), false);
-        Iterator<Integer> res = bitMapIndex.getMatches(predicate);
+        Iterator<Integer> res = bitMapIndex.lookUp(predicate);
         Set<Integer> resultSet = new HashSet<>();
         while (res.hasNext()) {
             resultSet.add(res.next());
@@ -200,18 +201,18 @@ public class TestBitMapIndex
 
         Object[] values = {"8", "4", "4", "8", "51", "52", "8", "1", "8", "2", "4", "7", "6", "1"};
 
-        bitMapIndex.addValues(values);
+        bitMapIndex.addValues(ImmutableMap.of("testColumn", values));
 
         File tmp = new File("tmp.bitmap" + UUID.randomUUID().toString());
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
-            bitMapIndex.persist(outputStream);
+            bitMapIndex.serialize(outputStream);
         }
 
-        bitMapIndex.load(new FileInputStream(tmp));
+        bitMapIndex.deserialize(new FileInputStream(tmp));
 
         Domain greaterThanOrEqual = Domain.create(ValueSet.ofRanges(greaterThanOrEqual(IntegerType.INTEGER, 8L)), false);
-        Iterator<Integer> res = bitMapIndex.getMatches(greaterThanOrEqual);
+        Iterator<Integer> res = bitMapIndex.lookUp(greaterThanOrEqual);
 
         Set<Integer> resultSet = new HashSet<>();
         while (res.hasNext()) {
@@ -221,7 +222,7 @@ public class TestBitMapIndex
         assertTrue(resultSet.containsAll(Arrays.asList(0, 3, 4, 5, 6, 8)));
 
         Domain greaterThan = Domain.create(ValueSet.ofRanges(greaterThan(IntegerType.INTEGER, 8L)), false);
-        res = bitMapIndex.getMatches(greaterThan);
+        res = bitMapIndex.lookUp(greaterThan);
 
         resultSet = new HashSet<>();
         while (res.hasNext()) {
@@ -232,7 +233,7 @@ public class TestBitMapIndex
         assertTrue(resultSet.containsAll(Arrays.asList(4, 5)));
 
         Domain lessThan = Domain.create(ValueSet.ofRanges(lessThan(IntegerType.INTEGER, 8L)), false);
-        res = bitMapIndex.getMatches(lessThan);
+        res = bitMapIndex.lookUp(lessThan);
 
         resultSet = new HashSet<>();
         while (res.hasNext()) {
@@ -248,26 +249,26 @@ public class TestBitMapIndex
     {
         BitMapIndex bitMapIndexWrite = new BitMapIndex();
         Float[] floatValues = new Float[] {8f, 4f, 4f, 8f, 51f, null, 8f, 1f, 8f, 2f, 4f, 7f, 6f, 1f};
-        bitMapIndexWrite.addValues(Stream.of(floatValues).map(floatValue -> {
+        bitMapIndexWrite.addValues(ImmutableMap.of("testColumn", Stream.of(floatValues).map(floatValue -> {
             if (floatValue == null) {
                 return floatValue;
             }
             return Float.floatToRawIntBits(floatValue);
-        }).toArray());
+        }).toArray()));
 
         File tmp = File.createTempFile(getClass().getSimpleName(), "floatTest");
         tmp.deleteOnExit();
 
         try (OutputStream outputStream = new FileOutputStream(tmp)) {
-            bitMapIndexWrite.persist(outputStream);
+            bitMapIndexWrite.serialize(outputStream);
         }
 
         BitMapIndex bitMapIndexRead = new BitMapIndex();
-        bitMapIndexRead.load(new FileInputStream(tmp));
+        bitMapIndexRead.deserialize(new FileInputStream(tmp));
 
         Domain eqPredicate = Domain.create(ValueSet.ofRanges(equal(RealType.REAL, (long) Float.floatToRawIntBits(51f))), false);
 
-        Iterator<Integer> eqResult = bitMapIndexRead.getMatches(eqPredicate);
+        Iterator<Integer> eqResult = bitMapIndexRead.lookUp(eqPredicate);
 
         Set<Integer> resultSet = new HashSet<>();
         while (eqResult.hasNext()) {
@@ -278,7 +279,7 @@ public class TestBitMapIndex
         assertTrue(resultSet.contains(4));
 
         Domain grtOrEqPredicate = Domain.create(ValueSet.ofRanges(greaterThanOrEqual(RealType.REAL, (long) Float.floatToRawIntBits(7f))), false);
-        Iterator<Integer> grtOrEqResult = bitMapIndexRead.getMatches(grtOrEqPredicate);
+        Iterator<Integer> grtOrEqResult = bitMapIndexRead.lookUp(grtOrEqPredicate);
 
         Set<Integer> grtOrEqResultSet = new HashSet<>();
         while (grtOrEqResult.hasNext()) {
@@ -295,23 +296,23 @@ public class TestBitMapIndex
         // adding 3 values to default size should pass
         BitMapIndex defaultSizedIndex = new BitMapIndex();
         assertEquals(defaultSizedIndex.getExpectedNumOfEntries(), BitMapIndex.DEFAULT_EXPECTED_NUM_OF_SIZE);
-        defaultSizedIndex.addValues(Stream.of(new Float[]{1f, 2f, 3f}).map(floatValue -> {
+        defaultSizedIndex.addValues(ImmutableMap.of("testColumn", Stream.of(new Float[] {1f, 2f, 3f}).map(floatValue -> {
             if (floatValue == null) {
                 return floatValue;
             }
             return Float.floatToRawIntBits(floatValue);
-        }).toArray());
+        }).toArray()));
 
         // adding 2 values to an index of size 2 should pass
         BitMapIndex equalSizedIndex = new BitMapIndex();
         equalSizedIndex.setExpectedNumOfEntries(2);
         assertEquals(equalSizedIndex.getExpectedNumOfEntries(), 2);
-        equalSizedIndex.addValues(Stream.of(new Float[]{1f, 2f}).map(floatValue -> {
+        equalSizedIndex.addValues(ImmutableMap.of("testColumn", Stream.of(new Float[] {1f, 2f}).map(floatValue -> {
             if (floatValue == null) {
                 return floatValue;
             }
             return Float.floatToRawIntBits(floatValue);
-        }).toArray());
+        }).toArray()));
     }
 
     @Test(expectedExceptions = RuntimeException.class)
@@ -321,12 +322,12 @@ public class TestBitMapIndex
         BitMapIndex smallSizedIndex = new BitMapIndex();
         smallSizedIndex.setExpectedNumOfEntries(2);
         assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
-        smallSizedIndex.addValues(Stream.of(new Float[] {1f, 2f, 3f}).map(floatValue -> {
+        smallSizedIndex.addValues(ImmutableMap.of("testColumn", Stream.of(new Float[] {1f, 2f, 3f}).map(floatValue -> {
             if (floatValue == null) {
                 return floatValue;
             }
             return Float.floatToRawIntBits(floatValue);
-        }).toArray());
+        }).toArray()));
     }
 
     @Test

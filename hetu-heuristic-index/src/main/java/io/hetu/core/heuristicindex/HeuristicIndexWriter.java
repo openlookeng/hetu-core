@@ -15,6 +15,7 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.AtomicDouble;
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
@@ -238,11 +239,11 @@ public class HeuristicIndexWriter
                         String indexFileName = indexFileNamePrefix + splitIndex.getId().toLowerCase(Locale.ENGLISH);
                         Path indexFilePath = Paths.get(uriIndexDirPath, indexFileName);
 
-                        splitIndex.addValues(values);
+                        splitIndex.addValues(ImmutableMap.of(column, values));
 
                         printVerboseMsg(String.format("writing split index to: %s", indexFilePath));
                         try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(indexFilePath)) {
-                            splitIndex.persist(outputStream);
+                            splitIndex.serialize(outputStream);
                             if (!IndexCommand.verbose) {
                                 currProgress *= 0.75 * PROGRESS_BAR_LENGTH;
                                 synchronized (progress) {

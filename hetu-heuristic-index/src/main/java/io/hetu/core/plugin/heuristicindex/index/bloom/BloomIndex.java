@@ -15,23 +15,19 @@
 
 package io.hetu.core.plugin.heuristicindex.index.bloom;
 
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.heuristicindex.Index;
-import io.prestosql.spi.heuristicindex.Operator;
 import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.util.BloomFilter;
+import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 
-import static java.util.stream.Collectors.toMap;
+import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 
 /**
  * Bloom index implementation
@@ -42,13 +38,11 @@ public class BloomIndex<T>
         implements Index<T>
 {
     public static final String ID = "BLOOM";
-    private static final String FPP_KEY = "fpp";
-
-    private static final double DEFAULT_FPP = 0.05;
     protected static final int DEFAULT_EXPECTED_NUM_OF_SIZE = 200000;
-
+    private static final String FPP_KEY = "fpp";
+    private static final double DEFAULT_FPP = 0.05;
     private Properties properties;
-    private BloomFilter<String> filter;
+    private BloomFilter filter;
     private double fpp = DEFAULT_FPP;
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
     private long memorySize;
@@ -60,107 +54,63 @@ public class BloomIndex<T>
     }
 
     @Override
-    public void addValues(T[] values)
+    public boolean addValues(Map<String, Object[]> values)
     {
-        for (T value : values) {
+        // Currently expecting only one column
+        Object[] columnIdxValue = values.values().iterator().next();
+        for (Object value : columnIdxValue) {
             if (value != null) {
-                getFilter().put(value.toString());
+                getFilter().add(value.toString().getBytes());
             }
         }
+        return true;
     }
 
-    /**
-     * Perform search using the bloom filter but the returned results might be false-positive.
-     *
-     * @param value value to be searched in the bloom filter
-     * @return true if index might contain the provided value
-     */
-    public boolean mightContain(T value)
-    {
-        return matches(value, Operator.EQUAL);
-    }
-
+    // For Bloom, expression should be an Expression object for now, until it's replaced by RowExpression
     @Override
-    public boolean matches(T value, Operator operator)
-            throws IllegalArgumentException
+    public boolean matches(Object expression)
     {
-        if (operator == null) {
-            throw new IllegalArgumentException("No operator provided.");
-        }
-
-        if (operator == Operator.EQUAL) {
-            return getFilter().mightContain(value.toString());
-        }
-        else {
-            throw new IllegalArgumentException("Unsupported operator " + operator);
-        }
-    }
-
-    @Override
-    public <I> Iterator<I> getMatches(Object filter)
-    {
-        Map<Index, Object> self = new HashMap<>();
-        self.put(this, filter);
-
-        return getMatches(self);
-    }
-
-    @Override
-    public <I> Iterator<I> getMatches(Map<Index, Object> indexToPredicate)
-    {
-        Map<BloomIndex, Domain> bloomIndexDomainMap = indexToPredicate.entrySet().stream()
-                .collect(toMap(e -> (BloomIndex) e.getKey(), e -> (Domain) e.getValue()));
-
-        boolean flag = true;
-
-        for (Map.Entry<BloomIndex, Domain> entry : bloomIndexDomainMap.entrySet()) {
-            BloomIndex bloomIndex = entry.getKey();
-            Domain predicate = entry.getValue();
-
+        if (expression instanceof Domain) {
+            Domain predicate = (Domain) expression;
             if (predicate.isSingleValue()) {
                 Class<?> javaType = predicate.getValues().getType().getJavaType();
-                flag = flag && bloomIndex.mightContain(rangeValueToString(predicate.getSingleValue(), javaType));
+                return getFilter().test(rangeValueToString(predicate.getSingleValue(), javaType).getBytes());
             }
-            else { // unsupported operator, not skip stripes
-                flag = true;
+            else {
+                // Does not support multiple predicate for now. Do not filter.
+                return true;
             }
         }
-        final boolean hasNext = flag;
 
-        return (Iterator<I>) new Iterator<Integer>()
-        {
-            @Override
-            public boolean hasNext()
-            {
-                return hasNext;
+        if (expression instanceof ComparisonExpression) {
+            ComparisonExpression compExp = (ComparisonExpression) expression;
+            ComparisonExpression.Operator operator = compExp.getOperator();
+            Object value = extractSingleValue(compExp.getRight());
+
+            if (operator == ComparisonExpression.Operator.EQUAL) {
+                return getFilter().test(value.toString().getBytes());
             }
 
-            @Override
-            public Integer next()
-            {
-                return null;
-            }
-        };
+            throw new IllegalArgumentException("Unsupported operator " + operator);
+        }
+
+        // Not supported expression. Do not filter.
+        return true;
     }
 
     @Override
-    public boolean supports(Operator operator)
-    {
-        return operator == Operator.EQUAL;
-    }
-
-    @Override
-    public void persist(OutputStream out)
+    public void serialize(OutputStream out)
             throws IOException
     {
         getFilter().writeTo(out);
     }
 
     @Override
-    public void load(InputStream in)
+    public Index deserialize(InputStream in)
             throws IOException
     {
-        filter = BloomFilter.readFrom(in, Funnels.stringFunnel(Charset.defaultCharset()));
+        filter = BloomFilter.readFrom(in);
+        return this;
     }
 
     @Override
@@ -176,15 +126,21 @@ public class BloomIndex<T>
     }
 
     @Override
+    public int getExpectedNumOfEntries()
+    {
+        return expectedNumOfEntries;
+    }
+
+    @Override
     public void setExpectedNumOfEntries(int expectedNumOfEntries)
     {
         this.expectedNumOfEntries = expectedNumOfEntries;
     }
 
     @Override
-    public int getExpectedNumOfEntries()
+    public boolean supportMultiColumn()
     {
-        return expectedNumOfEntries;
+        return false;
     }
 
     private double getFpp()
@@ -197,10 +153,10 @@ public class BloomIndex<T>
         return fpp;
     }
 
-    private BloomFilter<String> getFilter()
+    private BloomFilter getFilter()
     {
         if (filter == null) {
-            filter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), getExpectedNumOfEntries(), getFpp());
+            filter = new BloomFilter(getExpectedNumOfEntries(), getFpp());
         }
 
         return filter;
@@ -210,6 +166,7 @@ public class BloomIndex<T>
      * <pre>
      *  get range value, if it is slice, we should change it to string
      * </pre>
+     *
      * @param object value
      * @param javaType value java type
      * @return string

@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.InjectableValues;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.heuristicindex.Index;
-import io.prestosql.spi.heuristicindex.Operator;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Marker;
 import io.prestosql.spi.predicate.Range;
@@ -75,7 +74,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -85,7 +83,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
 
 /**
  * This BitMapIndexV2 will create and apply the filter for only one column data
@@ -103,11 +100,6 @@ import static java.util.stream.Collectors.toMap;
 public class BitMapIndex<T>
         implements Index<T>
 {
-    static
-    {
-        NullHandling.initializeForTests();
-    }
-
     static final int DEFAULT_EXPECTED_NUM_OF_SIZE = 200000;
     private static final Logger LOG = LoggerFactory.getLogger(BitMapIndex.class);
     private static final String COLUMN_NAME = "column";
@@ -124,7 +116,6 @@ public class BitMapIndex<T>
             " \t\"metricCompression\": \"lz4\",\n" +
             " \t\"longEncoding\": \"auto\"\n" +
             " }";
-
     // when the index is initialized an IncrementalIndex is created
     // and values can be added to it
     // this IncrementalIndex can then be persisted to disk.
@@ -146,7 +137,6 @@ public class BitMapIndex<T>
     // 5. query the QueryableIndex
     private IncrementalIndex incrementalIndex;
     private QueryableIndex queryableIndex;
-
     private AtomicLong rows = new AtomicLong();
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
     private long memorySize;
@@ -163,7 +153,8 @@ public class BitMapIndex<T>
      * @return
      * @throws IOException
      */
-    private static QueryableIndex load(File indexDir) throws IOException
+    private static QueryableIndex load(File indexDir)
+            throws IOException
     {
         ObjectMapper jsonMapper = new DefaultObjectMapper();
         InjectableValues.Std injectableValues = new InjectableValues.Std();
@@ -185,7 +176,8 @@ public class BitMapIndex<T>
      * @param outputDir
      * @throws IOException
      */
-    private static void persist(IncrementalIndex incrementalIndex, File outputDir) throws IOException
+    private static void persist(IncrementalIndex incrementalIndex, File outputDir)
+            throws IOException
     {
         ObjectMapper jsonMapper = new DefaultObjectMapper();
         InjectableValues.Std injectableValues = new InjectableValues.Std();
@@ -285,7 +277,7 @@ public class BitMapIndex<T>
      *  get range value, if it is slice, we should change it to string
      * </pre>
      *
-     * @param object   value
+     * @param object value
      * @param javaType value java type
      * @return string
      */
@@ -295,29 +287,17 @@ public class BitMapIndex<T>
     }
 
     @Override
-    public <I> Iterator<I> getMatches(Object filter)
-    {
-        Map<Index, Object> self = new HashMap<>();
-        self.put(this, filter);
-
-        return getMatches(self);
-    }
-
-    @Override
     public String getId()
     {
         return ID;
     }
 
-    /**
-     * input as one column values
-     *
-     * @param values values to add
-     */
     @Override
-    public void addValues(T[] values)
+    public boolean addValues(Map<String, Object[]> values)
     {
-        for (T value : values) {
+        // Currently expecting only one column
+        Object[] columnIdxValue = values.values().iterator().next();
+        for (Object value : columnIdxValue) {
             Map<String, Object> events = new LinkedHashMap<>();
             events.put(COLUMN_NAME, value);
             MapBasedInputRow mapBasedInputRow = new MapBasedInputRow(rows.get(), Collections.singletonList(COLUMN_NAME), events);
@@ -329,49 +309,67 @@ public class BitMapIndex<T>
             }
             rows.incrementAndGet();
         }
+        return true;
     }
 
-    /**
-     * Bitmap requires a Domain as the value, the Domain will already include what kind
-     * of operation is being performed, therefore the operator parameter is not required.
-     *
-     * @param operator not required since value should be a Domain
-     * @return
-     */
+    // For BitMap, expression should be a Domain object for now, until it's replaced by RowExpression
     @Override
-    public boolean matches(Object value, Operator operator)
-            throws IllegalArgumentException
+    public boolean matches(Object expression)
     {
-        if (!(value instanceof Domain)) {
-            throw new IllegalArgumentException("Value must be a Domain.");
-        }
-
-        Iterator iterator = getMatches(value);
-
-        if (iterator == null) {
-            throw new IllegalArgumentException("Operation not supported.");
-        }
-
-        return iterator.hasNext();
+        return lookUp(expression).hasNext();
     }
 
+    // For BitMap, expression should be a Domain object for now, until it's replaced by RowExpression
     @Override
-    public boolean supports(Operator operator)
+    public <I> Iterator<I> lookUp(Object expression)
     {
-        switch (operator) {
-            case EQUAL:
-            case LESS_THAN:
-            case LESS_THAN_OR_EQUAL:
-            case GREATER_THAN:
-            case GREATER_THAN_OR_EQUAL:
-                return true;
-            default:
-                return false;
+        Iterator result = Collections.emptyIterator();
+
+        if (expression instanceof Domain) {
+            Domain predicate = (Domain) expression;
+            List<DimFilter> dimFilters = predicateToFilter(predicate);
+
+            List<Filter> filters = dimFilters.stream()
+                    .map(filter -> filter.toFilter()).collect(toList());
+
+            QueryableIndex queryableIndex = this.getQueryableIndex();
+
+            ColumnSelectorBitmapIndexSelector bitmapIndexSelector = new ColumnSelectorBitmapIndexSelector(
+                    queryableIndex.getBitmapFactoryForDimensions(),
+                    VirtualColumns.nullToEmpty(null),
+                    queryableIndex);
+            BitmapResultFactory<?> bitmapResultFactory = new DefaultBitmapResultFactory(bitmapIndexSelector.getBitmapFactory());
+
+            if (filters.size() == 0) {
+                filters.add(TrueFilter.instance());
+            }
+
+            ImmutableBitmap bm = AndFilter.getBitmapIndex(bitmapIndexSelector, bitmapResultFactory, new HashSet<>(filters));
+
+            final IntIterator iterator = bm.iterator();
+
+            result = new Iterator<Integer>()
+            {
+                @Override
+                public boolean hasNext()
+                {
+                    return iterator.hasNext();
+                }
+
+                @Override
+                public Integer next()
+                {
+                    return iterator.next();
+                }
+            };
         }
+
+        return result;
     }
 
     @Override
-    public void persist(OutputStream out) throws IOException
+    public void serialize(OutputStream out)
+            throws IOException
     {
         File tmpDir = new File(FileUtils.getTempDirectory(), "bitmapsIndexTmp_" + UUID.randomUUID());
         try {
@@ -391,7 +389,8 @@ public class BitMapIndex<T>
     }
 
     @Override
-    public void load(InputStream in) throws IOException
+    public Index deserialize(InputStream in)
+            throws IOException
     {
         File tmpDir = new File(FileUtils.getTempDirectory(), "bitmapsIndexTmp_" + UUID.randomUUID());
         try {
@@ -405,6 +404,8 @@ public class BitMapIndex<T>
         finally {
             FileUtils.deleteDirectory(tmpDir);
         }
+
+        return this;
     }
 
     @Override
@@ -420,75 +421,9 @@ public class BitMapIndex<T>
     }
 
     @Override
-    public <I> Iterator<I> getMatches(Map<Index, Object> indexToPredicate)
+    public boolean supportMultiColumn()
     {
-        // indexToPredicate contains a mapping from BitMapIndex to predicates
-        // it will do an intersection on the results of applying the predicate using the
-        // corresponding index
-        // the map should also include this current object itself
-        // technically this is more like a utility method that should be static in the interface
-        // however, each index implementation may have a more efficient way of
-        // intersecting results, that's why each Index implementation will implement this method
-        Map<BitMapIndex, Domain> bitMapIndexDomainMap = indexToPredicate.entrySet().stream()
-                .collect(toMap(e -> (BitMapIndex) e.getKey(), e -> (Domain) e.getValue()));
-
-        ImmutableBitmap lastBm = null;
-        for (Map.Entry<BitMapIndex, Domain> entry : bitMapIndexDomainMap.entrySet()) {
-            BitMapIndex bitMapIndex = entry.getKey();
-            Domain predicate = entry.getValue();
-            List<DimFilter> dimFilters = predicateToFilter(predicate);
-
-            List<Filter> filters = dimFilters.stream()
-                    .map(filter -> filter.toFilter()).collect(toList());
-
-            QueryableIndex queryableIndex = bitMapIndex.getQueryableIndex();
-
-            // if queryableIndex is null, it means the index has not been loaded from disk
-            // so it cannot be queried
-            if (queryableIndex == null) {
-                continue;
-            }
-
-            ColumnSelectorBitmapIndexSelector bitmapIndexSelector = new ColumnSelectorBitmapIndexSelector(
-                    queryableIndex.getBitmapFactoryForDimensions(),
-                    VirtualColumns.nullToEmpty(null),
-                    queryableIndex);
-            BitmapResultFactory<?> bitmapResultFactory = new DefaultBitmapResultFactory(bitmapIndexSelector.getBitmapFactory());
-
-            if (filters.size() == 0) {
-                filters.add(TrueFilter.instance());
-            }
-
-            ImmutableBitmap bm = AndFilter.getBitmapIndex(bitmapIndexSelector, bitmapResultFactory, new HashSet(filters));
-
-            if (lastBm == null) {
-                lastBm = bm;
-            }
-            else {
-                lastBm = lastBm.intersection(bm);
-            }
-        }
-
-        if (lastBm == null) {
-            return Collections.emptyIterator();
-        }
-
-        IntIterator intIterator = lastBm.iterator();
-
-        return (Iterator<I>) new Iterator<Integer>()
-        {
-            @Override
-            public boolean hasNext()
-            {
-                return intIterator.hasNext();
-            }
-
-            @Override
-            public Integer next()
-            {
-                return intIterator.next();
-            }
-        };
+        return false;
     }
 
     /**
@@ -504,7 +439,8 @@ public class BitMapIndex<T>
      * @param dir
      * @throws IOException
      */
-    private void combineDirIntoStream(OutputStream outputStream, File dir) throws IOException
+    private void combineDirIntoStream(OutputStream outputStream, File dir)
+            throws IOException
     {
         File[] files = dir.listFiles();
 
@@ -614,5 +550,9 @@ public class BitMapIndex<T>
     public void setMemorySize(long memorySize)
     {
         this.memorySize = memorySize;
+    }
+
+    static {
+        NullHandling.initializeForTests();
     }
 }

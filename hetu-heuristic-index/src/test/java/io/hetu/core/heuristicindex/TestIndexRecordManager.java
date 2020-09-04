@@ -23,9 +23,11 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
@@ -73,6 +75,29 @@ public class TestIndexRecordManager
         testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "12", "123");
     }
 
+    @Test
+    public void testRecordEqualAndHash()
+    {
+        IndexRecordManager.IndexRecord r1 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "");
+        IndexRecordManager.IndexRecord r2 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "note");
+        IndexRecordManager.IndexRecord r3 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", "");
+        IndexRecordManager.IndexRecord r4 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", "");
+        assertEquals(r1, r1);
+        assertEquals(r1, r2);
+        assertNotEquals(r1, r3);
+        assertNotEquals(r1, r4);
+
+        HashSet<IndexRecordManager.IndexRecord> testSet = new HashSet<>();
+        testSet.add(r1);
+        assertEquals(testSet.size(), 1);
+        testSet.add(r2);
+        assertEquals(testSet.size(), 1);
+        testSet.add(r3);
+        assertEquals(testSet.size(), 2);
+        testSet.add(r4);
+        assertEquals(testSet.size(), 3);
+    }
+
     @Test(expectedExceptions = AssertionError.class)
     public void testAddAndLookUpDifferentNotes()
             throws IOException, IllegalAccessException
@@ -110,6 +135,7 @@ public class TestIndexRecordManager
             throws IllegalAccessException
     {
         for (Field field : actual.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
             assertEquals(field.get(actual), field.get(expected));
         }
     }

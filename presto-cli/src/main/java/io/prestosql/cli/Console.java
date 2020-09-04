@@ -103,6 +103,7 @@ public class Console
     private static final String PROMPT_NAME = "lk";
     private static final Duration EXIT_DELAY = new Duration(3, SECONDS);
     private static final Pattern createIndexPattern = Pattern.compile("^(drop|create|show)\\s*index.*", Pattern.CASE_INSENSITIVE);
+    private static final int COL_MAX_LENGTH = 70;
 
     @Inject
     public HelpOption helpOption;
@@ -350,7 +351,12 @@ public class Console
                     continue;
                 }
                 String partitions = (v.note == null || v.note.isEmpty()) ? "all" : v.note;
-                List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, partitions.replaceAll("(.{70})", "$0\n"));
+                StringBuilder partitionsStrToDisplay = new StringBuilder();
+                for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
+                    partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
+                    partitionsStrToDisplay.append("\n");
+                }
+                List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, partitionsStrToDisplay.toString());
                 rows.add(strings);
             }
 
@@ -510,6 +516,11 @@ public class Console
             CreateIndex createIndex = (CreateIndex) parser.createStatement(query, new ParsingOptions());
 
             String tableName = createIndex.getTableName().toString();
+
+            if (!tableName.matches("[\\p{Alnum}_]+")) {
+                System.out.println("Invalid table name " + tableName);
+                return false;
+            }
 
             if (createIndex.getTableName().getOriginalParts().size() == 1) {
                 if (queryRunner.getSession().getCatalog() != null && queryRunner.getSession().getSchema() != null) {

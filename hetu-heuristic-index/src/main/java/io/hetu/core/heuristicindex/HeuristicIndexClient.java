@@ -111,7 +111,7 @@ public class HeuristicIndexClient
             IndexMetadata index = new IndexMetadata(
                     entry.getValue(),
                     table.toString(),
-                    column.toString(),
+                    new String[] {column.toString()},
                     root.toString(),
                     remainder.toString(),
                     splitStart,
@@ -245,7 +245,7 @@ public class HeuristicIndexClient
                                 throw new IOException(e);
                             }
                             try (InputStream is = LOCAL_FS_CLIENT.newInputStream(child)) {
-                                index.load(is);
+                                index.deserialize(is);
                             }
 
                             printVerboseMsg(String.format("Loaded %s index from %s.", index.getId(), child));

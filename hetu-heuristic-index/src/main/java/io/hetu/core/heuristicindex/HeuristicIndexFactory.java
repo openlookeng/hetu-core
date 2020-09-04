@@ -16,6 +16,7 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableSet;
+import io.hetu.core.heuristicindex.filter.HeuristicIndexFilter;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.hetu.core.plugin.heuristicindex.datasource.base.EmptyDataSource;
@@ -28,10 +29,14 @@ import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
+import io.prestosql.spi.heuristicindex.IndexFilter;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
 
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -98,5 +103,11 @@ public class HeuristicIndexFactory
         printVerboseMsg(String.format("Creating IndexClient with given filesystem client with root path %s", root));
 
         return new HeuristicIndexClient(new HashSet<>(supportedIndex), fs, root);
+    }
+
+    @Override
+    public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
+    {
+        return new HeuristicIndexFilter(indices);
     }
 }
