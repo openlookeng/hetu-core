@@ -22,6 +22,7 @@ import io.airlift.log.Logger;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
 import io.prestosql.spi.seedstore.SeedStoreFactory;
@@ -76,6 +77,7 @@ public class SeedStoreManager
     private SeedStore seedStore;
     private String seedStoreType;
     private String filesystemProfile;
+    private HetuFileSystemClient fileSystemClient;
     private long seedHeartBeat;
     private long seedHeartBeatTimeout;
     private ConcurrentHashMap<String, Seed> refreshableSeedsMap = new ConcurrentHashMap<>();
@@ -114,8 +116,9 @@ public class SeedStoreManager
             SeedStoreFactory seedStoreFactory = seedStoreFactories.get(seedStoreType);
             checkState(seedStoreFactory != null, "SeedStoreFactory %s is not registered", seedStoreFactory);
             try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStoreFactory.getClass().getClassLoader())) {
+                fileSystemClient = fileSystemClientManager.getFileSystemClient(filesystemProfile, Paths.get("/"));
                 seedStore = seedStoreFactory.create(seedStoreType,
-                        fileSystemClientManager.getFileSystemClient(filesystemProfile, Paths.get("/")),
+                        fileSystemClient,
                         ImmutableMap.copyOf(config));
             }
             try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStore.getClass().getClassLoader())) {
@@ -124,6 +127,15 @@ public class SeedStoreManager
             }
             LOG.info("-- Loaded seed store %s --", seedStoreType);
         }
+    }
+
+    /**
+     * Get file system client
+     */
+
+    public HetuFileSystemClient getFileSystemClient()
+    {
+        return fileSystemClient;
     }
 
     /**
@@ -213,25 +225,18 @@ public class SeedStoreManager
         if (seedStore == null) {
             throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
-
-        long retryInterval = 0L;
-        for (int retryTimes = 0; retryTimes <= SEED_RETRY_TIMES; retryTimes++) {
-            try {
-                TimeUnit.MILLISECONDS.sleep(retryInterval);
-                Collection<Seed> expiredSeeds = seedStore.get()
-                        .stream()
-                        .filter(s -> (System.currentTimeMillis() - s.getTimestamp() > seedHeartBeatTimeout))
-                        .collect(Collectors.toList());
-                if (expiredSeeds.size() > 0) {
-                    LOG.debug("Expired seeds=%s will be cleared", expiredSeeds);
-                    seedStore.remove(expiredSeeds);
-                }
-                break;
+        try {
+            Collection<Seed> expiredSeeds = seedStore.get()
+                    .stream()
+                    .filter(s -> (System.currentTimeMillis() - s.getTimestamp() > seedHeartBeatTimeout))
+                    .collect(Collectors.toList());
+            if (expiredSeeds.size() > 0) {
+                LOG.info("Expired seeds=%s will be cleared", expiredSeeds);
+                seedStore.remove(expiredSeeds);
             }
-            catch (InterruptedException | RuntimeException e) {
-                LOG.warn("clearExpiredSeed failed: %s, will retry at times: %s", e.getMessage(), ++retryTimes);
-                retryInterval += SEED_RETRY_INTERVAL;
-            }
+        }
+        catch (RuntimeException e) {
+            LOG.warn("clearExpiredSeed failed with following message: %s", e.getMessage());
         }
     }
 
