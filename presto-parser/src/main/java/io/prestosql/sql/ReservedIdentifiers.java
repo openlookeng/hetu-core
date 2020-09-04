@@ -67,7 +67,7 @@ public final class ReservedIdentifiers
     private static void validateDocs(Path path)
             throws IOException
     {
-        System.out.println("Validating " + path);
+        System.out.println("Validating docs path.");
         List<String> lines = Files.readAllLines(path);
 
         if (lines.stream().filter(s -> s.startsWith(TABLE_PREFIX)).count() != 3) {

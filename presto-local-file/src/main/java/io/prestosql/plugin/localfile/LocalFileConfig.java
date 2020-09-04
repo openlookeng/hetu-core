@@ -19,6 +19,7 @@ import io.airlift.configuration.ConfigDescription;
 public class LocalFileConfig
 {
     private String httpRequestLogLocation = "var/log/http-request.log";
+    private int maxLogItemsLimit = 1000000;
     private String httpRequestLogFileNamePattern;
 
     public String getHttpRequestLogLocation()
@@ -26,8 +27,11 @@ public class LocalFileConfig
         return httpRequestLogLocation;
     }
 
-    @Config("presto-logs.http-request-log.location")
-    @ConfigDescription("Directory or file where http request logs are written")
+    public int getMaxLogItemsLimit()
+    {
+        return maxLogItemsLimit;
+    }
+
     public LocalFileConfig setHttpRequestLogLocation(String httpRequestLogLocation)
     {
         this.httpRequestLogLocation = httpRequestLogLocation;

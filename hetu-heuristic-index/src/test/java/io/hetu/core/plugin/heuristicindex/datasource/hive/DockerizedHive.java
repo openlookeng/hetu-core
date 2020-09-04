@@ -412,8 +412,10 @@ public class DockerizedHive
                     }
                 }
             }
-
-            Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            transformerFactory.setFeature("http://javax.xml.XMLConstants/feature/secure-processing", true);
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty("omit-xml-declaration", "yes");
             Result output = new StreamResult(coreSite);
             Source input = new DOMSource(coreXml);
             transformer.transform(input, output);

@@ -25,7 +25,6 @@ public class TestLocalFileConfig
     public void testDefaults()
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(LocalFileConfig.class)
-                .setHttpRequestLogLocation("var/log/http-request.log")
                 .setHttpRequestLogFileNamePattern(null));
     }
 
@@ -33,12 +32,10 @@ public class TestLocalFileConfig
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("presto-logs.http-request-log.location", "/data/foo.log")
                 .put("presto-logs.http-request-log.pattern", "bar")
                 .build();
 
         LocalFileConfig expected = new LocalFileConfig()
-                .setHttpRequestLogLocation("/data/foo.log")
                 .setHttpRequestLogFileNamePattern("bar");
 
         ConfigAssertions.assertFullMapping(properties, expected);

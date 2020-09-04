@@ -23,6 +23,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.ZoneId;
@@ -31,6 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -49,11 +51,15 @@ public class AtopProcessFactory
     private final ZoneId timeZone;
     private final Duration readTimeout;
     private final ExecutorService executor;
+    private Pattern pattern = Pattern.compile("[/.a-zA-Z0-9_-]+");
 
     @Inject
     public AtopProcessFactory(AtopConnectorConfig config, AtopCatalogName catalogName)
     {
-        this.executablePath = config.getExecutablePath();
+        this.executablePath = transToCanonPath(config.getExecutablePath());
+        if (!pattern.matcher(this.executablePath).matches()) {
+            throw new PrestoException(ATOP_CANNOT_START_PROCESS_ERROR, "Cannot start atop connector for error file path");
+        }
         this.timeZone = config.getTimeZoneId();
         this.readTimeout = config.getReadTimeout();
         this.executor = newFixedThreadPool(config.getConcurrentReadersPerNode(), daemonThreadsNamed("atop-" + catalogName + "executable-reader-%s"));
@@ -77,6 +83,17 @@ public class AtopProcessFactory
             throw new PrestoException(ATOP_CANNOT_START_PROCESS_ERROR, format("Cannot start %s", processBuilder.command()), e);
         }
         return new AtopProcess(process, readTimeout, executor);
+    }
+
+    public String transToCanonPath(String path)
+    {
+        File file = new File(path);
+        try {
+            return file.getCanonicalPath();
+        }
+        catch (IOException e) {
+            throw new PrestoException(ATOP_CANNOT_START_PROCESS_ERROR, "Cannot start atop connector for error file path");
+        }
     }
 
     @PreDestroy

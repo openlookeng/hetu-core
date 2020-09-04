@@ -114,7 +114,7 @@ public class HetuJmxAgent
         builder.append("service:jmx:rmi://").append(rmiHostname).append(":").append(jmxConnectorServerPort);
         builder.append("/jndi/rmi://").append(rmiHostname).append(":").append(jmxRegistryPort).append("/jmxrmi");
 
-        LOG.info(builder.toString());
+        LOG.info("Building jmx url.");
         return new JMXServiceURL(builder.toString());
     }
 

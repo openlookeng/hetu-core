@@ -50,10 +50,13 @@ public class LocalFileTables
     private final Map<SchemaTableName, List<ColumnMetadata>> tableColumns;
 
     private final LoadingCache<SchemaTableName, List<File>> cachedFiles;
+    private int maxTablesRowFromFile;
 
     @Inject
     public LocalFileTables(LocalFileConfig config)
     {
+        this.maxTablesRowFromFile = config.getMaxLogItemsLimit();
+
         ImmutableMap.Builder<SchemaTableName, DataLocation> dataLocationBuilder = ImmutableMap.builder();
         ImmutableMap.Builder<SchemaTableName, LocalFileTableHandle> tablesBuilder = ImmutableMap.builder();
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> tableColumnsBuilder = ImmutableMap.builder();
@@ -81,6 +84,11 @@ public class LocalFileTables
         cachedFiles = CacheBuilder.newBuilder()
                 .expireAfterWrite(10, SECONDS)
                 .build(CacheLoader.from(key -> tableDataLocations.get(key).files()));
+    }
+
+    public int getMaxTablesRowFromFile()
+    {
+        return this.maxTablesRowFromFile;
     }
 
     public LocalFileTableHandle getTable(SchemaTableName tableName)

@@ -16,6 +16,7 @@
 package io.hetu.core.hive.dynamicfunctions.utils;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.hive.dynamicfunctions.DynamicFunctionsConstants;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
@@ -74,6 +75,15 @@ public class HiveTypeTranslator
 
     static TypeSignature translateFromHiveTypeInfo(TypeInfo typeInfo)
     {
+        return limitedDepthTranslateFromHiveTypeInfo(typeInfo, DynamicFunctionsConstants.MAX_HIVE_TYPE_STRUCT_LEVEL);
+    }
+
+    private static TypeSignature limitedDepthTranslateFromHiveTypeInfo(TypeInfo typeInfo, int maxDepth)
+    {
+        int nowDepth = maxDepth - 1;
+        if (nowDepth <= 0) {
+            throw new PrestoException(NOT_SUPPORTED, "Hive type nested structure exceed the limit");
+        }
         switch (typeInfo.getCategory()) {
             case PRIMITIVE:
                 Type primitiveType = translateFromHivePrimitiveTypeInfo((PrimitiveTypeInfo) typeInfo);
@@ -83,14 +93,14 @@ public class HiveTypeTranslator
                 return primitiveType.getTypeSignature();
             case MAP:
                 MapTypeInfo mapTypeInfo = (MapTypeInfo) typeInfo;
-                TypeSignature keyType = translateFromHiveTypeInfo(mapTypeInfo.getMapKeyTypeInfo());
-                TypeSignature valueType = translateFromHiveTypeInfo(mapTypeInfo.getMapValueTypeInfo());
+                TypeSignature keyType = limitedDepthTranslateFromHiveTypeInfo(mapTypeInfo.getMapKeyTypeInfo(), nowDepth);
+                TypeSignature valueType = limitedDepthTranslateFromHiveTypeInfo(mapTypeInfo.getMapValueTypeInfo(), nowDepth);
                 return new TypeSignature(
                         StandardTypes.MAP,
                         ImmutableList.of(TypeSignatureParameter.of(keyType), TypeSignatureParameter.of(valueType)));
             case LIST:
                 ListTypeInfo listTypeInfo = (ListTypeInfo) typeInfo;
-                TypeSignature elementType = translateFromHiveTypeInfo(listTypeInfo.getListElementTypeInfo());
+                TypeSignature elementType = limitedDepthTranslateFromHiveTypeInfo(listTypeInfo.getListElementTypeInfo(), nowDepth);
                 return new TypeSignature(
                         StandardTypes.ARRAY,
                         ImmutableList.of(TypeSignatureParameter.of(elementType)));
@@ -137,6 +147,15 @@ public class HiveTypeTranslator
 
     static TypeInfo translateToHiveTypeInfo(Type type)
     {
+        return limitedDepthTranslateToHiveTypeInfo(type, DynamicFunctionsConstants.MAX_HIVE_TYPE_STRUCT_LEVEL);
+    }
+
+    private static TypeInfo limitedDepthTranslateToHiveTypeInfo(Type type, int maxDepth)
+    {
+        int nowDepth = maxDepth - 1;
+        if (nowDepth <= 0) {
+            throw new PrestoException(NOT_SUPPORTED, "Hive type nested structure exceed the limit");
+        }
         if (BOOLEAN.equals(type)) {
             return booleanTypeInfo;
         }
@@ -194,12 +213,12 @@ public class HiveTypeTranslator
             return new DecimalTypeInfo(decimalType.getPrecision(), decimalType.getScale());
         }
         if (isArrayType(type)) {
-            TypeInfo elementType = translateToHiveTypeInfo(type.getTypeParameters().get(0));
+            TypeInfo elementType = limitedDepthTranslateToHiveTypeInfo(type.getTypeParameters().get(0), nowDepth);
             return getListTypeInfo(elementType);
         }
         if (isMapType(type)) {
-            TypeInfo keyType = translateToHiveTypeInfo(type.getTypeParameters().get(0));
-            TypeInfo valueType = translateToHiveTypeInfo(type.getTypeParameters().get(1));
+            TypeInfo keyType = limitedDepthTranslateToHiveTypeInfo(type.getTypeParameters().get(0), nowDepth);
+            TypeInfo valueType = limitedDepthTranslateToHiveTypeInfo(type.getTypeParameters().get(1), nowDepth);
             return getMapTypeInfo(keyType, valueType);
         }
         throw new PrestoException(NOT_SUPPORTED, format("Unsupported Hive type: %s", type));

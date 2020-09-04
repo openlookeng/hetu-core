@@ -47,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 
 import static io.hetu.core.hive.dynamicfunctions.utils.HiveTypeTranslator.translateFromHivePrimitiveTypeInfo;
-import static io.hetu.core.hive.dynamicfunctions.utils.HiveTypeTranslator.translateToHiveTypeInfo;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
@@ -277,6 +276,6 @@ public class HiveObjectTranslator
 
     private static ObjectInspector getInspector(Type type)
     {
-        return TypeInfoUtils.getStandardJavaObjectInspectorFromTypeInfo(translateToHiveTypeInfo(type));
+        return TypeInfoUtils.getStandardJavaObjectInspectorFromTypeInfo(HiveTypeTranslator.translateToHiveTypeInfo(type));
     }
 }
