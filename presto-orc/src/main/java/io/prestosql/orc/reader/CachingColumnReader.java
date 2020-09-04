@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.util.concurrent.ExecutionException;
 
+import static io.prestosql.orc.OrcReader.handleCacheLoadException;
+
 public class CachingColumnReader<T>
         implements ColumnReader<T>
 {
@@ -112,7 +114,8 @@ public class CachingColumnReader<T>
             });
         }
         catch (UncheckedExecutionException | ExecutionException executionException) {
-            log.warn(executionException.getCause(), "Error while caching row group data. Falling back to default flow...");
+            handleCacheLoadException(executionException);
+            log.debug(executionException.getCause(), "Error while caching row group data. Falling back to default flow...");
             delegate.startRowGroup(dataStreamSources);
             delegate.prepareNextRead((int) rowCount);
             cachedBlock = delegate.readBlock();
