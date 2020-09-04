@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static java.util.Objects.requireNonNull;
@@ -52,16 +53,18 @@ public class DynamicFilterOperator
     private final List<Symbol> symbols;
     private final StateStoreProvider stateStoreProvider;
     private final Map<Integer, Type> columnTypes = new HashMap<>();
+    private final Optional<List<String>> columns;
     private boolean finished;
     private Page currentPage;
     private Map<Integer, BloomFilter> bloomFilterMap = new HashMap<>();
 
-    public DynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider)
+    public DynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider, Optional<List<String>> columns)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.queryId = queryId;
         this.stateStoreProvider = stateStoreProvider;
         this.symbols = symbols;
+        this.columns = columns;
 
         // Map column types to index
         for (int i = 0; i < symbols.size(); i++) {
@@ -101,9 +104,17 @@ public class DynamicFilterOperator
             if (bloomFilters != null && bloomFilters.size() > bloomFilterMap.size()) {
                 for (int i = 0; i < symbols.size(); i++) {
                     Symbol symbol = symbols.get(i);
-                    if (bloomFilters.containsKey(symbol.getName()) && !bloomFilterMap.containsKey(i)) {
+                    String columnName;
+                    // if symbols not equals columns, we use columns
+                    if (columns.isPresent()) {
+                        columnName = columns.get().get(i);
+                    }
+                    else {
+                        columnName = symbol.getName();
+                    }
+                    if (bloomFilters.containsKey(columnName) && !bloomFilterMap.containsKey(i)) {
                         // Deserialize new bloomfilters
-                        try (ByteArrayInputStream input = new ByteArrayInputStream(bloomFilters.get(symbol.getName()))) {
+                        try (ByteArrayInputStream input = new ByteArrayInputStream(bloomFilters.get(columnName))) {
                             bloomFilterMap.put(i, BloomFilter.readFrom(input));
                         }
                         catch (IOException e) {
@@ -236,8 +247,9 @@ public class DynamicFilterOperator
         private final StateStoreProvider stateStoreProvider;
         private final List<Symbol> symbols;
         private final TypeProvider typeProvider;
+        private final Optional<List<String>> columns;
 
-        public DynamicFilterOperatorFactory(int operatorId, PlanNodeId planNodeId, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider)
+        public DynamicFilterOperatorFactory(int operatorId, PlanNodeId planNodeId, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider, Optional<List<String>> columns)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -245,13 +257,14 @@ public class DynamicFilterOperator
             this.symbols = requireNonNull(symbols, "symbols is null");
             this.typeProvider = requireNonNull(typeProvider, "typeProvider is null");
             this.stateStoreProvider = stateStoreProvider;
+            this.columns = columns;
         }
 
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterOperator.class.getSimpleName());
-            return new DynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, stateStoreProvider);
+            return new DynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, stateStoreProvider, columns);
         }
 
         @Override
@@ -262,7 +275,7 @@ public class DynamicFilterOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new DynamicFilterOperatorFactory(operatorId, planNodeId, queryId, symbols, typeProvider, stateStoreProvider);
+            return new DynamicFilterOperatorFactory(operatorId, planNodeId, queryId, symbols, typeProvider, stateStoreProvider, columns);
         }
     }
 
