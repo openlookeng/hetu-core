@@ -192,7 +192,7 @@ public class HetuEventListenerConfig
      */
     @Config("hetu.event.listener.audit.file")
     @ConfigDescription(
-            "Optional property to define absolute file path for the logger. If not set, logger will use the default "
+            "Optional property to define absolute file path for the audit logger. If not set, audit logger will use the default "
                     + "log file")
     public HetuEventListenerConfig setAuditFile(String auditFile)
     {
