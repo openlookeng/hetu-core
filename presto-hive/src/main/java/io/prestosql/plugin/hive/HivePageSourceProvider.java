@@ -58,6 +58,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
+import static io.prestosql.plugin.hive.HiveColumnHandle.MAX_PARTITION_KEY_COLUMN_INDEX;
 import static io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMapping.toColumnHandles;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.plugin.hive.coercions.HiveCoercer.createCoercer;
@@ -152,9 +153,8 @@ public class HivePageSourceProvider
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
         if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
-            //TODO: Rajeev: To check if index and dynamic filter required for selective orc
             return createSelectivePageSource(selectivePageSourceFactories, configuration,
-                    session, hiveSplit, hiveColumns, hiveStorageTimeZone, typeManager,
+                    session, hiveSplit, assignUniqueIndicesToPartitionColumns(hiveColumns), hiveStorageTimeZone, typeManager,
                     dynamicFilterSupplier, hiveSplit.getDeleteDeltaLocations(),
                     hiveSplit.getStartRowOffsetOfFile(),
                     indexOptional, hiveSplit.isCacheable(),
@@ -193,6 +193,23 @@ public class HivePageSourceProvider
             return pageSource.get();
         }
         throw new RuntimeException("Could not find a file reader for split " + hiveSplit);
+    }
+
+    private static List<HiveColumnHandle> assignUniqueIndicesToPartitionColumns(List<HiveColumnHandle> columns)
+    {
+        // Gives a distinct hiveColumnIndex to partitioning columns. Columns are identified by these indices in the rest of the
+        // selective read path.
+        ImmutableList.Builder<HiveColumnHandle> newColumns = ImmutableList.builder();
+        int nextIndex = MAX_PARTITION_KEY_COLUMN_INDEX;
+        for (HiveColumnHandle column : columns) {
+            if (column.isPartitionKey()) {
+                newColumns.add(new HiveColumnHandle(column.getName(), column.getHiveType(), column.getTypeSignature(), nextIndex--, column.getColumnType(), column.getComment()));
+            }
+            else {
+                newColumns.add(column);
+            }
+        }
+        return newColumns.build();
     }
 
     private static ConnectorPageSource createSelectivePageSource(
