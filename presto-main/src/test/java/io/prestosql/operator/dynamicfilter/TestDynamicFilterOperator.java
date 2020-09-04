@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -150,7 +151,7 @@ public class TestDynamicFilterOperator
                 queryId,
                 createSymbolList(),
                 createTypeProvider(),
-                stateStoreProvider);
+                stateStoreProvider, Optional.empty());
         DriverContext driverContext = createTaskContext(executor, executor, TEST_SESSION)
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();

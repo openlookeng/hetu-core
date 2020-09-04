@@ -471,7 +471,12 @@ public class LocalExecutionPlanner
         Session session = taskContext.getSession();
         LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, stateStoreProvider);
 
-        PhysicalOperation physicalOperation = plan.accept(new Visitor(session, stageExecutionDescriptor), context);
+        Optional<List<String>> columns = Optional.empty();
+        if (plan instanceof OutputNode) {
+            columns = Optional.of(((OutputNode) plan).getColumnNames());
+        }
+
+        PhysicalOperation physicalOperation = plan.accept(new Visitor(session, stageExecutionDescriptor, columns), context);
 
         Function<Page, Page> pagePreprocessor = enforceLayoutProcessor(outputLayout, physicalOperation.getLayout());
 
@@ -725,11 +730,13 @@ public class LocalExecutionPlanner
     {
         private final Session session;
         private final StageExecutionDescriptor stageExecutionDescriptor;
+        private final Optional<List<String>> outputColumns;  // save outputNode's column names
 
-        private Visitor(Session session, StageExecutionDescriptor stageExecutionDescriptor)
+        private Visitor(Session session, StageExecutionDescriptor stageExecutionDescriptor, Optional<List<String>> outputColumns)
         {
             this.session = session;
             this.stageExecutionDescriptor = stageExecutionDescriptor;
+            this.outputColumns = outputColumns;
         }
 
         @Override
@@ -812,7 +819,7 @@ public class LocalExecutionPlanner
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 String queryId = context.getSession().getQueryId().getId();
                 List<Symbol> inputSymbols = node.getSource().getOutputSymbols();
-                OperatorFactory operatorFactory = new DynamicFilterOperator.DynamicFilterOperatorFactory(context.getNextOperatorId(), node.getId(), queryId, inputSymbols, context.getTypes(), stateStoreProvider);
+                OperatorFactory operatorFactory = new DynamicFilterOperator.DynamicFilterOperatorFactory(context.getNextOperatorId(), node.getId(), queryId, inputSymbols, context.getTypes(), stateStoreProvider, outputColumns);
                 return new PhysicalOperation(operatorFactory, makeLayout(node.getSource()), context, source);
             }
 
