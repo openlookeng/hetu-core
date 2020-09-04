@@ -114,7 +114,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.s3select-pushdown.enabled`          | Enable query pushdown to AWS S3 Select service.              | `false`  |
 | `hive.s3select-pushdown.max-connections`  | Maximum number of simultaneously open connections to S3 for [S3 Select Pushdown](#s3-select-pushdown). | 500      |
 | `hive.orc.use-column-names`               | To support alter table drop column, it is recommended to add `hive.orc.use-column-names=true` in hive properties, otherwise the drop column might not work properly. | false    |
-
+| `hive.orc-predicate-pushdown-enabled`     | Enables pushdown processing of predicates while reading ORC file. | `false` |
 
 
 

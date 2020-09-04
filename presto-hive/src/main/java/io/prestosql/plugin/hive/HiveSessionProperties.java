@@ -368,7 +368,7 @@ public final class HiveSessionProperties
                 booleanProperty(
                         ORC_PREDICATE_PUSHDOWN,
                         "Experimental: Consume deterministic predicates(conjucts: AND) for ORC scan.",
-                        false,
+                        hiveConfig.isOrcPredicatePushdownEnabled(),
                         false),
                 booleanProperty(
                         ORC_DISJUCT_PREDICATE_PUSHDOWN,

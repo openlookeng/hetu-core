@@ -107,6 +107,7 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.s3select-pushdown.enabled`| 允许向AWS S3 Select服务的查询下推。| `false`|
 | `hive.s3select-pushdown.max-connections`| [S3 Select下推](#s3-select下推)同时打开到S3的最大连接数。| 500|
 | `hive.orc.use-column-names`| 为了支持alter表drop列，建议在Hive属性中添加`hive.orc.use-column-names=true`，否则drop列可能无法正常工作。| false|
+| `hive.orc-predicate-pushdown-enabled`     | 在读取ORC文件时启用pushdown处理。| `false` |
 
 ## Hive Thrift 元存储配置属性说明
 
