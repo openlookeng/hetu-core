@@ -35,7 +35,7 @@
 
         <air.java.version>1.8.0-144</air.java.version>
         <air.maven.version>3.3.9</air.maven.version>
-
+        <dep.commons-codec.version>1.14</dep.commons-codec.version>
         <dep.antlr.version>4.7.1</dep.antlr.version>
         <dep.airlift.version>0.193</dep.airlift.version>
         <dep.packaging.version>${dep.airlift.version}</dep.packaging.version>
@@ -145,6 +145,12 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>${dep.commons-codec.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-vdm</artifactId>
