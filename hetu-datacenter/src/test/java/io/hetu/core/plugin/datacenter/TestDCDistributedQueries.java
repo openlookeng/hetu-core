@@ -23,10 +23,16 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.IntStream.range;
+import static org.testng.Assert.assertTrue;
 
 public class TestDCDistributedQueries
         extends AbstractTestDistributedQueries
@@ -198,5 +204,36 @@ public class TestDCDistributedQueries
         assertQuery("SELECT ARRAY[0, 0, 0] in (" + arrayValues + ")", "values false");
     }
 
+    @Test
+    public void testDeadLock()
+            throws InterruptedException, ExecutionException, TimeoutException
+    {
+        final class ThreadPerTaskExecutor
+                implements Executor
+        {
+            @Override
+            public void execute(Runnable runnable)
+            {
+                new Thread(runnable).start();
+            }
+        }
+
+        Executor threadPerTaskExec = new ThreadPerTaskExecutor();
+        CompletableFuture<Void> testMergeHLLCallableFuture = CompletableFuture.supplyAsync(() -> {
+            testMergeHyperLogLog();
+            return null;
+        }, threadPerTaskExec);
+
+        CompletableFuture<Void> testShowCatalogsCallableFuture = CompletableFuture.supplyAsync(() -> {
+            testShowCatalogs();
+            return null;
+        }, threadPerTaskExec);
+
+        CompletableFuture<Void> combined = CompletableFuture.allOf(testShowCatalogsCallableFuture, testMergeHLLCallableFuture);
+        combined.get(6000, TimeUnit.SECONDS);
+
+        assertTrue(testShowCatalogsCallableFuture.isDone());
+        assertTrue(testMergeHLLCallableFuture.isDone());
+    }
     // DataCenterConnector specific tests should normally go in TestDCIntegrationSmokeTest
 }
