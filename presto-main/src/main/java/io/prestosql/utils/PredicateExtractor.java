@@ -23,6 +23,7 @@ import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -183,6 +184,10 @@ public class PredicateExtractor
             return true;
         }
 
+        if (predicate instanceof BetweenPredicate) {
+            return true;
+        }
+
         return false;
     }
 
@@ -205,7 +210,8 @@ public class PredicateExtractor
             FilterNode filterNode = (FilterNode) filterNodeOptional.get(0);
             if (filterNode.getSource() instanceof TableScanNode) {
                 TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
-                if (tableScanNode.getPredicate().isPresent()) {
+                if (tableScanNode.getPredicate().isPresent()
+                        && isSupportedExpression(tableScanNode.getPredicate().get())) { /* if total filter is not supported use the filterNode */
                     return new Tuple<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
                 }
 

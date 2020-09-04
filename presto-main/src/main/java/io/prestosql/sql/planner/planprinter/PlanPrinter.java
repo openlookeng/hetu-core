@@ -684,13 +684,28 @@ public class PlanPrinter
         {
             TableHandle table = node.getTable();
             NodeRepresentation nodeOutput;
-            if (stageExecutionStrategy.isPresent()) {
-                nodeOutput = addNode(node,
+            {
+                String formatString = "[";
+                List<Object> arguments = new LinkedList<>();
+
+                formatString += "table = %s";
+                arguments.add(table);
+                if (stageExecutionStrategy.isPresent()) {
+                    formatString += ", grouped = %s, ";
+                    arguments.add(stageExecutionStrategy.get().isScanGroupedExecution(node.getId()));
+                }
+
+                String pushdownPredicates = printTablePushDownFilters(node);
+                if (pushdownPredicates.length() > 0) {
+                    formatString += ", pushdownFilters = %s";
+                    arguments.add(pushdownPredicates);
+                }
+
+                formatString += "]";
+                nodeOutput = addNode(
+                        node,
                         "TableScan",
-                        format("[%s, grouped = %s]", table, stageExecutionStrategy.get().isScanGroupedExecution(node.getId())));
-            }
-            else {
-                nodeOutput = addNode(node, "TableScan", format("[%s]", table));
+                        format(formatString, arguments.toArray()));
             }
             printTableScanInfo(nodeOutput, node);
             return null;
@@ -858,11 +873,11 @@ public class PlanPrinter
                         str.append(" ]");
                     }
                 }
+            }
 
-                if (node.getTable().getConnectorHandle().hasAdditionalFiltersPushdown()) {
-                    str.append(node.getTable().getConnectorHandle()
-                            .getAdditionalFilterConditions((domain) -> formatDomain(domain)));
-                }
+            if (node.getTable().getConnectorHandle().hasAdditionalFiltersPushdown()) {
+                str.append(node.getTable().getConnectorHandle()
+                        .getAdditionalFilterConditions((domain) -> formatDomain(domain)));
             }
 
             return str.toString();

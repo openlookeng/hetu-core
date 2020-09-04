@@ -783,7 +783,7 @@ public interface ConnectorMetadata
      * to loop indefinitely.
      * </p>
      */
-    default Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint, List<Constraint> additionalConstrainsts)
+    default Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint, List<Constraint> additionalConstrainsts, boolean pushParitionOnly)
     {
         return applyFilter(session, handle, constraint);
     }

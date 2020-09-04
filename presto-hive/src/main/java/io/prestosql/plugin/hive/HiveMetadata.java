@@ -2019,11 +2019,12 @@ public class HiveMetadata
     @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
     {
-        return applyFilter(session, tableHandle, constraint, ImmutableList.of());
+        return applyFilter(session, tableHandle, constraint, ImmutableList.of(), false);
     }
 
     @Override
-    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint, List<Constraint> additional)
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle,
+                                                                                   Constraint constraint, List<Constraint> additional, boolean pushPartitionsOnly)
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         checkArgument(!handle.getAnalyzePartitionValues().isPresent() || constraint.getSummary().isAll(), "Analyze should not have a constraint");
@@ -2097,13 +2098,13 @@ public class HiveMetadata
                 predicateColumns,
                 Optional.ofNullable(newEffectivePredicates));
 
-        if (handle.getPartitions().equals(newHandle.getPartitions()) &&
+        if (pushPartitionsOnly && handle.getPartitions().equals(newHandle.getPartitions()) &&
                 handle.getCompactEffectivePredicate().equals(newHandle.getCompactEffectivePredicate()) &&
                 handle.getBucketFilter().equals(newHandle.getBucketFilter())) {
             return Optional.empty();
         }
 
-        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+        if (!pushPartitionsOnly && HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
             Table table = metastore.getTable(handle.getSchemaName(), handle.getTableName())
                     .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
 

@@ -422,7 +422,7 @@ public class PlanOptimizers
                         ImmutableSet.<Rule<?>>builder()
                                 .addAll(projectionPushdownRules)
                                 .add(new PushLimitIntoTableScan(metadata))
-                                //.add(new PushPredicateIntoTableScan(metadata, typeAnalyzer))
+                                .add(new PushPredicateIntoTableScan(metadata, typeAnalyzer, true))
                                 .add(new PushSampleIntoTableScan(metadata))
                                 .build()),
                 new IterativeOptimizer(
@@ -477,11 +477,11 @@ public class PlanOptimizers
                         ImmutableSet.of(new EliminateCrossJoins())), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
                 predicatePushDown,
                 simplifyOptimizer, // Should be always run after PredicatePushDown
-                /*new IterativeOptimizer(
+                new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer))),*/
+                        ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer, true))),
                 projectionPushDown,
                 new PruneUnreferencedOutputs(),
                 new IterativeOptimizer(
@@ -541,14 +541,14 @@ public class PlanOptimizers
                             statsCalculator,
                             estimatedExchangesCostCalculator,
                             ImmutableSet.of(new PushTableWriteThroughUnion()))); // Must run before AddExchanges
-            builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeAnalyzer)));
+            builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeAnalyzer, false)));
         }
 
         IterativeOptimizer pushdownRule = new IterativeOptimizer(
                 ruleStats,
                 statsCalculator,
                 estimatedExchangesCostCalculator,
-                ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer)));
+                ImmutableSet.of(new PushPredicateIntoTableScan(metadata, typeAnalyzer, false)));
 
         IterativeOptimizer pushdownDeleteRule = new IterativeOptimizer(
                 ruleStats,

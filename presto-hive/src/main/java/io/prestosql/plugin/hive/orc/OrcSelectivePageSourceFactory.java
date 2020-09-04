@@ -183,7 +183,8 @@ public class OrcSelectivePageSourceFactory
                 isOrcRowDataCacheEnabled(session) && splitCacheable);
         if (additionPredicates.isPresent()
                 && additionPredicates.get().size() > 0
-                && !additionPredicates.get().get(0).isAll()) {
+                && !additionPredicates.get().get(0).isAll()
+                && !additionPredicates.get().get(0).isNone()) {
             List<ConnectorPageSource> pageSources = new ArrayList<>();
             List<Integer> positions = new ArrayList<>(10);
 

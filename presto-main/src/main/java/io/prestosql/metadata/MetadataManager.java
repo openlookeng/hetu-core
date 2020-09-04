@@ -1111,7 +1111,8 @@ public final class MetadataManager
     }
 
     @Override
-    public Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table, Constraint constraint, List<Constraint> additionalConstrains)
+    public Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table, Constraint constraint,
+                                                                          List<Constraint> additionalConstrains, boolean pushPartitionsOnly)
     {
         CatalogName catalogName = table.getCatalogName();
         ConnectorMetadata metadata = getMetadata(session, catalogName);
@@ -1121,7 +1122,7 @@ public final class MetadataManager
         }
 
         ConnectorSession connectorSession = session.toConnectorSession(catalogName);
-        return metadata.applyFilter(connectorSession, table.getConnectorHandle(), constraint, additionalConstrains)
+        return metadata.applyFilter(connectorSession, table.getConnectorHandle(), constraint, additionalConstrains, pushPartitionsOnly)
                 .map(result -> new ConstraintApplicationResult<>(
                         new TableHandle(catalogName, result.getHandle(), table.getTransaction(), Optional.empty()),
                         result.getRemainingFilter()));

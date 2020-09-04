@@ -67,7 +67,8 @@ public class DataCachingSelectiveColumnReader<T>
     @Override
     public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter) throws IOException
     {
-        Block block = cachedBlock.getRegion(offset, positions[positionCount - 1] + 1);
+        int maxPosition = Integer.min(cachedBlock.getPositionCount(), positions[positionCount - 1]) + 1;
+        Block block = cachedBlock.getRegion(offset, maxPosition);
         this.isDictionary = false;
         this.resultBlock = block;
 
@@ -92,7 +93,8 @@ public class DataCachingSelectiveColumnReader<T>
     @Override
     public int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filter, BitSet accumulator)
     {
-        Block block = cachedBlock.getRegion(offset, positions[positionCount - 1] + 1);
+        int maxPosition = Integer.min(cachedBlock.getPositionCount(), positions[positionCount - 1]) + 1;
+        Block block = cachedBlock.getRegion(offset, maxPosition);
         this.positionCount = positionCount;
         this.positions = positions.clone();
         this.isDictionary = false;

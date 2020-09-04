@@ -119,12 +119,14 @@ public class AddExchanges
     private final TypeAnalyzer typeAnalyzer;
     private final Metadata metadata;
     private final DomainTranslator domainTranslator;
+    private final boolean pushdownPartitionsOnly;
 
-    public AddExchanges(Metadata metadata, TypeAnalyzer typeAnalyzer)
+    public AddExchanges(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pushdownPartitionsOnly)
     {
         this.metadata = metadata;
         this.domainTranslator = new DomainTranslator(new LiteralEncoder(metadata));
         this.typeAnalyzer = typeAnalyzer;
+        this.pushdownPartitionsOnly = pushdownPartitionsOnly;
     }
 
     @Override
@@ -561,7 +563,7 @@ public class AddExchanges
 
         private Optional<PlanWithProperties> planTableScan(TableScanNode node, Expression predicate)
         {
-            return PushPredicateIntoTableScan.pushFilterIntoTableScan(node, predicate, true, session, types, idAllocator, metadata, typeAnalyzer, domainTranslator)
+            return PushPredicateIntoTableScan.pushFilterIntoTableScan(node, predicate, true, session, types, idAllocator, metadata, typeAnalyzer, domainTranslator, pushdownPartitionsOnly)
                     .map(plan -> new PlanWithProperties(plan, derivePropertiesRecursively(plan)));
         }
 
