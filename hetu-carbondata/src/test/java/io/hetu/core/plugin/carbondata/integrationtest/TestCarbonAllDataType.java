@@ -21,13 +21,18 @@ import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
+import org.apache.carbondata.core.fileoperations.FileWriteOperation;
+import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
+import org.apache.carbondata.core.metadata.CarbonMetadata;
 import org.apache.carbondata.core.metadata.converter.SchemaConverter;
 import org.apache.carbondata.core.metadata.converter.ThriftWrapperSchemaConverterImpl;
+import org.apache.carbondata.core.metadata.schema.SchemaReader;
 import org.apache.carbondata.core.metadata.schema.table.TableInfo;
 import org.apache.carbondata.core.reader.ThriftReader;
 import org.apache.carbondata.core.util.CarbonProperties;
 import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
+import org.apache.carbondata.core.writer.ThriftWriter;
 import org.apache.carbondata.format.ColumnSchema;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TBase;
@@ -1019,6 +1024,441 @@ public class TestCarbonAllDataType
         }
         hetuServer.execute("DROP TABLE IF EXISTS testdb.showcreatetable");
     }
+
+    @Test
+    public void testFilterUnboundedVarcharDatatype() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.unboundedvarchar(name varchar)");
+        hetuServer.execute("INSERT INTO testdb.unboundedvarchar VALUES('akash'),('anubhav'),('bhavya'),('amit  ')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarchar ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "anubhav");     }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarchar WHERE NAME='akash'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarchar WHERE NAME='amit  '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarchar WHERE NAME='amit'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("DROP TABLE testdb.unboundedvarchar");
+    }
+
+    @Test
+    public void testFilterBoundedVarcharDatatype() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.boundedvarchar(name varchar(6))");
+        hetuServer.execute("INSERT INTO testdb.boundedvarchar VALUES('akash'),('anubav'),('bhavya'), ('amit  ')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarchar ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "anubav");     }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarchar WHERE NAME='akash'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarchar WHERE NAME='bhavya'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarchar WHERE NAME='amit  '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarchar WHERE NAME='amit'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarchar WHERE NAME='amit   '");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+        try {
+            hetuServer.execute("INSERT INTO testdb.boundedvarchar VALUES('akashmital')");
+            Assert.fail("Exception expected");
+        }
+        catch(SQLException e){
+            assertEquals(e.getMessage().split(":")[1], " Insert query has mismatched column types");
+        }
+
+
+        hetuServer.execute("DROP TABLE testdb.boundedvarchar");
+    }
+
+    @Test
+    public void testFilterUnboundedCharDatatype() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.unboundedchar(name char)");
+        hetuServer.execute("INSERT INTO testdb.unboundedchar VALUES('a'),('b'),('c'),('d')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedchar ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "a");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "b");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "c");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "d");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedchar WHERE NAME='a'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "a");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedchar WHERE NAME='a '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "a");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        try {
+            hetuServer.execute("INSERT INTO testdb.unboundedchar VALUES('a ')");
+            Assert.fail("Exception expected");
+        }
+        catch(SQLException e){
+            assertEquals(e.getMessage().split(":")[1], " Insert query has mismatched column types");
+        }
+
+        hetuServer.execute("DROP TABLE testdb.unboundedchar");
+    }
+
+    @Test
+    public void testFilterBoundedCharDatatype() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.boundedchar(name char(7))");
+        hetuServer.execute("INSERT INTO testdb.boundedchar VALUES('akash'),('anubav'),('bhavya'),('amit   ')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedchar ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash  ");       }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit   ");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "anubav ");     }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya ");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedchar WHERE NAME='akash'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash  ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedchar WHERE NAME='bhavya'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedchar WHERE NAME='amit   '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit   ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedchar WHERE NAME='amit'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit   ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("DROP TABLE testdb.boundedchar");
+    }
+
+    @Test
+    public void testFilterUnboundedVarcharDatatypeForLocalDic() throws SQLException, IOException
+    {
+        hetuServer.execute("CREATE TABLE testdb.unboundedvarcharforlocaldic(name varchar)");
+        writeSchemaFileForLocalDic("unboundedvarcharforlocaldic");
+        hetuServer.execute("INSERT INTO testdb.unboundedvarcharforlocaldic VALUES('akash'),('anubhav'),('bhavya'),('amit  ')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarcharforlocaldic ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "anubhav");     }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarcharforlocaldic WHERE NAME='akash'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarcharforlocaldic WHERE NAME='amit  '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedvarcharforlocaldic WHERE NAME='amit'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("DROP TABLE testdb.unboundedvarcharforlocaldic");
+    }
+
+    @Test
+    public void testFilterBoundedVarcharDatatypeForLocalDic() throws SQLException, IOException
+    {
+        hetuServer.execute("CREATE TABLE testdb.boundedvarcharforlocaldic(name varchar(6))");
+        writeSchemaFileForLocalDic("boundedvarcharforlocaldic");
+        hetuServer.execute("INSERT INTO testdb.boundedvarcharforlocaldic VALUES('akash'),('anubav'),('bhavya'), ('amit  ')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarcharforlocaldic ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "anubav");     }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarcharforlocaldic WHERE NAME='akash'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "akash");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarcharforlocaldic WHERE NAME='bhavya'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "bhavya");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarcharforlocaldic WHERE NAME='amit  '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "amit  ");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarcharforlocaldic WHERE NAME='amit'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedvarcharforlocaldic WHERE NAME='amit   '");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+        try {
+            hetuServer.execute("INSERT INTO testdb.boundedvarcharforlocaldic VALUES('akashmital')");
+            Assert.fail("Exception expected");
+        }
+        catch(SQLException e){
+            assertEquals(e.getMessage().split(":")[1], " Insert query has mismatched column types");
+        }
+
+        hetuServer.execute("DROP TABLE testdb.boundedvarcharforlocaldic");
+    }
+
+    @Test
+    public void testFilterUnboundedCharDatatypeForLocalDic() throws SQLException, IOException
+    {
+        hetuServer.execute("CREATE TABLE testdb.unboundedcharforlocaldic(name char)");
+        writeSchemaFileForLocalDic("unboundedcharforlocaldic");
+        hetuServer.execute("INSERT INTO testdb.unboundedcharforlocaldic VALUES('a'),('b'),('c'),('d')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedcharforlocaldic ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "a");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "b");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "c");      }});
+            add(new TreeMap<String, Object>() {{    put("NAME", "d");      }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedcharforlocaldic WHERE NAME='a'");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "a");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.unboundedcharforlocaldic WHERE NAME='a '");
+        expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>() {{    put("NAME", "a");       }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        try {
+            hetuServer.execute("INSERT INTO testdb.unboundedcharforlocaldic VALUES('a ')");
+            Assert.fail("Exception expected");
+        }
+        catch(SQLException e){
+            assertEquals(e.getMessage().split(":")[1], " Insert query has mismatched column types");
+        }
+
+
+        hetuServer.execute("DROP TABLE testdb.unboundedcharforlocaldic");
+    }
+
+    @Test
+    public void testFilterBoundedCharDatatypeForLocalDic() throws SQLException, IOException {
+        hetuServer.execute("CREATE TABLE testdb.boundedcharlocaldic(id int, name char(7))");
+        writeSchemaFileForLocalDic("boundedcharlocaldic");
+        hetuServer.execute("INSERT INTO testdb.boundedcharlocaldic VALUES(1, 'akash'),(2, 'anubav'),(3, 'bhavya'),(4, 'amit   ')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedcharlocaldic ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "akash  ");
+            }});
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "amit   ");
+            }});
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "anubav ");
+            }});
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "bhavya ");
+            }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedcharlocaldic WHERE NAME='akash'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "akash  ");
+            }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedcharlocaldic WHERE NAME='bhavya'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "bhavya ");
+            }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedcharlocaldic WHERE NAME='amit   '");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "amit   ");
+            }});
+        }};
+
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        actualResult = hetuServer.executeQuery("SELECT NAME FROM testdb.boundedcharlocaldic WHERE NAME='amit'");
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new TreeMap<String, Object>() {{
+                put("NAME", "amit   ");
+            }});
+        }};
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("DROP TABLE testdb.boundedcharlocaldic");
+    }
+
+    private void writeSchemaFileForLocalDic(String tableName) throws IOException {
+        AbsoluteTableIdentifier identifier = AbsoluteTableIdentifier.from(storePath + "/carbon.store/testdb/" + tableName, "testdb", tableName);
+        TableInfo tableInfo = SchemaReader.getTableInfo(identifier);
+        tableInfo.getFactTable().getTableProperties().put("local_dictionary_enable", "true");
+        String schemaFilePath = CarbonTablePath.getSchemaFilePath(storePath + "/carbon.store/testdb/" + tableName);
+        SchemaConverter schemaConverter = new ThriftWrapperSchemaConverterImpl();
+        ThriftWriter thriftWriter = new ThriftWriter(schemaFilePath, false);
+        thriftWriter.open(FileWriteOperation.OVERWRITE);
+        thriftWriter.write(schemaConverter.fromWrapperToExternalTableInfo(tableInfo, identifier.getTableName(),
+                identifier.getDatabaseName()));
+        thriftWriter.close();
+        FileFactory.getCarbonFile(schemaFilePath).setLastModifiedTime(System.currentTimeMillis());
+        CarbonMetadata.getInstance().removeTable(identifier.getTablePath(), identifier.getDatabaseName());
+        CarbonMetadata.getInstance().loadTableMetadata(tableInfo);
+    }
+
 
     @Test
     public void testAutoCleanupInUpdate() throws SQLException

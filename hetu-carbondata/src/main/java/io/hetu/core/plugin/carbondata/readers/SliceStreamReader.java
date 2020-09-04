@@ -13,6 +13,7 @@
  */
 package io.hetu.core.plugin.carbondata.readers;
 
+import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
@@ -28,6 +29,8 @@ import org.apache.carbondata.core.util.ByteUtil;
 import java.util.Optional;
 
 import static io.airlift.slice.Slices.wrappedBuffer;
+import static io.prestosql.spi.type.Chars.byteCountWithoutTrailingSpace;
+import static io.prestosql.spi.type.Varchars.byteCount;
 
 /**
  * This class reads the String data and convert it into Slice Block
@@ -46,11 +49,17 @@ public class SliceStreamReader
 
     private boolean isLocalDict;
 
-    public SliceStreamReader(int batchSize, DataType dataType)
+    private int maxLength;
+
+    private boolean isCharType;
+
+    public SliceStreamReader(int batchSize, DataType dataType, int maxLength, boolean isCharType)
     {
         super(batchSize, dataType);
         this.batchSize = batchSize;
         this.builder = type.createBlockBuilder(null, batchSize);
+        this.maxLength = maxLength;
+        this.isCharType = isCharType;
     }
 
     @Override
@@ -84,23 +93,45 @@ public class SliceStreamReader
         nulls[0] = true;
         nulls[1] = true;
         int[] dictOffsets = new int[dictionary.getDictionarySize() + 1];
+        int[] truncatedDictOffsets = new int[dictionary.getDictionarySize() + 1];
         int size = 0;
         for (int i = 0; i < dictionary.getDictionarySize(); i++) {
             dictOffsets[i] = size;
             if (dictionary.getDictionaryValue(i) != null) {
                 size += dictionary.getDictionaryValue(i).length;
+                if (maxLength >= 0) {
+                    if (i < 2) {
+                        truncatedDictOffsets[i] = dictOffsets[i];
+                    }
+                    else {
+                        int actualLength = dictionary.getDictionaryValue(i).length;
+                        int truncatedLength = computeTruncatedLength(wrappedBuffer(dictionary.getDictionaryValue(i)), 0, actualLength, maxLength, isCharType);
+                        truncatedDictOffsets[i + 1] = truncatedDictOffsets[i] + truncatedLength;
+                    }
+                }
             }
         }
         byte[] singleArrayDictValues = new byte[size];
+        byte[] truncatedSingleArrayDictValues = new byte[size];
         for (int i = 0; i < dictionary.getDictionarySize(); i++) {
             if (dictionary.getDictionaryValue(i) != null) {
                 System.arraycopy(dictionary.getDictionaryValue(i), 0, singleArrayDictValues, dictOffsets[i],
                         dictionary.getDictionaryValue(i).length);
+                if (maxLength >= 0) {
+                    System.arraycopy(dictionary.getDictionaryValue(i), 0, truncatedSingleArrayDictValues, truncatedDictOffsets[i],
+                            dictionary.getDictionaryValue(i).length);
+                }
             }
         }
-        dictOffsets[dictOffsets.length - 1] = size;
-        dictionaryBlock = new VariableWidthBlock(dictionary.getDictionarySize(),
-                Slices.wrappedBuffer(singleArrayDictValues), dictOffsets, Optional.of(nulls));
+        if (maxLength < 0) {
+            dictOffsets[dictOffsets.length - 1] = size;
+            dictionaryBlock = new VariableWidthBlock(dictionary.getDictionarySize(),
+                    Slices.wrappedBuffer(singleArrayDictValues), dictOffsets, Optional.of(nulls));
+        }
+        else {
+            dictionaryBlock = new VariableWidthBlock(dictionary.getDictionarySize(),
+                    Slices.wrappedBuffer(truncatedSingleArrayDictValues), truncatedDictOffsets, Optional.of(nulls));
+        }
         this.isLocalDict = true;
     }
 
@@ -119,7 +150,8 @@ public class SliceStreamReader
     @Override
     public void putByteArray(int rowId, int offset, int length, byte[] value)
     {
-        type.writeSlice(builder, wrappedBuffer(value), offset, length);
+        int truncatedLength = computeTruncatedLength(wrappedBuffer(value), offset, length, maxLength, isCharType);
+        type.writeSlice(builder, wrappedBuffer(value), offset, truncatedLength);
     }
 
     @Override
@@ -168,5 +200,17 @@ public class SliceStreamReader
                 putInt(rowId, (int) value);
             }
         }
+    }
+
+    private int computeTruncatedLength(Slice slice, int offset, int length, int maxCodePointCount, boolean isCharType)
+    {
+        if (isCharType) {
+            // truncate the characters and then remove the trailing white spaces
+            return byteCountWithoutTrailingSpace(slice, offset, length, maxCodePointCount);
+        }
+        if (maxCodePointCount >= 0 && length > maxCodePointCount) {
+            return byteCount(slice, offset, length, maxCodePointCount);
+        }
+        return length;
     }
 }

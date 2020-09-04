@@ -287,7 +287,7 @@ public class CarbondataPageSource
             CarbonColumnVectorImpl[] columns = new CarbonColumnVectorImpl[columnCount];
             for (int i = 0; i < columnCount; ++i) {
                 columns[i] = CarbondataVectorBatch
-                        .createDirectStreamReader(batchSize, dataTypes[i], fields[i]);
+                        .createDirectStreamReader(batchSize, dataTypes[i], fields[i], -1, false);
             }
 
             while (rowReader.nextKeyValue()) {
@@ -401,7 +401,7 @@ public class CarbondataPageSource
             readSupport.initialize(queryModel.getProjectionColumns(), queryModel.getTable());
             HetuCarbondataVectorizedRecordReader reader =
                     new HetuCarbondataVectorizedRecordReader(queryExecutor, queryModel,
-                            (AbstractDetailQueryResultIterator) iterator, readSupport);
+                            (AbstractDetailQueryResultIterator) iterator, readSupport, (List<HiveColumnHandle>) columns);
             reader.setTaskId(Long.parseLong(carbonSplit.getSchema().getProperty("index")));
             return reader;
         }

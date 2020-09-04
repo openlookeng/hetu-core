@@ -13,6 +13,7 @@
  */
 package io.hetu.core.plugin.carbondata;
 
+import io.prestosql.plugin.hive.HiveColumnHandle;
 import org.apache.carbondata.core.datastore.block.TableBlockInfo;
 import org.apache.carbondata.core.keygenerator.directdictionary.DirectDictionaryGenerator;
 import org.apache.carbondata.core.keygenerator.directdictionary.DirectDictionaryKeyGeneratorFactory;
@@ -73,9 +74,12 @@ class HetuCarbondataVectorizedRecordReader
 
     private HetuCarbondataReadSupport readSupport;
 
+    private List<HiveColumnHandle> columnHandles;
+
     public HetuCarbondataVectorizedRecordReader(QueryExecutor queryExecutor, QueryModel queryModel,
                                                 AbstractDetailQueryResultIterator iterator,
-                                                HetuCarbondataReadSupport readSupport)
+                                                HetuCarbondataReadSupport readSupport,
+                                                List<HiveColumnHandle> columnHandles)
     {
         this.queryModel = queryModel;
         this.iterator = iterator;
@@ -83,6 +87,7 @@ class HetuCarbondataVectorizedRecordReader
         this.readSupport = readSupport;
         enableReturningBatches();
         this.queryStartTime = System.currentTimeMillis();
+        this.columnHandles = columnHandles;
 
         batchIdx = 0;
         numBatched = 0;
@@ -212,7 +217,7 @@ class HetuCarbondataVectorizedRecordReader
         }
 
         columnarBatch =
-                CarbondataVectorBatch.allocate(fields, readSupport, queryModel.isDirectVectorFill());
+                CarbondataVectorBatch.allocate(fields, readSupport, queryModel.isDirectVectorFill(), columnHandles);
         CarbonColumnVector[] vectors = new CarbonColumnVector[fields.length];
         boolean[] filteredRows = new boolean[columnarBatch.capacity()];
         for (int i = 0; i < fields.length; i++) {

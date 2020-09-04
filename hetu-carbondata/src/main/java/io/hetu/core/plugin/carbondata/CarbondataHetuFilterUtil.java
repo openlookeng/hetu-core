@@ -38,7 +38,9 @@ import org.apache.carbondata.core.scan.expression.conditional.LessThanExpression
 import org.apache.carbondata.core.scan.expression.conditional.ListExpression;
 import org.apache.carbondata.core.scan.expression.logical.AndExpression;
 import org.apache.carbondata.core.scan.expression.logical.OrExpression;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -311,9 +313,19 @@ public class CarbondataHetuFilterUtil
         else if (type.equals(HiveType.HIVE_LONG)) {
             return rawData;
         }
-        else if (type.equals(HiveType.HIVE_STRING)) {
+        else if (type.equals(HiveType.HIVE_STRING) || type.getTypeInfo() instanceof VarcharTypeInfo || type.getTypeInfo() instanceof CharTypeInfo) {
             if (rawData instanceof Slice) {
-                return ((Slice) rawData).toStringUtf8();
+                String value = ((Slice) rawData).toStringUtf8();
+                if (type.getTypeInfo() instanceof CharTypeInfo) {
+                    String padding = "";
+                    int paddedLength = ((CharTypeInfo) type.getTypeInfo()).getLength();
+                    int truncatedLength = value.length();
+                    for (int i = 0; i < paddedLength - truncatedLength; i++) {
+                        padding += " ";
+                    }
+                    return value + padding;
+                }
+                return value;
             }
             else {
                 return rawData;
