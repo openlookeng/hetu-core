@@ -314,7 +314,7 @@ public class TestHiveSqlMigrate
         String sql9 = "ALTER TABLE T1 ADD CONSTRAINT TEST PRIMARY KEY (ID, NAME) DISABLE NOVALIDATE";
         assertUnsupported(sql9, Optional.of("ADD CONSTRAINT"));
 
-        String sql10 = "ALTER TABLE T1 CHANGE COLUMN ID1 ID2 INT CONSTRAINT TEST NOT NULL ENABLE";
+        String sql10 = "ALTER TABLE FOO PARTITION (DS='2008-04-08', HR) CHANGE COLUMN DEC_COLUMN_NAME DEC_COLUMN_NAME DECIMAL(38,18)";
         assertUnsupported(sql10, Optional.of("CHANGE COLUMN"));
 
         String sql11 = "ALTER TABLE T1 DROP CONSTRAINT TEST";
@@ -728,6 +728,13 @@ public class TestHiveSqlMigrate
     {
         String sql = "LOAD DATA LOCAL INPATH '/PATH/TO/LOCAL/FILES' OVERWRITE  INTO TABLE TEST PARTITION (COUNTRY='CHINA')";
         assertUnsupported(sql, Optional.of("LOAD DATA"));
+    }
+
+    @Test
+    public void testSetSession()
+    {
+        String sql = "set hive.support.concurrency=true";
+        assertUnsupported(sql, Optional.of("SET PROPERTY"));
     }
 
     @Test

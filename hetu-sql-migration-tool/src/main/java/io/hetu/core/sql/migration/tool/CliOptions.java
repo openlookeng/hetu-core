@@ -33,4 +33,7 @@ public class CliOptions
 
     @Option(name = {"-c", "--config"}, title = "config", description = "Config file path")
     public String configFile;
+
+    @Option(name = {"-d", "--debug"}, title = "debug", description = "Print Debug info")
+    public String debug;
 }

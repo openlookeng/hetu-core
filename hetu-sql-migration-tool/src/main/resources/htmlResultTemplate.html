@@ -552,38 +552,40 @@ function formatSqlDiffs(entry) {
 
     for (let diff of entry.diffs) {
         if (diff.message && diff.message.length > 0) {
-            msgText += '<li>' + diff.message + '</li>';
+            let  formattedMsg = diff.message.replace(/</g, '&lt;');
+            formattedMsg = diff.message.replace(/>/g, '&gt;');
+            msgText += '<li>' + formattedMsg + '</li>';
         }
         switch (diff.diffType) {
             case 'deleted':
                 if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(diff.source, '<span style="color:red"><s>' + diff.source + '</s></span>')
+                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:red"><s>' + diff.source + '</s></span>')
                 }
                 break;
             case 'modified':
                 if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(diff.source, '<span style="color:blue">' + diff.source + '</span>')
+                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:blue">' + diff.source + '</span>')
                 }
                 if (diff.target && diff.target.length > 0) {
-                    convertedSql = convertedSql.replace(diff.target, '<span style="color:blue">' + diff.target + '</span>')
+                    convertedSql = convertedSql.replace(new RegExp(diff.target,'gm'), '<span style="color:blue">' + diff.target + '</span>')
                 }
                 break;
             case 'inserted':
                 if (diff.target && diff.target.length > 0) {
-                    convertedSql = convertedSql.replace(diff.target, '<span style="color:green">' + diff.target + '</span>')
+                    convertedSql = convertedSql.replace(new RegExp(diff.target,'gm'), '<span style="color:green">' + diff.target + '</span>')
                 }
                 break;
             case 'warning':
                 if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(diff.source, '<span style="color:#ffcc00">' + diff.source + '</span>')
+                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:#ffcc00">' + diff.source + '</span>')
                 }
                 if (diff.target && diff.target.length > 0) {
-                    convertedSql = convertedSql.replace(diff.target, '<span style="color:#ffcc00">' + diff.target + '</span>')
+                    convertedSql = convertedSql.replace(new RegExp(diff.target,'gm'), '<span style="color:#ffcc00">' + diff.target + '</span>')
                 }
                 break;
             case 'unsupported':
                 if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(diff.source, '<span style="color:#993333">' + diff.source + '</span>')
+                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:#993333">' + diff.source + '</span>')
                 }
                 break;
             default:

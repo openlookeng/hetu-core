@@ -1436,9 +1436,9 @@ public class HiveAstBuilder
     @Override
     public Node visitSetSession(HiveSqlParser.SetSessionContext context)
     {
-        if (context.property() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.property().getText(), "[SET PROPERTY] is not supported");
-            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported to set session property", context.property());
+        if (context.setProperty() != null) {
+            addDiif(DiffType.UNSUPPORTED, context.setProperty().getText(), "[SET PROPERTY] is not supported");
+            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported to set session property", context.setProperty());
         }
 
         return new ShowSession(getLocation(context));

@@ -63,12 +63,7 @@ public class SqlResultHandleUtils
             htmlEscape(convertedSqls);
             String htmlFileText = htmlTextTemplate.replaceAll("\\$\\{conversionResultData}\\$", convertedSqls.toString());
 
-            if (!"html".equalsIgnoreCase(outputFile.substring(outputFile.lastIndexOf(".")))) {
-                // if the output file specified by user is not end with html, then append the html suffix
-                outputFile += ".html";
-            }
-
-            OutputStream out = new FileOutputStream(outputFile);
+            OutputStream out = new FileOutputStream(outputFile + ".html");
             writer = new BufferedWriter(new OutputStreamWriter(out, UTF_8), BUFFER_SIZE);
             writer.write(htmlFileText);
         }

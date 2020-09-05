@@ -49,6 +49,7 @@ INSERT INTO table1
 | `--type` or `-t`| 输入SQL语句的类型，如`hive`、`impala`。可选参数，默认值为`hive`。|
 | `--output` or `-o`| 转换后SQL结果的存放目录。|
 | `--config` or `-c`| SQL迁移工具的配置文件。|
+| `--debug` or `-d`| 需要打印debug到控制界面时，设置值为true。|
 
 *提示：*
 
@@ -233,6 +234,7 @@ SELECT (DECIMAL '2.0' * 3)
 | ADD COMMENTS           | 不支持给数据库和列添加评论                  | [COMMENT](../sql/comment.md)                       |
 | SET SESSION            | 仅支持 "SET" 和 "SET ALL"                                          | [SET SESSION](../sql/set-session.md)                       |
 | ADD COLUMNS            | 不支持在一条语句添加多列，也不支持设置kudu属性                          | [ALTER TABLE](../sql/alter-table.md)                       |
+| SHOW FUNCTIONS         | 仅支持显示全部的函数                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
 
 
 由于特性差异，如下Impala语句暂不支持：
@@ -254,7 +256,6 @@ SELECT (DECIMAL '2.0' * 3)
 | REFRESH FUNCTION           |
 | UPDATE TABLE           |
 | UPSERT           |
-| SHOW FUNCTIONS           |
 | SHOW TABLE/COLUMN STATS           |
 | SHOW PARTITIONS           |
 | SHOW FILES           |

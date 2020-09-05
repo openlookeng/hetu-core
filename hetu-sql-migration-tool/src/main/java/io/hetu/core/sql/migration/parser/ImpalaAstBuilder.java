@@ -115,6 +115,7 @@ import io.prestosql.sql.tree.Select;
 import io.prestosql.sql.tree.SelectItem;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
+import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowRoles;
 import io.prestosql.sql.tree.ShowSchemas;
 import io.prestosql.sql.tree.ShowSession;
@@ -320,9 +321,6 @@ public class ImpalaAstBuilder
         Optional<String> comment = Optional.empty();
         if (context.COMMENT() != null) {
             comment = Optional.of(((StringLiteral) visit(context.comment)).getValue());
-
-            addDiif(DiffType.DELETED, context.COMMENT().getText(), null, null);
-            addDiif(DiffType.DELETED, comment.get(), null, format("[COMMENT] is omitted: %s", comment));
         }
 
         List<Property> properties = new ArrayList<>();
@@ -466,9 +464,6 @@ public class ImpalaAstBuilder
         Optional<String> comment = Optional.empty();
         if (context.COMMENT() != null) {
             comment = Optional.of(((StringLiteral) visit(context.comment)).getValue());
-
-            addDiif(DiffType.DELETED, context.COMMENT().getText(), null, null);
-            addDiif(DiffType.DELETED, comment.get(), null, format("[COMMENT] is omitted: %s", comment));
         }
 
         // like clause
@@ -1059,8 +1054,24 @@ public class ImpalaAstBuilder
     @Override
     public Node visitShowFunctions(ImpalaSqlParser.ShowFunctionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTIONS().getText(), "[SHOW FUNCTIONS] is not supported");
-        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW FUNCTIONS", context);
+        if (context.AGGREGATE() != null) {
+            addDiif(DiffType.UNSUPPORTED, context.AGGREGATE().getText(), "[AGGREGATE] is not supported");
+            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "AGGREGATE is not supported", context);
+        }
+        if (context.ANALYTIC() != null) {
+            addDiif(DiffType.UNSUPPORTED, context.ANALYTIC().getText(), "[ANALYTIC] is not supported");
+            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "ANALYTIC is not supported", context);
+        }
+        if (context.IN() != null) {
+            addDiif(DiffType.UNSUPPORTED, context.IN().getText(), "[IN] is not supported");
+            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "IN is not supported", context);
+        }
+        if (context.LIKE() != null) {
+            addDiif(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
+            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "LIKE is not supported", context);
+        }
+
+        return new ShowFunctions(getLocation(context));
     }
 
     @Override
@@ -1302,9 +1313,9 @@ public class ImpalaAstBuilder
     }
 
     @Override
-    public Node visitProperty(ImpalaSqlParser.PropertyContext ctx)
+    public Node visitProperty(ImpalaSqlParser.PropertyContext context)
     {
-        return super.visitProperty(ctx);
+        return new Property(getLocation(context), (Identifier) visit(context.identifier()), (Expression) visit(context.expression()));
     }
 
     @Override
@@ -1502,6 +1513,11 @@ public class ImpalaAstBuilder
         Relation left = (Relation) visit(context.left);
         Relation right;
 
+        if (context.CROSS() != null) {
+            right = (Relation) visit(context.right);
+            return new Join(getLocation(context), Join.Type.CROSS, left, right, Optional.empty());
+        }
+
         if (context.joinType().SEMI() != null) {
             addDiif(DiffType.UNSUPPORTED, context.joinType().SEMI().getText(), "[SEMI] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "SEMI", context);
@@ -1516,11 +1532,6 @@ public class ImpalaAstBuilder
                 (context.joinType().LEFT() != null || context.joinType().RIGHT() != null)) {
             addDiif(DiffType.UNSUPPORTED, context.joinType().INNER().getText(), "[LEFT INNER || RIGHT INNER] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "LEFT INNER || RIGHT INNER", context);
-        }
-
-        if (context.CROSS() != null) {
-            right = (Relation) visit(context.right);
-            return new Join(getLocation(context), Join.Type.CROSS, left, right, Optional.empty());
         }
 
         JoinCriteria criteria;

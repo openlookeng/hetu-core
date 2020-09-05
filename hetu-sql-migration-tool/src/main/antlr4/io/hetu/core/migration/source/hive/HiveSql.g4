@@ -78,9 +78,9 @@ statement
     | DELETE FROM qualifiedName (WHERE booleanExpression)?             #delete
     | ALTER TABLE from=qualifiedName RENAME TO to=qualifiedName        #renameTable
     | ALTER TABLE qualifiedName SET TBLPROPERTIES properties           #commentTable
-    | ALTER TABLE tableName=qualifiedName (PARTITION partition=properties)?
+    | ALTER TABLE tableName=qualifiedName (PARTITION partition=partitionSpec)?
         (ADD | REPLACE) COLUMNS '('tableElement (',' tableElement)*')' (CASCADE | RESTRICT)?                                                    #addReplaceColumn
-    | ALTER TABLE qualifiedName (PARTITION properties)? (SET SERDE string (WITH SERDEPROPERTIES properties)? | SET SERDEPROPERTIES properties)  #alterTableSerde
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec)? (SET SERDE string (WITH SERDEPROPERTIES properties)? | SET SERDEPROPERTIES properties)  #alterTableSerde
     | ALTER TABLE qualifiedName CLUSTERED BY columnAliases (SORTED BY columnAliases)? INTO expression BUCKETS                                   #alterTableStorage
     | ALTER TABLE qualifiedName SKEWED BY columnAliases ON  expression (',' expression)* (STORED_AS DIRECTORIES)?                               #alterTableSkewed
     | ALTER TABLE qualifiedName NOT SKEWED                                                                                                      #alterTableNotSkewed
@@ -88,25 +88,25 @@ statement
     | ALTER TABLE qualifiedName SET SKEWED LOCATION properties                                                                                  #alterTableSetSkewedLocation
     | ALTER TABLE qualifiedName ADD CONSTRAINT identifier
         (PRIMARY KEY columnAliases DISABLE NOVALIDATE
-          | FOREIGN KEY columnAliases REFERENCES identifier columnAliases DISABLE NOVALIDATE RELY
+          | FOREIGN KEY columnAliases REFERENCES qualifiedName columnAliases DISABLE NOVALIDATE RELY
           | UNIQUE columnAliases DISABLE NOVALIDATE)                                                                                            #alterTableAddConstraint
     | ALTER TABLE qualifiedName CHANGE COLUMN identifier identifier type
         CONSTRAINT identifier (NOT NULL ENABLE | DEFAULT defaultValue ENABLE | CHECK expression ENABLE)                                         #alterTableChangeConstraint
     | ALTER TABLE qualifiedName DROP CONSTRAINT identifier                                                                                      #alterTableDropConstraint
-    | ALTER TABLE qualifiedName ADD (IF NOT EXISTS)? PARTITION properties (LOCATION string) (PARTITION properties (LOCATION string)?)*          #alterTableAddPartition
-    | ALTER TABLE qualifiedName PARTITION properties RENAME TO PARTITION properties                                                             #alterTableRenamePartition
-    | ALTER TABLE qualifiedName EXCHANGE PARTITION properties WITH TABLE qualifiedName                                                          #alterTableExchangePartition
+    | ALTER TABLE qualifiedName ADD (IF NOT EXISTS)? PARTITION partitionSpec (LOCATION string)? (PARTITION partitionSpec (LOCATION string)?)*   #alterTableAddPartition
+    | ALTER TABLE qualifiedName PARTITION partitionSpec RENAME TO PARTITION partitionSpec                                                       #alterTableRenamePartition
+    | ALTER TABLE qualifiedName EXCHANGE PARTITION partitionSpec WITH TABLE qualifiedName                                                       #alterTableExchangePartition
     | ALTER TABLE qualifiedName RECOVER PARTITIONS                                                                                              #alterTableRecoverPartitions
-    | ALTER TABLE qualifiedName DROP (IF EXISTS)? PARTITION properties (',' PARTITION properties)? (IGNORE PROTECTION)? PURGE?                  #alterTableDropPartition
-    | ALTER TABLE qualifiedName (ARCHIVE | UNARCHIVE) PARTITION properties                                                                      #alterTableArchivePartition
-    | ALTER TABLE qualifiedName PARTITION properties SET FILEFORMAT identifier                                                                  #alterTablePartitionFileFormat
-    | ALTER TABLE qualifiedName PARTITION properties SET LOCATION string                                                                        #alterTablePartitionLocation
-    | ALTER TABLE qualifiedName TOUCH PARTITION properties                                                                                      #alterTablePartitionTouch
-    | ALTER TABLE qualifiedName PARTITION properties (ENABLE | DISABLE) (NO_DROP CASCADE? | OFFLINE)                                            #alterTablePartitionProtections
-    | ALTER TABLE qualifiedName PARTITION properties COMPACT string (AND WAIT)? WITH OVERWRITE TBLPROPERTIES properties                         #alterTablePartitionCompact
-    | ALTER TABLE qualifiedName PARTITION properties CONCATENATE                                                                                #alterTablePartitionConcatenate
-    | ALTER TABLE qualifiedName PARTITION properties UPDATE COLUMNS                                                                             #alterTablePartitionUpdateColumns
-    | ALTER TABLE qualifiedName (PARTITION properties)? CHANGE COLUMN? oldName=identifier newName=identifier type
+    | ALTER TABLE qualifiedName DROP (IF EXISTS)? PARTITION partitionSpec (',' PARTITION partitionSpec)? (IGNORE PROTECTION)? PURGE?            #alterTableDropPartition
+    | ALTER TABLE qualifiedName (ARCHIVE | UNARCHIVE) PARTITION partitionSpec                                                                   #alterTableArchivePartition
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec)? SET FILEFORMAT identifier                                                            #alterTablePartitionFileFormat
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec) SET LOCATION string                                                                   #alterTablePartitionLocation
+    | ALTER TABLE qualifiedName TOUCH (PARTITION partitionSpec)?                                                                                #alterTablePartitionTouch
+    | ALTER TABLE qualifiedName PARTITION partitionSpec (ENABLE | DISABLE) (NO_DROP CASCADE? | OFFLINE)                                         #alterTablePartitionProtections
+    | ALTER TABLE qualifiedName PARTITION partitionSpec COMPACT string (AND WAIT)? WITH OVERWRITE TBLPROPERTIES properties                      #alterTablePartitionCompact
+    | ALTER TABLE qualifiedName PARTITION partitionSpec CONCATENATE                                                                             #alterTablePartitionConcatenate
+    | ALTER TABLE qualifiedName PARTITION partitionSpec UPDATE COLUMNS                                                                          #alterTablePartitionUpdateColumns
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec)? CHANGE COLUMN? oldName=identifier newName=identifier type
         (COMMENT string)? (FIRST | AFTER columnName=identifier)? (CASCADE | RESTRICT)?                                                          #alterTableChangeColumn
     | CREATE VIEW (IF NOT EXISTS)?  qualifiedName viewColumns?
         (COMMENT string)?
@@ -164,18 +164,18 @@ statement
     | RELOAD (FUNCTIONS | FUNCTION)                                    #reloadFunctions
     | SHOW FUNCTIONS
         (LIKE pattern=string)?                                         #showFunctions
-    | SET property?                                                    #setSession
+    | SET setProperty?                                                 #setSession
     | RESET                                                            #resetSession
     | CREATE MATERIALIZED VIEW (IF NOT EXISTS)? qualifiedName
         createMaterializedViewOption* AS query                                              #createMaterializedView
     | DROP MATERIALIZED VIEW qualifiedName                                                  #dropMaterializedView
     | ALTER MATERIALIZED VIEW qualifiedName (ENABLE | DISABLE) REWRITE                      #alterMaterializedView
     | SHOW MATERIALIZED VIEWS ((IN | FROM) qualifiedName)? (LIKE pattern=string)?           #showMaterializedViews
-    | CREATE INDEX identifier ON TABLE? identifier columnAliases
-        AS identifier createIndexOptions*                                                   #createIndex
-    | DROP INDEX (IF EXISTS)? identifier ON identifier                                      #dropIndex
-    | ALTER INDEX identifier ON identifier (PARTITION properties)? REBUILD                  #alterIndex
-    | SHOW (FORMATTED)? (INDEX | INDEXES) ON identifier ((FROM | IN) qualifiedName)?        #showIndex
+    | CREATE INDEX identifier ON TABLE? qualifiedName columnAliases
+        AS identifier createIndexOptions*                                                      #createIndex
+    | DROP INDEX (IF EXISTS)? identifier ON qualifiedName                                      #dropIndex
+    | ALTER INDEX identifier ON qualifiedName (PARTITION properties)? REBUILD                  #alterIndex
+    | SHOW (FORMATTED)? (INDEX | INDEXES) ON qualifiedName ((FROM | IN) qualifiedName)?        #showIndex
     | SHOW PARTITIONS qualifiedName (PARTITION properties)?
         (WHERE where=booleanExpression)?
         (ORDER BY sortItem (',' sortItem)*)?
@@ -188,19 +188,19 @@ statement
     | (DESCRIBE | DESC) FUNCTION EXTENDED? functionName=expression                          #describeFunction
     | CREATE TEMPORARY MACRO identifier '(' (tableElement (',' tableElement)*)? ')' expression    #createMacro
     | DROP TEMPORARY MACRO (IF EXISTS)? identifier                                          #dropMacro
-    | SHOW LOCKS (DATABASE | SCHEMA)? identifier (PARTITION properties)? EXTENDED?          #showLocks
+    | SHOW LOCKS (DATABASE | SCHEMA)? qualifiedName (PARTITION properties)? EXTENDED?       #showLocks
     | SHOW CONF identifier                                                                  #showConf
     | SHOW TRANSACTIONS                                                                     #showTransactions
     | SHOW COMPACTIONS                                                                      #showCompactions
     | ABORT TRANSACTIONS INTEGER_VALUE (INTEGER_VALUE)*                                     #abortTransactions
-    | LOAD DATA LOCAL? INPATH identifier OVERWRITE? INTO TABLE identifier
+    | LOAD DATA LOCAL? INPATH identifier OVERWRITE? INTO TABLE qualifiedName
         (PARTITION properties)? (INPUTFORMAT identifier SERDE identifier)?                  #loadData
     | MERGE INTO qualifiedName AS T USING (qualifiedName | query) AS S ON booleanExpression
         (WHEN MATCHED (AND booleanExpression)? THEN UPDATE SET property (',' property)*)?
         (WHEN MATCHED (AND booleanExpression)? THEN DELETE)?
-        (WHEN NOT MATCHED (AND booleanExpression)? THEN INSERT VALUES expression (',' expression)* )?             #merge
-    | EXPORT TABLE identifier (PARTITION properties)? TO string (FOR REPLICATION '(' identifier ')')?             #exportData
-    | IMPORT (EXTERNAL? TABLE identifier (PARTITION properties)?)? FROM string (LOCATION string)?                 #importData
+        (WHEN NOT MATCHED (AND booleanExpression)? THEN INSERT VALUES expression (',' expression)* )?                #merge
+    | EXPORT TABLE qualifiedName (PARTITION properties)? TO string (FOR REPLICATION '(' identifier ')')?             #exportData
+    | IMPORT (EXTERNAL? TABLE qualifiedName (PARTITION properties)?)? FROM string (LOCATION string)?                 #importData
     ;
 
 assignmentList
@@ -222,6 +222,10 @@ describeTableOption
 
 createFunctionOption
     : USING (JAR | FILE | ARCHIVE) expression (',' (JAR | FILE | ARCHIVE) expression)?
+    ;
+
+setProperty
+    : identifier ('.' identifier)* EQ expression
     ;
 
 createMaterializedViewOption
@@ -270,6 +274,10 @@ columnDefinition
 
 properties
     : '(' property (',' property)* ')'
+    ;
+
+partitionSpec
+    : '(' identifier (EQ expression)? (',' identifier (EQ expression)?)* ')'
     ;
 
 clusteredBy

@@ -52,6 +52,7 @@ This tool also can take parameters and running in batch mode. It has five parame
 | `--type` or `-t` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
 | `--output` or `-o`     | the directory to save the converted SQL results. The result file's naming convention will be the input file's name + timestamp + .html suffix.             |
 | `--config` or `-c`     | the config file of SQL Migration Tool.                       |
+| `--debug` or `-d`     | if set value to 'true', then print the debug information in console.                       |
 
 *Tip:*
 
@@ -237,6 +238,7 @@ Below Impala statements are partially supported, which mean some keywords or att
 | ADD COMMENTS           | Adding comments to databases or columns is not supported                  | [COMMENT](../sql/comment.md)                       |
 | SET SESSION            | Only support "SET" and "SET ALL"                                          | [SET SESSION](../sql/set-session.md)                       |
 | ADD COLUMNS            | ADD multiple columns within single statement is not supported, kudu properties are not supported.    | [ALTER TABLE](../sql/alter-table.md)                       |
+| SHOW FUNCTIONS         | Only support show all functions.                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
 
 
 Below Impala statements are not supported, because of feature differences:
@@ -258,7 +260,6 @@ Below Impala statements are not supported, because of feature differences:
 | REFRESH FUNCTION           |
 | UPDATE TABLE           |
 | UPSERT           |
-| SHOW FUNCTIONS           |
 | SHOW TABLE/COLUMN STATS           |
 | SHOW PARTITIONS           |
 | SHOW FILES           |
