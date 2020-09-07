@@ -67,6 +67,7 @@ import static io.prestosql.sql.QueryUtil.aliasedName;
 import static io.prestosql.sql.QueryUtil.selectList;
 import static io.prestosql.sql.QueryUtil.simpleQuery;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_COLUMN;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_OPERATOR;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CACHE;
 import static java.util.Objects.requireNonNull;
 
@@ -213,6 +214,8 @@ final class CacheTableRewrite
                 switch (predicate.getOperator()) {
                     case AND:
                         return leftDomain.intersect(rightDomain);
+                    case OR:
+                        throw new SemanticException(INVALID_OPERATOR, node, "%s operator is not supported", predicate.getOperator().toString());
                 }
             }
             // create a Type entry for the converted Identifier
