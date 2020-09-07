@@ -81,7 +81,7 @@ public class IndexCache
         long lastModifiedTime = hiveSplit.getLastModifiedTime();
         Path path = new Path(hiveSplit.getPath());
 
-        URI pathUri = URI.create(path.toString());
+        URI pathUri = URI.create(path.toString().replaceAll(" ", "%20"));
         String tableFqn = catalog + "." + table;
 
         // for each split, load indexes for each predicate (if the predicate contains an indexed column)
