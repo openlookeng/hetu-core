@@ -133,11 +133,13 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.plugin.hive.HiveBucketing.containsTimestampBucketedV2;
+import static io.prestosql.plugin.hive.HiveStorageFormat.ORC;
 import static io.prestosql.plugin.hive.HiveTableProperties.IS_EXTERNAL_TABLE;
 import static io.prestosql.plugin.hive.HiveTableProperties.LOCATION_PROPERTY;
 import static io.prestosql.plugin.hive.HiveTableProperties.NON_INHERITABLE_PROPERTIES;
 import static io.prestosql.plugin.hive.HiveTableProperties.TRANSACTIONAL;
 import static io.prestosql.plugin.hive.HiveTableProperties.getExternalLocation;
+import static io.prestosql.plugin.hive.HiveTableProperties.getHiveStorageFormat;
 import static io.prestosql.plugin.hive.HiveTableProperties.getLocation;
 import static io.prestosql.plugin.hive.HiveTableProperties.getTransactionalValue;
 import static io.prestosql.plugin.hive.HiveTableProperties.isExternalTable;
@@ -173,6 +175,7 @@ import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
+import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
 
 public class HiveMetadata
         implements TransactionalMetadata
@@ -1971,17 +1974,15 @@ public class HiveMetadata
 
         TupleDomain<ColumnHandle> predicate = createPredicate(partitionColumns, partitions);
 
-        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+        if (hiveTable.isSuitableToPush()) {
             Table hmsTable = metastore.getTable(hiveTable.getSchemaName(), hiveTable.getTableName())
                     .orElseThrow(() -> new TableNotFoundException(hiveTable.getSchemaTableName()));
 
-            if (hmsTable.getStorage().getStorageFormat().getSerDe().equalsIgnoreCase(HiveStorageFormat.ORC.getSerDe())) {
-                ImmutableMap.Builder<ColumnHandle, Domain> pushedDown = ImmutableMap.builder();
-                pushedDown.putAll(hiveTable.getCompactEffectivePredicate().getDomains().get().entrySet().stream()
-                        .collect(toMap(e -> (ColumnHandle) e.getKey(), e -> e.getValue())));
+            ImmutableMap.Builder<ColumnHandle, Domain> pushedDown = ImmutableMap.builder();
+            pushedDown.putAll(hiveTable.getCompactEffectivePredicate().getDomains().get().entrySet().stream()
+                    .collect(toMap(e -> (ColumnHandle) e.getKey(), e -> e.getValue())));
 
-                predicate = predicate.intersect(withColumnDomains(pushedDown.build()));
-            }
+            predicate = predicate.intersect(withColumnDomains(pushedDown.build()));
         }
 
         Optional<DiscretePredicates> discretePredicates = Optional.empty();
@@ -2019,12 +2020,14 @@ public class HiveMetadata
     @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
     {
-        return applyFilter(session, tableHandle, constraint, ImmutableList.of(), false);
+        return applyFilter(session, tableHandle, constraint, ImmutableList.of(), ImmutableSet.of(), false);
     }
 
     @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle,
-                                                                                   Constraint constraint, List<Constraint> additional, boolean pushPartitionsOnly)
+                                                                                   Constraint constraint, List<Constraint> additional,
+                                                                                   Set<ColumnHandle> allColumnHandles,
+                                                                                   boolean pushPartitionsOnly)
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         checkArgument(!handle.getAnalyzePartitionValues().isPresent() || constraint.getSummary().isAll(), "Analyze should not have a constraint");
@@ -2064,14 +2067,24 @@ public class HiveMetadata
                 .forEach(predicateColumnNames::add);
 
         List<TupleDomain<HiveColumnHandle>> newEffectivePredicates = null;
-        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)
-                && HiveSessionProperties.isOrcDisjunctPredicatePushdownEnabled(session)) {
+        boolean isSuitableToPush = false;
+        if (HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+            isSuitableToPush = checkIfSuitableToPush(allColumnHandles, tableHandle, session);
+        }
+
+        if (isSuitableToPush && HiveSessionProperties.isOrcDisjunctPredicatePushdownEnabled(session)) {
             newEffectivePredicates = builder.build();
 
             newEffectivePredicates.stream().forEach(nfp ->
                     nfp.getDomains().get().keySet().stream()
                             .map(HiveColumnHandle::getColumnName)
                             .forEach(predicateColumnNames::add));
+        }
+
+        if (isSuitableToPush
+                    && partitionResult.getCompactEffectivePredicate().equals(newEffectivePredicate)
+                    && newEffectivePredicates.size() == 0) {
+            isSuitableToPush = false;
         }
 
         // Get column handle
@@ -2096,7 +2109,8 @@ public class HiveMetadata
                 newHandle.getBucketFilter(),
                 newHandle.getAnalyzePartitionValues(),
                 predicateColumns,
-                Optional.ofNullable(newEffectivePredicates));
+                Optional.ofNullable(newEffectivePredicates),
+                isSuitableToPush);
 
         if (pushPartitionsOnly && handle.getPartitions().equals(newHandle.getPartitions()) &&
                 handle.getCompactEffectivePredicate().equals(newHandle.getCompactEffectivePredicate()) &&
@@ -2104,17 +2118,37 @@ public class HiveMetadata
             return Optional.empty();
         }
 
-        if (!pushPartitionsOnly && HiveSessionProperties.isOrcPredicatePushdownEnabled(session)) {
+        if (!pushPartitionsOnly && isSuitableToPush) {
             Table table = metastore.getTable(handle.getSchemaName(), handle.getTableName())
                     .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
-
-            if (table.getStorage().getStorageFormat().getSerDe().equalsIgnoreCase(HiveStorageFormat.ORC.getSerDe())) {
-                return Optional.of(new ConstraintApplicationResult<>(newHandle, TupleDomain.all()));
-            }
+            return Optional.of(new ConstraintApplicationResult<>(newHandle, TupleDomain.all()));
         }
 
         // note here that all unenforced constraints will still be applied using the filter operator
         return Optional.of(new ConstraintApplicationResult<>(newHandle, partitionResult.getUnenforcedConstraint()));
+    }
+
+    // This should be adjusted as we continue to support additional functionality.
+    boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
+    {
+        // We allow predicate pushdown only for non-transaction table of HIVE ORC storage format.
+        if (getHiveStorageFormat(getTableMetadata(session, tableHandle).getProperties()) != ORC
+                || getTransactionalValue(getTableMetadata(session, tableHandle).getProperties())) {
+            return false;
+        }
+
+        for (ColumnHandle handle : allColumnHandles) {
+            HiveColumnHandle hiveColumnHandle = (HiveColumnHandle) handle;
+            // Non-primitive data type(e.g. STRUCT, MAP, LIST) and BYTE are not supported to pushdown.
+            // UPDATE/DELETE which has explicit column $rowId of STRUCT Type, will be not allowed to pushdown.
+            // NOTE: Incase STRUCT type supported, support of UPDATE/DELETE should be checked or should be handled here.
+            if (hiveColumnHandle.getHiveType().getCategory().equals(PRIMITIVE) == false
+                    || hiveColumnHandle.getHiveType().equals(HiveType.HIVE_BYTE)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     @Override
@@ -2208,7 +2242,8 @@ public class HiveMetadata
                 hiveTable.getBucketFilter(),
                 hiveTable.getAnalyzePartitionValues(),
                 hiveTable.getPredicateColumns(),
-                hiveTable.getAdditionalCompactEffectivePredicate());
+                hiveTable.getAdditionalCompactEffectivePredicate(),
+                hiveTable.isSuitableToPush());
     }
 
     @VisibleForTesting

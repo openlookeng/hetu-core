@@ -691,10 +691,12 @@ public class ClassLoaderSafeConnectorMetadata
     }
 
     @Override
-    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle table, Constraint constraint, List<Constraint> additionalConstraints, boolean pushPartitionOnly)
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle table,
+                                                                                   Constraint constraint, List<Constraint> additionalConstraints,
+                                                                                   Set<ColumnHandle> allColumnHandles, boolean pushPartitionOnly)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.applyFilter(session, table, constraint, additionalConstraints, pushPartitionOnly);
+            return delegate.applyFilter(session, table, constraint, additionalConstraints, allColumnHandles, pushPartitionOnly);
         }
     }
 
