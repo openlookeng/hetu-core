@@ -16,9 +16,7 @@ package io.hetu.core.plugin.hbase.metadata;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.utils.Constants;
-import io.hetu.core.plugin.hbase.utils.JsonHBaseTableUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
@@ -33,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * LocalHBaseMetastore: store file on local filesystem
+ * This Metastore is just for test
  *
  * @since 2020-03-30
  */
@@ -42,11 +41,11 @@ public class LocalHBaseMetastore
     private static final Logger LOG = Logger.get(LocalHBaseMetastore.class);
     private static final String ID = "LOCAL";
     private final Map<String, HBaseTable> hbaseTables = new ConcurrentHashMap<>();
-    private String filePath;
+    private final String filePath;
 
-    public LocalHBaseMetastore(HBaseConfig config)
+    public LocalHBaseMetastore(String filePath)
     {
-        filePath = config.getMetastoreUrl();
+        this.filePath = filePath;
     }
 
     @Override

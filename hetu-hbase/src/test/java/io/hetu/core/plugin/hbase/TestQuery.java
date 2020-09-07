@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase;
 
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
@@ -23,6 +23,9 @@ import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
+import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
+import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
+import io.hetu.core.plugin.hbase.metadata.TestHBaseTableUtils;
 import io.hetu.core.plugin.hbase.query.HBaseGetRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSet;
@@ -63,6 +66,8 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestQuery
 {
+    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
+
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private ConnectorSession session;
@@ -77,9 +82,8 @@ public class TestQuery
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        hCConf.setMetastoreUrl("./hbasetablecatalogtmp.ini");
-        TestJsonHBaseTableUtils.preFile(hCConf.getMetastoreUrl());
-        hconn = new TestHBaseClientConnection(hCConf);
+        TestHBaseTableUtils.preFile(TEST_METASTORE_FILE_PATH);
+        hconn = new TestHBaseClientConnection(hCConf, new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH));
         hconn.getConn();
         session = new TestingConnectorSession("root");
         split =
@@ -338,6 +342,6 @@ public class TestQuery
     @AfterClass
     public void clear()
     {
-        TestJsonHBaseTableUtils.delFile(hCConf.getMetastoreUrl());
+        TestHBaseTableUtils.delFile(TEST_METASTORE_FILE_PATH);
     }
 }

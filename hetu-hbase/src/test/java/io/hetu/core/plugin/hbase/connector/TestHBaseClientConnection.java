@@ -12,11 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.connector;
 
 import io.hetu.core.plugin.hbase.client.TestHBaseConnection;
 import io.hetu.core.plugin.hbase.conf.HBaseConfig;
-import io.hetu.core.plugin.hbase.connector.HBaseConnection;
+import io.hetu.core.plugin.hbase.metadata.HBaseMetastore;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 
 import java.io.IOException;
@@ -29,9 +29,9 @@ import java.io.IOException;
 public class TestHBaseClientConnection
         extends HBaseConnection
 {
-    public TestHBaseClientConnection(HBaseConfig conf)
+    public TestHBaseClientConnection(HBaseConfig conf, HBaseMetastore metastore)
     {
-        super(conf);
+        super(metastore, conf);
     }
 
     /**

@@ -12,9 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.conf;
 
-import io.hetu.core.plugin.hbase.conf.HBaseTableProperties;
 import org.apache.commons.lang3.tuple.Pair;
 import org.testng.annotations.Test;
 

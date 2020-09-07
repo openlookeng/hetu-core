@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase;
 
 import io.hetu.core.plugin.hbase.client.TestUtils;
 import io.hetu.core.plugin.hbase.client.TestingConnectorSession;
@@ -23,7 +23,10 @@ import io.hetu.core.plugin.hbase.connector.HBaseConnectorId;
 import io.hetu.core.plugin.hbase.connector.HBaseConnectorMetadataFactory;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseTransactionHandle;
+import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
 import io.hetu.core.plugin.hbase.metadata.HBaseConnectorMetadata;
+import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
+import io.hetu.core.plugin.hbase.metadata.TestHBaseTableUtils;
 import io.hetu.core.plugin.hbase.query.HBasePageSinkProvider;
 import io.hetu.core.plugin.hbase.query.HBasePageSourceProvider;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSetProvider;
@@ -73,6 +76,7 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestHBase
 {
+    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private HBaseConnectorMetadata hcm;
@@ -89,11 +93,10 @@ public class TestHBase
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        hCConf.setMetastoreUrl("./hbasetablecatalogtmp.ini");
-        TestJsonHBaseTableUtils.preFile(hCConf.getMetastoreUrl());
+        TestHBaseTableUtils.preFile(TEST_METASTORE_FILE_PATH);
         table = TestUtils.createHBaseTableHandle();
         schemaTableName = new SchemaTableName("hbase", "test_table");
-        hconn = new TestHBaseClientConnection(hCConf);
+        hconn = new TestHBaseClientConnection(hCConf, new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH));
         hconn.getConn();
         session = new TestingConnectorSession("root");
         hcm = new HBaseConnectorMetadata(hconn);
@@ -304,7 +307,7 @@ public class TestHBase
     /**
      * testListTables
      */
-    public void testListTables()
+    private void testListTables()
     {
         List<SchemaTableName> tables = hcm.listTables(session, Optional.of("hbase"));
         assertEquals(tables.size(), 1);
@@ -481,6 +484,6 @@ public class TestHBase
     @AfterClass
     public void clear()
     {
-        TestJsonHBaseTableUtils.delFile(hCConf.getMetastoreUrl());
+        TestHBaseTableUtils.delFile(TEST_METASTORE_FILE_PATH);
     }
 }

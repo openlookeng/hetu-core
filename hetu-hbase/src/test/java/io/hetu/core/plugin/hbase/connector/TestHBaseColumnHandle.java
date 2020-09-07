@@ -12,16 +12,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.connector;
 
-import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
-import org.junit.Test;
+import org.testng.annotations.Test;
 
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 /**
  * TestHBaseColumnHandle

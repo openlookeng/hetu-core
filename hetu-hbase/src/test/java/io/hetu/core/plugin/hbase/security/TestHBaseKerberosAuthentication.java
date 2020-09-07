@@ -12,9 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.security;
 
-import io.hetu.core.plugin.hbase.security.HBaseKerberosAuthentication;
+import io.hetu.core.plugin.hbase.metadata.TestHBaseTableUtils;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.testng.annotations.Test;
 
@@ -87,7 +87,7 @@ public class TestHBaseKerberosAuthentication
         }
 
         // krb5ConfPath is not a file
-        TestJsonHBaseTableUtils.createFile("user.keytab.test");
+        TestHBaseTableUtils.createFile("user.keytab.test");
         try {
             HBaseKerberosAuthentication.authenticateAndReturnUGI(
                     "root", "./user.keytab.test", "./", new HBaseConfiguration());
@@ -97,7 +97,7 @@ public class TestHBaseKerberosAuthentication
             assertEquals(true, e.toString().contains("java.io.IOException: krb5ConfFile"), e.toString());
             assertEquals(true, e.toString().contains("is not a file"), e.toString());
         }
-        TestJsonHBaseTableUtils.delFile("user.keytab");
+        TestHBaseTableUtils.delFile("user.keytab");
     }
 
     /**
@@ -108,8 +108,8 @@ public class TestHBaseKerberosAuthentication
             throws Exception
     {
         // krb5ConfPath is not a file
-        TestJsonHBaseTableUtils.createFile("user.keytab.test");
-        TestJsonHBaseTableUtils.createFile("krb5.conf.test");
+        TestHBaseTableUtils.createFile("user.keytab.test");
+        TestHBaseTableUtils.createFile("krb5.conf.test");
         try {
             HBaseKerberosAuthentication.authenticateAndReturnUGI(
                     "root", "./user.keytab.test", "./krb5.conf.test", new HBaseConfiguration());
@@ -117,8 +117,8 @@ public class TestHBaseKerberosAuthentication
         catch (IllegalStateException | NullPointerException e) {
             throw new IllegalStateException("testAuthenticateAndReturnUGINormal: failed");
         }
-        TestJsonHBaseTableUtils.delFile("user.keytab.test");
-        TestJsonHBaseTableUtils.delFile("krb5.conf.test");
+        TestHBaseTableUtils.delFile("user.keytab.test");
+        TestHBaseTableUtils.delFile("krb5.conf.test");
     }
 
     /**
@@ -141,8 +141,8 @@ public class TestHBaseKerberosAuthentication
 
         // userKeytabFile not exist
         try {
-            TestJsonHBaseTableUtils.delFile("krb5.conf.test");
-            TestJsonHBaseTableUtils.delFile("jaas.conf.test");
+            TestHBaseTableUtils.delFile("krb5.conf.test");
+            TestHBaseTableUtils.delFile("jaas.conf.test");
             HBaseKerberosAuthentication.setJaasConf("jaas.conf.test", "root", "krb5.conf.test");
             throw new IOException("testAuthenticate : failed");
         }
@@ -152,8 +152,8 @@ public class TestHBaseKerberosAuthentication
         }
 
         // Complete process
-        TestJsonHBaseTableUtils.createFile("krb5.conf.test");
-        TestJsonHBaseTableUtils.createFile("jaas.conf.test");
+        TestHBaseTableUtils.createFile("krb5.conf.test");
+        TestHBaseTableUtils.createFile("jaas.conf.test");
         try {
             HBaseKerberosAuthentication.setJaasConf("jaas.conf.test", "root", "krb5.conf.test");
             throw new IOException("testAuthenticate : failed");
@@ -163,7 +163,7 @@ public class TestHBaseKerberosAuthentication
                     e.toString(),
                     "java.io.IOException: AppConfigurationEntry named jaas.conf.test does not have value of keyTab.");
         }
-        TestJsonHBaseTableUtils.delFile("krb5.conf.test");
-        TestJsonHBaseTableUtils.delFile("jaas.conf.test");
+        TestHBaseTableUtils.delFile("krb5.conf.test");
+        TestHBaseTableUtils.delFile("jaas.conf.test");
     }
 }

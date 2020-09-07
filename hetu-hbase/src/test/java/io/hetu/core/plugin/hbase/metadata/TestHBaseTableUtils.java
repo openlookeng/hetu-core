@@ -12,29 +12,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.metadata;
 
-import io.hetu.core.plugin.hbase.conf.HBaseConfig;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
-import io.hetu.core.plugin.hbase.utils.JsonHBaseTableUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 
-import static org.junit.Assert.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 /**
  * TestJsonHBaseTableUtils
  *
  * @since 2020-03-20
  */
-public class TestJsonHBaseTableUtils
+public class TestHBaseTableUtils
 {
-    private static LocalHBaseMetastore lHBMetastore = new LocalHBaseMetastore(new HBaseConfig());
+    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
+    private static LocalHBaseMetastore lHBMetastore = new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH);
     private static String jsonStr =
             "{\n"
                     + "    \"hbase.test_table\": {\n"
@@ -97,39 +93,7 @@ public class TestJsonHBaseTableUtils
                     + "        ]\n"
                     + "    }}";
 
-    /**
-     * testFileUtils
-     *
-     * @throws NullPointerException Exception
-     */
-    @Test
-    public void testFileUtils()
-            throws Exception
-    {
-        String file = "./tmpcatalog.ini";
-        try {
-            JSONObject json = new JSONObject(jsonStr);
-            JsonHBaseTableUtils.loadHBaseTablesFromJson(new HashMap<>(), json);
-            JSONObject json2 = lHBMetastore.readJsonFromFile(file);
-
-            assertEquals(json.toString(), json2.toString());
-
-            File pfile = new File(file);
-            pfile.delete();
-        }
-        catch (NullPointerException e) {
-            assertEquals(e.toString(), "java.lang.NullPointerException");
-        }
-    }
-
-    /**
-     * testLoadHBaseTablesFromJsonNull
-     */
-    @Test
-    public void testLoadHBaseTablesFromJsonNull()
-    {
-        JsonHBaseTableUtils.loadHBaseTablesFromJson(new HashMap<>(), null);
-    }
+    private TestHBaseTableUtils() {}
 
     /**
      * preFile
@@ -171,14 +135,5 @@ public class TestJsonHBaseTableUtils
                 throw new IOException("createFile " + filename + " : failed");
             }
         }
-    }
-
-    /**
-     * testReadException
-     */
-    @Test
-    public void testReadException()
-    {
-        assertEquals(null, lHBMetastore.readJsonFromFile("xxx"));
     }
 }

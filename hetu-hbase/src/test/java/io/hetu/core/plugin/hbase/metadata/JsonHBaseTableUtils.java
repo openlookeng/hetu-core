@@ -12,11 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.utils;
+package io.hetu.core.plugin.hbase.metadata;
 
 import io.airlift.log.Logger;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
-import io.hetu.core.plugin.hbase.metadata.HBaseTable;
+import io.hetu.core.plugin.hbase.utils.Utils;
 import io.prestosql.spi.connector.ColumnHandle;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;

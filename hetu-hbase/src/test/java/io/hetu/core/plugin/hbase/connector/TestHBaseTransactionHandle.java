@@ -12,14 +12,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.connector;
 
-import io.hetu.core.plugin.hbase.connector.HBaseTransactionHandle;
 import org.testng.annotations.Test;
 
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 /**
  * TestHBaseTransactionHandle

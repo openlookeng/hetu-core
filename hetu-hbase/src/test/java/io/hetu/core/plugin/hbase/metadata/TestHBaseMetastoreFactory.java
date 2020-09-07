@@ -12,19 +12,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.metadata;
 
 import io.hetu.core.plugin.hbase.client.TestUtils;
 import io.hetu.core.plugin.hbase.conf.HBaseConfig;
-import io.hetu.core.plugin.hbase.metadata.HBaseMetastoreFactory;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
 import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import org.testng.annotations.Test;
-
-import java.util.UUID;
 
 import static org.testng.Assert.assertEquals;
 
@@ -35,34 +31,6 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestHBaseMetastoreFactory
 {
-    /**
-     * testLocalHBaseMetastoreGetId
-     */
-    @Test
-    public void testLocalHBaseMetastoreGetId()
-    {
-        LocalHBaseMetastore lhBMetastore = new LocalHBaseMetastore(new HBaseConfig());
-        assertEquals("LOCAL", lhBMetastore.getId());
-    }
-
-    /**
-     * testHBaseMetastoreFactoryHdfs
-     */
-    @Test
-    public void testHBaseMetastoreFactoryHdfs()
-    {
-        HBaseConfig hBConf = new HBaseConfig();
-        hBConf.setMetastoreType("hdfs");
-        hBConf.setHdfsSitePath("./hdfs-site.xml" + UUID.randomUUID());
-        hBConf.setCoreSitePath("./core-site.xml" + UUID.randomUUID());
-        hBConf.setKerberos("KERBEROS");
-        hBConf.setUserKeytabPath("./user.keytab" + UUID.randomUUID());
-        hBConf.setKrb5ConfPath("./krb5.conf" + UUID.randomUUID());
-        hBConf.setPrincipalUsername("root");
-        HBaseMetastoreFactory hBMetaFactory = new HBaseMetastoreFactory(hBConf);
-        hBMetaFactory.create();
-    }
-
     /**
      * testHBaseMetastoreFactoryHetuMetastore
      */
