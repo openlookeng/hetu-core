@@ -4,13 +4,14 @@
 SQL迁移工具帮助用户将SQL语法转换为ANSI 2003 的SQL语法。目前仅支持Hive 和 Impala SQL语法。
 
 ## 使用SQL迁移工具
+下载`hetu-sql-migration-cli-{version number}-executable.jar`， 并重命名为 `openlk-sql-migration-cli`， 可以运行该命令`chmod +x`让它变成可执行的， 然后运行它。
 
 **交互模式**
 
 该工具支持交互模式运行。例如：
 
 ```shell
-./sql-migration-cli-010-executable.jar --type hive
+./openlk-sql-migration-cli --type hive
 ```
 
 ```sql
@@ -57,7 +58,7 @@ INSERT INTO table1
 
 
 ```shell
-    ./sql-migration-cli-010-executable.jar --file /home/Query01.sql --output ./
+    ./openlk-sql-migration-cli --file /home/Query01.sql --output ./
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
     INFO: Migration Completed.
     May 26, 2020 5:27:10 PM io.airlift.log.Logger info
@@ -73,7 +74,7 @@ INSERT INTO table1
 
 
 ```shell
-./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --type hive
+./openlk-sql-migration-cli --execute "INSERT INTO TABLE T1 VALUES(10, 'openLooKeng')" --type hive
 
 
 ==========converted result==========
@@ -95,7 +96,7 @@ INSERT INTO t1
 convertDecimalLiteralsAsDouble=true
 
 
-./sql-migration-cli-010-executable.jar --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
+./openlk-sql-migration-cli --execute "INSERT INTO TABLE T1 select 2.0 * 3" --config config.properties
 
 
 ==========converted result==========
