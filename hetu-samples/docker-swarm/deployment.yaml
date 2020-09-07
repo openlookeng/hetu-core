@@ -1,16 +1,29 @@
+# Copyright (C) 2020. Huawei Technologies Co., Ltd. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Assuming this machine has a local copy of the following in the same directory as the docker-compose.yml
 # - A hdfs_configs directory containing default Hive connector configuration files
 
 version: "3.7"
 services:
-  # Hetu Engine - coordinator node
+  # openLooKeng Engine - coordinator node
   coordinator:
-    image: hetu:{{ imageTag }}
+    image: openlookeng:{{ imageTag }}
     ports:
       - "8080:8080"
     # mount config files for hive connector
     networks:
-      - hetu1
+      - openlk1
 #    configs:
 #      - source: hive_prop
 #        target: /usr/lib/hetu/etc/catalog/hive.properties
@@ -18,15 +31,15 @@ services:
 #        target: /opt/hdfs_configs/core-site.xml
 #      - source: hive_hdfs_site
 #        target: /opt/hdfs_configs/hdfs-site.xml
-    command: ["-t","coordinator","-nodeEnv","hetu1","-includeCoordinator","false"]
+    command: ["-t","coordinator","-nodeEnv","openlk1","-includeCoordinator","false"]
 
 #  coordinator1:
-#    image: hetu:{{ imageTag }}
+#    image: openlookeng:{{ imageTag }}
 #    ports:
 #      - "8081:8080"
 #    # mount config files for hive connector
 #    networks:
-#      - hetu2
+#      - openlk2
 ##    configs:
 ##      - source: hive_prop
 ##        target: /usr/lib/hetu/etc/catalog/hive.properties
@@ -34,16 +47,16 @@ services:
 ##        target: /opt/hdfs_configs/core-site.xml
 ##      - source: hive_hdfs_site
 ##        target: /opt/hdfs_configs/hdfs-site.xml
-#    command: ["-t","coordinator","-nodeEnv","hetu2","-includeCoordinator","false"]
+#    command: ["-t","coordinator","-nodeEnv","openlk2","-includeCoordinator","false"]
 
-  # Hetu Engine - worker node
+  # openLooKeng Engine - worker node
   worker:
-    image: hetu:{{ imageTag }}
+    image: openlookeng:{{ imageTag }}
     depends_on:
       - coordinator
     # mount config files for hive connector
     networks:
-      - hetu1
+      - openlk1
 #    configs:
 #      - source: hive_prop
 #        target: /usr/lib/hetu/etc/catalog/hive.properties
@@ -54,15 +67,15 @@ services:
     deploy:
       replicas: 2
     # -discoveryURI need to be full path; hostname must align with the coordinator service node
-    command: ["-t", "worker","-nodeEnv","hetu1","-discoveryURI","http://coordinator:8080"]
+    command: ["-t", "worker","-nodeEnv","openlk1","-discoveryURI","http://coordinator:8080"]
 
 #  worker1:
-#    image: hetu:{{ imageTag }}
+#    image: openlookeng:{{ imageTag }}
 #    depends_on:
 #      - coordinator1
 #    # mount config files for hive connector
 #    networks:
-#      - hetu2
+#      - openlk2
 ##    configs:
 ##      - source: hive_prop
 ##        target: /usr/lib/hetu/etc/catalog/hive.properties
@@ -73,8 +86,7 @@ services:
 #    deploy:
 #      replicas: 2
 #    # -discoveryURI need to be full path; hostname must align with the coordinator service node
-#    command: ["-t", "worker","-nodeEnv","hetu2","-discoveryURI","http://coordinator1:8080"]
-
+#    command: ["-t", "worker","-nodeEnv","openlk2","-discoveryURI","http://coordinator1:8080"]
 
 #  # Hive
 #  # must be named as hadoop-master
@@ -84,9 +96,8 @@ services:
 #    ports:
 #      - "9083:9083"
 #    networks:
-#      - hetu1
-#      - hetu2
-
+#      - openlk1
+#      - openlk2
 
 #configs:
 #  hive_prop:
@@ -97,9 +108,9 @@ services:
 #    file: ${PWD}/hdfs_configs/hdfs-site.xml
 
 networks:
-  hetu1:
+  openlk1:
     driver: overlay
     attachable: true
-#  hetu2:
+#  openlk2:
 #    driver: overlay
 #    attachable: true

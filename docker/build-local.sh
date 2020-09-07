@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
+
+# Copyright (C) 2020. Huawei Technologies Co., Ltd. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 CUSTOM_TAG=
 BASE_IMAGE="centos:centos7"
 TAG=$(date +%s)
@@ -33,6 +47,7 @@ if [[ $IS_GIT_FOLDER = true ]] && [[ -z "$CUSTOM_TAG" ]]; then
         echo "Changes not committed, couldn't retrive a unique HASH for tagging"
         exit
     else
+        # By default, tag the image using the latest git commit hash, e.g. openlookeng:23555bf9
         TAG=$(git rev-parse HEAD | cut -c 1-8)
     fi
 fi
@@ -60,8 +75,6 @@ cp -R bin default ${WORK_DIR}/hetu-server-${HETU_VERSION}
 
 cp ../presto-cli/target/hetu-cli-${HETU_VERSION}-executable.jar ${WORK_DIR}
 
-# tag the image using both the Hetu version and the latest git commit hash
-# i.e.) hetu:316-23555bf9
 docker build ${WORK_DIR} -f Dockerfile --build-arg "OPENLK_VERSION=${HETU_VERSION}" --build-arg "BASE_IMAGE=${BASE_IMAGE}" -t "openlookeng:${TAG}"
 
 rm -r ${WORK_DIR}
