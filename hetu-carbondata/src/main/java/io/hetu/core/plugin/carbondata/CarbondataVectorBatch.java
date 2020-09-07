@@ -24,15 +24,18 @@ import io.hetu.core.plugin.carbondata.readers.ObjectStreamReader;
 import io.hetu.core.plugin.carbondata.readers.ShortStreamReader;
 import io.hetu.core.plugin.carbondata.readers.SliceStreamReader;
 import io.hetu.core.plugin.carbondata.readers.TimestampStreamReader;
+import io.prestosql.plugin.hive.HiveColumnHandle;
 import org.apache.carbondata.core.constants.CarbonV3DataFormatConstants;
 import org.apache.carbondata.core.metadata.datatype.DataType;
 import org.apache.carbondata.core.metadata.datatype.DataTypes;
 import org.apache.carbondata.core.metadata.datatype.DecimalType;
 import org.apache.carbondata.core.metadata.datatype.StructField;
 import org.apache.carbondata.core.scan.result.vector.impl.CarbonColumnVectorImpl;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class CarbondataVectorBatch
@@ -50,7 +53,7 @@ public class CarbondataVectorBatch
     private int numRowsFiltered;
 
     private CarbondataVectorBatch(StructField[] schema, HetuCarbondataReadSupport readSupport,
-                                  int maxRows)
+                                  int maxRows, List<HiveColumnHandle> columnHandle)
     {
         this.capacity = maxRows;
         this.columns = new CarbonColumnVectorImpl[schema.length];
@@ -59,26 +62,28 @@ public class CarbondataVectorBatch
         DataType[] dataTypes = readSupport.getDataTypes();
 
         for (int i = 0; i < schema.length; ++i) {
-            columns[i] = createDirectStreamReader(maxRows, dataTypes[i], schema[i]);
+            boolean isCharType = columnHandle.get(i).getHiveType().getTypeInfo() instanceof CharTypeInfo;
+            int maxLength = isCharType ? ((CharTypeInfo) columnHandle.get(i).getHiveType().getTypeInfo()).getLength() : -1;
+            columns[i] = createDirectStreamReader(maxRows, dataTypes[i], schema[i], maxLength, isCharType);
         }
 
         numRowsFiltered = 0;
     }
 
     public static CarbondataVectorBatch allocate(StructField[] schema,
-                                                 HetuCarbondataReadSupport readSupport, boolean isDirectFill)
+                                                 HetuCarbondataReadSupport readSupport, boolean isDirectFill, List<HiveColumnHandle> columnHandle)
     {
         if (isDirectFill) {
             return new CarbondataVectorBatch(schema, readSupport,
-                    CarbonV3DataFormatConstants.NUMBER_OF_ROWS_PER_BLOCKLET_COLUMN_PAGE_DEFAULT);
+                    CarbonV3DataFormatConstants.NUMBER_OF_ROWS_PER_BLOCKLET_COLUMN_PAGE_DEFAULT, columnHandle);
         }
         else {
-            return new CarbondataVectorBatch(schema, readSupport, DEFAULT_BATCH_SIZE);
+            return new CarbondataVectorBatch(schema, readSupport, DEFAULT_BATCH_SIZE, columnHandle);
         }
     }
 
     public static CarbonColumnVectorImpl createDirectStreamReader(int batchSize, DataType dataType,
-            StructField field)
+            StructField field, int maxLength, boolean isCharType)
     {
         if (dataType == DataTypes.BOOLEAN) {
             return new BooleanStreamReader(batchSize, field.getDataType());
@@ -105,7 +110,7 @@ public class CarbondataVectorBatch
             return new ByteStreamReader(batchSize, field.getDataType());
         }
         else if (dataType == DataTypes.STRING || dataType == DataTypes.VARCHAR || dataType == DataTypes.BINARY) {
-            return new SliceStreamReader(batchSize, field.getDataType());
+            return new SliceStreamReader(batchSize, field.getDataType(), maxLength, isCharType);
         }
         else if (DataTypes.isDecimal(dataType)) {
             if (dataType instanceof DecimalType) {
