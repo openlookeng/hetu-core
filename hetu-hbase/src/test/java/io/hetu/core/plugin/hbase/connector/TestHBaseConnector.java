@@ -20,8 +20,7 @@ import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.conf.HBaseTableProperties;
 import io.hetu.core.plugin.hbase.metadata.HBaseConnectorMetadata;
 import io.hetu.core.plugin.hbase.metadata.HBaseTable;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
-import io.hetu.core.plugin.hbase.metadata.TestHBaseTableUtils;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
 import io.hetu.core.plugin.hbase.query.HBasePageSinkProvider;
 import io.hetu.core.plugin.hbase.query.HBasePageSourceProvider;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSetProvider;
@@ -74,13 +73,13 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestHBaseConnector
 {
-    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private HBaseConnectorMetadata hcm;
     private SchemaTableName schemaTableName;
     private HBaseConnector hConnector;
     private ConnectorSession session;
+    private TestingHetuMetastore hetuMetastore;
 
     /**
      * setUp
@@ -90,9 +89,9 @@ public class TestHBaseConnector
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        TestHBaseTableUtils.preFile(TEST_METASTORE_FILE_PATH);
+        hetuMetastore = new TestingHetuMetastore();
         schemaTableName = new SchemaTableName("hbase", "test_table");
-        hconn = new TestHBaseClientConnection(hCConf, new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH));
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         session = new TestingConnectorSession("root");
         hcm = new HBaseConnectorMetadata(hconn);
@@ -104,6 +103,15 @@ public class TestHBaseConnector
                         new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn)),
                         Optional.empty(),
                         new HBaseTableProperties());
+    }
+
+    /**
+     * clear
+     */
+    @AfterClass
+    public void clear()
+    {
+        hetuMetastore.close();
     }
 
     /**
@@ -187,29 +195,6 @@ public class TestHBaseConnector
         assertEquals(1, map.size());
         assertEquals("hbase", map.get("hbase").get(0).getSchemaName());
         assertEquals("test_table", map.get("hbase").get(0).getTableName());
-    }
-
-    /**
-     * testCreateNewTable
-     */
-    @Test
-    public void testCreateNewTable()
-    {
-        hcm.createTable(session, TestUtils.createConnectorTableMeta(), false);
-    }
-
-    /**
-     * testCreateExistTable
-     */
-    @Test
-    public void testCreateExistTable()
-    {
-        Map<String, Object> properties = TestUtils.createProperties();
-        properties.put("hbase_table_name", "hbase:test_table");
-        ConnectorTableMetadata ctm =
-                new ConnectorTableMetadata(
-                        new SchemaTableName("hbase", "test_table"), TestUtils.createColumnMetadataList(), properties);
-        hcm.createTable(session, ctm, false);
     }
 
     /**
@@ -354,7 +339,7 @@ public class TestHBaseConnector
         hCnnConf.setZkClientPort("2181");
         hCnnConf.setZkQuorum("zk1");
         hCnnConf.setRetryNumber(1);
-        HBaseConnection hConn = new TestHBaseClientConnection(hCnnConf, new LocalHBaseMetastore(null));
+        HBaseConnection hConn = new TestHBaseClientConnection(hCnnConf, null);
 
         try {
             hConn.createSchema("schema", null);
@@ -598,14 +583,5 @@ public class TestHBaseConnector
         hConnector.getPageSinkProvider();
         assertEquals(hConnector.getTableProperties().size(), 7);
         assertEquals(hConnector.getColumnProperties().size(), 2);
-    }
-
-    /**
-     * clear
-     */
-    @AfterClass
-    public void clear()
-    {
-        TestHBaseTableUtils.delFile(TEST_METASTORE_FILE_PATH);
     }
 }

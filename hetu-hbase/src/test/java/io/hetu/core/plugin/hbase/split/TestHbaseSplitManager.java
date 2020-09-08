@@ -19,7 +19,8 @@ import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -34,10 +35,10 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestHbaseSplitManager
 {
-    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private HBaseSplitManager hsm;
+    private TestingHetuMetastore hetuMetastore;
 
     /**
      * setUp
@@ -47,9 +48,16 @@ public class TestHbaseSplitManager
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        hconn = new TestHBaseClientConnection(hCConf, new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH));
+        hetuMetastore = new TestingHetuMetastore();
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         hsm = new HBaseSplitManager(hconn);
+    }
+
+    @AfterClass
+    public void destroy()
+    {
+        hetuMetastore.close();
     }
 
     /**

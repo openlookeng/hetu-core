@@ -14,25 +14,14 @@
  */
 package io.hetu.core.plugin.hbase.metadata;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.inject.Injector;
-import io.airlift.bootstrap.Bootstrap;
-import io.airlift.testing.mysql.TestingMySqlServer;
-import io.hetu.core.metastore.jdbc.JdbcMetastoreModule;
 import io.hetu.core.plugin.hbase.client.TestUtils;
-import io.prestosql.plugin.base.jmx.MBeanServerModule;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.metastore.HetuMetastore;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import org.weakref.jmx.guice.MBeanModule;
 
 import java.util.Map;
 import java.util.Optional;
 
-import static com.google.common.base.Throwables.throwIfUnchecked;
-import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -40,49 +29,20 @@ import static org.testng.Assert.assertTrue;
 
 public class TestHetuHBaseMetastore
 {
-    private static final String TEST_DATABASES = "hbase";
-    private static final String TEST_MYSQL_USER = "user";
-    private static final String TEST_MYSQL_PASSWORD = "testpass";
-
-    private TestingMySqlServer mySqlServer;
+    private TestingHetuMetastore hetuMetastore;
     private HetuHBaseMetastore metaStore;
 
     @BeforeClass
     public void setUp()
-            throws Exception
     {
-        this.mySqlServer = new TestingMySqlServer(TEST_MYSQL_USER, TEST_MYSQL_PASSWORD, TEST_DATABASES);
-        Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("hetu.metastore.db.url", mySqlServer.getJdbcUrl(TEST_DATABASES))
-                .put("hetu.metastore.db.user", TEST_MYSQL_USER)
-                .put("hetu.metastore.db.password", TEST_MYSQL_PASSWORD)
-                .build();
-        try {
-            Bootstrap app = new Bootstrap(
-                    new MBeanModule(),
-                    new MBeanServerModule(),
-                    new JdbcMetastoreModule());
-
-            Injector injector = app
-                    .strictConfig()
-                    .doNotInitializeLogging()
-                    .setRequiredConfigurationProperties(properties)
-                    .initialize();
-
-            this.metaStore = new HetuHBaseMetastore(injector.getInstance(HetuMetastore.class));
-            metaStore.init();
-        }
-        catch (Exception ex) {
-            throwIfUnchecked(ex);
-            throw new PrestoException(HETU_METASTORE_CODE,
-                    "init hetu hbase metastore module failed.");
-        }
+        hetuMetastore = new TestingHetuMetastore();
+        metaStore = hetuMetastore.getHetuMetastore();
     }
 
     @AfterClass(alwaysRun = true)
     public void destroy()
     {
-        mySqlServer.close();
+        hetuMetastore.close();
     }
 
     @Test

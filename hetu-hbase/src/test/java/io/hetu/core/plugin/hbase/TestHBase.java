@@ -25,8 +25,7 @@ import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseTransactionHandle;
 import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
 import io.hetu.core.plugin.hbase.metadata.HBaseConnectorMetadata;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
-import io.hetu.core.plugin.hbase.metadata.TestHBaseTableUtils;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
 import io.hetu.core.plugin.hbase.query.HBasePageSinkProvider;
 import io.hetu.core.plugin.hbase.query.HBasePageSourceProvider;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSetProvider;
@@ -76,7 +75,6 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestHBase
 {
-    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private HBaseConnectorMetadata hcm;
@@ -84,6 +82,7 @@ public class TestHBase
     private SchemaTableName schemaTableName;
     private ConnectorTableHandle table;
     private HBaseConnector hConnector;
+    private TestingHetuMetastore hetuMetastore;
 
     /**
      * setUp
@@ -93,10 +92,10 @@ public class TestHBase
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        TestHBaseTableUtils.preFile(TEST_METASTORE_FILE_PATH);
+        hetuMetastore = new TestingHetuMetastore();
         table = TestUtils.createHBaseTableHandle();
         schemaTableName = new SchemaTableName("hbase", "test_table");
-        hconn = new TestHBaseClientConnection(hCConf, new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH));
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         session = new TestingConnectorSession("root");
         hcm = new HBaseConnectorMetadata(hconn);
@@ -108,6 +107,15 @@ public class TestHBase
                         new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn)),
                         Optional.empty(),
                         null);
+    }
+
+    /**
+     * clear
+     */
+    @AfterClass
+    public void clear()
+    {
+        hetuMetastore.close();
     }
 
     /**
@@ -476,14 +484,5 @@ public class TestHBase
 
             cps.abort();
         }
-    }
-
-    /**
-     * clear
-     */
-    @AfterClass
-    public void clear()
-    {
-        TestHBaseTableUtils.delFile(TEST_METASTORE_FILE_PATH);
     }
 }

@@ -24,8 +24,7 @@ import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
-import io.hetu.core.plugin.hbase.metadata.TestHBaseTableUtils;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
 import io.hetu.core.plugin.hbase.query.HBaseGetRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSet;
@@ -66,12 +65,11 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestQuery
 {
-    private static final String TEST_METASTORE_FILE_PATH = "./hbasetablecatalogtmp.ini";
-
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private ConnectorSession session;
     private HBaseRecordSet recordSet;
+    private TestingHetuMetastore hetuMetastore;
     private HBaseSplit split;
 
     /**
@@ -82,8 +80,8 @@ public class TestQuery
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        TestHBaseTableUtils.preFile(TEST_METASTORE_FILE_PATH);
-        hconn = new TestHBaseClientConnection(hCConf, new LocalHBaseMetastore(TEST_METASTORE_FILE_PATH));
+        hetuMetastore = new TestingHetuMetastore();
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         session = new TestingConnectorSession("root");
         split =
@@ -99,6 +97,15 @@ public class TestQuery
         recordSet =
                 new HBaseRecordSet(
                         hconn, session, split, TestUtils.createHBaseTableHandle(), TestUtils.createColumnList());
+    }
+
+    /**
+     * clear
+     */
+    @AfterClass
+    public void clear()
+    {
+        hetuMetastore.close();
     }
 
     /**
@@ -244,7 +251,6 @@ public class TestQuery
      */
     @Test
     public void testHBaseRecordCursor()
-            throws Exception
     {
         List<HBaseColumnHandle> columnHandles = new ArrayList<>();
         columnHandles.add(TestUtils.createHBaseColumnRowId("rowkey"));
@@ -334,14 +340,5 @@ public class TestQuery
 
         // Check read data
         assertEquals("nick_name_1 12 2019-06-11 20", serializer.getColumnValues().get("rowkey"));
-    }
-
-    /**
-     * clear
-     */
-    @AfterClass
-    public void clear()
-    {
-        TestHBaseTableUtils.delFile(TEST_METASTORE_FILE_PATH);
     }
 }
