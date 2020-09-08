@@ -432,7 +432,7 @@ Heuristic index is external index module that which can be used to filter to out
 > -   **Type:** `boolean`
 > -   **Default value:** `false`
 >
-> This property enables heuristic index.
+> This property enables heuristic index. There is also a session property `heuristicindex_filter_enabled` which can be set per session. Note: the session property should ONLY be used to turn on and off index filtering temporarily when this global property in config file is set as `true`. The session property CANNOT be used to turn on index filter when it's not enabled globally.
  
 ### `hetu.heuristicindex.filter.cache.max-indices-number`
  
