@@ -22,6 +22,11 @@ import io.prestosql.orc.stream.BooleanInputStream;
 import io.prestosql.orc.stream.InputStreamSource;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.LongInputStream;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.DateType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -33,6 +38,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
 import static io.prestosql.orc.metadata.Stream.StreamKind.PRESENT;
+import static io.prestosql.orc.reader.ReaderUtils.verifyStreamType;
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static java.util.Objects.requireNonNull;
 
@@ -65,9 +71,11 @@ public abstract class AbstractNumericColumnReader<T>
      * @param systemMemoryContext
      * @throws OrcCorruptionException
      */
-    public AbstractNumericColumnReader(OrcColumn column, LocalMemoryContext systemMemoryContext)
+    public AbstractNumericColumnReader(Type type, OrcColumn column, LocalMemoryContext systemMemoryContext)
             throws OrcCorruptionException
     {
+        requireNonNull(type, "type is null");
+        verifyStreamType(column, type, t -> t instanceof BigintType || t instanceof IntegerType || t instanceof SmallintType || t instanceof DateType);
         this.column = requireNonNull(column, "column is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
     }

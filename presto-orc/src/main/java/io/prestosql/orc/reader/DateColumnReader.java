@@ -20,6 +20,7 @@ import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.DateType;
+import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -35,10 +36,10 @@ public class DateColumnReader
      * @param systemMemoryContext
      * @throws OrcCorruptionException
      */
-    public DateColumnReader(OrcColumn column, LocalMemoryContext systemMemoryContext)
+    public DateColumnReader(Type type, OrcColumn column, LocalMemoryContext systemMemoryContext)
             throws OrcCorruptionException
     {
-        super(column, systemMemoryContext);
+        super(type, column, systemMemoryContext);
     }
 
     @Override

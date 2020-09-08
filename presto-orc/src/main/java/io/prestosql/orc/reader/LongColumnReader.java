@@ -21,6 +21,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -43,10 +44,10 @@ public class LongColumnReader
      * @param systemMemoryContext
      * @throws OrcCorruptionException
      */
-    public LongColumnReader(OrcColumn column, LocalMemoryContext systemMemoryContext)
+    public LongColumnReader(Type type, OrcColumn column, LocalMemoryContext systemMemoryContext)
             throws OrcCorruptionException
     {
-        super(column, systemMemoryContext);
+        super(type, column, systemMemoryContext);
     }
 
     @Override
