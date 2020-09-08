@@ -378,14 +378,40 @@ public class TestBackgroundHiveSplitLoader
     public void testSplitsGenerationWithAbortedTransactions()
             throws Exception
     {
+        ImmutableMap<String, String> tableParams = ImmutableMap.of(
+                "transactional", "true",
+                "transactional_properties", "insert_only");
+        testAbortedTransactions(tableParams, Optional.empty(), ImmutableMap.of());
+    }
+
+    @Test
+    public void testSplitsGenerationWithAbortedTransactionsForIUDTable()
+            throws Exception
+    {
+        ImmutableMap<String, String> tableParams = ImmutableMap.of(
+                "transactional", "true");
+        testAbortedTransactions(tableParams, Optional.empty(), ImmutableMap.of());
+    }
+
+    @Test
+    public void testSplitsGenerationWithAbortedTransactionsForVacuum()
+            throws Exception
+    {
+        ImmutableMap<String, String> tableParams = ImmutableMap.of(
+                "transactional", "true");
+        testAbortedTransactions(tableParams, Optional.of(QueryType.VACUUM), ImmutableMap.of("FULL", false));
+    }
+
+    private void testAbortedTransactions(ImmutableMap<String, String> tableParameters,
+            Optional<QueryType> queryType, ImmutableMap<String, Object> queryInfo)
+            throws Exception
+    {
         java.nio.file.Path tablePath = Files.createTempDirectory(UUID.randomUUID().toString());
         Table table = table(
                 tablePath.toString(),
                 ImmutableList.of(),
                 Optional.empty(),
-                ImmutableMap.of(
-                        "transactional", "true",
-                        "transactional_properties", "insert_only"));
+                tableParameters);
 
         List<String> filePaths = ImmutableList.of(
                 tablePath + "/delta_0000001_0000001_0000/_orc_acid_version",
@@ -412,13 +438,16 @@ public class TestBackgroundHiveSplitLoader
                     Optional.empty(),
                     table,
                     Optional.empty(),
-                    Optional.of(new ValidReaderWriteIdList(validWriteIdsList)));
+                    Optional.of(new ValidReaderWriteIdList(validWriteIdsList)),
+                    queryType,
+                    queryInfo);
 
             HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
             backgroundHiveSplitLoader.start(hiveSplitSource);
             List<String> splits = drain(hiveSplitSource);
             assertTrue(splits.stream().anyMatch(p -> p.contains(filePaths.get(1))), format("%s not found in splits %s", filePaths.get(1), splits));
             assertTrue(splits.stream().anyMatch(p -> p.contains(filePaths.get(5))), format("%s not found in splits %s", filePaths.get(5), splits));
+            assertFalse(splits.stream().anyMatch(p -> p.contains(filePaths.get(3))), format("Aborted txn %s found in splits %s", filePaths.get(3), splits));
         }
         finally {
             Files.walk(tablePath).sorted(Comparator.reverseOrder()).map(java.nio.file.Path::toFile).forEach(File::delete);
