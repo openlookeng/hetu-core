@@ -18,7 +18,7 @@ Audit logging is an implementation of `io.prestosql.spi.eventlistener.EventListe
 and `AuditEventLogger#onQueryCompletedEvent`
 
 ## Configuration
-To enable audit logging feature, the following configs must be present in `etc/event-listener.config` for this feature to be active.
+To enable audit logging feature, the following configs must be present in `etc/event-listener.properties` for this feature to be active.
 
 ```
 hetu.event.listener.type=AUDIT
