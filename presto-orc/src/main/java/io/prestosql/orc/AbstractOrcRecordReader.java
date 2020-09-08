@@ -325,7 +325,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
 
         if (!andDomainMap.isEmpty()) {
             Iterator<Integer> thisStripeMatchingRows = ((andDomainMap.entrySet().iterator().next()).getKey()).getMatches(andDomainMap);
-            if (thisStripeMatchingRows.hasNext()) {
+            if (thisStripeMatchingRows != null && thisStripeMatchingRows.hasNext()) {
                 PeekingIterator<Integer> peekingIterator = Iterators.peekingIterator(thisStripeMatchingRows);
                 if (peekingIterator.peek() != null) {
                     this.stripeMatchingRows.put(stripe, peekingIterator);
@@ -337,7 +337,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         if (!orDomainMap.isEmpty()) {
             for (Map.Entry<Index, Domain> indexDomainEntry : orDomainMap.entrySet()) {
                 Iterator<Integer> thisStripeMatchingRows = (indexDomainEntry.getKey()).getMatches(indexDomainEntry.getValue());
-                if (thisStripeMatchingRows.hasNext()) {
+                if (thisStripeMatchingRows != null && thisStripeMatchingRows.hasNext()) {
                     /* any one matched; then include the stripe */
                     return false;
                 }

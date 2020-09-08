@@ -163,7 +163,7 @@ abstract class AbstractLongSelectiveColumnReader<T>
             }
 
             valuesCopy[positionIndex] = this.values[i];
-            if (includeNulls) {
+            if (nullsCopy != null) {
                 nullsCopy[positionIndex] = this.nulls[i];
             }
 
@@ -204,7 +204,7 @@ abstract class AbstractLongSelectiveColumnReader<T>
             }
 
             valuesCopy[positionIndex] = toIntExact(this.values[i]);
-            if (includeNulls) {
+            if (nullsCopy != null) {
                 nullsCopy[positionIndex] = this.nulls[i];
             }
 
@@ -235,7 +235,7 @@ abstract class AbstractLongSelectiveColumnReader<T>
             }
 
             valuesCopy[positionIndex] = (short) this.values[i];
-            if (includeNulls) {
+            if (nullsCopy != null) {
                 nullsCopy[positionIndex] = this.nulls[i];
             }
 
