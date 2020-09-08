@@ -70,7 +70,6 @@ public interface ConnectorTableHandle
      * schema name and table name.
      *
      * @return table name in 'schema.table' format if schema is available
-     *
      */
     default String getSchemaPrefixedTableName()
     {
@@ -102,5 +101,11 @@ public interface ConnectorTableHandle
     default String getDisjunctFilterConditions(Function<Domain, String> printer)
     {
         return "";
+    }
+
+    /* This method simply checks if Table can be cached by the Connector */
+    default boolean isTableCacheable()
+    {
+        return false;
     }
 }

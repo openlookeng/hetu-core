@@ -109,6 +109,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -186,6 +187,8 @@ public class HiveMetadata
     public static final String PRESTO_QUERY_ID_NAME = "presto_query_id";
     public static final String BUCKETING_VERSION = "bucketing_version";
     public static final String TABLE_COMMENT = "comment";
+
+    public static final String STORAGE_FORMAT = "storage_format";
 
     private static final String ORC_BLOOM_FILTER_COLUMNS_KEY = "orc.bloom.filter.columns";
     private static final String ORC_BLOOM_FILTER_FPP_KEY = "orc.bloom.filter.fpp";
@@ -298,10 +301,18 @@ public class HiveMetadata
 
         MetastoreUtil.verifyOnline(tableName, Optional.empty(), MetastoreUtil.getProtectMode(table.get()), table.get().getParameters());
 
+        Map<String, String> parameters = new HashMap<>();
+        parameters.putAll(table.get().getParameters());
+
+        String format = table.get().getStorage().getStorageFormat().getOutputFormatNullable();
+        if (format != null) {
+            parameters.put(STORAGE_FORMAT, format);
+        }
+
         return new HiveTableHandle(
                 tableName.getSchemaName(),
                 tableName.getTableName(),
-                table.get().getParameters(),
+                parameters,
                 getPartitionKeyColumnHandles(table.get()),
                 HiveBucketing.getHiveBucketHandle(table.get()));
     }

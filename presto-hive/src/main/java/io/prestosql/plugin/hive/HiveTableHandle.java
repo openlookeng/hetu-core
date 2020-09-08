@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static io.prestosql.plugin.hive.HiveMetadata.STORAGE_FORMAT;
 import static java.util.Objects.requireNonNull;
 
 public class HiveTableHandle
@@ -350,5 +351,11 @@ public class HiveTableHandle
     public boolean isSuitableForPushdown()
     {
         return this.suitableToPush;
+    }
+
+    @Override
+    public boolean isTableCacheable()
+    {
+        return HiveStorageFormat.ORC.getOutputFormat().equals(tableParameters.get().get(STORAGE_FORMAT));
     }
 }
