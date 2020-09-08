@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static io.hetu.core.heuristicindex.HeuristicIndexUtConstants.CVS_COLUMNS_DATA_TYPES;
 import static java.util.Objects.requireNonNull;
 
 public class CsvDataSource
@@ -133,6 +134,9 @@ public class CsvDataSource
                         result.put(i, values);
                     }
 
+                    if (!CVS_COLUMNS_DATA_TYPES.contains(types[i])) {
+                        throw new IllegalStateException("The input data type is not support");
+                    }
                     if (Class.forName(types[i]).equals(String.class)) {
                         values.add(columns[i]);
                     }

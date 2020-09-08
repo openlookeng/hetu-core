@@ -269,6 +269,9 @@ public interface HBaseRowSerializer
     static HBaseRowSerializer getSerializerInstance(String serializerClassName)
     {
         try {
+            if (!SerializerConstants.WHITE_LIST_HBASEROWSERIALIZER_NAME.contains(serializerClassName)) {
+                throw new PrestoException(NOT_FOUND, "Illegal configured serializer class.");
+            }
             return (HBaseRowSerializer) Class.forName(serializerClassName).getConstructor().newInstance();
         }
         catch (ClassNotFoundException

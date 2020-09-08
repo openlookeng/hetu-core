@@ -22,6 +22,8 @@ import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorAccessControl;
 
+import static io.prestosql.plugin.hive.security.SecurityConstants.WHITE_LIST_SQLSTANDARDACCESSCONTROL_IMPL;
+
 public class SqlStandardSecurityModule
         implements Module
 {
@@ -42,6 +44,9 @@ public class SqlStandardSecurityModule
         }
         else {
             try {
+                if (!WHITE_LIST_SQLSTANDARDACCESSCONTROL_IMPL.contains(sqlStandardAccessControlImp)) {
+                    throw new PrestoException(HiveErrorCode.HIVE_FILE_NOT_FOUND, "Found illegal class when binding ConnectorAccessControl.");
+                }
                 log.info("Binding ConnectorAccessControl.class to %s", sqlStandardAccessControlImp);
                 binder.bind(ConnectorAccessControl.class)
                         .to((Class<? extends ConnectorAccessControl>) Class.forName(this.sqlStandardAccessControlImp))

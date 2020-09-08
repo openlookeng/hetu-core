@@ -33,6 +33,8 @@ import io.prestosql.spi.procedure.Procedure;
 
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
 import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.prestosql.plugin.hive.metastore.thrift.ThriftConstants.WHITE_LIST_FOR_METASTORECLIENTFACTORY_CLASS;
+import static io.prestosql.plugin.hive.metastore.thrift.ThriftConstants.WHITE_LIST_FOR_THRIFTMETASTORE_CLASS;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public class ThriftMetastoreModule
@@ -52,6 +54,9 @@ public class ThriftMetastoreModule
                 binder.bind(MetastoreClientFactory.class).to(ThriftMetastoreClientFactory.class).in(Scopes.SINGLETON);
             }
             else {
+                if (!WHITE_LIST_FOR_METASTORECLIENTFACTORY_CLASS.contains(config.getMetastoreClientFactoryImp().trim())) {
+                    throw new PrestoException(HiveErrorCode.HIVE_FILE_NOT_FOUND, "Found illegal class when binding MetastoreClientFactory.");
+                }
                 log.info("Binding MetastoreClientFactory.class to %s", config.getMetastoreClientFactoryImp().trim());
                 binder.bind(MetastoreClientFactory.class)
                         .to((Class<? extends MetastoreClientFactory>) Class.forName(config.getMetastoreClientFactoryImp().trim()))
@@ -67,6 +72,9 @@ public class ThriftMetastoreModule
                 binder.bind(ThriftMetastore.class).to(ThriftHiveMetastore.class).in(Scopes.SINGLETON);
             }
             else {
+                if (!WHITE_LIST_FOR_THRIFTMETASTORE_CLASS.contains(config.getThriftMetastoreImp().trim())) {
+                    throw new PrestoException(HiveErrorCode.HIVE_FILE_NOT_FOUND, "Found illegal class when binding ThriftMetastore.");
+                }
                 log.info("Binding ThriftMetastore.class to %s", config.getThriftMetastoreImp().trim());
                 binder.bind(ThriftMetastore.class)
                         .to((Class<? extends ThriftMetastore>) Class.forName(config.getThriftMetastoreImp().trim()))
