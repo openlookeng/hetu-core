@@ -2082,7 +2082,7 @@ public class HiveMetadata
         }
 
         if (isSuitableToPush
-                    && partitionResult.getCompactEffectivePredicate().equals(newEffectivePredicate)
+                    && partitionResult.getEnforcedConstraint().equals(newEffectivePredicate)
                     && newEffectivePredicates.size() == 0) {
             isSuitableToPush = false;
         }
