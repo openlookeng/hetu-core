@@ -59,6 +59,7 @@ import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextInputFormat;
+import org.apache.hive.common.util.Ref;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -457,14 +458,31 @@ public class BackgroundHiveSplitLoader
             AcidUtils.Directory directory = hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () -> {
                 ValidWriteIdList writeIdList = validWriteIds.orElseThrow(() -> new IllegalStateException("No validWriteIds present"));
                 if (isVacuum) {
-                    writeIdList = new ValidCompactorWriteIdList(writeIdList.writeToString());
+                    writeIdList = new ValidCompactorWriteIdList(writeIdList.writeToString()) {
+                        @Override
+                        public RangeResponse isWriteIdRangeValid(long minWriteId, long maxWriteId)
+                        {
+                            //For unknown reasons.. ValidCompactorWriteIdList#isWriteIdRangeValid() doesnot
+                            // check for aborted transactions and AcidUtils.getAcidState() adds aborted transaction to both aborted and working lists.
+                            //Avoid this by overriding.
+                            RangeResponse writeIdRangeValid = super.isWriteIdRangeValid(minWriteId, maxWriteId);
+                            if (writeIdRangeValid == RangeResponse.NONE) {
+                                return RangeResponse.NONE;
+                            }
+                            else if (super.isWriteIdRangeAborted(minWriteId, maxWriteId) == RangeResponse.ALL) {
+                                return RangeResponse.NONE;
+                            }
+                            return writeIdRangeValid;
+                        }
+                    };
                 }
                 return AcidUtils.getAcidState(
                         path,
                         configuration,
                         writeIdList,
-                        false,
-                        true);
+                        Ref.from(false),
+                        true,
+                        table.getParameters());
             });
 
             if (AcidUtils.isFullAcidTable(table.getParameters())) {
@@ -550,7 +568,6 @@ public class BackgroundHiveSplitLoader
             if (isVacuum && !readPaths.isEmpty()) {
                 Object vacuumHandle = queryInfo.get("vacuumHandle");
                 if (vacuumHandle != null && vacuumHandle instanceof HiveVacuumTableHandle) {
-                    requireNonNull(vacuumHandle, "VacuumHandle should not be null");
                     HiveVacuumTableHandle hiveVacuumTableHandle = (HiveVacuumTableHandle) vacuumHandle;
                     hiveVacuumTableHandle.addRange(new Range(min, max));
                 }

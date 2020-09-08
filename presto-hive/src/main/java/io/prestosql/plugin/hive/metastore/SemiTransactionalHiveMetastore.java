@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.concurrent.MoreFutures;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
@@ -64,10 +65,10 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -811,7 +812,7 @@ public class SemiTransactionalHiveMetastore
         setShared();
         isVacuumIncluded |= isVacuum;
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
-        Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(schemaTableName, k -> new HashMap<>());
+        Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(schemaTableName, k -> new LinkedHashMap<>());
         Action<PartitionAndMore> oldPartitionAction = partitionActionsOfTable.get(partitionValues);
         if (oldPartitionAction == null) {
             Partition partition = delegate.getPartition(databaseName, tableName, partitionValues)
@@ -1991,7 +1992,7 @@ public class SemiTransactionalHiveMetastore
             Path targetPath,
             List<String> fileNames,
             List<DirectoryCleanUpTask> cleanUpTasksForAbort,
-            boolean isFileLevelRename)
+            boolean useDirectExecutor)
     {
         FileSystem fileSystem;
         try {
@@ -2004,6 +2005,9 @@ public class SemiTransactionalHiveMetastore
         //Remove duplicates
         fileNames = fileNames.stream().distinct().collect(Collectors.toList());
 
+        //In case of concurrent vacuums on same partitioned table,
+        // different partitions must be renamed in same sequence to avoid conflicts. So rename synchronously
+        Executor renameExecutor = (useDirectExecutor) ? MoreExecutors.directExecutor() : executor;
         for (String fileName : fileNames) {
             Path source = new Path(currentPath, fileName);
             Path target = new Path(targetPath, fileName);
@@ -2012,33 +2016,21 @@ public class SemiTransactionalHiveMetastore
                     return;
                 }
                 try {
-                    List<Path> toRename = ImmutableList.of(source);
-                    boolean isFileRename = false;
-                    if (isFileLevelRename) {
-                        FileStatus sourceStat = fileSystem.getFileStatus(source);
-                        if (sourceStat.isDirectory()) {
-                            toRename = Arrays.stream(fileSystem.listStatus(source)).map(stat -> stat.getPath()).collect(Collectors.toList());
-                            isFileRename = true;
-                        }
+                    if (fileSystem.exists(target)) {
+                        throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target));
                     }
-                    for (Path file : toRename) {
-                        Path destFilePath = new Path(targetPath, ((isFileRename) ? fileName + "/" : "") + file.getName());
-                        if (fileSystem.exists(destFilePath)) {
-                            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", file, destFilePath));
-                        }
-                        if (!fileSystem.exists(destFilePath.getParent())) {
-                            fileSystem.mkdirs(destFilePath.getParent());
-                        }
-                        if (!fileSystem.rename(file, destFilePath)) {
-                            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", file, destFilePath));
-                        }
+                    if (!fileSystem.exists(target.getParent())) {
+                        fileSystem.mkdirs(target.getParent());
+                    }
+                    if (!fileSystem.rename(source, target)) {
+                        throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target));
                     }
                     cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
                 }
                 catch (IOException e) {
                     throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target), e);
                 }
-            }, executor));
+            }, renameExecutor));
         }
     }
 
