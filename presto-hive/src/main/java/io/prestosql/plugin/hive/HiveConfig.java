@@ -1712,6 +1712,7 @@ public class HiveConfig
     }
 
     @Config("hive.auto-vacuum-enabled")
+    @ConfigDescription("Enable auto-vacuum on Hive tables")
     public HiveConfig setAutoVacuumEnabled(boolean autoVacuumEnabled)
     {
         this.autoVacuumEnabled = autoVacuumEnabled;

@@ -72,6 +72,7 @@ The properties that apply to Carbondata connector security are listed in the [Ca
 | `hive.hdfs.presto.principal`              | The Kerberos principal that openLooKeng will use when connecting to HDFS. |                                                 |
 | `hive.hdfs.presto.keytab`                 | HDFS client keytab location.                                 |                                                 |
 | `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.md#table-statistics) for details. | `true`                                          |
+| `carbondata.vacuum-service-threads`       | Specifies number of threads for Auto-cleanup. Min value is 1. | 2                                               |
 
 ## Hive Thrift Metastore Configuration Properties
 
@@ -102,6 +103,11 @@ When writing data, the Carbondata connector always collects basic statistics (`n
 | `CHAR `done      | Y          | Y                     | N       |
 | `VARBINARY` done | Y          | N                     | N       |
 | `BOOLEAN` done   | Y          | Y                     | N       |
+
+## Auto-cleanup:
+
+After the vacuum operation is completed on carbon tables, there will be unused base/stale folders & files (Ex: Segment folders, .segment and .lock  files) which are left in HDFS. So Carbondata Auto cleanup is used to cleanup those files automatically.
+Segment folders and .segment files are deleted at the time of insert, update, delete and vacuum  after 60min (.lock files after 48 hours) of vacuum operation is completed.    
 
 ## Examples
 
