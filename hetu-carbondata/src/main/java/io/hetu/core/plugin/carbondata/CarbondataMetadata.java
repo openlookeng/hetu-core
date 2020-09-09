@@ -14,6 +14,7 @@
 
 package io.hetu.core.plugin.carbondata;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -146,6 +147,9 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -214,6 +218,9 @@ public class CarbondataMetadata
     private List<Segment> segmentFilesToBeUpdatedLatest = new ArrayList<>();
     private List<List<LoadMetadataDetails>> segmentsMerged = new ArrayList<>();
     private List<CarbondataAutoCleaner> autoCleanerTasks = new ArrayList<>();
+
+    private static boolean enableTracingCleanupTask;
+    private static ConcurrentSkipListSet<Future<?>> queuedTasks = new ConcurrentSkipListSet<>();
 
     private enum State {
         INSERT,
@@ -1613,7 +1620,39 @@ public class CarbondataMetadata
     public void submitCleanupTasks()
     {
         if (autoCleanerTasks.size() > 0) {
-            autoCleanerTasks.forEach(c -> c.submitCarbondataAutoCleanupTask(vacuumExecutorService));
+            if (enableTracingCleanupTask) {
+                queuedTasks.addAll(autoCleanerTasks
+                        .stream()
+                        .map(act -> act.submitCarbondataAutoCleanupTask(vacuumExecutorService))
+                        .collect(Collectors.toList()));
+            }
+            else {
+                autoCleanerTasks.forEach(c -> c.submitCarbondataAutoCleanupTask(vacuumExecutorService));
+            }
         }
+    }
+
+    @VisibleForTesting
+    public static void enableTracingCleanupTask(boolean isEnabled)
+    {
+        enableTracingCleanupTask = isEnabled;
+    }
+
+    @VisibleForTesting
+    public static void waitForSubmittedTasksFinish()
+    {
+        queuedTasks.stream().forEach(f -> {
+            try {
+                f.get();
+            }
+            catch (InterruptedException e) {
+                LOG.debug("Interrupted to get the result of autoCleanup : " + e);
+            }
+            catch (ExecutionException e) {
+                LOG.debug("Exception to get the result of autoCleanup : " + e);
+            }
+        });
+        queuedTasks.clear();
+        LOG.info("All autocleanup tasks finished");
     }
 }
