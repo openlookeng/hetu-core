@@ -121,7 +121,7 @@ public class DataCenterConnectorManager
      * @param catalogName catalog name.
      * @return true if it is a Data Center catalog, else return false.
      */
-    public synchronized boolean isDCCatalog(String catalogName)
+    public boolean isDCCatalog(String catalogName)
     {
         return catalogConnectorStore.hasDCCatalogName(catalogName);
     }
@@ -146,36 +146,41 @@ public class DataCenterConnectorManager
      *
      * @param qualifiedCatalogName the dc sub catalog name, like dataCenter.hive
      */
-    public synchronized void loadDCCatalog(String qualifiedCatalogName)
+    public void loadDCCatalog(String qualifiedCatalogName)
     {
         if (!qualifiedCatalogName.contains(".")) {
             return;
         }
+        boolean needUpdateConnectionIds = false;
+        synchronized (this) {
+            String catalogName = qualifiedCatalogName.substring(0, qualifiedCatalogName.indexOf("."));
+            if (catalogConnectorStore.hasDCCatalogName(catalogName)
+                    && requireCatalogUpdate(catalogName)) {
+                checkState(!connectorManager.getStopped().get(), "ConnectorManager is stopped");
 
-        String catalogName = qualifiedCatalogName.substring(0, qualifiedCatalogName.indexOf("."));
-        if (catalogConnectorStore.hasDCCatalogName(catalogName)
-                && requireCatalogUpdate(catalogName)) {
-            checkState(!connectorManager.getStopped().get(), "ConnectorManager is stopped");
+                // get catalogs from remote data center.
+                Connector catalogConnector = catalogConnectorStore.getCatalogConnector(catalogName);
+                Map<String, String> properties = catalogConnectorStore.getCatalogProperties(catalogName);
+                Collection<String> remoteSubCatalogNames = catalogConnector.getCatalogs(properties.get(CONNECTION_USER), properties);
 
-            // get catalogs from remote data center.
-            Connector catalogConnector = catalogConnectorStore.getCatalogConnector(catalogName);
-            Map<String, String> properties = catalogConnectorStore.getCatalogProperties(catalogName);
-            Collection<String> remoteSubCatalogNames = catalogConnector.getCatalogs(properties.get(CONNECTION_USER), properties);
-
-            // check whether the catalog is in the remote data center.
-            String subCatalogName = qualifiedCatalogName.substring(qualifiedCatalogName.indexOf(".") + 1);
-            if (remoteSubCatalogNames.contains(subCatalogName)) {
-                // The catalog has not been loaded on the node.
-                if (!catalogConnectorStore.containsSubCatalog(catalogName, subCatalogName)) {
-                    addSubCatalog(catalogName, subCatalogName, properties);
-                    connectorManager.updateConnectorIds();
+                // check whether the catalog is in the remote data center.
+                String subCatalogName = qualifiedCatalogName.substring(qualifiedCatalogName.indexOf(".") + 1);
+                if (remoteSubCatalogNames.contains(subCatalogName)) {
+                    // The catalog has not been loaded on the node.
+                    if (!catalogConnectorStore.containsSubCatalog(catalogName, subCatalogName)) {
+                        addSubCatalog(catalogName, subCatalogName, properties);
+                        needUpdateConnectionIds = true;
+                    }
+                }
+                else {
+                    // The catalog does not exist on the remote end. Delete it.
+                    deleteSubCatalog(catalogName, subCatalogName);
+                    needUpdateConnectionIds = true;
                 }
             }
-            else {
-                // The catalog does not exist on the remote end. Delete it.
-                deleteSubCatalog(catalogName, subCatalogName);
-                connectorManager.updateConnectorIds();
-            }
+        }
+        if (needUpdateConnectionIds) {
+            connectorManager.updateConnectorIds();
         }
     }
 
@@ -183,41 +188,43 @@ public class DataCenterConnectorManager
      * Hetu DC requires the method to load all the DC subcatalog. The method is called
      * while execution of 'show catalogs' query
      */
-    public synchronized void loadAllDCCatalogs()
+    public void loadAllDCCatalogs()
     {
-        boolean updated = false;
-        List<String> dataCenterNames = catalogConnectorStore.getDataCenterNames();
-        for (String dataCenterName : dataCenterNames) {
-            try {
-                Connector catalogConnector = catalogConnectorStore.getCatalogConnector(dataCenterName);
-                Map<String, String> properties = catalogConnectorStore.getCatalogProperties(dataCenterName);
-                Set<String> remoteSubCatalogs = Sets.newHashSet(catalogConnector.getCatalogs(properties.get(CONNECTION_USER), properties));
-                // availableCatalogs is the List of all dc sub catalogs stored in Hetu
-                Set<String> availableCatalogs = catalogConnectorStore.getSubCatalogs(dataCenterName);
+        boolean needUpdateConnectionIds = false;
+        synchronized (this) {
+            List<String> dataCenterNames = catalogConnectorStore.getDataCenterNames();
+            for (String dataCenterName : dataCenterNames) {
+                try {
+                    Connector catalogConnector = catalogConnectorStore.getCatalogConnector(dataCenterName);
+                    Map<String, String> properties = catalogConnectorStore.getCatalogProperties(dataCenterName);
+                    Set<String> remoteSubCatalogs = Sets.newHashSet(catalogConnector.getCatalogs(properties.get(CONNECTION_USER), properties));
+                    // availableCatalogs is the List of all dc sub catalogs stored in Hetu
+                    Set<String> availableCatalogs = catalogConnectorStore.getSubCatalogs(dataCenterName);
 
-                // This loop traverses through each remote sub catalog and add the remote sub catalogs
-                // which is not available in Hetu
-                for (String subCatalog : remoteSubCatalogs) {
-                    if (!catalogConnectorStore.containsSubCatalog(dataCenterName, subCatalog)) {
-                        addSubCatalog(dataCenterName, subCatalog, properties);
-                        updated = true;
+                    // This loop traverses through each remote sub catalog and add the remote sub catalogs
+                    // which is not available in Hetu
+                    for (String subCatalog : remoteSubCatalogs) {
+                        if (!catalogConnectorStore.containsSubCatalog(dataCenterName, subCatalog)) {
+                            addSubCatalog(dataCenterName, subCatalog, properties);
+                            needUpdateConnectionIds = true;
+                        }
+                    }
+
+                    // This loop traverses through each available catalog and deletes the sub catalog which
+                    // is not available in remote Hetu dc
+                    for (String availableCatalog : availableCatalogs) {
+                        if (!remoteSubCatalogs.contains(availableCatalog)) {
+                            deleteSubCatalog(dataCenterName, availableCatalog);
+                            needUpdateConnectionIds = true;
+                        }
                     }
                 }
-
-                // This loop traverses through each available catalog and deletes the sub catalog which
-                // is not available in remote Hetu dc
-                for (String availableCatalog : availableCatalogs) {
-                    if (!remoteSubCatalogs.contains(availableCatalog)) {
-                        deleteSubCatalog(dataCenterName, availableCatalog);
-                        updated = true;
-                    }
+                catch (PrestoTransportException ignore) {
+                    log.warn(ignore, "Load the catalogs of data center %s failed.", dataCenterName);
                 }
-            }
-            catch (PrestoTransportException ignore) {
-                log.warn(ignore, "Load the catalogs of data center %s failed.", dataCenterName);
             }
         }
-        if (updated) {
+        if (needUpdateConnectionIds) {
             connectorManager.updateConnectorIds();
         }
     }
