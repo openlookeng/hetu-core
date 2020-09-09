@@ -17,6 +17,8 @@ package io.hetu.core.plugin.carbondata;
 
 public class CarbondataConstants
 {
+    public static final String SegmentNoRowCountMapping = "hetu.carbondata.states.segmentNoRowCountMapping";
+    public static final String CarbonTable = "hetu.carbondata.states.carbonTable";
     public static final String EncodedLoadModel = "hetu.carbondata.states.encodedLoadModel";
     public static final String NewSegmentId = "hetu.carbondata.states.newSegmentId";
     public static final String TxnBeginTimeStamp = "hetu.carbondata.states.transactionbegintimestamp";

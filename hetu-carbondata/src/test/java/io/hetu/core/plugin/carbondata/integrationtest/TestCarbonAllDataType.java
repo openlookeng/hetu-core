@@ -15,6 +15,7 @@
 
 package io.hetu.core.plugin.carbondata.integrationtest;
 
+import com.google.gson.Gson;
 import io.hetu.core.plugin.carbondata.CarbondataMetadata;
 import io.hetu.core.plugin.carbondata.server.HetuTestServer;
 import io.prestosql.hive.$internal.au.com.bytecode.opencsv.CSVReader;
@@ -29,6 +30,7 @@ import org.apache.carbondata.core.metadata.converter.SchemaConverter;
 import org.apache.carbondata.core.metadata.converter.ThriftWrapperSchemaConverterImpl;
 import org.apache.carbondata.core.metadata.schema.SchemaReader;
 import org.apache.carbondata.core.metadata.schema.table.TableInfo;
+import org.apache.carbondata.core.mutate.SegmentUpdateDetails;
 import org.apache.carbondata.core.reader.ThriftReader;
 import org.apache.carbondata.core.statusmanager.LoadMetadataDetails;
 import org.apache.carbondata.core.statusmanager.SegmentStatusManager;
@@ -44,6 +46,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -57,6 +60,7 @@ import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +69,7 @@ import java.util.TreeMap;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertFalse;
 
 @Test(singleThreaded = true)
 public class TestCarbonAllDataType
@@ -814,6 +819,69 @@ public class TestCarbonAllDataType
         catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void testSegmentDelete() throws SQLException {
+        hetuServer.execute("CREATE TABLE testdb.segmentdelete(a int, b tinyint)");
+        hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (10, tinyint '1'),(11, tinyint '2'),(12, tinyint '3')");
+        hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (13, tinyint '1'),(14, tinyint '2'),(15, tinyint '3')");
+        hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (16, tinyint '1'),(17, tinyint '2'),(18, tinyint '3')");
+        hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (19, tinyint '1'),(20, tinyint '2'),(21, tinyint '3')");
+        hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (22, tinyint '1'),(23, tinyint '2'),(24, tinyint '3')");
+        hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (25, tinyint '1'),(26, tinyint '2'),(27, tinyint '3')");
+
+        // Check if marked for delete  if a single row is deleted
+        hetuServer.execute("DELETE FROM testdb.segmentdelete WHERE a = 10");
+        assertFalse(checkStatusFileForDeleteMarked("segmentdelete", 0, 0));
+
+        // Check if marked for delete if whole segment is deleted
+        hetuServer.execute("DELETE FROM testdb.segmentdelete WHERE a < 16");
+        assertTrue(checkStatusFileForDeleteMarked("segmentdelete", 1, 1));
+
+        // Check if marked for delete if rows of multiple segments are deleted
+        hetuServer.execute("DELETE FROM testdb.segmentdelete WHERE a < 21");
+        assertTrue(checkStatusFileForDeleteMarked("segmentdelete", 2, 2));
+        assertFalse(checkStatusFileForDeleteMarked("segmentdelete", 2, 3));
+
+        // Check if marked for delete after an update
+        hetuServer.execute("UPDATE testdb.segmentdelete SET a=27 WHERE a = 22");
+        assertFalse(checkStatusFileForDeleteMarked("segmentdelete", 3, 3));
+
+        // Check if marked for delete after a delete after another delete and update
+        hetuServer.execute("DELETE FROM testdb.segmentdelete WHERE a = 25");
+        assertFalse(checkStatusFileForDeleteMarked("segmentdelete", 4, 4));
+        hetuServer.execute("UPDATE testdb.segmentdelete SET a=28 WHERE a = 26");
+        assertFalse(checkStatusFileForDeleteMarked("segmentdelete", 5, 4));
+        hetuServer.execute("DELETE FROM testdb.segmentdelete WHERE a < 29");
+        assertTrue(checkStatusFileForDeleteMarked("segmentdelete", 6, 4));
+
+        hetuServer.execute("drop table if exists testdb.segmentdelete");
+    }
+
+    /*
+        Returns true if "Marked for Delete" is present in both tableupdatestatus and tablestatus file
+    */
+    private boolean checkStatusFileForDeleteMarked(String tableName, int updateNumber, int segmentNumber) throws SQLException {
+        try {
+            File dir = new File(storePath + "/carbon.store/testdb/" + tableName + "/Metadata");
+            File[] tableUpdateStatusFiles = dir.listFiles((d, name) -> name.startsWith("tableupdatestatus"));
+            Arrays.sort(tableUpdateStatusFiles);
+            Gson gson = new Gson();
+            BufferedReader reader = new BufferedReader(new FileReader(tableUpdateStatusFiles[updateNumber]));
+            SegmentUpdateDetails[] segmentUpdateDetails = gson.fromJson(reader, SegmentUpdateDetails[].class);
+            File tableStatusFile = new File(dir.getAbsolutePath() + "/tablestatus");
+            reader = new BufferedReader(new FileReader(tableStatusFile));
+            LoadMetadataDetails loadMetadataDetails = gson.fromJson(reader, LoadMetadataDetails[].class)[segmentNumber];
+            if ((segmentUpdateDetails[0].getSegmentStatus() != null && segmentUpdateDetails[0].getSegmentStatus().toString().equals("Marked for Delete")) &&
+                    loadMetadataDetails.getSegmentStatus().toString().equals("Marked for Delete")) {
+                return true;
+            }
+        } catch (IOException e) {
+            hetuServer.execute("drop table if exists testdb." + tableName);
+            Assert.fail("Failed to read status files");
+        }
+        return false;
     }
 
     @Test

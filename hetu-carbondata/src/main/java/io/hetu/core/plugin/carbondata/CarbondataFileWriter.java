@@ -27,10 +27,17 @@ import io.prestosql.spi.type.TypeManager;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.index.Segment;
+import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
 import org.apache.carbondata.core.mutate.CarbonUpdateUtil;
 import org.apache.carbondata.core.mutate.DeleteDeltaBlockDetails;
 import org.apache.carbondata.core.mutate.SegmentUpdateDetails;
 import org.apache.carbondata.core.mutate.TupleIdEnum;
+import org.apache.carbondata.core.mutate.data.RowCountDetailsVO;
+import org.apache.carbondata.core.statusmanager.LoadMetadataDetails;
+import org.apache.carbondata.core.statusmanager.SegmentStatus;
+import org.apache.carbondata.core.statusmanager.SegmentStatusManager;
+import org.apache.carbondata.core.statusmanager.SegmentUpdateStatusManager;
+import org.apache.carbondata.core.util.ObjectSerializationUtil;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
 import org.apache.carbondata.core.writer.CarbonDeleteDeltaWriterImpl;
 import org.apache.carbondata.hadoop.api.CarbonTableOutputFormat;
@@ -63,6 +70,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
@@ -107,6 +115,11 @@ public class CarbondataFileWriter
     private ConcurrentHashMap<String, DeleteDeltaBlockDetails> deleteDeltaDetailsMap = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, SegmentUpdateDetails> segmentUpdateDetailMap = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, FileSinkOperator.RecordWriter> segmentRecordWriterMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, Boolean> deleteSegmentMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, String> deltaPathSegmentMap = new ConcurrentHashMap<>();
+    private Map<String, RowCountDetailsVO> segmentNoRowCountMapping;
+    private CarbonTable carbonTable;
+    private SegmentUpdateStatusManager segmentUpdateStatusManager;
 
     private boolean isInitDone;
     private boolean isCommitDone;
@@ -128,6 +141,21 @@ public class CarbondataFileWriter
         this.txnTimeStamp = configuration.get(CarbondataConstants.TxnBeginTimeStamp,
                 Long.toString(System.currentTimeMillis()));
         this.taskId = taskId.orElseGet(() -> 0);
+
+        try {
+            if (HiveACIDWriteType.isUpdateOrDelete(this.acidWriteType)) {
+                String encodedCarbonTable = configuration.get(CarbondataConstants.CarbonTable);
+                this.carbonTable = (CarbonTable) ObjectSerializationUtil.convertStringToObject(encodedCarbonTable);
+                LoadMetadataDetails[] loadMetadataDetails = SegmentStatusManager.readTableStatusFile(CarbonTablePath.getTableStatusFilePath(carbonTable.getTablePath()));
+                this.segmentUpdateStatusManager = new SegmentUpdateStatusManager(carbonTable, loadMetadataDetails);
+            }
+            if (HiveACIDWriteType.DELETE == this.acidWriteType) {
+                this.segmentNoRowCountMapping = (Map<String, RowCountDetailsVO>) ObjectSerializationUtil.convertStringToObject(configuration.get(CarbondataConstants.SegmentNoRowCountMapping));
+            }
+        }
+        catch (IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while converting string to object", e);
+        }
 
         tablePath = configuration.get("table.write.path");
         String segmentId = configuration.get(CarbondataConstants.NewSegmentId);
@@ -273,6 +301,8 @@ public class CarbondataFileWriter
                 deleteDeltaBlockDetails = deleteDeltaDetailsMap.computeIfAbsent(deltaPath,
                         v -> new DeleteDeltaBlockDetails(blockName));
 
+                deltaPathSegmentMap.put(deltaPath, segmentId);
+
                 segmentUpdateDetails = segmentUpdateDetailMap.computeIfAbsent(segmentBlockId,
                         v -> new SegmentUpdateDetails() {{
                                 setSegmentName(segmentId);
@@ -280,12 +310,13 @@ public class CarbondataFileWriter
                                 setActualBlockName(completeBlockName);
                                 setDeleteDeltaEndTimestamp(txnTimeStamp);
                                 setDeleteDeltaStartTimestamp(txnTimeStamp);
-                                setDeletedRowsInBlock("0");
-                            }});
+                                setDeletedRowsInBlock(segmentUpdateStatusManager.getDetailsForABlock(segmentBlockId) != null ?
+                                        segmentUpdateStatusManager.getDetailsForABlock(segmentBlockId).getDeletedRowsInBlock() : "0");
+                                }});
 
-                /* Note: Need to add the accumulated set of records the block total; and decide if segment can be deleted */
+                Long deletedRows = Long.parseLong(segmentUpdateDetails.getDeletedRowsInBlock()) + 1;
                 segmentUpdateDetails.setDeletedRowsInBlock(
-                        Integer.toString(Integer.parseInt(segmentUpdateDetails.getDeletedRowsInBlock()) + 1));
+                        Long.toString(deletedRows));
 
                 if (!deleteDeltaBlockDetails.addBlocklet(blockletId, rowId, Integer.parseInt(pageId))) {
                     LOG.error("Multiple input rows matched for same row!");
@@ -341,9 +372,25 @@ public class CarbondataFileWriter
     {
         try {
             if (HiveACIDWriteType.isUpdateOrDelete(acidWriteType)) {
+                //   if (HiveACIDWriteType.DELETE == acidWriteType || partitionInfo != null) {              #TODO For partitioned tables
+                if (HiveACIDWriteType.DELETE == acidWriteType) {
+                    for (String segmentBlockId : segmentUpdateDetailMap.keySet()) {
+                        SegmentUpdateDetails segmentUpdateDetails = segmentUpdateDetailMap.get(segmentBlockId);
+                        RowCountDetailsVO rowCountDetailsVO = segmentNoRowCountMapping.get(segmentUpdateDetails.getSegmentName());
+                        Long totalRowsInBlock = rowCountDetailsVO.getTotalNumberOfRows();
+                        Long totalDeletedRowsInBlock = Long.parseLong(segmentUpdateDetails.getDeletedRowsInBlock());
+                        boolean isSegmentDelete = totalRowsInBlock.equals(totalDeletedRowsInBlock);
+                        if (isSegmentDelete) {
+                            deleteSegmentMap.put(segmentUpdateDetails.getSegmentName(), true);
+                            segmentUpdateDetailMap.get(segmentBlockId).setSegmentStatus(SegmentStatus.MARKED_FOR_DELETE);
+                        }
+                    }
+                }
                 deleteDeltaDetailsMap.forEach((k, v) -> {
                     try {
-                        (new CarbonDeleteDeltaWriterImpl(k)).write(v);
+                        if (deleteSegmentMap.get(deltaPathSegmentMap.get(k)) == null) {
+                            (new CarbonDeleteDeltaWriterImpl(k)).write(v);
+                        }
                     }
                     catch (IOException e) {
                         LOG.error("Error while writing the deleteDeltas ", e);
