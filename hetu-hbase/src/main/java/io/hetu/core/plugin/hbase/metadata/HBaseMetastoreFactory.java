@@ -27,8 +27,6 @@ import io.prestosql.spi.metastore.HetuMetastore;
  */
 public class HBaseMetastoreFactory
 {
-    private static final String TYPE_LOCAL = "local";
-    private static final String TYPE_HDFS = "hdfs";
     private static final String TYPE_HETUMETASTORE = "hetuMetastore";
     private final HBaseConfig hbaseConfig;
     private final HetuMetastore hetuMetastore;
@@ -47,13 +45,7 @@ public class HBaseMetastoreFactory
     public HBaseMetastore create()
     {
         String type = hbaseConfig.getMetastoreType();
-        if (type == null || TYPE_LOCAL.equals(type)) {
-            return new LocalHBaseMetastore(hbaseConfig);
-        }
-        else if (TYPE_HDFS.equals(type)) {
-            return new HdfsHBaseMetastore(hbaseConfig);
-        }
-        else if (TYPE_HETUMETASTORE.equals(type)) {
+        if (type == null || TYPE_HETUMETASTORE.equals(type)) {
             return new HetuHBaseMetastore(hetuMetastore);
         }
         else {

@@ -14,11 +14,9 @@
  */
 package io.hetu.core.plugin.hbase.client;
 
-import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.metadata.HBaseTable;
-import io.hetu.core.plugin.hbase.metadata.LocalHBaseMetastore;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
@@ -208,15 +206,6 @@ public class TestUtils
         properties.put("serializer", "StringRowSerializer");
 
         return properties;
-    }
-
-    /**
-     * createHBaseTable
-     */
-    public static Map<String, HBaseTable> createHBaseTable(String file)
-    {
-        LocalHBaseMetastore lHBMetastore = new LocalHBaseMetastore(new HBaseConfig());
-        return loadHBaseTableFromFile(lHBMetastore.readJsonFromFile(file));
     }
 
     /**

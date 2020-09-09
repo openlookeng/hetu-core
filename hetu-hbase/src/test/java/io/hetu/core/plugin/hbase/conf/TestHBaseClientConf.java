@@ -12,13 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.conf;
 
-import io.hetu.core.plugin.hbase.conf.HBaseColumnProperties;
-import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import org.testng.annotations.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 /**
  * TestHBaseClientConf
@@ -47,9 +45,6 @@ public class TestHBaseClientConf
         hcc.setMetastoreType("type");
         assertEquals("type", hcc.getMetastoreType());
 
-        hcc.setMetastoreUrl("file");
-        assertEquals("file", hcc.getMetastoreUrl());
-
         hcc.setKerberos("file");
         assertEquals("file", hcc.getKerberos());
 
@@ -64,12 +59,6 @@ public class TestHBaseClientConf
 
         hcc.setJaasConfPath("/etc/hetu/");
         assertEquals("/etc/hetu/", hcc.getJaasConfPath());
-
-        hcc.setCoreSitePath("/etc/hetu/");
-        assertEquals("/etc/hetu/", hcc.getCoreSitePath());
-
-        hcc.setHdfsSitePath("/etc/hetu/");
-        assertEquals("/etc/hetu/", hcc.getHdfsSitePath());
 
         hcc.setHbaseSitePath("/etc/hetu/");
         assertEquals("/etc/hetu/", hcc.getHbaseSitePath());

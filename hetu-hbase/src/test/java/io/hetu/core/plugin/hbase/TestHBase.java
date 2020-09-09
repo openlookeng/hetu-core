@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase;
 
 import io.hetu.core.plugin.hbase.client.TestUtils;
 import io.hetu.core.plugin.hbase.client.TestingConnectorSession;
@@ -23,7 +23,9 @@ import io.hetu.core.plugin.hbase.connector.HBaseConnectorId;
 import io.hetu.core.plugin.hbase.connector.HBaseConnectorMetadataFactory;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseTransactionHandle;
+import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
 import io.hetu.core.plugin.hbase.metadata.HBaseConnectorMetadata;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
 import io.hetu.core.plugin.hbase.query.HBasePageSinkProvider;
 import io.hetu.core.plugin.hbase.query.HBasePageSourceProvider;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSetProvider;
@@ -80,6 +82,7 @@ public class TestHBase
     private SchemaTableName schemaTableName;
     private ConnectorTableHandle table;
     private HBaseConnector hConnector;
+    private TestingHetuMetastore hetuMetastore;
 
     /**
      * setUp
@@ -89,11 +92,10 @@ public class TestHBase
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        hCConf.setMetastoreUrl("./hbasetablecatalogtmp.ini");
-        TestJsonHBaseTableUtils.preFile(hCConf.getMetastoreUrl());
+        hetuMetastore = new TestingHetuMetastore();
         table = TestUtils.createHBaseTableHandle();
         schemaTableName = new SchemaTableName("hbase", "test_table");
-        hconn = new TestHBaseClientConnection(hCConf);
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         session = new TestingConnectorSession("root");
         hcm = new HBaseConnectorMetadata(hconn);
@@ -105,6 +107,15 @@ public class TestHBase
                         new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn)),
                         Optional.empty(),
                         null);
+    }
+
+    /**
+     * clear
+     */
+    @AfterClass
+    public void clear()
+    {
+        hetuMetastore.close();
     }
 
     /**
@@ -304,7 +315,7 @@ public class TestHBase
     /**
      * testListTables
      */
-    public void testListTables()
+    private void testListTables()
     {
         List<SchemaTableName> tables = hcm.listTables(session, Optional.of("hbase"));
         assertEquals(tables.size(), 1);
@@ -473,14 +484,5 @@ public class TestHBase
 
             cps.abort();
         }
-    }
-
-    /**
-     * clear
-     */
-    @AfterClass
-    public void clear()
-    {
-        TestJsonHBaseTableUtils.delFile(hCConf.getMetastoreUrl());
     }
 }

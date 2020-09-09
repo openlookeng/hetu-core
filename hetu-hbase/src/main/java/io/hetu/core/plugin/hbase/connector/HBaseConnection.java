@@ -104,10 +104,6 @@ public class HBaseConnection
      * Configuration
      */
     protected Configuration cfg;
-    /**
-     * catalogFile
-     */
-    protected String catalogFile;
 
     private UserGroupInformation ugi;
     private HBaseMetastore hBaseMetastore;
@@ -122,6 +118,19 @@ public class HBaseConnection
     {
         this.hbaseConfig = config;
         this.hBaseMetastore = new HBaseMetastoreFactory(config).create();
+        authenticate();
+    }
+
+    /**
+     * constructor for test
+     *
+     * @param hBaseMetastore HBaseMetaStore
+     * @param config HBaseConfig
+     */
+    protected HBaseConnection(HBaseMetastore hBaseMetastore, HBaseConfig config)
+    {
+        this.hbaseConfig = config;
+        this.hBaseMetastore = hBaseMetastore;
         authenticate();
     }
 
@@ -183,7 +192,6 @@ public class HBaseConnection
         cfg.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
 
         try {
-            catalogFile = hbaseConfig.getMetastoreUrl();
             init();
             hBaseMetastore.init();
         }

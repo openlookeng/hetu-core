@@ -12,37 +12,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.metadata;
 
-import io.hetu.core.plugin.hbase.client.TestHBaseConnection;
-import io.hetu.core.plugin.hbase.conf.HBaseConfig;
-import io.hetu.core.plugin.hbase.connector.HBaseConnection;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-
+import java.io.File;
 import java.io.IOException;
 
 /**
- * TestHBaseClientConnection
+ * TestJsonHBaseTableUtils
  *
  * @since 2020-03-20
  */
-public class TestHBaseClientConnection
-        extends HBaseConnection
+public class TestingHBaseTableUtils
 {
-    public TestHBaseClientConnection(HBaseConfig conf)
+    private TestingHBaseTableUtils() {}
+
+    /**
+     * delFile
+     */
+    public static void delFile(String file)
     {
-        super(conf);
+        File pfile = new File(file);
+        pfile.delete();
     }
 
     /**
-     * init
+     * createFile
      */
-    public void init()
-            throws IOException
+    public static void createFile(String filename)
+            throws Exception
     {
-        this.conn = new TestHBaseConnection();
-        if (conn.getAdmin() instanceof HBaseAdmin) {
-            this.hbaseAdmin = (HBaseAdmin) conn.getAdmin();
+        File file = new File(filename);
+        if (!file.exists()) {
+            try {
+                file.createNewFile();
+            }
+            catch (IOException e) {
+                throw new IOException("createFile " + filename + " : failed");
+            }
         }
     }
 }

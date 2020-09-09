@@ -31,11 +31,8 @@ public class HBaseConfig
     private String zkQuorum;
     private String zkClientPort;
     private String metastoreType;
-    private String metastoreUrl;
     private String defaultValue = "NULL";
     private String jaasConfPath; // java.security.auth.login.config: jaas.conf
-    private String coreSitePath; // core-site.xml file path
-    private String hdfsSitePath; // hdfs-site.xml file path
     private String hbaseSitePath; // hbase-site.xml file path
     private String krb5ConfPath; // java.security.krb5.conf: krb5.conf
     private String userKeytabPath; // user.keytab file path
@@ -84,28 +81,6 @@ public class HBaseConfig
     public void setJaasConfPath(String jaasConfPath)
     {
         this.jaasConfPath = jaasConfPath;
-    }
-
-    public String getCoreSitePath()
-    {
-        return coreSitePath;
-    }
-
-    @Config("hbase.core.site.path")
-    public void setCoreSitePath(String coreSitePath)
-    {
-        this.coreSitePath = coreSitePath;
-    }
-
-    public String getHdfsSitePath()
-    {
-        return hdfsSitePath;
-    }
-
-    @Config("hbase.hdfs.site.path")
-    public void setHdfsSitePath(String hdfsSitePath)
-    {
-        this.hdfsSitePath = hdfsSitePath;
     }
 
     public String getHbaseSitePath()
@@ -183,17 +158,6 @@ public class HBaseConfig
     public void setMetastoreType(String metastoreType)
     {
         this.metastoreType = metastoreType;
-    }
-
-    public String getMetastoreUrl()
-    {
-        return metastoreUrl;
-    }
-
-    @Config("hbase.metastore.uri")
-    public void setMetastoreUrl(String metastoreUrl)
-    {
-        this.metastoreUrl = metastoreUrl;
     }
 
     public String getKerberos()

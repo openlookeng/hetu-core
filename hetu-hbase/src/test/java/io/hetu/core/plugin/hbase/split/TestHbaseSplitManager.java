@@ -12,14 +12,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test.split;
+package io.hetu.core.plugin.hbase.split;
 
 import io.hetu.core.plugin.hbase.client.TestUtils;
 import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
-import io.hetu.core.plugin.hbase.split.HBaseSplitManager;
-import io.hetu.core.plugin.hbase.test.TestHBaseClientConnection;
+import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -37,6 +38,7 @@ public class TestHbaseSplitManager
     private HBaseConnection hconn;
     private HBaseConfig hCConf = new HBaseConfig();
     private HBaseSplitManager hsm;
+    private TestingHetuMetastore hetuMetastore;
 
     /**
      * setUp
@@ -46,10 +48,16 @@ public class TestHbaseSplitManager
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        hCConf.setMetastoreUrl("./hbasetablecatalogtmp.ini");
-        hconn = new TestHBaseClientConnection(hCConf);
+        hetuMetastore = new TestingHetuMetastore();
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         hsm = new HBaseSplitManager(hconn);
+    }
+
+    @AfterClass
+    public void destroy()
+    {
+        hetuMetastore.close();
     }
 
     /**

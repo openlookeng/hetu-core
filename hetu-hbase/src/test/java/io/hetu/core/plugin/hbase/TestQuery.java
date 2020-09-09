@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase;
 
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
@@ -23,6 +23,8 @@ import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
+import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
+import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
 import io.hetu.core.plugin.hbase.query.HBaseGetRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSet;
@@ -67,6 +69,7 @@ public class TestQuery
     private HBaseConfig hCConf = new HBaseConfig();
     private ConnectorSession session;
     private HBaseRecordSet recordSet;
+    private TestingHetuMetastore hetuMetastore;
     private HBaseSplit split;
 
     /**
@@ -77,9 +80,8 @@ public class TestQuery
     {
         hCConf.setZkClientPort("2181");
         hCConf.setZkQuorum("zk1");
-        hCConf.setMetastoreUrl("./hbasetablecatalogtmp.ini");
-        TestJsonHBaseTableUtils.preFile(hCConf.getMetastoreUrl());
-        hconn = new TestHBaseClientConnection(hCConf);
+        hetuMetastore = new TestingHetuMetastore();
+        hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
         hconn.getConn();
         session = new TestingConnectorSession("root");
         split =
@@ -95,6 +97,15 @@ public class TestQuery
         recordSet =
                 new HBaseRecordSet(
                         hconn, session, split, TestUtils.createHBaseTableHandle(), TestUtils.createColumnList());
+    }
+
+    /**
+     * clear
+     */
+    @AfterClass
+    public void clear()
+    {
+        hetuMetastore.close();
     }
 
     /**
@@ -240,7 +251,6 @@ public class TestQuery
      */
     @Test
     public void testHBaseRecordCursor()
-            throws Exception
     {
         List<HBaseColumnHandle> columnHandles = new ArrayList<>();
         columnHandles.add(TestUtils.createHBaseColumnRowId("rowkey"));
@@ -330,14 +340,5 @@ public class TestQuery
 
         // Check read data
         assertEquals("nick_name_1 12 2019-06-11 20", serializer.getColumnValues().get("rowkey"));
-    }
-
-    /**
-     * clear
-     */
-    @AfterClass
-    public void clear()
-    {
-        TestJsonHBaseTableUtils.delFile(hCConf.getMetastoreUrl());
     }
 }

@@ -12,17 +12,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test;
+package io.hetu.core.plugin.hbase.metadata;
 
 import io.hetu.core.plugin.hbase.client.TestUtils;
-import io.hetu.core.plugin.hbase.metadata.HBaseTable;
 import io.prestosql.spi.connector.SchemaTableName;
 import org.codehaus.jettison.json.JSONException;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 /**
  * TestHBaseTable

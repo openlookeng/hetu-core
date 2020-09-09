@@ -12,10 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.hbase.test.split;
+package io.hetu.core.plugin.hbase.split;
 
 import io.hetu.core.plugin.hbase.client.TestUtils;
-import io.hetu.core.plugin.hbase.split.HBaseSplit;
 import io.prestosql.spi.HostAddress;
 import org.testng.annotations.Test;
 
