@@ -64,7 +64,7 @@ By design, the script will check if there are existing configuration under direc
 
 If this file is missing, the install script will ask user to input the nodes information.
 
-Optionally, you can add user `openlkadmin` and create a file `/home/openlkadmin/.openlkconf/cluster_node_info`. 
+Optionally, you can add user `openlkadmin` and create a file `/home/openlkadmin/.openlkconf/cluster_node_info`.
 
 In the `cluster_node_info`,  you should list appropriate values for your cluster.
 
@@ -95,7 +95,7 @@ Execute below command to start openLooKeng Command Line client.:
 
 
 
-**Tips:** 
+**Tips:**
 
 If you are going to deploy openLooKeng on a big cluster with lots of nodes, instead of inputting the nodes' IP address one by one. It is better to prepare a file containing all nodes' IP address then pass this file as parameter to the installation script. Here is the command:
 
@@ -111,7 +111,7 @@ bash <(wget -qO- https://download.openlookeng.io/install.sh) --file <cluster_nod
 For more help message,execute below command to deploy single node cluster:
 ```shell
 bash <(wget -qO- https://download.openlookeng.io/install.sh) -h
-```   
+```
 or:
 ```shell
 bash <(wget -qO- https://download.openlookeng.io/install.sh) --help
@@ -150,7 +150,7 @@ execute below command to deploy the configurations to openLooKeng cluster:
 bash /opt/openlookeng/bin/configuration_deploy.sh
 ```
 
-Note, if you want to add more configrations or customize the configurations, you can add properties to the templates into file located at `/home/openlkadmin/.openlkadmin/.etc_template/coordinator` or `/home/openlkadmin/.openlkadmin/.etc_template/worker`. 
+Note, if you want to add more configrations or customize the configurations, you can add properties to the templates into file located at `/home/openlkadmin/.openlkadmin/.etc_template/coordinator` or `/home/openlkadmin/.openlkadmin/.etc_template/worker`.
 
 The property format has to be key=\<value\>, where value is wrapped with \'\<\' and \'\>\', which means it it a dynamic value. For example:
 
@@ -182,8 +182,17 @@ bash /opt/openlookeng/bin/uninstall.sh --all
 
 ## Deploying openLooKeng to Cluster offline
 
-If you can't access the download URL from the machine where you want to install openLooKeng, you can download offline tarball and unpack to /opt directory.
-Execute below command to deploy single node cluster:
+If you can't access the download URL from the machine where you want to install openLooKeng, you can download all required files beforehand and install offline.
+
+1. Download `https://download.openlookeng.io/auto-install/openlookeng.tar.gz` and extract its content to `/opt`.
+
+1. Create folder `/opt/openlookeng/resource` and save openLooKeng binary files under it: `https://download.openlookeng.io/010/hetu-server-010.tar.gz` and `https://download.openlookeng.io/010/hetu-cli-010-executable.jar`.
+
+1. Also save third party dependencies under `/opt/openlookeng/resource`. That is, download all files from either `https://download.openlookeng.io/auto-install/third-resource/x86/` or `https://download.openlookeng.io/auto-install/third-resource/aarch64/`, depending on the machine's architecture. This should include 1 `OpenJDK` file and 2 `sshpass` files.
+
+1. If you plan to perform multi-node installation, and some nodes in the cluster have a different architecture type from the current machine, then also download the `OpenJDK` file for the other architecture, and save it under `/opt/openlookeng/resource/<arch>`, where `<arch>` is either `x86` or `aarch64`, corresponding to the other architecture.
+
+After all resources are available, execute below command to deploy single node cluster:
 
 ```shell
 bash /opt/openlookeng/bin/install_offline.sh
@@ -206,7 +215,7 @@ execute the below command to get help on all available options:
 bash /opt/openlookeng/bin/install_offline.sh --help
 ```
 
-## Adding Node to Cluster 
+## Adding Node to Cluster
 
 If you want to add node to make the cluster bigger,execute the below command:
 
@@ -231,7 +240,7 @@ bash /opt/openlookeng/bin/add_cluster_node.sh --file <add_nodes_file_path>
 
 If there are multiple nodes, separated by commas(,).
 
-## Removing Node to Cluster 
+## Removing Node to Cluster
 
 If you want to remove node to make the cluster smaller,execute the below command:
 
