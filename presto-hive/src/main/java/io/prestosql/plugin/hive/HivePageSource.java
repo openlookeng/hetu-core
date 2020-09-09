@@ -481,4 +481,10 @@ public class HivePageSource
             return ids;
         }
     }
+
+    @Override
+    public boolean needMergingForPages()
+    {
+        return isSelectiveRead;
+    }
 }

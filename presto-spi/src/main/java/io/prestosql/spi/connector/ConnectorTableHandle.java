@@ -89,6 +89,11 @@ public interface ConnectorTableHandle
         return false;
     }
 
+    default boolean isSuitableForPushdown()
+    {
+        return false;
+    }
+
     default boolean hasAdditionalFiltersPushdown()
     {
         return false;

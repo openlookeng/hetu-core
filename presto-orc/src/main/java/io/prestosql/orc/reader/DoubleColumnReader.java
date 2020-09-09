@@ -232,6 +232,10 @@ public class DoubleColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Long value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testDouble(Double.longBitsToDouble(value));
     }
 }

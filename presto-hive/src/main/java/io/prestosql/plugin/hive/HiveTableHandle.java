@@ -345,4 +345,10 @@ public class HiveTableHandle
     {
         return AcidUtils.isTransactionalTable(getTableParameters().get()) && !AcidUtils.isInsertOnlyTable(getTableParameters().get());
     }
+
+    @Override
+    public boolean isSuitableForPushdown()
+    {
+        return this.suitableToPush;
+    }
 }

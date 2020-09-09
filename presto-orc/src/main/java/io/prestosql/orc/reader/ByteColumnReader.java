@@ -230,6 +230,10 @@ public class ByteColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Byte value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testLong(value);
     }
 }
