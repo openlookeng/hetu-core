@@ -17,6 +17,7 @@ package io.prestosql.sql.planner;
 import com.google.common.base.Strings;
 import com.google.common.base.VerifyException;
 import com.google.common.io.Resources;
+import io.prestosql.plugin.hive.HiveTableHandle;
 import io.prestosql.plugin.tpcds.TpcdsTableHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
@@ -54,9 +55,12 @@ import static org.testng.Assert.assertEquals;
 public abstract class AbstractCostBasedPlanTest
         extends BasePlanTest
 {
-    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier)
+    private final boolean pushdown;
+
+    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown)
     {
         super(supplier);
+        this.pushdown = pushdown;
     }
 
     protected abstract Stream<String> getQueryResourcePaths();
@@ -76,7 +80,11 @@ public abstract class AbstractCostBasedPlanTest
 
     private String getQueryPlanResourcePath(String queryResourcePath)
     {
-        return queryResourcePath.replaceAll("\\.sql$", ".plan.txt");
+        String fileName = ".plan.txt";
+        if (pushdown) {
+            fileName = ".push" + fileName;
+        }
+        return queryResourcePath.replaceAll("\\.sql$", fileName);
     }
 
     protected void generate()
@@ -211,6 +219,10 @@ public abstract class AbstractCostBasedPlanTest
             }
             else if (connectorTableHandle instanceof TpchTableHandle) {
                 output(indent, "scan %s", ((TpchTableHandle) connectorTableHandle).getTableName());
+            }
+            else if (connectorTableHandle instanceof HiveTableHandle) {
+                output(indent, "scan %s%s", ((HiveTableHandle) connectorTableHandle).getTableName(),
+                        ((HiveTableHandle) connectorTableHandle).isSuitableToPush() ? " (pushdown = true)" : "");
             }
             else {
                 throw new IllegalStateException(format("Unexpected ConnectorTableHandle: %s", connectorTableHandle.getClass()));

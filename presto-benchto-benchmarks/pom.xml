@@ -58,6 +58,21 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-hive</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.prestosql.hadoop</groupId>
+            <artifactId>hadoop-apache</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.prestosql.hive</groupId>
+            <artifactId>hive-apache</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
