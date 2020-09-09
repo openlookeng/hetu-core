@@ -135,12 +135,13 @@ public class TestHiveConfig
                 .setDynamicFilterPartitionFilteringEnabled(false)
                 .setDynamicFilteringRowFilteringThreshold(2000)
                 .setOrcCacheStatsMetricCollectionEnabled(false)
-                .setVacuumCleanupRecheckInterval(new Duration(1, TimeUnit.MINUTES))
+                .setVacuumCleanupRecheckInterval(new Duration(5, TimeUnit.MINUTES))
                 .setVacuumServiceThreads(2)
                 .setVacuumDeltaNumThreshold(10)
                 .setAutoVacuumEnabled(false)
                 .setVacuumDeltaPercentThreshold(0.1)
-                .setOrcPredicatePushdownEnabled(false));
+                .setOrcPredicatePushdownEnabled(false)
+                .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES)));
     }
 
     @Test
@@ -261,6 +262,7 @@ public class TestHiveConfig
                 .put("hive.vacuum-delta-percent-threshold", "0.6")
                 .put("hive.auto-vacuum-enabled", "true")
                 .put("hive.orc-predicate-pushdown-enabled", "true")
+                .put("hive.vacuum-collector-interval", "5s")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -367,7 +369,8 @@ public class TestHiveConfig
                 .setVacuumDeltaNumThreshold(5)
                 .setAutoVacuumEnabled(true)
                 .setVacuumDeltaPercentThreshold(0.6)
-                .setOrcPredicatePushdownEnabled(true);
+                .setOrcPredicatePushdownEnabled(true)
+                .setVacuumCollectorInterval(new Duration(5, TimeUnit.SECONDS));
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

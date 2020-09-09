@@ -41,6 +41,7 @@ import org.joda.time.DateTimeZone;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
@@ -146,7 +147,7 @@ public class CarbondataMetadataFactory
                 typeTranslator,
                 hetuVersion,
                 accessControlMetadataFactory,
-                2, 0.0, false);
+                2, 0.0, false, Optional.of(new Duration(5, TimeUnit.MINUTES)));
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;

@@ -151,6 +151,7 @@ public final class HiveQueryRunner
             Map<String, String> hiveAutoVacuumProperties = ImmutableMap.<String, String>builder()
                     .putAll(hiveProperties)
                     .put("hive.auto-vacuum-enabled", "true")
+                    .put("hive.vacuum-collector-interval", "15s")
                     .build();
             queryRunner.createCatalog(HIVE_AUTO_VACUUM_CATALOG, HIVE_CATALOG, hiveAutoVacuumProperties);
             queryRunner.createCatalog(HIVE_CATALOG, HIVE_CATALOG, hiveProperties);

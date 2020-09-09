@@ -38,6 +38,7 @@ import io.prestosql.plugin.hive.PartitionNotFoundException;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.PartitionUpdate;
 import io.prestosql.plugin.hive.VacuumCleaner;
+import io.prestosql.plugin.hive.VacuumEligibleTableCollector;
 import io.prestosql.plugin.hive.VacuumTableInfoForCleaner;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.PrestoException;
@@ -158,6 +159,8 @@ public class SemiTransactionalHiveMetastore
     //ex: base_000000/base_000000/bucket_00000
     //To avoid this, in case of vacuum rename should happen at file level instead of directory level.
     private boolean isVacuumIncluded;
+
+    private HiveTableHandle tableHandle;
 
     public SemiTransactionalHiveMetastore(
             HdfsEnvironment hdfsEnvironment,
@@ -1008,6 +1011,9 @@ public class SemiTransactionalHiveMetastore
     {
         if (vacuumCleanerTasks.size() > 0) {
             vacuumCleanerTasks.forEach(c -> c.submitVacuumCleanupTask());
+        }
+        if (tableHandle != null) {
+            VacuumEligibleTableCollector.finishVacuum(tableHandle.getSchemaTableName().toString());
         }
     }
 
@@ -3154,5 +3160,10 @@ public class SemiTransactionalHiveMetastore
         }
 
         return delegate.showLocks(rqst);
+    }
+
+    public void setVacuumTableHandle(HiveTableHandle vacuumTableHandle)
+    {
+        this.tableHandle = vacuumTableHandle;
     }
 }

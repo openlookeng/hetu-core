@@ -64,6 +64,7 @@ public class HiveMetadataFactory
     private final int vacuumDeltaNumThreshold;
     private final double vacuumDeltaPercentThreshold;
     private final boolean autoVacuumEnabled;
+    private Optional<Duration> vacuumCollectorInterval;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -108,7 +109,8 @@ public class HiveMetadataFactory
                 accessControlMetadataFactory,
                 hiveConfig.getVacuumDeltaNumThreshold(),
                 hiveConfig.getVacuumDeltaPercentThreshold(),
-                hiveConfig.getAutoVacuumEnabled());
+                hiveConfig.getAutoVacuumEnabled(),
+                hiveConfig.getVacuumCollectorInterval());
     }
 
     public HiveMetadataFactory(
@@ -137,7 +139,8 @@ public class HiveMetadataFactory
             AccessControlMetadataFactory accessControlMetadataFactory,
             int vacuumDeltaNumThreshold,
             double vacuumDeltaPercentThreshold,
-            boolean autoVacuumEnabled)
+            boolean autoVacuumEnabled,
+            Optional<Duration> vacuumCollectorInterval)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
         this.skipDeletionForAlter = skipDeletionForAlter;
@@ -173,6 +176,7 @@ public class HiveMetadataFactory
         this.vacuumDeltaNumThreshold = vacuumDeltaNumThreshold;
         this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
         this.autoVacuumEnabled = autoVacuumEnabled;
+        this.vacuumCollectorInterval = vacuumCollectorInterval;
     }
 
     @Override
@@ -208,6 +212,7 @@ public class HiveMetadataFactory
                 autoVacuumEnabled,
                 vacuumDeltaNumThreshold,
                 vacuumDeltaPercentThreshold,
-                hiveVacuumService);
+                hiveVacuumService,
+                vacuumCollectorInterval);
     }
 }

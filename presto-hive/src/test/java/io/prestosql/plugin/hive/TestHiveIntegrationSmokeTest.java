@@ -768,6 +768,57 @@ public class TestHiveIntegrationSmokeTest
         assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("2"), 2);
     }
 
+    @Test
+    public void testVacuumOnTableWithZeroRows()
+    {
+        String table = "tab7";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+        assertUpdate(String.format("DELETE FROM %s.%s", schema, table), 3);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 0);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+        assertFilesAfterCleanup(tablePath, 1);
+
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testVacuumOnTableWithZeroRowsOnPartitionTable()
+    {
+        String table = "tab8";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        String partitionedColumn = "b";
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc', partitioned_by=Array['%s'])",
+                schema, table, partitionedColumn));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2, 2)", schema, table), 1);
+        assertUpdate(String.format("DELETE FROM %s.%s WHERE %s=2", schema, table, partitionedColumn), 2);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 6);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1"), 1);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("2"), 2);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
     private void assertFilesAfterCleanupOnPartitionTable(String tablePath, String partitionedColumn, ImmutableList<String> partitionValue, int expectedNumberOfDirectories)
     {
         partitionValue.forEach(value -> {
