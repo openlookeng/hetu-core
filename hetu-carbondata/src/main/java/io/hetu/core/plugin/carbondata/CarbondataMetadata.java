@@ -99,14 +99,18 @@ import org.apache.carbondata.core.metadata.SegmentFileStore;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
 import org.apache.carbondata.core.mutate.CarbonUpdateUtil;
 import org.apache.carbondata.core.mutate.SegmentUpdateDetails;
+import org.apache.carbondata.core.mutate.data.BlockMappingVO;
+import org.apache.carbondata.core.mutate.data.RowCountDetailsVO;
 import org.apache.carbondata.core.statusmanager.LoadMetadataDetails;
 import org.apache.carbondata.core.statusmanager.SegmentStatus;
 import org.apache.carbondata.core.statusmanager.SegmentStatusManager;
 import org.apache.carbondata.core.statusmanager.SegmentUpdateStatusManager;
 import org.apache.carbondata.core.util.CarbonUtil;
+import org.apache.carbondata.core.util.ObjectSerializationUtil;
 import org.apache.carbondata.core.util.ThreadLocalSessionInfo;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
 import org.apache.carbondata.hadoop.api.CarbonOutputCommitter;
+import org.apache.carbondata.hadoop.api.CarbonTableInputFormat;
 import org.apache.carbondata.hadoop.api.CarbonTableOutputFormat;
 import org.apache.carbondata.hive.MapredCarbonOutputFormat;
 import org.apache.carbondata.hive.util.HiveCarbonUtil;
@@ -122,7 +126,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.io.IOConstants;
+import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobStatus;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -146,6 +153,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
@@ -406,6 +414,14 @@ public class CarbondataMetadata
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while cleaning Delta files", e);
             }
         });
+        Map<String, String> additionalConf = new HashMap<>();
+        additionalConf.put(CarbondataConstants.TxnBeginTimeStamp, timeStamp.toString());
+        try {
+            additionalConf.put(CarbondataConstants.CarbonTable, ObjectSerializationUtil.convertObjectToString(carbonTable));
+        }
+        catch (IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while converting objects to string", e);
+        }
         return new CarbondataUpdateTableHandle(parent.getSchemaName(),
                 parent.getTableName(),
                 parent.getInputColumns(),
@@ -413,8 +429,8 @@ public class CarbondataMetadata
                 parent.getLocationHandle(),
                 parent.getBucketProperty(),
                 parent.getTableStorageFormat(),
-                parent.getPartitionStorageFormat(), ImmutableMap.<String, String>of(
-                CarbondataConstants.TxnBeginTimeStamp, timeStamp.toString()));
+                parent.getPartitionStorageFormat(),
+                additionalConf);
     }
 
     @Override
@@ -451,6 +467,35 @@ public class CarbondataMetadata
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while cleaning Delta files", e);
             }
         });
+        Map<String, String> additionalConf = new HashMap<>();
+        initialConfiguration.set(CarbonTableInputFormat.INPUT_DIR, parent.getLocationHandle().getTargetPath().toString());
+        initialConfiguration.set(CarbonTableInputFormat.DATABASE_NAME, parent.getSchemaName());
+        initialConfiguration.set(CarbonTableInputFormat.TABLE_NAME, parent.getTableName());
+        additionalConf.put(CarbondataConstants.TxnBeginTimeStamp, timeStamp.toString());
+        try {
+            Job job = new Job(initialConfiguration);
+            CarbonTableInputFormat carbonTableInputFormat = new CarbonTableInputFormat();
+            FileInputFormat.addInputPath((JobConf) initialConfiguration, parent.getLocationHandle().getTargetPath());
+            BlockMappingVO blockMappingVO = carbonTableInputFormat.getBlockRowCount(job, carbonTable, null, true);
+            LoadMetadataDetails[] loadMetadataDetails = SegmentStatusManager.readTableStatusFile(CarbonTablePath.getTableStatusFilePath(carbonTable.getTablePath()));
+            SegmentUpdateStatusManager segmentUpdateStatusManager = new SegmentUpdateStatusManager(carbonTable, loadMetadataDetails);
+            CarbonUpdateUtil.createBlockDetailsMap(blockMappingVO, segmentUpdateStatusManager);
+
+            Map<String, RowCountDetailsVO> segmentNoRowCountMapping = new HashMap<>();
+            TreeMap<String, Long> blockRowCountMapping = new TreeMap<>();
+            for (Map.Entry<String, Long> entry : blockMappingVO.getBlockRowCountMapping().entrySet()) {
+                blockRowCountMapping.put(entry.getKey(), entry.getValue());
+            }
+            for (Map.Entry<String, Long> entry : blockRowCountMapping.entrySet()) {
+                String key = entry.getKey();
+                segmentNoRowCountMapping.putIfAbsent(blockMappingVO.getBlockToSegmentMapping().get(key), blockMappingVO.getCompleteBlockRowDetailVO().get(key));
+            }
+            additionalConf.put(CarbondataConstants.CarbonTable, ObjectSerializationUtil.convertObjectToString(carbonTable));
+            additionalConf.put(CarbondataConstants.SegmentNoRowCountMapping, ObjectSerializationUtil.convertObjectToString(segmentNoRowCountMapping));
+        }
+        catch (IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed while converting objects to string", e);
+        }
         return new CarbonDeleteAsInsertTableHandle(parent.getSchemaName(),
                 parent.getTableName(),
                 parent.getInputColumns(),
@@ -458,8 +503,8 @@ public class CarbondataMetadata
                 parent.getLocationHandle(),
                 parent.getBucketProperty(),
                 parent.getTableStorageFormat(),
-                parent.getPartitionStorageFormat(), ImmutableMap.<String, String>of(
-                CarbondataConstants.TxnBeginTimeStamp, timeStamp.toString()));
+                parent.getPartitionStorageFormat(),
+                additionalConf);
     }
 
     @Override
@@ -1278,6 +1323,12 @@ public class CarbondataMetadata
                 .map(SegmentUpdateDetails::getSegmentName)
                 .map(Segment::new).collect(Collectors.toList());
         List<Segment> segmentFilesToBeUpdatedLatest = new ArrayList<>();
+        List<Segment> segmentFilesToBeDeleted = blockUpdateDetailsList.stream()
+                .filter(segmentUpdateDetails -> segmentUpdateDetails.getSegmentStatus() != null &&
+                        segmentUpdateDetails.getSegmentStatus().equals(SegmentStatus.MARKED_FOR_DELETE))
+                .map(SegmentUpdateDetails::getSegmentName)
+                .map(Segment::new).collect(Collectors.toList());
+
         for (Segment segment : segmentFilesToBeUpdated) {
             String file =
                     SegmentFileStore.writeSegmentFile(carbonTable, segment.getSegmentNo(), timeStamp.toString());
@@ -1285,7 +1336,7 @@ public class CarbondataMetadata
         }
         if (!(updateSegmentStatusSuccess &&
                 CarbonUpdateUtil.updateTableMetadataStatus(new HashSet<>(segmentFilesToBeUpdated),
-                        carbonTable, timeStamp.toString(), true, ImmutableList.of(),
+                        carbonTable, timeStamp.toString(), true, segmentFilesToBeDeleted,
                         segmentFilesToBeUpdatedLatest, ""))) {
             CarbonUpdateUtil.cleanStaleDeltaFiles(carbonTable, timeStamp.toString());
         }
