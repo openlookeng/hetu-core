@@ -438,23 +438,6 @@ public class TestCarbonAllDataType
     }
 
     @Test
-    public void testCreateTableWrongOrderPartitionBy() throws SQLException
-    {
-        try {
-            hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'a'])");
-        }
-        catch (Exception e) {
-            System.out.println(e.getMessage());
-            //same order as the table properties
-            Boolean ret = e.getMessage().contains("same order as the table properties");
-            assertEquals("true", ret.toString());
-            return;
-        }
-        hetuServer.execute("drop table testdb.testtable2");
-        assertEquals("true", "false");
-    }
-
-    @Test
     public void testCreateTableAs() throws SQLException
     {
         hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
@@ -514,9 +497,9 @@ public class TestCarbonAllDataType
     }
 
     @Test
-    public void testCreateTablePartitionByValidate() throws SQLException
+    public void testCreateTableValidate() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'd'])");
+        hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int )");
 
         String schemaFilePath = CarbonTablePath.getSchemaFilePath( "file://" + storePath + "/carbon.store"+ "/testdb" + "/testtable2");
         // If metadata folder exists, it is a transactional table
@@ -541,19 +524,11 @@ public class TestCarbonAllDataType
                 thriftReader.open();
                 tableInfo = (org.apache.carbondata.format.TableInfo) thriftReader.read();
                 thriftReader.close();
-                List<ColumnSchema> partition_columns = tableInfo.getFact_table().getPartitionInfo().getPartition_columns();
-                String [] ConfigPartiotionComumns = {"c","d"};
                 String columnName;
                 int i = 0;
-                // validating partition columns
-                for (ColumnSchema column : partition_columns) {
-                    columnName =  column.getColumn_name();
-                    assertEquals(ConfigPartiotionComumns[i], columnName);
-                    i++;
-                }
+
                 String [] ConfigComumns = {"a", "b", "c", "d"};
                 List<ColumnSchema> columnSchema = tableInfo.getFact_table().getTable_columns();
-                i = 0;
                 // validating columns
                 for (ColumnSchema column : columnSchema) {
                     columnName =  column.getColumn_name();
@@ -1699,5 +1674,40 @@ public class TestCarbonAllDataType
 
         }
         hetuServer.execute("drop table testdb.testtableAutoCleanup8");
+    }
+
+    @Test
+    public void testCheckCreateTablePartitionByNotSupported() throws SQLException
+    {
+        try {
+            hetuServer.execute("CREATE TABLE testdb.partitiontesttable (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'd'])");
+        }
+        catch (Exception e) {
+            Boolean ret = e.getMessage().contains("Catalog 'carbondata' does not support table property 'partitioned_by");
+            assertEquals("true", ret.toString());
+            hetuServer.execute("drop table if exists testdb.partitiontesttable");
+            return;
+        }
+        hetuServer.execute("drop table if exists testdb.partitiontesttable");
+        assertEquals("true", "false");
+    }
+
+    @Test
+    public void testCheckCreateTableAsPartitionByNotSupported() throws SQLException
+    {
+        try {
+            hetuServer.execute("CREATE TABLE testdb.partitiontesttable1 (a int, b int , c int , d int )");
+            hetuServer.execute("CREATE TABLE testdb.partitiontesttable2 WITH (partitioned_by = ARRAY['c', 'd']) AS SELECT *  FROM  testdb.partitiontesttable1");
+        }
+        catch (Exception e) {
+            Boolean ret = e.getMessage().contains("Catalog 'carbondata' does not support table property 'partitioned_by");
+            assertEquals("true", ret.toString());
+            hetuServer.execute("drop table if exists  testdb.partitiontesttable1");
+            hetuServer.execute("drop table if exists testdb.partitiontesttable2");
+            return;
+        }
+        hetuServer.execute("drop table if exists  testdb.partitiontesttable1");
+        hetuServer.execute("drop table if exists testdb.partitiontesttable2");
+        assertEquals("true", "false");
     }
 }

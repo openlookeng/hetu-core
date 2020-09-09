@@ -1412,6 +1412,11 @@ public class CarbondataMetadata
         if (!target.isPresent()) {
             throw new TableNotFoundException(handle.getSchemaTableName());
         }
+
+        if (target.get().getPartitionColumns().size() > 0) {
+            throw new PrestoException(NOT_SUPPORTED, "Operations on Partitioned CarbonTables is not supported");
+        }
+
         this.user = session.getUser();
         this.schemaName = target.get().getDatabaseName();
         this.currentState = State.DROP_TABLE;

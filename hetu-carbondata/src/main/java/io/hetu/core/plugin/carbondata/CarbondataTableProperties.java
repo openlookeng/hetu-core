@@ -23,15 +23,12 @@ import io.prestosql.spi.type.TypeManager;
 
 import javax.inject.Inject;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static io.prestosql.spi.session.PropertyMetadata.enumProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.util.Locale.ENGLISH;
 
 public class CarbondataTableProperties
@@ -58,18 +55,7 @@ public class CarbondataTableProperties
                         "Hive storage format for the table",
                         CarbondataStorageFormat.class,
                         CarbondataStorageFormat.CARBON,
-                        false),
-                new PropertyMetadata<>(
-                        PARTITIONED_BY_PROPERTY,
-                        "Partition columns",
-                        typeManager.getType(parseTypeSignature("array(varchar)")),
-                        List.class,
-                        ImmutableList.of(),
-                        false,
-                        value -> ImmutableList.copyOf(((Collection<?>) value).stream()
-                                .map(name -> ((String) name).toLowerCase(ENGLISH))
-                                .collect(Collectors.toList())),
-                        value -> value));
+                        false));
     }
 
     @Override
