@@ -42,6 +42,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.hetu.core.plugin.carbondata.CarbondataMetadata.getCarbonTable;
@@ -72,12 +73,15 @@ public class CarbondataAutoCleaner
         this.user = user;
     }
 
-    public void submitCarbondataAutoCleanupTask(ScheduledExecutorService executorService)
+    public Future<?> submitCarbondataAutoCleanupTask(ScheduledExecutorService executorService)
     {
+        Future<?> result = null;
         if (null != executorService) {
-            executorService.submit(new CarbondataAutoCleanerTask());
+            result = executorService.submit(new CarbondataAutoCleanerTask());
             log.debug("Submitting task to Vacuum Cleaner thread pool");
         }
+
+        return result;
     }
 
     private class CarbondataAutoCleanerTask

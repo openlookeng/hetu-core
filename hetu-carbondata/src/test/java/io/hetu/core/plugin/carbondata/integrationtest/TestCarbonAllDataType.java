@@ -15,6 +15,7 @@
 
 package io.hetu.core.plugin.carbondata.integrationtest;
 
+import io.hetu.core.plugin.carbondata.CarbondataMetadata;
 import io.hetu.core.plugin.carbondata.server.HetuTestServer;
 import io.prestosql.hive.$internal.au.com.bytecode.opencsv.CSVReader;
 import org.apache.carbondata.common.logging.LogServiceFactory;
@@ -29,6 +30,8 @@ import org.apache.carbondata.core.metadata.converter.ThriftWrapperSchemaConverte
 import org.apache.carbondata.core.metadata.schema.SchemaReader;
 import org.apache.carbondata.core.metadata.schema.table.TableInfo;
 import org.apache.carbondata.core.reader.ThriftReader;
+import org.apache.carbondata.core.statusmanager.LoadMetadataDetails;
+import org.apache.carbondata.core.statusmanager.SegmentStatusManager;
 import org.apache.carbondata.core.util.CarbonProperties;
 import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
@@ -45,7 +48,10 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.ParseException;
@@ -1438,242 +1444,240 @@ public class TestCarbonAllDataType
     @Test
     public void testAutoCleanupInUpdate() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup1");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup1 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (130, 411)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup1 VALUES (130, 511)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup1 AND WAIT");
-        //TimeUnit.SECONDS.sleep(2);
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup1");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup1 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup1 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup1 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup1 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup1 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup1 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup1 AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup1/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+        hetuServer.execute("UPDATE testdb.testtableautocleanup1 SET a=232 WHERE b=511");
         try {
-            Thread.sleep(65000);
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup1/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup1/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup1/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup1/Fact/Part0/Segment_3", false), false);
         }
-        catch (InterruptedException e) {
-        }
-        hetuServer.execute("UPDATE testdb.testtableAutoCleanup1 SET a=232 WHERE b=511");
-        try {
-            Thread.sleep(10000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup1/Fact/Part0/Segment_3", false), false);
-        }
-        catch (IOException | InterruptedException exception) {
+        catch (IOException exception) {
 
         }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup1");
+
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup1");
     }
 
     @Test
     public void testAutoCleanupInVacuum() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup2");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup2 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup2 VALUES (130, 411)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup2 AND WAIT");
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup2");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup2 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup2 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup2 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup2 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup2 VALUES (130, 411)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup2 AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup2/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("vacuum table testdb.testtableautocleanup2 AND WAIT");
         try {
-            Thread.sleep(65000);
-        }
-        catch (InterruptedException e) {
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup2/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup2/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup2/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup2/Fact/Part0/Segment_3", false), false);
+        } catch (IOException exception) {
 
         }
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup2 AND WAIT");
-        try {
 
-            Thread.sleep(20000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup2/Fact/Part0/Segment_3", false), false);
-        } catch (IOException | InterruptedException exception) {
-
-        }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup2");
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup2");
     }
 
     @Test
     public void testAutoCleanupInDelete() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup3");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup3 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (130, 411)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup3 VALUES (130, 511)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup3 AND WAIT");
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup3");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup3 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup3 AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup3/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("DELETE FROM testdb.testtableautocleanup3 WHERE a=130");
         try {
-            Thread.sleep(65000);
-        }
-        catch (InterruptedException e) {
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_3", false), false);
+        } catch (IOException exception) {
 
         }
-        hetuServer.execute("DELETE FROM testdb.testtableAutoCleanup3 WHERE a=130");
-        try {
-            Thread.sleep(10000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup3/Fact/Part0/Segment_3", false), false);
-        } catch (IOException | InterruptedException exception) {
 
-        }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup3");
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup3");
     }
 
     @Test
     public void testAutoCleanupInInsert() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup4");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup4 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (130, 411)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (130, 511)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup4 AND WAIT");
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup4");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup4 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup4 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup4 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup4 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup4 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup4 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup4 AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup4/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup4 VALUES (130, 511)");
         try {
-            Thread.sleep(65000);
-        }
-        catch (InterruptedException e) {
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup4/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup4/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup4/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup4/Fact/Part0/Segment_3", false), false);
+        } catch (IOException exception) {
 
         }
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup4 VALUES (130, 511)");
-        try {
-            Thread.sleep(10000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup4/Fact/Part0/Segment_3", false), false);
-        } catch (IOException | InterruptedException exception) {
 
-        }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup4");
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup4");
     }
 
     @Test
     public void testFullAutoCleanupInUpdate() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup5");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup5 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (130, 411)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup5 VALUES (130, 511)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup5 AND WAIT");
-        //TimeUnit.SECONDS.sleep(2);
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup5");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup5 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup5 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup5 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup5 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup5 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup5 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup5 AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup5/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("UPDATE testdb.testtableautocleanup5 SET a=232 WHERE b=511");
         try {
-            Thread.sleep(65000);
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup5/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup5/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup5/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup5/Fact/Part0/Segment_3", false), false);
         }
-        catch (InterruptedException e) {
+        catch (IOException exception) {
 
         }
-        hetuServer.execute("UPDATE testdb.testtableAutoCleanup5 SET a=232 WHERE b=511");
-        try {
-            Thread.sleep(10000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup5/Fact/Part0/Segment_3", false), false);
-        }
-        catch (IOException | InterruptedException exception) {
 
-        }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup5");
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup5");
     }
 
     @Test
     public void testFullAutoCleanupInVacuum() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup6");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup6 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup6 VALUES (130, 411)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup6 FULL AND WAIT");
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup6");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup6 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup6 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup6 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup6 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup6 VALUES (130, 411)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup6 FULL AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup6/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("vacuum table testdb.testtableautocleanup6 FULL AND WAIT");
         try {
-            Thread.sleep(65000);
-        }
-        catch (InterruptedException e) {
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup6/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup6/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup6/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup6/Fact/Part0/Segment_3", false), false);
+        } catch (IOException exception) {
 
         }
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup6 FULL AND WAIT");
-        try {
-            Thread.sleep(20000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup6/Fact/Part0/Segment_3", false), false);
-        } catch (IOException | InterruptedException exception) {
 
-        }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup6");
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup6");
     }
 
     @Test
     public void testFullAutoCleanupInDelete() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup7");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup7 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (130, 411)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup7 VALUES (130, 511)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup7 FULL AND WAIT");
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup7");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup7 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup7 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup7 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup7 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup7 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup7 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup7 FULL AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup7/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("DELETE FROM testdb.testtableautocleanup7 WHERE a=130");
         try {
-            Thread.sleep(65000);
-        }
-        catch (InterruptedException e) {
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup7/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup7/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup7/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup7/Fact/Part0/Segment_3", false), false);
+        } catch (IOException exception) {
 
         }
-        hetuServer.execute("DELETE FROM testdb.testtableAutoCleanup7 WHERE a=130");
-        try {
-            Thread.sleep(10000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup7/Fact/Part0/Segment_3", false), false);
-        } catch (IOException | InterruptedException exception) {
 
-        }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup7");
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup7");
     }
 
     @Test
     public void testFullAutoCleanupInInsert() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtableAutoCleanup8");
-        hetuServer.execute("CREATE TABLE testdb.testtableAutoCleanup8 (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (110, 211)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (120, 311)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (130, 411)");
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (130, 511)");
-        hetuServer.execute("vacuum table testdb.testtableAutoCleanup8 FULL AND WAIT");
+        hetuServer.execute("drop table if exists testdb.testtableautocleanup8");
+        hetuServer.execute("CREATE TABLE testdb.testtableautocleanup8 (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup8 VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup8 VALUES (110, 211)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup8 VALUES (120, 311)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup8 VALUES (130, 411)");
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup8 VALUES (130, 511)");
+        hetuServer.execute("vacuum table testdb.testtableautocleanup8 FULL AND WAIT");
+
+        reduceModificationOrdeletionTimesStamp(storePath  + "/carbon.store/testdb/testtableautocleanup8/Metadata");
+        CarbondataMetadata.enableTracingCleanupTask(true);
+
+        hetuServer.execute("INSERT INTO testdb.testtableautocleanup8 VALUES (130, 511)");
         try {
-            Thread.sleep(65000);
-        }
-        catch (InterruptedException e) {
-        }
-        hetuServer.execute("INSERT INTO testdb.testtableAutoCleanup8 VALUES (130, 511)");
-        try {
-            Thread.sleep(10000);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_0", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_1", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_2", false), false);
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableAutoCleanup8/Fact/Part0/Segment_3", false), false);
-        } catch (IOException | InterruptedException exception) {
+            CarbondataMetadata.waitForSubmittedTasksFinish();
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup8/Fact/Part0/Segment_0", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup8/Fact/Part0/Segment_1", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup8/Fact/Part0/Segment_2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup8/Fact/Part0/Segment_3", false), false);
+        } catch (IOException exception) {
 
         }
-        hetuServer.execute("drop table testdb.testtableAutoCleanup8");
+
+        CarbondataMetadata.enableTracingCleanupTask(false);
+        hetuServer.execute("drop table testdb.testtableautocleanup8");
     }
 
     @Test
@@ -1709,5 +1713,33 @@ public class TestCarbonAllDataType
         hetuServer.execute("drop table if exists  testdb.partitiontesttable1");
         hetuServer.execute("drop table if exists testdb.partitiontesttable2");
         assertEquals("true", "false");
+    }
+
+    private void reduceModificationOrdeletionTimesStamp(String tableMetadatPath)
+    {
+        LoadMetadataDetails[] metadataDetails =
+                SegmentStatusManager.readLoadMetadata(tableMetadatPath);
+        for (LoadMetadataDetails oneLoad : metadataDetails) {
+            long deletionTime = oneLoad.getModificationOrdeletionTimesStamp();
+
+            String modificationOrdeletionTimesStamp = Long.toString(deletionTime);
+            deletionTime -= 70000L;
+            String replace = Long.toString(deletionTime);
+            System.out.println("replace" + replace);
+
+            Path path = Paths.get(tableMetadatPath + "/tablestatus");
+            Charset charset = StandardCharsets.UTF_8;
+
+            String content = null;
+            try {
+                content = new String(Files.readAllBytes(path), charset);
+
+                content = content.replaceFirst(modificationOrdeletionTimesStamp, replace);
+                Files.write(path, content.getBytes(charset));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            //boolean ret= CarbonUpdateUtil.isMaxQueryTimeoutExceeded(deletionTime);
+        }
     }
 }
