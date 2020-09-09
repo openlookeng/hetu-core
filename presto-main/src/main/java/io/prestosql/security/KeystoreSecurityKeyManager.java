@@ -94,7 +94,9 @@ public class KeystoreSecurityKeyManager
     {
         Path keystorePath = Paths.get(config.getFileStorePath());
         String keyStr = "";
-        try (InputStream inputStream = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/")).newInputStream(keystorePath)) {
+        try (HetuFileSystemClient hetuFileSystemClient =
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
+                InputStream inputStream = hetuFileSystemClient.newInputStream(keystorePath)) {
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
             Key key = keyStore.getKey(keyFileName, config.getKeystorePassword().toCharArray());
@@ -143,9 +145,8 @@ public class KeystoreSecurityKeyManager
         KeyStore keyStore;
         InputStream inputStream = null;
         OutputStream outputStream = null;
-        HetuFileSystemClient hetuFileSystemClient;
-        try {
-            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
+        try (HetuFileSystemClient hetuFileSystemClient =
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
             inputStream = hetuFileSystemClient.newInputStream(keystorPath);
             keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
@@ -167,12 +168,13 @@ public class KeystoreSecurityKeyManager
             throw new SecurityKeyException(format("error in I/O: fail to delete alias[%s] from keystore.", keyFileName));
         }
         finally {
-            try {
-                if (inputStream != null) {
-                    inputStream.close();
+            try (InputStream inputStreamRelease = inputStream;
+                    OutputStream outputStreamRelease = outputStream) {
+                if (inputStreamRelease != null) {
+                    inputStreamRelease.close();
                 }
-                if (outputStream != null) {
-                    outputStream.close();
+                if (outputStreamRelease != null) {
+                    outputStreamRelease.close();
                 }
             }
             catch (IOException e) {
@@ -191,9 +193,8 @@ public class KeystoreSecurityKeyManager
 
         InputStream inputStream = null;
         OutputStream outputStream = null;
-        HetuFileSystemClient hetuFileSystemClient;
-        try {
-            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
+        try (HetuFileSystemClient hetuFileSystemClient =
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
             boolean isStoreFileExists = hetuFileSystemClient.exists(keystorPath);
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             if (isStoreFileExists) {
@@ -223,12 +224,13 @@ public class KeystoreSecurityKeyManager
             throw new SecurityKeyException("error in I/O: create file failed.");
         }
         finally {
-            try {
-                if (inputStream != null) {
-                    inputStream.close();
+            try (InputStream inputStreamRelease = inputStream;
+                    OutputStream outputStreamRelease = outputStream) {
+                if (inputStreamRelease != null) {
+                    inputStreamRelease.close();
                 }
-                if (outputStream != null) {
-                    outputStream.close();
+                if (outputStreamRelease != null) {
+                    outputStreamRelease.close();
                 }
             }
             catch (IOException e) {
@@ -240,10 +242,8 @@ public class KeystoreSecurityKeyManager
     private void createStoreDirIfNotExists()
     {
         String file = config.getFileStorePath();
-        HetuFileSystemClient hetuFileSystemClient;
-        try {
-            hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
-
+        try (HetuFileSystemClient hetuFileSystemClient =
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
             int lastIndex = file.lastIndexOf(File.separator);
             String tmpFileDir = file.substring(0, lastIndex);
             if (hetuFileSystemClient.exists(Paths.get(tmpFileDir))) {

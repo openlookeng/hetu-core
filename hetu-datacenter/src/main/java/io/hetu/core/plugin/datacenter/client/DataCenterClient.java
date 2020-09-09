@@ -238,8 +238,7 @@ public class DataCenterClient
     {
         String query = "PREPARE subStatement FROM " + sql;
         String describe = "DESCRIBE OUTPUT subStatement";
-        try {
-            StatementClient preparedClient = execute(query);
+        try (StatementClient preparedClient = execute(query)) {
             DataCenterClientSession newClientSession = DataCenterStatementClientFactory.createClientSession(
                     preparedClient, this.config, this.typeManager);
 

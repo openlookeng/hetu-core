@@ -192,14 +192,8 @@ public class FileBasedSeedStore
     private void writeToFile(Path file, String content, boolean overwrite)
             throws IOException
     {
-        OutputStream os;
-        if (overwrite) {
-            os = fs.newOutputStream(file);
+        try (OutputStream os = (overwrite) ? fs.newOutputStream(file) : fs.newOutputStream(file, CREATE_NEW)) {
+            os.write(content.getBytes());
         }
-        else {
-            os = fs.newOutputStream(file, CREATE_NEW);
-        }
-        os.write(content.getBytes());
-        os.close();
     }
 }

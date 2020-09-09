@@ -283,6 +283,8 @@ public class HBaseRecordCursor
     @Override
     public void close()
     {
-        this.scanner.close();
+        if (this.scanner != null) {
+            this.scanner.close();
+        }
     }
 }

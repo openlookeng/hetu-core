@@ -144,5 +144,15 @@ public class HBaseGetRecordCursor
     }
 
     @Override
-    public void close() {}
+    public void close()
+    {
+        try (Connection connection = this.conn) {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        catch (IOException e) {
+            // ignore exception from close
+        }
+    }
 }
