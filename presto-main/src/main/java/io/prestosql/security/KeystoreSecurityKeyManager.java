@@ -84,12 +84,12 @@ public class KeystoreSecurityKeyManager
     /**
      * load publicKey or privateKey from keystore in hdfs
      *
-     * @param keyFileName keystore file's name
+     * @param catalogName catalog name that the key belong to
      * @return return the key as string
      * @throws SecurityKeyException throw exception as SecurityKeyException
      */
     @Override
-    public synchronized String loadKey(String keyFileName)
+    public synchronized String loadKey(String catalogName)
             throws SecurityKeyException
     {
         Path keystorePath = Paths.get(config.getFileStorePath());
@@ -97,20 +97,20 @@ public class KeystoreSecurityKeyManager
         try (InputStream inputStream = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/")).newInputStream(keystorePath)) {
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
-            Key key = keyStore.getKey(keyFileName, config.getKeystorePassword().toCharArray());
+            Key key = keyStore.getKey(catalogName, config.getKeystorePassword().toCharArray());
 
             if (key instanceof SecretKey) {
                 keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8));
-                LOG.info("success to load key for catalog[%s]...", keyFileName);
+                LOG.info("success to load key for catalog[%s]...", catalogName);
             }
             else if (key instanceof PrivateKey) {
-                Certificate certificate = keyStore.getCertificate(keyFileName);
+                Certificate certificate = keyStore.getCertificate(catalogName);
                 PublicKey publicKey = certificate.getPublicKey();
                 keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8));
             }
 
             if (key == null) {
-                Certificate certificate = keyStore.getCertificate(keyFileName);
+                Certificate certificate = keyStore.getCertificate(catalogName);
                 if (certificate != null) {
                     PublicKey publicKey = certificate.getPublicKey();
                     keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8));
@@ -127,7 +127,7 @@ public class KeystoreSecurityKeyManager
             throw new SecurityKeyException(format("certification is error: %s", e.getMessage()));
         }
         catch (UnrecoverableKeyException e) {
-            throw new SecurityKeyException(format("not found the key for catalog[%s]: %s", keyFileName, e.getMessage()));
+            throw new SecurityKeyException(format("not found the key for catalog[%s]: %s", catalogName, e.getMessage()));
         }
         catch (IOException e) {
             throw new SecurityKeyException(format("error happened when load key from keystore  %s", e.getMessage()));
@@ -135,8 +135,28 @@ public class KeystoreSecurityKeyManager
         return keyStr;
     }
 
+    /**
+     * get the key by catalog name
+     *
+     * @param catalogName catalog name
+     * @return the key, if not exist, return null
+     */
     @Override
-    public synchronized void deleteKey(String keyFileName)
+    public synchronized String getKey(String catalogName)
+    {
+        String key;
+        try {
+            key = loadKey(catalogName);
+        }
+        catch (SecurityKeyException e) {
+            key = null;
+            LOG.warn("the %s is not exist.", catalogName);
+        }
+        return key;
+    }
+
+    @Override
+    public synchronized void deleteKey(String catalogName)
             throws SecurityKeyException
     {
         Path keystorPath = Paths.get(config.getFileStorePath());
@@ -149,10 +169,10 @@ public class KeystoreSecurityKeyManager
             inputStream = hetuFileSystemClient.newInputStream(keystorPath);
             keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
-            keyStore.deleteEntry(keyFileName);
+            keyStore.deleteEntry(catalogName);
             outputStream = hetuFileSystemClient.newOutputStream(keystorPath);
             keyStore.store(outputStream, config.getKeystorePassword().toCharArray());
-            LOG.info("success to delete the alias[%s] from keystore file.", keyFileName);
+            LOG.info("success to delete the alias[%s] from keystore file.", catalogName);
         }
         catch (KeyStoreException e) {
             throw new SecurityKeyException(format("something wrong when use KeyStore: %s", e.getMessage()));
@@ -164,7 +184,7 @@ public class KeystoreSecurityKeyManager
             throw new SecurityKeyException(format("certification is error: %s", e.getMessage()));
         }
         catch (IOException e) {
-            throw new SecurityKeyException(format("error in I/O: fail to delete alias[%s] from keystore.", keyFileName));
+            throw new SecurityKeyException(format("error in I/O: fail to delete alias[%s] from keystore.", catalogName));
         }
         finally {
             try {
