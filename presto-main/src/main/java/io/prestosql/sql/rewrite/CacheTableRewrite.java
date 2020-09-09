@@ -45,6 +45,8 @@ import io.prestosql.sql.tree.Cache;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
+import io.prestosql.sql.tree.IsNotNullPredicate;
+import io.prestosql.sql.tree.IsNullPredicate;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.QualifiedName;
@@ -174,36 +176,28 @@ final class CacheTableRewrite
             LiteralEncoder literalEncoder = new LiteralEncoder(metadata);
             Map<Symbol, Type> symbolMapping = null;
             ColumnMetadata columnMetadata = null;
+            Identifier identifier = null;
+            Expression value = null;
 
             if (whereClause instanceof ComparisonExpression) {
                 ComparisonExpression predicate = (ComparisonExpression) whereClause;
-                Identifier identifier = (Identifier) ((predicate.getLeft() instanceof Identifier) ? predicate.getLeft() : predicate.getRight());
-                Expression value = (predicate.getLeft() instanceof Identifier) ? predicate.getRight() : predicate.getLeft();
+                identifier = (Identifier) ((predicate.getLeft() instanceof Identifier) ? predicate.getLeft() : predicate.getRight());
+                value = (predicate.getLeft() instanceof Identifier) ? predicate.getRight() : predicate.getLeft();
                 rewrittenPredicate = new ComparisonExpression(predicate.getOperator(), new SymbolReference(identifier.getValue()), value);
-
-                // create a Symbol to Type mapping  entry for the converted Identifier
-                symbolMapping = Collections.singletonMap(new Symbol(identifier.getValue()), tableMetadata.getColumn(identifier.getValue()).getType());
-                columnMetadata = tableMetadata.getColumn(identifier.getValue());
-                // verify if column is partitioned
-                // Hive columns contain extra info on whether or not a column is a partition key
-                // see: io.prestosql.plugin.hive.HiveUtil.columnExtraInfo
-                if (columnMetadata.getExtraInfo() == null) {
-                    throw new SemanticException(INVALID_COLUMN, node, "Column '%s' is not cacheable", columnMetadata.getName());
-                }
             }
             else if (whereClause instanceof BetweenPredicate) {
                 BetweenPredicate predicate = (BetweenPredicate) whereClause;
                 rewrittenPredicate = new BetweenPredicate(new SymbolReference(predicate.getValue().toString()), predicate.getMin(), predicate.getMax());
-
-                // create a Symbol to Type mapping  entry for the converted Identifier
-                symbolMapping = Collections.singletonMap(new Symbol(predicate.getValue().toString()), tableMetadata.getColumn(predicate.getValue().toString()).getType());
-                columnMetadata = tableMetadata.getColumn(predicate.getValue().toString());
-                // verify if column is partitioned
-                // Hive columns contain extra info on whether or not a column is a partition key
-                // see: io.prestosql.plugin.hive.HiveUtil.columnExtraInfo
-                if (columnMetadata.getExtraInfo() == null) {
-                    throw new SemanticException(INVALID_COLUMN, node, "Column '%s' is not cacheable", columnMetadata.getName());
-                }
+            }
+            else if (whereClause instanceof IsNullPredicate) {
+                IsNullPredicate predicate = (IsNullPredicate) whereClause;
+                identifier = (Identifier) predicate.getValue();
+                rewrittenPredicate = new IsNullPredicate(new SymbolReference(predicate.getValue().toString()));
+            }
+            else if (whereClause instanceof IsNotNullPredicate) {
+                IsNotNullPredicate predicate = (IsNotNullPredicate) whereClause;
+                identifier = (Identifier) predicate.getValue();
+                rewrittenPredicate = new IsNotNullPredicate(new SymbolReference(predicate.getValue().toString()));
             }
             else if (whereClause instanceof LogicalBinaryExpression) {
                 LogicalBinaryExpression predicate = (LogicalBinaryExpression) whereClause;
@@ -218,6 +212,20 @@ final class CacheTableRewrite
                         throw new SemanticException(INVALID_OPERATOR, node, "%s operator is not supported", predicate.getOperator().toString());
                 }
             }
+            else {
+                throw new PrestoException(GENERIC_USER_ERROR, "Cache table predicate is invalid");
+            }
+
+            // create a Symbol to Type mapping  entry for the converted Identifier
+            symbolMapping = Collections.singletonMap(new Symbol(identifier.getValue()), tableMetadata.getColumn(identifier.getValue()).getType());
+            columnMetadata = tableMetadata.getColumn(identifier.getValue());
+            // verify if column is partitioned
+            // Hive columns contain extra info on whether or not a column is a partition key
+            // see: io.prestosql.plugin.hive.HiveUtil.columnExtraInfo
+            if (columnMetadata.getExtraInfo() == null) {
+                throw new SemanticException(INVALID_COLUMN, node, "Column '%s' is not cacheable", columnMetadata.getName());
+            }
+
             // create a Type entry for the converted Identifier
             types = TypeProvider.copyOf(symbolMapping);
             // Use SimplifyExpressions class to rewrite the replacement predicate into a new expression

@@ -159,6 +159,42 @@ public class TestSplitCacheMap
     }
 
     @Test
+    public void testAddCacheForNullPredicate()
+    {
+        ColumnMetadata columnMetadataC = new ColumnMetadata("c", BIGINT);
+        TupleDomain<ColumnMetadata> tupleDomainC = TupleDomain.withColumnDomains(
+                ImmutableMap.of(columnMetadataC, Domain.onlyNull(BIGINT)));
+        String tupleDomainCPredicateString = "c IS NULL";
+
+        SplitCacheMap splitCacheMap = createNew();
+        splitCacheMap.addCache(table1QN, tupleDomainC, tupleDomainCPredicateString);
+        assertTrue(splitCacheMap.cacheExists(table1QN));
+
+        assertFalse(splitCacheMap.getCachedNodeId(table1SplitKey1).isPresent());
+        assertEquals(splitCacheMap.getCachePredicateTupleDomains(table1QN).size(), 1);
+        splitCacheMap.addCache(table1QN, tupleDomainC, tupleDomainCPredicateString);
+        assertEquals(splitCacheMap.getCachePredicateTupleDomains(table1QN).size(), 1);
+    }
+
+    @Test
+    public void testAddCacheForNotNullPredicate()
+    {
+        ColumnMetadata columnMetadataC = new ColumnMetadata("c", BIGINT);
+        TupleDomain<ColumnMetadata> tupleDomainC = TupleDomain.withColumnDomains(
+                ImmutableMap.of(columnMetadataC, Domain.notNull(BIGINT)));
+        String tupleDomainCPredicateString = "c IS NOT NULL";
+
+        SplitCacheMap splitCacheMap = createNew();
+        splitCacheMap.addCache(table1QN, tupleDomainC, tupleDomainCPredicateString);
+        assertTrue(splitCacheMap.cacheExists(table1QN));
+
+        assertFalse(splitCacheMap.getCachedNodeId(table1SplitKey1).isPresent());
+        assertEquals(splitCacheMap.getCachePredicateTupleDomains(table1QN).size(), 1);
+        splitCacheMap.addCache(table1QN, tupleDomainC, tupleDomainCPredicateString);
+        assertEquals(splitCacheMap.getCachePredicateTupleDomains(table1QN).size(), 1);
+    }
+
+    @Test
     public void testShowCache()
     {
         SplitCacheMap splitCacheMap = createNew();
