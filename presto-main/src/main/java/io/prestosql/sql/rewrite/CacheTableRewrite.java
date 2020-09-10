@@ -47,6 +47,7 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.IsNotNullPredicate;
 import io.prestosql.sql.tree.IsNullPredicate;
+import io.prestosql.sql.tree.LikePredicate;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.QualifiedName;
@@ -70,6 +71,7 @@ import static io.prestosql.sql.QueryUtil.selectList;
 import static io.prestosql.sql.QueryUtil.simpleQuery;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_COLUMN;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_OPERATOR;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_PREDICATE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_TABLE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CACHE;
 import static java.util.Objects.requireNonNull;
@@ -216,6 +218,9 @@ final class CacheTableRewrite
                     case OR:
                         throw new SemanticException(INVALID_OPERATOR, node, "%s operator is not supported", predicate.getOperator().toString());
                 }
+            }
+            else if (whereClause instanceof LikePredicate) {
+                throw new SemanticException(INVALID_PREDICATE, node, "LIKE predicate is not supported.");
             }
             else {
                 throw new PrestoException(GENERIC_USER_ERROR, "Cache table predicate is invalid");
