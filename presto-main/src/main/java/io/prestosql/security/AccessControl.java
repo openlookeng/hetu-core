@@ -42,7 +42,7 @@ public interface AccessControl
      */
     Set<String> filterCatalogs(Identity identity, Set<String> catalogs);
 
-    /*
+    /**
     * Check whether identity is allowed to access catalogs
     */
     default void checkCanAccessCatalogs(Identity identity) {}

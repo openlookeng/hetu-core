@@ -38,10 +38,10 @@ public class CatalogAccessControlRule
         this.catalogRegex = requireNonNull(catalogRegex, "catalogRegex is null");
     }
 
-    public Optional<Boolean> match(String user, String catalog)
+    public Optional<Boolean> match(String user, Optional<String> catalog)
     {
         if (userRegex.map(regex -> regex.matcher(user).matches()).orElse(true) &&
-                catalogRegex.map(regex -> regex.matcher(catalog).matches()).orElse(true)) {
+                catalogRegex.map(regex -> regex.matcher(catalog.orElse("")).matches()).orElse(true)) {
             return Optional.of(allow);
         }
         return Optional.empty();

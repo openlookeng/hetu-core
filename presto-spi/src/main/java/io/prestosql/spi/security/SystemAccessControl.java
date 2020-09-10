@@ -84,6 +84,13 @@ public interface SystemAccessControl
     }
 
     /**
+     * Check whether identity is can show catalogs
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanShowCatalogs(Identity identity) {}
+
+    /**
      * Check whether identity is can create a catalog
      *
      * @throws AccessDeniedException if not allowed

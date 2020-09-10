@@ -73,6 +73,12 @@ public abstract class ForwardingSystemAccessControl
     }
 
     @Override
+    public void checkCanShowCatalogs(Identity identity)
+    {
+        delegate().checkCanShowCatalogs(identity);
+    }
+
+    @Override
     public void checkCanCreateCatalog(Identity identity, String catalogName)
     {
         delegate().checkCanCreateCatalog(identity, catalogName);

@@ -164,6 +164,14 @@ public class AccessControlManager
     }
 
     @Override
+    public void checkCanAccessCatalogs(Identity identity)
+    {
+        requireNonNull(identity, "identity is null");
+
+        authenticationCheck(() -> systemAccessControl.get().checkCanShowCatalogs(identity));
+    }
+
+    @Override
     public void checkCanAccessCatalog(Identity identity, String catalogName)
     {
         requireNonNull(identity, "identity is null");

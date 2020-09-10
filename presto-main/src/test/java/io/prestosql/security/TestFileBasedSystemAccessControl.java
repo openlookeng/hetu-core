@@ -123,7 +123,28 @@ public class TestFileBasedSystemAccessControl
                     assertEquals(accessControlManager.filterCatalogs(bob, allCatalogs), bobCatalogs);
                     Set<String> nonAsciiUserCatalogs = ImmutableSet.of("open-to-all", "all-allowed", "\u0200\u0200\u0200");
                     assertEquals(accessControlManager.filterCatalogs(nonAsciiUser, allCatalogs), nonAsciiUserCatalogs);
+
+                    accessControlManager.checkCanCreateCatalog(alice, "alice-catalog");
+                    accessControlManager.checkCanDropCatalog(alice, "alice-catalog");
+                    accessControlManager.checkCanUpdateCatalog(alice, "alice-catalog");
+                    accessControlManager.checkCanAccessCatalog(alice, "alice-catalog");
+                    accessControlManager.checkCanAccessCatalogs(admin);
                 });
+        assertThrows(AccessDeniedException.class, () -> transaction(transactionManager, accessControlManager).execute(transactionId -> {
+            accessControlManager.checkCanCreateCatalog(bob, "alice-catalog");
+        }));
+        assertThrows(AccessDeniedException.class, () -> transaction(transactionManager, accessControlManager).execute(transactionId -> {
+            accessControlManager.checkCanDropCatalog(bob, "alice-catalog");
+        }));
+        assertThrows(AccessDeniedException.class, () -> transaction(transactionManager, accessControlManager).execute(transactionId -> {
+            accessControlManager.checkCanUpdateCatalog(bob, "alice-catalog");
+        }));
+        assertThrows(AccessDeniedException.class, () -> transaction(transactionManager, accessControlManager).execute(transactionId -> {
+            accessControlManager.checkCanAccessCatalog(bob, "alice-catalog");
+        }));
+        assertThrows(AccessDeniedException.class, () -> transaction(transactionManager, accessControlManager).execute(transactionId -> {
+            accessControlManager.checkCanAccessCatalogs(bob);
+        }));
     }
 
     @Test
