@@ -70,6 +70,7 @@ import static io.prestosql.sql.QueryUtil.selectList;
 import static io.prestosql.sql.QueryUtil.simpleQuery;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_COLUMN;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_OPERATOR;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_TABLE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CACHE;
 import static java.util.Objects.requireNonNull;
 
@@ -179,6 +180,10 @@ final class CacheTableRewrite
             Identifier identifier = null;
             Expression value = null;
 
+            if (!metadata.getTableHandle(session, tableMetadata.getQualifiedName()).get().getConnectorHandle().isFilterSupported()) {
+                throw new SemanticException(INVALID_TABLE, node, "Table '%s' cannot be cached. Only tables in Hive catalog can be cached",
+                        tableMetadata.getQualifiedName().toString());
+            }
             if (whereClause instanceof ComparisonExpression) {
                 ComparisonExpression predicate = (ComparisonExpression) whereClause;
                 identifier = (Identifier) ((predicate.getLeft() instanceof Identifier) ? predicate.getLeft() : predicate.getRight());
