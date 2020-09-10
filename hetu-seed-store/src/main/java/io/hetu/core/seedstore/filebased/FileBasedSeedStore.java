@@ -16,6 +16,7 @@
 package io.hetu.core.seedstore.filebased;
 
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
@@ -35,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 
 /**
@@ -68,6 +70,15 @@ public class FileBasedSeedStore
         this.config = config;
 
         seedDir = Paths.get(config.get(FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR).trim());
+        try {
+            checkArgument(!seedDir.toString().contains("../"),
+                    "SeedStore directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(seedDir.toString()),
+                    "SeedStore directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
         seedFilePath = seedDir.resolve(name).resolve(FileBasedSeedConstants.SEED_FILE_NAME);
     }
 

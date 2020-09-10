@@ -59,7 +59,7 @@ public class TestIndexCache
 
         String catalog = "test_catalog";
         String column = "column_name";
-        String table = "table_name";
+        String table = "schema_name.table_name";
         long testLastModifiedTime = 1;
         String testPath = "/user/hive/schema.db/table/001.orc";
         List<HiveColumnHandle> testPartitions = Collections.emptyList();
@@ -96,7 +96,7 @@ public class TestIndexCache
 
         String catalog = "test_catalog";
         String column = "column_name";
-        String table = "table_name";
+        String table = "schema_name.table_name";
         long testLastModifiedTime = 1;
         String testPath = "/user/hive/schema.db/table/001.orc";
         List<HiveColumnHandle> testPartitions = Collections.emptyList();
@@ -135,7 +135,7 @@ public class TestIndexCache
 
         String catalog = "test_catalog";
         String column = "column_name";
-        String table = "table_name";
+        String table = "schema_name.table_name";
         long testLastModifiedTime = 1;
         String testPath = "/user/hive/schema.db/table/001.orc";
         List<HiveColumnHandle> testPartitions = Collections.emptyList();
@@ -179,7 +179,7 @@ public class TestIndexCache
 
         String catalog = "test_catalog";
         String column = "column_name";
-        String table = "table_name";
+        String table = "schema_name.table_name";
         long testLastModifiedTime = 1;
         String testPath = "/user/hive/schema.db/table/001.orc";
 

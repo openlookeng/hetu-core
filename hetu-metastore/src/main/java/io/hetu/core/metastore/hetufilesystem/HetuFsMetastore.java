@@ -17,6 +17,7 @@ package io.hetu.core.metastore.hetufilesystem;
 import com.google.common.io.CharStreams;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.metastore.jdbc.JdbcMetadataUtil;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogAlreadyExistsException;
@@ -50,6 +51,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -86,6 +88,17 @@ public class HetuFsMetastore
     {
         this.metadataPath = metadataConfig.getHetuFileSystemMetastorePath();
         this.client = client;
+
+        try {
+            checkArgument(!metadataPath.contains("../"),
+                    "Metadata directory path must be absolute and at user workspace: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(metadataPath),
+                    "Metadata directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
+
         if (!client.exists(Paths.get(metadataPath))) {
             try {
                 client.createDirectories(Paths.get(metadataPath));
@@ -141,6 +154,8 @@ public class HetuFsMetastore
     @Override
     public void createCatalog(CatalogEntity catalog)
     {
+        checkArgument(catalog.getName().matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         runTransaction(() -> {
             assertCatalogNotExist(catalog.getName());
             try (OutputStream outputStream = client.newOutputStream(getCatalogMetadataPath(catalog.getName()))) {
@@ -155,6 +170,9 @@ public class HetuFsMetastore
     @Override
     public void alterCatalog(String catalogName, CatalogEntity newCatalog)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(newCatalog.getName().matches("[\\p{Alnum}_]+"), "Invalid new catalog name");
+
         runTransaction(() -> {
             if (!catalogName.equals(newCatalog.getName())) {
                 throw new PrestoException(HETU_METASTORE_CODE, "Cannot alter a catalog's name");
@@ -181,6 +199,8 @@ public class HetuFsMetastore
     @Override
     public void dropCatalog(String catalogName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         runTransaction(() -> {
             assertCatalogExist(catalogName);
             Path catalogMetadataDir = getCatalogMetadataDir(catalogName);
@@ -218,6 +238,8 @@ public class HetuFsMetastore
     @Override
     public Optional<CatalogEntity> getCatalog(String catalogName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         try {
             assertCatalogExist(catalogName);
         }
@@ -285,6 +307,9 @@ public class HetuFsMetastore
     @Override
     public void createDatabase(DatabaseEntity database)
     {
+        checkArgument(database.getName().matches("[\\p{Alnum}_]+"), "Invalid database name");
+        checkArgument(database.getCatalogName().matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         runTransaction(() -> {
             try {
                 assertCatalogExist(database.getCatalogName());
@@ -307,6 +332,10 @@ public class HetuFsMetastore
     @Override
     public void alterDatabase(String catalogName, String databaseName, DatabaseEntity newDatabase)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+        checkArgument(newDatabase.getName().matches("[\\p{Alnum}_]+"), "Invalid new database name");
+
         runTransaction(() -> {
             if (!catalogName.equals(newDatabase.getCatalogName())) {
                 throw new PrestoException(HETU_METASTORE_CODE, "The catalog name is not correct");
@@ -363,6 +392,9 @@ public class HetuFsMetastore
     @Override
     public void dropDatabase(String catalogName, String databaseName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+
         runTransaction(() -> {
             assertCatalogExist(catalogName);
             assertDatabaseExist(catalogName, databaseName);
@@ -401,6 +433,9 @@ public class HetuFsMetastore
     @Override
     public Optional<DatabaseEntity> getDatabase(String catalogName, String databaseName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+
         try {
             assertCatalogExist(catalogName);
             assertDatabaseExist(catalogName, databaseName);
@@ -421,6 +456,8 @@ public class HetuFsMetastore
     @Override
     public List<DatabaseEntity> getAllDatabases(String catalogName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         List<DatabaseEntity> databases = new ArrayList<>();
         assertCatalogExist(catalogName);
         try (Stream<Path> paths = client.list(getCatalogMetadataDir(catalogName))) {
@@ -471,6 +508,10 @@ public class HetuFsMetastore
             String databaseName = table.getDatabaseName();
             String tableName = table.getName();
 
+            checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+            checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+            checkArgument(tableName.matches("[\\p{Alnum}_]+"), "Invalid table name");
+
             assertCatalogExist(catalogName);
             assertDatabaseExist(catalogName, databaseName);
             assertTableNotExist(catalogName, databaseName, tableName);
@@ -487,6 +528,10 @@ public class HetuFsMetastore
     @Override
     public void dropTable(String catalogName, String databaseName, String tableName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+        checkArgument(tableName.matches("[\\p{Alnum}_]+"), "Invalid table name");
+
         runTransaction(() -> {
             assertCatalogExist(catalogName);
             assertDatabaseExist(catalogName, databaseName);
@@ -504,6 +549,11 @@ public class HetuFsMetastore
     @Override
     public void alterTable(String catalogName, String databaseName, String oldTableName, TableEntity newTable)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+        checkArgument(oldTableName.matches("[\\p{Alnum}_]+"), "Invalid table name");
+        checkArgument(newTable.getName().matches("[\\p{Alnum}_]+"), "Invalid new table name");
+
         runTransaction(() -> {
             if (!catalogName.equals(newTable.getCatalogName()) || !databaseName.equals(newTable.getDatabaseName())) {
                 throw new PrestoException(HETU_METASTORE_CODE, "The catalog name or schema name is not correct");
@@ -539,6 +589,10 @@ public class HetuFsMetastore
     @Override
     public Optional<TableEntity> getTable(String catalogName, String databaseName, String table)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+        checkArgument(table.matches("[\\p{Alnum}_]+"), "Invalid table name");
+
         try {
             assertCatalogExist(catalogName);
             assertDatabaseExist(catalogName, databaseName);
@@ -560,6 +614,9 @@ public class HetuFsMetastore
     @Override
     public List<TableEntity> getAllTables(String catalogName, String databaseName)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+
         List<TableEntity> tables = new ArrayList<>();
 
         assertCatalogExist(catalogName);

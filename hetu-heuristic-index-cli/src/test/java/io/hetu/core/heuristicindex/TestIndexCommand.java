@@ -55,6 +55,18 @@ public class TestIndexCommand
         extends PowerMockTestCase
 {
     @Test
+    public void validateInputs() throws IOException
+    {
+        try {
+            IndexCommand indexCommand = new IndexCommand("/", "catalog.schema.table", IndexCommand.Command.show);
+            indexCommand.call();
+        }
+        catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("Config directory path must at user workspace"));
+        }
+    }
+
+    @Test
     public void testCallWithEmptyConfigDirectory()
             throws IOException
     {

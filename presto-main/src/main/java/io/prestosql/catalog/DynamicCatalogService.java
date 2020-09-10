@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
@@ -96,6 +97,8 @@ public class DynamicCatalogService
             HttpRequestSessionContext sessionContext)
     {
         String catalogName = catalogInfo.getCatalogName();
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         // check the permission.
         try {
             accessControl.checkCanCreateCatalog(sessionContext.getIdentity(), catalogName);
@@ -169,6 +172,7 @@ public class DynamicCatalogService
             HttpRequestSessionContext sessionContext)
     {
         String catalogName = catalogInfo.getCatalogName();
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
 
         // check the permission.
         try {
@@ -233,6 +237,8 @@ public class DynamicCatalogService
 
     public synchronized Response dropCatalog(String catalogName, HttpRequestSessionContext sessionContext)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         // check the permission.
         try {
             accessControl.checkCanDropCatalog(sessionContext.getIdentity(), catalogName);

@@ -18,6 +18,7 @@ package io.prestosql.catalog;
 import com.google.common.io.ByteStreams;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -36,6 +37,7 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.fromProperties;
 import static io.prestosql.catalog.CatalogFilePath.getCatalogBasePath;
@@ -57,6 +59,16 @@ public abstract class AbstractCatalogStore
     public AbstractCatalogStore(String baseDirectory, HetuFileSystemClient fileSystemClient, int maxFileSizeInBytes)
     {
         this.baseDirectory = requireNonNull(baseDirectory, "baseDirectory is null");
+        try {
+            checkArgument(!baseDirectory.contains("../"),
+                    "Catalog directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(baseDirectory),
+                    "Catalog file directory path must at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Catalog file path not secure", e);
+        }
+
         this.maxFileSizeInBytes = requireNonNull(maxFileSizeInBytes, "maxFileSizeInBytes is null");
         this.fileSystemClient = requireNonNull(fileSystemClient, "fileSystemClient is null");
         if (!fileSystemClient.exists(getCatalogBasePath(baseDirectory))) {
