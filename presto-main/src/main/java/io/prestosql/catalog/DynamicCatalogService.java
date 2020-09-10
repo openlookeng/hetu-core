@@ -196,11 +196,11 @@ public class DynamicCatalogService
                 }
 
                 // update security key
-                boolean updateKey = (catalogInfo.getSecurityKey() == null);
+                boolean updateKey = (catalogInfo.getSecurityKey() != null);
                 String preSecurityKey = "";
                 if (updateKey) {
                     try {
-                        preSecurityKey = securityKeyManager.loadKey(catalogName);
+                        preSecurityKey = securityKeyManager.getKey(catalogName);
                         securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
                     }
                     catch (SecurityKeyException e) {
@@ -215,7 +215,12 @@ public class DynamicCatalogService
                 }
                 catch (PrestoException | IllegalArgumentException ex) {
                     if (updateKey) {
-                        rollbackKey(catalogName, preSecurityKey);
+                        if (preSecurityKey != null) {
+                            rollbackKey(catalogName, preSecurityKey);
+                        }
+                        else {
+                            deleteSecurityKey(catalogName);
+                        }
                     }
                     throw badRequest(BAD_REQUEST, ex.getMessage());
                 }

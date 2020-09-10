@@ -23,15 +23,20 @@ public interface SecurityKeyManager
         // do nothing
     }
 
-    default String loadKey(String keyFileName)
+    default String loadKey(String catalogName)
             throws SecurityKeyException
     {
         return "";
     }
 
-    default void deleteKey(String keyFileName)
+    default void deleteKey(String catalogName)
             throws SecurityKeyException
     {
         // do nothing
+    }
+
+    default String getKey(String catalogName)
+    {
+        return null;
     }
 }
