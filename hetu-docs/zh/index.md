@@ -36,6 +36,7 @@ headless: true
     - [分布式排序]({{< relref "./docs/admin/dist-sort.md" >}})
     - [动态目录]({{< relref "./docs/admin/dynamic-catalog.md" >}})
     - [集群节点管理]({{< relref "./docs/admin/cluster-node-management.md" >}})
+    - [动态过滤]({{< relref "./docs/admin/dynamic-filters.md" >}})
 
 - [查询优化器]("#")
     - [表统计]({{< relref "./docs/optimizer/statistics.md" >}})

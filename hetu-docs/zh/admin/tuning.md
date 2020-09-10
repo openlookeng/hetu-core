@@ -1,5 +1,5 @@
 
-# PopenLooKeng调优
+# openLooKeng调优
 
 默认openLooKeng设置对于大多数工作负载应该可以正常工作。如果你的集群面临特定的性能问题，以下信息可能会有帮助。
 
