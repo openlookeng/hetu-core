@@ -138,6 +138,10 @@ public class LongColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Long value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testLong(value);
     }
 }

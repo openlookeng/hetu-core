@@ -365,6 +365,10 @@ public class DecimalColumnReader<T>
     @Override
     public boolean filterTest(TupleDomainFilter filter, T value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         if (type.isShort()) {
             return filter.testLong((Long) value);
         }

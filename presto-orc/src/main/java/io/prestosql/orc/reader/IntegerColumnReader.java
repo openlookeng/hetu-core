@@ -139,6 +139,10 @@ public class IntegerColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Integer value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testLong(value);
     }
 }

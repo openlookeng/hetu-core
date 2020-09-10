@@ -139,6 +139,10 @@ public class ShortColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Short value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testLong(value);
     }
 }

@@ -1361,7 +1361,17 @@ public class LocalExecutionPlanner
                 columns.add(node.getAssignments().get(symbol));
             }
 
-            OperatorFactory operatorFactory = new TableScanOperatorFactory(context.getNextOperatorId(), node.getId(), pageSourceProvider, node.getTable(), columns);
+            Assignments assignments = Assignments.identity(node.getOutputSymbols());
+            Map<NodeRef<Expression>, Type> columnTypes = typeAnalyzer.getTypes(
+                    context.getSession(),
+                    context.getTypes(),
+                    concat(assignments.getExpressions()));
+
+            OperatorFactory operatorFactory = new TableScanOperatorFactory(context.getNextOperatorId(), node.getId(),
+                    pageSourceProvider, node.getTable(), columns,
+                    columnTypes.values().stream().collect(Collectors.toList()),
+                    getFilterAndProjectMinOutputPageSize(session),
+                    getFilterAndProjectMinOutputPageRowCount(session));
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
         }
 

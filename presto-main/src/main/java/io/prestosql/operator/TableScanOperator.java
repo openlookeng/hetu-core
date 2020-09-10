@@ -16,6 +16,7 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.airlift.units.DataSize;
 import io.prestosql.Session;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
@@ -25,6 +26,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.UpdatablePageSource;
+import io.prestosql.spi.type.Type;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.EmptySplitPageSource;
 import io.prestosql.split.PageSourceProvider;
@@ -53,6 +55,9 @@ public class TableScanOperator
         private final PageSourceProvider pageSourceProvider;
         private final TableHandle table;
         private final List<ColumnHandle> columns;
+        private final List<Type> types;
+        private final DataSize minOutputPageSize;
+        private final int minOutputPageRowCount;
         private boolean closed;
 
         public TableScanOperatorFactory(
@@ -60,13 +65,19 @@ public class TableScanOperator
                 PlanNodeId sourceId,
                 PageSourceProvider pageSourceProvider,
                 TableHandle table,
-                Iterable<ColumnHandle> columns)
+                Iterable<ColumnHandle> columns,
+                List<Type> types,
+                DataSize minOutputPageSize,
+                int minOutputPageRowCount)
         {
             this.operatorId = operatorId;
             this.sourceId = requireNonNull(sourceId, "sourceId is null");
             this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
             this.table = requireNonNull(table, "table is null");
             this.columns = ImmutableList.copyOf(requireNonNull(columns, "columns is null"));
+            this.types = requireNonNull(types, "types is null");
+            this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
+            this.minOutputPageRowCount = minOutputPageRowCount;
         }
 
         @Override
@@ -92,6 +103,10 @@ public class TableScanOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, getOperatorType());
+            if (table.getConnectorHandle().isSuitableForPushdown()) {
+                return new WorkProcessorSourceOperatorAdapter(operatorContext, this);
+            }
+
             return new TableScanOperator(
                     operatorContext,
                     sourceId,
@@ -113,7 +128,10 @@ public class TableScanOperator
                     splits,
                     pageSourceProvider,
                     table,
-                    columns);
+                    columns,
+                    types,
+                    minOutputPageSize,
+                    minOutputPageRowCount);
         }
 
         @Override

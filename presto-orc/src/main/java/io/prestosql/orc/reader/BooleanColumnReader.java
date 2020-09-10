@@ -229,6 +229,10 @@ public class BooleanColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Byte value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testBoolean(value != 0);
     }
 }

@@ -165,6 +165,10 @@ public class SliceColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, byte[] value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testBytes(value, 0, value.length);
     }
 }

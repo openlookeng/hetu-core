@@ -70,4 +70,9 @@ public interface ConnectorPageSource
     {
         return NOT_BLOCKED;
     }
+
+    default boolean needMergingForPages()
+    {
+        return false;
+    }
 }

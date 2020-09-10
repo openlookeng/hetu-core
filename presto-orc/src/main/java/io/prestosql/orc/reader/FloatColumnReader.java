@@ -231,6 +231,10 @@ public class FloatColumnReader
     @Override
     public boolean filterTest(TupleDomainFilter filter, Integer value)
     {
+        if (value == null) {
+            return filter.testNull();
+        }
+
         return filter.testFloat(Float.intBitsToFloat(value));
     }
 }
