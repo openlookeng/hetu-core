@@ -83,6 +83,7 @@ import static io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment.AS_
 import static io.prestosql.verifier.QueryType.CREATE;
 import static io.prestosql.verifier.QueryType.MODIFY;
 import static io.prestosql.verifier.QueryType.READ;
+import static io.prestosql.verifier.VerifierConstants.variableJdbcList;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
@@ -178,6 +179,9 @@ public class VerifyCommand
 
     private static void loadJdbcDriver(URL[] urls, String jdbcClassName)
     {
+        if (!variableJdbcList.contains(jdbcClassName)) {
+            throw new RuntimeException("Illegal jdbc driver name.");
+        }
         try (URLClassLoader classLoader = new URLClassLoader(urls)) {
             Driver driver = (Driver) Class.forName(jdbcClassName, true, classLoader).getConstructor().newInstance();
             // The code calling the DriverManager to load the driver needs to be in the same class loader as the driver

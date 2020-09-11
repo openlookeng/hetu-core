@@ -27,6 +27,8 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.hetu.core.plugin.hbase.utils.Constants.HBASE_DATA_TYPE_NAME_LIST;
+
 /**
  * Utils
  *
@@ -76,6 +78,9 @@ public class Utils
     public static Type createTypeByName(String type)
     {
         Type result = null;
+        if (!HBASE_DATA_TYPE_NAME_LIST.contains(type)) {
+            return Optional.ofNullable(result).orElse(result);
+        }
         try {
             Class clazz = Class.forName(type);
             Field[] fields = clazz.getFields();

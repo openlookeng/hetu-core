@@ -14,6 +14,21 @@
  */
 package io.hetu.core.plugin.hbase.utils;
 
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.BooleanType;
+import io.prestosql.spi.type.DateType;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.TimeType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TinyintType;
+import io.prestosql.spi.type.VarcharType;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * constants
  *
@@ -195,6 +210,24 @@ public class Constants
      * hdfs authentication kerberos
      */
     public static final String HDFS_AUTHENTICATION_KERBEROS = "KERBEROS";
+
+    /**
+     * type class names' list
+     */
+    public static final List<String> HBASE_DATA_TYPE_NAME_LIST = Collections.unmodifiableList(new ArrayList<String>() {
+        {
+            this.add(VarcharType.class.getName());
+            this.add(TinyintType.class.getName());
+            this.add(SmallintType.class.getName());
+            this.add(IntegerType.class.getName());
+            this.add(BigintType.class.getName());
+            this.add(DoubleType.class.getName());
+            this.add(BooleanType.class.getName());
+            this.add(TimeType.class.getName());
+            this.add(DateType.class.getName());
+            this.add(TimestampType.class.getName());
+        }
+    });
 
     private Constants() {}
 }

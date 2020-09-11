@@ -107,6 +107,7 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.toArray;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static io.prestosql.plugin.hive.s3.PrestoS3Constants.ENCRYPTIONMATERIALSPROVIDER_IMPL_LIST;
 import static java.lang.Math.max;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
@@ -730,6 +731,9 @@ public class PrestoS3FileSystem
         }
 
         try {
+            if (!ENCRYPTIONMATERIALSPROVIDER_IMPL_LIST.contains(empClassName)) {
+                throw new RuntimeException("Invalid provider class: " + empClassName);
+            }
             Object instance = Class.forName(empClassName).getConstructor().newInstance();
             if (!(instance instanceof EncryptionMaterialsProvider)) {
                 throw new RuntimeException("Invalid encryption materials provider class: " + instance.getClass().getName());
