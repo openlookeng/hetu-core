@@ -1,0 +1,24 @@
+local exchange (GATHER, SINGLE, [])
+    remote exchange (GATHER, SINGLE, [])
+        join (INNER, REPLICATED):
+            scan customer_demographics
+            local exchange (GATHER, SINGLE, [])
+                remote exchange (REPLICATE, BROADCAST, [])
+                    join (INNER, REPLICATED):
+                        scan store_returns
+                        local exchange (GATHER, SINGLE, [])
+                            remote exchange (REPLICATE, BROADCAST, [])
+                                join (INNER, PARTITIONED):
+                                    remote exchange (REPARTITION, HASH, ["hd_income_band_sk"])
+                                        join (INNER, REPLICATED):
+                                            scan household_demographics
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                    join (INNER, REPLICATED):
+                                                        scan customer
+                                                        local exchange (GATHER, SINGLE, [])
+                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                scan customer_address (pushdown = true)
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPARTITION, HASH, ["ib_income_band_sk"])
+                                            scan income_band (pushdown = true)

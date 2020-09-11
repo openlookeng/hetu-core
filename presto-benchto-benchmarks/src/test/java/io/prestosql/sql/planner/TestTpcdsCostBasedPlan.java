@@ -60,7 +60,7 @@ public class TestTpcdsCostBasedPlan
                     new TpcdsConnectorFactory(1),
                     ImmutableMap.of());
             return queryRunner;
-        });
+        }, false);
     }
 
     @Override
