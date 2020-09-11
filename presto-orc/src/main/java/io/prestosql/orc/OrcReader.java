@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -319,7 +320,8 @@ public class OrcReader
             Map<Integer, List<TupleDomainFilter>> additionalFilters,
             List<Integer> positions, boolean useDataCache,
             Map<Integer, Function<Block, Block>> coercer,
-            Map<String, List<Domain>> orDomains) throws OrcCorruptionException
+            Map<String, List<Domain>> orDomains,
+            Set<Integer> missingColumns) throws OrcCorruptionException
     {
         return new OrcSelectiveRecordReader(
                 outputColumns,
@@ -359,7 +361,8 @@ public class OrcReader
                 positions,
                 useDataCache,
                 coercer,
-                orDomains);
+                orDomains,
+                missingColumns);
     }
 
     public static OrcDataSource wrapWithCacheIfTiny(OrcDataSource dataSource, DataSize maxCacheSize)

@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -184,7 +185,8 @@ public class BenchmarkSelectiveColumnReaders
                     new ArrayList<>(),
                     false,
                     ImmutableMap.of(),
-                    ImmutableMap.of());
+                    ImmutableMap.of(),
+                    new HashSet<>());
         }
     }
 
