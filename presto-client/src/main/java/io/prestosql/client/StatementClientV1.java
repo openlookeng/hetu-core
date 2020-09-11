@@ -49,6 +49,18 @@ import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.net.HttpHeaders.USER_AGENT;
 import static io.airlift.json.JsonCodec.jsonCodec;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_CSP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_CSP_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_RP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_RP_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XFO;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XFO_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XXP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XXP_VALUE;
 import static java.lang.String.format;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.net.HttpURLConnection.HTTP_UNAVAILABLE;
@@ -177,6 +189,13 @@ class StatementClientV1
 
         builder.addHeader(PrestoHeaders.PRESTO_CLIENT_CAPABILITIES, clientCapabilities);
 
+        // add security header
+        builder.addHeader(HTTP_SECURITY_CSP, HTTP_SECURITY_CSP_VALUE);
+        builder.addHeader(HTTP_SECURITY_RP, HTTP_SECURITY_RP_VALUE);
+        builder.addHeader(HTTP_SECURITY_XCTO, HTTP_SECURITY_XCTO_VALUE);
+        builder.addHeader(HTTP_SECURITY_XFO, HTTP_SECURITY_XFO_VALUE);
+        builder.addHeader(HTTP_SECURITY_XPCDP, HTTP_SECURITY_XPCDP_VALUE);
+        builder.addHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
         return builder.build();
     }
 

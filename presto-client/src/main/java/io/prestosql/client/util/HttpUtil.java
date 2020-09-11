@@ -36,6 +36,18 @@ import java.util.Map;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.net.HttpHeaders.USER_AGENT;
 import static io.airlift.json.JsonCodec.jsonCodec;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_CSP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_CSP_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_RP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_RP_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XFO;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XFO_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP_VALUE;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XXP;
+import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XXP_VALUE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CATALOG;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CLIENT_CAPABILITIES;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CLIENT_INFO;
@@ -165,6 +177,13 @@ public class HttpUtil
         builder.addHeader(PRESTO_USER, session.getUser())
                 .addHeader(USER_AGENT, USER_AGENT_VALUE);
         builder.addHeader(ACCEPT_ENCODING_HEADER, "");
+        // add security header
+        builder.addHeader(HTTP_SECURITY_CSP, HTTP_SECURITY_CSP_VALUE);
+        builder.addHeader(HTTP_SECURITY_RP, HTTP_SECURITY_RP_VALUE);
+        builder.addHeader(HTTP_SECURITY_XCTO, HTTP_SECURITY_XCTO_VALUE);
+        builder.addHeader(HTTP_SECURITY_XFO, HTTP_SECURITY_XFO_VALUE);
+        builder.addHeader(HTTP_SECURITY_XPCDP, HTTP_SECURITY_XPCDP_VALUE);
+        builder.addHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
         return builder.url(url);
     }
 
