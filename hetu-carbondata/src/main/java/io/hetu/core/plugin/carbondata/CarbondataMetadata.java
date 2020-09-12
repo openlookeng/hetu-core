@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
+import io.airlift.units.Duration;
 import io.hetu.core.plugin.carbondata.impl.CarbondataTableCacheModel;
 import io.hetu.core.plugin.carbondata.impl.CarbondataTableReader;
 import io.prestosql.plugin.hive.BaseStorageFormat;
@@ -159,6 +160,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -256,7 +258,8 @@ public class CarbondataMetadata
         super(metastore, hdfsEnvironment, partitionManager, timeZone, allowCorruptWritesForTesting,
                 writesToNonManagedTablesEnabled, createsOfNonManagedTablesEnabled, tableCreatesWithLocationAllowed,
                 typeManager, locationService, partitionUpdateCodec, typeTranslator, hetuVersion,
-                hiveStatisticsProvider, accessControlMetadata, false, 2, 0.0, executorService);
+                hiveStatisticsProvider, accessControlMetadata, false, 2, 0.0, executorService,
+                Optional.of(new Duration(5, TimeUnit.MINUTES)));
         this.carbondataTableReader = carbondataTableReader;
         this.carbondataTableStore = carbondataTableStore;
         this.metadataLock = null;

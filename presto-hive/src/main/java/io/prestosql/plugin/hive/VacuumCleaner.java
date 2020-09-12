@@ -16,6 +16,7 @@ package io.prestosql.plugin.hive;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
+import io.prestosql.spi.PrestoException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -32,6 +33,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 
 public class VacuumCleaner
 {
@@ -81,39 +84,55 @@ public class VacuumCleaner
 
     void stopScheduledCleanupTask()
     {
-        log("Vacuum cleanup task completed");
+        log("Vacuum cleanup task Finished");
         cleanupTask.cancel(true);
     }
 
     private class CleanerTask
             implements Runnable
     {
+        private int maxCleanerAttempts = 5;
+        private int currentAttempt = 1;
+        private boolean stop;
+
         @Override
         public void run()
         {
-            log("Starting Vacuum cleaner task");
+            log("Starting Vacuum cleaner task. Attempt: " + currentAttempt);
 
-            if (!readyToClean()) {
-                log("Waiting for readers to finish");
-                return;
-            }
             try {
-                // All readers which had started before vacuum operation
-                // have been finished. Now we are ready to clean up.
-                String fullTableName = vacuumTableInfo.getDbName() + "." + vacuumTableInfo.getTableName();
-                long highestWriteId = vacuumTableInfo.getMaxId();
-                final ValidWriteIdList validWriteIdList = (highestWriteId > 0)
-                        ? new ValidReaderWriteIdList(fullTableName, new long[0], new BitSet(), highestWriteId)
-                        : new ValidReaderWriteIdList();
-                hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () -> {
-                    removeFiles(validWriteIdList);
-                });
+                if (!readyToClean()) {
+                    log("Waiting for readers to finish");
+                    currentAttempt++;
+                    if (currentAttempt <= maxCleanerAttempts) {
+                        return;
+                    }
+                    else {
+                        log("Vacuum Cleaner task reached to the maximum number of attempts.");
+                    }
+                }
+                else {
+                    // All readers which had started before vacuum operation
+                    // have been finished. Now we are ready to clean up.
+                    String fullTableName = vacuumTableInfo.getDbName() + "." + vacuumTableInfo.getTableName();
+                    long highestWriteId = vacuumTableInfo.getMaxId();
+                    final ValidWriteIdList validWriteIdList = (highestWriteId > 0)
+                            ? new ValidReaderWriteIdList(fullTableName, new long[0], new BitSet(), highestWriteId)
+                            : new ValidReaderWriteIdList();
+                    hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () -> {
+                        removeFiles(validWriteIdList);
+                    });
+                }
+                stop = true;
             }
             catch (Exception e) {
-                log.debug("Exception in Vacuum cleanup: ", e.getMessage());
+                log.info("Exception in Vacuum cleanup: ", e);
+                stop = true;
             }
             finally {
-                stopScheduledCleanupTask();
+                if (stop) {
+                    stopScheduledCleanupTask();
+                }
             }
         }
 
@@ -136,8 +155,7 @@ public class VacuumCleaner
                 fileSystem = filesToDelete.get(0).getFileSystem(configuration);
             }
             catch (IOException e) {
-                log("Failure while getting file system: " + e.getMessage());
-                return;
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failure while getting file system: " + e.getMessage());
             }
             for (Path filePath : filesToDelete) {
                 log(String.format("Removing directory on path : %s", filePath.toString()));
@@ -166,7 +184,7 @@ public class VacuumCleaner
                     return true;
                 }
             }
-            log(String.format("Number of readers = %i", lockIds.size()));
+            log(String.format("Number of readers = %d", lockIds.size()));
             Set<Long> currentLockIds = lockResponseToSet(response);
             for (Long lockId : lockIds) {
                 if (currentLockIds.contains(lockId)) {

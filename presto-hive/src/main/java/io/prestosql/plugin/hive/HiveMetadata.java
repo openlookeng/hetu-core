@@ -27,6 +27,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
+import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.metastore.Column;
@@ -153,6 +154,7 @@ import static io.prestosql.plugin.hive.HiveUtil.isPrestoView;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.plugin.hive.HiveUtil.verifyPartitionTypeSupported;
 import static io.prestosql.plugin.hive.HiveWriteUtils.isS3FileSystem;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_ANALYZE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SCHEMA_PROPERTY;
@@ -217,6 +219,7 @@ public class HiveMetadata
     private final double vacuumDeltaPercentThreshold;
     private final boolean autoVacuumEnabled;
     protected final ScheduledExecutorService vacuumExecutorService;
+    private final long vacuumCollectorInterval;
 
     private boolean externalTable;
 
@@ -239,7 +242,8 @@ public class HiveMetadata
             boolean autoVacuumEnabled,
             int vacuumDeltaNumThreshold,
             double vacuumDeltaPercentThreshold,
-            ScheduledExecutorService vacuumExecutorService)
+            ScheduledExecutorService vacuumExecutorService,
+            Optional<Duration> vacuumCollectorInterval)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
 
@@ -263,6 +267,8 @@ public class HiveMetadata
         this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
         this.autoVacuumEnabled = autoVacuumEnabled;
         this.vacuumExecutorService = vacuumExecutorService;
+        this.vacuumCollectorInterval = vacuumCollectorInterval.map(Duration::toMillis)
+                .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Vacuum collector interval is not set correctly"));
     }
 
     public SemiTransactionalHiveMetastore getMetastore()
@@ -1669,6 +1675,10 @@ public class HiveMetadata
     public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
     {
         HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, HiveACIDWriteType.VACUUM);
+        if ((!session.getSource().get().isEmpty()) &&
+                session.getSource().get().equals("auto-vacuum")) {
+            metastore.setVacuumTableHandle((HiveTableHandle) tableHandle);
+        }
         return new HiveVacuumTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
@@ -1687,10 +1697,6 @@ public class HiveMetadata
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
                 finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates, true);
 
-        if ((!session.getSource().get().isEmpty()) &&
-                session.getSource().get().equals("auto-vacuum")) {
-            VacuumEligibleTableCollector.finishVacuum(vacuumTableHandle.getSchemaName() + "." + vacuumTableHandle.getTableName());
-        }
         metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
         return connectorOutputMetadata;
     }
@@ -2807,7 +2813,7 @@ public class HiveMetadata
     {
         if (autoVacuumEnabled) {
             return VacuumEligibleTableCollector.getVacuumTableList(metastore, hdfsEnvironment,
-                    vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, vacuumExecutorService);
+                    vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, vacuumExecutorService, vacuumCollectorInterval);
         }
         return null;
     }

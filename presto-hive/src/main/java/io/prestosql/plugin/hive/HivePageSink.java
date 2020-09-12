@@ -27,12 +27,14 @@ import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.HiveVacuumTableHandle.Range;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PageIndexer;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.IntArrayBlockBuilder;
 import io.prestosql.spi.block.RowBlock;
+import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSink;
@@ -56,14 +58,18 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -324,6 +330,11 @@ public class HivePageSink
     {
         List<ConnectorPageSource> pageSources;
         Iterator<Page> sortedPagesForVacuum;
+        Set<Integer> allBucketList = new HashSet<>();
+        Map<String, Set<Integer>> partitionToBuckets = new HashMap<>();
+        Map<String, List<HivePartitionKey>> partitionToKeys = new HashMap<>();
+        AtomicInteger rowsWritten = new AtomicInteger();
+        AtomicBoolean emptyfileWriten = new AtomicBoolean();
 
         private VaccumOp(ConnectorPageSourceProvider pageSourceProvider,
                          ConnectorTransactionHandle transactionHandle,
@@ -335,6 +346,18 @@ public class HivePageSink
                 hiveSplits.addAll(((HiveSplitWrapper) split).getSplits());
             });
             vacuumOptions.set(getVacuumOptions(hiveSplits));
+            //In case of no
+            hiveSplits.stream().forEach(split -> {
+                String partitionName = split.getPartitionName();
+                if (partitionName != null && !partitionName.isEmpty()) {
+                    Set<Integer> partitionBuckets = partitionToBuckets.computeIfAbsent(partitionName,
+                            (partition) -> new HashSet<>());
+                    List<HivePartitionKey> partitionKeys = split.getPartitionKeys();
+                    partitionToKeys.put(partitionName, partitionKeys);
+                    partitionBuckets.add(split.getBucketNumber().orElse(0));
+                }
+                allBucketList.add(split.getBucketNumber().orElse(0));
+            });
 
             List<ColumnHandle> inputColumns = new ArrayList<>(HivePageSink.this.inputColumns);
             if (isInsertOnlyTable()) {
@@ -378,9 +401,60 @@ public class HivePageSink
             if (sortedPagesForVacuum.hasNext()) {
                 Page page = sortedPagesForVacuum.next();
                 appendPage(page);
+                rowsWritten.addAndGet(page.getPositionCount());
                 return page;
             }
+            if (rowsWritten.get() == 0) {
+                //In case this partition/table have 0 rows, then create empty file.
+                if (partitionToBuckets.isEmpty()) {
+                    createEmptyFiles(ImmutableList.of(), allBucketList);
+                }
+                else {
+                    partitionToBuckets.entrySet().stream().forEach(entry -> {
+                        String partitionName = entry.getKey();
+                        List<HivePartitionKey> partitionKeys = partitionToKeys.get(partitionName);
+                        Set<Integer> buckets = entry.getValue();
+                        createEmptyFiles(partitionKeys, buckets);
+                    });
+                }
+            }
             return null;
+        }
+
+        /*
+         * When all rows of table are deleted, then vacuum will not generate any of the compacted file.
+         * So at the end, need to generate empty bucket files in base directory to indicate all rows are deleted.
+         */
+        private synchronized void createEmptyFiles(List<HivePartitionKey> partitionKeys, Set<Integer> bucketNumbers)
+        {
+            if (emptyfileWriten.get()) {
+                return;
+            }
+            PageBuilder builder;
+            if (partitionKeys != null && !partitionKeys.isEmpty()) {
+                List<Type> partitionTypes = inputColumns.stream()
+                        .filter(HiveColumnHandle::isPartitionKey)
+                        .map(HiveColumnHandle::getHiveType)
+                        .map((t) -> t.getType(typeManager))
+                        .collect(toList());
+                builder = new PageBuilder(partitionTypes);
+                for (int i = 0; i < partitionKeys.size(); i++) {
+                    HivePartitionKey partitionKey = partitionKeys.get(i);
+                    Type type = partitionTypes.get(i);
+                    Object partitionColumnValue = HiveUtil.typedPartitionKey(partitionKey.getValue(), type, partitionKey.getName(), null);
+                    RunLengthEncodedBlock block = RunLengthEncodedBlock.create(type, partitionColumnValue, 1);
+                    type.appendTo(block, 0, builder.getBlockBuilder(i));
+                }
+                builder.declarePosition();
+            }
+            else {
+                builder = new PageBuilder(ImmutableList.of());
+            }
+            Page partitionColumns = builder.build();
+            bucketNumbers.forEach((bucket) -> {
+                writers.add(writerFactory.createWriter(partitionColumns, 0, OptionalInt.of(bucket), Optional.of(vacuumOptions.get())));
+            });
+            emptyfileWriten.compareAndSet(false, true);
         }
 
         boolean isFinished()

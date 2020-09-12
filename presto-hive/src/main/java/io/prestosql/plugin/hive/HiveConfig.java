@@ -204,8 +204,9 @@ public class HiveConfig
 
     private boolean tlsEnabled;
 
-    private Optional<Duration> vacuumCleanupRecheckInterval = Optional.of(new Duration(1, MINUTES));
+    private Optional<Duration> vacuumCleanupRecheckInterval = Optional.of(new Duration(5, MINUTES));
     private int vacuumServiceThreads = 2;
+    private Optional<Duration> vacuumCollectorInterval = Optional.of(new Duration(5, MINUTES));
 
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
@@ -1735,5 +1736,19 @@ public class HiveConfig
     public boolean isOrcPredicatePushdownEnabled()
     {
         return orcPredicatePushdownEnabled;
+    }
+
+    @Config("hive.vacuum-collector-interval")
+    @ConfigDescription("Interval after which vacuum collector task will be resubmitted")
+    public HiveConfig setVacuumCollectorInterval(Duration interval)
+    {
+        this.vacuumCollectorInterval = Optional.ofNullable(interval);
+        return this;
+    }
+
+    @NotNull
+    public Optional<Duration> getVacuumCollectorInterval()
+    {
+        return vacuumCollectorInterval;
     }
 }

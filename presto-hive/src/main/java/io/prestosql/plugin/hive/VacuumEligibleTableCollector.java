@@ -70,8 +70,8 @@ public class VacuumEligibleTableCollector
     }
 
     public static synchronized void createInstance(SemiTransactionalHiveMetastore metastore,
-            HdfsEnvironment hdfsEnvironment,
-            int vacuumDeltaNumThreshold, double vacuumDeltaPercentThreshold, ScheduledExecutorService executorService)
+            HdfsEnvironment hdfsEnvironment, int vacuumDeltaNumThreshold, double vacuumDeltaPercentThreshold,
+            ScheduledExecutorService executorService, long vacuumCollectorInterval)
     {
         if (instance == null) {
             instance = new VacuumEligibleTableCollector(metastore, hdfsEnvironment, vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, executorService);
@@ -84,22 +84,22 @@ public class VacuumEligibleTableCollector
             }
             // Also start preparing vacuumTableList
             instance.executorService.scheduleAtFixedRate(instance.task,
-                    0, 1, TimeUnit.MINUTES);
+                    0, vacuumCollectorInterval, TimeUnit.MILLISECONDS);
         }
     }
 
     public static void finishVacuum(String schemaTable)
     {
-        instance.inProgressVacuums.remove(schemaTable);
+        if (instance.inProgressVacuums.containsKey(schemaTable)) {
+            instance.inProgressVacuums.remove(schemaTable);
+        }
     }
 
     static List<ConnectorVacuumTableInfo> getVacuumTableList(SemiTransactionalHiveMetastore metastore,
-                                                                                 HdfsEnvironment hdfsEnvironment,
-                                                                                 int vacuumDeltaNumThreshold,
-                                                                                 double vacuumDeltaPercentThreshold,
-                                                                                 ScheduledExecutorService executorService)
+                    HdfsEnvironment hdfsEnvironment, int vacuumDeltaNumThreshold,
+                    double vacuumDeltaPercentThreshold, ScheduledExecutorService executorService, long vacuumCollectorInterval)
     {
-        createInstance(metastore, hdfsEnvironment, vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, executorService);
+        createInstance(metastore, hdfsEnvironment, vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, executorService, vacuumCollectorInterval);
         synchronized (instance) {
             instance.metastore = metastore;
             ImmutableList<ConnectorVacuumTableInfo> newList = ImmutableList.copyOf(instance.vacuumTableList);
@@ -134,53 +134,73 @@ public class VacuumEligibleTableCollector
         @Override
         public void run()
         {
+            try {
+                collectTablesForVacuum();
+            }
+            catch (Exception e) {
+                log.info("Error while collecting tables for auto-vacuum", e);
+            }
+        }
+
+        private void collectTablesForVacuum()
+        {
             SemiTransactionalHiveMetastore taskMetastore = metastore;
             List<String> databases = taskMetastore.getAllDatabases();
             for (String database : databases) {
                 //Let each database get analyzed asynchronously.
                 executorService.submit(() -> {
-                    Optional<List<String>> tables = taskMetastore.getAllTables(database);
-                    if (tables.isPresent()) {
-                        List<ConnectorVacuumTableInfo> tablesForVacuum = new ArrayList<>();
-                        for (String table : tables.get()) {
-                            if (inProgressVacuums.containsKey(database + "." + table)) {
-                                continue;
-                            }
-                            Table tableInfo = getTable(database, table, taskMetastore);
-                            if (isTransactional(tableInfo)) {
-                                Optional<List<String>> partitions = taskMetastore.getPartitionNames(database, table);
-                                String tablePath = getLocation(tableInfo);
-                                HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(
-                                        new ConnectorIdentity("openLooKeng", Optional.empty(), Optional.empty()));
-                                hdfsEnvironment.doAs("openLooKeng", () -> {
-                                    try {
-                                        // For Hive partitioned table
-                                        if (partitions.isPresent() && partitions.get().size() > 0) {
-                                            for (String partitionName : partitions.get()) {
-                                                String partitionPath = tablePath + "/" + partitionName;
-                                                boolean updated = determineVacuumType(partitionPath, database, table, tablesForVacuum, tableInfo.getParameters(), hdfsContext);
-                                                // If auto-vacuum condition satisfies for 1 partition,
-                                                // stop checking for other partitions. Since auto-vacuum runs
-                                                // on entire table.
-                                                if (updated) {
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        else {
-                                            determineVacuumType(tablePath, database, table, tablesForVacuum, tableInfo.getParameters(), hdfsContext);
-                                        }
-                                    }
-                                    catch (Exception e) {
-                                        // Ignore for now
-                                        e.printStackTrace();
-                                    }
-                                });
-                            }
-                        }
-                        addToVacuumTableList(tablesForVacuum);
+                    try {
+                        scanDatabase(database, taskMetastore);
+                    }
+                    catch (Exception e) {
+                        log.info("Error while scanning database for vacuum", e);
                     }
                 });
+            }
+        }
+
+        private void scanDatabase(String database, SemiTransactionalHiveMetastore taskMetastore)
+        {
+            Optional<List<String>> tables = taskMetastore.getAllTables(database);
+            if (tables.isPresent()) {
+                List<ConnectorVacuumTableInfo> tablesForVacuum = new ArrayList<>();
+                for (String table : tables.get()) {
+                    if (inProgressVacuums.containsKey(appendTableWithSchema(database, table))) {
+                        log.debug("Auto-vacuum is in progress for table: " + appendTableWithSchema(database, table));
+                        continue;
+                    }
+                    Table tableInfo = getTable(database, table, taskMetastore);
+                    if (isTransactional(tableInfo)) {
+                        Optional<List<String>> partitions = taskMetastore.getPartitionNames(database, table);
+                        String tablePath = getLocation(tableInfo);
+                        HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(
+                                new ConnectorIdentity("openLooKeng", Optional.empty(), Optional.empty()));
+                        hdfsEnvironment.doAs("openLooKeng", () -> {
+                            try {
+                                // For Hive partitioned table
+                                if (partitions.isPresent() && partitions.get().size() > 0) {
+                                    for (String partitionName : partitions.get()) {
+                                        String partitionPath = tablePath + "/" + partitionName;
+                                        boolean updated = determineVacuumType(partitionPath, database, table, tablesForVacuum, tableInfo.getParameters(), hdfsContext);
+                                        // If auto-vacuum condition satisfies for 1 partition,
+                                        // stop checking for other partitions. Since auto-vacuum runs
+                                        // on entire table.
+                                        if (updated) {
+                                            break;
+                                        }
+                                    }
+                                }
+                                else {
+                                    determineVacuumType(tablePath, database, table, tablesForVacuum, tableInfo.getParameters(), hdfsContext);
+                                }
+                            }
+                            catch (Exception e) {
+                                log.info("Exception while determining vacuum type for table: " + database + "." + table, e);
+                            }
+                        });
+                    }
+                }
+                addToVacuumTableList(tablesForVacuum);
             }
         }
 
@@ -220,13 +240,16 @@ public class VacuumEligibleTableCollector
             for (AcidUtils.ParsedDelta delta : deltas) {
                 deltaSize += sumDirSize(fs, delta.getPath());
             }
+
+            logStats(schema, table, baseSize, deltaSize, dir.getCurrentDirectories().size());
+
             if (baseSize == 0 && deltaSize > 0) {
                 noBase = true;
             }
             else {
                 boolean bigEnough = (float) deltaSize / (float) baseSize > vacuumDeltaPercentThreshold;
                 if (bigEnough) {
-                    ConnectorVacuumTableInfo vacuumTable = new ConnectorVacuumTableInfo(schema + "." + table, true);
+                    ConnectorVacuumTableInfo vacuumTable = new ConnectorVacuumTableInfo(appendTableWithSchema(schema, table), true);
                     tablesForVacuum.add(vacuumTable);
                     return true;
                 }
@@ -237,11 +260,25 @@ public class VacuumEligibleTableCollector
                 if (AcidUtils.isInsertOnlyTable(parameters) || noBase) {
                     isFull = true;
                 }
-                ConnectorVacuumTableInfo vacuumTable = new ConnectorVacuumTableInfo(schema + "." + table, isFull);
+                ConnectorVacuumTableInfo vacuumTable = new ConnectorVacuumTableInfo(appendTableWithSchema(schema, table), isFull);
                 tablesForVacuum.add(vacuumTable);
                 return true;
             }
             return false;
+        }
+
+        private void logStats(String schema, String table, long baseSize, long deltaSize, int numOfDeltaDir)
+        {
+            log.debug(String.format("Auto-vacuum stats for table '%s': baseSize='%d', delatSize='%d', numOfDeltaDir='%d'",
+                    appendTableWithSchema(schema, table),
+                    baseSize,
+                    deltaSize,
+                    numOfDeltaDir));
+        }
+
+        private String appendTableWithSchema(String schema, String table)
+        {
+            return schema + "." + table;
         }
 
         public AcidUtils.Directory getDirectory(HdfsEnvironment.HdfsContext hdfsContext, Path tablePath)
