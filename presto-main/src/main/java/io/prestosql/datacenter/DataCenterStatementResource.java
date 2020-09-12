@@ -14,16 +14,15 @@
  */
 package io.prestosql.datacenter;
 
-import io.airlift.concurrent.BoundedExecutor;
 import io.prestosql.client.CrossRegionDynamicFilterRequest;
 import io.prestosql.client.CrossRegionDynamicFilterResponse;
 import io.prestosql.client.DataCenterRequest;
 import io.prestosql.client.DataCenterResponse;
 import io.prestosql.client.DataCenterResponseType;
+import io.prestosql.dispatcher.DispatchExecutor;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.operator.ExchangeClientSupplier;
-import io.prestosql.server.ForStatementResource;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.server.SessionContext;
 import io.prestosql.server.protocol.PagePublisherQueryManager;
@@ -52,7 +51,6 @@ import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
 import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
 
 import static java.util.Objects.isNull;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
@@ -73,16 +71,14 @@ public class DataCenterStatementResource
             DispatchManager dispatchManager,
             BlockEncodingSerde blockEncodingSerde,
             ExchangeClientSupplier exchangeClientSupplier,
-            @ForStatementResource BoundedExecutor responseExecutor,
-            @ForStatementResource ScheduledExecutorService timeoutExecutor,
+            DispatchExecutor dispatchExecutor,
             StateStoreProvider stateStoreProvider)
     {
         this.queryManager = new PagePublisherQueryManager(dispatchManager,
                 queryManager,
                 exchangeClientSupplier,
                 blockEncodingSerde,
-                responseExecutor,
-                timeoutExecutor,
+                dispatchExecutor,
                 stateStoreProvider,
                 hetuConfig.getDataCenterConsumerTimeout());
         int noOfSplits = hetuConfig.getDataCenterSplits();
