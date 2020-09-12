@@ -15,12 +15,12 @@
 package io.prestosql.server.protocol;
 
 import com.google.common.collect.Sets;
-import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.client.DataCenterQueryResults;
 import io.prestosql.client.StatementStats;
+import io.prestosql.dispatcher.DispatchExecutor;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.operator.ExchangeClientSupplier;
@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.airlift.concurrent.Threads.threadsNamed;
@@ -67,7 +68,7 @@ public class PagePublisherQueryManager
     private final QueryManager queryManager;
     private final ExchangeClientSupplier exchangeClientSupplier;
     private final BlockEncodingSerde blockEncodingSerde;
-    private final BoundedExecutor responseExecutor;
+    private final Executor responseExecutor;
     private final ScheduledExecutorService timeoutExecutor;
     private final StateStoreProvider stateStoreProvider;
     private final Duration pageConsumerTimeout;
@@ -77,8 +78,7 @@ public class PagePublisherQueryManager
             QueryManager queryManager,
             ExchangeClientSupplier exchangeClientSupplier,
             BlockEncodingSerde blockEncodingSerde,
-            BoundedExecutor responseExecutor,
-            ScheduledExecutorService timeoutExecutor,
+            DispatchExecutor dispatchExecutor,
             StateStoreProvider stateStoreProvider,
             Duration pageConsumerTimeout)
     {
@@ -86,8 +86,8 @@ public class PagePublisherQueryManager
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
         this.exchangeClientSupplier = requireNonNull(exchangeClientSupplier, "exchangeClientSupplier is null");
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
-        this.responseExecutor = requireNonNull(responseExecutor, "responseExecutor is null");
-        this.timeoutExecutor = requireNonNull(timeoutExecutor, "timeoutExecutor is null");
+        this.responseExecutor = requireNonNull(dispatchExecutor, "dispatchExecutor is null").getExecutor();
+        this.timeoutExecutor = requireNonNull(dispatchExecutor, "dispatchExecutor is null").getScheduledExecutor();
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
         this.pageConsumerTimeout = requireNonNull(pageConsumerTimeout, "pageConsumerTimeout is null");
         this.queryPurger.scheduleWithFixedDelay(
