@@ -36,6 +36,7 @@ import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeNotFoundException;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import org.joda.time.DateTimeZone;
 
@@ -69,6 +70,7 @@ public class OrcSelectiveRecordReader
     Map<Integer, Type> includedColumns;
 
     private final Map<Integer, Object> constantValues;
+
     Set<Integer> colReaderWithFilter;
     Set<Integer> colReaderWithORFilter;
     Set<Integer> colReaderWithoutFilter;
@@ -213,7 +215,19 @@ public class OrcSelectiveRecordReader
         SelectiveColumnReader[] columnReaders = getColumnReaders();
         if (positionCount != 0) {
             for (Integer columnIdx : colReaderWithFilter) {
-                if (columnReaders[columnIdx] != null) {
+                if (columnIdx < 0) {
+                    if (!matchConstantWithPredicate(includedColumns.get(columnIdx), constantValues.get(columnIdx), filters.get(columnIdx))) {
+                        positionCount = 0;
+                        break;
+                    }
+                }
+                else if (missingColumns.contains(columnIdx)) {
+                    if (!filters.get(columnIdx).testNull()) {
+                        positionCount = 0;
+                        break;
+                    }
+                }
+                else if (columnReaders[columnIdx] != null) {
                     positionCount = columnReaders[columnIdx].read(getNextRowInGroup(), positionsToRead, positionCount, filters.get(columnIdx));
                     if (positionCount == 0) {
                         break;
@@ -223,12 +237,6 @@ public class OrcSelectiveRecordReader
                     // input to the next column
                     positionsToRead = columnReaders[columnIdx].getReadPositions();
                 }
-                else if (missingColumns.contains(columnIdx)) {
-                    if (!filters.get(columnIdx).testNull()) {
-                        positionCount = 0;
-                        break;
-                    }
-                }
             }
         }
 
@@ -237,16 +245,20 @@ public class OrcSelectiveRecordReader
         if (colReaderWithORFilter.size() > 0 && positionCount > 0) {
             int localPositionCount = positionCount;
             for (Integer columnIdx : colReaderWithORFilter) {
-                if (columnReaders[columnIdx] != null) {
-                    localPositionCount += columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, additionalFilters.get(columnIdx), accumulator);
+                if (columnIdx < 0) {
+                    if (matchConstantWithPredicate(includedColumns.get(columnIdx), constantValues.get(columnIdx), additionalFilters.get(columnIdx).get(0))) {
+                        /* Skip OR filtering all will match */
+                        accumulator.set(positionsToRead[0], positionsToRead[positionCount - 1] + 1);
+                    }
                 }
                 else if (missingColumns.contains(columnIdx)) {
-                    boolean condMatch = additionalFilters.get(columnIdx).get(0).testNull();
-                    for (int i = 0; i < positionCount; i++) {
-                        if (condMatch || accumulator.get(i)) {
-                            accumulator.set(i);
-                        }
+                    if (additionalFilters.get(columnIdx).get(0).testNull()) {
+                        /* Skip OR filtering all will match */
+                        accumulator.set(positionsToRead[0], positionsToRead[positionCount - 1] + 1);
                     }
+                }
+                else if (columnReaders[columnIdx] != null) {
+                    localPositionCount += columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, additionalFilters.get(columnIdx), accumulator);
                 }
             }
 
@@ -384,6 +396,9 @@ public class OrcSelectiveRecordReader
         colReaderWithFilter = new IntArraySet();
         colReaderWithORFilter = new IntArraySet();
         colReaderWithoutFilter = new IntArraySet();
+        IntArraySet remainingColumns = new IntArraySet();
+        remainingColumns.addAll(includedColumns.keySet());
+
         for (int i = 0; i < fieldCount; i++) {
             if (includedColumns.containsKey(i)) {
                 int columnIndex = i;
@@ -422,6 +437,21 @@ public class OrcSelectiveRecordReader
                 else {
                     colReaderWithoutFilter.add(columnIndex);
                 }
+
+                remainingColumns.remove(columnIndex);
+            }
+        }
+
+        /* if any still remaining colIdx < 0 */
+        remainingColumns.removeAll(missingColumns);
+        for (Integer col : remainingColumns) {
+            if (col < 0) { /* should be always true! */
+                if (filters.get(col) != null) {
+                    colReaderWithFilter.add(col);
+                }
+                else if (additionalFilters.get(col) != null && additionalFilters.get(col).size() > 0) {
+                    colReaderWithORFilter.add(col);
+                }
             }
         }
 
@@ -436,5 +466,46 @@ public class OrcSelectiveRecordReader
         }
 
         return columnReaders;
+    }
+
+    private boolean matchConstantWithPredicate(Type type, Object value, TupleDomainFilter filter)
+    {
+        if (value == null) {
+            return filter.testNull();
+        }
+        else if (type.getJavaType() == boolean.class) {
+            return filter.testBoolean((Boolean) value);
+        }
+        else if (type.getJavaType() == double.class) {
+            return filter.testDouble(((Number) value).doubleValue());
+        }
+        else if (type.getJavaType() == float.class) {
+            return filter.testFloat(((Number) value).floatValue());
+        }
+        else if (type.getJavaType() == long.class) {
+            return filter.testLong(((Number) value).longValue());
+        }
+        else if (type.getJavaType() == int.class) {
+            return filter.testLong(((Number) value).intValue());
+        }
+        else if (type.getJavaType() == Slice.class) {
+            byte[] strVal;
+            if (value instanceof byte[]) {
+                strVal = (byte[]) value;
+            }
+            else if (value instanceof String) {
+                strVal = ((String) value).getBytes();
+            }
+            else {
+                strVal = ((Slice) value).getBytes();
+            }
+            return filter.testBytes(strVal, 0, strVal.length);
+        }
+        else if (type.getJavaType() == long[].class) {
+            long[] data = (long[]) value;
+            return filter.testDecimal(data[0], data[1]);
+        }
+
+        throw new TypeNotFoundException(type.getTypeSignature());
     }
 }

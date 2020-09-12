@@ -410,6 +410,7 @@ public class OrcSelectivePageSourceFactory
             additionalDomainPredicates.stream()
                     .forEach(ap -> ap.getDomains().get().forEach((k, v) -> additionalPredicateDomains.merge(k, v, (v1, v2) -> v1.union(v2))));
 
+            boolean hasParitionKeyORPredicate = additionalPredicateDomains.keySet().stream().anyMatch(c -> c.isPartitionKey());
             Map<String, List<Domain>> orDomains = new ConcurrentHashMap<>();
             Set<Integer> missingColumns = new HashSet<>();
             for (HiveColumnHandle column : columns) {
@@ -440,7 +441,7 @@ public class OrcSelectivePageSourceFactory
                     }
 
                     domain = additionalPredicateDomains.get(column);
-                    if (domain != null) {
+                    if (!hasParitionKeyORPredicate && domain != null) {
                         predicateBuilder.addOrColumn(orcColumn.getColumnId(), domain);
                         orDomains.computeIfAbsent(column.getName(), l -> new ArrayList<>()).add(domain);
                     }

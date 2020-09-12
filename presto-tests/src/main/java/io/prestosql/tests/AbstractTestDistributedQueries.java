@@ -1074,4 +1074,34 @@ public abstract class AbstractTestDistributedQueries
                         "SELECT count(DISTINCT a), CAST(max(b) AS VARCHAR) FROM t",
                 "VALUES (1, '0 00:00:01.000')");
     }
+
+    @Test
+    public void testDisjunctPredicateWithPartitionKey()
+    {
+        if (supportsPushdown()) {
+            assertUpdate("CREATE TABLE test_partition_predicate (id int, p1 char, p2 int) WITH (partitioned_by=ARRAY['p2'])");
+            assertTrue(getQueryRunner().tableExists(getSession(), "test_partition_predicate"));
+            assertTableColumnNames("test_partition_predicate", "id", "p1", "p2");
+
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (1,'a',1), (2,'b',2), (3,'c',3)", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (4,'d',4), (5,'e',5), (6,'f',6)", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (7,'g',7), (8,'h',8), (9,'i',9)", 3);
+
+            assertQuery(getSession(),
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id",
+                    "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9)");
+
+            Session session1 = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .build();
+            assertQuery(session1,
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id",
+                    "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9)");
+
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (10,'j',10)", 1);
+            assertQuery(session1,
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id",
+                    "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9), (10,'j',10)");
+        }
+    }
 }
