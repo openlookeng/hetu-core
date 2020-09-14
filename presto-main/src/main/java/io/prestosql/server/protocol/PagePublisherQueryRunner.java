@@ -130,7 +130,7 @@ public class PagePublisherQueryRunner
         this.queryResults = new LinkedBlockingQueue<>(maxSubscribersLimit);
         this.consumers = new HashMap<>(maxSubscribersLimit);
         this.stateStoreProvider = stateStoreProvider;
-        start();
+        this.executor.execute(this::start);
     }
 
     public String getSlug()
