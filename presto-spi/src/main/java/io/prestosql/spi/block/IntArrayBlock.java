@@ -247,9 +247,11 @@ public class IntArrayBlock
         int matchCount = 0;
         for (int i = 0; i < positionCount; i++) {
             if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset]) {
-                continue;
+                if (test.apply(null)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
-            if (test.apply(values[positions[i] + arrayOffset])) {
+            else if (test.apply(values[positions[i] + arrayOffset])) {
                 matchedPositions[matchCount++] = positions[i];
             }
         }

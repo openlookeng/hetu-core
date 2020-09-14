@@ -253,12 +253,16 @@ public class Int128ArrayBlock
         long[] val = new long[2];
         for (int i = 0; i < positionCount; i++) {
             if (valueIsNull != null && valueIsNull[positions[i] + positionOffset]) {
-                continue;
+                if (test.apply(null)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
-            val[0] = values[(positions[i] + positionOffset) * 2];
-            val[1] = values[((positions[i] + positionOffset) * 2) + 1];
-            if (test.apply(val)) {
-                matchedPositions[matchCount++] = positions[i];
+            else {
+                val[0] = values[(positions[i] + positionOffset) * 2];
+                val[1] = values[((positions[i] + positionOffset) * 2) + 1];
+                if (test.apply(val)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
         }
 

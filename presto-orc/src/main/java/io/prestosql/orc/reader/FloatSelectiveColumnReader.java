@@ -152,6 +152,9 @@ public class FloatSelectiveColumnReader
         int streamPosition = 0;
         if (dataStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
+            if (filters != null && filters.get(0).testNull() && accumulator != null) {
+                accumulator.set(positions[0], streamPosition);
+            }
         }
         else if (filters == null) {
             streamPosition = readNoFilter(positions, positionCount);
@@ -245,6 +248,9 @@ public class FloatSelectiveColumnReader
                 if (nullsAllowed) {
                     if (outputRequired) {
                         nulls[outputPositionCount] = true;
+                    }
+                    if (accumulator != null) {
+                        accumulator.set(position);
                     }
                     outputPositions[outputPositionCount] = position;
                     outputPositionCount++;

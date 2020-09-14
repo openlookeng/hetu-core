@@ -176,6 +176,9 @@ public abstract class AbstractDecimalSelectiveColumnReader<T>
         outputPositionCount = 0;
         if (dataStream == null && scaleStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
+            if (filters != null && filters.get(0).testNull() && accumulator != null) {
+                accumulator.set(positions[0], streamPosition);
+            }
         }
         else if (filters == null) {
             streamPosition = readNoFilter(positions, positionCount);

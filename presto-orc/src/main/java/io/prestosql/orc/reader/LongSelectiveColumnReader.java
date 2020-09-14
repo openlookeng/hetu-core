@@ -203,6 +203,9 @@ public class LongSelectiveColumnReader
         int streamPosition = 0;
         if (dataStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
+            if (filters != null && filters.get(0).testNull() && accumulator != null) {
+                accumulator.set(positions[0], streamPosition);
+            }
         }
         else {
             for (int i = 0; i < positionCount; i++) {
@@ -220,6 +223,9 @@ public class LongSelectiveColumnReader
                         }
                         if (filters != null) {
                             outputPositions[outputPositionCount] = position;
+                        }
+                        if (accumulator != null) {
+                            accumulator.set(position);
                         }
                         outputPositionCount++;
                     }

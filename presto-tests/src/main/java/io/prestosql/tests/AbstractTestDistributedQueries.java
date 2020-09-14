@@ -1087,21 +1087,43 @@ public abstract class AbstractTestDistributedQueries
             assertUpdate("INSERT INTO test_partition_predicate VALUES (4,'d',4), (5,'e',5), (6,'f',6)", 3);
             assertUpdate("INSERT INTO test_partition_predicate VALUES (7,'g',7), (8,'h',8), (9,'i',9)", 3);
 
-            assertQuery(getSession(),
-                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id",
+            String sql = "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id";
+            assertQuery(getSession(), sql,
                     "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9)");
 
             Session session1 = Session.builder(getSession())
                     .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
                     .build();
-            assertQuery(session1,
-                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id",
+            assertQuery(session1, sql,
                     "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9)");
 
             assertUpdate("INSERT INTO test_partition_predicate VALUES (10,'j',10)", 1);
-            assertQuery(session1,
-                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1='b' or p2>3) ORDER BY id",
+            assertQuery(session1, sql,
                     "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9), (10,'j',10)");
+
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (11,NULL,11), (12,NULL,NULL), (NULL,NULL,NULL)", 3);
+
+            /* NUlls Excluded */
+            MaterializedResult resultNormal = computeActual(sql);
+            MaterializedResult resultPushdown = computeActual(session1, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+
+            /* NUlls Included */
+            sql = "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 IS NULL or p2<3) ORDER BY id, p1";
+            resultPushdown = computeActual(session1, sql);
+            resultNormal = computeActual(sql);
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+
+            /* Query Test with Cache */
+            Session session2 = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "true")
+                    .build();
+            assertQuery(session2, "CACHE TABLE test_partition_predicate WHERE p2 > 0", "VALUES ('OK')");
+
+            MaterializedResult resultCachePushdown = computeActual(session2, sql);
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
         }
     }
 }

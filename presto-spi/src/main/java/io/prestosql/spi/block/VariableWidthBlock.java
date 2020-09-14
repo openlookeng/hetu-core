@@ -242,12 +242,15 @@ public class VariableWidthBlock
         int matchCount = 0;
         for (int i = 0; i < positionCount; i++) {
             if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset]) {
-                continue;
+                if (test.apply(null)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
-
-            byte[] value = slice.slice(offsets[i + arrayOffset], offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]).getBytes();
-            if (test.apply(value)) {
-                matchedPositions[matchCount++] = positions[i];
+            else {
+                byte[] value = slice.slice(offsets[i + arrayOffset], offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]).getBytes();
+                if (test.apply(value)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
         }
 
@@ -257,6 +260,9 @@ public class VariableWidthBlock
     @Override
     public byte[] get(int position)
     {
+        if (valueIsNull != null && valueIsNull[position + arrayOffset]) {
+            return null;
+        }
         return slice.slice(offsets[position + arrayOffset], offsets[position + arrayOffset + 1] - offsets[position + arrayOffset]).getBytes();
     }
 }

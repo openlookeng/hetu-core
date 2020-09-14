@@ -146,6 +146,11 @@ public class LongDecimalSelectiveColumnReader
                     if (outputRequired) {
                         nulls[outputPositionCount] = true;
                     }
+
+                    if (accumulator != null) {
+                        accumulator.set(position);
+                    }
+
                     outputPositions[outputPositionCount] = position;
                     outputPositionCount++;
                 }
