@@ -548,12 +548,17 @@ public class CarbondataMetadata
         currentState = State.VACUUM;
         HiveInsertTableHandle insertTableHandle = super.beginInsert(session, tableHandle);
         this.user = session.getUser();
-        return hdfsEnvironment.doAs(user, () -> {
-            SchemaTableName tableName = insertTableHandle.getSchemaTableName();
-            Optional<Table> table =
-                    this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
-            this.table = table;
+        SchemaTableName tableName = insertTableHandle.getSchemaTableName();
+        this.table =
+                this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
 
+        try {
+            hdfsEnvironment.getFileSystem(new HdfsEnvironment.HdfsContext(session, table.get().getDatabaseName()), new Path(table.get().getStorage().getLocation()));
+        }
+        catch (IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to get file system" + e.getMessage());
+        }
+        return hdfsEnvironment.doAs(user, () -> {
             // Fill this conf here and use it in finishVacuum also
             initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment
                     .getConfiguration(

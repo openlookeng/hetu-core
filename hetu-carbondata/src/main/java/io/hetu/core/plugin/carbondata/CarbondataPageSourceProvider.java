@@ -24,6 +24,7 @@ import io.prestosql.plugin.hive.HivePageSourceProvider;
 import io.prestosql.plugin.hive.HiveRecordCursorProvider;
 import io.prestosql.plugin.hive.HiveSplit;
 import io.prestosql.plugin.hive.HiveSplitWrapper;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -38,9 +39,11 @@ import org.apache.carbondata.core.util.ThreadLocalSessionInfo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.hive.ql.io.AcidUtils.isFullAcidTable;
 
@@ -81,6 +84,12 @@ public class CarbondataPageSourceProvider
             return super.createPageSource(transactionHandle, session, split, table, columns);
         }
 
+        try {
+            hdfsEnvironment.getFileSystem(new HdfsEnvironment.HdfsContext(session, carbonSplit.getDatabase()), new Path(carbonSplit.getSchema().getProperty("tablePath")));
+        }
+        catch (IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to get file system: " + e.getMessage());
+        }
         return hdfsEnvironment.doAs(session.getUser(), () -> {
             Configuration configuration = this.hdfsEnvironment.getConfiguration(
                     new HdfsEnvironment.HdfsContext(session, carbonSplit.getDatabase(), carbonSplit.getTable()),
