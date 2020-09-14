@@ -167,7 +167,8 @@ public class Console
                     }
                 }
             }
-            session.setConsolePrintEnable(cliOptions.execute != null);
+            session.setDebugEnable(cliOptions.debug != null && cliOptions.debug.equalsIgnoreCase("true"));
+            session.setConsolePrintEnable(cliOptions.execute != null || session.isDebugEnable());
             return executeCommand(query, outputFile, session);
         }
 
@@ -354,6 +355,9 @@ public class Console
             StatementSplitter splitter = new StatementSplitter(query);
             SqlSyntaxConverter sqlConverter = SqlConverterFactory.getSqlConverter(session);
             for (StatementSplitter.Statement split : splitter.getCompleteStatements()) {
+                if (session.isDebugEnable()) {
+                    log.info(String.format("Processing sql: %s", split.toString()));
+                }
                 JSONObject result = sqlConverter.convert(split.statement());
                 output.put(result);
                 if (session.isConsolePrintEnable()) {

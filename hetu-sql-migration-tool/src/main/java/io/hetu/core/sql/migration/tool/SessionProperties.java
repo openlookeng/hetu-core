@@ -26,6 +26,7 @@ public class SessionProperties
     private ParsingOptions parsingOptions;
     private MigrationConfig migrationConfig;
     private boolean isConsolePrintEnable;
+    private boolean isDebugEnable;
 
     public SqlSyntaxType getSourceType()
     {
@@ -70,5 +71,15 @@ public class SessionProperties
     public void setMigrationConfig(MigrationConfig migrationConfig)
     {
         this.migrationConfig = migrationConfig;
+    }
+
+    public boolean isDebugEnable()
+    {
+        return isDebugEnable;
+    }
+
+    public void setDebugEnable(boolean debugEnable)
+    {
+        isDebugEnable = debugEnable;
     }
 }

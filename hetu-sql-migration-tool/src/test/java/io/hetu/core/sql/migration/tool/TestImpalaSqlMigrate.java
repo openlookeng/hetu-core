@@ -135,7 +135,10 @@ public class TestImpalaSqlMigrate
                 "   format = 'Parquet',\n" +
                 "   location = '/user/tmp'\n" +
                 ")";
-        assertWarning(sql2, expectedSql2);
+        assertSuccess(sql2, expectedSql2);
+
+        String sql3 = "create table impala10(impala1 tinyint, impala2 smallint, impala3 int) TBLPROPERTIES('id'='11','cnt'=1)";
+        assertUnsupported(sql3, Optional.of("TBLPROPERTIES"));
 
         // Test negative sql - row format is not supported
         String negativeSql1 = "CREATE TABLE tbl_row_format (id INT, name STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY 'char'";
@@ -180,7 +183,7 @@ public class TestImpalaSqlMigrate
                 ")";
         assertSuccess(sql2, expectedSql2);
 
-        String negativeSql3 = "CREATE TABLE tb3 (c1 STRUCT <employer : STRING, id : BIGINT, address : STRING>)";
+        String negativeSql3 = "CREATE TABLE tb3 (c1 STRUCT <employer:STRING, id : BIGINT, address : STRING>)";
         assertUnsupported(negativeSql3, Optional.of("STRUCT"));
     }
 
@@ -208,7 +211,7 @@ public class TestImpalaSqlMigrate
                 "   location = '/USER/TEST',\n" +
                 "   format = 'Avro'\n" +
                 ")";
-        assertWarning(sql, expectedSql);
+        assertSuccess(sql, expectedSql);
 
         String sql2 = "CREATE EXTERNAL TABLE T2 LIKE PARQUET '/user/test/impala' COMMENT 'HETU' STORED AS AVRO LOCATION '/USER/TEST'";
         assertUnsupported(sql2, Optional.of("PARQUET"));
@@ -286,6 +289,39 @@ public class TestImpalaSqlMigrate
                 "HAVING (\"max\"(salary) > 110)\n" +
                 "LIMIT 5\n";
         assertSuccess(sql4, expectedSql4);
+
+        // teet join
+        String sql5 = "SELECT * FROM t1 JOIN t2 ON t1.id = t2.id";
+        String expectedSql5 = "SELECT *\n" +
+                "FROM\n" +
+                "  (t1\n" +
+                "INNER JOIN t2 ON (t1.id = t2.id))\n";
+        assertSuccess(sql5, expectedSql5);
+
+        String sql6 = "SELECT * FROM t1 INNER JOIN t2 ON t1.id = t2.id";
+        assertSuccess(sql6, expectedSql5);
+
+        String sql7 = "SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id";
+        String expectedSql7 = "SELECT *\n" +
+                "FROM\n" +
+                "  (t1\n" +
+                "FULL JOIN t2 ON (t1.id = t2.id))\n";
+        assertSuccess(sql7, expectedSql7);
+
+        String sql8 = "SELECT * FROM t1 LEFT OUTER JOIN t2 ON t1.id = t2.id";
+        String expectedSql8 = "SELECT *\n" +
+                "FROM\n" +
+                "  (t1\n" +
+                "LEFT JOIN t2 ON (t1.id = t2.id))\n";
+        assertSuccess(sql8, expectedSql8);
+
+        String sql9 = "SELECT * FROM t1 CROSS JOIN t2 WHERE t1.id > t2.id";
+        String expectedSql9 = "SELECT *\n" +
+                "FROM\n" +
+                "  (t1\n" +
+                "CROSS JOIN t2)\n" +
+                "WHERE (t1.id > t2.id)\n";
+        assertSuccess(sql9, expectedSql9);
     }
 
     @Test
@@ -642,7 +678,9 @@ public class TestImpalaSqlMigrate
     public void testShutDown()
     {
         String sql = ":SHUTDOWN('LOCALHOST' : 8090, 0)";
+        String sql2 = ":SHUTDOWN(\\\"hostname:1234\\\")";
         assertUnsupported(sql, Optional.of("SHUTDOWN"));
+        assertUnsupported(sql2, Optional.of("SHUTDOWN"));
     }
 
     @Test
@@ -794,9 +832,11 @@ public class TestImpalaSqlMigrate
         String sql = "SHOW FUNCTIONS IN DB1";
         String sql2 = "SHOW AGGREGATE FUNCTIONS IN DB1";
         String sql3 = "SHOW ANALYTIC FUNCTIONS IN DB1";
-        assertUnsupported(sql, Optional.of("FUNCTIONS"));
-        assertUnsupported(sql2, Optional.of("FUNCTIONS"));
-        assertUnsupported(sql3, Optional.of("FUNCTIONS"));
+        String sql4 = "SHOW FUNCTIONS";
+        assertUnsupported(sql, Optional.of("IN"));
+        assertUnsupported(sql2, Optional.of("AGGREGATE"));
+        assertUnsupported(sql3, Optional.of("ANALYTIC"));
+        assertSuccess(sql4, "SHOW FUNCTIONS");
     }
 
     @Test

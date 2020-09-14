@@ -141,7 +141,7 @@ statement
     | COMMENT ON (DATABASE|TABLE|COLUMN) qualifiedName IS (string | NULL)                 #addComments
     | EXPLAIN statement                                                                   #explain
     | SET (ALL | identifier EQ expression)?                                               #setSession
-    | ':'SHUTDOWN '(' (string)? (':' expression)? (',' expression )? ')'                  #shutdown
+    | ':'SHUTDOWN '(' ('\\')? (expression)? (':' expression)? (',' expression )? ')'                  #shutdown
     | INVALIDATE METADATA qualifiedName                                                   #invalidateMeta
     | LOAD DATA INPATH STRING (OVERWRITE)? INTO TABLE qualifiedName
         (PARTITION '('expression (',' expression)?')')?                                   #loadData
@@ -844,8 +844,8 @@ PERCENT: '%';
 CONCAT: '||';
 
 STRING
-    : '\'' ( ~'\'' | '\'\'' )* '\''
-    | '"' ( ~'"' | '""' )* '"'
+    : '\'' (~'\'' | '\\' | ('\\' '\''))* '\''
+    | '"' (~'"' | '\\' | '\\"')* '"'
     ;
 
 UNICODE_STRING
@@ -874,7 +874,7 @@ DOUBLE_VALUE
     ;
 
 IDENTIFIER
-    : (LETTER | '_') (LETTER | DIGIT | '_' | '@' | ':')*
+    : (LETTER | '_') (LETTER | DIGIT | '_')*
     ;
 
 DIGIT_IDENTIFIER
