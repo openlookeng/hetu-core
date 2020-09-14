@@ -55,6 +55,10 @@ Then add the following to the list of VM options:
 
     -Dhive.metastore.thrift.client.socks-proxy=localhost:1080
 
+### Logging
+
+Audit log functionality is disabled by default. To enable with default settings, modify configs in `etc/event-listener.properties` and ensure the process running the server has write permission to the audit log directory.
+
 ### Running the CLI
 
 Start the CLI to connect to the server and run SQL queries:
