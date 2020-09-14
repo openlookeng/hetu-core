@@ -48,6 +48,9 @@ public class ServerSecurityModule
 
         binder.bind(PasswordAuthenticatorManager.class).in(Scopes.SINGLETON);
 
+        newSetBinder(binder, Filter.class, TheServlet.class).addBinding()
+                .to(HttpSecurityHeaderFilter.class).in(Scopes.SINGLETON);
+
         List<AuthenticationType> authTypes = buildConfigObject(SecurityConfig.class).getAuthenticationTypes();
         Multibinder<Authenticator> authBinder = newSetBinder(binder, Authenticator.class);
 
