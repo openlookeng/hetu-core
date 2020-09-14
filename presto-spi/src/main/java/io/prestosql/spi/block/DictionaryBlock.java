@@ -472,12 +472,15 @@ public class DictionaryBlock<T>
         int matchCount = 0;
         for (int i = 0; i < positionCount; i++) {
             if (dictionary.isNull(getId(positions[i]))) {
-                continue;
+                if (test.apply(null)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
-
-            T value = dictionary.get(getId(positions[i]));
-            if (test.apply(value)) {
-                matchedPositions[matchCount++] = positions[i];
+            else {
+                T value = dictionary.get(getId(positions[i]));
+                if (test.apply(value)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
             }
         }
 
@@ -487,6 +490,9 @@ public class DictionaryBlock<T>
     @Override
     public T get(int position)
     {
+        if (dictionary.isNull(getId(position))) {
+            return null;
+        }
         return dictionary.get(getId(position));
     }
 }

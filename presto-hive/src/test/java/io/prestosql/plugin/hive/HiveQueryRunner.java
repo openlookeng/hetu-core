@@ -111,6 +111,7 @@ public final class HiveQueryRunner
             Map<String, String> configProperties = new HashMap<>();
             configProperties.put("auto-vacuum.enabled", "true");
             configProperties.put("auto-vacuum.scan.interval", "15s");
+            configProperties.put("hetu.split-cache-map.enabled", "true");
 
             queryRunner = DistributedQueryRunner
                     .builder(createSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))))

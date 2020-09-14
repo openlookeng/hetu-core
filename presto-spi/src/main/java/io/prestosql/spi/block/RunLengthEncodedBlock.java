@@ -19,6 +19,7 @@ import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static io.prestosql.spi.block.BlockUtil.checkValidPosition;
@@ -303,5 +304,34 @@ public class RunLengthEncodedBlock<T>
         if (position < 0 || position >= positionCount) {
             throw new IllegalArgumentException("position is not valid");
         }
+    }
+
+    @Override
+    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
+    {
+        int matchCount = 0;
+        for (int i = 0; i < positionCount; i++) {
+            checkReadablePosition(positions[i]);
+            if (value.isNull(0)) {
+                if (test.apply(null)) {
+                    matchedPositions[matchCount++] = positions[i];
+                }
+            }
+            else if (test.apply(value.get(0))) {
+                matchedPositions[matchCount++] = positions[i];
+            }
+        }
+
+        return matchCount;
+    }
+
+    @Override
+    public T get(int position)
+    {
+        checkReadablePosition(position);
+        if (value.isNull(0)) {
+            return null;
+        }
+        return value.get(0);
     }
 }
