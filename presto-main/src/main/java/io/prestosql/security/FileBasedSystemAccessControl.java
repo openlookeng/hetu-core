@@ -64,18 +64,35 @@ public class FileBasedSystemAccessControl
     }
 
     @Override
+    public void checkCanShowCatalogs(Identity identity)
+    {
+        if (!canAccessCatalog(identity)) {
+            denyCatalogAccess();
+        }
+    }
+
+    @Override
     public void checkCanCreateCatalog(Identity identity, String catalogName)
     {
+        if (!canAccessCatalog(identity, Optional.of(catalogName))) {
+            denyCatalogAccess(catalogName);
+        }
     }
 
     @Override
     public void checkCanDropCatalog(Identity identity, String catalogName)
     {
+        if (!canAccessCatalog(identity, Optional.of(catalogName))) {
+            denyCatalogAccess(catalogName);
+        }
     }
 
     @Override
     public void checkCanUpdateCatalog(Identity identity, String catalogName)
     {
+        if (!canAccessCatalog(identity, Optional.of(catalogName))) {
+            denyCatalogAccess(catalogName);
+        }
     }
 
     @Override
@@ -120,7 +137,7 @@ public class FileBasedSystemAccessControl
     @Override
     public void checkCanAccessCatalog(Identity identity, String catalogName)
     {
-        if (!canAccessCatalog(identity, catalogName)) {
+        if (!canAccessCatalog(identity, Optional.of(catalogName))) {
             denyCatalogAccess(catalogName);
         }
     }
@@ -130,14 +147,19 @@ public class FileBasedSystemAccessControl
     {
         ImmutableSet.Builder<String> filteredCatalogs = ImmutableSet.builder();
         for (String catalog : catalogs) {
-            if (canAccessCatalog(identity, catalog)) {
+            if (canAccessCatalog(identity, Optional.of(catalog))) {
                 filteredCatalogs.add(catalog);
             }
         }
         return filteredCatalogs.build();
     }
 
-    private boolean canAccessCatalog(Identity identity, String catalogName)
+    private boolean canAccessCatalog(Identity identity)
+    {
+        return canAccessCatalog(identity, Optional.empty());
+    }
+
+    private boolean canAccessCatalog(Identity identity, Optional<String> catalogName)
     {
         for (CatalogAccessControlRule rule : catalogRules) {
             Optional<Boolean> allowed = rule.match(identity.getUser(), catalogName);
@@ -171,7 +193,7 @@ public class FileBasedSystemAccessControl
     @Override
     public Set<String> filterSchemas(Identity identity, String catalogName, Set<String> schemaNames)
     {
-        if (!canAccessCatalog(identity, catalogName)) {
+        if (!canAccessCatalog(identity, Optional.of(catalogName))) {
             return ImmutableSet.of();
         }
 
@@ -206,7 +228,7 @@ public class FileBasedSystemAccessControl
     @Override
     public Set<SchemaTableName> filterTables(Identity identity, String catalogName, Set<SchemaTableName> tableNames)
     {
-        if (!canAccessCatalog(identity, catalogName)) {
+        if (!canAccessCatalog(identity, Optional.of(catalogName))) {
             return ImmutableSet.of();
         }
 
@@ -221,7 +243,7 @@ public class FileBasedSystemAccessControl
     @Override
     public List<ColumnMetadata> filterColumns(Identity identity, CatalogSchemaTableName tableName, List<ColumnMetadata> columns)
     {
-        if (!canAccessCatalog(identity, tableName.getCatalogName())) {
+        if (!canAccessCatalog(identity, Optional.of(tableName.getCatalogName()))) {
             return ImmutableList.of();
         }
 

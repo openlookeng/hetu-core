@@ -194,6 +194,11 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
+    public void checkCanShowCatalogs(Identity identity)
+    {
+    }
+
+    @Override
     public void checkCanCreateCatalog(Identity identity, String catalogName)
     {
     }

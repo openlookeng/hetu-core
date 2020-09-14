@@ -41,6 +41,11 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("Principal %s cannot become user %s%s", principal.orElse(null), userName, formatExtraInfo(extraInfo)));
     }
 
+    public static void denyCatalogAccess()
+    {
+        denyCatalogAccess(null);
+    }
+
     public static void denyCatalogAccess(String catalogName)
     {
         denyCatalogAccess(catalogName, null);
@@ -48,7 +53,7 @@ public class AccessDeniedException
 
     public static void denyCatalogAccess(String catalogName, String extraInfo)
     {
-        throw new AccessDeniedException(format("Cannot access catalog %s%s", catalogName, formatExtraInfo(extraInfo)));
+        throw new AccessDeniedException(format("Cannot access catalog %s%s", catalogName == null ? "" : catalogName, formatExtraInfo(extraInfo)));
     }
 
     public static void denyCreateSchema(String schemaName)
