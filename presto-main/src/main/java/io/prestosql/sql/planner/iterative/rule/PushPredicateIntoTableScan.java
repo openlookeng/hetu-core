@@ -175,21 +175,21 @@ public class PushPredicateIntoTableScan
         assignments.keySet().stream().forEach(allColumnHandles::add);
 
         Constraint constraint;
-        List<Constraint> additionalConstraints = ImmutableList.of();
+        List<Constraint> disjunctConstraints = ImmutableList.of();
 
         if (!pushPartitionsOnly) {
             List<Expression> orSet = extractDisjuncts(decomposedPredicate.getRemainingExpression());
-            List<DomainTranslator.ExtractionResult> additionalPredicates = orSet.stream()
+            List<DomainTranslator.ExtractionResult> disjunctPredicates = orSet.stream()
                     .map(e -> DomainTranslator.fromPredicate(metadata, session, e, types))
                     .collect(Collectors.toList());
 
             /* Check if any Branch yeild all records; then no need to process OR branches */
-            if (!additionalPredicates.stream().anyMatch(e -> e.getTupleDomain().isAll())) {
-                List<TupleDomain<ColumnHandle>> orDomains = additionalPredicates.stream()
+            if (!disjunctPredicates.stream().anyMatch(e -> e.getTupleDomain().isAll())) {
+                List<TupleDomain<ColumnHandle>> orDomains = disjunctPredicates.stream()
                         .map(er -> er.getTupleDomain().transform(node.getAssignments()::get))
                         .collect(Collectors.toList());
 
-                additionalConstraints = orDomains.stream()
+                disjunctConstraints = orDomains.stream()
                         .filter(d -> !d.isAll() && !d.isNone())
                         .map(d -> new Constraint(d))
                         .collect(Collectors.toList());
@@ -226,7 +226,7 @@ public class PushPredicateIntoTableScan
                 return Optional.of(new ValuesNode(idAllocator.getNextId(), node.getOutputSymbols(), ImmutableList.of()));
             }
 
-            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, additionalConstraints, allColumnHandles, pushPartitionsOnly);
+            Optional<ConstraintApplicationResult<TableHandle>> result = metadata.applyFilter(session, node.getTable(), constraint, disjunctConstraints, allColumnHandles, pushPartitionsOnly);
 
             if (!result.isPresent()) {
                 return Optional.empty();
@@ -274,7 +274,7 @@ public class PushPredicateIntoTableScan
         //   and non-TupleDomain-expressible expressions should be retained. Changing the order can lead
         //   to failures of previously successful queries.
         Expression resultingPredicate;
-        if (remainingFilter.isAll() && newTable.getConnectorHandle().hasAdditionalFiltersPushdown()) {
+        if (remainingFilter.isAll() && newTable.getConnectorHandle().hasDisjunctFiltersPushdown()) {
             resultingPredicate = combineConjuncts(
                     domainTranslator.toPredicate(remainingFilter.transform(assignments::get)),
                     filterNonDeterministicConjuncts(predicate));

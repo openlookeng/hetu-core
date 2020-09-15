@@ -48,7 +48,7 @@ public class HiveTableHandle
     private final Optional<HiveBucketing.HiveBucketFilter> bucketFilter;
     private final Optional<List<List<String>>> analyzePartitionValues;
     private final Map<String, HiveColumnHandle> predicateColumns;
-    private final Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate;
+    private final Optional<List<TupleDomain<HiveColumnHandle>>> disjunctCompactEffectivePredicate;
     private final boolean suitableToPush;
 //    private final RowExpression remainingPredicate; //For Complex Expression.
 
@@ -63,7 +63,7 @@ public class HiveTableHandle
             @JsonProperty("bucketFilter") Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
             @JsonProperty("analyzePartitionValues") Optional<List<List<String>>> analyzePartitionValues,
             @JsonProperty("predicateColumns") Map<String, HiveColumnHandle> predicateColumns,
-            @JsonProperty("additionaPredicates") Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate,
+            @JsonProperty("additionaPredicates") Optional<List<TupleDomain<HiveColumnHandle>>> disjunctCompactEffectivePredicate,
             @JsonProperty("suitableToPush") boolean suitableToPush)
     {
         this(
@@ -78,7 +78,7 @@ public class HiveTableHandle
                 bucketFilter,
                 analyzePartitionValues,
                 predicateColumns,
-                additionalCompactEffectivePredicate,
+                disjunctCompactEffectivePredicate,
                 suitableToPush);
     }
 
@@ -117,7 +117,7 @@ public class HiveTableHandle
             Optional<HiveBucketing.HiveBucketFilter> bucketFilter,
             Optional<List<List<String>>> analyzePartitionValues,
             Map<String, HiveColumnHandle> predicateColumns,
-            Optional<List<TupleDomain<HiveColumnHandle>>> additionalCompactEffectivePredicate,
+            Optional<List<TupleDomain<HiveColumnHandle>>> disjunctCompactEffectivePredicate,
             boolean suitableToPush)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
@@ -131,7 +131,7 @@ public class HiveTableHandle
         this.bucketFilter = requireNonNull(bucketFilter, "bucketFilter is null");
         this.analyzePartitionValues = requireNonNull(analyzePartitionValues, "analyzePartitionValues is null");
         this.predicateColumns = predicateColumns;
-        this.additionalCompactEffectivePredicate = requireNonNull(additionalCompactEffectivePredicate, "additionalPredicates is null");
+        this.disjunctCompactEffectivePredicate = requireNonNull(disjunctCompactEffectivePredicate, "disjunctCompactEffectivePredicate is null");
         this.suitableToPush = suitableToPush;
     }
 
@@ -241,9 +241,9 @@ public class HiveTableHandle
     }
 
     @JsonProperty
-    public Optional<List<TupleDomain<HiveColumnHandle>>> getAdditionalCompactEffectivePredicate()
+    public Optional<List<TupleDomain<HiveColumnHandle>>> getDisjunctCompactEffectivePredicate()
     {
-        return additionalCompactEffectivePredicate;
+        return disjunctCompactEffectivePredicate;
     }
 
     @JsonProperty
@@ -280,15 +280,15 @@ public class HiveTableHandle
                 oldHiveConnectorTableHandle.getBucketFilter(),
                 oldHiveConnectorTableHandle.getAnalyzePartitionValues(),
                 oldHiveConnectorTableHandle.getPredicateColumns(),
-                oldHiveConnectorTableHandle.getAdditionalCompactEffectivePredicate(),
+                oldHiveConnectorTableHandle.getDisjunctCompactEffectivePredicate(),
                 oldHiveConnectorTableHandle.isSuitableToPush());
     }
 
     @Override
-    public boolean hasAdditionalFiltersPushdown()
+    public boolean hasDisjunctFiltersPushdown()
     {
-        return additionalCompactEffectivePredicate.isPresent()
-                && additionalCompactEffectivePredicate.get().size() > 0;
+        return disjunctCompactEffectivePredicate.isPresent()
+                && disjunctCompactEffectivePredicate.get().size() > 0;
     }
 
     private String formatPredicate(Function<Domain, String> printer, TupleDomain<HiveColumnHandle> predicate)
@@ -299,10 +299,10 @@ public class HiveTableHandle
     }
 
     @Override
-    public String getAdditionalFilterConditions(Function<Domain, String> printer)
+    public String getDisjunctFilterConditions(Function<Domain, String> printer)
     {
-        if (additionalCompactEffectivePredicate.isPresent()) {
-            return additionalCompactEffectivePredicate.get().stream()
+        if (disjunctCompactEffectivePredicate.isPresent()) {
+            return disjunctCompactEffectivePredicate.get().stream()
                     .map(predicate -> "[ " + formatPredicate(printer, predicate) + " ]")
                     .collect(Collectors.joining(" OR "));
         }

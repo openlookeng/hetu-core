@@ -74,7 +74,7 @@ public class OrcSelectiveRecordReader
     Set<Integer> colReaderWithFilter;
     Set<Integer> colReaderWithORFilter;
     Set<Integer> colReaderWithoutFilter;
-    Map<Integer, List<TupleDomainFilter>> additionalFilters;
+    Map<Integer, List<TupleDomainFilter>> disjuctFilters;
     Map<Integer, Function<Block, Block>> coercers;
     private final Set<Integer> missingColumns;
     // flag indicating whether range filter on a constant column is false; no data is read in that case
@@ -114,7 +114,7 @@ public class OrcSelectiveRecordReader
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
-            Map<Integer, List<TupleDomainFilter>> additionalFilters,
+            Map<Integer, List<TupleDomainFilter>> disjuctFilters,
             List<Integer> positions,
             boolean useDataCache,
             Map<Integer, Function<Block, Block>> coercers,
@@ -160,7 +160,7 @@ public class OrcSelectiveRecordReader
         this.excludePositions = positions;
 
         this.filters = filters;
-        this.additionalFilters = additionalFilters;
+        this.disjuctFilters = disjuctFilters;
         this.constantValues = requireNonNull(constantValues, "constantValues is null");
         this.coercers = requireNonNull(coercers, "coercers is null");
         this.missingColumns = requireNonNull(missingColumns, "missingColumns is null");
@@ -246,19 +246,19 @@ public class OrcSelectiveRecordReader
             int localPositionCount = positionCount;
             for (Integer columnIdx : colReaderWithORFilter) {
                 if (columnIdx < 0) {
-                    if (matchConstantWithPredicate(includedColumns.get(columnIdx), constantValues.get(columnIdx), additionalFilters.get(columnIdx).get(0))) {
+                    if (matchConstantWithPredicate(includedColumns.get(columnIdx), constantValues.get(columnIdx), disjuctFilters.get(columnIdx).get(0))) {
                         /* Skip OR filtering all will match */
                         accumulator.set(positionsToRead[0], positionsToRead[positionCount - 1] + 1);
                     }
                 }
                 else if (missingColumns.contains(columnIdx)) {
-                    if (additionalFilters.get(columnIdx).get(0).testNull()) {
+                    if (disjuctFilters.get(columnIdx).get(0).testNull()) {
                         /* Skip OR filtering all will match */
                         accumulator.set(positionsToRead[0], positionsToRead[positionCount - 1] + 1);
                     }
                 }
                 else if (columnReaders[columnIdx] != null) {
-                    localPositionCount += columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, additionalFilters.get(columnIdx), accumulator);
+                    localPositionCount += columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, disjuctFilters.get(columnIdx), accumulator);
                 }
             }
 
@@ -431,7 +431,7 @@ public class OrcSelectiveRecordReader
                 if (filters.get(i) != null) {
                     colReaderWithFilter.add(columnIndex);
                 }
-                else if (additionalFilters.get(i) != null && additionalFilters.get(i).size() > 0) {
+                else if (disjuctFilters.get(i) != null && disjuctFilters.get(i).size() > 0) {
                     colReaderWithORFilter.add(columnIndex);
                 }
                 else {
@@ -449,7 +449,7 @@ public class OrcSelectiveRecordReader
                 if (filters.get(col) != null) {
                     colReaderWithFilter.add(col);
                 }
-                else if (additionalFilters.get(col) != null && additionalFilters.get(col).size() > 0) {
+                else if (disjuctFilters.get(col) != null && disjuctFilters.get(col).size() > 0) {
                     colReaderWithORFilter.add(col);
                 }
             }
@@ -460,7 +460,7 @@ public class OrcSelectiveRecordReader
             if (filters.get(missingColumn) != null) {
                 colReaderWithFilter.add(missingColumn);
             }
-            else if (additionalFilters.get(missingColumn) != null && additionalFilters.get(missingColumn).size() > 0) {
+            else if (disjuctFilters.get(missingColumn) != null && disjuctFilters.get(missingColumn).size() > 0) {
                 colReaderWithORFilter.add(missingColumn);
             }
         }

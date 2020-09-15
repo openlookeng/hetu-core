@@ -2031,7 +2031,7 @@ public class HiveMetadata
 
     @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle tableHandle,
-                                                                                   Constraint constraint, List<Constraint> additional,
+                                                                                   Constraint constraint, List<Constraint> disjuctConstaints,
                                                                                    Set<ColumnHandle> allColumnHandles,
                                                                                    boolean pushPartitionsOnly)
     {
@@ -2056,7 +2056,7 @@ public class HiveMetadata
                 .intersect(withColumnDomains(pushedDown.build()));
 
         ImmutableList.Builder<TupleDomain<HiveColumnHandle>> builder = ImmutableList.builder();
-        additional.stream().forEach(c -> {
+        disjuctConstaints.stream().forEach(c -> {
             TupleDomain<HiveColumnHandle> newSubDomain = withColumnDomains(c.getSummary()
                             .getDomains().get().entrySet()
                             .stream().collect(toMap(e -> (HiveColumnHandle) e.getKey(), e -> e.getValue())))
@@ -2248,7 +2248,7 @@ public class HiveMetadata
                 hiveTable.getBucketFilter(),
                 hiveTable.getAnalyzePartitionValues(),
                 hiveTable.getPredicateColumns(),
-                hiveTable.getAdditionalCompactEffectivePredicate(),
+                hiveTable.getDisjunctCompactEffectivePredicate(),
                 hiveTable.isSuitableToPush());
     }
 
