@@ -1,0 +1,20 @@
+{
+  "nodeInfo": [
+    {
+      "user": "admin",
+      "allow": true
+    },
+    {
+      "user": "alice",
+      "allow": true
+    },
+    {
+      "user": "bob",
+      "allow": false
+    },
+    {
+      "user": "\u0194\u0194\u0194",
+      "allow": true
+    }
+  ]
+}

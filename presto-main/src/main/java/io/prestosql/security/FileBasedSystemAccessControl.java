@@ -43,6 +43,7 @@ import static io.prestosql.plugin.base.JsonUtils.parseJson;
 import static io.prestosql.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
 import static io.prestosql.plugin.base.security.FileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
 import static io.prestosql.spi.StandardErrorCode.CONFIGURATION_INVALID;
+import static io.prestosql.spi.security.AccessDeniedException.denyAccessNodeInfo;
 import static io.prestosql.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.prestosql.spi.security.AccessDeniedException.denySetUser;
 import static java.lang.String.format;
@@ -56,11 +57,13 @@ public class FileBasedSystemAccessControl
     private static final Logger log = Logger.get(FileBasedSystemAccessControl.class);
     private final List<CatalogAccessControlRule> catalogRules;
     private final Optional<List<PrincipalUserMatchRule>> principalUserMatchRules;
+    private final List<NodeInformationRule> nodeInfoRules;
 
-    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules)
+    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules, List<NodeInformationRule> nodeInfoRules)
     {
         this.catalogRules = catalogRules;
         this.principalUserMatchRules = principalUserMatchRules;
+        this.nodeInfoRules = nodeInfoRules;
     }
 
     @Override
@@ -327,6 +330,25 @@ public class FileBasedSystemAccessControl
         return null;
     }
 
+    @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+        if (!canAccessNodeInfo(identity)) {
+            denyAccessNodeInfo();
+        }
+    }
+
+    private boolean canAccessNodeInfo(Identity identity)
+    {
+        for (NodeInformationRule rule : nodeInfoRules) {
+            Optional<Boolean> owner = rule.match(identity.getUser());
+            if (owner.isPresent()) {
+                return owner.get();
+            }
+        }
+        return false;
+    }
+
     public static class Factory
             implements SystemAccessControlFactory
     {
@@ -387,7 +409,7 @@ public class FileBasedSystemAccessControl
                     Optional.of(Pattern.compile(".*")),
                     Optional.of(Pattern.compile("system"))));
 
-            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules());
+            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules(), rules.getNodeInfoRules());
         }
     }
 }

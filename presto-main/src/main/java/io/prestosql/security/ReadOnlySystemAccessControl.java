@@ -140,4 +140,9 @@ public class ReadOnlySystemAccessControl
     {
         return null;
     }
+
+    @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+    }
 }

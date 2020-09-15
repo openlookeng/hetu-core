@@ -53,6 +53,11 @@ public interface AccessControl
     void checkCanAccessCatalog(Identity identity, String catalogName);
 
     /**
+     * Check whether identity is can access the node info
+     */
+    void checkCanAccessNodeInfo(Identity identity);
+
+    /**
      * Check whether identity is can create a catalog
      */
     default void checkCanCreateCatalog(Identity identity, String catalogName) {}

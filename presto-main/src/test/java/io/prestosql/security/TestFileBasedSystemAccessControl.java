@@ -269,6 +269,21 @@ public class TestFileBasedSystemAccessControl
                 });
     }
 
+    @Test
+    public void testNodeOperations()
+    {
+        TransactionManager transactionManager = createTestTransactionManager();
+        AccessControlManager accessControlManager = newAccessControlManager(transactionManager, "server.json");
+
+        accessControlManager.checkCanAccessNodeInfo(alice);
+
+        try {
+            accessControlManager.checkCanAccessNodeInfo(bob);
+        }
+        catch (AccessDeniedException expected) {
+        }
+    }
+
     private AccessControlManager newAccessControlManager(TransactionManager transactionManager, String resourceName)
     {
         AccessControlManager accessControlManager = new AccessControlManager(transactionManager);

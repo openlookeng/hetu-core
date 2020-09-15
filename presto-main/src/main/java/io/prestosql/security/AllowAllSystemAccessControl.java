@@ -247,4 +247,9 @@ public class AllowAllSystemAccessControl
     {
         return null;
     }
+
+    @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+    }
 }

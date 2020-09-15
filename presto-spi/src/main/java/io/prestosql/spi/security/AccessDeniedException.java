@@ -393,4 +393,14 @@ public class AccessDeniedException
     {
         throw new AccessDeniedException(format("Cannot update catalog %s", catalogName));
     }
+
+    public static void denyAccessNodeInfo()
+    {
+        denyAccessNodeInfo(null);
+    }
+
+    public static void denyAccessNodeInfo(String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot access node information", formatExtraInfo(extraInfo)));
+    }
 }
