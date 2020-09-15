@@ -91,6 +91,18 @@ public class IndexCache
                     .filter(key -> partitions == null || !partitions.contains(key))
                     .map(HiveColumnHandle::getName)
                     .map(String::toLowerCase).forEach(column -> {
+                        // security check required before using values in a Path
+                        // e.g. catalog.schema.table or dc.catalog.schema.table
+                        if (!tableFqn.matches("([\\p{Alnum}_]+\\.){2,3}[\\p{Alnum}_]+")) {
+                            LOG.warn("Invalid table name " + tableFqn);
+                            return;
+                        }
+
+                        if (!column.matches("[\\p{Alnum}_]+")) {
+                            LOG.warn("Invalid column name " + column);
+                            return;
+                        }
+
                         String indexCacheKeyPath = Paths.get(tableFqn, column, pathUri.getPath()).toString();
                         IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime, "bitmap", "bloom");
                         // check if cache contains the key

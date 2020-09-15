@@ -15,9 +15,13 @@
 
 package io.prestosql.catalog;
 
+import io.hetu.core.common.util.SecurePathWhiteList;
+
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public final class CatalogFilePath
@@ -49,10 +53,21 @@ public final class CatalogFilePath
         requireNonNull(baseDirectory, "base directory is null");
         requireNonNull(catalogName, "catalog name is null");
 
+        try {
+            checkArgument(!baseDirectory.contains("../"),
+                    "Catalog directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(baseDirectory),
+                    "Catalog file directory path must at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Catalog file path not secure", e);
+        }
+
         // global files directory
         this.globalDirPath = Paths.get(baseDirectory, "global");
         // catalog files directory
         String catalogBasePath = getCatalogBasePath(baseDirectory).toString();
+
         this.catalogDirPath = Paths.get(catalogBasePath, catalogName);
         this.propertiesPath = Paths.get(catalogBasePath, catalogName + ".properties");
         this.metadataPath = Paths.get(catalogDirPath.toString(), catalogName + ".metadata");

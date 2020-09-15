@@ -16,6 +16,7 @@ package io.prestosql.spi.filesystem;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -40,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 
 /**
@@ -92,6 +94,15 @@ public class FileBasedLock
         String retryIntervalRead = lockProperties.getProperty(LOCK_RETRY_INTERVAL_CONFIG);
         String refreshRateRead = lockProperties.getProperty(LOCK_REFRESH_RATE_CONFIG);
 
+        try {
+            checkArgument(!lockDir.contains("../"),
+                    "Lock directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(lockDir),
+                    "Lock directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
         Path lockFileDir = Paths.get(lockDir);
         long timeout = (timeoutRead == null) ? DEFAULT_LOCK_FILE_TIMEOUT : Long.parseLong(timeoutRead);
         long retryInterval = (retryIntervalRead == null) ? DEFAULT_RETRY_INTERVAL : Long.parseLong(retryIntervalRead);
@@ -130,6 +141,15 @@ public class FileBasedLock
                          long refreshRate)
             throws IOException
     {
+        try {
+            checkArgument(!lockFileDir.toString().contains("../"),
+                    "Lock directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(lockFileDir.toString()),
+                    "Lock directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
         fs.createDirectories(lockFileDir);
         this.fs = fs;
         this.uuid = UUID.randomUUID();

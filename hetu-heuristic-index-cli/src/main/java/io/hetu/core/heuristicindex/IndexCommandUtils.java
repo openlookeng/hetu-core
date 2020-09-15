@@ -15,6 +15,7 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableSet;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.filesystem.HdfsFileSystemClientFactory;
 import io.hetu.core.filesystem.LocalFileSystemClientFactory;
 import io.hetu.core.heuristicindex.util.IndexConstants;
@@ -33,6 +34,7 @@ import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class IndexCommandUtils
@@ -86,6 +88,15 @@ public class IndexCommandUtils
 
         Path root = Paths.get(requireNonNull(properties.getProperty(IndexConstants.INDEXSTORE_URI_KEY),
                 IndexConstants.INDEXSTORE_URI_KEY + " is not set in config.properties"));
+        try {
+            checkArgument(!root.toString().contains("../"), "Index store directory path must be absolute");
+            checkArgument(SecurePathWhiteList.isSecurePath(root.toString()),
+                    "Index store directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
+
         String fileSystemProfileName = requireNonNull(properties.getProperty(IndexConstants.INDEXSTORE_FILESYSTEM_PROFILE_KEY),
                 IndexConstants.INDEXSTORE_FILESYSTEM_PROFILE_KEY + " is not set in config.properties");
 

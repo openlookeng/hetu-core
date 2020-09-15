@@ -15,6 +15,7 @@
 
 package io.hetu.core.heuristicindex;
 
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
@@ -78,8 +79,7 @@ public class IndexCommand
     @CommandLine.Option(
             names = {"-c", "--config"},
             required = true,
-            defaultValue = "../etc",
-            description = "root folder of hetu etc directory (default: ${DEFAULT-VALUE})")
+            description = "root folder of hetu etc directory")
     String configDirPath;
     @CommandLine.Option(
             names = {"-t", "--table"},
@@ -131,6 +131,13 @@ public class IndexCommand
     {
     }
 
+    public IndexCommand(String configDirPath, String table, Command command)
+    {
+        this.configDirPath = configDirPath;
+        this.table = table;
+        this.command = command;
+    }
+
     /**
      * start application
      *
@@ -147,8 +154,23 @@ public class IndexCommand
     public Void call()
             throws IOException
     {
-        // make sure the file paths provided exist
+        // validate inputs
+        // security check required before using values in Path
+        // e.g. catalog.schema.table or dc.catalog.schema.table
+        checkArgument(table.matches("([\\p{Alnum}_]+\\.){2,3}[\\p{Alnum}_]+"), "Invalid table name");
+
+        if (columns != null) {
+            for (String column : columns) {
+                checkArgument(column.matches("[\\p{Alnum}_]+"), "Invalid column name");
+            }
+        }
+
+        checkArgument(!configDirPath.contains("../"),
+                "Config directory path must be absolute or current directory and at user workspace: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
         checkArgument(Paths.get(configDirPath).toFile().exists(), "Config directory does not exist");
+
+        checkArgument(SecurePathWhiteList.isSecurePath(configDirPath),
+                "Config directory path must at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
         IndexFactory factory = IndexCommandUtils.getIndexFactory();
 

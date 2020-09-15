@@ -70,6 +70,10 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <scope>compile</scope>

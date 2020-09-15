@@ -14,6 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
@@ -47,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -127,6 +129,8 @@ public class HeuristicIndexWriter
 
         // lock table so multiple callers can't index the same table
         Path tableIndexDirPath = Paths.get(strTmpPath, root.toString(), table);
+        checkArgument(SecurePathWhiteList.isSecurePath(tableIndexDirPath.toString()),
+                "Create index temp directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
         Lock lock = null;
         if (lockingEnabled) {
@@ -159,6 +163,19 @@ public class HeuristicIndexWriter
                         if (values == null || values.length == 0) {
                             LOG.debug("values were null or empty, skipping column={}; uri={}; splitOffset={}", column, uri, splitStart);
                             return;
+                        }
+
+                        // security check required before using values in a Path
+                        if (!column.matches("[\\p{Alnum}_]+")) {
+                            LOG.warn("Invalid column name " + column);
+                            return;
+                        }
+                        try {
+                            checkArgument(SecurePathWhiteList.isSecurePath(tableIndexDirPath.toString()),
+                                    "Create index temp directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+                        }
+                        catch (IOException e) {
+                            throw new UncheckedIOException("Get secure path list error", e);
                         }
 
                         Path columnIndexDirPath = tableIndexDirPath.resolve(column);

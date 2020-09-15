@@ -18,7 +18,9 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.split.HBaseSplit;
+import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
 import io.hetu.core.plugin.hbase.utils.serializers.HBaseRowSerializer;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.type.Type;
@@ -129,17 +131,23 @@ public class HBaseGetRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        if (this.currentRecordIndex >= this.results.length) {
-            return false;
-        }
-        else {
-            Result record = this.results[this.currentRecordIndex];
-            serializer.reset();
-            if (record.getRow() != null) {
-                serializer.deserialize(record, this.defaultValue);
+        try {
+            if (this.currentRecordIndex >= this.results.length) {
+                return false;
             }
-            this.currentRecordIndex++;
-            return true;
+            else {
+                Result record = this.results[this.currentRecordIndex];
+                serializer.reset();
+                if (record.getRow() != null) {
+                    serializer.deserialize(record, this.defaultValue);
+                }
+                this.currentRecordIndex++;
+                return true;
+            }
+        }
+        catch (Exception e) {
+            this.close();
+            throw new PrestoException(HBaseErrorCode.IO_ERROR, e);
         }
     }
 

@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.CATALOG_FILE;
 import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.GLOBAL_FILE;
 import static io.prestosql.catalog.DynamicCatalogService.badRequest;
@@ -177,6 +178,8 @@ public class CatalogResource
     public Response dropCatalog(@NotNull @PathParam("catalogName") String catalogName,
             @Context HttpServletRequest servletRequest)
     {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+
         return service.dropCatalog(catalogName, new HttpRequestSessionContext(servletRequest));
     }
 
