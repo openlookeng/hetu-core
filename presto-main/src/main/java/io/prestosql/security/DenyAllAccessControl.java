@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static io.prestosql.spi.security.AccessDeniedException.denyAccessNodeInfo;
 import static io.prestosql.spi.security.AccessDeniedException.denyAddColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.prestosql.spi.security.AccessDeniedException.denyCommentTable;
@@ -83,6 +84,12 @@ public class DenyAllAccessControl
     public void checkCanAccessCatalog(Identity identity, String catalogName)
     {
         denyCatalogAccess(catalogName);
+    }
+
+    @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+        denyAccessNodeInfo();
     }
 
     @Override

@@ -24,14 +24,18 @@ public class FileBasedSystemAccessControlRules
 {
     private final List<CatalogAccessControlRule> catalogRules;
     private final Optional<List<PrincipalUserMatchRule>> principalUserMatchRules;
+    private final List<NodeInformationRule> nodeInfoRules;
 
     @JsonCreator
     public FileBasedSystemAccessControlRules(
             @JsonProperty("catalogs") Optional<List<CatalogAccessControlRule>> catalogRules,
-            @JsonProperty("principals") Optional<List<PrincipalUserMatchRule>> principalUserMatchRules)
+            @JsonProperty("principals") Optional<List<PrincipalUserMatchRule>> principalUserMatchRules,
+            @JsonProperty("nodeInfo") Optional<List<NodeInformationRule>> nodeInfoRules)
+
     {
         this.catalogRules = catalogRules.map(ImmutableList::copyOf).orElse(ImmutableList.of());
         this.principalUserMatchRules = principalUserMatchRules.map(ImmutableList::copyOf);
+        this.nodeInfoRules = nodeInfoRules.map(ImmutableList::copyOf).orElse(ImmutableList.of());
     }
 
     public List<CatalogAccessControlRule> getCatalogRules()
@@ -42,5 +46,10 @@ public class FileBasedSystemAccessControlRules
     public Optional<List<PrincipalUserMatchRule>> getPrincipalUserMatchRules()
     {
         return principalUserMatchRules;
+    }
+
+    public List<NodeInformationRule> getNodeInfoRules()
+    {
+        return nodeInfoRules;
     }
 }

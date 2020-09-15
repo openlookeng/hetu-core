@@ -85,6 +85,11 @@ public class TestingRangerAccessControl
     }
 
     @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+    }
+
+    @Override
     public void checkCanCreateSchema(TransactionId transactionId, Identity identity, CatalogSchemaName schemaName)
     {
     }

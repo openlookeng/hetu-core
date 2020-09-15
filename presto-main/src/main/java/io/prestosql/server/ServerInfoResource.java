@@ -17,14 +17,19 @@ import io.airlift.node.NodeInfo;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.client.ServerInfo;
 import io.prestosql.metadata.NodeState;
+import io.prestosql.security.AccessControl;
+import io.prestosql.spi.security.AccessDeniedException;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -48,17 +53,20 @@ public class ServerInfoResource
     private final NodeStateChangeHandler nodeStateChangeHandler;
     private final long startTime = System.nanoTime();
     private final AtomicBoolean startupComplete = new AtomicBoolean();
+    private final AccessControl accessControl;
 
     @Inject
     public ServerInfoResource(NodeVersion nodeVersion,
-                              NodeInfo nodeInfo,
-                              ServerConfig serverConfig,
-                              NodeStateChangeHandler nodeStateChangeHandler)
+            NodeInfo nodeInfo,
+            ServerConfig serverConfig,
+            NodeStateChangeHandler nodeStateChangeHandler,
+            AccessControl accessControl)
     {
         this.version = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
         this.coordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
         this.nodeStateChangeHandler = requireNonNull(nodeStateChangeHandler, "nodeStateChangeHandler");
+        this.accessControl = requireNonNull(accessControl, "accessControl is null");
     }
 
     @GET
@@ -74,17 +82,17 @@ public class ServerInfoResource
      * - ACTIVE, ISOLATING, ISOLATED: allowed when current state is one of these 3
      * - SHUTTING_DOWN: always allowed
      * - INACTIVE: never allowed
-     *
+     * <p>
      * Result of setting a new <code>state</code>:
      * - ACTIVE: restore the node back to normal operation
      * - ISOLATING: request to isolate the node, by not assigning new workload on it,
-     *              and waiting for existing workloads to finish, upon which state becomes ISOLATED
+     * and waiting for existing workloads to finish, upon which state becomes ISOLATED
      * - ISOLATED: immediately isolate this node, by not assigning new workload;
-     *             if there are ongoing workloads, they are deemed unimportant and may not finish.
-     *             The "isolated" state is useful for, e.g. maintenance work on the node.
+     * if there are ongoing workloads, they are deemed unimportant and may not finish.
+     * The "isolated" state is useful for, e.g. maintenance work on the node.
      * - SHUTTING_DOWN: request to shut down the node, by not assigning new workload on it,
-     *                  and waiting for existing workloads to finish, upon which the Java process exits
-     *
+     * and waiting for existing workloads to finish, upon which the Java process exits
+     * <p>
      * Note that the caller (resource provider) is responsible for making sure minimum number of active nodes
      * are available after isolation or shutdown requests.
      *
@@ -95,10 +103,17 @@ public class ServerInfoResource
     @Path("state")
     @Consumes(APPLICATION_JSON)
     @Produces(TEXT_PLAIN)
-    public Response updateState(NodeState state)
+    public Response updateState(NodeState state, @Context HttpServletRequest servletRequest)
             throws WebApplicationException
     {
         requireNonNull(state, "state is null");
+        try {
+            HttpRequestSessionContext httpRequestSessionContext = new HttpRequestSessionContext(servletRequest);
+            accessControl.checkCanAccessNodeInfo(httpRequestSessionContext.getIdentity());
+        }
+        catch (AccessDeniedException e) {
+            throw new ForbiddenException();
+        }
 
         try {
             nodeStateChangeHandler.doStateTransition(state);

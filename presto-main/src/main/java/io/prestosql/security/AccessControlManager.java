@@ -806,6 +806,14 @@ public class AccessControlManager
         return entry.getAccessControl().applyColumnMasking(entry.getTransactionHandle(transactionId), identity, tableName.asSchemaTableName(), columnName);
     }
 
+    @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+        requireNonNull(identity, "identity is null");
+
+        authenticationCheck(() -> systemAccessControl.get().checkCanAccessNodeInfo(identity));
+    }
+
     private CatalogAccessControlEntry getConnectorAccessControl(TransactionId transactionId, String catalogName)
     {
         return transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)

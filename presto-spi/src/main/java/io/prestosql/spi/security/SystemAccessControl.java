@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static io.prestosql.spi.security.AccessDeniedException.denyAccessNodeInfo;
 import static io.prestosql.spi.security.AccessDeniedException.denyAddColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.prestosql.spi.security.AccessDeniedException.denyCommentTable;
@@ -402,5 +403,15 @@ public interface SystemAccessControl
     default String applyColumnMasking(Identity identity, CatalogSchemaTableName asCatalogSchemaTableName, String columnName)
     {
         return null;
+    }
+
+    /**
+     * Check if identity is allowed to access or modify node info.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanAccessNodeInfo(Identity identity)
+    {
+        denyAccessNodeInfo();
     }
 }

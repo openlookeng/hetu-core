@@ -259,6 +259,12 @@ public abstract class ForwardingSystemAccessControl
     }
 
     @Override
+    public void checkCanAccessNodeInfo(Identity identity)
+    {
+        delegate().checkCanAccessNodeInfo(identity);
+    }
+
+    @Override
     public String applyRowLevelFiltering(Identity identity, CatalogSchemaTableName table)
     {
         return null;
