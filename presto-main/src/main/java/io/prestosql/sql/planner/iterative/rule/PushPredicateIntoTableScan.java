@@ -53,7 +53,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -173,6 +172,7 @@ public class PushPredicateIntoTableScan
 
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
         Set<ColumnHandle> allColumnHandles = new HashSet<>();
+        assignments.keySet().stream().forEach(allColumnHandles::add);
 
         Constraint constraint;
         List<Constraint> additionalConstraints = ImmutableList.of();
@@ -183,22 +183,17 @@ public class PushPredicateIntoTableScan
                     .map(e -> DomainTranslator.fromPredicate(metadata, session, e, types))
                     .collect(Collectors.toList());
 
-            AtomicInteger i = new AtomicInteger(0);
-            additionalPredicates.stream().forEach(er -> {
-                log.debug("[%d]- Enforced [%s]\n\tRemaining [%s]", i.getAndIncrement(),
-                        er.getTupleDomain(), er.getRemainingExpression());
-            });
+            /* Check if any Branch yeild all records; then no need to process OR branches */
+            if (!additionalPredicates.stream().anyMatch(e -> e.getTupleDomain().isAll())) {
+                List<TupleDomain<ColumnHandle>> orDomains = additionalPredicates.stream()
+                        .map(er -> er.getTupleDomain().transform(node.getAssignments()::get))
+                        .collect(Collectors.toList());
 
-            List<TupleDomain<ColumnHandle>> orDomains = additionalPredicates.stream()
-                    .map(er -> er.getTupleDomain().transform(node.getAssignments()::get))
-                    .collect(Collectors.toList());
-
-            additionalConstraints = orDomains.stream()
-                    .filter(d -> !d.isAll() && !d.isNone())
-                    .map(d -> new Constraint(d))
-                    .collect(Collectors.toList());
-
-            assignments.keySet().stream().forEach(allColumnHandles::add);
+                additionalConstraints = orDomains.stream()
+                        .filter(d -> !d.isAll() && !d.isNone())
+                        .map(d -> new Constraint(d))
+                        .collect(Collectors.toList());
+            }
         }
 
         if (pruneWithPredicateExpression) {

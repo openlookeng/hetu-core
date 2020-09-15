@@ -33,6 +33,8 @@ import io.prestosql.testing.TestingSession;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -1093,6 +1095,7 @@ public abstract class AbstractTestDistributedQueries
 
             Session session1 = Session.builder(getSession())
                     .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "false")
                     .build();
             assertQuery(session1, sql,
                     "VALUES (2,'b',2), (4,'d',4), (5,'e',5), (6,'f',6), (7,'g',7), (8,'h',8), (9,'i',9)");
@@ -1124,6 +1127,188 @@ public abstract class AbstractTestDistributedQueries
 
             MaterializedResult resultCachePushdown = computeActual(session2, sql);
             assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+
+            sql = "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 IS NULL or p2 IS NULL) ORDER BY id";
+
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(session1, sql);
+            resultCachePushdown = computeActual(session2, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+
+            sql = "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 IS NOT NULL or p2 IS NULL) ORDER BY id";
+
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(session1, sql);
+            resultCachePushdown = computeActual(session2, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+
+            sql = "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 > 'e' OR p2 IS NULL) ORDER BY id";
+
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(session1, sql);
+            resultCachePushdown = computeActual(session2, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+        }
+    }
+
+    @Test
+    public void testLikePredicateWithPartitionKey()
+    {
+        if (supportsPushdown()) {
+            assertUpdate("DROP TABLE IF EXISTS test_partition_predicate");
+            assertUpdate("CREATE TABLE test_partition_predicate (id int, p1 varchar, p2 varchar) WITH (partitioned_by=ARRAY['p2'])");
+            assertTrue(getQueryRunner().tableExists(getSession(), "test_partition_predicate"));
+            assertTableColumnNames("test_partition_predicate", "id", "p1", "p2");
+
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (1,'aaa','aaa'), (2,'bbb','bbb'), (3,'ccc','ccc')", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (4,'ddd','ddd'), (5,'eee','eee'), (6,'fff','fff')", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (7,'ggg','ggg'), (8,'hhh','hhh'), (9,'iii','iii')", 3);
+
+            Session sessionPushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "false")
+                    .build();
+            Session sessionCachePushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "true")
+                    .build();
+
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (10,NULL,'10'), (11,NULL,NULL), (NULL,NULL,NULL)", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (13,'ab',NULL), (14,'aab',NULL), (NULL,'aaab',NULL)", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (15,'ab','aab'), (16,'aab','aab'), (NULL,'aaab','aaab')", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (18,'b',NULL), (19,'abb',NULL), (NULL,'abbb',NULL)", 3);
+            assertUpdate("INSERT INTO test_partition_predicate VALUES (21,'b','b'), (22,'abb','abb'), (NULL,'abbb','abbb')", 3);
+
+            MaterializedResult resultNormal;
+            MaterializedResult resultPushdown;
+            MaterializedResult resultCachePushdown;
+
+            /* Conjuct Like */
+            List<String> sqlList = Arrays.asList(
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE 'a%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE 'a%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE 'aa%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE 'ab%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE '%a' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE '%b' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE '%ab' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE '%a%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE '%aa%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p2 LIKE '%aaa%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE 'a%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE 'a%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE 'aa%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE 'ab%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE '%a' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE '%b' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE '%ab' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE '%a%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE '%aa%' ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and p1 LIKE '%aaa%' ORDER BY id");
+            for (String sql : sqlList) {
+                resultNormal = computeActual(sql);
+                resultPushdown = computeActual(sessionPushdown, sql);
+                resultCachePushdown = computeActual(sessionCachePushdown, sql);
+
+                assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+                assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+            }
+
+            /* disjunct Like */
+            sqlList = Arrays.asList(
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'a%'      OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'a%'      OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'aa%'     OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'ab%'     OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%a'      OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%b'      OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%ab'     OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%a%'     OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%aa%'    OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%aaa%'   OR p1 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'a%'      OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'a%'      OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'aa%'     OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'ab%'     OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%a'      OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%b'      OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%ab'     OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%a%'     OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%aa%'    OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%aaa%'   OR p1 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'a%'      OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'a%'      OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'aa%'     OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE 'ab%'     OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%a'      OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%b'      OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%ab'     OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%a%'     OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%aa%'    OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p2 LIKE '%aaa%'   OR p1 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'a%'      OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'a%'      OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'aa%'     OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'ab%'     OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%a'      OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%b'      OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%ab'     OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%a%'     OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%aa%'    OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%aaa%'   OR p2 > 'c') ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'a%'      OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'a%'      OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'aa%'     OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'ab%'     OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%a'      OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%b'      OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%ab'     OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%a%'     OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%aa%'    OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%aaa%'   OR p2 IS NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'a%'      OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'a%'      OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'aa%'     OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE 'ab%'     OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%a'      OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%b'      OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%ab'     OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%a%'     OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%aa%'    OR p2 IS NOT NULL) ORDER BY id",
+                    "SELECT id, p1, p2 FROM test_partition_predicate WHERE id > 0 and (p1 LIKE '%aaa%'   OR p2 IS NOT NULL) ORDER BY id");
+            for (String sql : sqlList) {
+                resultNormal = computeActual(sql);
+                resultPushdown = computeActual(sessionPushdown, sql);
+                resultCachePushdown = computeActual(sessionCachePushdown, sql);
+
+                if (!resultNormal.getMaterializedRows().equals(resultPushdown.getMaterializedRows())
+                        || !resultNormal.getMaterializedRows().equals(resultCachePushdown.getMaterializedRows())) {
+                    System.out.println("------------------------------------------------------------------------");
+                    System.out.println("Failed Query: " + sql);
+                    System.out.println("------------------------------------------------------------------------");
+                    System.out.println("Expected        : " + resultNormal.getMaterializedRows());
+                    System.out.println("Result[Pushdown]: " + resultPushdown.getMaterializedRows());
+                    System.out.println("Result[Cache]   : " + resultCachePushdown.getMaterializedRows());
+                    System.out.println("------------------------------------------------------------------------");
+                    resultNormal = computeActual("EXPLAIN " + sql);
+                    resultPushdown = computeActual(sessionPushdown, "EXPLAIN " + sql);
+                    resultCachePushdown = computeActual(sessionCachePushdown, "EXPLAIN " + sql);
+
+                    System.out.println("Running query [" + sql + "]");
+                    System.out.println("Normal Plan: " + resultNormal);
+                    System.out.println("PushDown Plan: " + resultPushdown);
+                    System.out.println("CacheDown Plan: " + resultCachePushdown);
+                    System.out.println("------------------------------------------------------------------------");
+                }
+                assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+                assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+            }
         }
     }
 }
