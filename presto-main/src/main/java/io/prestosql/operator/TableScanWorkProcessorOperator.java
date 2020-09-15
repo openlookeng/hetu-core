@@ -29,6 +29,8 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.type.Type;
+import io.prestosql.split.EmptySplit;
+import io.prestosql.split.EmptySplitPageSource;
 import io.prestosql.split.PageSourceProvider;
 
 import java.io.IOException;
@@ -175,7 +177,12 @@ public class TableScanWorkProcessorOperator
             }
 
             checkState(source == null, "Table scan split already set");
-            source = pageSourceProvider.createPageSource(session, split, table, columns, null);
+            if (split.getConnectorSplit() instanceof EmptySplit) {
+                source = new EmptySplitPageSource();
+            }
+            else {
+                source = pageSourceProvider.createPageSource(session, split, table, columns, null);
+            }
             if (source.needMergingForPages()) {
                 return TransformationState.ofResult(
                         WorkProcessor.create(new ConnectorPageSourceToPages(aggregatedMemoryContext, source))
