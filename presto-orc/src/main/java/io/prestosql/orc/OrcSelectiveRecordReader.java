@@ -391,7 +391,7 @@ public class OrcSelectiveRecordReader
             throws OrcCorruptionException
     {
         int fieldCount = orcTypes.get(OrcColumnId.ROOT_COLUMN).getFieldCount();
-        SelectiveColumnReader[] columnReaders = new SelectiveColumnReader[includedColumns.size()];
+        SelectiveColumnReader[] columnReaders = new SelectiveColumnReader[fieldCount];
 
         colReaderWithFilter = new IntArraySet();
         colReaderWithORFilter = new IntArraySet();
@@ -455,7 +455,7 @@ public class OrcSelectiveRecordReader
             }
         }
 
-        // specially for alter add/drop column case:
+        // specially for alter add column case:
         for (int missingColumn : missingColumns) {
             if (filters.get(missingColumn) != null) {
                 colReaderWithFilter.add(missingColumn);

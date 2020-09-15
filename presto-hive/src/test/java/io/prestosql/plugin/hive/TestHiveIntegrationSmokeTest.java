@@ -4965,6 +4965,7 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate(session1, "CREATE TABLE alldtype (id1 int, id4 double, id5 float, id6 decimal(5,2), id7 varchar(10), id8 char(10)) with (format='orc')");
         assertUpdate(session1, "INSERT Into alldtype values(1,4.5,5.6,6.7,'rajeev','male')", 1);
         assertQuery(session1, "select * from alldtype where id1=1", "SELECT 1,4.5,5.6,6.7,'rajeev','male'");
+        assertQuery(session1, "select count(1) from alldtype where id4=4.5", "SELECT 1");
         assertUpdate(session1, "CREATE TABLE part2key (id1 int, id2 int, id3 int) with (format='orc', partitioned_by=ARRAY['id2','id3'])");
         assertUpdate(session1, "INSERT Into part2key values(1,2,3)", 1);
         assertQuery(session1, "select * from part2key where id2=2 and id3=3", "SELECT 1,2,3");

@@ -580,7 +580,7 @@ public class SliceDirectSelectiveColumnReader
             if (data == null || data.length < totalLength) {
                 data = new byte[totalLength];
             }
-            if (offsets == null || offsets.length < totalLength) {
+            if (offsets == null || offsets.length < totalLength + 1) {
                 offsets = new int[totalPositions + 1];
             }
         }

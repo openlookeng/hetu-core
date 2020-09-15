@@ -13,6 +13,7 @@
  */
 package io.prestosql.tests;
 
+import io.prestosql.Session;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
 import org.testng.annotations.Test;
@@ -27,6 +28,11 @@ import static org.testng.Assert.assertTrue;
 public abstract class AbstractTestAggregations
         extends AbstractTestQueryFramework
 {
+    protected boolean supportsPushdown()
+    {
+        return false;
+    }
+
     public AbstractTestAggregations(QueryRunnerSupplier supplier)
     {
         super(supplier);
@@ -316,6 +322,13 @@ public abstract class AbstractTestAggregations
                 "SELECT 1");
 
         assertQuery("SELECT count(1) FILTER (WHERE orderstatus = 'O') FROM orders", "SELECT count(*) FROM orders WHERE orderstatus = 'O'");
+
+        if (supportsPushdown()) {
+            Session session1 = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .build();
+            assertQuery(session1, "SELECT count(1) FILTER (WHERE orderstatus = 'O') FROM orders", "SELECT count(*) FROM orders WHERE orderstatus = 'O'");
+        }
 
         // filter out all rows
         assertQuery("SELECT sum(x) FILTER (WHERE y > 5) FROM (VALUES (1, 3), (2, 4), (2, 4), (4, 5)) t (x, y)", "SELECT null");
