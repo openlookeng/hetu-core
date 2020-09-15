@@ -327,7 +327,7 @@ public class OrcSelectivePageSourceFactory
             Optional<List<IndexMetadata>> indexes,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
-            List<TupleDomain<HiveColumnHandle>> additionalDomainPredicates,
+            List<TupleDomain<HiveColumnHandle>> disjunctDomains,
             List<Integer> positions,
             List<HivePageSourceProvider.ColumnMapping> columnMappings,
             Map<Integer, HiveCoercer> coercers)
@@ -406,11 +406,11 @@ public class OrcSelectivePageSourceFactory
                     .orElseThrow(() -> new IllegalArgumentException("Effective predicate is none"));
 
             /* Fixme(Nitin): If same-columns or conditions can be merged as TreeMap in optimization step; below code can be spared */
-            Map<HiveColumnHandle, Domain> additionalPredicateDomains = new HashMap<>();
-            additionalDomainPredicates.stream()
-                    .forEach(ap -> ap.getDomains().get().forEach((k, v) -> additionalPredicateDomains.merge(k, v, (v1, v2) -> v1.union(v2))));
+            Map<HiveColumnHandle, Domain> disjunctPredicateDomains = new HashMap<>();
+            disjunctDomains.stream()
+                    .forEach(ap -> ap.getDomains().get().forEach((k, v) -> disjunctPredicateDomains.merge(k, v, (v1, v2) -> v1.union(v2))));
 
-            boolean hasParitionKeyORPredicate = additionalPredicateDomains.keySet().stream().anyMatch(c -> c.isPartitionKey());
+            boolean hasParitionKeyORPredicate = disjunctPredicateDomains.keySet().stream().anyMatch(c -> c.isPartitionKey());
             Map<String, List<Domain>> orDomains = new ConcurrentHashMap<>();
             Set<Integer> missingColumns = new HashSet<>();
             for (HiveColumnHandle column : columns) {
@@ -440,7 +440,7 @@ public class OrcSelectivePageSourceFactory
                         predicateBuilder.addColumn(orcColumn.getColumnId(), domain); //TODO: Rajeev: need to see if this index is 0-based or 1-based.
                     }
 
-                    domain = additionalPredicateDomains.get(column);
+                    domain = disjunctPredicateDomains.get(column);
                     if (!hasParitionKeyORPredicate && domain != null) {
                         predicateBuilder.addOrColumn(orcColumn.getColumnId(), domain);
                         orDomains.computeIfAbsent(column.getName(), l -> new ArrayList<>()).add(domain);
@@ -482,7 +482,7 @@ public class OrcSelectivePageSourceFactory
             Map<Integer, TupleDomainFilter> tupleDomainFilters = toTupleDomainFilters(domainPredicate, ImmutableBiMap.copyOf(columnNames).inverse());
             Map<Integer, List<TupleDomainFilter>> orFilters = new HashMap<>();
 
-            additionalDomainPredicates.stream()
+            disjunctDomains.stream()
                     .forEach(ap -> toTupleDomainFilters(ap, ImmutableBiMap.copyOf(columnNames).inverse()).entrySet().stream()
                             .forEach(td -> orFilters.computeIfAbsent(td.getKey(), list -> new ArrayList<>()).add(td.getValue())));
 

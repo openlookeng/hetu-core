@@ -94,12 +94,12 @@ public interface ConnectorTableHandle
         return false;
     }
 
-    default boolean hasAdditionalFiltersPushdown()
+    default boolean hasDisjunctFiltersPushdown()
     {
         return false;
     }
 
-    default String getAdditionalFilterConditions(Function<Domain, String> printer)
+    default String getDisjunctFilterConditions(Function<Domain, String> printer)
     {
         return "";
     }

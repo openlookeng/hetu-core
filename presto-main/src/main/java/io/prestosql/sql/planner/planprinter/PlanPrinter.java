@@ -867,7 +867,7 @@ public class PlanPrinter
                             .map(filter -> filter.getKey() + " <- " + formatDomain(filter.getValue().simplify()))
                             .collect(Collectors.joining(" AND ", "{", "}")));
                     str.append(" ]");
-                    if (node.getTable().getConnectorHandle().hasAdditionalFiltersPushdown()) {
+                    if (node.getTable().getConnectorHandle().hasDisjunctFiltersPushdown()) {
                         str.append("[ ");
                         str.append(" AND ");
                         str.append(" ]");
@@ -875,9 +875,9 @@ public class PlanPrinter
                 }
             }
 
-            if (node.getTable().getConnectorHandle().hasAdditionalFiltersPushdown()) {
+            if (node.getTable().getConnectorHandle().hasDisjunctFiltersPushdown()) {
                 str.append(node.getTable().getConnectorHandle()
-                        .getAdditionalFilterConditions((domain) -> formatDomain(domain)));
+                        .getDisjunctFilterConditions((domain) -> formatDomain(domain)));
             }
 
             return str.toString();

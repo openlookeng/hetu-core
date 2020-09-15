@@ -228,7 +228,7 @@ public class HivePartitionManager
                 partitions.getBucketFilter(),
                 handle.getAnalyzePartitionValues(),
                 handle.getPredicateColumns(),
-                handle.getAdditionalCompactEffectivePredicate(),
+                handle.getDisjunctCompactEffectivePredicate(),
                 handle.isSuitableToPush());
     }
 

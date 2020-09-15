@@ -141,8 +141,8 @@ public class HivePageSourceProvider
                     .getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
                     hiveTable.getPartitionColumns()));
 
-            if (hiveTable.getAdditionalCompactEffectivePredicate().isPresent() && hiveTable.getAdditionalCompactEffectivePredicate().get().size() > 0) {
-                hiveTable.getAdditionalCompactEffectivePredicate().get().forEach(orPredicate ->
+            if (hiveTable.getDisjunctCompactEffectivePredicate().isPresent() && hiveTable.getDisjunctCompactEffectivePredicate().get().size() > 0) {
+                hiveTable.getDisjunctCompactEffectivePredicate().get().forEach(orPredicate ->
                         indexes.addAll(this.indexCache.getIndices(session
                         .getCatalog().orElse(null), hiveTable
                         .getSchemaTableName().toString(), hiveSplit, orPredicate, hiveTable
@@ -160,7 +160,7 @@ public class HivePageSourceProvider
                     indexOptional, hiveSplit.isCacheable(),
                     hiveTable.getCompactEffectivePredicate(),
                     hiveTable.getPredicateColumns(),
-                    hiveTable.getAdditionalCompactEffectivePredicate(),
+                    hiveTable.getDisjunctCompactEffectivePredicate(),
                     hiveSplit.getBucketConversion(),
                     hiveSplit.getBucketNumber());
         }

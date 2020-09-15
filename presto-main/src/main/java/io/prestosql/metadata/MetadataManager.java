@@ -1112,7 +1112,7 @@ public final class MetadataManager
 
     @Override
     public Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table, Constraint constraint,
-                                                                          List<Constraint> additionalConstrains,
+                                                                          List<Constraint> disjunctConstraints,
                                                                           Set<ColumnHandle> allColumnHandles,
                                                                           boolean pushPartitionsOnly)
     {
@@ -1124,7 +1124,7 @@ public final class MetadataManager
         }
 
         ConnectorSession connectorSession = session.toConnectorSession(catalogName);
-        return metadata.applyFilter(connectorSession, table.getConnectorHandle(), constraint, additionalConstrains, allColumnHandles, pushPartitionsOnly)
+        return metadata.applyFilter(connectorSession, table.getConnectorHandle(), constraint, disjunctConstraints, allColumnHandles, pushPartitionsOnly)
                 .map(result -> new ConstraintApplicationResult<>(
                         new TableHandle(catalogName, result.getHandle(), table.getTransaction(), Optional.empty()),
                         result.getRemainingFilter()));
