@@ -21,6 +21,11 @@ import static io.prestosql.plugin.hive.HiveQueryRunner.createQueryRunner;
 public class TestHiveDistributedAggregations
         extends AbstractTestAggregations
 {
+    protected boolean supportsPushdown()
+    {
+        return true;
+    }
+
     public TestHiveDistributedAggregations()
     {
         super(() -> createQueryRunner(getTables()));
