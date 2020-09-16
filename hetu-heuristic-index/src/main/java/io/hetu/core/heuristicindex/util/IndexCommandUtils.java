@@ -12,14 +12,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.heuristicindex;
+package io.hetu.core.heuristicindex.util;
 
 import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.filesystem.HdfsFileSystemClientFactory;
 import io.hetu.core.filesystem.LocalFileSystemClientFactory;
-import io.hetu.core.heuristicindex.util.IndexConstants;
-import io.hetu.core.heuristicindex.util.IndexServiceUtils;
+import io.hetu.core.heuristicindex.HeuristicIndexFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.heuristicindex.IndexFactory;
@@ -118,11 +117,11 @@ public class IndexCommandUtils
                 }
             }
 
-            throw new IllegalArgumentException(String.format("fs.client.type '{}' has no registered factory", fsType));
+            throw new IllegalArgumentException(String.format("fs.client.type '%s' has no registered factory", fsType));
         }
     }
 
-    static class IndexStore
+    public static class IndexStore
     {
         final HetuFileSystemClient fs;
         final Path root;

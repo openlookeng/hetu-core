@@ -19,112 +19,43 @@ import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestHeuristicIndexClient
 {
-    List<TempFolder> testFolders = new LinkedList<>();
-
     @Test
-    public void testDeleteAllColumns()
-            throws IOException
-    {
-        testDeleteSelectedColumnsHelper(new String[] {"c1", "c2", "c3"}, new String[] {"c1", "c2", "c3"});
-    }
-
-    @Test
-    public void testDeleteSelectedColumns()
-            throws IOException
-    {
-        testDeleteSelectedColumnsHelper(new String[] {"c1", "c2", "c3"}, new String[] {"c1", "c3"});
-        testDeleteSelectedColumnsHelper(new String[] {"c1", "c2", "c3"}, new String[] {"c1"});
-        testDeleteSelectedColumnsHelper(new String[] {"c1", "c2", "c3", "abc"}, new String[] {"c3"});
-        testDeleteSelectedColumnsHelper(new String[] {"c1", "c2", "c3", "abc", "def"}, new String[] {"abc", "c2"});
-    }
-
-    private void testDeleteSelectedColumnsHelper(String[] columns, String[] deleted)
+    public void testDeleteSelectedColumnsHelper()
             throws IOException
     {
         String tableName = "catalog.schema.UT_test";
-        assertTrue(columns.length >= deleted.length);
 
-        String[] remained = new String[columns.length - deleted.length];
-        int i = 0;
-        for (String c : columns) {
-            boolean found = false;
-            for (String dc : deleted) {
-                if (c.equals(dc)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                remained[i++] = c;
-            }
-        }
-
-        TempFolder folder = new TempFolder();
-        testFolders.add(folder);
-        folder.create();
-
-        createIndexFolderStructure(folder.getRoot(), tableName, columns);
-        HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
-        Set<Index> emptyIndices = new HashSet<>();
-
-        HeuristicIndexClient client = new HeuristicIndexClient(emptyIndices, fs, folder.getRoot().toPath());
-        client.deleteIndex(tableName, deleted);
-
-        File tableFolder = new File(folder.getRoot(), tableName);
-        if (remained.length == 0) {
-            // if all columns are deleted, no folder/files should be under the table folder
-            assertEquals(tableFolder.list().length, 0);
-        }
-        else {
-            // if there are columns left, tableFolder has to have the same number of folders of the remained columns
-            assertEquals(remained.length, tableFolder.list().length);
-            for (String remainedColumn : remained) {
-                // remained column should have at least one index file
-                File columnFolder = new File(tableFolder, remainedColumn);
-                assertTrue(columnFolder.list().length > 0);
-            }
-            for (String deletedColumn : deleted) {
-                // deleted column should not exist
-                File columnFolder = new File(tableName, deletedColumn);
-                assertFalse(columnFolder.exists());
-            }
-        }
-    }
-
-    private void createIndexFolderStructure(File folder, String table, String... columns)
-            throws IOException
-    {
-        File tableFolder = new File(folder, table);
-        assertTrue(tableFolder.mkdir());
-        for (String column : columns) {
-            File columnFolder = new File(tableFolder, column);
+        try (TempFolder folder = new TempFolder()) {
+            // root/catalog.schema.UT_test/testColumn/bloom/testIndex.index
+            folder.create();
+            File tableFolder = new File(folder.getRoot().getPath(), tableName);
+            assertTrue(tableFolder.mkdir());
+            File columnFolder = new File(tableFolder, "testColumn");
             assertTrue(columnFolder.mkdirs());
-            assertTrue(new File(columnFolder, "testIndex.index").createNewFile());
-        }
-    }
+            File indexTypeFolder = new File(columnFolder, "bloom");
+            assertTrue(indexTypeFolder.mkdirs());
+            assertTrue(new File(indexTypeFolder, "testIndex.index").createNewFile());
 
-    @AfterTest
-    public void cleanUp()
-    {
-        for (TempFolder folder : testFolders) {
-            folder.close();
+            HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
+            Set<Index> emptyIndices = new HashSet<>();
+
+            HeuristicIndexClient client = new HeuristicIndexClient(emptyIndices, fs, folder.getRoot().toPath());
+            client.deleteIndex(tableName, new String[] {"testColumn"}, "bloom");
+
+            assertFalse(indexTypeFolder.exists());
         }
     }
 }

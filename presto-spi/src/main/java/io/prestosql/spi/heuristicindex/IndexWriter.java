@@ -51,14 +51,13 @@ public interface IndexWriter
      * @param table fully qualified table name
      * @param columns columns to index
      * @param partitions only index specified partitions, if null, index all partitions
-     * @param indexTypes type of the index to be created (its string ID returned from {@link Index#getId()})
+     * @param indexType type of the index to be created (its string ID returned from {@link Index#getId()})
      * @param lockingEnabled if enabled, the table will be locked and multiple callers can't create index for the table in parallel
-     * @param debugEnabled writes the raw split data to a file alongside the index file
      * @throws IOException thrown during index creation
      */
-    public void createIndex(String table, String[] columns, String[] partitions, String[] indexTypes, boolean lockingEnabled, boolean debugEnabled)
+    public void createIndex(String table, String[] columns, String[] partitions, String indexType, boolean lockingEnabled)
             throws IOException;
 
-    public void createIndex(String table, String[] columns, String[] partitions, String... indexTypes)
+    public void createIndex(String table, String[] columns, String[] partitions, String indexType)
             throws IOException;
 }

@@ -25,8 +25,6 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,6 +45,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.hetu.core.heuristicindex.util.IndexConstants.COLUMN_DELIMITER;
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.printVerboseMsg;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -57,7 +57,6 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexClient
         implements IndexClient
 {
-    private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexClient.class);
     private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
             new LocalConfig(new Properties()), Paths.get("/"));
 
@@ -75,20 +74,22 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public List<IndexMetadata> readSplitIndex(String path, String... filterIndexTypes)
+    public List<IndexMetadata> readSplitIndex(String path)
             throws IOException
     {
         requireNonNull(path, "no path specified");
 
         List<IndexMetadata> indexes = new LinkedList<>();
 
-        for (Map.Entry<String, Index> entry : readIndexMap(path, filterIndexTypes).entrySet()) {
+        for (Map.Entry<String, Index> entry : readIndexMap(path).entrySet()) {
             String absolutePath = entry.getKey();
             Path remainder = Paths.get(absolutePath.replaceFirst(root.toString(), ""));
             Path table = remainder.subpath(0, 1);
             remainder = Paths.get(remainder.toString().replaceFirst(table.toString(), ""));
             Path column = remainder.subpath(0, 1);
             remainder = Paths.get(remainder.toString().replaceFirst(column.toString(), ""));
+            Path indexType = remainder.subpath(0, 1);
+            remainder = Paths.get(remainder.toString().replaceFirst(indexType.toString(), ""));
 
             Path filenamePath = remainder.getFileName();
             if (filenamePath == null) {
@@ -97,13 +98,14 @@ public class HeuristicIndexClient
             remainder = remainder.getParent();
             table = table.getFileName();
             column = column.getFileName();
-            if (remainder == null || table == null || column == null) {
+            indexType = indexType.getFileName();
+            if (remainder == null || table == null || column == null || indexType == null) {
                 throw new IllegalArgumentException("Split path cannot be resolved: " + path);
             }
 
             String filename = filenamePath.toString();
             long splitStart = Long.parseLong(filename.substring(0, filename.lastIndexOf('.')));
-            String timeDir = Paths.get(table.toString(), column.toString(), remainder.toString()).toString();
+            String timeDir = Paths.get(table.toString(), column.toString(), indexType.toString(), remainder.toString()).toString();
             long lastUpdated = getLastModified(timeDir);
 
             IndexMetadata index = new IndexMetadata(
@@ -139,7 +141,7 @@ public class HeuristicIndexClient
                     }
                 }
                 else {
-                    LOG.debug("File path not valid: {}", child);
+                    printVerboseMsg(String.format("File path not valid: %s", child));
                     return 0;
                 }
             }
@@ -149,14 +151,16 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public void deleteIndex(String table, String[] columns)
+    public void deleteIndex(String table, String[] columns, String indexType)
             throws IOException
     {
-        // get the parts just to validate the table name
-        IndexServiceUtils.getTableParts(table);
+        Path toDelete = root.resolve(table).resolve(String.join(COLUMN_DELIMITER, columns)).resolve(indexType);
 
-        Path tablePath = root.resolve(table);
-        Lock lock = new FileBasedLock(fs, tablePath);
+        if (!fs.exists(toDelete)) {
+            return;
+        }
+
+        Lock lock = new FileBasedLock(fs, toDelete.getParent());
         try {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 lock.unlock();
@@ -169,26 +173,13 @@ public class HeuristicIndexClient
             }));
             lock.lock();
 
-            if (columns == null) {
-                LOG.info("Deleted index for table {}", table);
-                fs.deleteRecursively(tablePath);
-            }
-            else {
-                for (String column : columns) {
-                    Path indexFilePath = tablePath.resolve(column);
-                    if (!fs.exists(indexFilePath)) {
-                        LOG.warn("No index found for column {}", column);
-                    }
-                    else {
-                        fs.deleteRecursively(indexFilePath);
-                        LOG.info("Deleted index for column {}", column);
-                    }
-                }
-            }
+            fs.deleteRecursively(toDelete);
         }
         finally {
             lock.unlock();
         }
+
+        return;
     }
 
     private boolean notDirectory(Path path)
@@ -205,11 +196,10 @@ public class HeuristicIndexClient
      *
      * @param path relative path to the index file or dir, if dir, it will be searched recursively (relative to the
      * root uri, if one was set)
-     * @param filterIndexTypes only load index types matching these types, if empty or null, all types will be loaded
      * @return an immutable mapping from all index files read to the corresponding index that was loaded
      * @throws IOException
      */
-    private Map<String, Index> readIndexMap(String path, String... filterIndexTypes)
+    private Map<String, Index> readIndexMap(String path)
             throws IOException
     {
         ImmutableMap.Builder<String, Index> result = ImmutableMap.builder();
@@ -224,13 +214,13 @@ public class HeuristicIndexClient
         try (Stream<Path> tarsOnRemote = fs.walk(absolutePath).filter(p -> p.toString().contains(".tar"))) {
             for (Path tarFile : (Iterable<Path>) tarsOnRemote::iterator) {
                 Path localTmpDir = Files.createTempDirectory("tmp-index-dump-").toAbsolutePath();
-                LOG.debug("Fetching index from remote filesystem to local: " + tarFile);
+                printVerboseMsg("Fetching index from remote filesystem to local: " + tarFile);
                 IndexServiceUtils.unArchive(fs, LOCAL_FS_CLIENT, tarFile, localTmpDir);
                 Path tarReadPath = Paths.get(localTmpDir.toString(), absolutePath.toString());
 
                 try (Stream<Path> children = LOCAL_FS_CLIENT.walk(tarReadPath).filter(this::notDirectory)) {
                     for (Path child : (Iterable<Path>) children::iterator) {
-                        LOG.debug("Processing file {}.", child);
+                        printVerboseMsg(String.format("Processing file %s.", child));
 
                         Path childFilePath = child.getFileName();
                         if (childFilePath == null) {
@@ -243,21 +233,6 @@ public class HeuristicIndexClient
                         }
 
                         String indexType = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ENGLISH);
-
-                        if (filterIndexTypes != null && filterIndexTypes.length != 0) {
-                            // check if indexType matches any of the indexTypes expected to be loaded
-                            boolean found = false;
-                            for (int i = 0; i < filterIndexTypes.length; i++) {
-                                if (filterIndexTypes[i].equalsIgnoreCase(indexType)) {
-                                    found = true;
-                                    break;
-                                }
-                            }
-
-                            if (!found) {
-                                continue;
-                            }
-                        }
 
                         Index index = indexTypesMap.get(indexType);
                         if (index != null) {
@@ -272,7 +247,8 @@ public class HeuristicIndexClient
                             try (InputStream is = LOCAL_FS_CLIENT.newInputStream(child)) {
                                 index.load(is);
                             }
-                            LOG.debug("Loaded {} index from {}.", index.getId(), child);
+
+                            printVerboseMsg(String.format("Loaded %s index from %s.", index.getId(), child));
 
                             Object fileSize = LOCAL_FS_CLIENT.getAttribute(child, SupportedFileAttributes.SIZE);
                             if (fileSize instanceof Long) {

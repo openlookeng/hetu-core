@@ -20,19 +20,15 @@ public class IndexCacheKey
 {
     private String path;
     private long lastModifiedTime;
-    private String[] indexTypes;
 
     /**
-     *
      * @param path path to the file the index files should be read for
      * @param lastModifiedTime lastModifiedTime of the file, used to validate the indexes
-     * @param indexTypes only load specified index types, e.g. bloom
      */
-    public IndexCacheKey(String path, long lastModifiedTime, String... indexTypes)
+    public IndexCacheKey(String path, long lastModifiedTime)
     {
         this.path = path;
         this.lastModifiedTime = lastModifiedTime;
-        this.indexTypes = indexTypes;
     }
 
     public String getPath()
@@ -72,10 +68,5 @@ public class IndexCacheKey
     public int hashCode()
     {
         return Objects.hash(path);
-    }
-
-    public String[] getIndexTypes()
-    {
-        return indexTypes;
     }
 }

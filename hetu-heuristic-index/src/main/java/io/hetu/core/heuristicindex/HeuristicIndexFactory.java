@@ -28,8 +28,6 @@ import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -37,6 +35,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.printVerboseMsg;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -48,8 +47,6 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexFactory
         implements IndexFactory
 {
-    private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexFactory.class);
-
     // Add new Index and DataSources here in the future
     private final Set<Index> supportedIndex = ImmutableSet.of(new BloomIndex(), new MinMaxIndex(), new BitMapIndex());
     private final Set<DataSource> supportedDataSource = ImmutableSet.of(new EmptyDataSource(), new HiveDataSource());
@@ -61,8 +58,8 @@ public class HeuristicIndexFactory
     @Override
     public HeuristicIndexWriter getIndexWriter(Properties dataSourceProps, Properties indexProps, HetuFileSystemClient fs, Path root)
     {
-        LOG.debug("dataSourceProps: {}", dataSourceProps);
-        LOG.debug("indexProps: {}", indexProps);
+        printVerboseMsg(String.format("dataSourceProps: %s", dataSourceProps));
+        printVerboseMsg(String.format("indexProps: %s", indexProps));
 
         // Load DataSource
         String dataSourceName = dataSourceProps.getProperty(IndexConstants.DATASTORE_TYPE_KEY);
@@ -76,17 +73,16 @@ public class HeuristicIndexFactory
         }
 
         if (dataSource == null) {
-            LOG.error("DataSource not supported: {}", dataSourceName);
             throw new IllegalArgumentException("DataSource not supported: " + dataSourceName);
         }
 
-        LOG.debug("Using DataSource: {}", dataSource);
+        printVerboseMsg(String.format("Using DataSource: %s", dataSource));
         dataSource.setProperties(dataSourceProps);
 
         // Load Index
         Set<Index> indices = new HashSet<>(supportedIndex);
         for (Index index : indices) {
-            LOG.debug("Using Index: {}", index);
+            printVerboseMsg(String.format("Using Index: %s", index));
             index.setProperties(IndexServiceUtils.getPropertiesSubset(
                     indexProps, index.getId().toLowerCase(Locale.ENGLISH) + "."));
         }
@@ -99,7 +95,7 @@ public class HeuristicIndexFactory
     {
         requireNonNull(root, "No root path specified");
 
-        LOG.debug("Creating IndexClient with given filesystem client with root path {}", root);
+        printVerboseMsg(String.format("Creating IndexClient with given filesystem client with root path %s", root));
 
         return new HeuristicIndexClient(new HashSet<>(supportedIndex), fs, root);
     }

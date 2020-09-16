@@ -1,0 +1,4 @@
+#!/bin/bash
+
+java -jar "$(dirname "$0")/hetu-cli-010-executable.jar"\
+    "$@"

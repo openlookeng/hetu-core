@@ -77,7 +77,7 @@ public class CsvDataSource
 
                         List<Object> columnValues = values.get(columnNum);
 
-                        callback.call(column, columnValues.toArray(new Object[0]), e.toString(), 0, e.toFile().lastModified());
+                        callback.call(column, columnValues.toArray(new Object[0]), e.toString(), 0, e.toFile().lastModified(), 0);
                     }
                 }
                 catch (IOException ex) {

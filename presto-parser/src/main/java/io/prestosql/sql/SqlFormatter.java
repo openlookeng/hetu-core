@@ -27,6 +27,7 @@ import io.prestosql.sql.tree.CallArgument;
 import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -38,6 +39,7 @@ import io.prestosql.sql.tree.DescribeInput;
 import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -95,6 +97,7 @@ import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
+import io.prestosql.sql.tree.ShowIndex;
 import io.prestosql.sql.tree.ShowRoleGrants;
 import io.prestosql.sql.tree.ShowRoles;
 import io.prestosql.sql.tree.ShowSchemas;
@@ -832,6 +835,47 @@ public final class SqlFormatter
                     .append(" RENAME TO ")
                     .append(formatExpression(node.getTarget(), parameters));
 
+            return null;
+        }
+
+        @Override
+        protected Void visitCreateIndex(CreateIndex node, Integer context)
+        {
+            builder.append("CREATE INDEX ");
+            if (node.isNotExists()) {
+                builder.append("IF NOT EXISTS ");
+            }
+            builder.append(formatName(node.getIndexName()));
+            builder.append("USING ");
+            builder.append(format(node.getIndexType()));
+            builder.append(" ON ");
+            builder.append(formatName(node.getTableName()));
+            String columnList = node.getColumnAliases().stream().map(element -> formatExpression(element, parameters)).collect(joining(", "));
+            builder.append(format("( %s )", columnList));
+            builder.append(formatPropertiesMultiLine(node.getProperties()));
+            if (node.getExpression().isPresent()) {
+                builder.append(node.getExpression().get());
+            }
+
+            return null;
+        }
+
+        @Override
+        protected Void visitDropIndex(DropIndex node, Integer context)
+        {
+            append(context, "DROP INDEX ");
+            if (node.isExists()) {
+                builder.append("IF EXISTS ");
+            }
+            builder.append(node.getIndexName());
+
+            return null;
+        }
+
+        @Override
+        protected Void visitShowIndex(ShowIndex node, Integer context)
+        {
+            append(context, "SHOW INDEX ");
             return null;
         }
 
