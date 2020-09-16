@@ -3706,6 +3706,23 @@ public class TestHiveIntegrationSmokeTest
             assertQuery(notColocated, joinMismatchedBuckets, expectedJoinMismatchedBuckets);
             assertQuery(colocatedAllGroupsAtOnce, joinMismatchedBuckets, expectedJoinMismatchedBuckets, assertRemoteExchangesCount(1));
             assertQuery(colocatedOneGroupAtATime, joinMismatchedBuckets, expectedJoinMismatchedBuckets, assertRemoteExchangesCount(1));
+
+            Session notColocated1 = Session.builder(notColocated)
+                    .setCatalogSessionProperty(notColocated.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .build();
+            Session colocatedAllGroupsAtOnce1 = Session.builder(colocatedAllGroupsAtOnce)
+                    .setCatalogSessionProperty(colocatedAllGroupsAtOnce.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .build();
+            Session colocatedOneGroupAtATime1 = Session.builder(colocatedOneGroupAtATime)
+                    .setCatalogSessionProperty(colocatedOneGroupAtATime.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .build();
+            assertQuery(notColocated1, noSplits, expectedNoSplits);
+
+            assertQuery(colocatedAllGroupsAtOnce1, noSplits, expectedNoSplits, assertRemoteExchangesCount(1));
+            assertQuery(colocatedOneGroupAtATime1, noSplits, expectedNoSplits, assertRemoteExchangesCount(1));
+            assertQuery(notColocated1, joinMismatchedBuckets, expectedJoinMismatchedBuckets);
+            assertQuery(colocatedAllGroupsAtOnce1, joinMismatchedBuckets, expectedJoinMismatchedBuckets, assertRemoteExchangesCount(1));
+            assertQuery(colocatedOneGroupAtATime1, joinMismatchedBuckets, expectedJoinMismatchedBuckets, assertRemoteExchangesCount(1));
         }
         finally {
             assertUpdate("DROP TABLE IF EXISTS test_grouped_join1");
