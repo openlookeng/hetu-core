@@ -1311,4 +1311,178 @@ public abstract class AbstractTestDistributedQueries
             }
         }
     }
+
+    @Test
+    public void testDecimalCachedDisjunctPushdown()
+    {
+        if (supportsPushdown()) {
+            assertUpdate("DROP TABLE IF EXISTS test_store_sales");
+            assertUpdate("create table test_store_sales\n" +
+                    "(\n" +
+                    "    ss_sold_time_sk           bigint,\n" +
+                    "    ss_item_sk                bigint,\n" +
+                    "    ss_customer_sk            bigint,\n" +
+                    "    ss_cdemo_sk               bigint,\n" +
+                    "    ss_hdemo_sk               bigint,\n" +
+                    "    ss_addr_sk                bigint,\n" +
+                    "    ss_store_sk               bigint,\n" +
+                    "    ss_promo_sk               bigint,\n" +
+                    "    ss_ticket_number          bigint,\n" +
+                    "    ss_quantity               int,\n" +
+                    "    ss_wholesale_cost         decimal(7,2),\n" +
+                    "    ss_list_price             decimal(7,2),\n" +
+                    "    ss_sales_price            decimal(7,2),\n" +
+                    "    ss_ext_discount_amt       decimal(7,2),\n" +
+                    "    ss_ext_sales_price        decimal(7,2),\n" +
+                    "    ss_ext_wholesale_cost     decimal(7,2),\n" +
+                    "    ss_ext_list_price         decimal(7,2),\n" +
+                    "    ss_ext_tax                decimal(7,2),\n" +
+                    "    ss_coupon_amt             decimal(7,2),\n" +
+                    "    ss_net_paid               decimal(7,2),\n" +
+                    "    ss_net_paid_inc_tax       decimal(7,2),\n" +
+                    "    ss_net_profit             decimal(7,2),\n" +
+                    "    ss_sold_date_sk           bigint \n" +
+                    ") WITH (partitioned_by=ARRAY['ss_sold_date_sk'])");
+
+            assertTrue(getQueryRunner().tableExists(getSession(), "test_store_sales"));
+
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,1091,6,591617,3428,839,2,2,1,79,11.41,18.71,2.80,99.54,221.20,901.39,1478.09,6.08,99.54,121.66,127.74,-779.73,2451813)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,1478,6,591617,3428,839,2,1,1,37,63.63,101.17,41.47,46.03,1534.39,2354.31,3743.29,59.53,46.03,1488.36,1547.89,-865.95,2451813)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,1961,6,591617,3428,839,2,1,1,99,80.52,137.68,83.98,0.00,8314.02,7971.48,13630.32,0.00,0.00,8314.02,8314.02,342.54,2451814)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,470,6,591617,3428,839,2,1,1,14,57.37,76.30,6.10,0.00,85.40,803.18,1068.20,0.00,0.00,85.40,85.40,-717.78,2451814)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,404,6,591617,3428,839,2,2,1,100,25.08,36.86,0.73,0.00,73.00,2508.00,3686.00,6.57,0.00,73.00,79.57,-2435.00,NULL)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,404,6,591617,3428,839,2,2,1,100,25.08,36.86,0.73,0.00,73.00,2508.00,3686.00,6.57,0.00,73.00,79.57,-2435.00,2451815)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,2451815)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)", 1);
+
+            /* ss_quantity: 0...5 */
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,1439,6,591617,3428,839,2,1,1,5,10.68,15.91,6.68,0.00,33.40,53.40,79.55,2.33,0.00,33.40,35.73,-20.00,2451813)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (75316,56,284,1712478,4672,266,2,2,2,4,13.46,15.34,12.57,0.00,50.28,53.84,61.36,4.02,0.00,50.28,54.30,-3.56,2451524)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (50412,1539,47,586372,697,622,1,2,3,4,95.75,146.49,43.94,0.00,175.76,383.00,585.96,5.27,0.00,175.76,181.03,-207.24,2452638)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (50412,1545,47,586372,697,622,1,1,3,4,75.67,130.15,35.14,0.00,140.56,302.68,520.60,9.83,0.00,140.56,150.39,-162.12,2452638)", 1);
+            /* ss_quantity: 6...10 */
+            assertUpdate("INSERT INTO test_store_sales VALUES (46712,1829,954,890396,791,633,2,3,7,9,56.13,59.49,30.93,0.00,278.37,505.17,535.41,22.26,0.00,278.37,300.63,-226.80,2452260)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (52209,665,944,578318,6045,19,1,2,8,7,18.65,27.97,20.41,0.00,142.87,130.55,195.79,1.42,0.00,142.87,144.29,12.32,2452179)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (45986,1803,480,1023064,4248,385,1,2,9,6,27.17,51.62,25.29,0.00,151.74,163.02,309.72,3.03,0.00,151.74,154.77,-11.28,2452496)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (35137,7,820,63209,3198,434,1,1,12,9,7.33,11.94,11.22,31.30,100.98,65.97,107.46,2.09,31.30,69.68,71.77,3.71,2451206)", 1);
+            /* ss_quantity: 11...15 */
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,470,6,591617,3428,839,2,1,1,14,57.37,76.30,6.10,0.00,85.40,803.18,1068.20,0.00,0.00,85.40,85.40,-717.78,2451813)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (65495,1837,6,591617,3428,839,2,1,1,14,11.54,11.77,0.00,0.00,0.00,161.56,164.78,0.00,0.00,0.00,0.00,-161.56,2451813)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (53976,691,246,963544,5042,940,2,3,5,15,21.21,33.93,30.53,0.00,457.95,318.15,508.95,22.89,0.00,457.95,480.84,139.80,2451465)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (46712,1177,954,890396,791,633,2,2,7,12,47.60,75.20,65.42,0.00,785.04,571.20,902.40,47.10,0.00,785.04,832.14,213.84,2452260)", 1);
+            /* ss_quantity: 16...20 */
+            assertUpdate("INSERT INTO test_store_sales VALUES (50412,1719,47,586372,697,622,1,2,3,17,72.38,111.46,75.79,0.00,1288.43,1230.46,1894.82,38.65,0.00,1288.43,1327.08,57.97,2452638)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (38195,1465,814,874786,1511,83,2,1,4,17,54.26,105.80,9.52,116.52,161.84,922.42,1798.60,0.00,116.52,45.32,45.32,-877.10,2451438)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (52209,1757,944,578318,6045,19,1,3,8,20,18.95,33.92,31.88,0.00,637.60,379.00,678.40,51.00,0.00,637.60,688.60,258.60,2452179)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (60226,1377,451,71288,6925,515,2,2,10,17,88.36,133.42,53.36,0.00,907.12,1502.12,2268.14,0.00,0.00,907.12,907.12,-595.00,2451966)", 1);
+            /* ss_quantity: 21...25 */
+            assertUpdate("INSERT INTO test_store_sales VALUES (75316,1030,284,1712478,4672,266,2,3,2,25,74.26,89.11,35.64,0.00,891.00,1856.50,2227.75,8.91,0.00,891.00,899.91,-965.50,2451524)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (38195,397,814,874786,1511,83,2,2,4,23,2.91,3.57,3.53,32.47,81.19,66.93,82.11,0.97,32.47,48.72,49.69,-18.21,2451438)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (38195,886,814,874786,1511,83,2,2,4,21,40.39,40.39,12.11,0.00,254.31,848.19,848.19,22.88,0.00,254.31,277.19,-593.88,2451438)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (38195,908,814,874786,1511,83,2,2,4,23,53.28,77.78,1.55,21.03,35.65,1225.44,1788.94,1.16,21.03,14.62,15.78,-1210.82,2451438)", 1);
+            /* ss_quantity: 26...30 */
+            assertUpdate("INSERT INTO test_store_sales VALUES (75316,686,284,1712478,4672,266,2,3,2,30,2.27,3.83,1.11,0.00,33.30,68.10,114.90,0.00,0.00,33.30,33.30,-34.80,2451524)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (50412,1063,47,586372,697,622,1,2,3,27,37.04,58.89,55.35,0.00,1494.45,1000.08,1590.03,29.88,0.00,1494.45,1524.33,494.37,2452638)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (38195,272,814,874786,1511,83,2,2,4,27,26.21,44.81,19.26,0.00,520.02,707.67,1209.87,46.80,0.00,520.02,566.82,-187.65,2451438)", 1);
+            assertUpdate("INSERT INTO test_store_sales VALUES (45986,775,480,1023064,4248,385,1,1,9,27,98.68,195.38,15.63,0.00,422.01,2664.36,5275.26,33.76,0.00,422.01,455.77,-2242.35,2452496)", 1);
+
+            Session sessionPushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "false")
+                    .build();
+            Session sessionCachePushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "true")
+                    .build();
+
+            MaterializedResult resultNormal;
+            MaterializedResult resultPushdown;
+            MaterializedResult resultCachePushdown;
+
+            String sql = "SELECT *\n" +
+                    "FROM (SELECT\n" +
+                    "  avg(ss_list_price) B1_LP,\n" +
+                    "  count(ss_list_price) B1_CNT,\n" +
+                    "  count(DISTINCT ss_list_price) B1_CNTD\n" +
+                    "FROM test_store_sales\n" +
+                    "WHERE ss_quantity BETWEEN 0 AND 5\n" +
+                    "  AND (ss_list_price BETWEEN 8 AND 8 + 10\n" +
+                    "  OR ss_coupon_amt BETWEEN 459 AND 459 + 1000\n" +
+                    "  OR ss_wholesale_cost BETWEEN 57 AND 57 + 20)) B1,\n" +
+                    "  (SELECT\n" +
+                    "    avg(ss_list_price) B2_LP,\n" +
+                    "    count(ss_list_price) B2_CNT,\n" +
+                    "    count(DISTINCT ss_list_price) B2_CNTD\n" +
+                    "  FROM test_store_sales\n" +
+                    "  WHERE ss_quantity BETWEEN 6 AND 10\n" +
+                    "    AND (ss_list_price BETWEEN 90 AND 90 + 10\n" +
+                    "    OR ss_coupon_amt BETWEEN 2323 AND 2323 + 1000\n" +
+                    "    OR ss_wholesale_cost BETWEEN 31 AND 31 + 20)) B2,\n" +
+                    "  (SELECT\n" +
+                    "    avg(ss_list_price) B3_LP,\n" +
+                    "    count(ss_list_price) B3_CNT,\n" +
+                    "    count(DISTINCT ss_list_price) B3_CNTD\n" +
+                    "  FROM test_store_sales\n" +
+                    "  WHERE ss_quantity BETWEEN 11 AND 15\n" +
+                    "    AND (ss_list_price BETWEEN 142 AND 142 + 10\n" +
+                    "    OR ss_coupon_amt BETWEEN 12214 AND 12214 + 1000\n" +
+                    "    OR ss_wholesale_cost BETWEEN 79 AND 79 + 20)) B3,\n" +
+                    "  (SELECT\n" +
+                    "    avg(ss_list_price) B4_LP,\n" +
+                    "    count(ss_list_price) B4_CNT,\n" +
+                    "    count(DISTINCT ss_list_price) B4_CNTD\n" +
+                    "  FROM test_store_sales\n" +
+                    "  WHERE ss_quantity BETWEEN 16 AND 20\n" +
+                    "    AND (ss_list_price BETWEEN 135 AND 135 + 10\n" +
+                    "    OR ss_coupon_amt BETWEEN 6071 AND 6071 + 1000\n" +
+                    "    OR ss_wholesale_cost BETWEEN 38 AND 38 + 20)) B4,\n" +
+                    "  (SELECT\n" +
+                    "    avg(ss_list_price) B5_LP,\n" +
+                    "    count(ss_list_price) B5_CNT,\n" +
+                    "    count(DISTINCT ss_list_price) B5_CNTD\n" +
+                    "  FROM test_store_sales\n" +
+                    "  WHERE ss_quantity BETWEEN 21 AND 25\n" +
+                    "    AND (ss_list_price BETWEEN 122 AND 122 + 10\n" +
+                    "    OR ss_coupon_amt BETWEEN 836 AND 836 + 1000\n" +
+                    "    OR ss_wholesale_cost BETWEEN 17 AND 17 + 20)) B5,\n" +
+                    "  (SELECT\n" +
+                    "    avg(ss_list_price) B6_LP,\n" +
+                    "    count(ss_list_price) B6_CNT,\n" +
+                    "    count(DISTINCT ss_list_price) B6_CNTD\n" +
+                    "  FROM test_store_sales\n" +
+                    "  WHERE ss_quantity BETWEEN 26 AND 30\n" +
+                    "    AND (ss_list_price BETWEEN 154 AND 154 + 10\n" +
+                    "    OR ss_coupon_amt BETWEEN 7326 AND 7326 + 1000\n" +
+                    "    OR ss_wholesale_cost BETWEEN 7 AND 7 + 20)) B6\n" +
+                    "LIMIT 100";
+
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(sessionPushdown, sql);
+
+            assertQuery("CACHE TABLE test_store_sales WHERE ss_sold_date_sk > 2451801", "VALUES('OK')");
+            resultCachePushdown = computeActual(sessionCachePushdown, sql);
+
+            if (!resultNormal.getMaterializedRows().equals(resultPushdown.getMaterializedRows())
+                    || !resultNormal.getMaterializedRows().equals(resultCachePushdown.getMaterializedRows())) {
+                System.out.println("------------------------------------------------------------------------");
+                System.out.println("Failed Query: " + sql);
+                System.out.println("------------------------------------------------------------------------");
+                System.out.println("Expected        : " + resultNormal.getMaterializedRows());
+                System.out.println("Result[Pushdown]: " + resultPushdown.getMaterializedRows());
+                System.out.println("Result[Cache]   : " + resultCachePushdown.getMaterializedRows());
+                System.out.println("------------------------------------------------------------------------");
+                resultNormal = computeActual("EXPLAIN " + sql);
+                resultPushdown = computeActual(sessionPushdown, "EXPLAIN " + sql);
+                resultCachePushdown = computeActual(sessionCachePushdown, "EXPLAIN " + sql);
+
+                System.out.println("Running query [" + sql + "]");
+                System.out.println("Normal Plan: " + resultNormal);
+                System.out.println("PushDown Plan: " + resultPushdown);
+                System.out.println("CacheDown Plan: " + resultCachePushdown);
+                System.out.println("------------------------------------------------------------------------");
+            }
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+        }
+    }
 }
