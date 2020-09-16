@@ -25,6 +25,7 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
@@ -142,6 +143,11 @@ final class CacheTableRewrite
                 throw new SemanticException(MISSING_CACHE, cache, "Table '%s' does not exist", qualifiedTableName.toString());
             }
 
+            ConnectorTableHandle tableHandle = metadata.getTableHandle(session, qualifiedTableName).get().getConnectorHandle();
+            if (!tableHandle.isTableCacheable()) {
+                throw new SemanticException(INVALID_TABLE, cache, "Table '%s' cannot be cached", qualifiedTableName.toString());
+            }
+
             TableMetadata tableMetadata = metadata.getTableMetadata(session, metadata.getTableHandle(session, qualifiedTableName).get());
 
             TupleDomain<ColumnMetadata> columnMetadataTupleDomain = translateToTupleDomain(tableMetadata, predicate);
@@ -182,10 +188,6 @@ final class CacheTableRewrite
             Identifier identifier = null;
             Expression value = null;
 
-            if (!metadata.getTableHandle(session, tableMetadata.getQualifiedName()).get().getConnectorHandle().isFilterSupported()) {
-                throw new SemanticException(INVALID_TABLE, node, "Table '%s' cannot be cached. Only tables in Hive catalog can be cached",
-                        tableMetadata.getQualifiedName().toString());
-            }
             if (whereClause instanceof ComparisonExpression) {
                 ComparisonExpression predicate = (ComparisonExpression) whereClause;
                 identifier = (Identifier) ((predicate.getLeft() instanceof Identifier) ? predicate.getLeft() : predicate.getRight());
