@@ -15,13 +15,17 @@
 
 package io.prestosql.catalog;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.Files;
 import com.google.inject.Inject;
 import io.airlift.json.JsonCodec;
 import io.prestosql.server.HttpRequestSessionContext;
+import org.assertj.core.util.VisibleForTesting;
 import org.glassfish.jersey.media.multipart.BodyPartEntity;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -38,6 +42,7 @@ import javax.ws.rs.core.Response;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -48,13 +53,15 @@ import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 
 @Path("/v1/catalog")
+@MultipartConfig(maxFileSize = 20971520, maxRequestSize = 20971520)
 public class CatalogResource
 {
     private static final JsonCodec<CatalogInfo> CATALOG_INFO_CODEC = JsonCodec.jsonCodec(CatalogInfo.class);
-    private static final String FILE_NAME_REGEX = "[^\\s\\\\/:\\*\\?\\\"<>\\|](\\x20|[^\\s\\\\/:\\*\\?\\\"<>\\|])*[^\\s\\\\/:\\*\\?\\\"<>\\|\\.]$";
+    private static final String VALID_NAME_REGEX = "[^\\s\\\\/:\\*\\?\\\"<>\\|](\\x20|[^\\s\\\\/:\\*\\?\\\"<>\\|])*[^\\s\\\\/:\\*\\?\\\"<>\\|\\.]$";
     private final DynamicCatalogService service;
     private final int catalogMaxFileSizeInBytes;
     private final int catalogMaxFileNumber;
+    private final List<String> validFileSuffixes;
 
     @Inject
     public CatalogResource(DynamicCatalogService service, DynamicCatalogConfig config)
@@ -63,6 +70,22 @@ public class CatalogResource
         this.service = requireNonNull(service, "service is null");
         catalogMaxFileSizeInBytes = (int) config.getCatalogMaxFileSize().toBytes();
         catalogMaxFileNumber = config.getCatalogMaxFileNumber();
+        String suffixes = config.getCatalogValidFileSuffixes();
+        validFileSuffixes = (suffixes == null ? ImmutableList.of() : Arrays.asList(suffixes.split(",")));
+    }
+
+    @VisibleForTesting
+    boolean checkFileName(String fileName)
+    {
+        if (!fileName.matches(VALID_NAME_REGEX)) {
+            return false;
+        }
+
+        String suffix = Files.getFileExtension(fileName);
+        if (validFileSuffixes.isEmpty() || validFileSuffixes.contains(suffix)) {
+            return true;
+        }
+        return false;
     }
 
     private void putInputStreams(CatalogFileInputStream.Builder builder, List<FormDataBodyPart> configFileBodyParts, CatalogFileInputStream.CatalogFileType fileType)
@@ -75,7 +98,7 @@ public class CatalogResource
             for (FormDataBodyPart bodyPart : configFileBodyParts) {
                 BodyPartEntity bodyPartEntity = (BodyPartEntity) bodyPart.getEntity();
                 String fileName = bodyPart.getContentDisposition().getFileName();
-                if (!fileName.matches(FILE_NAME_REGEX)) {
+                if (!checkFileName(fileName)) {
                     builder.close();
                     throw new IOException("The file name is not correct.");
                 }
@@ -117,7 +140,11 @@ public class CatalogResource
         }
 
         try {
-            return CATALOG_INFO_CODEC.fromJson(catalogInfoJson);
+            CatalogInfo catalogInfo = CATALOG_INFO_CODEC.fromJson(catalogInfoJson);
+            if (!catalogInfo.getCatalogName().matches(VALID_NAME_REGEX)) {
+                throw badRequest(BAD_REQUEST, "Invalid catalog name");
+            }
+            return catalogInfo;
         }
         catch (IllegalArgumentException ex) {
             throw badRequest(BAD_REQUEST, "Invalid JSON string of catalog information");

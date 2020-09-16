@@ -72,7 +72,6 @@ public class TestCatalogStore
         Properties metadata = new Properties();
         metadata.put("version", "9d3fe902-a0f0-4556-81b7-2d5cf5e21518");
         metadata.put("createdTime", "0");
-        metadata.put("submitter", "admin");
         metadata.put("catalogFiles", "[ \"hdfs-site.xml\", \"core-site.xml\", \"user.keytab\" ]");
         metadata.put("globalFiles", "[\"krb5.conf\"]");
         return metadata;
@@ -157,7 +156,6 @@ public class TestCatalogStore
         CatalogInfo catalogInfo = new CatalogInfo("hive",
                 "hadoop-hive2",
                 "",
-                "admin",
                 0,
                 UUID.randomUUID().toString(),
                 fromProperties(properties));

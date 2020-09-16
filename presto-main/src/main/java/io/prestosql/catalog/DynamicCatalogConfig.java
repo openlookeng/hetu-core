@@ -33,6 +33,7 @@ public class DynamicCatalogConfig
     private Duration catalogScannerInterval = Duration.valueOf("5s");
     private DataSize catalogMaxFileSize = new DataSize(128, KILOBYTE);
     private int catalogMaxFileNumber = 10;
+    private String catalogValidFileSuffixes;
 
     @Config("catalog.dynamic-enabled")
     @ConfigDescription("Whether to enable dynamic catalog.")
@@ -113,5 +114,18 @@ public class DynamicCatalogConfig
     public int getCatalogMaxFileNumber()
     {
         return catalogMaxFileNumber;
+    }
+
+    @Config("catalog.valid-file-suffixes")
+    @ConfigDescription("The valid suffixes of catalog config file, if there are several suffixes, separated by commas.")
+    public DynamicCatalogConfig setCatalogValidFileSuffixes(String catalogValidFileSuffixes)
+    {
+        this.catalogValidFileSuffixes = catalogValidFileSuffixes;
+        return this;
+    }
+
+    public String getCatalogValidFileSuffixes()
+    {
+        return catalogValidFileSuffixes;
     }
 }

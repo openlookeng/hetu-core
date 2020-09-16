@@ -115,6 +115,7 @@ UPDATE操作是DELETE和ADD操作的组合。首先管理员向协调节点发�
 | `catalog.dynamic-enabled`| 否| 是否启用动态目录| false|
 | `catalog.scanner-interval`| 否| 扫描共享文件系统中目录的时间间隔。| 5s|
 | `catalog.max-file-size`| 否| 目录文件最大大小| 128 KB|
+| `catalog.valid-file-suffixes`| 否| 有效的配置文件后缀名，如果有多个，以逗号分开；当不配置时，允许所有的后缀类型| |
 
 在`etc/node.properties`中：
 

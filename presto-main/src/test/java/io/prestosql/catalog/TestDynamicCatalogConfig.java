@@ -37,7 +37,8 @@ public class TestDynamicCatalogConfig
                 .setCatalogShareConfigurationDir(null)
                 .setCatalogScannerInterval(Duration.valueOf("5s"))
                 .setCatalogMaxFileSize(new DataSize(128, KILOBYTE))
-                .setCatalogMaxFileNumber(10));
+                .setCatalogMaxFileNumber(10)
+                .setCatalogValidFileSuffixes(null));
     }
 
     @Test
@@ -50,6 +51,7 @@ public class TestDynamicCatalogConfig
                 .put("catalog.scanner-interval", "5m")
                 .put("catalog.max-file-size", "5MB")
                 .put("catalog.max-file-number", "1")
+                .put("catalog.valid-file-suffixes", "jks,xml,keystore")
                 .build();
 
         DynamicCatalogConfig expected = new DynamicCatalogConfig()
@@ -58,7 +60,8 @@ public class TestDynamicCatalogConfig
                 .setCatalogShareConfigurationDir("hdfs://etc/catalog")
                 .setCatalogScannerInterval(Duration.valueOf("5m"))
                 .setCatalogMaxFileSize(new DataSize(5, MEGABYTE))
-                .setCatalogMaxFileNumber(1);
+                .setCatalogMaxFileNumber(1)
+                .setCatalogValidFileSuffixes("jks,xml,keystore");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

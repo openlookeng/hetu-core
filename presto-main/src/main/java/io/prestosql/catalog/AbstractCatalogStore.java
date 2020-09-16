@@ -136,9 +136,6 @@ public abstract class AbstractCatalogStore
 
             // store the metadata.
             Properties metadata = new Properties();
-            if (catalogInfo.getSubmitter() != null) {
-                metadata.put("submitter", catalogInfo.getSubmitter());
-            }
             metadata.put("createdTime", String.valueOf(catalogInfo.getCreatedTime()));
             metadata.put("version", String.valueOf(catalogInfo.getVersion()));
             metadata.put("catalogFiles", LIST_CODEC.toJson(configFiles.getCatalogFileNames()));
@@ -223,7 +220,6 @@ public abstract class AbstractCatalogStore
         try (InputStream metadataInputStream = fileSystemClient.newInputStream(catalogPath.getMetadataPath())) {
             metadata.load(metadataInputStream);
         }
-        String submitter = metadata.getProperty("submitter");
         long createdTime = 0;
         if (metadata.getProperty("createdTime") != null) {
             createdTime = Long.valueOf(metadata.getProperty("createdTime"));
@@ -237,7 +233,7 @@ public abstract class AbstractCatalogStore
 
         String connectorName = catalogProperties.remove(CATALOG_NAME_PROPERTY);
         checkState(connectorName != null, "Catalog configuration does not contain connector.name");
-        return new CatalogInfo(catalogName, connectorName, null, submitter, createdTime, version, catalogProperties);
+        return new CatalogInfo(catalogName, connectorName, null, createdTime, version, catalogProperties);
     }
 
     public CatalogFileInputStream getCatalogFiles(String catalogName)
