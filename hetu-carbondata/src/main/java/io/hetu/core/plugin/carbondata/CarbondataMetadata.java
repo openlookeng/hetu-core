@@ -1714,4 +1714,10 @@ public class CarbondataMetadata
         queuedTasks.clear();
         LOG.info("All autocleanup tasks finished");
     }
+
+    @Override
+    protected boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
+    {
+        return false;
+    }
 }
