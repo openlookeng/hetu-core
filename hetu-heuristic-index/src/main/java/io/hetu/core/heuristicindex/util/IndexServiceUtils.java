@@ -52,11 +52,13 @@ public class IndexServiceUtils
     /**
      * there are minimum three parts in "catalog.schema.table"1
      */
-    private static final int MINIMUM_FULLY_QUALIFIED_TABLE_FORMAT_PARTS = 3;
+    private static final int FULLY_QUALIFIED_TABLE_FORMAT_PARTS = 3;
 
-    private static final int DATABASE_NAME_OFFSET = 2;
+    private static final int CATALOG_NAME_INDEX = 0;
 
-    private static final int TABLE_NAME_OFFSET = 1;
+    private static final int DATABASE_NAME_INDEX = 1;
+
+    private static final int TABLE_NAME_INDEX = 2;
 
     private IndexServiceUtils()
     {
@@ -74,6 +76,30 @@ public class IndexServiceUtils
             return path + File.separator;
         }
         return path;
+    }
+
+    /**
+     * check if a file with specific file path exist
+     *
+     * @param filePath filesPath that need to be checked
+     */
+    public static void isFileExisting(String filePath) throws IOException
+    {
+        File file = Paths.get(filePath).toFile();
+        isFileExisting(file);
+    }
+
+    /**
+     * load properties from a filePath
+     *
+     * @param propertyFilePath property file path
+     * @return Property object which holds all properties
+     * @throws IOException when property file does NOT exist
+     */
+    public static Properties loadProperties(String propertyFilePath) throws IOException
+    {
+        File propertyFile = Paths.get(propertyFilePath).toFile();
+        return loadProperties(propertyFile);
     }
 
     /**
@@ -130,18 +156,17 @@ public class IndexServiceUtils
     {
         String[] parts = fullyQualifiedTableName.split("\\.");
 
-        checkArgument(parts.length >= MINIMUM_FULLY_QUALIFIED_TABLE_FORMAT_PARTS,
+        checkArgument(parts.length == FULLY_QUALIFIED_TABLE_FORMAT_PARTS,
                 INVALID_TABLE_NAME_ERR_MSG);
 
-        String databaseName = parts[parts.length - DATABASE_NAME_OFFSET].trim();
+        String catalogName = parts[CATALOG_NAME_INDEX].trim();
+        checkArgument(!catalogName.isEmpty(), INVALID_TABLE_NAME_ERR_MSG);
+
+        String databaseName = parts[DATABASE_NAME_INDEX].trim();
         checkArgument(!databaseName.isEmpty(), INVALID_TABLE_NAME_ERR_MSG);
 
-        String catalogName = fullyQualifiedTableName
-                .substring(0, fullyQualifiedTableName.indexOf(databaseName) - 1).trim();
-        checkArgument(!catalogName.isEmpty(), INVALID_TABLE_NAME_ERR_MSG);
-
-        String tableName = parts[parts.length - TABLE_NAME_OFFSET];
-        checkArgument(!catalogName.isEmpty(), INVALID_TABLE_NAME_ERR_MSG);
+        String tableName = parts[TABLE_NAME_INDEX];
+        checkArgument(!tableName.isEmpty(), INVALID_TABLE_NAME_ERR_MSG);
 
         return new String[]{catalogName, databaseName, tableName};
     }
