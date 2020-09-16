@@ -109,6 +109,7 @@ public class HeuristicIndexWriter
         requireNonNull(table, "no table specified");
         requireNonNull(columns, "no columns specified");
         requireNonNull(indexTypes, "no index types specified");
+        checkIndexTypes(indexTypes);
 
         LOG.info("Creating index for: table={} columns={} partitions={}", table, Arrays.toString(columns),
                 partitions == null ? "all" : Arrays.toString(partitions));
@@ -213,12 +214,6 @@ public class HeuristicIndexWriter
                             // the instances in the map are the "base" instances bc they have their properties set
                             // we need to create a new Index instance for each split and copy the properties the base has
                             Index indexTypeBaseObj = indexTypesMap.get(indexType.toLowerCase(Locale.ENGLISH));
-                            if (indexTypeBaseObj == null) {
-                                String msg = String.format(Locale.ENGLISH, "Index type %s not supported.", indexType);
-                                LOG.error(msg);
-                                throw new IllegalArgumentException(msg);
-                            }
-
                             Index splitIndex;
                             try {
                                 Constructor<? extends Index> constructor = indexTypeBaseObj.getClass().getConstructor();
@@ -364,6 +359,18 @@ public class HeuristicIndexWriter
 
             LOG.info("Deleting local tmp folder: " + strTmpPath);
             LOCAL_FS_CLIENT.deleteRecursively(tmpPath);
+        }
+    }
+
+    private void checkIndexTypes(String[] indexTypes)
+    {
+        for (String indexType : indexTypes) {
+            Index indexTypeBaseObj = indexTypesMap.get(indexType.toLowerCase(Locale.ENGLISH));
+            if (indexTypeBaseObj == null) {
+                String msg = String.format(Locale.ENGLISH, "Index type %s not supported.", indexType);
+                LOG.error(msg);
+                throw new IllegalArgumentException(msg);
+            }
         }
     }
 

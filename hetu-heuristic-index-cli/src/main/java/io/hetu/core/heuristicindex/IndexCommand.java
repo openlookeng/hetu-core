@@ -218,12 +218,7 @@ public class IndexCommand
             }
         }
         catch (IOException e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Error occurred, please check the stacktrace for details: ", e);
-            }
-            else {
-                LOG.info("Error occurred. Enabled -v option for more details. {}", e.getMessage());
-            }
+            LOG.error("Error occurred, please check the stacktrace for details: ", e);
         }
 
         return null;

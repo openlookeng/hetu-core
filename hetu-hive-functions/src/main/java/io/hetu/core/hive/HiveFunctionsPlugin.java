@@ -124,11 +124,9 @@ public class HiveFunctionsPlugin
         }
 
         for (String funcMetadataInfo : loadFunctionMetadataFromPropertiesFile()) {
-            RecognizedFunctions.addRecognizedFunction(FunctionMetadata.parseFunctionClassName(funcMetadataInfo)[1]);
-        }
-
-        for (String funcMetadataInfo : loadFunctionMetadataFromPropertiesFile()) {
             try {
+                RecognizedFunctions.addRecognizedFunction(FunctionMetadata.parseFunctionClassName(funcMetadataInfo)[1]);
+
                 FunctionMetadata functionMetadata = new FunctionMetadata(funcMetadataInfo, this.funcClassLoader);
                 Method[] methods = functionMetadata.getClazz().getMethods();
                 for (Method method : methods) {

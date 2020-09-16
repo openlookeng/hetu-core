@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.heuristicindex.datasource.hive;
 
+import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;

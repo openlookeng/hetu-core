@@ -47,11 +47,11 @@ public class TestIndexServiceUtils
         String expected1 = "efg_s";
         checkStringEquals(IndexServiceUtils.getPath(input1, "_s"), expected1);
 
-        String[] input2 = new String[] {"random", "character"};
-        String expected2 = "character";
-        checkStringEquals(IndexServiceUtils.getPath(input2, "cter"), expected2);
+        String[] input2 = new String[] {"random", "字符"};
+        String expected2 = "字符";
+        checkStringEquals(IndexServiceUtils.getPath(input2, "符"), expected2);
 
-        assertNull(IndexServiceUtils.getPath(input2, "e_char"));
+        assertNull(IndexServiceUtils.getPath(input2, "字字符"));
     }
 
     @Test
@@ -115,17 +115,9 @@ public class TestIndexServiceUtils
     @Test
     public void testValidGetTableParts()
     {
-        String[] parts;
-
-        parts = IndexServiceUtils.getTableParts("catalog.schema.table");
+        String[] parts = IndexServiceUtils.getTableParts("catalog.schema.table");
         assertEquals(3, parts.length);
         assertEquals("catalog", parts[0]);
-        assertEquals("schema", parts[1]);
-        assertEquals("table", parts[2]);
-
-        parts = IndexServiceUtils.getTableParts("dc.catalog.schema.table");
-        assertEquals(3, parts.length);
-        assertEquals("dc.catalog", parts[0]);
         assertEquals("schema", parts[1]);
         assertEquals("table", parts[2]);
     }
@@ -156,8 +148,8 @@ public class TestIndexServiceUtils
     @DataProvider(name = "invalidTableNames")
     public static Object[][] invalidTableNames()
     {
-        return new Object[][] {{"schema.table", false}, {".schema.table", false}, {" .schema.table", false},
-                {"table", false}};
+        return new Object[][] {{"dc.catalog.schema.table", false}, {"schema.table", false}, {".schema.table", false}, {" .schema.table", false},
+                {"table", false}, {"catalog..table", false}, {"catalog.schema.", false}};
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class, dataProvider = "invalidTableNames")
