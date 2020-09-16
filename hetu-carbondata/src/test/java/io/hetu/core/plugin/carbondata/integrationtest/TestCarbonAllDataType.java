@@ -1599,6 +1599,41 @@ public class TestCarbonAllDataType
     }
 
     @Test
+    public void testAutoCleanupInDeleteWithPushdown() throws SQLException
+    {
+        try {
+            hetuServer.execute("set session carbondata.orc_predicate_pushdown_enabled = true");
+            hetuServer.execute("drop table if exists testdb.testtableautocleanup3");
+            hetuServer.execute("CREATE TABLE testdb.testtableautocleanup3 (a int, b int)");
+            hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (10, 11)");
+            hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (110, 211)");
+            hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (120, 311)");
+            hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (130, 411)");
+            hetuServer.execute("INSERT INTO testdb.testtableautocleanup3 VALUES (130, 511)");
+            hetuServer.execute("vacuum table testdb.testtableautocleanup3 AND WAIT");
+
+            reduceModificationOrdeletionTimesStamp(storePath + "/carbon.store/testdb/testtableautocleanup3/Metadata");
+            CarbondataMetadata.enableTracingCleanupTask(true);
+
+            hetuServer.execute("DELETE FROM testdb.testtableautocleanup3 WHERE a=130");
+            try {
+                CarbondataMetadata.waitForSubmittedTasksFinish();
+                assertEquals(FileFactory.isFileExist(storePath + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_0", false), false);
+                assertEquals(FileFactory.isFileExist(storePath + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_1", false), false);
+                assertEquals(FileFactory.isFileExist(storePath + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_2", false), false);
+                assertEquals(FileFactory.isFileExist(storePath + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_3", false), false);
+            } catch (IOException exception) {
+
+            }
+        }
+        finally {
+            CarbondataMetadata.enableTracingCleanupTask(false);
+            hetuServer.execute("drop table testdb.testtableautocleanup3");
+            hetuServer.execute("set session carbondata.orc_predicate_pushdown_enabled = false");
+        }
+    }
+
+    @Test
     public void testAutoCleanupInInsert() throws SQLException
     {
         hetuServer.execute("drop table if exists testdb.testtableautocleanup4");

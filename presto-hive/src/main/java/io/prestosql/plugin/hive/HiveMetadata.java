@@ -2135,7 +2135,7 @@ public class HiveMetadata
     }
 
     // This should be adjusted as we continue to support additional functionality.
-    boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
+    protected boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
     {
         // We allow predicate pushdown only for non-transaction table of HIVE ORC storage format.
         if (getHiveStorageFormat(getTableMetadata(session, tableHandle).getProperties()) != ORC

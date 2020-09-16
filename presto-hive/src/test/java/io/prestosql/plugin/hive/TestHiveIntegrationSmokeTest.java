@@ -4967,28 +4967,31 @@ public class TestHiveIntegrationSmokeTest
         Session session1 = Session.builder(session)
                 .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
                 .build();
+        try {
+            assertUpdate(session1, "CREATE TABLE test_unsupport (a int, b int) with (transactional=true, format='orc')");
+            assertUpdate(session1, "INSERT INTO test_unsupport VALUES (1, 2),(11,22)", 2);
+            assertEquals(computeActual(session1, "SELECT * from test_unsupport").getRowCount(), 02L);
+            assertUpdate(session1, "UPDATE test_unsupport set a=111 where a=1", 01L);
+            assertUpdate(session1, "DELETE from test_unsupport where a=111", 01L);
 
-        assertUpdate(session1, "CREATE TABLE test_unsupport (a int, b int) with (transactional=true, format='orc')");
-        assertUpdate(session1, "INSERT INTO test_unsupport VALUES (1, 2),(11,22)", 2);
-        assertEquals(computeActual(session1, "SELECT * from test_unsupport").getRowCount(), 02L);
-        assertUpdate(session1, "UPDATE test_unsupport set a=111 where a=1", 01L);
-        assertUpdate(session1, "DELETE from test_unsupport where a=111", 01L);
-        assertUpdate("DROP TABLE test_unsupport");
-
-        assertUpdate(session1, "CREATE TABLE map_test with (format='orc') AS SELECT MAP(ARRAY[0,1], ARRAY[2,NULL]) AS col", 1);
-        assertQuery(session1, "SELECT col[0] FROM map_test", "SELECT 2");
-        assertUpdate(session1, "CREATE TABLE array_test AS SELECT ARRAY[1, 2, NULL] AS col", 1);
-        assertQuery(session1, "SELECT col[2] FROM array_test", "SELECT 2");
-        assertUpdate(session1, "CREATE TABLE alldtype (id1 int, id4 double, id5 float, id6 decimal(5,2), id7 varchar(10), id8 char(10)) with (format='orc')");
-        assertUpdate(session1, "INSERT Into alldtype values(1,4.5,5.6,6.7,'rajeev','male')", 1);
-        assertQuery(session1, "select * from alldtype where id1=1", "SELECT 1,4.5,5.6,6.7,'rajeev','male'");
-        assertQuery(session1, "select count(1) from alldtype where id4=4.5", "SELECT 1");
-        assertUpdate(session1, "CREATE TABLE part2key (id1 int, id2 int, id3 int) with (format='orc', partitioned_by=ARRAY['id2','id3'])");
-        assertUpdate(session1, "INSERT Into part2key values(1,2,3)", 1);
-        assertQuery(session1, "select * from part2key where id2=2 and id3=3", "SELECT 1,2,3");
-        assertUpdate("DROP TABLE part2key");
-        assertUpdate("DROP TABLE alldtype");
-        assertUpdate("DROP TABLE map_test");
-        assertUpdate("DROP TABLE array_test");
+            assertUpdate(session1, "CREATE TABLE map_test with (format='orc') AS SELECT MAP(ARRAY[0,1], ARRAY[2,NULL]) AS col", 1);
+            assertQuery(session1, "SELECT col[0] FROM map_test", "SELECT 2");
+            assertUpdate(session1, "CREATE TABLE array_test AS SELECT ARRAY[1, 2, NULL] AS col", 1);
+            assertQuery(session1, "SELECT col[2] FROM array_test", "SELECT 2");
+            assertUpdate(session1, "CREATE TABLE alldtype (id1 int, id4 double, id5 float, id6 decimal(5,2), id7 varchar(10), id8 char(10)) with (format='orc')");
+            assertUpdate(session1, "INSERT Into alldtype values(1,4.5,5.6,6.7,'rajeev','male')", 1);
+            assertQuery(session1, "select * from alldtype where id1=1", "SELECT 1,4.5,5.6,6.7,'rajeev','male'");
+            assertQuery(session1, "select count(1) from alldtype where id4=4.5", "SELECT 1");
+            assertUpdate(session1, "CREATE TABLE part2key (id1 int, id2 int, id3 int) with (format='orc', partitioned_by=ARRAY['id2','id3'])");
+            assertUpdate(session1, "INSERT Into part2key values(1,2,3)", 1);
+            assertQuery(session1, "select * from part2key where id2=2 and id3=3", "SELECT 1,2,3");
+        }
+        finally {
+            assertUpdate("DROP TABLE IF EXISTS test_unsupport");
+            assertUpdate("DROP TABLE IF EXISTS part2key");
+            assertUpdate("DROP TABLE IF EXISTS alldtype");
+            assertUpdate("DROP TABLE IF EXISTS map_test");
+            assertUpdate("DROP TABLE IF EXISTS array_test");
+        }
     }
 }
