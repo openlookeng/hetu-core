@@ -81,6 +81,7 @@ statement
     | ALTER TABLE tableName=qualifiedName (PARTITION partition=partitionSpec)?
         (ADD | REPLACE) COLUMNS '('tableElement (',' tableElement)*')' (CASCADE | RESTRICT)?                                                    #addReplaceColumn
     | ALTER TABLE qualifiedName (PARTITION partitionSpec)? (SET SERDE string (WITH SERDEPROPERTIES properties)? | SET SERDEPROPERTIES properties)  #alterTableSerde
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec)? UNSET SERDEPROPERTIES '(' qualifiedName (',' qualifiedName)* ')'                     #alterRemoveSerde
     | ALTER TABLE qualifiedName CLUSTERED BY columnAliases (SORTED BY columnAliases)? INTO expression BUCKETS                                   #alterTableStorage
     | ALTER TABLE qualifiedName SKEWED BY columnAliases ON  expression (',' expression)* (STORED_AS DIRECTORIES)?                               #alterTableSkewed
     | ALTER TABLE qualifiedName NOT SKEWED                                                                                                      #alterTableNotSkewed
@@ -100,7 +101,7 @@ statement
     | ALTER TABLE qualifiedName DROP (IF EXISTS)? PARTITION partitionSpec (',' PARTITION partitionSpec)? (IGNORE PROTECTION)? PURGE?            #alterTableDropPartition
     | ALTER TABLE qualifiedName (ARCHIVE | UNARCHIVE) PARTITION partitionSpec                                                                   #alterTableArchivePartition
     | ALTER TABLE qualifiedName (PARTITION partitionSpec)? SET FILEFORMAT identifier                                                            #alterTablePartitionFileFormat
-    | ALTER TABLE qualifiedName (PARTITION partitionSpec) SET LOCATION string                                                                   #alterTablePartitionLocation
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec)? SET LOCATION string                                                                  #alterTablePartitionLocation
     | ALTER TABLE qualifiedName TOUCH (PARTITION partitionSpec)?                                                                                #alterTablePartitionTouch
     | ALTER TABLE qualifiedName PARTITION partitionSpec (ENABLE | DISABLE) (NO_DROP CASCADE? | OFFLINE)                                         #alterTablePartitionProtections
     | ALTER TABLE qualifiedName PARTITION partitionSpec COMPACT string (AND WAIT)? WITH OVERWRITE TBLPROPERTIES properties                      #alterTablePartitionCompact
@@ -244,7 +245,7 @@ createMaterializedViewOption
 createIndexOptions
     : WITH DEFERRED REBUILD
     | IDXPROPERTIES properties
-    | IN TABLE identifier
+    | IN TABLE qualifiedName
     | (ROW FORMAT expression)? STORED_AS expression
     | STORED BY expression
     | LOCATION string
@@ -970,6 +971,7 @@ UNIQUE: 'UNIQUE';
 UNION: 'UNION';
 UNIONTYPE: 'UNIONTYPE ';
 UNNEST: 'UNNEST';
+UNSET: 'UNSET';
 USE: 'USE';
 USER: 'USER';
 USING: 'USING';

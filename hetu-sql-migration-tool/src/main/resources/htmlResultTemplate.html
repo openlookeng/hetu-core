@@ -558,35 +558,16 @@ function formatSqlDiffs(entry) {
         }
         switch (diff.diffType) {
             case 'deleted':
-                if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:red"><s>' + diff.source + '</s></span>')
-                }
+            case 'unsupported':
+                originalSql = buildColorString(originalSql, diff.source, diff.diffType);
                 break;
             case 'modified':
-                if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:blue">' + diff.source + '</span>')
-                }
-                if (diff.target && diff.target.length > 0) {
-                    convertedSql = convertedSql.replace(new RegExp(diff.target,'gm'), '<span style="color:blue">' + diff.target + '</span>')
-                }
+            case 'warning':
+                originalSql = buildColorString(originalSql, diff.source, diff.diffType);
+                convertedSql = buildColorString(convertedSql, diff.target, diff.diffType);
                 break;
             case 'inserted':
-                if (diff.target && diff.target.length > 0) {
-                    convertedSql = convertedSql.replace(new RegExp(diff.target,'gm'), '<span style="color:green">' + diff.target + '</span>')
-                }
-                break;
-            case 'warning':
-                if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:#ffcc00">' + diff.source + '</span>')
-                }
-                if (diff.target && diff.target.length > 0) {
-                    convertedSql = convertedSql.replace(new RegExp(diff.target,'gm'), '<span style="color:#ffcc00">' + diff.target + '</span>')
-                }
-                break;
-            case 'unsupported':
-                if (diff.source && diff.source.length > 0) {
-                    originalSql = originalSql.replace(new RegExp(diff.source,'gm'), '<span style="color:#993333">' + diff.source + '</span>')
-                }
+                convertedSql = buildColorString(convertedSql, diff.target, diff.diffType);
                 break;
             default:
                 console.log('error: unknown diff type ${diff.diffType}')
@@ -600,6 +581,40 @@ function formatSqlDiffs(entry) {
     sqlStrWithMarks.push(convertedSql);
     sqlStrWithMarks.push(msgText);
     return sqlStrWithMarks;
+}
+
+function buildColorString(inputStr, keyword, type) {
+    if(!inputStr || inputStr.length ==0 || !type || type.length ==0 || !keyword || keyword.length ==0) {
+        // skip the invalid input
+        return inputStr;
+    }
+    let inputStrList = inputStr.split(/\r?\n/g);
+    for (i=0; i< inputStrList.length; i++) {
+        if(inputStrList[i].length == 0 || (inputStrList[i].trim().length>2 && inputStrList[i].trim().substring(0,2) == '--')) {
+            // skip the blank line or comment line
+            continue;
+        }
+        switch (type) {
+            case 'deleted':
+                inputStrList[i] = inputStrList[i].replace(keyword, '<span style="color:red"><s>' + keyword + '</s></span>');
+                break;
+            case 'modified':
+                inputStrList[i] = inputStrList[i].replace(keyword, '<span style="color:blue">' + keyword + '</span>');
+                break;
+            case 'inserted':
+                inputStrList[i] = inputStrList[i].replace(keyword, '<span style="color:green">' + keyword + '</span>');
+                break;
+            case 'warning':
+                inputStrList[i] = inputStrList[i].replace(keyword, '<span style="color:#ffcc00">' + keyword + '</span>');
+                break;
+            case 'unsupported':
+                inputStrList[i] = inputStrList[i].replace(keyword, '<span style="color:#993333">' + keyword + '</span>')
+                break;
+            default:
+                console.log('error: unknown diff type ${diff.diffType}');
+        }
+    }
+    return inputStrList.join('\n');
 }
 
 let spanList = document.getElementsByClassName('summary');

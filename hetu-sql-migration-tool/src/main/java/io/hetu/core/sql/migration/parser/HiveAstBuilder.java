@@ -193,7 +193,7 @@ public class HiveAstBuilder
         return parserDiffsList;
     }
 
-    public void addDiif(DiffType type, String source, String target, String message)
+    public void addDiff(DiffType type, String source, String target, String message)
     {
         parserDiffsList.add(new ParserDiffs(type,
                 Optional.ofNullable(source),
@@ -201,7 +201,7 @@ public class HiveAstBuilder
                 Optional.ofNullable(message)));
     }
 
-    public void addDiif(DiffType type, String source, String message)
+    public void addDiff(DiffType type, String source, String message)
     {
         parserDiffsList.add(new ParserDiffs(type,
                 Optional.ofNullable(source),
@@ -243,7 +243,7 @@ public class HiveAstBuilder
     public Node visitCreateSchema(HiveSqlParser.CreateSchemaContext context)
     {
         if (context.DBPROPERTIES() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DBPROPERTIES().getText(), "[WITH DBPROPERTIES] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DBPROPERTIES().getText(), "[WITH DBPROPERTIES] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: DBPROPERTIES", context.properties());
         }
 
@@ -251,8 +251,8 @@ public class HiveAstBuilder
         if (context.COMMENT() != null) {
             String comment = ((StringLiteral) visit(context.comment)).getValue();
 
-            addDiif(DiffType.DELETED, context.COMMENT().getText(), null, null);
-            addDiif(DiffType.DELETED, comment, null, format("[COMMENT] is omitted: %s", comment));
+            addDiff(DiffType.DELETED, context.COMMENT().getText(), null, null);
+            addDiff(DiffType.DELETED, comment, null, format("[COMMENT] is omitted: %s", comment));
         }
 
         if (context.LOCATION() != null) {
@@ -260,13 +260,13 @@ public class HiveAstBuilder
             StringLiteral location = (StringLiteral) visit(context.location);
             properties.add(new Property(getLocation(context), identifier, location));
 
-            addDiif(DiffType.INSERTED, null, "WITH", "New [with] clause");
-            addDiif(DiffType.MODIFIED, location.toString(), "location = " + location.toString(), "[location] is formatted");
+            addDiff(DiffType.INSERTED, null, "WITH", "New [with] clause");
+            addDiff(DiffType.MODIFIED, location.toString(), "location = " + location.toString(), "[location] is formatted");
         }
 
         // if database keyword to schema keyword
         if (context.DATABASE() != null && !context.DATABASE().getText().equalsIgnoreCase("schema")) {
-            addDiif(DiffType.MODIFIED, context.DATABASE().getText(), "SCHEMA", "[DATABASE] is updated to [SCHEMA]");
+            addDiff(DiffType.MODIFIED, context.DATABASE().getText(), "SCHEMA", "[DATABASE] is updated to [SCHEMA]");
         }
 
         return new CreateSchema(
@@ -280,17 +280,17 @@ public class HiveAstBuilder
     public Node visitDropSchema(HiveSqlParser.DropSchemaContext context)
     {
         if (context.CASCADE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.CASCADE().getText(), "[CASCADE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.CASCADE().getText(), "[CASCADE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: CASCADE", context);
         }
 
         // if database keyword to schema keyword
         if (context.DATABASE() != null && !context.DATABASE().getText().equalsIgnoreCase("schema")) {
-            addDiif(DiffType.MODIFIED, context.DATABASE().getText(), "SCHEMA", "[DATABASE] is updated to [SCHEMA]");
+            addDiff(DiffType.MODIFIED, context.DATABASE().getText(), "SCHEMA", "[DATABASE] is updated to [SCHEMA]");
         }
 
         if (context.RESTRICT() == null) {
-            addDiif(DiffType.INSERTED, null, "RESTRICT", "add default keyword [RESTRICT]");
+            addDiff(DiffType.INSERTED, null, "RESTRICT", "add default keyword [RESTRICT]");
         }
 
         return new DropSchema(
@@ -306,22 +306,22 @@ public class HiveAstBuilder
         Optional<String> escape = Optional.empty();
         if (pattern.isPresent()) {
             if (pattern.get().contains("|")) {
-                addDiif(DiffType.UNSUPPORTED, context.string().getText(), "[LIKE] does not support multiple patter");
+                addDiff(DiffType.UNSUPPORTED, context.string().getText(), "[LIKE] does not support multiple patter");
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: LIKE can not have multiple pattern", context.pattern);
             }
             if (pattern.get().contains("_")) {
                 pattern = Optional.of(pattern.get().replace("_", "#_"));
                 escape = Optional.of("#");
 
-                addDiif(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
-                addDiif(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
+                addDiff(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
+                addDiff(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
             }
             pattern = Optional.of(pattern.get().replace("*", "%"));
-            addDiif(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
+            addDiff(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
         }
         // if database keyword to schema keyword
         if (context.DATABASES() != null && !context.DATABASES().getText().equalsIgnoreCase("schema")) {
-            addDiif(DiffType.MODIFIED, context.DATABASES().getText(), "SCHEMAS", "[DATABASES] is updated to [SCHEMAS]");
+            addDiff(DiffType.MODIFIED, context.DATABASES().getText(), "SCHEMAS", "[DATABASES] is updated to [SCHEMAS]");
         }
         return new ShowSchemas(getLocation(context), Optional.empty(), pattern, escape);
     }
@@ -330,10 +330,10 @@ public class HiveAstBuilder
     public Node visitAlterSchema(HiveSqlParser.AlterSchemaContext context)
     {
         if (context.DATABASE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[ALTER DATABASE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[ALTER DATABASE] is not supported");
         }
         if (context.SCHEMA() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.SCHEMA().getText(), "[ALTER SCHEMA] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.SCHEMA().getText(), "[ALTER SCHEMA] is not supported");
         }
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Schema/Database", context);
     }
@@ -342,10 +342,10 @@ public class HiveAstBuilder
     public Node visitDescribeSchema(HiveSqlParser.DescribeSchemaContext context)
     {
         if (context.DATABASE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[DESCRIBE DATABASE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[DESCRIBE DATABASE] is not supported");
         }
         if (context.SCHEMA() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.SCHEMA().getText(), "[DESCRIBE SCHEMA] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.SCHEMA().getText(), "[DESCRIBE SCHEMA] is not supported");
         }
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Describe Schema/Database", context);
     }
@@ -356,17 +356,17 @@ public class HiveAstBuilder
         if (context.COMMENT() != null) {
             String comment = ((StringLiteral) visit(context.string())).getValue();
 
-            addDiif(DiffType.DELETED, context.COMMENT().getText(), null, null);
-            addDiif(DiffType.DELETED, comment, null, format("[COMMENT] is omitted: %s", comment));
+            addDiff(DiffType.DELETED, context.COMMENT().getText(), null, null);
+            addDiff(DiffType.DELETED, comment, null, format("[COMMENT] is omitted: %s", comment));
         }
 
         if (context.viewColumns() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.viewColumns().getText(), "[COLUMN ALIASES] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.viewColumns().getText(), "[COLUMN ALIASES] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: COLUMN ALIASES", context.viewColumns());
         }
 
         if (context.TBLPROPERTIES() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.TBLPROPERTIES().getText(), "[TBLPROPERTIES] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.TBLPROPERTIES().getText(), "[TBLPROPERTIES] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: TBLPROPERTIES", context.properties());
         }
 
@@ -382,11 +382,11 @@ public class HiveAstBuilder
     public Node visitAlterView(HiveSqlParser.AlterViewContext context)
     {
         if (context.TBLPROPERTIES() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.TBLPROPERTIES().getText(), "[SET TBLPROPERTIES] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.TBLPROPERTIES().getText(), "[SET TBLPROPERTIES] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: TBLPROPERTIES", context.properties());
         }
 
-        addDiif(DiffType.MODIFIED, context.ALTER().getText(), "CREATE OR REPLACE", "[ALTER] is updated to [CREATE OR REPLACE]");
+        addDiff(DiffType.MODIFIED, context.ALTER().getText(), "CREATE OR REPLACE", "[ALTER] is updated to [CREATE OR REPLACE]");
         return new CreateView(
                 getLocation(context),
                 getQualifiedName(context.qualifiedName()),
@@ -398,7 +398,7 @@ public class HiveAstBuilder
     @Override
     public Node visitShowViews(HiveSqlParser.ShowViewsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.VIEWS().getText(), "[SHOW VIEWS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.VIEWS().getText(), "[SHOW VIEWS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Views", context);
     }
 
@@ -412,17 +412,17 @@ public class HiveAstBuilder
     public Node visitCreateTable(HiveSqlParser.CreateTableContext context)
     {
         if (context.TEMPORARY() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.TEMPORARY().getText(), "[TEMPORARY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.TEMPORARY().getText(), "[TEMPORARY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: CREATE TEMPORARY TABLE", context);
         }
         if (context.constraintSpecification() != null) {
             HiveSqlParser.ConstraintSpecificationContext constraintContext = context.constraintSpecification();
             if (constraintContext.PRIMARY() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.PRIMARY().getText(), "[PRIMARY KEY] is not supported");
-                addDiif(DiffType.UNSUPPORTED, constraintContext.KEY().getText(), null);
+                addDiff(DiffType.UNSUPPORTED, constraintContext.PRIMARY().getText(), "[PRIMARY KEY] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.KEY().getText(), null);
             }
             if (constraintContext.CONSTRAINT() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.CONSTRAINT().getText(), "[CONSTRAINT] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.CONSTRAINT().getText(), "[CONSTRAINT] is not supported");
             }
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported constraint statement", context.constraintSpecification());
         }
@@ -438,7 +438,7 @@ public class HiveAstBuilder
             Expression value = new Identifier("true");
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.TRANSACTIONAL().getText(), "transactional = true", "[TRANSACTIONAL] is formatted");
+            addDiff(DiffType.MODIFIED, context.TRANSACTIONAL().getText(), "transactional = true", "[TRANSACTIONAL] is formatted");
         }
         List<TableElement> elements = getTableElements(context.tableElement());
         if (context.PARTITIONED() != null) {
@@ -455,7 +455,7 @@ public class HiveAstBuilder
             Expression value = new ArrayConstructor(expressions);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.PARTITIONED().getText(), PARTITIONED_BY, "[PARTITIONED BY] is formatted");
+            addDiff(DiffType.MODIFIED, context.PARTITIONED().getText(), PARTITIONED_BY, "[PARTITIONED BY] is formatted");
         }
         if (context.CLUSTERED() != null) {
             Identifier name = new Identifier("bucketed_by");
@@ -467,7 +467,7 @@ public class HiveAstBuilder
             Expression value = new ArrayConstructor(quotedExpressions);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.CLUSTERED().getText(), "bucketed_by", "[CLUSTERED BY] is formatted");
+            addDiff(DiffType.MODIFIED, context.CLUSTERED().getText(), "bucketed_by", "[CLUSTERED BY] is formatted");
         }
         if (context.SORTED() != null) {
             Identifier name = new Identifier("sorted_by");
@@ -485,25 +485,25 @@ public class HiveAstBuilder
             Expression value = new ArrayConstructor(expressions);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.SORTED().getText(), SORTED_BY, "[SORTED BY] is formatted");
+            addDiff(DiffType.MODIFIED, context.SORTED().getText(), SORTED_BY, "[SORTED BY] is formatted");
         }
         if (context.INTO() != null) {
             Identifier name = new Identifier("bucket_count");
             Expression value = (Expression) visit(context.bucketcount);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.INTO().getText(), "bucket_count", "[INTO BUCKETS] is formatted");
+            addDiff(DiffType.MODIFIED, context.INTO().getText(), "bucket_count", "[INTO BUCKETS] is formatted");
         }
         if (context.SKEWED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.SKEWED().getText(), "[SKEWED] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.SKEWED().getText(), "[SKEWED] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: SKEWED", context.columnAliases());
         }
         if (context.ROW() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ROW().getText(), "[ROW FORMAT] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.ROW().getText(), "[ROW FORMAT] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: ROW FORMAT", context.rowFormat());
         }
         if (context.STORED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.STORED().getText(), "[STORED BY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.STORED().getText(), "[STORED BY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: STORED BY", context.storedBy);
         }
         if (context.stored_as != null) {
@@ -512,25 +512,25 @@ public class HiveAstBuilder
             Expression value = new StringLiteral(getFileFormat(storedAsString));
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.STORED_AS(0).getText(), FORMAT, "[STORED AS] is formatted");
+            addDiff(DiffType.MODIFIED, context.STORED_AS(0).getText(), FORMAT, "[STORED AS] is formatted");
         }
         if (context.EXTERNAL() != null) {
             if (context.LOCATION() == null) {
-                addDiif(DiffType.UNSUPPORTED, context.EXTERNAL().getText(), "[EXTERNAL] should be used with location");
+                addDiff(DiffType.UNSUPPORTED, context.EXTERNAL().getText(), "[EXTERNAL] should be used with location");
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: External attribute should be used with location", context);
             }
             Identifier name = new Identifier("external");
             Expression value = new Identifier("true");
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[EXTERNAL] is formatted");
+            addDiff(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[EXTERNAL] is formatted");
         }
         if (context.LOCATION() != null) {
             Identifier name = new Identifier("location");
             Expression value = (StringLiteral) visit(context.location);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
+            addDiff(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
         }
         if (context.TBLPROPERTIES() != null) {
             List<Property> tblProperties = visit(context.tableProperties.property(), Property.class);
@@ -541,10 +541,10 @@ public class HiveAstBuilder
                     Expression value = new Identifier(unquote(property.getValue().toString()));
                     properties.add(new Property(name, value));
 
-                    addDiif(DiffType.MODIFIED, property.getName().getValue(), "transactional = ", "[TRANSACTIONAL] is formatted");
+                    addDiff(DiffType.MODIFIED, property.getName().getValue(), "transactional = ", "[TRANSACTIONAL] is formatted");
                 }
                 else {
-                    addDiif(DiffType.UNSUPPORTED, property.getName().getValue(), "[TBLPROPERTIES] has unsupported properties");
+                    addDiff(DiffType.UNSUPPORTED, property.getName().getValue(), "[TBLPROPERTIES] has unsupported properties");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, format("Unsupported attribute: %s", property.getName().getValue()), context.tableProperties);
                 }
             }
@@ -563,7 +563,7 @@ public class HiveAstBuilder
     public Node visitCreateTableAsSelect(HiveSqlParser.CreateTableAsSelectContext context)
     {
         if (context.TEMPORARY() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.TEMPORARY().getText(), "[TEMPORARY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.TEMPORARY().getText(), "[TEMPORARY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: CREATE TEMPORARY TABLE", context);
         }
 
@@ -583,7 +583,7 @@ public class HiveAstBuilder
             Expression value = new Identifier("true");
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.TRANSACTIONAL().getText(), "transactional = true", "[TRANSACTIONAL] is formatted");
+            addDiff(DiffType.MODIFIED, context.TRANSACTIONAL().getText(), "transactional = true", "[TRANSACTIONAL] is formatted");
         }
         if (context.STORED_AS() != null) {
             Identifier name = new Identifier("format");
@@ -591,14 +591,14 @@ public class HiveAstBuilder
             Expression value = new StringLiteral(getFileFormat(storedAsString));
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.STORED_AS().getText(), FORMAT, "[STORED AS] is formatted");
+            addDiff(DiffType.MODIFIED, context.STORED_AS().getText(), FORMAT, "[STORED AS] is formatted");
         }
         if (context.LOCATION() != null) {
             Identifier name = new Identifier("location");
             Expression value = (StringLiteral) visit(context.location);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
+            addDiff(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
         }
         if (context.TBLPROPERTIES() != null) {
             List<Property> tableProperties = visit(context.properties().property(), Property.class);
@@ -609,10 +609,10 @@ public class HiveAstBuilder
                     Expression value = new Identifier(unquote(property.getValue().toString()));
                     properties.add(new Property(name, value));
 
-                    addDiif(DiffType.MODIFIED, property.getName().getValue(), "transactional = ", "[TRANSACTIONAL] is formatted");
+                    addDiff(DiffType.MODIFIED, property.getName().getValue(), "transactional = ", "[TRANSACTIONAL] is formatted");
                 }
                 else {
-                    addDiif(DiffType.UNSUPPORTED, property.getName().getValue(), "[TBLPROPERTIES] has unsupported properties");
+                    addDiff(DiffType.UNSUPPORTED, property.getName().getValue(), "[TBLPROPERTIES] has unsupported properties");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, format("Unsupported attribute: %s", property.getName().getValue()), context.properties());
                 }
             }
@@ -635,26 +635,26 @@ public class HiveAstBuilder
         List<TableElement> elements = new ArrayList<>();
         LikeClause likeClause = new LikeClause(getQualifiedName(context.likeTableName), Optional.of(LikeClause.PropertiesOption.EXCLUDING));
         elements.add(likeClause);
-        addDiif(DiffType.INSERTED, null, "EXCLUDING PROPERTIES", "add keyword [EXCLUDING PROPERTIES]");
+        addDiff(DiffType.INSERTED, null, "EXCLUDING PROPERTIES", "add keyword [EXCLUDING PROPERTIES]");
 
         List<Property> properties = new ArrayList<>();
         if (context.EXTERNAL() != null) {
             if (context.LOCATION() == null) {
-                addDiif(DiffType.UNSUPPORTED, context.EXTERNAL().getText(), "[EXTERNAL] should be used with location");
+                addDiff(DiffType.UNSUPPORTED, context.EXTERNAL().getText(), "[EXTERNAL] should be used with location");
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "External attribute should be used with location", context);
             }
             Identifier name = new Identifier("external");
             Expression value = new Identifier("true");
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[EXTERNAL] is formatted");
+            addDiff(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[EXTERNAL] is formatted");
         }
         if (context.LOCATION() != null) {
             Identifier name = new Identifier("location");
             Expression value = (StringLiteral) visit(context.location);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
+            addDiff(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
         }
 
         return new CreateTable(
@@ -673,18 +673,18 @@ public class HiveAstBuilder
         Optional<String> escape = Optional.empty();
         if (pattern.isPresent()) {
             if (pattern.get().contains("|")) {
-                addDiif(DiffType.UNSUPPORTED, context.string().getText(), "[LIKE] does not support multiple patter");
+                addDiff(DiffType.UNSUPPORTED, context.string().getText(), "[LIKE] does not support multiple patter");
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: LIKE can not have multiple pattern ", context);
             }
             if (pattern.get().contains("_")) {
                 pattern = Optional.of(pattern.get().replace("_", "#_"));
                 escape = Optional.of("#");
 
-                addDiif(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
-                addDiif(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
+                addDiff(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
+                addDiff(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
             }
             pattern = Optional.of(pattern.get().replace("*", "%"));
-            addDiif(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
+            addDiff(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
         }
         return new ShowTables(
                 getLocation(context),
@@ -697,10 +697,10 @@ public class HiveAstBuilder
     @Override
     public Node visitShowCreateTable(HiveSqlParser.ShowCreateTableContext context)
     {
-        addDiif(DiffType.FUNCTION_WARNING, context.SHOW().getText(), "SHOW CREATE TABLE",
+        addDiff(DiffType.FUNCTION_WARNING, context.SHOW().getText(), "SHOW CREATE TABLE",
                 format("This conversion might not correct, this statement can also be converted to 'SHOW CREATE VIEW %s'", getQualifiedName(context.qualifiedName())));
-        addDiif(DiffType.FUNCTION_WARNING, context.CREATE().getText(), null);
-        addDiif(DiffType.FUNCTION_WARNING, context.TABLE().getText(), null);
+        addDiff(DiffType.FUNCTION_WARNING, context.CREATE().getText(), null);
+        addDiff(DiffType.FUNCTION_WARNING, context.TABLE().getText(), null);
         return new ShowCreate(getLocation(context), ShowCreate.Type.TABLE, getQualifiedName(context.qualifiedName()));
     }
 
@@ -721,119 +721,126 @@ public class HiveAstBuilder
                 comment = Optional.of(unquote(property.getValue().toString()));
             }
             else {
-                addDiif(DiffType.UNSUPPORTED, property.getName().getValue(), format("[SET TBLPROPERTIES: %s] is not supported", property.getName().getValue()));
+                addDiff(DiffType.UNSUPPORTED, property.getName().getValue(), format("[SET TBLPROPERTIES: %s] is not supported", property.getName().getValue()));
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, format("Unsupported attribute: %s", property.getName().getValue()), context.properties());
             }
         }
 
-        addDiif(DiffType.MODIFIED, context.ALTER().getText(), "COMMENT ON TABLE", "[ALTER TABLE] is formatted to [COMMENT ON TABLE]");
-        addDiif(DiffType.MODIFIED, context.TABLE().getText(), null);
+        addDiff(DiffType.MODIFIED, context.ALTER().getText(), "COMMENT ON TABLE", "[ALTER TABLE] is formatted to [COMMENT ON TABLE]");
+        addDiff(DiffType.MODIFIED, context.TABLE().getText(), null);
         return new Comment(getLocation(context), Comment.Type.TABLE, getQualifiedName(context.qualifiedName()), comment);
     }
 
     @Override
     public Node visitAlterTableAddConstraint(HiveSqlParser.AlterTableAddConstraintContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.ADD().getText(), "[ADD CONSTRAINT] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.CONSTRAINT().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.ADD().getText(), "[ADD CONSTRAINT] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.CONSTRAINT().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Add Constraint", context);
     }
 
     @Override
     public Node visitAlterTableChangeConstraint(HiveSqlParser.AlterTableChangeConstraintContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.CHANGE().getText(), "[CHANGE COLUMN] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.COLUMN().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.CHANGE().getText(), "[CHANGE COLUMN] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.COLUMN().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Change Constraint", context);
     }
 
     @Override
     public Node visitAlterTableDropConstraint(HiveSqlParser.AlterTableDropConstraintContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP CONSTRAINT] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.CONSTRAINT().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP CONSTRAINT] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.CONSTRAINT().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Drop Constraint", context);
     }
 
     @Override
     public Node visitAlterTableSerde(HiveSqlParser.AlterTableSerdeContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.SET().getText(), "[SET SERDE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.SET().getText(), "[SET SERDE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Serde", context);
+    }
+
+    @Override
+    public Node visitAlterRemoveSerde(HiveSqlParser.AlterRemoveSerdeContext context)
+    {
+        addDiff(DiffType.UNSUPPORTED, context.UNSET().getText(), "[UNSET SERDEPROPERTIES] is not supported");
+        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table UNSET SERDEPROPERTIES", context);
     }
 
     @Override
     public Node visitAlterTableStorage(HiveSqlParser.AlterTableStorageContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.CLUSTERED().getText(), "[STORAGE PROPERTIES] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.CLUSTERED().getText(), "[STORAGE PROPERTIES] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Storage", context);
     }
 
     @Override
     public Node visitAlterTableSkewed(HiveSqlParser.AlterTableSkewedContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.SKEWED().getText(), "[SKEWED] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.SKEWED().getText(), "[SKEWED] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Skewed", context);
     }
 
     @Override
     public Node visitAlterTableNotSkewed(HiveSqlParser.AlterTableNotSkewedContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.NOT().getText(), "[NOT SKEWED] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.SKEWED().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.NOT().getText(), "[NOT SKEWED] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.SKEWED().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Not Skewed", context);
     }
 
     @Override
     public Node visitAlterTableNotAsDirectories(HiveSqlParser.AlterTableNotAsDirectoriesContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.NOT().getText(), "[NOT STORED AS DIRECTORIES] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.STORED_AS().getText(), null);
-        addDiif(DiffType.UNSUPPORTED, context.DIRECTORIES().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.NOT().getText(), "[NOT STORED AS DIRECTORIES] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.STORED_AS().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.DIRECTORIES().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Not Stored As Directoriese", context);
     }
 
     @Override
     public Node visitAlterTableSetSkewedLocation(HiveSqlParser.AlterTableSetSkewedLocationContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.SET().getText(), "[SET SKEWED LOCATION] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.SKEWED().getText(), null);
-        addDiif(DiffType.UNSUPPORTED, context.LOCATION().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.SET().getText(), "[SET SKEWED LOCATION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.SKEWED().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.LOCATION().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Set Skewed Location", context);
     }
 
     @Override
     public Node visitAlterTableAddPartition(HiveSqlParser.AlterTableAddPartitionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.ADD().getText(), "[ADD PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.ADD().getText(), "[ADD PARTITION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Add Partition", context);
     }
 
     @Override
     public Node visitAlterTableRenamePartition(HiveSqlParser.AlterTableRenamePartitionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.RENAME().getText(), "[RENAME PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.RENAME().getText(), "[RENAME PARTITION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Rename Partition", context);
     }
 
     @Override
     public Node visitAlterTableExchangePartition(HiveSqlParser.AlterTableExchangePartitionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.EXCHANGE().getText(), "[EXCHANGE PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.EXCHANGE().getText(), "[EXCHANGE PARTITION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Exchange Partition", context);
     }
 
     @Override
     public Node visitAlterTableRecoverPartitions(HiveSqlParser.AlterTableRecoverPartitionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.RECOVER().getText(), "[RECOVER PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.RECOVER().getText(), "[RECOVER PARTITION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Recover Partition", context);
     }
 
     @Override
     public Node visitAlterTableDropPartition(HiveSqlParser.AlterTableDropPartitionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP PARTITION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Drop Partition", context);
     }
 
@@ -841,10 +848,10 @@ public class HiveAstBuilder
     public Node visitAlterTableArchivePartition(HiveSqlParser.AlterTableArchivePartitionContext context)
     {
         if (context.ARCHIVE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ARCHIVE().getText(), "[ARCHIVE PARTITION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.ARCHIVE().getText(), "[ARCHIVE PARTITION] is not supported");
         }
         if (context.UNARCHIVE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.UNARCHIVE().getText(), "[UNARCHIVE PARTITION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.UNARCHIVE().getText(), "[UNARCHIVE PARTITION] is not supported");
         }
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Archive/Unarchive Partition", context);
@@ -853,24 +860,24 @@ public class HiveAstBuilder
     @Override
     public Node visitAlterTablePartitionFileFormat(HiveSqlParser.AlterTablePartitionFileFormatContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.SET().getText(), "[SET FILEFORMAT] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.FILEFORMAT().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.SET().getText(), "[SET FILEFORMAT] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FILEFORMAT().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Partition File Format", context);
     }
 
     @Override
     public Node visitAlterTablePartitionLocation(HiveSqlParser.AlterTablePartitionLocationContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.SET().getText(), "[SET LOCATION] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.LOCATION().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.SET().getText(), "[SET LOCATION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.LOCATION().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Partition Location", context);
     }
 
     @Override
     public Node visitAlterTablePartitionTouch(HiveSqlParser.AlterTablePartitionTouchContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.TOUCH().getText(), "[TOUCH PARTITION] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.PARTITION().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.TOUCH().getText(), "[TOUCH PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Touch Partition", context);
     }
 
@@ -878,253 +885,253 @@ public class HiveAstBuilder
     public Node visitAlterTablePartitionProtections(HiveSqlParser.AlterTablePartitionProtectionsContext context)
     {
         String source = context.ENABLE() != null ? context.ENABLE().getText() : context.DISABLE().getText();
-        addDiif(DiffType.UNSUPPORTED, source, "[PARTITION PROTECTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, source, "[PARTITION PROTECTION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Partition Protections", context);
     }
 
     @Override
     public Node visitAlterTablePartitionCompact(HiveSqlParser.AlterTablePartitionCompactContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.COMPACT().getText(), "[PARTITION COMPACT] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.COMPACT().getText(), "[PARTITION COMPACT] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Partition Compact", context);
     }
 
     @Override
     public Node visitAlterTablePartitionConcatenate(HiveSqlParser.AlterTablePartitionConcatenateContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.CONCATENATE().getText(), "[PARTITION CONCATENATE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.CONCATENATE().getText(), "[PARTITION CONCATENATE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Partition Concatenate", context);
     }
 
     @Override
     public Node visitAlterTablePartitionUpdateColumns(HiveSqlParser.AlterTablePartitionUpdateColumnsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.UPDATE().getText(), "[UPDATE COLUMNS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.UPDATE().getText(), "[UPDATE COLUMNS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Partition Update Columns", context);
     }
 
     @Override
     public Node visitAlterTableChangeColumn(HiveSqlParser.AlterTableChangeColumnContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.CHANGE().getText(), "[CHANGE COLUMN] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.CHANGE().getText(), "[CHANGE COLUMN] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Change Column", context);
     }
 
     @Override
     public Node visitShowTableExtended(HiveSqlParser.ShowTableExtendedContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.EXTENDED().getText(), "[SHOW TABLE EXTENDED] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.EXTENDED().getText(), "[SHOW TABLE EXTENDED] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Table Extended", context);
     }
 
     @Override
     public Node visitShowTableProperties(HiveSqlParser.ShowTablePropertiesContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.TBLPROPERTIES().getText(), "[SHOW TBLPROPERTIES] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.TBLPROPERTIES().getText(), "[SHOW TBLPROPERTIES] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Table Properties", context);
     }
 
     @Override
     public Node visitTruncateTable(HiveSqlParser.TruncateTableContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.TRUNCATE().getText(), "[TRUNCATE TABLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.TRUNCATE().getText(), "[TRUNCATE TABLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Truncate Table", context);
     }
 
     @Override
     public Node visitMsckRepairTable(HiveSqlParser.MsckRepairTableContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MSCK().getText(), "[MSCK] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MSCK().getText(), "[MSCK] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Msck Repair Table", context);
     }
 
     @Override
     public Node visitCreateMaterializedView(HiveSqlParser.CreateMaterializedViewContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[CREATE MATERIALIZED VIEW] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[CREATE MATERIALIZED VIEW] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Materialized View", context);
     }
 
     @Override
     public Node visitDropMaterializedView(HiveSqlParser.DropMaterializedViewContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[DROP MATERIALIZED VIEW] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[DROP MATERIALIZED VIEW] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Drop Materialized View", context);
     }
 
     @Override
     public Node visitAlterMaterializedView(HiveSqlParser.AlterMaterializedViewContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[ALTER MATERIALIZED VIEW] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[ALTER MATERIALIZED VIEW] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Materialized View", context);
     }
 
     @Override
     public Node visitShowMaterializedViews(HiveSqlParser.ShowMaterializedViewsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[SHOW MATERIALIZED VIEW] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MATERIALIZED().getText(), "[SHOW MATERIALIZED VIEW] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Materialized Views", context);
     }
 
     @Override
     public Node visitCreateFunction(HiveSqlParser.CreateFunctionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[CREATE FUNCTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[CREATE FUNCTION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Function", context);
     }
 
     @Override
     public Node visitDropFunction(HiveSqlParser.DropFunctionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[DROP FUNCTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[DROP FUNCTION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Drop Function", context);
     }
 
     @Override
     public Node visitReloadFunctions(HiveSqlParser.ReloadFunctionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.RELOAD().getText(), "[RELOAD FUNCTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.RELOAD().getText(), "[RELOAD FUNCTION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Reload Functions", context);
     }
 
     @Override
     public Node visitCreateIndex(HiveSqlParser.CreateIndexContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.INDEX().getText(), "[CREATE INDEX] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INDEX().getText(), "[CREATE INDEX] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Index", context);
     }
 
     @Override
     public Node visitDropIndex(HiveSqlParser.DropIndexContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.INDEX().getText(), "[DROP INDEX] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INDEX().getText(), "[DROP INDEX] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Drop Index", context);
     }
 
     @Override
     public Node visitAlterIndex(HiveSqlParser.AlterIndexContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.INDEX().getText(), "[ALTER INDEX] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INDEX().getText(), "[ALTER INDEX] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Index", context);
     }
 
     @Override
     public Node visitShowIndex(HiveSqlParser.ShowIndexContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.INDEX().getText(), "[SHOW INDEX] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INDEX().getText(), "[SHOW INDEX] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Index", context);
     }
 
     @Override
     public Node visitShowPartitions(HiveSqlParser.ShowPartitionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.PARTITIONS().getText(), "[SHOW PARTITIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.PARTITIONS().getText(), "[SHOW PARTITIONS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Partitions", context);
     }
 
     @Override
     public Node visitDescribePartition(HiveSqlParser.DescribePartitionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[DESCRIBE PARTITIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[DESCRIBE PARTITIONS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Describe Partition", context);
     }
 
     @Override
     public Node visitDescribeFunction(HiveSqlParser.DescribeFunctionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[DESCRIBE FUNCTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[DESCRIBE FUNCTION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Describe Function", context);
     }
 
     @Override
     public Node visitCreateMacro(HiveSqlParser.CreateMacroContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MACRO().getText(), "[CREATE MACRO] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MACRO().getText(), "[CREATE MACRO] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Macro", context);
     }
 
     @Override
     public Node visitDropMacro(HiveSqlParser.DropMacroContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MACRO().getText(), "[DROP MACRO] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MACRO().getText(), "[DROP MACRO] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Drop Macro", context);
     }
 
     @Override
     public Node visitShowRoleGrant(HiveSqlParser.ShowRoleGrantContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.GRANT().getText(), "[SHOW ROLE GRANT] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.GRANT().getText(), "[SHOW ROLE GRANT] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Role Grant", context);
     }
 
     @Override
     public Node visitShowPrincipals(HiveSqlParser.ShowPrincipalsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.PRINCIPALS().getText(), "[SHOW PRINCIPALS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.PRINCIPALS().getText(), "[SHOW PRINCIPALS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Principals", context);
     }
 
     @Override
     public Node visitShowLocks(HiveSqlParser.ShowLocksContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.LOCKS().getText(), "[SHOW LOCKS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.LOCKS().getText(), "[SHOW LOCKS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Locks", context);
     }
 
     @Override
     public Node visitShowConf(HiveSqlParser.ShowConfContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.CONF().getText(), "[SHOW CONF] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.CONF().getText(), "[SHOW CONF] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Conf", context);
     }
 
     @Override
     public Node visitShowTransactions(HiveSqlParser.ShowTransactionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.TRANSACTIONS().getText(), "[SHOW TRANSACTIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.TRANSACTIONS().getText(), "[SHOW TRANSACTIONS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Transactions", context);
     }
 
     @Override
     public Node visitShowCompactions(HiveSqlParser.ShowCompactionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.COMPACTIONS().getText(), "[SHOW COMPACTIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.COMPACTIONS().getText(), "[SHOW COMPACTIONS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Compactions", context);
     }
 
     @Override
     public Node visitAbortTransactions(HiveSqlParser.AbortTransactionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.ABORT().getText(), "[ABORT TRANSACTIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.ABORT().getText(), "[ABORT TRANSACTIONS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Abort Transactions", context);
     }
 
     @Override
     public Node visitLoadData(HiveSqlParser.LoadDataContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.LOAD().getText(), "[LOAD DATA] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.DATA().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.LOAD().getText(), "[LOAD DATA] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.DATA().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Load Data", context);
     }
 
     @Override
     public Node visitMerge(HiveSqlParser.MergeContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.MERGE().getText(), "[MERGE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.MERGE().getText(), "[MERGE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Merge", context);
     }
 
     @Override
     public Node visitExportData(HiveSqlParser.ExportDataContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.EXPORT().getText(), "[EXPORT TABLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.EXPORT().getText(), "[EXPORT TABLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Export", context);
     }
 
     @Override
     public Node visitImportData(HiveSqlParser.ImportDataContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.IMPORT().getText(), "[IMPORT TABLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.IMPORT().getText(), "[IMPORT TABLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Import", context);
     }
 
@@ -1132,7 +1139,7 @@ public class HiveAstBuilder
     public Node visitDropTable(HiveSqlParser.DropTableContext context)
     {
         if (context.PURGE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PURGE().getText(), "[PURGE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PURGE().getText(), "[PURGE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: PURGE", context);
         }
         return new DropTable(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
@@ -1142,17 +1149,17 @@ public class HiveAstBuilder
     public Node visitShowColumns(HiveSqlParser.ShowColumnsContext context)
     {
         if (context.dbName != null) {
-            addDiif(DiffType.UNSUPPORTED, context.inDatabase.getText(), format("[%s] is not supported", context.inDatabase.getText()));
+            addDiff(DiffType.UNSUPPORTED, context.inDatabase.getText(), format("[%s] is not supported", context.inDatabase.getText()));
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: FROM/IN DATABASE", context.dbName);
         }
 
         if (context.pattern != null) {
-            addDiif(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: LIKE", context.pattern);
         }
 
         if (context.inTable.getText().equalsIgnoreCase("in")) {
-            addDiif(DiffType.MODIFIED, context.inTable.getText(), "FROM", "keyword: [IN] is updated to [FROM]");
+            addDiff(DiffType.MODIFIED, context.inTable.getText(), "FROM", "keyword: [IN] is updated to [FROM]");
         }
         QualifiedName qualifiedName = QualifiedName.of(visit(context.tableName.identifier(), Identifier.class));
         return new ShowColumns(getLocation(context), qualifiedName);
@@ -1162,21 +1169,21 @@ public class HiveAstBuilder
     public Node visitDescribeTable(HiveSqlParser.DescribeTableContext context)
     {
         if (context.EXTENDED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.EXTENDED().getText(), "[EXTENDED] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.EXTENDED().getText(), "[EXTENDED] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: EXTENDED", context);
         }
         if (context.FORMATTED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.FORMATTED().getText(), "[FORMATTED] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.FORMATTED().getText(), "[FORMATTED] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: FORMATTED", context);
         }
 
         if (context.describeTableOption() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.describeTableOption().getText(), "[DESCRIBE TABLE OPTION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.describeTableOption().getText(), "[DESCRIBE TABLE OPTION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported Describe statement", context.describeTableOption());
         }
 
         String source = context.DESCRIBE() != null ? context.DESCRIBE().getText() : context.DESC().getText();
-        addDiif(DiffType.MODIFIED, source, "SHOW COLUMNS FROM", format("keyword: [%s] is updated to [SHOW COLUMNS FROM]", source.toUpperCase(ENGLISH)));
+        addDiff(DiffType.MODIFIED, source, "SHOW COLUMNS FROM", format("keyword: [%s] is updated to [SHOW COLUMNS FROM]", source.toUpperCase(ENGLISH)));
         QualifiedName qualifiedName = QualifiedName.of(visit(context.describeName().identifier(), Identifier.class));
         return new ShowColumns(getLocation(context), qualifiedName);
     }
@@ -1185,20 +1192,20 @@ public class HiveAstBuilder
     public Node visitAddReplaceColumn(HiveSqlParser.AddReplaceColumnContext context)
     {
         if (context.CASCADE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.CASCADE().getText(), "[CASCADE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.CASCADE().getText(), "[CASCADE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: CASCADE", context);
         }
         if (context.REPLACE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.REPLACE().getText(), "[REPLACE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.REPLACE().getText(), "[REPLACE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: REPLACE", context);
         }
         if (context.PARTITION() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: PARTITION", context.partition);
         }
         if (context.tableElement().size() > 1) {
-            addDiif(DiffType.UNSUPPORTED, context.ADD().getText(), "[ADD MULTIPLE COLUMNS] is not supported");
-            addDiif(DiffType.UNSUPPORTED, context.COLUMNS().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.ADD().getText(), "[ADD MULTIPLE COLUMNS] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.COLUMNS().getText(), null);
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported add multiple columns", context.tableElement(0));
         }
 
@@ -1218,7 +1225,7 @@ public class HiveAstBuilder
     public Node visitInsertInto(HiveSqlParser.InsertIntoContext context)
     {
         if (context.PARTITION() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: PARTITION", context.insertPartition());
         }
 
@@ -1236,7 +1243,7 @@ public class HiveAstBuilder
     @Override public Node visitInsertOverwrite(HiveSqlParser.InsertOverwriteContext context)
     {
         if (context.PARTITION() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: PARTITION", context.insertPartition());
         }
 
@@ -1251,7 +1258,7 @@ public class HiveAstBuilder
     @Override
     public Node visitInsertFilesystem(HiveSqlParser.InsertFilesystemContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.DIRECTORY().getText(), "[INSERT FILESYSTEM] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.DIRECTORY().getText(), "[INSERT FILESYSTEM] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Insert Filesystem", context);
     }
 
@@ -1272,7 +1279,7 @@ public class HiveAstBuilder
     public Node visitShowFunctions(HiveSqlParser.ShowFunctionsContext context)
     {
         if (context.LIKE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: LIKE", context.pattern);
         }
 
@@ -1374,12 +1381,12 @@ public class HiveAstBuilder
     public Node visitShowGrants(HiveSqlParser.ShowGrantsContext context)
     {
         if (context.principal() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.principal().getText(), "[PRINCIPAL] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.principal().getText(), "[PRINCIPAL] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: PRINCIPAL", context.principal());
         }
 
         if (context.ALL() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ALL().getText(), "SHOW GRANT ON [ALL] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.ALL().getText(), "SHOW GRANT ON [ALL] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: ALL", context);
         }
 
@@ -1403,31 +1410,31 @@ public class HiveAstBuilder
     public Node visitExplain(HiveSqlParser.ExplainContext context)
     {
         if (context.EXTENDED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.EXTENDED().getText(), "[EXTENDED] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.EXTENDED().getText(), "[EXTENDED] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: EXTENDED", context);
         }
         if (context.CBO() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.CBO().getText(), "[CBO] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.CBO().getText(), "[CBO] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: CBO", context);
         }
         if (context.AST() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.AST().getText(), "[AST] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.AST().getText(), "[AST] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: AST", context);
         }
         if (context.DEPENDENCY() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DEPENDENCY().getText(), "[DEPENDENCY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DEPENDENCY().getText(), "[DEPENDENCY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: DEPENDENCY", context);
         }
         if (context.AUTHORIZATION() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.AUTHORIZATION().getText(), "[AUTHORIZATION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.AUTHORIZATION().getText(), "[AUTHORIZATION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: AUTHORIZATION", context);
         }
         if (context.LOCKS() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.LOCKS().getText(), "[LOCKS] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.LOCKS().getText(), "[LOCKS] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: LOCKS", context);
         }
         if (context.VECTORIZATIONANALYZE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.VECTORIZATIONANALYZE().getText(), "[VECTORIZATIONANALYZE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.VECTORIZATIONANALYZE().getText(), "[VECTORIZATIONANALYZE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: VECTORIZATIONANALYZE", context);
         }
         return new Explain(getLocation(context), context.ANALYZE() != null, false, (Statement) visit(context.statement()), ImmutableList.of());
@@ -1437,7 +1444,7 @@ public class HiveAstBuilder
     public Node visitSetSession(HiveSqlParser.SetSessionContext context)
     {
         if (context.setProperty() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.setProperty().getText(), "[SET PROPERTY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.setProperty().getText(), "[SET PROPERTY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported to set session property", context.setProperty());
         }
 
@@ -1447,7 +1454,7 @@ public class HiveAstBuilder
     @Override
     public Node visitResetSession(HiveSqlParser.ResetSessionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.RESET().getText(), "[RESET] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.RESET().getText(), "[RESET] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Reset", context);
     }
 
@@ -1510,17 +1517,17 @@ public class HiveAstBuilder
         }
 
         if (context.clusteredBy() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.CLUSTER().getText(), "[CLUSTERED BY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.CLUSTER().getText(), "[CLUSTERED BY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: CLUSTERED BY", context.clusteredBy());
         }
 
         if (context.distributeBy() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DISTRIBUTE().getText(), "[DISTRIBUTE BY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DISTRIBUTE().getText(), "[DISTRIBUTE BY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: DISTRIBUTE BY", context.distributeBy());
         }
 
         if (context.sortedBy() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.SORT().getText(), "[SORT BY] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.SORT().getText(), "[SORT BY] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: SORT BY", context.sortedBy());
         }
 
@@ -1571,8 +1578,8 @@ public class HiveAstBuilder
     public Node visitQuerySpecification(HiveSqlParser.QuerySpecificationContext context)
     {
         if (context.lateralView().size() > 0) {
-            addDiif(DiffType.UNSUPPORTED, context.LATERAL(0).getText(), "[LATERAL VIEW] is not supported");
-            addDiif(DiffType.UNSUPPORTED, context.VIEW(0).getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.LATERAL(0).getText(), "[LATERAL VIEW] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.VIEW(0).getText(), null);
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: LATERAL VIEW", context.lateralView(0));
         }
 
@@ -1721,17 +1728,17 @@ public class HiveAstBuilder
 
         // Semi Join
         if (context.semiJoin() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.semiJoin().LEFT().getText(), "[LEFT SEMI JOIN] is not supported");
-            addDiif(DiffType.UNSUPPORTED, context.semiJoin().SEMI().getText(), null);
-            addDiif(DiffType.UNSUPPORTED, context.semiJoin().JOIN().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.semiJoin().LEFT().getText(), "[LEFT SEMI JOIN] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.semiJoin().SEMI().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.semiJoin().JOIN().getText(), null);
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Left semi join", context.semiJoin());
         }
 
         // Cross join
         if (context.crossJoin() != null) {
             if (context.crossJoin().joinCriteria() != null) {
-                addDiif(DiffType.UNSUPPORTED, context.crossJoin().CROSS().getText(), "[CROSS JOIN] must not contain join condition");
-                addDiif(DiffType.UNSUPPORTED, context.crossJoin().JOIN().getText(), null);
+                addDiff(DiffType.UNSUPPORTED, context.crossJoin().CROSS().getText(), "[CROSS JOIN] must not contain join condition");
+                addDiff(DiffType.UNSUPPORTED, context.crossJoin().JOIN().getText(), null);
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Cross join must not contain join condition", context.crossJoin().joinCriteria());
             }
 
@@ -1743,9 +1750,9 @@ public class HiveAstBuilder
         if (context.innerJoin() != null) {
             if (context.innerJoin().joinCriteria() == null) {
                 if (context.innerJoin().INNER() != null) {
-                    addDiif(DiffType.UNSUPPORTED, context.innerJoin().INNER().getText(), null);
+                    addDiff(DiffType.UNSUPPORTED, context.innerJoin().INNER().getText(), null);
                 }
-                addDiif(DiffType.UNSUPPORTED, context.innerJoin().JOIN().getText(), "[INNER JOIN] must contain join condition");
+                addDiff(DiffType.UNSUPPORTED, context.innerJoin().JOIN().getText(), "[INNER JOIN] must contain join condition");
                 throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Inner join must contain join condition", context.innerJoin());
             }
 
@@ -1832,7 +1839,7 @@ public class HiveAstBuilder
     @Override
     public Node visitExpressionPredicated(HiveSqlParser.ExpressionPredicatedContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.getText(), format("Unsupported statement: [%s]", context.getText()));
+        addDiff(DiffType.UNSUPPORTED, context.getText(), format("Unsupported statement: [%s]", context.getText()));
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, format("Unsupported statement: %s", context.getText()), context);
     }
 
@@ -1909,14 +1916,14 @@ public class HiveAstBuilder
     @Override
     public Node visitRlike(HiveSqlParser.RlikeContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.RLIKE().getText(), "[RLIKE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.RLIKE().getText(), "[RLIKE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: RLIKE", context);
     }
 
     @Override
     public Node visitRegexp(HiveSqlParser.RegexpContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.REGEXP().getText(), "[REGEXP] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.REGEXP().getText(), "[REGEXP] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: REGEXP", context);
     }
 
@@ -1997,7 +2004,7 @@ public class HiveAstBuilder
     @Override
     public Node visitArithmeticBit(HiveSqlParser.ArithmeticBitContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.getText(), "[BIT ARITHMETIC] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.getText(), "[BIT ARITHMETIC] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Bit arithmetic", context);
     }
 
@@ -2215,21 +2222,21 @@ public class HiveAstBuilder
         if (context.columnConstraintSpecification() != null) {
             HiveSqlParser.ColumnConstraintSpecificationContext constraintContext = context.columnConstraintSpecification();
             if (constraintContext.PRIMARY() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.PRIMARY().getText(), "[PRIMARY KEY] is not supported");
-                addDiif(DiffType.UNSUPPORTED, constraintContext.KEY().getText(), null);
+                addDiff(DiffType.UNSUPPORTED, constraintContext.PRIMARY().getText(), "[PRIMARY KEY] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.KEY().getText(), null);
             }
             if (constraintContext.UNIQUE() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.UNIQUE().getText(), "[UNIQUE] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.UNIQUE().getText(), "[UNIQUE] is not supported");
             }
             if (constraintContext.NOT() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.NOT().getText(), "[NOT NULL] is not supported");
-                addDiif(DiffType.UNSUPPORTED, constraintContext.NULL().getText(), null);
+                addDiff(DiffType.UNSUPPORTED, constraintContext.NOT().getText(), "[NOT NULL] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.NULL().getText(), null);
             }
             if (constraintContext.DEFAULT() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.DEFAULT().getText(), "[DEFAULT] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.DEFAULT().getText(), "[DEFAULT] is not supported");
             }
             if (constraintContext.CHECK() != null) {
-                addDiif(DiffType.UNSUPPORTED, constraintContext.CHECK().getText(), "[CHECK] is not supported");
+                addDiff(DiffType.UNSUPPORTED, constraintContext.CHECK().getText(), "[CHECK] is not supported");
             }
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: Column constraint", constraintContext);
         }
@@ -2324,7 +2331,7 @@ public class HiveAstBuilder
     @Override
     public Node visitDigitIdentifier(HiveSqlParser.DigitIdentifierContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.getText(), "[DIGIT IDENTIFIER] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.getText(), "[DIGIT IDENTIFIER] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, format("Unsupported statement: %s(identifiers must not start with a digit)", context.getText()), context);
     }
 
@@ -2341,7 +2348,7 @@ public class HiveAstBuilder
     {
         String value = context.getText();
         if (value.contains("\\'")) {
-            addDiif(DiffType.UNSUPPORTED, context.getText(), format("Unsupported string: [%s]", value));
+            addDiff(DiffType.UNSUPPORTED, context.getText(), format("Unsupported string: [%s]", value));
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, format("Unsupported string: %s", value), context);
         }
         return new StringLiteral(getLocation(context), unquote(context.STRING().getText()));
@@ -2719,7 +2726,7 @@ public class HiveAstBuilder
         }
 
         String typeName = type.getText().split("<")[0].trim();
-        addDiif(DiffType.UNSUPPORTED, typeName, format("type [%s] is not supported.", type.getText()));
+        addDiff(DiffType.UNSUPPORTED, typeName, format("type [%s] is not supported.", type.getText()));
         throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported type specification: " + type.getText());
     }
 
@@ -2809,7 +2816,7 @@ public class HiveAstBuilder
             return HIVE_TO_HETU_FILE_FORMAT.get(key);
         }
 
-        addDiif(DiffType.UNSUPPORTED, hiveFileFormat, format("[%s] file format is not supported", hiveFileFormat));
+        addDiff(DiffType.UNSUPPORTED, hiveFileFormat, format("[%s] file format is not supported", hiveFileFormat));
         throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, format("Unsupported file format: %s", hiveFileFormat));
     }
 
