@@ -17,7 +17,6 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <version.ojdbc6>11.2.0.4</version.ojdbc6>
         <version.h2>1.4.199</version.h2>
-        <version.jmockit>1.38</version.jmockit>
         <version.maven-surefire-plugin>3.0.0-M2</version.maven-surefire-plugin>
     </properties>
 
@@ -175,13 +174,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-parser</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.jmockit</groupId>
-            <artifactId>jmockit</artifactId>
-            <version>${version.jmockit}</version>
-            <scope>test</scope>
         </dependency>
 
         <dependency>
