@@ -235,10 +235,9 @@ public class OrcSelectiveRecordReader
         }
 
         matchingRowsInBatchArray = null;
-        initializePositions(batchSize);
+        int positionCount = initializePositions(batchSize);
 
         int[] positionsToRead = this.positions;
-        int positionCount = batchSize;
 
         /* first evaluate columns with filter AND conditions */
         SelectiveColumnReader[] columnReaders = getColumnReaders();
@@ -350,7 +349,7 @@ public class OrcSelectiveRecordReader
         return page;
     }
 
-    private void initializePositions(int batchSize)
+    private int initializePositions(int batchSize)
     {
         // currentPosition to currentBatchSize
         StripeInformation stripe = stripes.get(currentStripe);
@@ -381,7 +380,7 @@ public class OrcSelectiveRecordReader
         if (positions == null || positions.length < batchSize) {
             if (matchingRowsInBatchArray != null) {
                 positions = matchingRowsInBatchArray;
-                return;
+                return matchingRowsInBatchArray.length;
             }
 
             positions = new int[batchSize];
@@ -389,6 +388,8 @@ public class OrcSelectiveRecordReader
                 positions[i] = i;
             }
         }
+
+        return batchSize;
     }
 
     @Override
