@@ -48,6 +48,23 @@ public class TestHBaseRegionLocator
     }
 
     @Override
+    public HRegionLocation getRegionLocation(byte[] bytes, int i, boolean b) throws IOException
+    {
+        return null;
+    }
+
+    @Override
+    public List<HRegionLocation> getRegionLocations(byte[] bytes, boolean b) throws IOException
+    {
+        return null;
+    }
+
+    @Override
+    public void clearRegionLocationCache()
+    {
+    }
+
+    @Override
     public List<HRegionLocation> getAllRegionLocations()
             throws IOException
     {

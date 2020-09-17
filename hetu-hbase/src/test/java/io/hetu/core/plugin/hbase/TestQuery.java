@@ -16,7 +16,6 @@ package io.hetu.core.plugin.hbase;
 
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
-import io.hetu.core.plugin.hbase.client.TestHBaseConnection;
 import io.hetu.core.plugin.hbase.client.TestUtils;
 import io.hetu.core.plugin.hbase.client.TestingConnectorSession;
 import io.hetu.core.plugin.hbase.conf.HBaseConfig;
@@ -25,7 +24,6 @@ import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.connector.TestHBaseClientConnection;
 import io.hetu.core.plugin.hbase.metadata.TestingHetuMetastore;
-import io.hetu.core.plugin.hbase.query.HBaseGetRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordCursor;
 import io.hetu.core.plugin.hbase.query.HBaseRecordSet;
 import io.hetu.core.plugin.hbase.split.HBaseSplit;
@@ -291,54 +289,5 @@ public class TestQuery
                     e.toString(),
                     "java.lang.ClassCastException: io.airlift.slice.Slice cannot be cast to java.util.Map");
         }
-    }
-
-    /**
-     * testHBaseGetRecordCursor
-     */
-    @Test
-    public void testHBaseGetRecordCursor()
-    {
-        StringRowSerializer serializer = new StringRowSerializer();
-        serializer.setRowIdName("rowkey");
-        String[] fieldToColumnName = {"rowkey"};
-        List<HBaseColumnHandle> columnHandles = new ArrayList<>();
-        columnHandles.add(TestUtils.createHBaseColumnRowId("rowkey"));
-        Map<Integer, List<Range>> ranges = new HashMap<>();
-        List<Range> range = new ArrayList<>();
-        long exactly = 12345678;
-        range.add(Range.equal(BIGINT, exactly));
-        ranges.put(0, range);
-        HBaseSplit hBasesplit =
-                new HBaseSplit(
-                        "rowkey",
-                        TestUtils.createHBaseTableHandle(),
-                        new ArrayList<HostAddress>(1),
-                        "start",
-                        "end",
-                        ranges,
-                        null,
-                        true);
-        HBaseGetRecordCursor hgrc =
-                new HBaseGetRecordCursor(
-                        columnHandles,
-                        hBasesplit,
-                        new TestHBaseConnection(),
-                        serializer,
-                        null,
-                        "rowkey",
-                        fieldToColumnName,
-                        "defaultValue");
-        assertEquals(hgrc.advanceNextPosition(), true);
-        assertEquals(hgrc.advanceNextPosition(), true);
-        assertEquals(hgrc.advanceNextPosition(), true);
-        assertEquals(hgrc.advanceNextPosition(), true);
-        assertEquals(hgrc.advanceNextPosition(), true);
-        assertEquals(hgrc.advanceNextPosition(), false);
-
-        hgrc.close();
-
-        // Check read data
-        assertEquals("nick_name_1 12 2019-06-11 20", serializer.getColumnValues().get("rowkey"));
     }
 }

@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -222,7 +223,7 @@ public class HBaseConnection
                                 conn = ConnectionFactory.createConnection(cfg);
                             }
                             catch (IOException e) {
-                                LOG.error("[safemode] create fi hbase connector failed...cause by : %s", e);
+                                LOG.error("[safemode] create hbase connector failed...cause by : %s", e);
                             }
                             return conn;
                         }
@@ -233,7 +234,7 @@ public class HBaseConnection
                 conn = ConnectionFactory.createConnection(cfg);
             }
             catch (IOException e) {
-                LOG.error("create fi hbase connection failed...cause by: %s", e);
+                LOG.error("create hbase connection failed...cause by: %s", e);
                 conn = null;
             }
         }
@@ -248,6 +249,17 @@ public class HBaseConnection
     {
         if (conn == null) {
             initConnection();
+        }
+        if (conn.isClosed()) {
+            LOG.info("Connection is null or closed, creating a new one");
+            try {
+                init();
+            }
+            catch (IOException e) {
+                throw new PrestoException(
+                        HBaseErrorCode.UNEXPECTED_HBASE_ERROR,
+                        format("init hbase connection failed... cause by %s", e.getMessage()));
+            }
         }
 
         return conn;
@@ -269,6 +281,9 @@ public class HBaseConnection
         catch (IOException e) {
             LOG.error("getHbaseAdmin failed... cause by %s", e);
             hbaseAdmin = null;
+            throw new PrestoException(
+                    HBaseErrorCode.UNEXPECTED_HBASE_ERROR,
+                    format("getHbaseAdmin failed... cause by %s", e.getMessage()));
         }
         return hbaseAdmin;
     }
@@ -417,8 +432,7 @@ public class HBaseConnection
     protected void addNewFamily(String table, String family)
     {
         try {
-            HColumnDescriptor hcd = new HColumnDescriptor(family);
-            this.getHbaseAdmin().addColumn(table, hcd);
+            this.getHbaseAdmin().addColumnFamily(TableName.valueOf(table), ColumnFamilyDescriptorBuilder.of(family));
         }
         catch (IOException e) {
             LOG.error("addNewFamily failed, cause by %s", e);

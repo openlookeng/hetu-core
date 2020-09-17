@@ -16,6 +16,7 @@ package io.hetu.core.plugin.hbase.client;
 
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.metrics.ScanMetrics;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -56,6 +57,18 @@ public class TestResultScanner
     public void close()
     {
         // do nothing
+    }
+
+    @Override
+    public boolean renewLease()
+    {
+        return false;
+    }
+
+    @Override
+    public ScanMetrics getScanMetrics()
+    {
+        return null;
     }
 
     @Override

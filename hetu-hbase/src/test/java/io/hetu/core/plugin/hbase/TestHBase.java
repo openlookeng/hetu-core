@@ -47,7 +47,6 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
-import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
@@ -390,53 +389,6 @@ public class TestHBase
                         TestUtils.createHBaseTableHandle(),
                         hconn.getTable("hbase.test_table").getColumns());
         assertEquals(5, rs.getColumnTypes().size());
-
-        RecordCursor rc = rs.cursor();
-        rc.getReadTimeNanos();
-
-        assertEquals(rc.advanceNextPosition(), true);
-        assertEquals(rc.advanceNextPosition(), true);
-        assertEquals(rc.advanceNextPosition(), true);
-        assertEquals(rc.advanceNextPosition(), true);
-        assertEquals(rc.advanceNextPosition(), true);
-        assertEquals(rc.advanceNextPosition(), false);
-    }
-
-    /**
-     * testRecodeSet
-     */
-    @Test
-    public void testRecodeSet()
-    {
-        List<HostAddress> hostAddressList = new ArrayList<>(1);
-        Map<Integer, List<Range>> ranges = new HashMap<>();
-        HBaseSplit split =
-                new HBaseSplit(
-                        "rowkey", TestUtils.createHBaseTableHandle(), hostAddressList, null, null, ranges, null, true);
-
-        HBaseRecordSetProvider hrsp = new HBaseRecordSetProvider(hconn);
-        RecordSet rs =
-                hrsp.getRecordSet(
-                        new HBaseTransactionHandle(),
-                        session,
-                        split,
-                        TestUtils.createHBaseTableHandle(),
-                        hconn.getTable("hbase.test_table").getColumns());
-        RecordCursor rc = rs.cursor();
-        rc.advanceNextPosition();
-        rc.getCompletedBytes();
-        try {
-            rc.getLong(0);
-        }
-        catch (IllegalArgumentException e) {
-            rc.isNull(2);
-            rc.close();
-            assertEquals(
-                    e.getMessage(),
-                    format(
-                            ("Expected field 0 to be a type of "
-                                    + "bigint,date,integer,real,smallint,time,timestamp,tinyint but is varchar")));
-        }
     }
 
     /**
