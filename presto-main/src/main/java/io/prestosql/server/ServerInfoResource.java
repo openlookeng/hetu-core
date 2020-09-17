@@ -117,7 +117,7 @@ public class ServerInfoResource
             accessControl.checkCanAccessNodeInfo(httpRequestSessionContext.getIdentity());
         }
         catch (AccessDeniedException e) {
-            throw new ForbiddenException();
+            throw new ForbiddenException("No permission");
         }
 
         try {
