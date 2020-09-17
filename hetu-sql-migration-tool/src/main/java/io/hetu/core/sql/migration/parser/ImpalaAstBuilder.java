@@ -188,7 +188,7 @@ public class ImpalaAstBuilder
         return parserDiffsList;
     }
 
-    public void addDiif(DiffType type, String source, String target, String message)
+    public void addDiff(DiffType type, String source, String target, String message)
     {
         parserDiffsList.add(new ParserDiffs(type,
                 Optional.ofNullable(source),
@@ -196,7 +196,7 @@ public class ImpalaAstBuilder
                 Optional.ofNullable(message)));
     }
 
-    public void addDiif(DiffType type, String source, String message)
+    public void addDiff(DiffType type, String source, String message)
     {
         parserDiffsList.add(new ParserDiffs(type,
                 Optional.ofNullable(source),
@@ -259,8 +259,8 @@ public class ImpalaAstBuilder
         if (context.COMMENT() != null) {
             // Comment is not supported yet, give an warning message.
             String comment = ((StringLiteral) visit(context.comment)).getValue();
-            addDiif(DiffType.DELETED, context.COMMENT().getText(), null, null);
-            addDiif(DiffType.DELETED, comment, null, format("[COMMENT] is omitted: %s", comment));
+            addDiff(DiffType.DELETED, context.COMMENT().getText(), null, null);
+            addDiff(DiffType.DELETED, comment, null, format("[COMMENT] is omitted: %s", comment));
         }
 
         // handle location by properties
@@ -269,13 +269,13 @@ public class ImpalaAstBuilder
             StringLiteral location = (StringLiteral) visit(context.location);
             properties.add(new Property(getLocation(context), identifier, location));
 
-            addDiif(DiffType.INSERTED, null, "WITH", "New [with] clause");
-            addDiif(DiffType.MODIFIED, location.toString(), "location = " + location.toString(), "[location] is formatted");
+            addDiff(DiffType.INSERTED, null, "WITH", "New [with] clause");
+            addDiff(DiffType.MODIFIED, location.toString(), "location = " + location.toString(), "[location] is formatted");
         }
 
         // if database keyword to schema keyword
         if (context.DATABASE() != null && !context.DATABASE().getText().equalsIgnoreCase("schema")) {
-            addDiif(DiffType.MODIFIED, context.DATABASE().getText(), "SCHEMA", "[DATABASE] is updated to [SCHEMA]");
+            addDiff(DiffType.MODIFIED, context.DATABASE().getText(), "SCHEMA", "[DATABASE] is updated to [SCHEMA]");
         }
 
         return new CreateSchema(
@@ -289,10 +289,10 @@ public class ImpalaAstBuilder
     public Node visitAlterSchema(ImpalaSqlParser.AlterSchemaContext context)
     {
         if (context.ALTER() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ALTER().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.ALTER().getText(), null);
         }
         if (context.DATABASE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[ALTER DATABASE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[ALTER DATABASE] is not supported");
         }
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "ALTER DATABASE", context);
     }
@@ -301,12 +301,12 @@ public class ImpalaAstBuilder
     public Node visitDropSchema(ImpalaSqlParser.DropSchemaContext context)
     {
         if (context.CASCADE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.CASCADE().getText(), "[CASCADE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.CASCADE().getText(), "[CASCADE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "CASCADE", context);
         }
 
         if (context.RESTRICT() == null) {
-            addDiif(DiffType.INSERTED, null, "RESTRICT", "add default keyword [RESTRICT]");
+            addDiff(DiffType.INSERTED, null, "RESTRICT", "add default keyword [RESTRICT]");
         }
 
         return new DropSchema(
@@ -334,7 +334,7 @@ public class ImpalaAstBuilder
             Expression value = new Identifier("true");
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[external] is formatted");
+            addDiff(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[external] is formatted");
         }
 
         // handle partitioned by
@@ -357,7 +357,7 @@ public class ImpalaAstBuilder
             Expression value = new ArrayConstructor(expressions);
             properties.add(new Property(new Identifier(PARTITIONED_BY), value));
 
-            addDiif(DiffType.MODIFIED, context.PARTITIONED().getText(), PARTITIONED_BY, "[partitioned by] is formatted");
+            addDiff(DiffType.MODIFIED, context.PARTITIONED().getText(), PARTITIONED_BY, "[partitioned by] is formatted");
         }
 
         // handle sort by
@@ -370,19 +370,19 @@ public class ImpalaAstBuilder
             Expression value = new ArrayConstructor(quotedExpressions);
             properties.add(new Property(new Identifier(SORTED_BY), value));
 
-            addDiif(DiffType.MODIFIED, context.SORT().getText(), SORTED_BY, "[sorted by] is formatted");
+            addDiff(DiffType.MODIFIED, context.SORT().getText(), SORTED_BY, "[sorted by] is formatted");
         }
 
         // row format
         if (context.ROW() != null && context.FORMAT() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ROW().getText(), "[ROW FORMAT] is not supported");
-            addDiif(DiffType.UNSUPPORTED, context.FORMAT().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.ROW().getText(), "[ROW FORMAT] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.FORMAT().getText(), null);
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "ROW FORMAT", context);
         }
 
         // serde properties
         if (context.SERDEPROPERTIES() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.SERDEPROPERTIES().getText(), "[WITH SERDEPROPERTIES] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.SERDEPROPERTIES().getText(), "[WITH SERDEPROPERTIES] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "WITH SERDEPROPERTIES", context);
         }
 
@@ -392,7 +392,7 @@ public class ImpalaAstBuilder
             Expression value = new StringLiteral(getFileFormat(storedAsString));
             properties.add(new Property(new Identifier(FORMAT), value));
 
-            addDiif(DiffType.MODIFIED, context.STORED_AS().getText(), FORMAT, "[stored as] is formatted");
+            addDiff(DiffType.MODIFIED, context.STORED_AS().getText(), FORMAT, "[stored as] is formatted");
         }
 
         // location
@@ -400,12 +400,12 @@ public class ImpalaAstBuilder
             Expression value = (StringLiteral) visit(context.location);
             properties.add(new Property(new Identifier(LOCATION), value));
 
-            addDiif(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[location] is formatted");
+            addDiff(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[location] is formatted");
         }
 
         // cached in
         if (context.CACHED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.CACHED().getText(), "[CACHED IN] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.CACHED().getText(), "[CACHED IN] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "CACHED IN", context);
         }
 
@@ -419,10 +419,10 @@ public class ImpalaAstBuilder
                     Expression value = new Identifier(unquote(property.getValue().toString()));
                     properties.add(new Property(name, value));
 
-                    addDiif(DiffType.MODIFIED, property.getName().getValue(), "transactional = ", "[transactional] is formatted");
+                    addDiff(DiffType.MODIFIED, property.getName().getValue(), "transactional = ", "[transactional] is formatted");
                 }
                 else {
-                    addDiif(DiffType.UNSUPPORTED, property.getName().getValue(), "[TBLPROPERTIES] has unsupported properties");
+                    addDiff(DiffType.UNSUPPORTED, property.getName().getValue(), "[TBLPROPERTIES] has unsupported properties");
                     throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE,
                             property.getName().getValue(),
                             context.tblProp);
@@ -456,7 +456,7 @@ public class ImpalaAstBuilder
     public Node visitCreateTableLike(ImpalaSqlParser.CreateTableLikeContext context)
     {
         if (context.PARQUET() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PARQUET().getText(), "[LIKE PARQUET] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PARQUET().getText(), "[LIKE PARQUET] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "PARQUET", context.parquet);
         }
 
@@ -481,7 +481,7 @@ public class ImpalaAstBuilder
             Expression value = new Identifier("true");
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[external] is formatted");
+            addDiff(DiffType.MODIFIED, context.EXTERNAL().getText(), "external = true", "[external] is formatted");
         }
 
         // location
@@ -490,7 +490,7 @@ public class ImpalaAstBuilder
             Expression value = (StringLiteral) visit(context.location);
             properties.add(new Property(name, value));
 
-            addDiif(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[location] is formatted");
+            addDiff(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[location] is formatted");
         }
 
         // stored as
@@ -499,7 +499,7 @@ public class ImpalaAstBuilder
             Expression value = new StringLiteral(getFileFormat(storedAsString));
             properties.add(new Property(new Identifier(FORMAT), value));
 
-            addDiif(DiffType.MODIFIED, context.STORED_AS().getText(), FORMAT, "[stored as] is formatted");
+            addDiff(DiffType.MODIFIED, context.STORED_AS().getText(), FORMAT, "[stored as] is formatted");
         }
 
         return new CreateTable(
@@ -514,14 +514,14 @@ public class ImpalaAstBuilder
     @Override
     public Node visitCreateKuduTable(ImpalaSqlParser.CreateKuduTableContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.KUDU().getText(), "[CREATE KUDU TABLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.KUDU().getText(), "[CREATE KUDU TABLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Create Kudu Table", context);
     }
 
     @Override
     public Node visitCreateKuduTableAsSelect(ImpalaSqlParser.CreateKuduTableAsSelectContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.KUDU().getText(), "[CREATE KUDU TABLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.KUDU().getText(), "[CREATE KUDU TABLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Create Kudu Table", context);
     }
 
@@ -535,18 +535,18 @@ public class ImpalaAstBuilder
     public Node visitAddColumns(ImpalaSqlParser.AddColumnsContext context)
     {
         if (context.EXISTS() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.EXISTS().getText(), "[IF NOT EXISTS] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.EXISTS().getText(), "[IF NOT EXISTS] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "[IF NOT EXISTS] is not supported", context);
         }
 
         if (context.columnSpecWithKudu().size() > 1) {
             // does not support add multiple column
-            addDiif(DiffType.UNSUPPORTED, context.columnSpecWithKudu(1).getText(), "adding [Multiple columns] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.columnSpecWithKudu(1).getText(), "adding [Multiple columns] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "adding [Multiple columns] is not supported", context);
         }
 
         if (context.columnSpecWithKudu(0).kuduAttributes() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.columnSpecWithKudu(0).kuduAttributes().getText(), "[KUDU Attribute] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.columnSpecWithKudu(0).kuduAttributes().getText(), "[KUDU Attribute] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "[KUDU Attribute] is not supported", context);
         }
 
@@ -555,7 +555,7 @@ public class ImpalaAstBuilder
             comment = Optional.of(((StringLiteral) visit(context.columnSpecWithKudu(0).string())).getValue());
         }
 
-        addDiif(DiffType.MODIFIED, context.COLUMNS().getText(), "COLUMN", "[COLUMNS] is modified to column");
+        addDiff(DiffType.MODIFIED, context.COLUMNS().getText(), "COLUMN", "[COLUMNS] is modified to column");
 
         ColumnDefinition columnDefinition = new ColumnDefinition((Identifier) visit(context.columnSpecWithKudu(0).identifier()),
                 getType(context.columnSpecWithKudu(0).type()), true, new ArrayList<>(), comment);
@@ -566,7 +566,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitReplaceColumns(ImpalaSqlParser.ReplaceColumnsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.REPLACE().getText(), "[REPLACE COLUMNS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.REPLACE().getText(), "[REPLACE COLUMNS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Replace Column", context);
     }
 
@@ -574,12 +574,12 @@ public class ImpalaAstBuilder
     public Node visitAddSingleColumn(ImpalaSqlParser.AddSingleColumnContext context)
     {
         if (context.EXISTS() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.EXISTS().getText(), "[IF NOT EXISTS] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.EXISTS().getText(), "[IF NOT EXISTS] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "[IF NOT EXISTS] is not supported", context);
         }
 
         if (context.columnSpecWithKudu().kuduAttributes() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.columnSpecWithKudu().kuduAttributes().getText(), "[KUDU Attribute] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.columnSpecWithKudu().kuduAttributes().getText(), "[KUDU Attribute] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "[KUDU Attribute] is not supported", context);
         }
 
@@ -603,14 +603,14 @@ public class ImpalaAstBuilder
     @Override
     public Node visitAlterTableOwner(ImpalaSqlParser.AlterTableOwnerContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.OWNER().getText(), "[ALTER OWNER] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.OWNER().getText(), "[ALTER OWNER] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Alter Owner", context);
     }
 
     @Override
     public Node visitAlterTableKuduOnly(ImpalaSqlParser.AlterTableKuduOnlyContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.ALTER(1).getText(), "[ALTER KUDU TABLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.ALTER(1).getText(), "[ALTER KUDU TABLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Alter Kudu table", context);
     }
 
@@ -618,7 +618,7 @@ public class ImpalaAstBuilder
     public Node visitDropTable(ImpalaSqlParser.DropTableContext context)
     {
         if (context.PURGE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PURGE().getText(), "[PURGE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PURGE().getText(), "[PURGE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "PURGE", context);
         }
 
@@ -628,7 +628,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitTruncateTable(ImpalaSqlParser.TruncateTableContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.TRUNCATE().getText(), "[TRUNCATE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.TRUNCATE().getText(), "[TRUNCATE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Truncate", context);
     }
 
@@ -636,9 +636,9 @@ public class ImpalaAstBuilder
     public Node visitCreateView(ImpalaSqlParser.CreateViewContext context)
     {
         if (context.EXISTS() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.IF().getText(), null);
-            addDiif(DiffType.UNSUPPORTED, context.NOT().getText(), null);
-            addDiif(DiffType.UNSUPPORTED, context.EXISTS().getText(), "[IF NOT EXISTS] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.IF().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.NOT().getText(), null);
+            addDiff(DiffType.UNSUPPORTED, context.EXISTS().getText(), "[IF NOT EXISTS] is not supported");
 
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "Unsupported attribute: IF NOT EXISTS", context);
         }
@@ -649,7 +649,7 @@ public class ImpalaAstBuilder
                 if (text.equals("(")) {
                     continue;
                 }
-                addDiif(DiffType.UNSUPPORTED, context.viewColumns().getChild(i).getText(), "[COLUMN ALIASES] is not supported");
+                addDiff(DiffType.UNSUPPORTED, context.viewColumns().getChild(i).getText(), "[COLUMN ALIASES] is not supported");
                 break;
             }
             throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported attribute: COLUMN ALIASES", context.viewColumns());
@@ -673,14 +673,14 @@ public class ImpalaAstBuilder
                 if (text.equals("(")) {
                     continue;
                 }
-                addDiif(DiffType.UNSUPPORTED, context.viewColumns().getChild(i).getText(), "[COLUMN ALIASES] is not supported");
+                addDiff(DiffType.UNSUPPORTED, context.viewColumns().getChild(i).getText(), "[COLUMN ALIASES] is not supported");
                 break;
             }
             throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported attribute: COLUMN ALIASES", context.viewColumns());
         }
 
         // it equals to create or replace
-        addDiif(DiffType.INSERTED, "OR REPLACE", "[OR REPLACE] is added");
+        addDiff(DiffType.INSERTED, "OR REPLACE", "[OR REPLACE] is added");
 
         return new CreateView(
                 getLocation(context),
@@ -693,14 +693,14 @@ public class ImpalaAstBuilder
     @Override
     public Node visitRenameView(ImpalaSqlParser.RenameViewContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.RENAME().getText(), "[RENAME VIEW] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.RENAME().getText(), "[RENAME VIEW] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Rename View", context);
     }
 
     @Override
     public Node visitAlterViewOwner(ImpalaSqlParser.AlterViewOwnerContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.OWNER().getText(), "[ALTER VIEW OWNER] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.OWNER().getText(), "[ALTER VIEW OWNER] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Alter View Owner", context);
     }
 
@@ -714,24 +714,24 @@ public class ImpalaAstBuilder
     public Node visitDescribeDbOrTable(ImpalaSqlParser.DescribeDbOrTableContext context)
     {
         if (context.DATABASE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[DESCRIBE DATABASE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.DATABASE().getText(), "[DESCRIBE DATABASE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "DESCRIBE DATABASE", context);
         }
 
         if (context.FORMATTED() != null || context.EXTENDED() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.FORMATTED() != null ? context.FORMATTED().getText() : context.EXTENDED().getText(),
+            addDiff(DiffType.UNSUPPORTED, context.FORMATTED() != null ? context.FORMATTED().getText() : context.EXTENDED().getText(),
                     null, "[FORMATTED or EXTENDED] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "Unsupported attribute: FORMATTED or EXTENDED", context);
         }
-        addDiif(DiffType.MODIFIED, context.DESCRIBE().getText(), "SHOW COLUMNS", "[DESCRIBE] is formatted to SHOW COLUMNS");
+        addDiff(DiffType.MODIFIED, context.DESCRIBE().getText(), "SHOW COLUMNS", "[DESCRIBE] is formatted to SHOW COLUMNS");
         return new ShowColumns(getLocation(context), getQualifiedName(context.qualifiedName()));
     }
 
     @Override
     public Node visitComputeStats(ImpalaSqlParser.ComputeStatsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.COMPUTE().getText(), "[COMPUTE STATS] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.STATS().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.COMPUTE().getText(), "[COMPUTE STATS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.STATS().getText(), null);
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "COMPUTE STATS", context);
     }
@@ -739,9 +739,9 @@ public class ImpalaAstBuilder
     @Override
     public Node visitComputeIncrementalStats(ImpalaSqlParser.ComputeIncrementalStatsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.COMPUTE().getText(), "[COMPUTE INCREMENTAL STATS] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.INCREMENTAL().getText(), null);
-        addDiif(DiffType.UNSUPPORTED, context.STATS().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.COMPUTE().getText(), "[COMPUTE INCREMENTAL STATS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INCREMENTAL().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.STATS().getText(), null);
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "COMPUTE INCREMENTAL STATS", context);
     }
@@ -749,8 +749,8 @@ public class ImpalaAstBuilder
     @Override
     public Node visitDropStats(ImpalaSqlParser.DropStatsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP STATS] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.STATS().getText(), "[DROP STATS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP STATS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.STATS().getText(), "[DROP STATS] is not supported");
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "DROP STATS", context);
     }
@@ -758,9 +758,9 @@ public class ImpalaAstBuilder
     @Override
     public Node visitDropIncrementalStats(ImpalaSqlParser.DropIncrementalStatsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP INCREMENTAL STATS] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.INCREMENTAL().getText(), null);
-        addDiif(DiffType.UNSUPPORTED, context.STATS().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP INCREMENTAL STATS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INCREMENTAL().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.STATS().getText(), null);
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "DROP INCREMENTAL STATS", context);
     }
@@ -768,7 +768,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitCreateFunction(ImpalaSqlParser.CreateFunctionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[CREATE FUNCTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FUNCTION().getText(), "[CREATE FUNCTION] is not supported");
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "CREATE FUNCTION", context);
     }
@@ -776,8 +776,8 @@ public class ImpalaAstBuilder
     @Override
     public Node visitRefreshFunction(ImpalaSqlParser.RefreshFunctionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.REFRESH().getText(), "[REFRESH FUNCTIONS] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTIONS().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.REFRESH().getText(), "[REFRESH FUNCTIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FUNCTIONS().getText(), null);
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "REFRESH FUNCTIONS", context);
     }
@@ -785,8 +785,8 @@ public class ImpalaAstBuilder
     @Override
     public Node visitDropFunction(ImpalaSqlParser.DropFunctionContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP FUNCTION] is not supported");
-        addDiif(DiffType.UNSUPPORTED, context.FUNCTION().getText(), null);
+        addDiff(DiffType.UNSUPPORTED, context.DROP().getText(), "[DROP FUNCTION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FUNCTION().getText(), null);
 
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "DROP FUNCTION", context);
     }
@@ -811,7 +811,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitGrantRole(ImpalaSqlParser.GrantRoleContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.GROUP().getText(), "GRANT ROLE TO [GROUP] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.GROUP().getText(), "GRANT ROLE TO [GROUP] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "GRANT ROLE TO GROUP", context);
     }
 
@@ -820,7 +820,7 @@ public class ImpalaAstBuilder
     {
         Optional<List<String>> privileges;
         if (context.ALL() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ALL().getText(), "GRANT [ALL] is not supported, Because some privileges are not supported. e.g. REFRESH");
+            addDiff(DiffType.UNSUPPORTED, context.ALL().getText(), "GRANT [ALL] is not supported, Because some privileges are not supported. e.g. REFRESH");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: GRANT ALL. " +
                     "Because some privileges are not supported. e.g. REFRESH", context);
         }
@@ -828,22 +828,22 @@ public class ImpalaAstBuilder
         if (context.privilege().size() > 0) {
             for (ImpalaSqlParser.PrivilegeContext privilegeContext : context.privilege()) {
                 if (privilegeContext.REFRESH() != null) {
-                    addDiif(DiffType.UNSUPPORTED, privilegeContext.REFRESH().getText(), "[REFRESH] is not supported");
+                    addDiff(DiffType.UNSUPPORTED, privilegeContext.REFRESH().getText(), "[REFRESH] is not supported");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: GRANT REFRESH. ", context);
                 }
                 else if (privilegeContext.CREATE() != null) {
-                    addDiif(DiffType.UNSUPPORTED, privilegeContext.CREATE().getText(), "GRANT [CREATE] is not supported");
+                    addDiff(DiffType.UNSUPPORTED, privilegeContext.CREATE().getText(), "GRANT [CREATE] is not supported");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: GRANT CREATE. ", context);
                 }
                 else if (privilegeContext.columnName != null) {
-                    addDiif(DiffType.UNSUPPORTED, privilegeContext.SELECT().getText(), "GRANT [SELECT(column_name)] is not supported");
+                    addDiff(DiffType.UNSUPPORTED, privilegeContext.SELECT().getText(), "GRANT [SELECT(column_name)] is not supported");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: GRANT SELECT(column_name). ", context);
                 }
             }
         }
 
         if (!context.objectType().getText().equalsIgnoreCase("table")) {
-            addDiif(DiffType.UNSUPPORTED, context.objectType().getText(),
+            addDiff(DiffType.UNSUPPORTED, context.objectType().getText(),
                     format("GRANT ON [%s] is not supported", context.objectType().getText().toUpperCase()));
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: GRANT only support 'ON TABLE'. ", context);
         }
@@ -864,7 +864,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitRevokeRole(ImpalaSqlParser.RevokeRoleContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.GROUP().getText(), "REVOKE ROLE FROM [GROUP] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.GROUP().getText(), "REVOKE ROLE FROM [GROUP] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "REVOKE ROLE FROM GROUP", context);
     }
 
@@ -873,7 +873,7 @@ public class ImpalaAstBuilder
     {
         Optional<List<String>> privileges;
         if (context.ALL() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ALL().getText(), "REVOKE [ALL] is not supported, Because some privileges are not supported. e.g. REFRESH");
+            addDiff(DiffType.UNSUPPORTED, context.ALL().getText(), "REVOKE [ALL] is not supported, Because some privileges are not supported. e.g. REFRESH");
 
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: REVOKE ALL. " +
                     "Because some privileges are not supported. e.g. REFRESH", context);
@@ -882,22 +882,22 @@ public class ImpalaAstBuilder
         if (context.privilege().size() > 0) {
             for (ImpalaSqlParser.PrivilegeContext privilegeContext : context.privilege()) {
                 if (privilegeContext.REFRESH() != null) {
-                    addDiif(DiffType.UNSUPPORTED, privilegeContext.REFRESH().getText(), "[REFRESH] is not supported");
+                    addDiff(DiffType.UNSUPPORTED, privilegeContext.REFRESH().getText(), "[REFRESH] is not supported");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: REVOKE REFRESH. ", context);
                 }
                 else if (privilegeContext.CREATE() != null) {
-                    addDiif(DiffType.UNSUPPORTED, privilegeContext.CREATE().getText(), "[CREATE] is not supported");
+                    addDiff(DiffType.UNSUPPORTED, privilegeContext.CREATE().getText(), "[CREATE] is not supported");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: REVOKE CREATE. ", context);
                 }
                 else if (privilegeContext.columnName != null) {
-                    addDiif(DiffType.UNSUPPORTED, privilegeContext.SELECT().getText(), "[SELECT(column_name)] is not supported");
+                    addDiff(DiffType.UNSUPPORTED, privilegeContext.SELECT().getText(), "[SELECT(column_name)] is not supported");
                     throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: REVOKE SELECT(column_name). ", context);
                 }
             }
         }
 
         if (!context.objectType().getText().equalsIgnoreCase("table")) {
-            addDiif(DiffType.UNSUPPORTED, context.objectType().getText(),
+            addDiff(DiffType.UNSUPPORTED, context.objectType().getText(),
                     format("REVOKE ON [%s] is not supported", context.objectType().getText().toUpperCase()));
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: REVOKE only support 'ON TABLE'. ", context);
         }
@@ -919,17 +919,17 @@ public class ImpalaAstBuilder
     public Node visitInsertInto(ImpalaSqlParser.InsertIntoContext context)
     {
         if (context.with() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.with().getChild(0).getText(), "[WITH] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.with().getChild(0).getText(), "[WITH] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "Unsupported attribute: INSERT does not support WITH.", context);
         }
 
         if (context.hintClause().size() > 0) {
-            addDiif(DiffType.UNSUPPORTED, context.hintClause(0).getText(), "[hint] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.hintClause(0).getText(), "[hint] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported attribute: INSERT does not support hint.", context);
         }
 
         if (context.PARTITION() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), "[PARTITION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported attribute: INSERT does not support PARTITION.", context);
         }
 
@@ -938,7 +938,6 @@ public class ImpalaAstBuilder
             columnAliases = Optional.of(visit(context.columnAliases().identifier(), Identifier.class));
         }
 
-        addDiif(DiffType.INSERTED, null, "ROW (", "[ROW] is a new keyword");
         return new Insert(
                 getQualifiedName(context.qualifiedName()),
                 columnAliases,
@@ -958,7 +957,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitDeleteTableRef(ImpalaSqlParser.DeleteTableRefContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.relation(0).getText(), "DELETE TABLE WITH [REFERENCE AND JOIN] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.relation(0).getText(), "DELETE TABLE WITH [REFERENCE AND JOIN] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "DELETE TABLE WITH REFERENCE AND JOIN.", context);
     }
 
@@ -966,7 +965,7 @@ public class ImpalaAstBuilder
     public Node visitUpdateTable(ImpalaSqlParser.UpdateTableContext context)
     {
         if (context.FROM() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.FROM().getText(), "UPDATE WITH [RELATION] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.FROM().getText(), "UPDATE WITH [RELATION] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "UPDATE with relation", context);
         }
 
@@ -975,7 +974,7 @@ public class ImpalaAstBuilder
             assignmentItems = visit(context.assignmentList().assignmentItem(), AssignmentItem.class);
         }
 
-        addDiif(DiffType.FUNCTION_WARNING, context.UPDATE().getText(), "UPDATE ",
+        addDiff(DiffType.FUNCTION_WARNING, context.UPDATE().getText(), "UPDATE ",
                 "This UPDATE might not work, although syntax is correct. Because openLooKeng currently only support executing UPDATE on specified format.");
 
         return new Update(
@@ -988,7 +987,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitUpsert(ImpalaSqlParser.UpsertContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.UPSERT().getText(), "[UPSERT] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.UPSERT().getText(), "[UPSERT] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "UPSERT", context);
     }
 
@@ -996,7 +995,7 @@ public class ImpalaAstBuilder
     public Node visitShowSchemas(ImpalaSqlParser.ShowSchemasContext context)
     {
         if (context.string().size() > 1) {
-            addDiif(DiffType.UNSUPPORTED, context.string(1).getText(), "[LIKE] does not support multiple matchers");
+            addDiff(DiffType.UNSUPPORTED, context.string(1).getText(), "[LIKE] does not support multiple matchers");
             throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported attribute: LIKE can not have multiple matchers ", context);
         }
         Optional<String> escape = Optional.empty();
@@ -1006,16 +1005,16 @@ public class ImpalaAstBuilder
                 pattern = Optional.of(pattern.get().replace("_", "#_"));
                 escape = Optional.of("#");
 
-                addDiif(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
-                addDiif(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
+                addDiff(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
+                addDiff(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
             }
 
-            addDiif(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
+            addDiff(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
             pattern = Optional.of(pattern.get().replace("*", "%"));
         }
 
         if (context.DATABASES() != null) {
-            addDiif(DiffType.MODIFIED, context.DATABASES().getText(), "SCHEMAS", "[DATABASES] is updated to SCHEMAS");
+            addDiff(DiffType.MODIFIED, context.DATABASES().getText(), "SCHEMAS", "[DATABASES] is updated to SCHEMAS");
         }
 
         return new ShowSchemas(getLocation(context), Optional.empty(), pattern, escape);
@@ -1025,7 +1024,7 @@ public class ImpalaAstBuilder
     public Node visitShowTables(ImpalaSqlParser.ShowTablesContext context)
     {
         if (context.string().size() > 1) {
-            addDiif(DiffType.UNSUPPORTED, context.string(1).getText(), "[LIKE] does not support multiple patter");
+            addDiff(DiffType.UNSUPPORTED, context.string(1).getText(), "[LIKE] does not support multiple patter");
             throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported attribute: LIKE can not have multiple pattern ", context);
         }
 
@@ -1036,11 +1035,11 @@ public class ImpalaAstBuilder
                 pattern = Optional.of(pattern.get().replace("_", "#_"));
                 escape = Optional.of("#");
 
-                addDiif(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
-                addDiif(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
+                addDiff(DiffType.MODIFIED, "_", "#_", "[_] is formatted to #_");
+                addDiff(DiffType.INSERTED, null, "ESCAPE", "New [ESCAPE] clause");
             }
 
-            addDiif(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
+            addDiff(DiffType.MODIFIED, "*", "%", "[*] is formatted to %");
             pattern = Optional.of(pattern.get().replace("*", "%"));
         }
         return new ShowTables(
@@ -1055,19 +1054,19 @@ public class ImpalaAstBuilder
     public Node visitShowFunctions(ImpalaSqlParser.ShowFunctionsContext context)
     {
         if (context.AGGREGATE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.AGGREGATE().getText(), "[AGGREGATE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.AGGREGATE().getText(), "[AGGREGATE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "AGGREGATE is not supported", context);
         }
         if (context.ANALYTIC() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.ANALYTIC().getText(), "[ANALYTIC] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.ANALYTIC().getText(), "[ANALYTIC] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "ANALYTIC is not supported", context);
         }
         if (context.IN() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.IN().getText(), "[IN] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.IN().getText(), "[IN] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "IN is not supported", context);
         }
         if (context.LIKE() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "LIKE is not supported", context);
         }
 
@@ -1089,7 +1088,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitShowTableStats(ImpalaSqlParser.ShowTableStatsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.STATS().getText(), "[SHOW TABLE STATS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.STATS().getText(), "[SHOW TABLE STATS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW TABLE STATS", context);
     }
 
@@ -1102,14 +1101,14 @@ public class ImpalaAstBuilder
     @Override
     public Node visitShowPartitions(ImpalaSqlParser.ShowPartitionsContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.PARTITIONS().getText(), "[SHOW PARTITIONS] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.PARTITIONS().getText(), "[SHOW PARTITIONS] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW PARTITIONS", context);
     }
 
     @Override
     public Node visitShowFiles(ImpalaSqlParser.ShowFilesContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.FILES().getText(), "[SHOW FILES] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.FILES().getText(), "[SHOW FILES] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW FILES", context);
     }
 
@@ -1125,21 +1124,21 @@ public class ImpalaAstBuilder
     @Override
     public Node visitShowRoleGrant(ImpalaSqlParser.ShowRoleGrantContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.GROUP().getText(), "SHOW ROLE GRANT [GROUP] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.GROUP().getText(), "SHOW ROLE GRANT [GROUP] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW ROLE GRANT GROUP", context);
     }
 
     @Override
     public Node visitShowGrantRole(ImpalaSqlParser.ShowGrantRoleContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.ROLE().getText(), "SHOW [GRANT ROLE] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.ROLE().getText(), "SHOW [GRANT ROLE] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW GRANT ROLE", context);
     }
 
     @Override
     public Node visitShowGrantUser(ImpalaSqlParser.ShowGrantUserContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.USER().getText(), "SHOW [GRANT USER] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.USER().getText(), "SHOW [GRANT USER] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHOW GRANT USER", context);
     }
 
@@ -1147,7 +1146,7 @@ public class ImpalaAstBuilder
     public Node visitAddComments(ImpalaSqlParser.AddCommentsContext context)
     {
         if (context.DATABASE() != null || context.COLUMN() != null) {
-            addDiif(DiffType.UNSUPPORTED,
+            addDiff(DiffType.UNSUPPORTED,
                     context.DATABASE() != null ? context.DATABASE().getText() : context.COLUMN().getText(),
                     "COMMENT ON [DATABASE/COLUMN] is not supported");
 
@@ -1171,45 +1170,45 @@ public class ImpalaAstBuilder
     public Node visitSetSession(ImpalaSqlParser.SetSessionContext context)
     {
         if (context.identifier() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.identifier().getText(), "SET [IDENTIFIER] is not support");
+            addDiff(DiffType.UNSUPPORTED, context.identifier().getText(), "SET [IDENTIFIER] is not support");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SET QUERY OPTION", context);
         }
-        addDiif(DiffType.MODIFIED, context.SET().getText(), "SHOW", "[SET] is formatted to SHOW");
+        addDiff(DiffType.MODIFIED, context.SET().getText(), "SHOW", "[SET] is formatted to SHOW");
         return new ShowSession(getLocation(context));
     }
 
     @Override
     public Node visitShutdown(ImpalaSqlParser.ShutdownContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.SHUTDOWN().getText(), "[SHUTDOWN] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.SHUTDOWN().getText(), "[SHUTDOWN] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "SHUTDOWN", context);
     }
 
     @Override
     public Node visitInvalidateMeta(ImpalaSqlParser.InvalidateMetaContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.INVALIDATE().getText(), "[INVALIDATE METADATA] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.INVALIDATE().getText(), "[INVALIDATE METADATA] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "INVALIDATE METADATA", context);
     }
 
     @Override
     public Node visitLoadData(ImpalaSqlParser.LoadDataContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.LOAD().getText(), "[LOAD DATA] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.LOAD().getText(), "[LOAD DATA] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "LOAD DATA", context);
     }
 
     @Override
     public Node visitRefreshMeta(ImpalaSqlParser.RefreshMetaContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.REFRESH().getText(), "[REFRESH METADATA] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.REFRESH().getText(), "[REFRESH METADATA] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "REFRESH", context);
     }
 
     @Override
     public Node visitRefreshAuth(ImpalaSqlParser.RefreshAuthContext context)
     {
-        addDiif(DiffType.UNSUPPORTED, context.REFRESH().getText(), "[REFRESH AUTHORIZATION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.REFRESH().getText(), "[REFRESH AUTHORIZATION] is not supported");
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "REFRESH AUTHORIZATION", context);
     }
 
@@ -1407,6 +1406,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitInlineTable(ImpalaSqlParser.InlineTableContext context)
     {
+        addDiff(DiffType.INSERTED, null, "ROW (", "[ROW] is a new keyword");
         return new Values(getLocation(context), visit(context.expression(), Expression.class));
     }
 
@@ -1519,18 +1519,18 @@ public class ImpalaAstBuilder
         }
 
         if (context.joinType().SEMI() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.joinType().SEMI().getText(), "[SEMI] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.joinType().SEMI().getText(), "[SEMI] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "SEMI", context);
         }
 
         if (context.joinType().ANTI() != null) {
-            addDiif(DiffType.UNSUPPORTED, context.joinType().ANTI().getText(), "[ANTI] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.joinType().ANTI().getText(), "[ANTI] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "ANTI", context);
         }
 
         if (context.joinType().INNER() != null &&
                 (context.joinType().LEFT() != null || context.joinType().RIGHT() != null)) {
-            addDiif(DiffType.UNSUPPORTED, context.joinType().INNER().getText(), "[LEFT INNER || RIGHT INNER] is not supported");
+            addDiff(DiffType.UNSUPPORTED, context.joinType().INNER().getText(), "[LEFT INNER || RIGHT INNER] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_KEYWORDS, "LEFT INNER || RIGHT INNER", context);
         }
 
@@ -2305,7 +2305,7 @@ public class ImpalaAstBuilder
         if (IMPALA_TO_HETU_FILE_FORMAT.containsKey(key)) {
             return IMPALA_TO_HETU_FILE_FORMAT.get(key);
         }
-        addDiif(DiffType.UNSUPPORTED, hiveFileFormat, String.format("[%s] file format is not supported", key));
+        addDiff(DiffType.UNSUPPORTED, hiveFileFormat, String.format("[%s] file format is not supported", key));
         throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, format("Unsupported file format: %s", hiveFileFormat));
     }
 
@@ -2551,7 +2551,7 @@ public class ImpalaAstBuilder
 
         // extract the type name
         String typeName = type.getText().split("<")[0].trim();
-        addDiif(DiffType.UNSUPPORTED, typeName, String.format("type [%s] is not supported.", type.getText()));
+        addDiff(DiffType.UNSUPPORTED, typeName, String.format("type [%s] is not supported.", type.getText()));
         throw unsupportedError(ErrorType.UNSUPPORTED_ATTRIBUTE, "Unsupported type specification: " + type.getText());
     }
 

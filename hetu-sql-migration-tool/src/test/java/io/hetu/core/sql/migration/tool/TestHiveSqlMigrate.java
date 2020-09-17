@@ -319,6 +319,9 @@ public class TestHiveSqlMigrate
 
         String sql11 = "ALTER TABLE T1 DROP CONSTRAINT TEST";
         assertUnsupported(sql11, Optional.of("DROP CONSTRAINT"));
+
+        String sql12 = "ALTER TABLE D1.T1 UNSET SERDEPROPERTIES('FIELD.DELIM')";
+        assertUnsupported(sql12, Optional.of("UNSET SERDEPROPERTIES"));
     }
 
     @Test
