@@ -75,7 +75,7 @@ public class CarbondataMetadataFactory
     private final String carbondataTableStore;
     private final long carbondataMinorVacuumSegmentCount;
     private final long carbondataMajorVacuumSegmentSize;
-    private final Optional<Duration> vacuumCleanupInterval;
+    private final Duration vacuumCleanupInterval;
 
     @Inject
     public CarbondataMetadataFactory(CarbondataConfig carbondataConfig, HiveMetastore metastore,
@@ -115,7 +115,7 @@ public class CarbondataMetadataFactory
                                      boolean createsOfNonManagedTablesEnabled, boolean tableCreatesWithLocationAllowed,
                                      long perTransactionCacheMaximumSize,
                                      Optional<Duration> hiveTransactionHeartbeatInterval,
-                                     Optional<Duration> vacuumCleanupInterval,
+                                     Duration vacuumCleanupInterval,
                                      TypeManager typeManager, LocationService locationService,
                                      JsonCodec<PartitionUpdate> partitionUpdateCodec,
                                      JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,

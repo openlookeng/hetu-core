@@ -204,7 +204,7 @@ public class HiveConfig
 
     private boolean tlsEnabled;
 
-    private Optional<Duration> vacuumCleanupRecheckInterval = Optional.of(new Duration(5, MINUTES));
+    private Duration vacuumCleanupRecheckInterval = new Duration(5, MINUTES);
     private int vacuumServiceThreads = 2;
     private Optional<Duration> vacuumCollectorInterval = Optional.of(new Duration(5, MINUTES));
 
@@ -1660,12 +1660,13 @@ public class HiveConfig
     @ConfigDescription("Interval after which vacuum cleanup task will be resubmitted")
     public HiveConfig setVacuumCleanupRecheckInterval(Duration interval)
     {
-        this.vacuumCleanupRecheckInterval = Optional.ofNullable(interval);
+        this.vacuumCleanupRecheckInterval = interval;
         return this;
     }
 
     @NotNull
-    public Optional<Duration> getVacuumCleanupRecheckInterval()
+    @MinDuration("5m")
+    public Duration getVacuumCleanupRecheckInterval()
     {
         return vacuumCleanupRecheckInterval;
     }

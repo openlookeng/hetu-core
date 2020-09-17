@@ -138,7 +138,7 @@ public class VacuumEligibleTableCollector
                 collectTablesForVacuum();
             }
             catch (Exception e) {
-                log.info("Error while collecting tables for auto-vacuum", e);
+                log.info("Error while collecting tables for auto-vacuum" + e.toString());
             }
         }
 
@@ -153,7 +153,7 @@ public class VacuumEligibleTableCollector
                         scanDatabase(database, taskMetastore);
                     }
                     catch (Exception e) {
-                        log.info("Error while scanning database for vacuum", e);
+                        log.info("Error while scanning database for vacuum" + e.toString());
                     }
                 });
             }
@@ -195,7 +195,7 @@ public class VacuumEligibleTableCollector
                                 }
                             }
                             catch (Exception e) {
-                                log.info("Exception while determining vacuum type for table: " + database + "." + table, e);
+                                log.info("Exception while determining vacuum type for table: " + database + "." + table + ": " + e.toString());
                             }
                         });
                     }

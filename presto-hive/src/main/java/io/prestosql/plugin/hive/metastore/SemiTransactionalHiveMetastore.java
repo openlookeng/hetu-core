@@ -104,7 +104,6 @@ import static io.prestosql.plugin.hive.util.Statistics.ReduceOperator.SUBTRACT;
 import static io.prestosql.plugin.hive.util.Statistics.merge;
 import static io.prestosql.plugin.hive.util.Statistics.reduce;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
-import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.TRANSACTION_CONFLICT;
 import static io.prestosql.spi.security.PrincipalType.USER;
@@ -125,7 +124,7 @@ public class SemiTransactionalHiveMetastore
     private final HdfsEnvironment hdfsEnvironment;
     private final Executor renameExecutor;
     private final ScheduledExecutorService vacuumExecutorService;
-    private final Optional<Duration> configuredVacuumCleanupInterval;
+    private final Duration configuredVacuumCleanupInterval;
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
     private final ScheduledExecutorService heartbeatExecutor;
@@ -167,7 +166,7 @@ public class SemiTransactionalHiveMetastore
             HiveMetastore delegate,
             Executor renameExecutor,
             ScheduledExecutorService vacuumExecutorService,
-            Optional<Duration> vacuumCleanupInterval,
+            Duration vacuumCleanupInterval,
             boolean skipDeletionForAlter,
             boolean skipTargetCleanupOnRollback,
             Optional<Duration> hiveTransactionHeartbeatInterval,
@@ -3145,8 +3144,7 @@ public class SemiTransactionalHiveMetastore
 
     public long getVacuumCleanupInterval()
     {
-        return configuredVacuumCleanupInterval.map(Duration::toMillis)
-                .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Vacuum cleanup interval is not set correctly"));
+        return configuredVacuumCleanupInterval.toMillis();
     }
 
     public ShowLocksResponse showLocks(VacuumTableInfoForCleaner tableInfo)
