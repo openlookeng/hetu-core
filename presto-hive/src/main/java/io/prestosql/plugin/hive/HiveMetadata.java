@@ -2145,7 +2145,18 @@ public class HiveMetadata
         return Optional.of(new ConstraintApplicationResult<>(newHandle, partitionResult.getUnenforcedConstraint()));
     }
 
-    // This should be adjusted as we continue to support additional functionality.
+    /**
+     * This function will be called only user enabled pushdown (i.e. orc_predicate_pushdown_enabled=true).
+     * Then further check if pushdown can be supported by connector. It support iff below all condition satisfies.
+     * 1. Storage Format should be only ORC.
+     * 2. Table to be scanned is not transactional table (so effectively DELETE/UPDATE also not supported).
+     * 3. Also columns part of the scan are of any primitive data-type except byte.
+     * NOTE: This should be adjusted as we continue to support additional functionality.
+     * @param allColumnHandles set of all column handles being part of scan.
+     * @param tableHandle table handle
+     * @param session current session handler
+     * @return return true if current scan can support pushdown otherwise false.
+     */
     protected boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
     {
         // We allow predicate pushdown only for non-transaction table of HIVE ORC storage format.

@@ -80,6 +80,28 @@ public class OrcSelectiveRecordReader
     // flag indicating whether range filter on a constant column is false; no data is read in that case
     private boolean constantFilterIsFalse;
 
+    /**
+     * Create a selective record reader to be used with selective page source.
+     * This reader is different from main reader in terms:
+     * 1. Applied filter on each column during read of each column value.
+     * 2. Matching row position from current column read is passed as input to subsequent column read, so next column
+     *    needs to read only partial data.
+     * 3. If a particular column is involved in only filter (but no projection), then its values not saved.
+     * 4. Finally a Page block is formed only on final matching rows.
+     *
+     * For more details how read logic works, check SelectiveColumnReader.read.
+     * @param outputColumns List of columns which needs to be projected.
+     * @param includedColumns List of columns which are part of scan and all of these needs to be read so we need
+     *                        reader for all these columns.
+     * @param filters   Map of each column index with the corresponding filter.
+     * @param constantValues Constant value corresponding to all prefilled columns (e.g. partition key).
+     * @param predicate This will be used for split filtering.
+     * @param disjuctFilters Filters corresponding to OR clause.
+     * @param useDataCache Enabled/disable use of data cache.
+     * @param coercers Map of coercion function corresponding to column index.
+     * @param missingColumns List of all columns which are not file but part of scan.
+     * @throws OrcCorruptionException
+     */
     public OrcSelectiveRecordReader(
             List<Integer> outputColumns,
             Map<Integer, Type> includedColumns,
@@ -190,6 +212,13 @@ public class OrcSelectiveRecordReader
         return columnFilters != null && !columnFilters.testNull();
     }
 
+    /* Perform ORC read by eliminating non-matching records before forming the data blocks
+     * This is carried out in 3 stages;
+     *  I)   Filter using Conjuncts (AND'd operators)
+     *  II)  Filter using discjuncts (OR'd operators)
+     *  III) Fields without filters
+     *  Finally compose the block/page with the matching records.
+     */
     public Page getNextPage()
             throws IOException
     {
@@ -240,7 +269,13 @@ public class OrcSelectiveRecordReader
             }
         }
 
-        /* perform OR filtering */
+        /* Perform OR filtering:
+         *    OR filtering is applied with 2 level; identify match and exclude.
+         *    -  Identify:  Read all the matching records using the available positions by apply the filter to each
+         *                  row position from Stage-1; and accumulate position in the accumulator.
+         *    - Exclude:    Exclude all records which did not matched in any pass of the filters applied; i.e.
+         *                  accumulator set becomes the final matching row positions.
+         */
         BitSet accumulator = new BitSet();
         if (colReaderWithORFilter.size() > 0 && positionCount > 0) {
             int localPositionCount = positionCount;
@@ -400,6 +435,7 @@ public class OrcSelectiveRecordReader
         remainingColumns.addAll(includedColumns.keySet());
 
         for (int i = 0; i < fieldCount; i++) {
+            // create column reader only for columns which are part of projection and filter.
             if (includedColumns.containsKey(i)) {
                 int columnIndex = i;
                 OrcColumn column = fileColumns.get(columnIndex);

@@ -218,6 +218,16 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             }
         }
 
+        /* Stripe Filtering:
+         *      Stripes in the given spilt are checked using additional metadata like Statistics, Index; whichever
+         *  available and applied to eliminate reading and matching of the stripes which do not contain the data.
+         *  Stats: minmax, null counts etc are applied here to check if any of the predicate conditions match
+         *  Heuristic Index: bitmap,bloom are applied to check and confirm if the stripe has matching records
+         *      as per the predicates; if not then eliminated.
+         *
+         *  Additionally, if BITMAP Index is present; the rows within a given rowGroup matching the Conjunct domains
+         *  are selected and are guaranteed to match the predicate.
+         */
         long totalRowCount = 0;
         long fileRowCount = 0;
         ImmutableList.Builder<StripeInformation> stripes = ImmutableList.builder();

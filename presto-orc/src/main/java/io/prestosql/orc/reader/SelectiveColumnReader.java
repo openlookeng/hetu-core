@@ -26,7 +26,16 @@ public interface SelectiveColumnReader<T>
     /**
      ** Extract values at the specified positions, apply filter and buffer the values that pass
      ** the filter.
-     **
+     ** Each datatype reader logic is as below:
+     *  1. Allocates enough storage to store potential matching position count.
+     *  2. Allocate enough storage to store all matching values.
+     *  3. Allocates enough storage to store null values.
+     *  4. Traverse through all positions in the position array, if there is hollow in position array, then skip
+     *     corresponding number of offset within the column file stream.
+     *  5. Apply filter, if it matches then
+     *      a. Then store the corresponding position in outputPositionCount.
+     *      b. If column is part of projection, then corresponding values also.
+     *  6. Finally return number of matching positionCount to be used by next column reader.
      ** @param positions Monotonically increasing positions to read
      ** @param positionCount Number of valid positions in the positions array; may be less than the
      **                      size of the array
@@ -52,6 +61,17 @@ public interface SelectiveColumnReader<T>
      **/
     Block<T> getBlock(int[] positions, int positionCount);
 
+    /**
+     * Similar to read but it applies OR filter.
+     * @param offset Offset within the row group.
+     * @param positions Monotonically increasing positions to read
+     * @param positionCount Number of valid positions in the positions array; may be less than the
+     *                     size of the array
+     * @param filter      Filter to be applied.
+     * @param accumulator  Used to set bit corresponding to position which matched filter.
+     * @return
+     * @throws IOException
+     */
     default int readOr(int offset, int[] positions, int positionCount, List<TupleDomainFilter> filter, BitSet accumulator)
             throws IOException
     {

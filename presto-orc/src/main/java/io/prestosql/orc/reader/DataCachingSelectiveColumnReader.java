@@ -77,7 +77,10 @@ public class DataCachingSelectiveColumnReader<T>
         if (filter != null) {
             this.positions = new int[positionCount];
 
-            /* traverse block and find matches */
+            /* Traverse block and find matches:
+             *      Filter condition is pushdown to the cached row data block such that only matched positions are
+             *      given to the upper layer
+             */
             this.positionCount = block.filter(positions, positionCount, this.positions, (value) -> delegate.filterTest(filter, value));
             if (this.positionCount != positionCount) {
                 this.positions = Arrays.copyOf(this.positions, this.positionCount); /* since dictionary block uses arr.length */

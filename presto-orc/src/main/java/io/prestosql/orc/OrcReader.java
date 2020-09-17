@@ -311,7 +311,7 @@ public class OrcReader
             DateTimeZone hiveStorageTimeZone,
             AggregatedMemoryContext systemMemoryUsage,
             int initialBatchSize,
-            Function<Exception, RuntimeException> exceptionTransform, //TODO: Revisit below argument for caching and index
+            Function<Exception, RuntimeException> exceptionTransform,
             Optional<List<IndexMetadata>> indexes,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
