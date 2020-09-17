@@ -46,3 +46,36 @@ hetu.multiple-coordinator.enabled=true
 
 - `hetu.multiple-coordinator.enabled`：开启了多协调节点模式。
 - `hetu.embedded-state-store.enabled`：允许此协调节点使用嵌入式状态存储。
+
+## HA及反向代理
+
+要尽可能的显示HA的优势，建议客户端(例如openLooKeng CLI, JDBC等)不直接连接特定的协调节点，而是通过反向代理连接多个协调节点，例如使用负载平衡器或者Kubernetes服务，这样即使某个协调节点无法正常工作，客户端也可以继续使用其它的协调节点。
+
+### 反向代理要求
+
+通过反向代理连接时，要求客户端在执行语句查询期间连接到同一协调器，确保在语句查询运行时客户端和协调器之间保持恒定心跳。这可以通过配置反向代理实现，例如Nginx的`ip_hash`。
+
+### 配置反向代理 (Nginx)
+
+请在Nginx配置文件中包含以下配置（nginx.conf）
+
+```
+http {
+    ...  # 用户自定义配置
+    upstream backend {
+        ip_hash;
+        server <coordinator1_ip>:<coordinator1_port>;
+        server <coordinator2_ip>:<coordinator2_port>;
+        server <coordinator3_ip>:<coordinator3_port>;
+        ...
+    }
+
+    server {
+        ... # 用户自定义配置
+        location / {
+            proxy_pass http://backend;
+            proxy_set_header Host <nginx_ip>:<nginx_port>;
+        }
+    }
+}
+```
