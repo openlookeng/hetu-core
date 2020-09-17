@@ -188,4 +188,12 @@ public class TestMinMaxIndex
         index.addValues(testValues);
         assertThrows(IllegalArgumentException.class, () -> index.matches(1, Operator.NOT_EQUAL));
     }
+
+    @Test
+    public void testMemorySize()
+    {
+        MinMaxIndex index = new MinMaxIndex();
+        index.setMemorySize(10);
+        assertEquals(index.getMemorySize(), 10);
+    }
 }

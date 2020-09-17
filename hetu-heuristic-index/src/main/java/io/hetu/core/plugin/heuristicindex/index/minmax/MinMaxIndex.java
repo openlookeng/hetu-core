@@ -40,6 +40,7 @@ public class MinMaxIndex<T>
 
     private Comparable min;
     private Comparable max;
+    private long memorySize;
 
     /**
      * Default Constructor
@@ -257,5 +258,17 @@ public class MinMaxIndex<T>
     public int hashCode()
     {
         return Objects.hash(min, max);
+    }
+
+    @Override
+    public long getMemorySize()
+    {
+        return this.memorySize;
+    }
+
+    @Override
+    public void setMemorySize(long memorySize)
+    {
+        this.memorySize = memorySize;
     }
 }

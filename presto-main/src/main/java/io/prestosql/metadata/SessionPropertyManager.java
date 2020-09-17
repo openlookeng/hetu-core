@@ -51,6 +51,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
 import static io.prestosql.spi.type.TypeUtils.writeNativeValue;
 import static io.prestosql.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
@@ -356,10 +357,12 @@ public final class SessionPropertyManager
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, hetuConfig.isFilterEnabled());
         if (hetuConfig.isFilterEnabled()) {
-            PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, hetuConfig.getMaxIndicesInCache());
-            PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, hetuConfig.getIndexCacheTTLMinutes());
+            // set the max memory in KB
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY, (long) (hetuConfig.getIndexCacheMaxMemory().getValue(KILOBYTE)));
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, hetuConfig.getIndexCacheTTL());
             PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, hetuConfig.getIndexCacheLoadingDelay());
             PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, hetuConfig.getIndexCacheLoadingThreads());
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE, hetuConfig.isIndexCacheSoftReferenceEnabled());
             PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, hetuConfig.getIndexStoreUri());
             PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, hetuConfig.getIndexStoreFileSystemProfile());
         }

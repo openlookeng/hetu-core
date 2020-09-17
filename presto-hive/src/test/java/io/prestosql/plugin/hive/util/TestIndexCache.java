@@ -16,15 +16,18 @@ package io.prestosql.plugin.hive.util;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.service.PropertyService;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
@@ -33,6 +36,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.prestosql.spi.predicate.Range.range;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static org.mockito.Matchers.any;
@@ -42,82 +46,84 @@ import static org.testng.Assert.assertEquals;
 
 public class TestIndexCache
 {
-    private void setProperties()
+    private final String catalog = "test_catalog";
+    private final String column = "column_name";
+    private final String table = "schema_name.table_name";
+    private final long testLastModifiedTime = 1;
+    private final String testPath = "/user/hive/schema.db/table/001.orc";
+    private final String testPath2 = "/user/hive/schema.db/table/002.orc";
+    private TupleDomain<HiveColumnHandle> effectivePredicate;
+    private TupleDomain<HiveColumnHandle> effectivePredicateForPartition;
+    private HiveColumnHandle partitionColumnHandle;
+    private HiveSplit testHiveSplit;
+    private List<HiveColumnHandle> testPartitions = Collections.emptyList();
+    private final long loadDelay = 1000;
+
+    @BeforeClass
+    public void setupBeforeClass()
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
         PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
-        PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, 10L);
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY, (long) (new DataSize(10, KILOBYTE).getValue(KILOBYTE)));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, new Duration(10, TimeUnit.MINUTES));
-        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(5000, TimeUnit.MILLISECONDS));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(loadDelay, TimeUnit.MILLISECONDS));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE, false);
+
+        Domain domain = Domain.create(ValueSet.ofRanges(range(INTEGER, 0L, true, 100L, true)), false);
+        HiveColumnHandle testColumnHandle = mock(HiveColumnHandle.class);
+        when(testColumnHandle.getName()).thenReturn(column);
+        testHiveSplit = mock(HiveSplit.class);
+        when(testHiveSplit.getPath()).thenReturn(testPath);
+        effectivePredicate = TupleDomain.withColumnDomains(ImmutableMap.of(testColumnHandle, domain));
+
+        partitionColumnHandle = mock(HiveColumnHandle.class);
+        // partition column should be filtered out this should never get called
+        when(partitionColumnHandle.getName()).thenThrow(Exception.class);
+
+        effectivePredicateForPartition = TupleDomain.withColumnDomains(ImmutableMap.of(testColumnHandle, domain,
+                        partitionColumnHandle, domain));
     }
 
     @Test
     public void testIndexCacheGetIndices() throws Exception
     {
-        setProperties();
-
-        String catalog = "test_catalog";
-        String column = "column_name";
-        String table = "schema_name.table_name";
-        long testLastModifiedTime = 1;
-        String testPath = "/user/hive/schema.db/table/001.orc";
-        List<HiveColumnHandle> testPartitions = Collections.emptyList();
-
-        Domain domain = Domain.create(ValueSet.ofRanges(range(INTEGER, 0L, true, 100L, true)), false);
-        HiveColumnHandle testColumnHandle = mock(HiveColumnHandle.class);
-        when(testColumnHandle.getName()).thenReturn(column);
-        HiveSplit testHiveSplit = mock(HiveSplit.class);
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-        when(testHiveSplit.getPath()).thenReturn(testPath);
-        TupleDomain<HiveColumnHandle> effectivePredicate = TupleDomain.withColumnDomains(
-                ImmutableMap.of(testColumnHandle, domain));
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
         IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
         when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
+
         IndexCache indexCache = new IndexCache(indexCacheLoader);
         List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
-        Thread.sleep(5500);
-        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
-                testPartitions);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 1);
     }
 
     @Test
     public void testIndexCacheThrowsExecutionException() throws Exception
     {
-        setProperties();
-
-        String catalog = "test_catalog";
-        String column = "column_name";
-        String table = "schema_name.table_name";
-        long testLastModifiedTime = 1;
-        String testPath = "/user/hive/schema.db/table/001.orc";
-        List<HiveColumnHandle> testPartitions = Collections.emptyList();
-
-        Domain domain = Domain.create(ValueSet.ofRanges(range(INTEGER, 0L, true, 100L, true)), false);
-        HiveColumnHandle testColumnHandle = mock(HiveColumnHandle.class);
-        when(testColumnHandle.getName()).thenReturn(column);
-        HiveSplit testHiveSplit = mock(HiveSplit.class);
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-        when(testHiveSplit.getPath()).thenReturn(testPath);
-        TupleDomain<HiveColumnHandle> effectivePredicate = TupleDomain.withColumnDomains(
-                ImmutableMap.of(testColumnHandle, domain));
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
         IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
         when(indexCacheLoader.load(any())).thenThrow(ExecutionException.class);
 
-        long loadDelay = 1000;
         IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
         List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, testPartitions);
@@ -131,31 +137,18 @@ public class TestIndexCache
     @Test
     public void testExpiredCacheIndices() throws Exception
     {
-        setProperties();
-
-        String catalog = "test_catalog";
-        String column = "column_name";
-        String table = "schema_name.table_name";
-        long testLastModifiedTime = 1;
-        String testPath = "/user/hive/schema.db/table/001.orc";
-        List<HiveColumnHandle> testPartitions = Collections.emptyList();
-
-        Domain domain = Domain.create(ValueSet.ofRanges(range(INTEGER, 0L, true, 100L, true)), false);
-        HiveColumnHandle testColumnHandle = mock(HiveColumnHandle.class);
-        when(testColumnHandle.getName()).thenReturn(column);
-        HiveSplit testHiveSplit = mock(HiveSplit.class);
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-        when(testHiveSplit.getPath()).thenReturn(testPath);
-        TupleDomain<HiveColumnHandle> effectivePredicate = TupleDomain.withColumnDomains(
-                ImmutableMap.of(testColumnHandle, domain));
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
         IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
         when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
-        long loadDelay = 1000;
+
         IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
         List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                 effectivePredicate, testPartitions);
@@ -166,7 +159,7 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.size(), 1);
 
         // now the index is in the cache, but changing the lastmodified date of the split should invalidate it
-        when(testHiveSplit.getLastModifiedTime()).thenReturn(++testLastModifiedTime);
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime + 1);
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
@@ -175,49 +168,82 @@ public class TestIndexCache
     @Test
     public void testIndexCacheIWIthPartitions() throws Exception
     {
-        setProperties();
-
-        String catalog = "test_catalog";
-        String column = "column_name";
-        String table = "schema_name.table_name";
-        long testLastModifiedTime = 1;
-        String testPath = "/user/hive/schema.db/table/001.orc";
-
-        Domain domain = Domain.create(ValueSet.ofRanges(range(INTEGER, 0L, true, 100L, true)), false);
-        HiveColumnHandle indexColumnHandle = mock(HiveColumnHandle.class);
-        when(indexColumnHandle.getName()).thenReturn("indexColumn");
-
-        HiveColumnHandle partitionColumnHandle = mock(HiveColumnHandle.class);
-        // partition column should be filtered out this should never get called
-        when(partitionColumnHandle.getName()).thenThrow(Exception.class);
-
-        List<HiveColumnHandle> partitionColumns = ImmutableList.of(partitionColumnHandle);
-
-        TupleDomain<HiveColumnHandle> effectivePredicate = TupleDomain.withColumnDomains(
-                ImmutableMap.of(indexColumnHandle, domain,
-                        partitionColumnHandle, domain));
-
-        HiveSplit testHiveSplit = mock(HiveSplit.class);
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-        when(testHiveSplit.getPath()).thenReturn(testPath);
+        List<HiveColumnHandle> partitionColumns = ImmutableList.of(partitionColumnHandle);
 
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
         IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
         when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-        long loadDelay = 1000;
         IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
         List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
-                effectivePredicate, partitionColumns);
+                effectivePredicateForPartition, partitionColumns);
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
-        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicateForPartition,
                 partitionColumns);
 
         assertEquals(actualSplitIndex.size(), 1);
+    }
+
+    @Test
+    public void testIndexCacheEviction() throws Exception
+    {
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+
+        //get index for split1
+        List<IndexMetadata> expectedIndices1 = new LinkedList<>();
+        IndexMetadata indexMetadata1 = mock(IndexMetadata.class);
+        when(indexMetadata1.getLastUpdated()).thenReturn(testLastModifiedTime);
+        expectedIndices1.add(indexMetadata1);
+        Index index1 = mock(Index.class);
+        when(indexMetadata1.getIndex()).thenReturn(index1);
+        when(index1.getMemorySize()).thenReturn(new DataSize(5, KILOBYTE).toBytes());
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices1);
+
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
+                effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+                testPartitions);
+        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.get(0), expectedIndices1.get(0));
+        assertEquals(indexCache.getCacheSize(), 1);
+
+        //get index for split2
+        when(testHiveSplit.getPath()).thenReturn(testPath2);
+        List<IndexMetadata> expectedIndices2 = new LinkedList<>();
+        IndexMetadata indexMetadata2 = mock(IndexMetadata.class);
+        when(indexMetadata2.getLastUpdated()).thenReturn(testLastModifiedTime);
+        expectedIndices2.add(indexMetadata2);
+        Index index2 = mock(Index.class);
+        when(indexMetadata2.getIndex()).thenReturn(index2);
+        when(index2.getMemorySize()).thenReturn(new DataSize(8, KILOBYTE).toBytes());
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices2);
+
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        assertEquals(indexCache.getCacheSize(), 1);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.get(0), expectedIndices2.get(0));
+        assertEquals(indexCache.getCacheSize(), 1);
+
+        // get index for split1
+        when(testHiveSplit.getPath()).thenReturn(testPath);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        assertEquals(indexCache.getCacheSize(), 1);
     }
 }

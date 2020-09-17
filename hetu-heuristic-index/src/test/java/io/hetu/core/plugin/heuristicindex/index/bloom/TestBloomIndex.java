@@ -227,4 +227,12 @@ public class TestBloomIndex
         assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
         smallSizedIndex.addValues(new Float[]{1f, 2f, 3f});
     }
+
+    @Test
+    public void testMemorySize()
+    {
+        BloomIndex index = new BloomIndex();
+        index.setMemorySize(10);
+        assertEquals(index.getMemorySize(), 10);
+    }
 }

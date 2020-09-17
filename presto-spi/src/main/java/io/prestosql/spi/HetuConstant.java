@@ -23,10 +23,11 @@ public class HetuConstant
     private HetuConstant() {}
 
     public static final String FILTER_ENABLED = "hetu.heuristicindex.filter.enabled";
-    public static final String FILTER_MAX_INDICES_IN_CACHE = "hetu.heuristicindex.filter.cache.max-indices-number";
+    public static final String FILTER_CACHE_MAX_MEMORY = "hetu.heuristicindex.filter.cache.max-memory";
     public static final String FILTER_CACHE_LOADING_THREADS = "hetu.heuristicindex.filter.cache.loading-threads";
     public static final String FILTER_CACHE_LOADING_DELAY = "hetu.heuristicindex.filter.cache.loading-delay";
     public static final String FILTER_CACHE_TTL = "hetu.heuristicindex.filter.cache.ttl";
+    public static final String FILTER_CACHE_SOFT_REFERENCE = "hetu.heuristicindex.filter.cache.soft-reference";
     public static final String INDEXSTORE_URI = "hetu.heuristicindex.indexstore.uri";
     public static final String INDEXSTORE_FILESYSTEM_PROFILE = "hetu.heuristicindex.indexstore.filesystem.profile";
     public static final String DATA_CENTER_CONNECTOR_NAME = "dc";
@@ -36,4 +37,5 @@ public class HetuConstant
     public static final String SPLIT_CACHE_MAP_ENABLED = "hetu.split-cache-map.enabled";
     public static final String SPLIT_CACHE_STATE_UPDATE_INTERVAL = "hetu.split-cache-map.state-update-interval";
     public static final String ENCRYPTED_PROPERTIES = "encrypted-properties";
+    public static final long KILOBYTE = 1024L;
 }

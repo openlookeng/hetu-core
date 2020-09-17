@@ -434,17 +434,26 @@ Heuristic index is external index module that which can be used to filter to out
 >
 > This property enables heuristic index. There is also a session property `heuristicindex_filter_enabled` which can be set per session. Note: the session property should ONLY be used to turn on and off index filtering temporarily when this global property in config file is set as `true`. The session property CANNOT be used to turn on index filter when it's not enabled globally.
  
-### `hetu.heuristicindex.filter.cache.max-indices-number`
+### `hetu.heuristicindex.filter.cache.max-memory`
  
-> -   **Type:** `integer`
-> -   **Default value:** `10,000,000`
+> -   **Type:** `data size`
+> -   **Default value:** `1GB`
 >
-> Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from index store. Cache in part of This property controls maximum number of index files that can be cached. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
+> Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from indexstore. This property controls the maximum memory used by the index cache. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
+
+### `hetu.heuristicindex.filter.cache.soft-reference`
+ 
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Caching the index files provides better performance, however it utilizes memory. Enabling this property allows the Garbage Collector to remove entries from the cache if memory is running low.
+>
+> Be aware that this is an experimental feature and should be used with care.
 
 ### `hetu.heuristicindex.filter.cache.ttl`
  
 > -   **Type:** `Duration`
-> -   **Default value:** `10m`
+> -   **Default value:** `1h`
 >
 > The time period after which index cache expires.
 
@@ -458,7 +467,7 @@ Heuristic index is external index module that which can be used to filter to out
 ### `hetu.heuristicindex.filter.cache.loading-delay`
  
 > -   **Type:** `Duration`
-> -   **Default value:** `5000ms`
+> -   **Default value:** `10s`
 >
 > The delay to wait before async loading task starts to load index cache from indexstore.
  
