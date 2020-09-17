@@ -141,6 +141,7 @@ public class HivePageSourceProvider
                     .getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
                     hiveTable.getPartitionColumns()));
 
+            /* Bloom/Bitmap indices are checked for given table and added to the possible matchers for pushdown. */
             if (hiveTable.getDisjunctCompactEffectivePredicate().isPresent() && hiveTable.getDisjunctCompactEffectivePredicate().get().size() > 0) {
                 hiveTable.getDisjunctCompactEffectivePredicate().get().forEach(orPredicate ->
                         indexes.addAll(this.indexCache.getIndices(session
@@ -152,6 +153,12 @@ public class HivePageSourceProvider
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
+        /**
+         * This is main logical division point to process filter pushdown enabled case (aka as selective read flow).
+         * If user configuration orc_predicate_pushdown_enabled is true and if all clause of query can be handled by hive
+         * selective read flow, then hiveTable.isSuitableToPush() will be enabled.
+         * (Refer HiveMetadata.checkIfSuitableToPush).
+         */
         if (hiveTable.isSuitableToPush()) {
             return createSelectivePageSource(selectivePageSourceFactories, configuration,
                     session, hiveSplit, assignUniqueIndicesToPartitionColumns(hiveColumns), hiveStorageTimeZone, typeManager,
@@ -195,6 +202,11 @@ public class HivePageSourceProvider
         throw new RuntimeException("Could not find a file reader for split " + hiveSplit);
     }
 
+    /**
+     * All partition columns have index as -1, since we are making map of this, we need to assign an unique index.
+     * @param columns List of partition columns
+     * @return Modified list of columns with unique index.
+     */
     private static List<HiveColumnHandle> assignUniqueIndicesToPartitionColumns(List<HiveColumnHandle> columns)
     {
         // Gives a distinct hiveColumnIndex to partitioning columns. Columns are identified by these indices in the rest of the
@@ -212,6 +224,21 @@ public class HivePageSourceProvider
         return newColumns.build();
     }
 
+    /**
+     * Create selective page source, which will be used for selective reader flow.
+     * Unlike normal page source, selective page source required to pass below additional details to reader
+     * a. Pre-filled values of all constant.
+     * b. Coercion information of all columns.
+     * c. Columns which required to be projected.
+     * d. Total list of columns which will be read (projection + filter).
+     * All these info gets used by reader.
+     * @param columns List of all columns being part of scan.
+     * @param effectivePredicate Predicates related to AND clause
+     * @param predicateColumns Map of all columns handles being part of predicate
+     * @param additionPredicates Predicates related to OR clause.
+     * Remaining columns are same as for createHivePageSource.
+     * @return
+     */
     private static ConnectorPageSource createSelectivePageSource(
             Set<HiveSelectivePageSourceFactory> selectivePageSourceFactories,
             Configuration configuration,
@@ -251,10 +278,14 @@ public class HivePageSourceProvider
         Optional<BucketAdaptation> bucketAdaptation = toBucketAdaptation(bucketConversion, regularAndInterimColumnMappings, bucketNumber);
         checkArgument(!bucketAdaptation.isPresent(), "Bucket conversion is not yet supported");
 
+        // Make a list of all PREFILLED columns, which can be passed to reader. Unlike normal flow, selective read
+        // flow require to pass this below at reader level as we need to make block of all column values.
         Map<Integer, String> prefilledValues = columnMappings.stream()
                 .filter(mapping -> mapping.getKind() == ColumnMappingKind.PREFILLED)
                 .collect(toImmutableMap(mapping -> mapping.getHiveColumnHandle().getHiveColumnIndex(), ColumnMapping::getPrefilledValue));
 
+        // Make a map of column required to be coerced. This also needs to be sent to reader level as coercion
+        // should be applied before adding values in block.
         Map<Integer, HiveCoercer> coercers = columnMappings.stream()
                 .filter(mapping -> mapping.getCoercionFrom().isPresent())
                 .collect(toImmutableMap(

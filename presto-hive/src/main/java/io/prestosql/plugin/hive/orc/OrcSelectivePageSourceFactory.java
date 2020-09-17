@@ -437,7 +437,7 @@ public class OrcSelectivePageSourceFactory
 
                     Domain domain = effectivePredicateDomains.get(column);
                     if (domain != null) {
-                        predicateBuilder.addColumn(orcColumn.getColumnId(), domain); //TODO: Rajeev: need to see if this index is 0-based or 1-based.
+                        predicateBuilder.addColumn(orcColumn.getColumnId(), domain);
                     }
 
                     domain = disjunctPredicateDomains.get(column);
@@ -465,6 +465,8 @@ public class OrcSelectivePageSourceFactory
                 }
             }
 
+            // missingColumns are list of columns which are not part of file but being part of projection.
+            // This happens if a table was altered to add more columns.
             predicateBuilder.setMissingColumns(missingColumns);
             Map<Integer, Type> columnTypes = columns.stream()
                     .collect(toImmutableMap(HiveColumnHandle::getHiveColumnIndex, column -> typeManager.getType(column.getTypeSignature())));
