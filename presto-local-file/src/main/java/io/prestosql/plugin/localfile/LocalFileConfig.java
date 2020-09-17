@@ -32,6 +32,8 @@ public class LocalFileConfig
         return maxLogItemsLimit;
     }
 
+    @Config("presto-logs.http-request-log.location")
+    @ConfigDescription("Directory or file where http request logs are written")
     public LocalFileConfig setHttpRequestLogLocation(String httpRequestLogLocation)
     {
         this.httpRequestLogLocation = httpRequestLogLocation;
