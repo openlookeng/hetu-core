@@ -36,7 +36,6 @@ public class TestIndexCacheLoader
     private void setProperties()
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
-        PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, 10L);
     }
 
     @Test(expectedExceptions = Exception.class)

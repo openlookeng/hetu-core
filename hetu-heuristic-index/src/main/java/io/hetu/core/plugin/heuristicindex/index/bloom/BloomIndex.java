@@ -51,6 +51,7 @@ public class BloomIndex<T>
     private BloomFilter<String> filter;
     private double fpp = DEFAULT_FPP;
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
+    private long memorySize;
 
     @Override
     public String getId()
@@ -216,5 +217,17 @@ public class BloomIndex<T>
     private String rangeValueToString(Object object, Class<?> javaType)
     {
         return javaType == Slice.class ? ((Slice) object).toStringUtf8() : object.toString();
+    }
+
+    @Override
+    public long getMemorySize()
+    {
+        return this.memorySize;
+    }
+
+    @Override
+    public void setMemorySize(long memorySize)
+    {
+        this.memorySize = memorySize;
     }
 }

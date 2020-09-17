@@ -51,7 +51,6 @@ public class TestSplitUtils
     public void testGetFilteredSplit()
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
-        PropertyService.setProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE, Long.valueOf(100));
         PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, "/tmp/hetu/indices");
         PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, new Duration(10, TimeUnit.MINUTES));

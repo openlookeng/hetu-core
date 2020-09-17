@@ -328,4 +328,12 @@ public class TestBitMapIndex
             return Float.floatToRawIntBits(floatValue);
         }).toArray());
     }
+
+    @Test
+    public void testMemorySize()
+    {
+        BitMapIndex index = new BitMapIndex();
+        index.setMemorySize(10);
+        assertEquals(index.getMemorySize(), 10);
+    }
 }

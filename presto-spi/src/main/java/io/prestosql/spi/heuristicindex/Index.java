@@ -167,4 +167,35 @@ public interface Index<T>
     int getExpectedNumOfEntries();
 
     void setExpectedNumOfEntries(int expectedNumOfEntries);
+
+    /**
+     * <pre>
+     * Returns the memorySize of the Index.
+     *
+     * The memorySize may be used to estimate the memory usage for index.
+     * Index cache can evict entries according to all indices memory size.
+     * The unit is Byte.
+     * </pre>
+     *
+     * @return long returns memorySize of the index
+     */
+    default long getMemorySize()
+    {
+        return 0;
+    }
+
+    /**
+     * <pre>
+     * Sets the memorySize of the Index.
+     *
+     * The memorySize may be used to estimate the memory usage for index.
+     * Index cache can evict entries according to all indices memory size.
+     * The unit is Byte.
+     * </pre>
+     *
+     * @param memorySize Properties being set
+     */
+    default void setMemorySize(long memorySize)
+    {
+    }
 }

@@ -16,11 +16,14 @@ package io.prestosql.utils;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
+import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import org.testng.annotations.Test;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 
 public class TestHetuConfig
 {
@@ -31,10 +34,11 @@ public class TestHetuConfig
                 .setFilterEnabled(false)
                 .setIndexStoreUri("/opt/hetu/indices/")
                 .setIndexStoreFileSystemProfile("local-config-default")
-                .setMaxIndicesInCache(10000000L)
-                .setIndexCacheTTLMinutes(new Duration(10, TimeUnit.MINUTES))
+                .setIndexCacheMaxMemory(new DataSize(1, GIGABYTE))
+                .setIndexCacheTTL(new Duration(1, TimeUnit.HOURS))
                 .setIndexCacheLoadingThreads(2L)
-                .setIndexCacheLoadingDelay(new Duration(5000, TimeUnit.MILLISECONDS))
+                .setIndexCacheLoadingDelay(new Duration(10, TimeUnit.SECONDS))
+                .setIndexCacheSoftReferenceEnabled(false)
                 .setExecutionPlanCacheEnabled(false)
                 .setExecutionPlanCacheTimeout(60000L)
                 .setExecutionPlanCacheMaxItems(1000L)
@@ -58,10 +62,11 @@ public class TestHetuConfig
                 .put("hetu.heuristicindex.filter.enabled", "true")
                 .put("hetu.heuristicindex.indexstore.uri", "/tmp")
                 .put("hetu.heuristicindex.indexstore.filesystem.profile", "index-test")
-                .put("hetu.heuristicindex.filter.cache.max-indices-number", "10")
+                .put("hetu.heuristicindex.filter.cache.max-memory", "2GB")
                 .put("hetu.heuristicindex.filter.cache.loading-threads", "5")
                 .put("hetu.heuristicindex.filter.cache.loading-delay", "1000ms")
                 .put("hetu.heuristicindex.filter.cache.ttl", "20m")
+                .put("hetu.heuristicindex.filter.cache.soft-reference", "true")
                 .put("hetu.executionplan.cache.enabled", "true")
                 .put("hetu.executionplan.cache.timeout", "6000")
                 .put("hetu.executionplan.cache.limit", "10000")
@@ -82,10 +87,11 @@ public class TestHetuConfig
                 .setFilterEnabled(true)
                 .setIndexStoreUri("/tmp")
                 .setIndexStoreFileSystemProfile("index-test")
-                .setMaxIndicesInCache(10L)
-                .setIndexCacheTTLMinutes(new Duration(20, TimeUnit.MINUTES))
+                .setIndexCacheMaxMemory(new DataSize(2, GIGABYTE))
+                .setIndexCacheTTL(new Duration(20, TimeUnit.MINUTES))
                 .setIndexCacheLoadingThreads(5L)
                 .setIndexCacheLoadingDelay(new Duration(1000, TimeUnit.MILLISECONDS))
+                .setIndexCacheSoftReferenceEnabled(true)
                 .setExecutionPlanCacheEnabled(true)
                 .setExecutionPlanCacheTimeout(6000L)
                 .setExecutionPlanCacheMaxItems(10000L)

@@ -16,6 +16,7 @@ package io.prestosql.utils;
 
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
+import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 import io.prestosql.spi.HetuConstant;
@@ -23,6 +24,8 @@ import io.prestosql.spi.HetuConstant;
 import javax.validation.constraints.NotNull;
 
 import java.util.concurrent.TimeUnit;
+
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 
 /**
  * HetuConfig contains Hetu configurations
@@ -32,10 +35,11 @@ import java.util.concurrent.TimeUnit;
 public class HetuConfig
 {
     private Boolean enableFilter = Boolean.FALSE;
-    private long maxIndicesInCache = 10000000L;
+    private DataSize indexCacheMaxMemory = new DataSize(1, GIGABYTE);
     private long indexCacheLoadingThreads = 2L;
-    private Duration indexCacheLoadingDelay = new Duration(5000, TimeUnit.MILLISECONDS);
-    private Duration indexCacheTTLMinutes = new Duration(10, TimeUnit.MINUTES);
+    private Duration indexCacheLoadingDelay = new Duration(10, TimeUnit.SECONDS);
+    private Duration indexCacheTTL = new Duration(1, TimeUnit.HOURS);
+    private Boolean indexCacheSoftReference = Boolean.FALSE;
     private String indexStoreUri = "/opt/hetu/indices/";
     private String indexStoreFileSystemProfile = "local-config-default";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
@@ -99,16 +103,16 @@ public class HetuConfig
         return this;
     }
 
-    public Duration getIndexCacheTTLMinutes()
+    public Duration getIndexCacheTTL()
     {
-        return this.indexCacheTTLMinutes;
+        return this.indexCacheTTL;
     }
 
     @Config(HetuConstant.FILTER_CACHE_TTL)
     @ConfigDescription("The duration after which index cache expires")
-    public HetuConfig setIndexCacheTTLMinutes(Duration indexCacheTTLMinutes)
+    public HetuConfig setIndexCacheTTL(Duration indexCacheTTL)
     {
-        this.indexCacheTTLMinutes = indexCacheTTLMinutes;
+        this.indexCacheTTL = indexCacheTTL;
         return this;
     }
 
@@ -138,16 +142,30 @@ public class HetuConfig
         return this;
     }
 
-    public long getMaxIndicesInCache()
+    public DataSize getIndexCacheMaxMemory()
     {
-        return this.maxIndicesInCache;
+        return this.indexCacheMaxMemory;
     }
 
-    @Config(HetuConstant.FILTER_MAX_INDICES_IN_CACHE)
-    @ConfigDescription("The maximum number of indices that could be loaded into cache before eviction happens")
-    public HetuConfig setMaxIndicesInCache(long maxIndicesInCache)
+    @Config(HetuConstant.FILTER_CACHE_MAX_MEMORY)
+    @ConfigDescription("The maximum memory size of indices cache")
+    public HetuConfig setIndexCacheMaxMemory(DataSize indexCacheMaxMemory)
     {
-        this.maxIndicesInCache = maxIndicesInCache;
+        this.indexCacheMaxMemory = indexCacheMaxMemory;
+        return this;
+    }
+
+    public Boolean isIndexCacheSoftReferenceEnabled()
+    {
+        return this.indexCacheSoftReference;
+    }
+
+    @Config(HetuConstant.FILTER_CACHE_SOFT_REFERENCE)
+    @ConfigDescription("Experimental: Enabling index cache soft reference allows the Garbage Collector to" +
+            " remove entries from the cache if memory is low")
+    public HetuConfig setIndexCacheSoftReferenceEnabled(Boolean indexCacheSoftReference)
+    {
+        this.indexCacheSoftReference = indexCacheSoftReference;
         return this;
     }
 

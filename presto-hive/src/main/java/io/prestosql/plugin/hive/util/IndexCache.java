@@ -14,9 +14,11 @@
  */
 package io.prestosql.plugin.hive.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Weigher;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -40,6 +42,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import static io.prestosql.spi.HetuConstant.KILOBYTE;
+
 public class IndexCache
 {
     private static final Logger LOG = Logger.get(IndexCache.class);
@@ -58,10 +62,22 @@ public class IndexCache
             loadDelay = PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY).toMillis();
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
             executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
-            cache = CacheBuilder.newBuilder()
+            CacheBuilder cacheBuilder = CacheBuilder.newBuilder()
                     .expireAfterWrite(PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_TTL).toMillis(), TimeUnit.MILLISECONDS)
-                    .maximumSize(PropertyService.getLongProperty(HetuConstant.FILTER_MAX_INDICES_IN_CACHE))
-                    .build(loader);
+                    .maximumWeight(PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY))
+                    .weigher((Weigher<IndexCacheKey, List<IndexMetadata>>) (indexCacheKey, indices) -> {
+                        int memorySize = 0;
+                        for (IndexMetadata indexMetadata : indices) {
+                            // HetuConstant.FILTER_CACHE_MAX_MEMORY is set in KBs
+                            // convert index size to KB
+                            memorySize += (indexMetadata.getIndex().getMemorySize() / KILOBYTE);
+                        }
+                        return memorySize;
+                    });
+            if (PropertyService.getBooleanProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE)) {
+                cacheBuilder.softValues();
+            }
+            cache = cacheBuilder.build(loader);
         }
     }
 
@@ -141,5 +157,11 @@ public class IndexCache
                     });
 
         return splitIndexes;
+    }
+
+    @VisibleForTesting
+    protected long getCacheSize()
+    {
+        return cache.size();
     }
 }

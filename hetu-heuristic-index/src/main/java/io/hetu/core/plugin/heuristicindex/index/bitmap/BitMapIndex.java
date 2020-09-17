@@ -142,6 +142,7 @@ public class BitMapIndex<T>
 
     private AtomicLong rows = new AtomicLong();
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
+    private long memorySize;
 
     public BitMapIndex()
     {
@@ -592,5 +593,17 @@ public class BitMapIndex<T>
     QueryableIndex getQueryableIndex()
     {
         return this.queryableIndex;
+    }
+
+    @Override
+    public long getMemorySize()
+    {
+        return this.memorySize;
+    }
+
+    @Override
+    public void setMemorySize(long memorySize)
+    {
+        this.memorySize = memorySize;
     }
 }

@@ -17,6 +17,7 @@ package io.hetu.core.heuristicindex;
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
+import io.hetu.core.filesystem.SupportedFileAttributes;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.filesystem.FileBasedLock;
@@ -272,6 +273,12 @@ public class HeuristicIndexClient
                                 index.load(is);
                             }
                             LOG.debug("Loaded {} index from {}.", index.getId(), child);
+
+                            Object fileSize = LOCAL_FS_CLIENT.getAttribute(child, SupportedFileAttributes.SIZE);
+                            if (fileSize instanceof Long) {
+                                index.setMemorySize((long) fileSize);
+                            }
+
                             if (localTmpDir != null) {
                                 // remove the temp folder path at the beginning
                                 result.put(child.toString().replaceAll(localTmpDir.toString(), ""), index);
