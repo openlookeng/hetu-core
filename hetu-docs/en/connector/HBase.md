@@ -6,9 +6,9 @@
 
 The HBase Connector allows querying and creating tables on an external Apache HBase instance. Users can create a table in HBase connector, mapping it to an existing table in HBase Cluster, and support insert, select, or delete.
 
-The HBase Connector maintains a Metastore to persist HBase metadata, currently only following storage format are supported as Metastore: `Local File System`,  `Hadoop Distributed File System (HDFS)`, and `openLooKeng Metastore`.
+The HBase Connector maintains a Metastore to persist HBase metadata, currently support Metastore: `openLooKeng Metastore`.
 
-**Note:** *Apache HBase 1.3.1 version is supported by HBase connector*
+**Note:** *We use Apache HBase 2.2.3 version in HBase connector*
 
 
 
@@ -23,34 +23,12 @@ hbase.zookeeper.quorum=xxx.xxx.xxx.xxx,xxx.xxx.xxx.xxx
 
 hbase.zookeeper.property.clientPort=xxxx
 
-hbase.metastore.type=local
-
-hbase.metastore.uri=/xxx/hbasemetastore.ini
+hbase.metastore.type=hetuMetastore
 ```
 
 For the value of `hbase.zookeeper.quorum`, please use comma (`,`) as the delimiter if it has multiple ip addresses. 
 
 **Note**
-
-If you are using `Local File System`,  `HDFS` as Metastore, you need to create an empty file , such as `hbasemetastore.ini`. 
-
-
-
-**Use HDFS to store HBase metadata**
-
-You need to add below properties:
-
-```properties
-hbase.core.site.path=/xxx/core-site.xml
-
-hbase.hdfs.site.path=/xxx/hdfs-site.xml
-
-hbase.metastore.type=hdfs
-
-hbase.metastore.uri=hdfs://xxx.xxx.xxx.xxx:21088/xxx/hbasemetastore.ini
-```
-
-
 
 **Use openLooKeng Metastore to store HBase metadata**
 
@@ -59,26 +37,6 @@ You have to create `etc/hetu-metastore.properties` to connect database. For the 
 ```properties
 hbase.metastore.type=hetuMetastore
 ```
-
-
-
-**Kerberos Configuration:**
-
-```properties
-hbase.jaas.conf.path=/xxx/jaas.conf
-
-hbase.hbase.site.path=/xxx/hbase-site.xml
-
-hbase.krb5.conf.path=/xxx/krb5.conf
-
-hbase.kerberos.keytab=/xxx/user.keytab
-
-hbase.kerberos.principal=xxx
-
-hbase.authentication.type=KERBEROS
-```
-
-
 
 ## Configuration Properties
 
@@ -90,17 +48,7 @@ hbase.authentication.type=KERBEROS
 | hbase.client.pause.time             | 100           | No       | HBase client disconnect time                                 |
 | hbase.rpc.protection.enable         | false         | No       | Communication privacy protection. You can get this from `hbase-site.xml`. |
 | hbase.default.value                 | NULL          | No       | The default value of data in table                           |
-| hbase.metastore.type                | local         | No       | The storage of hbase metadata, you can choose one of `local/hdfs/hetuMetastore` |
-| hbase.metastore.uri                 | (none)        | Yes      | File path for storing hbase metadata                         |
-| hbase.core.site.path                | (none)        | No       | Configuration file for connecting hdfs                       |
-| hbase.hdfs.site.path                | (none)        | No       | Configuration file for connecting hdfs                       |
-| hbase.authentication.type           | (none)        | No       | Access security authentication mode of hdfs/hbase component  |
-| hbase.kerberos.principal            | (none)        | No       | User name for security authentication                        |
-| hbase.kerberos.keytab               | (none)        | No       | Key for security authentication                              |
-| hbase.hbase.site.path               | (none)        | No       | Configuration used to connect to a secure hbase cluster      |
-| hbase.jaas.conf.path                | (none)        | No       | Jaas for security authentication                             |
-| hbase.krb5.conf.path                | (none)        | No       | Krb5 for security authentication                             |
-
+| hbase.metastore.type                | hetuMetastore | No       | The storage of hbase metadata, you can choose `hetuMetastore` |
 
 
 ## Table Properties

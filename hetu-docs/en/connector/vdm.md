@@ -23,6 +23,12 @@ hetu.metastore.db.user=root
 hetu.metastore.db.password=123456
 ```
 * Here is an example of using HDFS as metastore，create `etc/hetu-metastore.properties`：
+
+    Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
+    
+    Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is node.data_dir;
+    otherwise, the current workspace is the parent directory of openlookeng server's bin directory.
+
 ```
 # the type of metastore storage
 hetu.metastore.type=hetufilesystem
