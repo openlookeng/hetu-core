@@ -18,6 +18,7 @@ package io.prestosql.catalog;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
+import com.google.inject.Key;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -33,6 +34,7 @@ import java.util.List;
 import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static javax.ws.rs.core.Response.Status.CREATED;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestCatalogResource
@@ -41,6 +43,15 @@ public class TestCatalogResource
     public TestCatalogResource()
             throws Exception
     {
+    }
+
+    @Test
+    public void testCheckFileName()
+    {
+        CatalogResource resource = server.getInstance(Key.get(CatalogResource.class));
+        assertTrue(resource.checkFileName("keystore.jks"));
+        assertFalse(resource.checkFileName("/dir/keystore.jks"));
+        assertFalse(resource.checkFileName("keystore.exe"));
     }
 
     @Test

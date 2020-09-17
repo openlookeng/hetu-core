@@ -100,6 +100,7 @@ public class TestDynamicCatalogRunner
                 .put("catalog.dynamic-enabled", "true")
                 .put("catalog.config-dir", localPath)
                 .put("catalog.share.config-dir", sharePath)
+                .put("catalog.valid-file-suffixes", "jks,keytab,conf,xml")
                 .put("security.key.manager-type", "keystore")
                 .put("security.key.keystore-password", "password")
                 .put("security.key.store-file-path", storePath)
@@ -146,7 +147,7 @@ public class TestDynamicCatalogRunner
             multipartEntity.addPart("globalConfigurationFiles", propertiesFile);
         });
 
-        CatalogInfo catalogInfo = new CatalogInfo(catalogName, connectorName, "", "admin", 0, UUID.randomUUID().toString(), properties);
+        CatalogInfo catalogInfo = new CatalogInfo(catalogName, connectorName, "", 0, UUID.randomUUID().toString(), properties);
         StringBody catalogInfoBody = new StringBody(CATALOG_INFO_CODEC.toJson(catalogInfo));
         multipartEntity.addPart("catalogInformation", catalogInfoBody);
 

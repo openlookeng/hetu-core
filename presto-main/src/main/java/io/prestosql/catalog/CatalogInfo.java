@@ -33,24 +33,21 @@ public class CatalogInfo
     private String catalogName; // data source instance name
     private String connectorName; // data source type,for example:mysql,oracle
     private String securityKey;  // the key to decrypt the encrypted property
-    private String submitter;
     private String version;
     private long createdTime;
 
     @JsonCreator
     public CatalogInfo(
-            @JsonProperty("catalogName") String catalogName,
-            @JsonProperty("connectorName") String connectorName,
-            @JsonProperty("securityKey") String securityKey,
-            @JsonProperty("submitter") String submitter,
-            @JsonProperty("createdTime") long createdTime,
-            @JsonProperty("version") String version,
-            @JsonProperty("properties") Map<String, String> properties)
+            String catalogName,
+            String connectorName,
+            String securityKey,
+            long createdTime,
+            String version,
+            Map<String, String> properties)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.connectorName = requireNonNull(connectorName, "connectorName is null");
         this.securityKey = securityKey;
-        this.submitter = submitter;
         this.createdTime = createdTime;
         this.version = version == null || version.isEmpty() ? UUID.randomUUID().toString() : version;
         this.properties = properties == null ? ImmutableMap.of() : properties;
@@ -74,23 +71,11 @@ public class CatalogInfo
     }
 
     @JsonProperty
-    public String getSubmitter()
-    {
-        return submitter;
-    }
-
-    public void setSubmitter(String submitter)
-    {
-        this.submitter = submitter;
-    }
-
-    @JsonProperty
     public long getCreatedTime()
     {
         return createdTime;
     }
 
-    @JsonProperty
     public String getVersion()
     {
         return version;
@@ -138,13 +123,12 @@ public class CatalogInfo
                 version == that.version &&
                 properties.equals(that.properties) &&
                 catalogName.equals(that.catalogName) &&
-                connectorName.equals(that.connectorName) &&
-                submitter.equals(that.submitter);
+                connectorName.equals(that.connectorName);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(properties, catalogName, connectorName, submitter, createdTime, version);
+        return Objects.hash(properties, catalogName, connectorName, createdTime, version);
     }
 }

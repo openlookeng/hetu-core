@@ -116,6 +116,7 @@ In `etc/config.properties`:
 | `catalog.dynamic-enabled`  | NO        | Whether to enable dynamic catalog                         | false         |
 | `catalog.scanner-interval` | NO        | Interval for scanning catalogs in the shared file system. | 5s            |
 | `catalog.max-file-size`    | NO        | Maximum catalog file size                                 | 128k          |
+| `catalog.valid-file-suffixes`    | NO        |The valid suffixes of catalog config file, if there are several suffixes, separated by commas. Allow all file suffixes when it is empty|           |
 
 In `etc/node.properties`:
 
