@@ -503,7 +503,7 @@ public class BitMapIndex<T>
         // first create the header line
         // this will contain the names and sizes for all the files being written to the stream
         StringBuilder header = new StringBuilder();
-        for (int i = 0; i < files.length; i++) {
+        for (int i = 0; files != null && i < files.length; i++) {
             File file = files[i];
             header.append(file.getName())
                     .append(HEADER_FILE_INFO_PROPERTY_SEPARATOR)

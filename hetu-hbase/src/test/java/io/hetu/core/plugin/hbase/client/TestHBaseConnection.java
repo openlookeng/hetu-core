@@ -14,24 +14,40 @@
  */
 package io.hetu.core.plugin.hbase.client;
 
+import io.hetu.core.plugin.hbase.utils.TestSliceUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.BufferedMutatorParams;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionConfiguration;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.RpcRetryingCallerFactory;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.TableBuilder;
 import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static org.testng.Assert.assertEquals;
 
 /**
  * TestHBaseConnection
@@ -46,6 +62,16 @@ public class TestHBaseConnection
      */
     public static ClusterConnection connection;
 
+    /**
+     * mockito hbase admin
+     */
+    public static HBaseAdmin admin;
+
+    /**
+     * mockito hbase admin
+     */
+    public static Table htable;
+
     static {
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.client.retries.number", "1");
@@ -58,6 +84,46 @@ public class TestHBaseConnection
         RpcRetryingCallerFactory callerFactory = new RpcRetryingCallerFactory(conf);
         Mockito.when(connection.getRpcRetryingCallerFactory()).thenReturn(callerFactory);
         Mockito.when(connection.getNewRpcRetryingCallerFactory(conf)).thenReturn(callerFactory);
+
+        admin = Mockito.mock(HBaseAdmin.class);
+        try {
+            Mockito.when(admin.listNamespaceDescriptors()).thenReturn(listNamespaceDescriptors());
+            Mockito.when(admin.getTableDescriptor(Mockito.any())).thenAnswer(
+                    new Answer() {
+                        @Override
+                        public Object answer(InvocationOnMock invocationOnMock) throws Throwable
+                        {
+                            TableName arg = (TableName) invocationOnMock.getArguments()[0];
+                            return getTableDescriptor(arg);
+                        }
+                    });
+            Mockito.when(admin.listNamespaceDescriptors()).thenReturn(listNamespaceDescriptors());
+            Mockito.when(admin.listTableDescriptorsByNamespace(Mockito.anyString())).thenAnswer(
+                    new Answer() {
+                        @Override
+                        public Object answer(InvocationOnMock invocationOnMock) throws Throwable
+                        {
+                            String arg = (String) invocationOnMock.getArguments()[0];
+                            return listTableDescriptorsByNamespace(arg);
+                        }
+                    });
+            Mockito.when(admin.listNamespaceDescriptors()).thenReturn(listNamespaceDescriptors());
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        htable = Mockito.mock(Table.class);
+        try {
+            Mockito.doAnswer((Answer) invocation -> {
+                List<Put> arg = (List<Put>) invocation.getArguments()[0];
+                put(arg);
+                return null;
+            }).when(htable).put(Mockito.anyListOf(Put.class));
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -91,10 +157,98 @@ public class TestHBaseConnection
     }
 
     @Override
-    public Admin getAdmin()
+    public void clearRegionLocationCache()
+    {
+        // do nothing
+    }
+
+    @Override
+    public HBaseAdmin getAdmin()
             throws IOException
     {
-        return new TestHBaseAdmin();
+        return admin;
+    }
+
+    /**
+     * listNamespaceDescriptors
+     */
+    public static NamespaceDescriptor[] listNamespaceDescriptors()
+            throws IOException
+    {
+        NamespaceDescriptor[] res = new NamespaceDescriptor[3];
+
+        res[0] = NamespaceDescriptor.create("hbase").build();
+        res[1] = NamespaceDescriptor.create("default").build();
+        res[2] = NamespaceDescriptor.create("testSchema").build();
+
+        return res;
+    }
+
+    /**
+     * getTableDescriptor
+     */
+    public static HTableDescriptor getTableDescriptor(TableName tableName)
+            throws TableNotFoundException
+    {
+        HTableDescriptor hTableDescriptor = new HTableDescriptor(tableName);
+        if (!tableName.getNameAsString().equals("hbase.test_table")
+                && !tableName.getNameAsString().equals("hbase.test_table4")) {
+            return hTableDescriptor;
+        }
+
+        hTableDescriptor.addFamily(new HColumnDescriptor("name"));
+        hTableDescriptor.addFamily(new HColumnDescriptor("age"));
+        hTableDescriptor.addFamily(new HColumnDescriptor("gender"));
+        hTableDescriptor.addFamily(new HColumnDescriptor("t"));
+        return hTableDescriptor;
+    }
+
+    /**
+     * listTableDescriptorsByNamespace
+     */
+    public static HTableDescriptor[] listTableDescriptorsByNamespace(final String schema)
+            throws IOException
+    {
+        if ("hbase".equals(schema)) {
+            HTableDescriptor[] tables = new HTableDescriptor[3];
+            for (int iNum = 0; iNum < 3; iNum++) {
+                if (iNum != 0) {
+                    tables[iNum] = new HTableDescriptor(TableName.valueOf("hbase.test_table" + iNum));
+                }
+                else {
+                    tables[iNum] = new HTableDescriptor(TableName.valueOf("hbase.test_table"));
+                }
+                tables[iNum].addFamily(new HColumnDescriptor("name"));
+                tables[iNum].addFamily(new HColumnDescriptor("age"));
+                tables[iNum].addFamily(new HColumnDescriptor("gender"));
+                tables[iNum].addFamily(new HColumnDescriptor("t"));
+            }
+
+            return tables;
+        }
+        else {
+            return new HTableDescriptor[0];
+        }
+    }
+
+    /**
+     * put
+     */
+    public static void put(List<Put> puts)
+            throws IOException
+    {
+        Put put = new Put("0001".getBytes(UTF_8));
+        put.addColumn(
+                "name".getBytes(UTF_8), "nick_name".getBytes(UTF_8), TestSliceUtils.createSlice("name2").getBytes());
+        Long longs = Long.valueOf(12);
+        put.addColumn("age".getBytes(UTF_8), "lit_age".getBytes(UTF_8), longs.toString().getBytes(UTF_8));
+        Integer ints = Integer.valueOf(17832);
+        byte[] gender = new Date(DAYS.toMillis(ints.longValue())).toString().getBytes(UTF_8);
+        put.addColumn("gender".getBytes(UTF_8), "gender".getBytes(UTF_8), gender);
+        put.addColumn("t".getBytes(UTF_8), "t".getBytes(UTF_8), longs.toString().getBytes(UTF_8));
+        List<Put> expected = new ArrayList<>();
+        expected.add(put);
+        assertEquals(expected.toString(), puts.toString());
     }
 
     @Override
@@ -108,6 +262,12 @@ public class TestHBaseConnection
     public boolean isClosed()
     {
         return true;
+    }
+
+    @Override
+    public TableBuilder getTableBuilder(TableName tableName, ExecutorService executorService)
+    {
+        return null;
     }
 
     @Override
@@ -126,7 +286,7 @@ public class TestHBaseConnection
     public Table getTable(TableName tableName)
             throws IOException
     {
-        return new TestHTable();
+        return htable;
     }
 
     @Override
