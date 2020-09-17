@@ -743,7 +743,7 @@ public abstract class AbstractTestHive
                 true,
                 1000,
                 Optional.empty(),
-                Optional.empty(),
+                Duration.valueOf("5m"),
                 TYPE_MANAGER,
                 locationService,
                 partitionUpdateCodec,

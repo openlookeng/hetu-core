@@ -60,7 +60,7 @@ public class HiveMetadataFactory
     private final AccessControlMetadataFactory accessControlMetadataFactory;
     private final Optional<Duration> hiveTransactionHeartbeatInterval;
     private final ScheduledExecutorService heartbeatService;
-    private final Optional<Duration> vacuumCleanupRecheckInterval;
+    private final Duration vacuumCleanupRecheckInterval;
     private final int vacuumDeltaNumThreshold;
     private final double vacuumDeltaPercentThreshold;
     private final boolean autoVacuumEnabled;
@@ -127,7 +127,7 @@ public class HiveMetadataFactory
             boolean tableCreatesWithLocationAllowed,
             long perTransactionCacheMaximumSize,
             Optional<Duration> hiveTransactionHeartbeatInterval,
-            Optional<Duration> vacuumCleanupRecheckInterval,
+            Duration vacuumCleanupRecheckInterval,
             TypeManager typeManager,
             LocationService locationService,
             JsonCodec<PartitionUpdate> partitionUpdateCodec,

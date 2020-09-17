@@ -126,7 +126,7 @@ public class VacuumCleaner
                 stop = true;
             }
             catch (Exception e) {
-                log.info("Exception in Vacuum cleanup: ", e);
+                log.info("Exception in Vacuum cleanup: " + e.toString());
                 stop = true;
             }
             finally {
@@ -155,7 +155,7 @@ public class VacuumCleaner
                 fileSystem = filesToDelete.get(0).getFileSystem(configuration);
             }
             catch (IOException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failure while getting file system: " + e.getMessage());
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failure while getting file system: ", e);
             }
             for (Path filePath : filesToDelete) {
                 log(String.format("Removing directory on path : %s", filePath.toString()));
