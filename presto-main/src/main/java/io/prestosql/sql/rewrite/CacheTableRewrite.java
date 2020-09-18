@@ -196,6 +196,7 @@ final class CacheTableRewrite
             }
             else if (whereClause instanceof BetweenPredicate) {
                 BetweenPredicate predicate = (BetweenPredicate) whereClause;
+                identifier = (Identifier) predicate.getValue();
                 rewrittenPredicate = new BetweenPredicate(new SymbolReference(predicate.getValue().toString()), predicate.getMin(), predicate.getMax());
             }
             else if (whereClause instanceof IsNullPredicate) {
