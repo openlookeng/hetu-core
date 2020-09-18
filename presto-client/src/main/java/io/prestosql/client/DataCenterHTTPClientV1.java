@@ -103,7 +103,7 @@ public class DataCenterHTTPClientV1
     private final String slug;
     private final String queryId;
     private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
-    private final URI serverURI;
+    private final HttpUrl serverURI;
     private final HttpUrl cancelUrl;
     private final String clientId;
 
@@ -121,7 +121,10 @@ public class DataCenterHTTPClientV1
         this.timeZone = session.getTimeZone();
         this.requestTimeoutNanos = session.getClientRequestTimeout();
         this.clientId = UUID.randomUUID().toString();
-        this.serverURI = session.getServer();
+        this.serverURI = HttpUrl.get(session.getServer());
+        if (this.serverURI == null) {
+            throw new RuntimeException("Invalid server Url:" + session.getServer());
+        }
         this.typeManager = session.getTypeManager();
         this.serde = new PagesSerdeFactory(new ExternalBlockEncodingSerde(this.typeManager),
                 true).createPagesSerde();
@@ -167,13 +170,11 @@ public class DataCenterHTTPClientV1
                 state.compareAndSet(State.RUNNING, State.FINISHED);
             }
             this.slug = result.getSlug();
-            this.cancelUrl = HttpUrl.get(this.serverURI)
-                    .newBuilder()
-                    .encodedPath(ROOT_URL + this.queryId + "/" + this.slug).build();
+            this.cancelUrl = this.serverURI.newBuilder().encodedPath(ROOT_URL + this.queryId + "/" + this.slug).build();
         }
         this.currentResults.set(new DataCenterQueryResults(
                 this.queryId,
-                this.serverURI,
+                this.serverURI.uri(),
                 null,
                 this.state.get() == State.RUNNING ? URI.create("") : null,
                 null,
@@ -192,9 +193,7 @@ public class DataCenterHTTPClientV1
 
     private HttpUrl nextURL()
     {
-        return HttpUrl.get(this.serverURI)
-                .newBuilder()
-                .encodedPath(ROOT_URL + DataCenterResponseType.HTTP_PULL + "/" + this.clientId + "/" + this.queryId + "/" + this.slug + "/" + this.token).build();
+        return this.serverURI.newBuilder().encodedPath(ROOT_URL + DataCenterResponseType.HTTP_PULL + "/" + this.clientId + "/" + this.queryId + "/" + this.slug + "/" + this.token).build();
     }
 
     @Override
@@ -525,7 +524,11 @@ public class DataCenterHTTPClientV1
 
     private void httpDelete(URI uri)
     {
-        Request request = prepareRequest(HttpUrl.get(uri), this.session)
+        HttpUrl httpUrl = HttpUrl.get(uri);
+        if (httpUrl == null) {
+            throw new RuntimeException("Invalid URL:" + uri.toString());
+        }
+        Request request = prepareRequest(httpUrl, this.session)
                 .delete()
                 .build();
         try {

@@ -47,7 +47,6 @@ import okhttp3.Request;
 
 import javax.inject.Inject;
 
-import java.net.URI;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -89,7 +88,7 @@ public class DataCenterClient
 
     public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private final URI serverUri;
+    private final HttpUrl serverUri;
 
     private final DataCenterClientSession clientSession;
 
@@ -113,7 +112,11 @@ public class DataCenterClient
     {
         Map<String, String> properties = new HashMap<>();
         this.config = requireNonNull(config, "config is null");
-        this.serverUri = config.getConnectionUrl();
+
+        this.serverUri = HttpUrl.get(config.getConnectionUrl());
+        if (this.serverUri == null) {
+            throw new RuntimeException("Invalid connect-url :" + config.getConnectionUrl().toString());
+        }
         if (config.isCompressionEnabled()) {
             properties.put(EXCHANGE_COMPRESSION, "true");
         }
@@ -152,7 +155,7 @@ public class DataCenterClient
             return catalogNames;
         }
         catch (SQLException ex) {
-            throw new PrestoTransportException(REMOTE_TASK_ERROR, HostAddress.fromUri(this.serverUri),
+            throw new PrestoTransportException(REMOTE_TASK_ERROR, HostAddress.fromUri(this.serverUri.uri()),
                     "could not connect to the data center");
         }
     }
@@ -280,7 +283,7 @@ public class DataCenterClient
             data = getResults(clientSession, query);
         }
         catch (SQLException ex) {
-            throw new PrestoTransportException(REMOTE_TASK_ERROR, HostAddress.fromUri(this.serverUri),
+            throw new PrestoTransportException(REMOTE_TASK_ERROR, HostAddress.fromUri(this.serverUri.uri()),
                     "could not connect to the remote data center");
         }
         TableStatistics.Builder builder = TableStatistics.builder();
@@ -342,7 +345,7 @@ public class DataCenterClient
      */
     public int getSplits(String globalQueryId)
     {
-        HttpUrl url = HttpUrl.get(this.serverUri).newBuilder().encodedPath("/v1/dc/split/" + globalQueryId).build();
+        HttpUrl url = this.serverUri.newBuilder().encodedPath("/v1/dc/split/" + globalQueryId).build();
         Request request = HttpUtil.prepareRequest(url, this.clientSession).build();
         JsonResponse<Integer> response = JsonResponse.execute(INTEGER_JSON_CODEC, httpClient, request);
         if ((response.getStatusCode() == HTTP_OK) && response.hasValue()) {
