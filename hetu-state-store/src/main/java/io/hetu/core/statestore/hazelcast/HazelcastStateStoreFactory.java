@@ -22,6 +22,8 @@ import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.HazelcastInstance;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.hetu.core.security.authentication.kerberos.KerberosConfig;
+import io.hetu.core.security.networking.ssl.SslConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.seedstore.Seed;
@@ -46,6 +48,18 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MOD
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_MULTICAST;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_TCPIP;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HAZELCAST_SSL_ENABLED;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.JAAS_CONFIG_FILE;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_ENABLED;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_LOGIN_CONTEXT_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_SERVICE_PRINCIPAL;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KRB5_CONFIG_FILE;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.SSL_CIPHER_SUITES;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.SSL_KEYSTORE_PASSWORD;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.SSL_KEYSTORE_PATH;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.SSL_PROTOCOLS;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.SSL_TRUSTSTORE_PASSWORD;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.SSL_TRUSTSTORE_PATH;
 import static io.prestosql.spi.StandardErrorCode.CONFIGURATION_INVALID;
 import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
 import static java.lang.String.format;
@@ -90,6 +104,26 @@ public class HazelcastStateStoreFactory
         SerializerConfig sc = new SerializerConfig().setImplementation(new HazelCastSliceSerializer()).setTypeClass(Slice.class);
         clientConfig.getSerializationConfig().addSerializerConfig(sc);
         clientConfig.setClusterName(clusterId);
+
+        // set security config
+        if (Boolean.parseBoolean(properties.get(KERBEROS_ENABLED))) {
+            KerberosConfig.setKerberosEnabled(true);
+            KerberosConfig.setLoginContextName(properties.get(KERBEROS_LOGIN_CONTEXT_NAME));
+            KerberosConfig.setServicePrincipalName(properties.get(KERBEROS_SERVICE_PRINCIPAL));
+            System.setProperty("java.security.krb5.conf", properties.get(KRB5_CONFIG_FILE));
+            System.setProperty("java.security.auth.login.config", properties.get(JAAS_CONFIG_FILE));
+        }
+
+        // Set hazelcast SSL config
+        if (Boolean.parseBoolean(properties.get(HAZELCAST_SSL_ENABLED))) {
+            SslConfig.setSslEnabled(true);
+            SslConfig.setKeyStorePath(properties.get(SSL_KEYSTORE_PATH));
+            SslConfig.setKeyStorePassword(properties.get(SSL_KEYSTORE_PASSWORD));
+            SslConfig.setTrustStorePath(properties.get(SSL_TRUSTSTORE_PATH));
+            SslConfig.setTrustStorePassword(properties.get(SSL_TRUSTSTORE_PASSWORD));
+            SslConfig.setCipherSuites(properties.get(SSL_CIPHER_SUITES));
+            SslConfig.setProtocols(properties.get(SSL_PROTOCOLS));
+        }
 
         final String discoveryMode = properties.get(DISCOVERY_MODE_CONFIG_NAME);
 

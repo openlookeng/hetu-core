@@ -63,6 +63,65 @@ public final class HazelcastConstants
     public static final String DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME =
             "com.hazelcast.spi.discovery.multicast.MulticastDiscoveryStrategy";
 
+    /**
+     * Enable hazelcast kerberos authentication
+     */
+    public static final String KERBEROS_ENABLED = "hazelcast.kerberos.enable";
+
+    /**
+     * Hazelcast kerberos login context name
+     */
+    public static final String KERBEROS_LOGIN_CONTEXT_NAME = "hazelcast.kerberos.login.context.name";
+
+    /**
+     * Hazelcast kerberos service principal
+     */
+    public static final String KERBEROS_SERVICE_PRINCIPAL = "hazelcast.kerberos.service.principal";
+
+    /**
+     * Hazelcast kerberos krb5 config file
+     */
+    public static final String KRB5_CONFIG_FILE = "hazelcast.kerberos.krb5.conf";
+
+    /**
+     * Hazelcast kerberos authentication login config
+     */
+    public static final String JAAS_CONFIG_FILE = "hazelcast.kerberos.auth.login.config";
+
+    /**
+     * Enable hazelcast SSL
+     */
+    public static final String HAZELCAST_SSL_ENABLED = "hazelcast.ssl.enabled";
+
+    /**
+     * Hazelcast SSL keystore path
+     */
+    public static final String SSL_KEYSTORE_PATH = "hazelcast.ssl.keystore.path";
+
+    /**
+     * Hazelcast SSL keystore password
+     */
+    public static final String SSL_KEYSTORE_PASSWORD = "hazelcast.ssl.keystore.password";
+
+    /**
+     * Hazelcast SSL truststore path
+     */
+    public static final String SSL_TRUSTSTORE_PATH = "hazelcast.ssl.truststore.path";
+
+    /**
+     * Hazelcast SSL truststore password
+     */
+    public static final String SSL_TRUSTSTORE_PASSWORD = "hazelcast.ssl.truststore.password";
+
+    /**
+     * Hazelcast SSL cipher suites
+     */
+    public static final String SSL_CIPHER_SUITES = "hazelcast.ssl.cipher.suites";
+    /**
+     * Hazelcast SSL protocols
+     */
+    public static final String SSL_PROTOCOLS = "hazelcast.ssl.protocols";
+
     private HazelcastConstants()
     {
     }
