@@ -16,8 +16,6 @@
 
 支持的索引类型如下：BITMAP, BLOOM, MINMAX
 
-支持的索引存储：LOCAL, HDFS (必须 在{--config}/config.properties配置
-
 支持的数据源：HIVE using ORC files (必须在{--config}/catalog/catalog_name.properties配置
 
 

@@ -35,8 +35,9 @@ headless: true
     - [Session Property Managers]({{< relref "./docs/admin/session-property-managers.md" >}})
     - [Distributed Sort]({{< relref "./docs/admin/dist-sort.md" >}})
     - [Dynamic Catalog]({{< relref "./docs/admin/dynamic-catalog.md" >}})
-    - [Cluster Node Management]({{< relref "./docs/admin/cluster-node-management.md" >}})
+    - [Horizontal Scaling]({{< relref "./docs/admin/horizontal-scaling.md" >}})
     - [Dynamic Filtering]({{< relref "./docs/admin/dynamic-filters.md" >}})
+    - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
 
 - [Query Optimizer]("#")
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
@@ -135,6 +136,7 @@ headless: true
     - [GRANT ROLES]({{< relref "./docs/sql/grant-roles.md" >}})
     - [INSERT]({{< relref "./docs/sql/insert.md" >}})
     - [INSERT OVERWRITE]({{< relref "./docs/sql/insert-overwrite.md" >}})
+    - [JMX]({{< relref "./docs/sql/jmx.md" >}})
     - [PREPARE]({{< relref "./docs/sql/prepare.md" >}})
     - [RESET SESSION]({{< relref "./docs/sql/reset-session.md" >}})
     - [REVOKE]({{< relref "./docs/sql/revoke.md" >}})

@@ -104,10 +104,10 @@ When writing data, the Carbondata connector always collects basic statistics (`n
 | `VARBINARY` done | Y          | N                     | N       |
 | `BOOLEAN` done   | Y          | Y                     | N       |
 
-## Auto-cleanup:
+## Auto-cleanup
 
 After the vacuum operation is completed on carbon tables, there will be unused base/stale folders & files (Ex: Segment folders, .segment and .lock  files) which are left in HDFS. So Carbondata Auto cleanup is used to cleanup those files automatically.
-Segment folders and .segment files are deleted at the time of insert, update, delete and vacuum  after 60min (.lock files after 48 hours) of vacuum operation is completed.    
+Segment folders and .segment files are deleted at the time of insert, update, delete and vacuum after 60min (.lock files after 48 hours) of vacuum operation is completed.    
 
 ## Examples
 

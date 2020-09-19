@@ -542,6 +542,7 @@ helps with cache affinity scheduling.
 > -   **Default value:** `false`
 >
 > This is to enable auto-vacuum functionality.
+>
 > **Note:** This should be configured only in coordinator.
 
 ### `auto-vacuum.scan.interval`
@@ -552,6 +553,7 @@ helps with cache affinity scheduling.
 > It is scheduled Interval to get vacuum table info from the data sources and trigger vacuum for those tables.
 > Timer is started when the server starts and it will keep on scheduling for configured interval.
 > Min value is 15s and Max value is 24h.
+>
 > **Note:** This should be configured only in coordinator.
 
 ### `auto-vacuum.scan.threads`
@@ -560,4 +562,5 @@ helps with cache affinity scheduling.
 > - **Default value:** `3`
 >
 > Number of threads used for Auto vacuum functionality. Min value is 1 and Max value is 16.
+>
 > **Note:** This should be configured only in coordinator.

@@ -64,9 +64,9 @@ return injector.getInstance(ExampleConnector.class);
 
 `ExampleMetadata` 实现将许多此类调用委托给 `ExampleClient`，该类可以实现连接器的大部分核心功能。
 
-### 拆分管理器： ExampleSplitManager
+### 分片管理器： ExampleSplitManager
 
-拆分管理器将表的数据分区成多个块，这些块由 openLooKeng 分发至工作节点进行处理。对于 Example HTTP 连接器，每个表都包含一个或多个指向实际数据的 URI。系统针对每个 URI 创建一个拆分。
+分片管理器将表的数据分区成多个块，这些块由 openLooKeng 分发至工作节点进行处理。对于 Example HTTP 连接器，每个表都包含一个或多个指向实际数据的 URI。系统针对每个 URI 创建一个分片。
 
 ### 记录集提供程序：ExampleRecordSetProvider
 
