@@ -76,7 +76,6 @@ public class PagesIndexOrdering
             }
             m = median3(pagesIndex, l, m, n); // Mid-size, med of 3
         }
-        // int v = x[m];
 
         int a = from;
         int b = a;

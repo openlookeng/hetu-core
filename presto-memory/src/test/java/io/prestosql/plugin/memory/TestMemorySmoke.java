@@ -102,7 +102,6 @@ public class TestMemorySmoke
                             .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
                             .map(summary -> summary.getInputPositions())
                             .collect(toImmutableSet());
-        //assertEquals(rowsRead, ImmutableSet.of(0L, buildSideRowsCount));
         assertEquals(rowsRead, ImmutableSet.of(60_175L, buildSideRowsCount));
     }
 
@@ -137,7 +136,6 @@ public class TestMemorySmoke
                             .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
                             .map(summary -> summary.getInputPositions())
                             .collect(toImmutableSet());
-       // assertEquals(rowsRead, ImmutableSet.of(6L, buildSideRowsCount));
         assertEquals(rowsRead, ImmutableSet.of(60_175L, buildSideRowsCount));
     }
 

@@ -77,7 +77,6 @@ public class CarbondataLocationService
                                            ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo)
     {
         // TODO: check and make it compatible for cloud scenario
-        // super.forExistingTable(metastore, session, table, Optional.empty());
 
         HdfsEnvironment.HdfsContext context =
                 new HdfsEnvironment.HdfsContext(session, table.getDatabaseName(), table.getTableName());

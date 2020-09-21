@@ -109,7 +109,6 @@ public class SliceDirectSelectiveColumnReader
         this.orcType = orcType;
         this.isCharType = orcType.getOrcTypeKind() == OrcType.OrcTypeKind.CHAR;
         this.maxCodePointCount = orcType.getLength().orElse(-1);
-        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
     }
 
     @Override

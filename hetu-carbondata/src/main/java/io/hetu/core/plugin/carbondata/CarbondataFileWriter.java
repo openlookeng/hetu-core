@@ -372,7 +372,7 @@ public class CarbondataFileWriter
     {
         try {
             if (HiveACIDWriteType.isUpdateOrDelete(acidWriteType)) {
-                //   if (HiveACIDWriteType.DELETE == acidWriteType || partitionInfo != null) {              #TODO For partitioned tables
+                // TODO For partitioned tables
                 if (HiveACIDWriteType.DELETE == acidWriteType) {
                     for (String segmentBlockId : segmentUpdateDetailMap.keySet()) {
                         SegmentUpdateDetails segmentUpdateDetails = segmentUpdateDetailMap.get(segmentBlockId);

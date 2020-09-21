@@ -196,7 +196,6 @@ public class SqlTaskManager
         currentMemoryPoolAssignmentVersion = assignments.getVersion();
         if (coordinatorId != null && !coordinatorId.equals(assignments.getCoordinatorId())) {
             // Disable the warning for multi-coordinator feature
-            //log.warn("Switching coordinator affinity from " + coordinatorId + " to " + assignments.getCoordinatorId());
         }
         coordinatorId = assignments.getCoordinatorId();
 

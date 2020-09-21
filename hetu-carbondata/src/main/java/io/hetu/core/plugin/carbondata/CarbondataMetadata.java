@@ -1488,7 +1488,6 @@ public class CarbondataMetadata
         this.currentState = State.DROP_TABLE;
 
         this.tableStorageLocation = Optional.of(target.get().getStorage().getLocation());
-        //this.tableStorageLocation = Optional.of(target.get().getStorage().getSerdeParameters().get("tablePath"));
 
         try {
             hdfsEnvironment.getFileSystem(new HdfsEnvironment.HdfsContext(session, target.get().getDatabaseName()), new Path(this.tableStorageLocation.get()));

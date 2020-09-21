@@ -346,7 +346,6 @@ public class BackgroundHiveSplitLoader
         TupleDomain<HiveColumnHandle> effectivePredicate = (TupleDomain<HiveColumnHandle>) compactEffectivePredicate;
 
         if (dynamicFilterSupplier != null && isDynamicFilteringSplitFilteringEnabled(session)) {
-            //buildDynamicFilters(dynamicFilterSupplier.get(), cachedDynamicFilters);
             if (isPartitionFiltered(partitionKeys, dynamicFilterSupplier.get(), typeManager)) {
                 // Avoid listing files and creating splits from a partition if it has been pruned due to dynamic filters
                 return COMPLETED_FUTURE;

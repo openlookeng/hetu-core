@@ -64,8 +64,6 @@ public class TestBlockAndPositionNullConvention
         assertTrue(FunctionWithBlockAndPositionConvention.hitBlockPositionSlice.get());
 
         // TODO: add adaptations so these will pass
-        //assertFunction("test_block_position(null)", UNKNOWN, null);
-        //assertFalse(FunctionWithBlockAndPositionConvention.hitBlockPositionObject.get());
 
         assertFunction("test_block_position(false)", BOOLEAN, false);
         assertFalse(FunctionWithBlockAndPositionConvention.hitBlockPositionBoolean.get());

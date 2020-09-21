@@ -384,22 +384,6 @@ public class CarbondataTableReader
         addProperty(CarbonCommonConstants.CARBON_WRITTEN_BY_APPNAME, "Hetu_Server");
     }
 
-//    public Configuration updateS3Properties(Configuration configuration)
-//    {
-//        configuration.set(ACCESS_KEY, Objects.toString(config.getS3A_AcesssKey(), ""));
-//        configuration.set(SECRET_KEY, Objects.toString(config.getS3A_SecretKey()));
-//        configuration
-//                .set(CarbonCommonConstants.S3_ACCESS_KEY, Objects.toString(config.getS3_AcesssKey(), ""));
-//        configuration
-//                .set(CarbonCommonConstants.S3_SECRET_KEY, Objects.toString(config.getS3_SecretKey()));
-//        configuration
-//                .set(CarbonCommonConstants.S3N_ACCESS_KEY, Objects.toString(config.getS3N_AcesssKey(), ""));
-//        configuration
-//                .set(CarbonCommonConstants.S3N_SECRET_KEY, Objects.toString(config.getS3N_SecretKey(), ""));
-//        configuration.set(ENDPOINT, Objects.toString(config.getS3EndPoint(), ""));
-//        return configuration;
-//    }
-
     private void addProperty(String propertyName, String propertyValue)
     {
         if (propertyValue != null) {

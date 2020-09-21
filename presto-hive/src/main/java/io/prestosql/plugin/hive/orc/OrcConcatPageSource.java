@@ -54,7 +54,6 @@ public class OrcConcatPageSource
                 while (nextPage.getPositionCount() == 0);
 
                 /* Todo(Nitin) Check if loaded block needed here! */
-                //nextPage = nextPage.getLoadedPage();
                 return nextPage;
             }
         }).collect(toList());

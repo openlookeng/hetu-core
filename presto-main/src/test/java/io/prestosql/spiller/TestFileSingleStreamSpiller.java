@@ -128,14 +128,12 @@ public class TestFileSingleStreamSpiller
 
         // The spillers release their memory reservations when they are closed, therefore at this point
         // they will have non-zero memory reservation.
-        // assertEquals(memoryContext.getBytes(), 0);
 
         Iterator<Page> spilledPagesIterator = spiller.getSpilledPages();
         assertEquals(memoryContext.getBytes(), FileSingleStreamSpiller.BUFFER_SIZE);
         ImmutableList<Page> spilledPages = ImmutableList.copyOf(spilledPagesIterator);
         // The spillers release their memory reservations when they are closed, therefore at this point
         // they will have non-zero memory reservation.
-        // assertEquals(memoryContext.getBytes(), 0);
 
         assertEquals(4, spilledPages.size());
         for (int i = 0; i < 4; ++i) {

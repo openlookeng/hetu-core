@@ -821,7 +821,6 @@ public final class MetadataManager
         CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, catalogName);
         ConnectorMetadata metadata = catalogMetadata.getMetadata();
         ConnectorTransactionHandle transactionHandle = catalogMetadata.getTransactionHandleFor(catalogName);
-        //ConnectorTableHandle handle = metadata.beginDelete(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
         ConnectorDeleteAsInsertTableHandle handle = metadata.beginDeletesAsInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
         return new DeletesAsInsertTableHandle(tableHandle.getCatalogName(), transactionHandle, handle);
     }

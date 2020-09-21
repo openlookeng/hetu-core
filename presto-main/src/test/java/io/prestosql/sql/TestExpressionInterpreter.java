@@ -406,8 +406,6 @@ public class TestExpressionInterpreter
         assertOptimizedEquals("extract (SECOND from bound_timestamp)", "5");
         // todo reenable when cast as timestamp with time zone is implemented
         // todo add bound timestamp with time zone
-        //assertOptimizedEquals("extract (TIMEZONE_HOUR from bound_timestamp)", "0");
-        //assertOptimizedEquals("extract (TIMEZONE_MINUTE from bound_timestamp)", "0");
 
         assertOptimizedEquals("extract (YEAR from unbound_timestamp)", "extract (YEAR from unbound_timestamp)");
         assertOptimizedEquals("extract (SECOND from bound_timestamp + INTERVAL '3' SECOND)", "8");
@@ -1112,11 +1110,6 @@ public class TestExpressionInterpreter
                 "2.2");
 
         // TODO enabled when DECIMAL is default for literal:
-//        assertOptimizedEquals("case true " +
-//                        "when false then 1234567890.0987654321 " +
-//                        "when true then 3.3 " +
-//                        "end",
-//                "CAST(3.3 AS DECIMAL(20,10))");
 
         assertOptimizedEquals("case true " +
                         "when false then 1 " +
