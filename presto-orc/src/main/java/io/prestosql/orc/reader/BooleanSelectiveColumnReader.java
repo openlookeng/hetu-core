@@ -84,7 +84,6 @@ public class BooleanSelectiveColumnReader
             LocalMemoryContext systemMemoryContext)
     {
         requireNonNull(filter, "filter is null");
-        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
         this.columnDesc = requireNonNull(columnDesc, "stream is null");
         this.filter = filter.orElse(null);
         this.outputRequired = outputRequired;

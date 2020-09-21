@@ -87,7 +87,6 @@ public class DoubleSelectiveColumnReader
             LocalMemoryContext systemMemoryContext)
     {
         requireNonNull(filter, "filter is null");
-        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
         this.streamDescriptor = requireNonNull(streamDescriptor, "streamDescriptor is null");
         this.filter = filter.orElse(null);
         this.outputRequired = outputRequired;

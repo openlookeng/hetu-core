@@ -223,7 +223,6 @@ public class TestExpressionCompiler
         assertExecute("bound_binary_literal", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xab}));
 
         // todo enable when null output type is supported
-        // assertExecute("null", null);
 
         Futures.allAsList(futures).get();
     }
@@ -243,7 +242,6 @@ public class TestExpressionCompiler
         assertFilter("bound_null_string = 'foo'", false);
 
         // todo enable when null output type is supported
-        // assertFilter("null", false);
         assertFilter("cast(null as boolean)", false);
         assertFilter("nullif(true, true)", false);
 
@@ -1046,7 +1044,6 @@ public class TestExpressionCompiler
     public void testSearchCaseSingle()
             throws Exception
     {
-        // assertExecute("case when null and true then 1 else 0 end", 0L);
         for (Double value : doubleLefts) {
             for (Integer firstTest : intLefts) {
                 for (Double secondTest : doubleRights) {
@@ -1879,7 +1876,6 @@ public class TestExpressionCompiler
             }
             else {
                 // todo enable when null output type is supported
-                // unrolledValues.add(ImmutableSet.of("null", "cast(null as " + type + ")"));
                 unrolledValues.add(ImmutableSet.of("cast(null as " + type + ")"));
             }
         }

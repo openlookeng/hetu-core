@@ -1405,20 +1405,4 @@ public class OrcTester
         }
         return METADATA.getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
     }
-
-//    static RecordWriter createOrcRecordWriter(File outputFile, Format format, CompressionKind compression, List<Type> types)
-//            throws IOException
-//    {
-//        JobConf jobConf = new JobConf();
-//        jobConf.set("hive.exec.orc.write.format", format == ORC_12 ? "0.12" : "0.11");
-//        jobConf.set("hive.exec.orc.default.compress", compression.name());
-//
-//        return new OrcOutputFormat().getHiveRecordWriter(
-//                jobConf,
-//                new Path(outputFile.toURI()),
-//                Text.class,
-//                compression != NONE,
-//                createTableProperties("test", getJavaObjectInspector(types).getTypeName()),
-//                () -> {});
-//    }
 }

@@ -27,8 +27,5 @@ public class TestConsoleHistory
         File historyFile = new File("/?", ".history");
         assertFalse(historyFile.canRead(), "historyFile is readable");
         assertFalse(historyFile.canWrite(), "historyFile is writable");
-//        MemoryHistory result = Console.getHistory(historyFile);
-//        assertNotNull(result, "result is null");
-//        assertFalse(result instanceof FileHistory, "result type is FileHistory");
     }
 }

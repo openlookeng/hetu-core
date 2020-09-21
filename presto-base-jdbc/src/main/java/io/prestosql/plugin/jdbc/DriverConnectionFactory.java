@@ -138,7 +138,6 @@ public class DriverConnectionFactory
             }
         }
         catch (Exception e) {
-            //e.printStackTrace();
             if (LOG.isDebugEnabled()) {
                 LOG.debug("createGenericObjectPoolConfig: failed... cause by ", e);
             }

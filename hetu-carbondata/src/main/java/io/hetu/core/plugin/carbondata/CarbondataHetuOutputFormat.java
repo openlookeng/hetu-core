@@ -129,11 +129,7 @@ public class CarbondataHetuOutputFormat<T>
                         carbonOutputCommitter.abortJob(jobContext, JobStatus.State.FAILED);
                     }
                     else {
-//            SegmentFileStore
-//                .writeSegmentFile(updatedCarbonLoadModel.getCarbonDataLoadSchema().getCarbonTable(),
-//                    updatedCarbonLoadModel.getSegmentId(),
-//                    String.valueOf(updatedCarbonLoadModel.getFactTimeStamp()));
-//            carbonOutputCommitter.commitJob(jobContext);
+                        // need else action
                     }
                 }
                 catch (InterruptedException e) {

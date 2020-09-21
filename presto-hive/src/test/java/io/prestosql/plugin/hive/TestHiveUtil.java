@@ -140,7 +140,6 @@ public class TestHiveUtil
         partitions.add(new HivePartitionKey("app_id", "10000"));
 
         ColumnHandle nameColumn = new HiveColumnHandle("name", HIVE_STRING, parseTypeSignature(VARCHAR), 0, REGULAR, Optional.empty());
-        //BloomFilter nameFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()), 1024 * 1024, 0.01);
         Set nameFilter = new HashSet();
         nameFilter.add("Alice");
         dynamicFilters.add(new HashSetDynamicFilter("1", nameColumn, nameFilter, DynamicFilter.Type.GLOBAL));

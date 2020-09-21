@@ -228,7 +228,6 @@ public class VariableWidthBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        //boolean[] result = new boolean[values.length];
         for (int i = 0; i < positionCount; i++) {
             byte[] value = slice.slice(offsets[i + arrayOffset], offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]).getBytes();
             validPositions[i] = validPositions[i] && filter.test(value);

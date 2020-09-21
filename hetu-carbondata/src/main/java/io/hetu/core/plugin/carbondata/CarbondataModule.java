@@ -123,7 +123,6 @@ public class CarbondataModule
         newSetBinder(binder, EventClient.class).addBinding().to(HiveEventClient.class)
                 .in(Scopes.SINGLETON);
         binder.bind(HivePartitionManager.class).in(Scopes.SINGLETON);
-        //binder.bind(LocationService.class).to(HiveLocationService.class).in(Scopes.SINGLETON);
         binder.bind(LocationService.class).to(CarbondataLocationService.class).in(Scopes.SINGLETON);
         binder.bind(HiveMetadataFactory.class).to(CarbondataMetadataFactory.class).in(Scopes.SINGLETON);
         binder.bind(new TypeLiteral<Supplier<TransactionalMetadata>>()

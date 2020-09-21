@@ -324,7 +324,6 @@ public abstract class AbstractTestDistributedQueries
         assertTrue(value.matches("(?s:.*)CPU:.*, Input:.*, Output(?s:.*)"), format("Expected output to contain \"CPU:.*, Input:.*, Output\", but it is %s", value));
 
         // TODO: check that rendered plan is as expected, once stats are collected in a consistent way
-        // assertTrue(value.contains("Cost: "), format("Expected output to contain \"Cost: \", but it is %s", value));
     }
 
     protected void assertCreateTableAsSelect(String table, @Language("SQL") String query, @Language("SQL") String rowCountQuery)

@@ -118,8 +118,6 @@ public abstract class AbstractTestingPrestoClient<T>
             throw new RuntimeException("Query failed: " + error.getMessage());
 
             // dump query info to console for debugging (NOTE: not pretty printed)
-            // JsonCodec<QueryInfo> queryInfoJsonCodec = createCodecFactory().prettyPrint().jsonCodec(QueryInfo.class);
-            // log.info("\n" + queryInfoJsonCodec.toJson(queryInfo));
         }
     }
 

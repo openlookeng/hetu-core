@@ -186,9 +186,6 @@ public class TestJdbcResultSet
         });
 
         // TODO line 1:8: '00:39:05' is not a valid time literal
-//        checkRepresentation("TIME '00:39:05'", Types.TIME, (rs, column) -> {
-//            ...
-//        });
 
         checkRepresentation("TIME '09:39:07 +01:00'", Types.TIME /* TODO TIME_WITH_TIMEZONE */, (rs, column) -> {
             assertEquals(rs.getObject(column), Time.valueOf(LocalTime.of(1, 39, 7))); // TODO this should represent TIME '09:39:07 +01:00'
@@ -229,9 +226,6 @@ public class TestJdbcResultSet
         });
 
         // TODO line 1:8: '1970-01-01 00:14:15.123' is not a valid timestamp literal; the expected values will pro
-//        checkRepresentation("TIMESTAMP '1970-01-01 00:14:15.123'", Types.TIMESTAMP, (rs, column) -> {
-//            ...
-//        });
 
         checkRepresentation("TIMESTAMP '2018-02-13 13:14:15.227 Europe/Warsaw'", Types.TIMESTAMP /* TODO TIMESTAMP_WITH_TIMEZONE */, (rs, column) -> {
             assertEquals(rs.getObject(column), Timestamp.valueOf(LocalDateTime.of(2018, 2, 13, 6, 14, 15, 227_000_000))); // TODO this should represent TIMESTAMP '2018-02-13 13:14:15.227 Europe/Warsaw'

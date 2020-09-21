@@ -270,7 +270,6 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         // ListStreamReader and StructStreamReader) instance sizes were not counted, because calling setBytes() in
         // their constructors is confusing.
         AggregatedMemoryContext streamReadersSystemMemoryContext = this.systemMemoryUsage.newAggregatedMemoryContext();
-//        this.columnReaders = requireNonNull(columnReaders, "columnReaders is null");
         stripeReader = new StripeReader(
                 orcDataSource,
                 hiveStorageTimeZone.toTimeZone().toZoneId(),
