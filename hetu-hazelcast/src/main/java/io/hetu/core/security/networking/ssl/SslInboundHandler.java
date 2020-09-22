@@ -34,6 +34,7 @@ import static com.hazelcast.internal.networking.ChannelOption.SO_RCVBUF;
 import static com.hazelcast.internal.networking.ChannelOption.SO_SNDBUF;
 import static com.hazelcast.internal.nio.IOUtil.compactOrClear;
 import static com.hazelcast.internal.nio.IOUtil.newByteBuffer;
+import static java.lang.String.format;
 import static javax.net.ssl.SSLEngineResult.HandshakeStatus.FINISHED;
 import static javax.net.ssl.SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING;
 
@@ -72,70 +73,96 @@ public class SslInboundHandler
         try {
             ChannelOptions config = channel.options();
             ByteBuffer byteBuffer = newByteBuffer(config.getOption(SO_RCVBUF), config.getOption(DIRECT_BUF));
-            SSLEngineResult result = engine.unwrap(src, byteBuffer);
-            switch (result.getStatus()) {
-                case BUFFER_OVERFLOW:
-                    byteBuffer = enlargeApplicationBuffer(byteBuffer);
-                    break;
-                case BUFFER_UNDERFLOW:
-                    if (engine.getSession().getPacketBufferSize() > src.capacity()) {
-                        ByteBuffer newBuffer = enlargePacketBuffer(src);
-                        newBuffer.put(src);
-                        src = newBuffer;
-                        updateInboundPipeline();
-                        return HandlerStatus.DIRTY;
-                    }
-                    break;
-                case OK:
-                    break;
-                case CLOSED:
-                    if (!engine.isOutboundDone()) {
-                        engine.closeOutbound();
-                    }
-                    break;
-                default:
-                    throw new IllegalStateException("Invalid SSL status: " + result.getStatus());
-            }
-            SSLEngineResult.HandshakeStatus handshakeStatus = result.getHandshakeStatus();
 
-            outer:
-            while (true) {
-                switch (handshakeStatus) {
-                    case NOT_HANDSHAKING:
-                    case FINISHED:
-                        setHandshakeSuccess();
-                        break outer;
-                    case NEED_TASK:
-                        runAllDelegatedTasks();
-                        handshakeStatus = engine.getHandshakeStatus();
-                        break;
-                    case NEED_WRAP:
-                        // We just wrap a non app data, and send out.
-                        wrapNonAppData();
-                        handshakeStatus = engine.getHandshakeStatus();
-                        break;
-                    case NEED_UNWRAP:
-                        // If it is NEED_UNWRAP, it need some message to be unwrapped,
-                        // so we need wakeup inbound pipeline to get more message from SocketChannel.
-                        wakeupInbound();
-                        break outer;
-                    default:
-                        throw new IllegalStateException("unknown handshake status: " + handshakeStatus);
+            while (src.hasRemaining()) {
+                if (logger.isFineEnabled()) {
+                    logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
                 }
-            }
+                SSLEngineResult result = engine.unwrap(src, byteBuffer);
+                if (logger.isFineEnabled()) {
+                    logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s], byteBuffer=[%s, %s, %s], status=[%s, %s]",
+                            channel, src.position(), src.limit(), src.capacity(), byteBuffer.position(), byteBuffer.limit(), byteBuffer.capacity(),
+                            result.getStatus(), result.getHandshakeStatus()));
+                }
+                switch (result.getStatus()) {
+                    case BUFFER_OVERFLOW:
+                        byteBuffer = enlargeApplicationBuffer(byteBuffer);
+                        break;
+                    case BUFFER_UNDERFLOW:
+                        if (engine.getSession().getPacketBufferSize() > src.capacity()) {
+                            ByteBuffer newBuffer = enlargePacketBuffer(src);
+                            newBuffer.put(src);
+                            src = newBuffer;
+                            updateInboundPipeline();
+                            if (logger.isFineEnabled()) {
+                                logger.fine("channel=" + channel + "....BUFFER_UNDERFLOW" );
+                            }
+                        }
+                        return HandlerStatus.CLEAN;
+                    case OK:
+                        break;
+                    case CLOSED:
+                        if (!engine.isOutboundDone()) {
+                            engine.closeOutbound();
+                        }
+                        break;
+                    default:
+                        throw new IllegalStateException("Invalid SSL status: " + result.getStatus());
+                }
 
-            if (handshakeStatus == NOT_HANDSHAKING || handshakeStatus == FINISHED) {
-                // If finished handshake, then putting the byteBuffer to dst.
-                byteBuffer.flip();
-                dst = adapterByteBufferIfNotEnough(dst, byteBuffer.limit());
-                dst.put(byteBuffer);
-                // Do not call flip() here, because it will flip() at the start of next handler.
+                SSLEngineResult.HandshakeStatus handshakeStatus = result.getHandshakeStatus();
+                if (logger.isFineEnabled()) {
+                    logger.fine("enlargePacketBuffer, src=" + src.toString());
+                }
+                outer:
+                while (true) {
+                    switch (handshakeStatus) {
+                        case NOT_HANDSHAKING:
+                        case FINISHED:
+                            if (logger.isFineEnabled()) {
+                                logger.fine("handshakeStatus=" + handshakeStatus);
+                            }
+                            setHandshakeSuccess();
+                            break outer;
+                        case NEED_TASK:
+                            if (logger.isFineEnabled()) {
+                                logger.fine("need-task");
+                            }
+                            runAllDelegatedTasks();
+                            handshakeStatus = engine.getHandshakeStatus();
+                            break;
+                        case NEED_WRAP:
+                            // We just wrap a non app data, and send out.
+                            wrapNonAppData();
+                            handshakeStatus = engine.getHandshakeStatus();
+                            break;
+                        case NEED_UNWRAP:
+                            // If it is NEED_UNWRAP, it need some message to be unwrapped,
+                            // so we need wakeup inbound pipeline to get more message from SocketChannel.
+                            wakeupInbound();
+                            break outer;
+                        default:
+                            throw new IllegalStateException("unknown handshake status: " + handshakeStatus);
+                    }
+                }
+
+                if (handshakeStatus == NOT_HANDSHAKING || handshakeStatus == FINISHED) {
+                    // If finished handshake, then putting the byteBuffer to dst.
+                    byteBuffer.flip();
+                    dst = adapterByteBufferIfNotEnough(dst, byteBuffer.limit());
+                    dst.put(byteBuffer);
+                    compactOrClear(byteBuffer);
+                    if (logger.isFineEnabled()) {
+                        logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s]", channel, dst.position(), dst.limit(), dst.capacity()));
+                    }
+                    // Do not call flip() here, because it will flip() at the start of next handler.
+                }
             }
             return HandlerStatus.CLEAN;
         }
         catch (SSLException sslException) {
             engine.closeOutbound();
-            throw new SSLException("A problem was encountered while processing data caused the SSLEngine to abort. try to close connection...");
+            throw new SSLException("A problem was encountered while processing data caused the SSLEngine to abort. try to close connection..." + sslException.getMessage());
         }
         finally {
             compactOrClear(src);
@@ -195,6 +222,9 @@ public class SslInboundHandler
     {
         ChannelOptions config = channel.options();
         int appBufferSize = engine.getSession().getApplicationBufferSize();
+        if (logger.isFineEnabled()) {
+            logger.fine("enlargeApplicationBuffer....");
+        }
         if (appBufferSize > buffer.capacity()) {
             buffer = newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF));
         }
@@ -208,6 +238,9 @@ public class SslInboundHandler
     {
         ChannelOptions config = channel.options();
         int appBufferSize = engine.getSession().getPacketBufferSize();
+        if (logger.isFineEnabled()) {
+            logger.fine("enlargePacketBuffer....");
+        }
         if (appBufferSize > buffer.capacity()) {
             buffer = newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF));
         }
@@ -221,6 +254,9 @@ public class SslInboundHandler
     {
         ChannelOptions config = channel.options();
         if (buffer.capacity() < otherBufferLimit) {
+            if (logger.isFineEnabled()) {
+                logger.fine("adapterByteBufferIfNotEnough....");
+            }
             buffer = newByteBuffer(otherBufferLimit, config.getOption(DIRECT_BUF));
             updateInboundPipeline();
         }
