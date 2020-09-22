@@ -48,6 +48,11 @@ We will use this example throughout this tutorial.
 
 In `etc/config.properties`, add these lines:
 
+Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
+
+Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is node.data_dir;
+otherwise, the current workspace is the parent directory of openlookeng server's bin directory.
+
     hetu.heuristicindex.filter.enabled=true
     hetu.heuristicindex.filter.cache.max-indices-number=2000000
     hetu.heuristicindex.indexstore.uri=/opt/hetu/indices

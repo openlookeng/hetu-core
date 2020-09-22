@@ -23,6 +23,12 @@ hetu.metastore.db.user=root
 hetu.metastore.db.password=my-mysql-pwd
 ```
 * 下面是使用HDFS作为元数据存储的实例，创建`etc/hetu-metastore.properties`：
+
+    路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+
+    注意：避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir；
+        如果没有配置，那么当前工作目录为openlookeng server的bin目录的上级目录
+
 ```
 # the type of metastore storage
 hetu.metastore.type=hetufilesystem
