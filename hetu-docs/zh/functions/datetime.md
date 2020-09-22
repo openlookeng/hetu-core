@@ -383,11 +383,13 @@
 
 这是`week`的别名。
 
-#### YEAR OF WEEK
+#### YEAR
 
 **year(x)** -> bigint
 
 从`x`返回年份。
+
+#### YEAR OF WEEK
 
 **year\_of\_week(x)** -> bigint
 

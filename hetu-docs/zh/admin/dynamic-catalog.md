@@ -32,11 +32,11 @@ fs.client.type=local
 ```
 ## 使用
 
-目录操作是通过openLooKeng协调节点上的RESTful API来完成的。HTTP请求具有如下形态（以hive连接节点为例）：
+目录操作是通过openLooKeng协调节点上的RESTful API来完成的。HTTP请求具有如下形态（以hive连接节点为例），POST/PUT请求体形式为`multipart/form-data`：
 
     request: POST/DELETE/PUT
     
-    header: ``X-Presto-User: admin``
+    header: `X-Presto-User: admin`
     
     form: 'catalogInformation={
             "catalogName" : "hive",
@@ -131,6 +131,5 @@ UPDATE操作是DELETE和ADD操作的组合。首先管理员向协调节点发�
 
 ## 对查询的影响
 
-- 添加目录后，在扫描期间查询可能会失败。
-- 删除目录后，正在执行的查询可能会失败。查询可能能够在扫描期间完成。
-- 更新目录时，正在进行的查询可能会失败。更新目录后，在扫描期间查询可能会失败。
+- 删除目录后，正在执行的查询可能会失败。
+- 更新目录时，正在进行的查询可能会失败。

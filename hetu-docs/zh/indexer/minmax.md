@@ -3,7 +3,7 @@
 
 ## 用例
 
-MinMax 索引用于拆分过滤，仅被**coordinator**节点使用。
+MinMax 索引用于分片过滤，仅被**coordinator**节点使用。
 
 如果查询中作为谓词一部分的列存在此索引，则引擎可以通过筛选预定Splits来提高性能，类似于Bloom索引。
 

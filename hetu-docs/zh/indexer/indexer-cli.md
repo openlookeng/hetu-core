@@ -14,13 +14,13 @@ WITH ( "bloom.fpp" = '0.001', [, …] )
 WHERE predicate;
 ```
 
-To show all indexes or a specific index_name: 
+显示所有索引或特定的索引名称的方法如下：
 ```roomsql
 SHOW INDEX;
 SHOW INDEX index_name;
 ```
 
-To delete an index by name:
+通过索引名称删除索引的方法如下：
 ```roomsql
 DROP INDEX index_name;
 ```
