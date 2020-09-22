@@ -54,7 +54,7 @@ Notice：avoid to choose root directory; ../ can't include in path; if you confi
 otherwise, the current workspace is the parent directory of openlookeng server's bin directory.
 
     hetu.heuristicindex.filter.enabled=true
-    hetu.heuristicindex.filter.cache.max-indices-number=2000000
+    hetu.heuristicindex.filter.cache.max-memory=2GB
     hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
     hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
     
