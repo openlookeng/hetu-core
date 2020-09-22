@@ -32,78 +32,78 @@
 
     <!-- Server -->
     <artifactSet to="lib">
-        <artifact id="${project.groupId}:presto-main:${dep.prestosql.version}" />
+        <artifact id="${project.groupId}:presto-main:${project.version}" />
     </artifactSet>
 
     <!-- Plugins -->
     <artifactSet to="plugin/resource-group-managers">
-        <artifact id="${project.groupId}:presto-resource-group-managers:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-resource-group-managers:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/password-authenticators">
-        <artifact id="${project.groupId}:presto-password-authenticators:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-password-authenticators:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/session-property-managers">
-        <artifact id="${project.groupId}:presto-session-property-managers:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-session-property-managers:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/jmx">
-        <artifact id="${project.groupId}:presto-jmx:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-jmx:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/example-http">
-        <artifact id="${project.groupId}:presto-example-http:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-example-http:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/hive-hadoop2">
-        <artifact id="${project.groupId}:presto-hive-hadoop2:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-hive-hadoop2:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/memory">
-        <artifact id="${project.groupId}:presto-memory:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-memory:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/kafka">
-        <artifact id="${project.groupId}:presto-kafka:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-kafka:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/atop">
-        <artifact id="${project.groupId}:presto-atop:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-atop:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/ml">
-        <artifact id="${project.groupId}:presto-ml:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-ml:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/geospatial">
-        <artifact id="${project.groupId}:presto-geospatial:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-geospatial:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/mysql">
-        <artifact id="${project.groupId}:presto-mysql:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-mysql:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
@@ -121,7 +121,7 @@
     </artifactSet>
 
     <artifactSet to="plugin/postgresql">
-        <artifact id="${project.groupId}:presto-postgresql:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-postgresql:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
@@ -133,7 +133,7 @@
     </artifactSet>
 
     <artifactSet to="plugin/sqlserver">
-        <artifact id="${project.groupId}:presto-sqlserver:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-sqlserver:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
@@ -195,7 +195,7 @@
     </artifactSet>-->
 
     <artifactSet to="plugin/tpch">
-        <artifact id="${project.groupId}:presto-tpch:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-tpch:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
@@ -207,31 +207,31 @@
     </artifactSet>
 
     <artifactSet to="plugin/tpcds">
-        <artifact id="${project.groupId}:presto-tpcds:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-tpcds:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/teradata-functions">
-        <artifact id="${project.groupId}:presto-teradata-functions:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-teradata-functions:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/localfile">
-        <artifact id="${project.groupId}:presto-local-file:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-local-file:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/presto-thrift">
-        <artifact id="${project.groupId}:presto-thrift:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-thrift:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
     <artifactSet to="plugin/presto-elasticsearch">
-        <artifact id="${project.groupId}:presto-elasticsearch:zip:${dep.prestosql.version}">
+        <artifact id="${project.groupId}:presto-elasticsearch:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>

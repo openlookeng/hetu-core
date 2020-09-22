@@ -10,7 +10,7 @@
 
     <groupId>io.hetu.core</groupId>
     <artifactId>presto-root</artifactId>
-    <version>316</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -54,7 +54,7 @@
         <dep.prestosql.apache.hadoop.version>3.2.0-8</dep.prestosql.apache.hadoop.version>
         <carbon.version>2.0.1</carbon.version>
         <dep.prestosql.version>316</dep.prestosql.version>
-        <dep.hetu.version>010</dep.hetu.version>
+        <dep.hetu.version>${project.version}</dep.hetu.version>
         <dep.jetty.version>9.4.30.v20200611</dep.jetty.version>
 
         <!--
@@ -154,149 +154,149 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-vdm</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-metastore</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-common</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-common</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-spi</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-spi</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-resource-group-managers</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-resource-group-managers</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-password-authenticators</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-session-property-managers</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-array</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-plugin-toolkit</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-record-decoder</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-orc</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-parquet</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-rcfile</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-hive</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-hive-hadoop2</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-carbondata</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-example-http</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>zip</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-listener</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-filesystem-client</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-local-file</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-hive</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
@@ -309,13 +309,13 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-tpch</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-tpcds</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
@@ -327,43 +327,43 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-kafka</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-memory</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-base-jdbc</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-datacenter</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-mysql</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-geospatial</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-geospatial-toolkit</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
@@ -375,117 +375,117 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-cli</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-client</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-parser</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-parser</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-main</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-main</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-matching</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-memory-context</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>io.prestosql</groupId>
+                <groupId>io.hetu.core</groupId>
                 <artifactId>presto-elasticsearch</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-jdbc</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-server</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-server-rpm</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-testing-docker</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-tests</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-benchmark</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-benchto-benchmarks</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-product-tests</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-sqlserver</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-heuristic-index</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
@@ -509,45 +509,45 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-thrift-api</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-thrift-api</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-thrift-testing-server</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-thrift</artifactId>
-                <version>${dep.prestosql.version}</version>
+                <version>${project.version}</version>
                 <type>zip</type>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-seed-store</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-state-store</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-transport</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
