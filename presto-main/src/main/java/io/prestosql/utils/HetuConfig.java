@@ -56,6 +56,7 @@ public class HetuConfig
     private long executionPlanCacheTimeout = 60000L;
     private boolean splitCacheMapEnabled = Boolean.FALSE;
     private Duration splitCacheStateUpdateInterval = new Duration(2, TimeUnit.SECONDS);
+    private boolean isTraceStackVisible;
 
     public HetuConfig()
     {
@@ -359,6 +360,20 @@ public class HetuConfig
     public HetuConfig setSplitCacheStateUpdateInterval(Duration stateUpdateInterval)
     {
         this.splitCacheStateUpdateInterval = stateUpdateInterval;
+        return this;
+    }
+
+    public boolean isTraceStackVisible()
+    {
+        return this.isTraceStackVisible;
+    }
+
+    @Config(HetuConstant.TRACE_STACK_VISIBLE)
+    @ConfigDescription("Is stack trace visible for user")
+    public HetuConfig setTraceStackVisible(boolean isTraceStackVisible)
+    {
+        this.isTraceStackVisible = isTraceStackVisible;
+        System.setProperty("stack-trace-visible", String.valueOf(isTraceStackVisible));
         return this;
     }
 }

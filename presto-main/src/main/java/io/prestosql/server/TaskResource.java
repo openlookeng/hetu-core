@@ -31,6 +31,7 @@ import io.prestosql.execution.TaskStatus;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.server.security.SecurityRequireNonNull;
 import io.prestosql.spi.Page;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
@@ -124,8 +125,12 @@ public class TaskResource
     @Consumes({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public Response createOrUpdateTask(@PathParam("taskId") TaskId taskId, TaskUpdateRequest taskUpdateRequest, @Context UriInfo uriInfo)
     {
-        requireNonNull(taskUpdateRequest, "taskUpdateRequest is null");
-
+        try {
+            requireNonNull(taskUpdateRequest, "taskUpdateRequest is null");
+        }
+        catch (Exception ex) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
         Session session = taskUpdateRequest.getSession().toSession(sessionPropertyManager, taskUpdateRequest.getExtraCredentials());
         TaskInfo taskInfo = taskManager.updateTask(session,
                 taskId,
@@ -151,7 +156,7 @@ public class TaskResource
             @Context UriInfo uriInfo,
             @Suspended AsyncResponse asyncResponse)
     {
-        requireNonNull(taskId, "taskId is null");
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
 
         if (currentState == null || maxWait == null) {
             TaskInfo taskInfo = taskManager.getTaskInfo(taskId);
@@ -189,7 +194,7 @@ public class TaskResource
             @Context UriInfo uriInfo,
             @Suspended AsyncResponse asyncResponse)
     {
-        requireNonNull(taskId, "taskId is null");
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
 
         if (currentState == null || maxWait == null) {
             TaskStatus taskStatus = taskManager.getTaskStatus(taskId);
@@ -221,7 +226,7 @@ public class TaskResource
             @QueryParam("abort") @DefaultValue("true") boolean abort,
             @Context UriInfo uriInfo)
     {
-        requireNonNull(taskId, "taskId is null");
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
         TaskInfo taskInfo;
 
         if (abort) {
@@ -247,8 +252,8 @@ public class TaskResource
             @HeaderParam(PRESTO_MAX_SIZE) DataSize maxSize,
             @Suspended AsyncResponse asyncResponse)
     {
-        requireNonNull(taskId, "taskId is null");
-        requireNonNull(bufferId, "bufferId is null");
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+        SecurityRequireNonNull.requireNonNull(bufferId, "bufferId is null");
 
         long start = System.nanoTime();
         ListenableFuture<BufferResult> bufferResultFuture = taskManager.getTaskResults(taskId, bufferId, token, maxSize);
@@ -303,8 +308,8 @@ public class TaskResource
             @PathParam("bufferId") OutputBufferId bufferId,
             @PathParam("token") final long token)
     {
-        requireNonNull(taskId, "taskId is null");
-        requireNonNull(bufferId, "bufferId is null");
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+        SecurityRequireNonNull.requireNonNull(bufferId, "bufferId is null");
 
         taskManager.acknowledgeTaskResults(taskId, bufferId, token);
     }
@@ -314,8 +319,8 @@ public class TaskResource
     @Produces(MediaType.APPLICATION_JSON)
     public void abortResults(@PathParam("taskId") TaskId taskId, @PathParam("bufferId") OutputBufferId bufferId, @Context UriInfo uriInfo)
     {
-        requireNonNull(taskId, "taskId is null");
-        requireNonNull(bufferId, "bufferId is null");
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+        SecurityRequireNonNull.requireNonNull(bufferId, "bufferId is null");
 
         taskManager.abortTaskResults(taskId, bufferId);
     }

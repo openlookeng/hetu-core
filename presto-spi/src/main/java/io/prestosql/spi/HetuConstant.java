@@ -16,6 +16,7 @@ package io.prestosql.spi;
 
 /**
  * HetuConstant contains constant variables used by Hetu classes
+ *
  * @since 2019-11-29
  */
 public class HetuConstant
@@ -37,5 +38,6 @@ public class HetuConstant
     public static final String SPLIT_CACHE_MAP_ENABLED = "hetu.split-cache-map.enabled";
     public static final String SPLIT_CACHE_STATE_UPDATE_INTERVAL = "hetu.split-cache-map.state-update-interval";
     public static final String ENCRYPTED_PROPERTIES = "encrypted-properties";
+    public static final String TRACE_STACK_VISIBLE = "stack-trace-visible";
     public static final long KILOBYTE = 1024L;
 }

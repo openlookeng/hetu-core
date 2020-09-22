@@ -15,6 +15,7 @@ package io.prestosql.server;
 
 import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.StageId;
+import io.prestosql.server.security.SecurityRequireNonNull;
 
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -38,7 +39,7 @@ public class StageResource
     @Path("{stageId}")
     public void cancelStage(@PathParam("stageId") StageId stageId)
     {
-        requireNonNull(stageId, "stageId is null");
+        SecurityRequireNonNull.requireNonNull(stageId, "stageId is null");
         queryManager.cancelStage(stageId);
     }
 }

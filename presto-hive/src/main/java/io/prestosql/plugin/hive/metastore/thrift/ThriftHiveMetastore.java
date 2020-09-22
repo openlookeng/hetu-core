@@ -248,7 +248,7 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("getTable", stats.getGetTable().wrap(() -> {
                         Table table = getTableFromMetastore(databaseName, tableName);
-                        // for cbg we need delete view type check
+                        // we need delete view type check
                         return Optional.of(table);
                     }));
         }
