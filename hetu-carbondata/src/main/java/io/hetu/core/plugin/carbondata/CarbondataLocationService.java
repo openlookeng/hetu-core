@@ -17,6 +17,7 @@ package io.hetu.core.plugin.carbondata;
 import com.google.inject.Inject;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveLocationService;
+import io.prestosql.plugin.hive.HiveWriteUtils;
 import io.prestosql.plugin.hive.LocationHandle;
 import io.prestosql.plugin.hive.WriteIdInfo;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
@@ -48,10 +49,11 @@ public class CarbondataLocationService
     public LocationHandle forNewTable(SemiTransactionalHiveMetastore metastore,
                                       ConnectorSession session, String schemaName,
                                       String tableName, Optional<WriteIdInfo> writeIdInfo,
-                                      Optional<Path> tablePath)
+                                      Optional<Path> tablePath,
+                                      HiveWriteUtils.OpertionType opertionType)
     {
         // TODO: check and make it compatible for cloud scenario
-        super.forNewTable(metastore, session, schemaName, tableName, writeIdInfo, tablePath);
+        super.forNewTable(metastore, session, schemaName, tableName, writeIdInfo, tablePath, opertionType);
         Path targetPath;
         HdfsEnvironment.HdfsContext context =
                 new HdfsEnvironment.HdfsContext(session, schemaName, tableName);

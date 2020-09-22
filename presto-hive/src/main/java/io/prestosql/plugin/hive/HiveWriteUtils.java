@@ -93,7 +93,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 import org.joda.time.DateTimeZone;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.sql.Date;
@@ -109,7 +108,6 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Strings.padEnd;
 import static com.google.common.io.BaseEncoding.base16;
-import static io.prestosql.plugin.hive.HiveSessionProperties.getTemporaryStagingDirectoryPath;
 import static io.prestosql.plugin.hive.HiveUtil.checkCondition;
 import static io.prestosql.plugin.hive.HiveUtil.isArrayType;
 import static io.prestosql.plugin.hive.HiveUtil.isMapType;
@@ -164,8 +162,9 @@ public final class HiveWriteUtils
     }
 
     public enum OpertionType {
-        NEW_TABLE,
-        EXISTING_TABLE
+        CREATE_TABLE,
+        CREATE_TABLE_AS,
+        INSERT
     }
 
     public static RecordWriter createRecordWriter(Path target, JobConf conf, Properties properties, String outputFormatName, ConnectorSession session)
@@ -553,56 +552,43 @@ public final class HiveWriteUtils
 
     public static Path createTemporaryPath(ConnectorSession session, HdfsContext context, HdfsEnvironment hdfsEnvironment, Path targetPath, OpertionType type)
     {
-        // use a per-user temporary directory to avoid permission problems
-        String temporaryPrefix = getTemporaryStagingDirectoryPath(session)
-                .replace("${USER}", context.getIdentity().getUser());
+        String temporaryPrefix;
+        String stagingDirectoryName;
 
         // use relative temporary directory on ViewFS
         if (isViewFileSystem(context, hdfsEnvironment, targetPath)) {
             temporaryPrefix = ".hive-staging";
+            stagingDirectoryName = randomUUID().toString();
+        }
+        else {
+            temporaryPrefix = ((type != OpertionType.INSERT) ? targetPath.getParent() : targetPath).toString();
+            if ((type == OpertionType.INSERT) && !pathExists(temporaryPrefix, context, hdfsEnvironment)) {
+                temporaryPrefix = targetPath.getParent().toString();
+            }
+            String queryId = context.getQueryId().isPresent() ? context.getQueryId().get() : "";
+            stagingDirectoryName = ".staging-" + queryId + "-" + randomUUID().toString();
         }
 
         // create a temporary directory on the same filesystem
         Path temporaryRoot = new Path(targetPath, temporaryPrefix);
-        Path temporaryPath = new Path(temporaryRoot, randomUUID().toString());
+        Path temporaryPath = new Path(temporaryRoot, stagingDirectoryName);
 
-        switch (type) {
-            case NEW_TABLE:
-                createDirectoryAndSetOwner(context, hdfsEnvironment, temporaryPath, targetPath.getParent());
-                break;
-            case EXISTING_TABLE:
-                createDirectoryAndSetOwner(context, hdfsEnvironment, temporaryPath, targetPath);
-        }
-
+        createDirectory(context, hdfsEnvironment, temporaryPath);
         return temporaryPath;
     }
 
-    private static void createDirectoryAndSetOwner(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path temporaryPath, Path targetPath)
+    private static boolean pathExists(String location, HdfsContext context, HdfsEnvironment hdfsEnvironment)
     {
-        createDirectory(context, hdfsEnvironment, temporaryPath);
-
-        String group;
+        Path path = new Path(location);
         try {
-            FileStatus targetFS = hdfsEnvironment.getFileSystem(context, targetPath).getFileStatus(targetPath);
-            if (targetFS == null) {
-                return;
+            if (hdfsEnvironment.getFileSystem(context, path).exists(path)) {
+                return true;
             }
-            group = targetFS.getGroup();
-        }
-        catch (FileNotFoundException e) {
-            // Don't set owner if targetPath doesn't exist
-            return;
         }
         catch (IOException e) {
-            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Failed to get group: " + targetPath, e);
+            return false;
         }
-
-        try {
-            hdfsEnvironment.getFileSystem(context, temporaryPath).setOwner(temporaryPath, null, group);
-        }
-        catch (IOException e) {
-            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Failed to set owner on directory: " + temporaryPath, e);
-        }
+        return false;
     }
 
     public static void createDirectory(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
