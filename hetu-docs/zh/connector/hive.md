@@ -645,6 +645,10 @@ DROP TABLE hive.web.request_logs
 DROP SCHEMA hive.web
 ```
 
+## 已知问题
+
+- 在运行并发查询（包括选择、更新、删除、清空）或清空清理时，部分查询可能会由于冲突而失败。读查询也可能失败并报错“FileNotFoundException”。这些场景都是Hive ACID utils的bug导致，但不会造成数据丢失。此外，重新运行读取/选择查询也会成功。
+
 ## Hive连接器限制
 
 - 只有当表是非事务性，`WHERE`子句匹配整个分区时，才支持[DELETE](../sql/delete.md)。对于事务型表，`WHERE`子句可以是任何条件。
