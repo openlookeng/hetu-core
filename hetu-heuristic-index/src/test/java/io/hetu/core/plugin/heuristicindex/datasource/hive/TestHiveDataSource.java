@@ -166,7 +166,7 @@ public class TestHiveDataSource
             Map<String, Class> readColumnClasses = new ConcurrentHashMap<>();
 
             testSource.readSplits(DockerizedHive.DATABASE_NAME, DockerizedHive.TYPES_TABLE_NAME, expectedColumnClasses.keySet().toArray(new String[0]), null,
-                    (column, values, uri, splitStart, lastModified) -> readColumnClasses.putIfAbsent(column, values[0].getClass()));
+                    (column, values, uri, splitStart, lastModified, progress) -> readColumnClasses.putIfAbsent(column, values[0].getClass()));
 
             assertEquals(readColumnClasses, expectedColumnClasses);
         }
@@ -186,7 +186,7 @@ public class TestHiveDataSource
             Map<String, Class> readColumnClasses = new ConcurrentHashMap<>();
 
             testSource.readSplits(DockerizedHive.DATABASE_NAME, DockerizedHive.TYPES_TABLE_NAME, new String[] {unsupportedColumn}, null,
-                    (column, values, uri, splitStart, lastModified) -> readColumnClasses.putIfAbsent(column, values[0].getClass()));
+                    (column, values, uri, splitStart, lastModified, progress) -> readColumnClasses.putIfAbsent(column, values[0].getClass()));
         }
     }
 
@@ -209,7 +209,7 @@ public class TestHiveDataSource
         FileSystem fs = FileSystem.get(conf);
         long totalRows = getTotalRows(fs, tableUrl);
 
-        source.readSplits(databaseName, tableName, columns, partitions, (column, values, uri, splitStart, lastModified) -> {
+        source.readSplits(databaseName, tableName, columns, partitions, (column, values, uri, splitStart, lastModified, progress) -> {
             rowCounter.add(values.length);
             splitCounter.increment();
         });

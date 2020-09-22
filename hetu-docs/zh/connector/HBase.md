@@ -8,9 +8,9 @@
 
 HBase连接支持在外部Apache HBase实例上查询和创建表。用户可以在HBase连接器中创建表，并映射到HBase Cluster中已有的表，支持insert、select和delete操作。
 
-HBase连接器维护着一个元存储，用于持久化HBase元数据，目前元存储只支持以下存储格式：`Local File System`、`Hadoop Distributed File System (HDFS)`和`openLooKeng Metastore`。
+HBase连接器维护着一个元存储，用于持久化HBase元数据，目前元存储只支持以下存储格式：`openLooKeng Metastore`。
 
-**注意：** *Hbase连接器支持Apache HBase 1.3.1版本。*
+**注意：** *Hbase连接器使用Apache HBase 2.2.3版本。*
 
 ## 连接器配置
 
@@ -23,30 +23,12 @@ hbase.zookeeper.quorum=xxx.xxx.xxx.xxx,xxx.xxx.xxx.xxx
 
 hbase.zookeeper.property.clientPort=xxxx
 
-hbase.metastore.type=local
-
-hbase.metastore.uri=/xxx/hbasemetastore.ini
+hbase.metastore.type=hetuMetastore
 ```
 
 对于`hbase.zookeeper.quorum`的值，如果有多个IP地址，请使用逗号（`,`）作为分隔符。
 
 **注意**
-
-如果使用`Local File System`和`HDFS`作为元存储，则需要创建一个空文件，如`hbasemetastore.ini`。
-
-**使用HDFS存储HBase元数据**
-
-需要添加以下属性：
-
-```properties
-hbase.core.site.path=/xxx/core-site.xml
-
-hbase.hdfs.site.path=/xxx/hdfs-site.xml
-
-hbase.metastore.type=hdfs
-
-hbase.metastore.uri=hdfs://xxx.xxx.xxx.xxx:21088/xxx/hbasemetastore.ini
-```
 
 **使用openLooKeng元存储来存储HBase元数据**
 
@@ -54,22 +36,6 @@ hbase.metastore.uri=hdfs://xxx.xxx.xxx.xxx:21088/xxx/hbasemetastore.ini
 
 ```properties
 hbase.metastore.type=hetuMetastore
-```
-
-**Kerberos配置：**
-
-```properties
-hbase.jaas.conf.path=/xxx/jaas.conf
-
-hbase.hbase.site.path=/xxx/hbase-site.xml
-
-hbase.krb5.conf.path=/xxx/krb5.conf
-
-hbase.kerberos.keytab=/xxx/user.keytab
-
-hbase.kerberos.principal=xxx
-
-hbase.authentication.type=KERBEROS
 ```
 
 ## 配置属性
@@ -82,16 +48,8 @@ hbase.authentication.type=KERBEROS
 | hbase.client.pause.time| 100| 否| HBase客户端断连时间|
 | hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值。|
 | hbase.default.value| NULL| 否| 表中数据的默认值|
-| hbase.metastore.type| local| 否| HBase元数据的存储，可以从`local/hdfs/hetuMetastore`中选择一种|
-| hbase.metastore.uri| （无）| 是| 存储HBase元数据的文件路径|
-| hbase.core.site.path| （无）| 否| 连接HDFS的配置文件|
-| hbase.hdfs.site.path| （无）| 否| 连接HDFS的配置文件|
-| hbase.authentication.type| （无）| 否| HDFS/HBase组件访问安全身份验证方式|
-| hbase.kerberos.principal| （无）| 否| 安全身份验证的用户名|
-| hbase.kerberos.keytab| （无）| 否| 安全身份验证的密钥|
-| hbase.hbase.site.path| （无）| 否| 连接安全HBase集群的配置|
-| hbase.jaas.conf.path| （无）| 否| 安全身份验证的JAAS|
-| hbase.krb5.conf.path| （无）| 否| 安全身份验证的krb5|
+| hbase.metastore.type| hetuMetastore| 否| HBase元数据的存储，`hetuMetastore`|
+
 
 ## 表属性
 

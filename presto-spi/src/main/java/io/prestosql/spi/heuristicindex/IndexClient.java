@@ -52,11 +52,11 @@ public interface IndexClient
      *
      * @param path relative path to the split index file or dir, if dir, it will be searched recursively (relative to \
      * the root uri, if one was set)
-     * @param filterIndexTypes only load index types matching these types, if empty or null, all types will be loaded
      * @return all split indexes that were read, with the split metadata set based on the split path
      * @throws IOException thrown by doing IO operations using filesystem client
      */
-    public List<IndexMetadata> readSplitIndex(String path, String... filterIndexTypes) throws IOException;
+    public List<IndexMetadata> readSplitIndex(String path)
+            throws IOException;
 
     /**
      * Searches the path for lastModified file and returns the value as a long.
@@ -77,10 +77,11 @@ public interface IndexClient
      * Delete the indexes for the table, if columns are specified, only indexes
      * for the specified columns will be deleted.
      *
-     * @param table fully qualified table name
-     * @param columns columns to delete index of, if null the indexes for the entire
-     * table are deleted
+     * @param table table of the index
+     * @param columns columns of the index
+     * @param indexType the index type
      * @throws IOException any IOException thrown by filesystem client during file deletion
      */
-    public void deleteIndex(String table, String[] columns) throws IOException;
+    public void deleteIndex(String table, String[] columns, String indexType)
+            throws IOException;
 }

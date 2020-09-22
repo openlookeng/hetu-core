@@ -126,7 +126,6 @@
         <module>hetu-oracle</module>
         <module>hetu-vdm</module>
         <module>hetu-heuristic-index</module>
-        <module>hetu-heuristic-index-cli</module>
         <module>hetu-datacenter</module>
         <module>hetu-hana</module>
         <module>hetu-listener</module>

@@ -20,7 +20,6 @@ import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -62,7 +61,7 @@ public class IndexCacheLoader
 
         List<IndexMetadata> indices;
         try {
-            indices = indexClient.readSplitIndex(key.getPath(), key.getIndexTypes());
+            indices = indexClient.readSplitIndex(key.getPath());
         }
         catch (Exception e) {
             throw new Exception("No valid index files found for key " + key, e);
@@ -70,7 +69,7 @@ public class IndexCacheLoader
 
         // lastModified file was valid, but no index files for the given types
         if (indices.isEmpty()) {
-            throw new Exception("No index files found for key " + key + " of type(s) " + Arrays.toString(key.getIndexTypes()));
+            throw new Exception("No index files found for key " + key);
         }
 
         // Sort the indices based on split starting position

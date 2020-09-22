@@ -25,6 +25,5 @@ public class TestTableNameCompleter
         QueryRunner runner = TestQueryRunner.createQueryRunner(session);
 
         TableNameCompleter completer = new TableNameCompleter(runner);
-        //assertEquals(completer.complete("SELECT is_infi", 14, ImmutableList.of()), 7);
     }
 }

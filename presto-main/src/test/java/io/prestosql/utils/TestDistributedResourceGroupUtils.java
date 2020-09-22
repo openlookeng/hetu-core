@@ -149,7 +149,6 @@ public class TestDistributedResourceGroupUtils
         synchronized (lock) {
             //manully load datetime
             DateTime dt = DistributedResourceGroupUtils.getLastUpdateTime();
-            //Thread.sleep(1000);
 
             ResourceGroupId root = new ResourceGroupId("root");
 

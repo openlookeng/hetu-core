@@ -94,7 +94,6 @@ public class CarbondataPageSourceProvider
             Configuration configuration = this.hdfsEnvironment.getConfiguration(
                     new HdfsEnvironment.HdfsContext(session, carbonSplit.getDatabase(), carbonSplit.getTable()),
                     new Path(carbonSplit.getSchema().getProperty("tablePath")));
-//            configuration = carbonTableReader.updateS3Properties(configuration);
             CarbonTable carbonTable = getCarbonTable(carbonSplit, configuration);
 
             /* So that CarbonTLS can access it */

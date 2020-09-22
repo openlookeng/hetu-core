@@ -160,19 +160,16 @@ public class CursorProcessorCompiler
                 .getVariable(cursor)
                 .invokeVirtual(classDefinition.getType(), "filter", type(boolean.class), type(ConnectorSession.class), type(RecordCursor.class));
 
-        // pageBuilder.declarePosition();
         ifStatement.ifTrue()
                 .getVariable(pageBuilder)
                 .invokeVirtual(PageBuilder.class, "declarePosition", void.class);
 
-        // this.project_43(session, cursor, pageBuilder.getBlockBuilder(42)));
         for (int projectionIndex = 0; projectionIndex < projections; projectionIndex++) {
             ifStatement.ifTrue()
                     .append(method.getThis())
                     .getVariable(session)
                     .getVariable(cursor);
 
-            // pageBuilder.getBlockBuilder(0)
             ifStatement.ifTrue()
                     .getVariable(pageBuilder)
                     .push(projectionIndex)

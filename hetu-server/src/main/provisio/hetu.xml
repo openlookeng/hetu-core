@@ -12,8 +12,8 @@
     </fileSet>
 
     <fileSet to="bin">
-        <directory path="${basedir}/../hetu-heuristic-index-cli/target/">
-            <include>hetu-heuristic-index-cli-shaded.jar</include>
+        <directory path="${basedir}/../presto-cli/target/">
+            <include>hetu-cli-010-executable.jar</include>
         </directory>
     </fileSet>
 
@@ -22,7 +22,7 @@
         <artifact id="io.airlift:launcher:tar.gz:bin:${dep.packaging.version}">
             <unpack />
         </artifact>
-        <artifact id="io.hetu.core:hetu-heuristic-index-cli:tar.gz:bin:${project.version}">
+        <artifact id="io.hetu.core:presto-cli:tar.gz:bin:${project.version}">
             <unpack />
         </artifact>
         <artifact id="io.airlift:launcher:tar.gz:properties:${dep.packaging.version}">

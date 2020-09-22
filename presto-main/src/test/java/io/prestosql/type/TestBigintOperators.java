@@ -250,7 +250,6 @@ public class TestBigintOperators
     {
         assertNumericOverflow(format("%s * BIGINT '2'", Long.MAX_VALUE), "bigint multiplication overflow: 9223372036854775807 * 2");
         // TODO: uncomment when https://github.com/prestodb/presto/issues/4571 is fixed
-        //assertNumericOverflow(format("%s * -1", Long.MAX_VALUE), "bigint multiplication overflow: 9223372036854775807 * -1");
     }
 
     @Test(enabled = false) // TODO: enable when https://github.com/prestodb/presto/issues/4571 is fixed

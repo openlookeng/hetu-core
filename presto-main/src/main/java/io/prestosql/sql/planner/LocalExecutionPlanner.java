@@ -1341,7 +1341,6 @@ public class LocalExecutionPlanner
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
                     collector.initContext(tableScanNode.getAssignments(), dynamicFilters.get());
-//                    return Suppliers.memoizeWithExpiration(() -> collector.getDynamicFilters(tableScanNode), 5, TimeUnit.MILLISECONDS);
                     return () -> collector.getDynamicFilters(tableScanNode);
                 }
             }

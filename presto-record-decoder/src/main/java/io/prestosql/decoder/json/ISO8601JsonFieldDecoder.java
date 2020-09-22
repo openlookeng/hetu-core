@@ -104,14 +104,10 @@ public class ISO8601JsonFieldDecoder
             try {
                 String textValue = value.asText();
                 if (columnType == TIMESTAMP) {
-                    // Equivalent to: ISO_DATE_TIME.parse(textValue, LocalDateTime::from).toInstant(UTC).toEpochMilli();
                     TemporalAccessor parseResult = ISO_DATE_TIME.parse(textValue);
                     return TimeUnit.DAYS.toMillis(parseResult.getLong(EPOCH_DAY)) + parseResult.getLong(MILLI_OF_DAY);
                 }
                 if (columnType == TIMESTAMP_WITH_TIME_ZONE) {
-                    // Equivalent to:
-                    // ZonedDateTime dateTime = ISO_OFFSET_DATE_TIME.parse(textValue, ZonedDateTime::from);
-                    // packDateTimeWithZone(dateTime.toInstant().toEpochMilli(), getTimeZoneKey(dateTime.getZone().getId()));
                     TemporalAccessor parseResult = ISO_OFFSET_DATE_TIME.parse(textValue);
                     return packDateTimeWithZone(parseResult.getLong(INSTANT_SECONDS) * 1000 + parseResult.getLong(MILLI_OF_SECOND), getTimeZoneKey(ZoneId.from(parseResult).getId()));
                 }

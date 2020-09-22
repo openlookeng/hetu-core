@@ -90,7 +90,7 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(table, column, split);
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
         assertEquals(actualSplitIndex.get(0), expectedIndices.get(0));
     }
 
@@ -136,7 +136,7 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(table, column, split);
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
 
         // now the index is in the cache, but changing the lastmodified date of the split should invalidate it
         when(indexMetadata.getLastUpdated()).then(new Returns(testLastModifiedTime + 1));
@@ -166,9 +166,9 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(table, column, split);
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
         assertEquals(actualSplitIndex.get(0), indexMetadata1);
-        assertEquals(indexCache.getCacheSize(), 1);
+        assertEquals(indexCache.getCacheSize(), 2);
 
         //get index for split2
         when(connectorSplit.getFilePath()).thenReturn(testPath2);
@@ -183,7 +183,7 @@ public class TestIndexCache
         when(indexCacheLoader.load(any())).then(new Returns(expectedIndices2));
         actualSplitIndex = indexCache.getIndices(table, column, split);
         assertEquals(actualSplitIndex.size(), 0);
-        assertEquals(indexCache.getCacheSize(), 1);
+        assertEquals(indexCache.getCacheSize(), 2);
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(table, column, split);
         assertEquals(actualSplitIndex.size(), 1);

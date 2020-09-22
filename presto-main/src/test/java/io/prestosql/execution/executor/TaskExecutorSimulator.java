@@ -101,10 +101,6 @@ public class TaskExecutorSimulator
 
         SimulationController controller = new SimulationController(taskExecutor, TaskExecutorSimulator::printSummaryStats);
 
-        // Uncomment one of these:
-        // runExperimentOverloadedCluster(controller);
-        // runExperimentMisbehavingQuanta(controller);
-        // runExperimentStarveSlowSplits(controller);
         runExperimentWithinLevelFairness(controller);
 
         System.out.println("Stopped scheduling new tasks. Ending simulation..");

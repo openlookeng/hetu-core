@@ -106,7 +106,7 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.size(), 0);
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
     }
 
     @Test
@@ -156,7 +156,7 @@ public class TestIndexCache
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
 
         // now the index is in the cache, but changing the lastmodified date of the split should invalidate it
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime + 1);
@@ -190,7 +190,7 @@ public class TestIndexCache
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicateForPartition,
                 partitionColumns);
 
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
     }
 
     @Test
@@ -216,9 +216,9 @@ public class TestIndexCache
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
                 testPartitions);
-        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.size(), 2);
         assertEquals(actualSplitIndex.get(0), expectedIndices1.get(0));
-        assertEquals(indexCache.getCacheSize(), 1);
+        assertEquals(indexCache.getCacheSize(), 2);
 
         //get index for split2
         when(testHiveSplit.getPath()).thenReturn(testPath2);
@@ -233,7 +233,7 @@ public class TestIndexCache
 
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 0);
-        assertEquals(indexCache.getCacheSize(), 1);
+        assertEquals(indexCache.getCacheSize(), 2);
         Thread.sleep(loadDelay + 500);
         actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
         assertEquals(actualSplitIndex.size(), 1);

@@ -355,7 +355,7 @@ public class Query
         out.println();
     }
 
-    private static void renderErrorLocation(String query, ErrorLocation location, PrintStream out)
+    static void renderErrorLocation(String query, ErrorLocation location, PrintStream out)
     {
         List<String> lines = ImmutableList.copyOf(Splitter.on('\n').split(query).iterator());
 

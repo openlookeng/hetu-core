@@ -119,7 +119,6 @@ public class SliceDictionarySelectiveColumnReader
         this.isCharType = orcType.getOrcTypeKind() == CHAR;
         this.outputRequired = outputType.isPresent();
         this.orcType = orcType;
-        //checkArgument(filter.isPresent() || outputRequired, "filter must be present if outputRequired is false");
     }
 
     @Override
