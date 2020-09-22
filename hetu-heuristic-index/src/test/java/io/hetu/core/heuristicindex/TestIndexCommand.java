@@ -15,6 +15,7 @@
 package io.hetu.core.heuristicindex;
 
 import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.heuristicindex.util.IndexCommandUtils;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
@@ -22,9 +23,7 @@ import io.prestosql.spi.heuristicindex.IndexWriter;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.testng.PowerMockTestCase;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
-import picocli.CommandLine;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -34,39 +33,26 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
 
-import static io.hetu.core.heuristicindex.IndexCommandUtils.loadDataSourceProperties;
-import static io.hetu.core.heuristicindex.IndexCommandUtils.loadIndexStore;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static io.hetu.core.heuristicindex.util.IndexCommandUtils.loadDataSourceProperties;
+import static io.hetu.core.heuristicindex.util.IndexCommandUtils.loadIndexStore;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
-@PrepareForTest({LoggerFactory.class, IndexCommandUtils.class})
+@PrepareForTest({IndexCommandUtils.class, IndexRecordManager.class})
 @PowerMockIgnore("javax.management.*")
 @Test(singleThreaded = true)
 public class TestIndexCommand
         extends PowerMockTestCase
 {
-    @Test
-    public void validateInputs() throws IOException
-    {
-        try {
-            IndexCommand indexCommand = new IndexCommand("/", "catalog.schema.table", IndexCommand.Command.show);
-            indexCommand.call();
-        }
-        catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("Config directory path must at user workspace"));
-        }
-    }
-
-    @Test
+    @Test(expectedExceptions = RuntimeException.class)
     public void testCallWithEmptyConfigDirectory()
             throws IOException
     {
@@ -75,14 +61,14 @@ public class TestIndexCommand
             File tempFile = testFolder.newFile();
             assertTrue(tempFile.delete());
 
-            String[] args = {"--config=" + tempFile.getAbsolutePath(), "--table=catalog.schema.table",
-                    "--column=column", "--type=bloom", "create"};
+            IndexCommand indexCommand = new IndexCommand(tempFile.getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
+                    "bloom", null, true, false, null);
 
-            assertRuntimeException(args);
+            indexCommand.createIndex();
         }
     }
 
-    @Test
+    @Test(expectedExceptions = RuntimeException.class)
     public void testCallWithNoIndexType()
             throws IOException
     {
@@ -90,12 +76,13 @@ public class TestIndexCommand
             testFolder.create();
 
             mockStatic(IndexCommandUtils.class);
-            when(IndexCommandUtils.loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(IndexCommandUtils.loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
+            when(loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
+            when(loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
 
-            String[] args = {"--config=" + testFolder.getRoot().getAbsolutePath(), "--table=catalog.schema.table", "--column=column", "create"};
+            IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
+                    null, null, true, false, null);
 
-            assertRuntimeException(args);
+            indexCommand.createIndex();
         }
     }
 
@@ -109,16 +96,18 @@ public class TestIndexCommand
             IndexFactory factory = mock(IndexFactory.class);
             IndexWriter writer = mock(IndexWriter.class);
             when(factory.getIndexWriter(any(), any(), any(), any())).thenReturn(writer);
-
+            mockStatic(IndexRecordManager.class);
+            when(IndexRecordManager.readAllIndexRecords(any(), any())).thenReturn(null);
             mockStatic(IndexCommandUtils.class);
-            when(IndexCommandUtils.loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(IndexCommandUtils.loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
+            when(loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
+            when(loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
             when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
 
-            String[] args = {"--config=" + testFolder.getRoot().getAbsolutePath(), "--table=catalog.schema.table", "--column=column", "--type=bloom", "create"};
-            IndexCommand.main(args);
+            IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
+                    "bloom", null, false, false, null);
+            indexCommand.createIndex();
 
-            verify(writer, times(1)).createIndex(any(), any(), any(), any(), eq(true), eq(false));
+            verify(writer, times(1)).createIndex(any(), any(), any(), any(), eq(false));
         }
     }
 
@@ -132,16 +121,18 @@ public class TestIndexCommand
             IndexFactory factory = mock(IndexFactory.class);
             IndexClient client = mock(IndexClient.class);
             when(factory.getIndexClient(any(), any())).thenReturn(client);
-
+            mockStatic(IndexRecordManager.class);
+            when(IndexRecordManager.lookUpIndexRecord(any(), any(), anyString())).thenReturn(new IndexRecordManager.IndexRecord(null, null, null, null, null, null));
             mockStatic(IndexCommandUtils.class);
-            when(IndexCommandUtils.loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(IndexCommandUtils.loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
+            when(loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
+            when(loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
             when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
 
-            String[] args = {"--config=" + testFolder.getRoot().getAbsolutePath(), "--table=catalog.schema.table", "--column=column", "--type=bloom", "delete"};
-            IndexCommand.main(args);
+            IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
+                    "bloom", null, false, false, null);
+            indexCommand.deleteIndex();
 
-            verify(client, times(1)).deleteIndex(any(), any());
+            verify(client, times(1)).deleteIndex(any(), any(), any());
         }
     }
 
@@ -190,13 +181,5 @@ public class TestIndexCommand
 
             assertNotNull(factory.getIndexWriter(dsPropsRead, ixProps, is.getFs(), is.getRoot()));
         }
-    }
-
-    private void assertRuntimeException(String[] args)
-    {
-        IndexCommand myCommand = new IndexCommand();
-        CommandLine commandLine = new CommandLine(myCommand);
-        commandLine.parseArgs(args);
-        assertThrows(RuntimeException.class, myCommand::call);
     }
 }

@@ -149,6 +149,9 @@ public class ClientOptions
     @Option(name = "--ignore-errors", title = "ignore errors", description = "Continue processing in batch mode when an error occurs (default is to exit immediately)")
     public boolean ignoreErrors;
 
+    @Option(name = {"-c", "--config"}, title = "root folder of hetu etc directory (default: \"../etc\")", description = "root folder of hetu etc directory (default: \"../etc\")")
+    public String configDirPath = "../etc";
+
     public enum OutputFormat
     {
         ALIGNED,

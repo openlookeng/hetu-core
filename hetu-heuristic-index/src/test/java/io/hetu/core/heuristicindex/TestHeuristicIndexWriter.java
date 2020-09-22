@@ -141,7 +141,7 @@ public class TestHeuristicIndexWriter
             public void readSplits(String schema, String table, String[] columns, String[] partitions, DataSource.Callback callback)
             {
                 Object[] values = new Object[] {"test", "dsfdfs", "random"};
-                callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis());
+                callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis(), 0);
             }
         };
         try (TempFolder folder = new TempFolder()) {
@@ -164,13 +164,13 @@ public class TestHeuristicIndexWriter
                     .filter(Files::isRegularFile).collect(Collectors.toSet());
             previousFiles.forEach(f -> LOG.info(f.toString()));
 
-            writer.createIndex(tableName, new String[] {"test"}, new String[] {}, "minmax");
+            writer.createIndex(tableName, new String[] {"test"}, new String[] {}, "bloom");
             LOG.info("New files:");
             Set<Path> newFiles = Files.walk(Paths.get(indexFolder.getAbsolutePath()))
                     .filter(Files::isRegularFile).collect(Collectors.toSet());
             newFiles.forEach(f -> LOG.info(f.toString()));
 
-            // should be the minmax index file and lastmodified file
+            // catalog.schema.table/UT_test_column/minmax/UT_test/lastModified=123.tar
             assertEquals(newFiles.size(), 1);
 
             // all files should be different
@@ -206,7 +206,7 @@ public class TestHeuristicIndexWriter
                     callback)
             {
                 Object[] values = new Object[] {"test", "dsfdfs", "random"};
-                callback.call("UT_test_column", values, "UT_test", 100, 123);
+                callback.call("UT_test_column", values, "UT_test", 100, 123, 0);
             }
         };
 
@@ -236,9 +236,11 @@ public class TestHeuristicIndexWriter
                     .filter(Files::isRegularFile).collect(Collectors.toSet());
             newFiles.forEach(f -> LOG.info(f.toString()));
 
-            // Expect one tar file, containing two minmax index entries
-            assertEquals(newFiles.size(), 1);
-            assertTarEntry(newFiles.iterator().next(), 2);
+            // two files:
+            // catalog.schema.table/UT_test_column/minmax/UT_test/lastModified=123.tar
+            // catalog.schema.table/UT_test_column/bloom/UT_test/lastModified=123.tar
+            assertEquals(newFiles.size(), 2);
+            assertTarEntry(newFiles.iterator().next(), 1);
 
             // previous files should still be there
             for (Path previousFile : previousFiles) {
@@ -270,7 +272,7 @@ public class TestHeuristicIndexWriter
                     callback)
             {
                 Object[] values = new Object[] {"test", "dsfdfs", "random"};
-                callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis());
+                callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis(), 0);
             }
         };
 
@@ -285,7 +287,7 @@ public class TestHeuristicIndexWriter
             HeuristicIndexWriter writer = new HeuristicIndexWriter(ds, indices, fs, folder.getRoot().toPath());
             String tableName = "catalog.schema.table";
 
-            writer.createIndex(tableName, new String[] {"test"}, new String[] {}, new String[] {"bloom"}, true, true);
+            writer.createIndex(tableName, new String[] {"test"}, new String[] {}, "bloom", true);
 
             File indexFolder = new File(folder.getRoot().getAbsolutePath() + "/" + tableName);
             LOG.info("Previous files:");
@@ -293,9 +295,8 @@ public class TestHeuristicIndexWriter
                     .filter(Files::isRegularFile).collect(Collectors.toSet());
             files.forEach(f -> LOG.info(f.toString()));
 
-            // Expect one tar file, containing two minmax index entries
             assertEquals(files.size(), 1);
-            assertTarEntry(files.iterator().next(), 2);
+            assertTarEntry(files.iterator().next(), 1);
         }
     }
 
@@ -321,7 +322,7 @@ public class TestHeuristicIndexWriter
                 throws IOException
         {
             Object[] values = new Object[] {"test", "dsfdfs", "random"};
-            callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis());
+            callback.call("UT_test_column", values, "UT_test", 100, System.currentTimeMillis(), 0);
         }
     }
 

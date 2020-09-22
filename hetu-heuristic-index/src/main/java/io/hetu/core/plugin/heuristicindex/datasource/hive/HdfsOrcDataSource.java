@@ -69,6 +69,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -338,13 +339,15 @@ public class HdfsOrcDataSource
         boolean isTransactional = AcidUtils.isTransactionalTable(tableMetadata.getTable().getParameters());
         boolean isFullAcid = AcidUtils.isFullAcidTable(tableMetadata.getTable().getParameters());
         List<FileStatus> files = HadoopUtil.getFiles(getFs(), tablePath, partitions, isTransactional);
+        AtomicLong processedFiles = new AtomicLong();
+
         // schedule reading of each file
         ExecutorService executorServices = new ThreadPoolExecutor(getConcurrency(), getConcurrency(), 0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(10240));
         try {
             List<Future> jobs = files.parallelStream().map(file -> executorServices.submit(() -> {
                         String path = file.getPath().toString();
                         long lastModified = file.getModificationTime();
-
+                        double progress = (processedFiles.incrementAndGet() / ((double) files.size()));
                         FSDataInputStream in;
                         try {
                             in = getFs().open(new Path(path));
@@ -359,7 +362,7 @@ public class HdfsOrcDataSource
                                 new OrcDataSourceId(path), file.getLen(),
                                 new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE),
                                 true, in, new FileFormatDataSourceStats())) {
-                            readOrcFile(source, path, isFullAcid, columnTypes, columnNames, lastModified, callback);
+                            readOrcFile(source, path, isFullAcid, columnTypes, columnNames, lastModified, progress, callback);
                         }
                         catch (Exception e) {
                             LOG.error(String.format(ENGLISH, "Error reading file: %s. Skipping.", path), e);
@@ -386,6 +389,7 @@ public class HdfsOrcDataSource
             Map<Integer, Type> columnTypes,
             Map<Integer, String> columnNames,
             long lastModified,
+            double progress,
             Callback callback)
             throws IOException
     {
@@ -475,7 +479,8 @@ public class HdfsOrcDataSource
                         columnValues.toArray(new Object[0]),
                         path,
                         stripeInfo.getOffset(),
-                        lastModified);
+                        lastModified,
+                        progress);
                 columnValues.clear();
             }
         }

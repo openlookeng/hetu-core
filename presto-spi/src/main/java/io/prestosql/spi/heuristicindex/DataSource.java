@@ -111,7 +111,8 @@ public interface DataSource
          * @param uri        uri of the file or source that was read
          * @param splitStart the split offset, e.g. if the source was a large file,
          *                   it may have been read in multiple splits
+         * @param progress   Value between 0.0 and 1.0 representing the progress.
          */
-        void call(String column, Object[] values, String uri, long splitStart, long lastModified);
+        void call(String column, Object[] values, String uri, long splitStart, long lastModified, double progress);
     }
 }

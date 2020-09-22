@@ -14,15 +14,31 @@
 package io.prestosql.cli;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.airline.Command;
 import io.airlift.airline.HelpOption;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.airlift.units.Duration;
+import io.hetu.core.heuristicindex.IndexCommand;
+import io.hetu.core.heuristicindex.IndexRecordManager;
 import io.prestosql.client.ClientSelectedRole;
 import io.prestosql.client.ClientSession;
+import io.prestosql.client.ClientTypeSignature;
+import io.prestosql.client.Column;
+import io.prestosql.client.ErrorLocation;
+import io.prestosql.sql.parser.ParsingException;
+import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.parser.StatementSplitter;
+import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.Identifier;
+import io.prestosql.sql.tree.LogicalBinaryExpression;
+import io.prestosql.sql.tree.Property;
+import io.prestosql.sql.tree.ShowIndex;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.History;
 import org.jline.reader.LineReaderBuilder;
@@ -35,15 +51,23 @@ import javax.inject.Inject;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.CharMatcher.whitespace;
 import static com.google.common.base.Preconditions.checkState;
@@ -56,6 +80,7 @@ import static com.google.common.util.concurrent.Uninterruptibles.awaitUninterrup
 import static io.prestosql.cli.Help.getHelpText;
 import static io.prestosql.cli.QueryPreprocessor.preprocessQuery;
 import static io.prestosql.client.ClientSession.stripTransactionId;
+import static io.prestosql.client.ClientStandardTypes.VARCHAR;
 import static io.prestosql.sql.parser.StatementSplitter.Statement;
 import static io.prestosql.sql.parser.StatementSplitter.isEmptyStatement;
 import static java.lang.String.format;
@@ -74,6 +99,7 @@ public class Console
 
     private static final String PROMPT_NAME = "lk";
     private static final Duration EXIT_DELAY = new Duration(3, SECONDS);
+    private static final Pattern createIndexPattern = Pattern.compile("^(drop|create|show)\\s*index.*", Pattern.CASE_INSENSITIVE);
 
     @Inject
     public HelpOption helpOption;
@@ -89,7 +115,6 @@ public class Console
         ClientSession session = clientOptions.toClientSession();
         boolean hasQuery = !isNullOrEmpty(clientOptions.execute);
         boolean isFromFile = !isNullOrEmpty(clientOptions.file);
-
         initializeLogging(clientOptions.logLevelsFile);
 
         String query = clientOptions.execute;
@@ -140,6 +165,11 @@ public class Console
                 Optional.ofNullable(clientOptions.krb5CredentialCachePath),
                 !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization)) {
             if (hasQuery) {
+                if (createIndexPattern.matcher(query).matches()) {
+                    executeHeuristicIndexQuery(query.substring(0, query.length() - 1), exiting, queryRunner);
+                    return true;
+                }
+
                 return executeCommand(
                         queryRunner,
                         exiting,
@@ -155,6 +185,21 @@ public class Console
         finally {
             exited.countDown();
             interruptor.close();
+        }
+    }
+
+    private void executeHeuristicIndexQuery(String query, AtomicBoolean exiting, QueryRunner queryRunner)
+    {
+        switch (query.split(" ", 2)[0].toLowerCase(ENGLISH)) {
+            case "create":
+                createIndexCommand(query, queryRunner, exiting);
+                break;
+            case "show":
+                showIndexCommand(query, queryRunner, exiting);
+                break;
+            case "drop":
+                deleteIndexCommand(query, queryRunner, exiting);
+                break;
         }
     }
 
@@ -186,7 +231,158 @@ public class Console
         }
     }
 
-    private static void runConsole(QueryRunner queryRunner, AtomicBoolean exiting)
+    private void deleteIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    {
+        boolean hasAuthenticated = executeCommand(
+                queryRunner,
+                exiting,
+                "show catalogs;",
+                ClientOptions.OutputFormat.NULL,
+                false,
+                false);
+
+        if (hasAuthenticated) {
+            SqlParser parser = new SqlParser();
+            try {
+                DropIndex deleteIndex = (DropIndex) parser.createStatement(query);
+                IndexCommand command = new IndexCommand(clientOptions.configDirPath, deleteIndex.getIndexName().toString(),
+                        false, clientOptions.user);
+                command.deleteIndex();
+            }
+            catch (ParsingException e) {
+                System.out.println(e.getMessage());
+                Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
+            }
+            catch (IllegalArgumentException e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+
+    private void showIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    {
+        boolean hasAuthenticated = executeCommand(
+                queryRunner,
+                exiting,
+                "show catalogs;",
+                ClientOptions.OutputFormat.NULL,
+                false,
+                false);
+
+        if (hasAuthenticated) {
+            SqlParser parser = new SqlParser();
+            try {
+                ShowIndex showIndex = (ShowIndex) parser.createStatement(query);
+                IndexCommand command = new IndexCommand(clientOptions.configDirPath, (showIndex.getIndexName() == null ? "" : showIndex.getIndexName().toString()),
+                        false);
+
+                List<Column> columns = ImmutableList.<Column>builder()
+                        .add(new Column("Index Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                        .add(new Column("User", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                        .add(new Column("Table Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                        .add(new Column("Column Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                        .add(new Column("Index Type", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                        .add(new Column("Partitions", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                        .build();
+                List<IndexRecordManager.IndexRecord> records = command.getIndexes();
+
+                List<List<?>> rows = new ArrayList<>();
+                for (IndexRecordManager.IndexRecord v : records) {
+                    List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, v.note.replaceAll("(.{70})", "$0\n"));
+                    rows.add(strings);
+                }
+                StringWriter writer = new StringWriter();
+                OutputPrinter printer = new AlignedTablePrinter(columns, writer);
+                printer.printRows(rows, true);
+                printer.finish();
+
+                System.out.println(writer.getBuffer().toString());
+            }
+            catch (ParsingException e) {
+                System.out.println(e.getMessage());
+                Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
+            }
+            catch (IOException e) {
+                e.printStackTrace(System.err);
+            }
+        }
+    }
+
+    private void createIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    {
+        boolean hasAuthenticated = executeCommand(
+                queryRunner,
+                exiting,
+                "show catalogs;",
+                ClientOptions.OutputFormat.NULL,
+                false,
+                false);
+
+        if (hasAuthenticated) {
+            SqlParser parser = new SqlParser();
+
+            try {
+                CreateIndex createIndex = (CreateIndex) parser.createStatement(query);
+                String[] columns = createIndex.getColumnAliases().stream()
+                        .map(Identifier::getValue)
+                        .toArray(String[]::new);
+
+                if (columns.length > 1) {
+                    System.out.println("Composite indices are currently not supported");
+                    return;
+                }
+                Expression expression = null;
+
+                // Separating the properties needed by IndexCommand Class from the properties for creating the heuristic index
+                final String parallelCreation = "parallelCreation";
+                final String verbose = "verbose";
+                List<String> indexCommandClassProperties = Arrays.asList(parallelCreation, verbose);
+
+                Map<Boolean, List<Property>> properties = createIndex.getProperties().stream()
+                        .collect(Collectors.partitioningBy(property -> indexCommandClassProperties.stream().anyMatch(property.getName().getValue()::equalsIgnoreCase)));
+
+                String[] indexProperties = properties.get(false).stream()
+                        .map(property -> property.getName() + "=" + property.getValue())
+                        .toArray(String[]::new);
+                Map<String, Boolean> providedClassProperties = properties.get(true).stream()
+                        .collect(Collectors.toMap(property -> property.getName().getValue().toLowerCase(ENGLISH),
+                                property -> Boolean.parseBoolean(property.getValue().toString())));
+
+                if (createIndex.getExpression().isPresent()) {
+                    expression = createIndex.getExpression().get();
+                }
+                String[] partitions = extractPartitions(expression).toArray(new String[0]);
+
+                String indexTypes = createIndex.getIndexType();
+
+                IndexCommand command = new IndexCommand(clientOptions.configDirPath, createIndex.getIndexName().toString(), createIndex.getTableName().toString(),
+                        columns, partitions, indexTypes, indexProperties, providedClassProperties.getOrDefault(parallelCreation, false),
+                        providedClassProperties.getOrDefault(verbose, false), clientOptions.user);
+                command.createIndex();
+            }
+            catch (ParsingException e) {
+                System.out.println(e.getMessage());
+                Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
+            }
+        }
+    }
+
+    private List<String> extractPartitions(Expression expression)
+    {
+        if (expression instanceof ComparisonExpression) {
+            ComparisonExpression exp = (ComparisonExpression) expression;
+            return Collections.singletonList(exp.getLeft().toString() + "=" + exp.getRight().toString());
+        }
+        else if (expression instanceof LogicalBinaryExpression) {
+            LogicalBinaryExpression exp = (LogicalBinaryExpression) expression;
+            Expression left = exp.getLeft();
+            Expression right = exp.getRight();
+            return Stream.concat(extractPartitions(left).stream(), extractPartitions(right).stream()).collect(Collectors.toList());
+        }
+        return Collections.emptyList();
+    }
+
+    private void runConsole(QueryRunner queryRunner, AtomicBoolean exiting)
     {
         try (TableNameCompleter tableNameCompleter = new TableNameCompleter(queryRunner);
                 InputReader reader = new InputReader(getHistoryFile(), Completion.commandCompleter(), tableNameCompleter)) {
@@ -246,6 +442,11 @@ public class Console
                     ClientOptions.OutputFormat outputFormat = ClientOptions.OutputFormat.ALIGNED;
                     if (split.terminator().equals("\\G")) {
                         outputFormat = ClientOptions.OutputFormat.VERTICAL;
+                    }
+                    if (createIndexPattern.matcher(split.statement()).matches()) {
+                        String query = split.statement();
+                        executeHeuristicIndexQuery(query, exiting, queryRunner);
+                        continue;
                     }
                     process(queryRunner, split.statement(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
                 }

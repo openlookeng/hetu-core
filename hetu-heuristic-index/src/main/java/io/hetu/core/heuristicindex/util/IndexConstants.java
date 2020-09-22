@@ -30,6 +30,8 @@ public class IndexConstants
      */
     public static final String LAST_MODIFIED_FILE_PREFIX = "lastModified=";
 
+    public static final String COLUMN_DELIMITER = ",";
+
     public static final String CONFIG_FILE = "config.properties";
 
     public static final String CATALOG_CONFIGS_DIR = "catalog";

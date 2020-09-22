@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.hetu.core.heuristicindex.IndexCommand.verbose;
 
 /**
  * Util class for creating external index.
@@ -107,7 +108,8 @@ public class IndexServiceUtils
      *
      * @param file file need to be checked
      */
-    public static void isFileExisting(File file) throws IOException
+    public static void isFileExisting(File file)
+            throws IOException
     {
         checkArgument(file.exists(), file.getCanonicalPath() + " not found");
     }
@@ -119,7 +121,8 @@ public class IndexServiceUtils
      * @return Property object which holds all properties
      * @throws IOException when property file does NOT exist
      */
-    public static Properties loadProperties(File propertyFile) throws IOException
+    public static Properties loadProperties(File propertyFile)
+            throws IOException
     {
         try (InputStream is = new FileInputStream(propertyFile)) {
             Properties properties = new Properties();
@@ -131,7 +134,7 @@ public class IndexServiceUtils
     /**
      * get files path with a specific suffix from a path array
      *
-     * @param paths  paths array
+     * @param paths paths array
      * @param suffix specific suffix
      * @return first path with specific suffix from that array or null if nothing found
      */
@@ -168,7 +171,7 @@ public class IndexServiceUtils
         String tableName = parts[TABLE_NAME_INDEX];
         checkArgument(!tableName.isEmpty(), INVALID_TABLE_NAME_ERR_MSG);
 
-        return new String[]{catalogName, databaseName, tableName};
+        return new String[] {catalogName, databaseName, tableName};
     }
 
     /**
@@ -250,6 +253,13 @@ public class IndexServiceUtils
                     IOUtils.copy(i, o);
                 }
             }
+        }
+    }
+
+    public static void printVerboseMsg(String msg)
+    {
+        if (verbose) {
+            System.out.println(msg);
         }
     }
 }

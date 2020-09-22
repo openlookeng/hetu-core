@@ -19,6 +19,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -48,6 +49,7 @@ public class IndexCache
 {
     private static final Logger LOG = Logger.get(IndexCache.class);
     private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Hive-IndexCache-pool-%d").setDaemon(true).build();
+    private static final List<String> INDEX_TYPES = ImmutableList.of("bloom", "minmax");
 
     private static ScheduledExecutorService executor;
 
@@ -103,24 +105,26 @@ public class IndexCache
         // for each split, load indexes for each predicate (if the predicate contains an indexed column)
         List<IndexMetadata> splitIndexes = new LinkedList<>();
         effectivePredicate.getDomains().get().keySet().stream()
-                    // if the domain column is a partition column, skip it
-                    .filter(key -> partitions == null || !partitions.contains(key))
-                    .map(HiveColumnHandle::getName)
-                    .map(String::toLowerCase).forEach(column -> {
-                        // security check required before using values in a Path
-                        // e.g. catalog.schema.table or dc.catalog.schema.table
-                        if (!tableFqn.matches("([\\p{Alnum}_]+\\.){2,3}[\\p{Alnum}_]+")) {
-                            LOG.warn("Invalid table name " + tableFqn);
-                            return;
-                        }
+                // if the domain column is a partition column, skip it
+                .filter(key -> partitions == null || !partitions.contains(key))
+                .map(HiveColumnHandle::getName)
+                .map(String::toLowerCase)
+                .forEach(column -> {
+                    // security check required before using values in a Path
+                    // e.g. catalog.schema.table or dc.catalog.schema.table
+                    if (!tableFqn.matches("([\\p{Alnum}_]+\\.){2,3}[\\p{Alnum}_]+")) {
+                        LOG.warn("Invalid table name " + tableFqn);
+                        return;
+                    }
 
-                        if (!column.matches("[\\p{Alnum}_]+")) {
-                            LOG.warn("Invalid column name " + column);
-                            return;
-                        }
+                    if (!column.matches("[\\p{Alnum}_]+")) {
+                        LOG.warn("Invalid column name " + column);
+                        return;
+                    }
 
-                        String indexCacheKeyPath = Paths.get(tableFqn, column, pathUri.getPath()).toString();
-                        IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime, "bitmap", "bloom");
+                    for (String indexType : INDEX_TYPES) {
+                        String indexCacheKeyPath = Paths.get(tableFqn, column, indexType, pathUri.getPath()).toString();
+                        IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime);
                         // check if cache contains the key
                         List<IndexMetadata> predicateIndexes = cache.getIfPresent(indexCacheKey);
 
@@ -154,7 +158,8 @@ public class IndexCache
                                 splitIndexes.addAll(predicateIndexes);
                             }
                         }
-                    });
+                    }
+                });
 
         return splitIndexes;
     }
