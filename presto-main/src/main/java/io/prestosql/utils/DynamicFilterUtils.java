@@ -36,11 +36,9 @@ import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.LOCAL;
  */
 public class DynamicFilterUtils
 {
-    public static final String REGISTERPREFIX = "register-";
     public static final String FILTERPREFIX = "filter-";
-    public static final String FINISHPREFIX = "finish-";
     public static final String PARTIALPREFIX = "partial-";
-    public static final String WORKERSPREFIX = "workers-";
+    public static final String TASKSPREFIX = "tasks-";
     public static final String MERGEMAP = "merged";
     public static final double BLOOM_FILTER_EXPECTED_FPP = 0.25F;
 

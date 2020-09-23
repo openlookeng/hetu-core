@@ -232,7 +232,6 @@ import static com.google.common.collect.Range.closedOpen;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.SystemSessionProperties.getAggregationOperatorUnspillMemoryLimit;
-import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageRowCount;
@@ -2086,7 +2085,7 @@ public class LocalExecutionPlanner
             }
             LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
             return LocalDynamicFilter
-                    .create(node, partitionCount)
+                    .create(node, partitionCount, context.getSession(), context.taskContext.getTaskId(), stateStoreProvider)
                     .map(filter -> {
                         // Intersect dynamic filters' predicates when they become ready,
                         // in order to support multiple join nodes in the same plan fragment.
@@ -2192,11 +2191,7 @@ public class LocalExecutionPlanner
                                         filter.getValueConsumer(), /** the consumer to process all values collected to build the dynamic filter */
                                         filterBuildChannels,
                                         getDynamicFilteringMaxPerDriverValueCount(buildContext.getSession()),
-                                        getDynamicFilteringMaxPerDriverSize(buildContext.getSession()),
-                                        getDynamicFilteringDataType(buildContext.getSession()),
-                                        filter.getType(),
-                                        nodeInfo,
-                                        stateStoreProvider));
+                                        getDynamicFilteringMaxPerDriverSize(buildContext.getSession())));
                     });
 
             HashBuilderOperatorFactory hashBuilderOperatorFactory = new HashBuilderOperatorFactory(

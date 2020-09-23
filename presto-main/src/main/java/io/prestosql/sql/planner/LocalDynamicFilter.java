@@ -18,15 +18,24 @@ import com.google.common.collect.MultimapBuilder;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
+import io.prestosql.Session;
+import io.prestosql.execution.TaskId;
 import io.prestosql.operator.DynamicFilterSourceOperator;
+import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.statestore.StateSet;
+import io.prestosql.spi.statestore.StateStore;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
+import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,8 +46,17 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static com.google.common.base.Verify.verify;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringBloomFilterFpp;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
+import static io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter.convertBloomFilterToByteArray;
+import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
+import static io.prestosql.spi.statestore.StateCollection.Type.SET;
 import static io.prestosql.sql.DynamicFilters.Descriptor;
+import static io.prestosql.utils.DynamicFilterUtils.PARTIALPREFIX;
+import static io.prestosql.utils.DynamicFilterUtils.TASKSPREFIX;
+import static io.prestosql.utils.DynamicFilterUtils.createKey;
 import static io.prestosql.utils.DynamicFilterUtils.findFilterNodeInStage;
+import static io.prestosql.utils.DynamicFilterUtils.getDynamicFilterDataType;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 
@@ -54,27 +72,46 @@ public class LocalDynamicFilter
     private final DynamicFilter.Type type;
     // If any partial dynamic filter is discarded due to too large
     private boolean isIncomplete;
-    private SettableFuture<Map<Symbol, Set>> hashSetResultFuture;
+    private SettableFuture<Map<Symbol, Set>> dynamicFilterResultFuture;
     // Number of partitions left to be processed.
     private int partitionsLeft;
     // The resulting predicate for local dynamic filtering.
     private Map<String, Set> result = new HashMap<>();
 
-    public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount, DynamicFilter.Type type)
+    private DynamicFilterDataType dynamicFilterDataType;
+    private final double bloomFilterFpp;
+    private final StateStoreProvider stateStoreProvider;
+    private final TaskId taskId;
+    private Map<String, DynamicFilterSourceOperator.Channel> channels = new HashMap<>();
+
+    public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount, DynamicFilter.Type type, Session session,
+            TaskId taskId, StateStoreProvider stateStoreProvider)
+    {
+        this(probeSymbols, buildChannels, partitionCount, type, getDynamicFilteringDataType(session),
+                getDynamicFilteringBloomFilterFpp(session), taskId, stateStoreProvider);
+    }
+
+    public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount,
+                              DynamicFilter.Type filterType, DynamicFilterDataType dataType,
+                              double bloomFilterFpp, TaskId taskId, StateStoreProvider stateStoreProvider)
     {
         this.probeSymbols = requireNonNull(probeSymbols, "probeSymbols is null");
         this.buildChannels = requireNonNull(buildChannels, "buildChannels is null");
         verify(probeSymbols.keySet().equals(buildChannels.keySet()), "probeSymbols and buildChannels must have same keys");
 
         this.resultFuture = SettableFuture.create();
-        this.hashSetResultFuture = SettableFuture.create();
+        this.dynamicFilterResultFuture = SettableFuture.create();
 
         this.partitionsLeft = partitionCount;
 
-        this.type = type;
+        this.type = filterType;
+        this.dynamicFilterDataType = requireNonNull(dataType, "dynamic filter data type is null");
+        this.bloomFilterFpp = bloomFilterFpp;
+        this.taskId = requireNonNull(taskId, "taskId is null");
+        this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStore is null");
     }
 
-    public static Optional<LocalDynamicFilter> create(JoinNode planNode, int partitionCount)
+    public static Optional<LocalDynamicFilter> create(JoinNode planNode, int partitionCount, Session session, TaskId taskId, StateStoreProvider stateStoreProvider)
     {
         Set<String> joinDynamicFilters = planNode.getDynamicFilters().keySet();
         // Mapping from probe-side dynamic filters' IDs to their matching probe symbols.
@@ -117,7 +154,7 @@ public class LocalDynamicFilter
         if (buildChannels.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, partitionCount, type));
+        return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, partitionCount, type, session, taskId, stateStoreProvider));
     }
 
     private static void mapProbeSymbols(Expression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
@@ -154,14 +191,6 @@ public class LocalDynamicFilter
      */
     public synchronized void addOperatorResult(Map<DynamicFilterSourceOperator.Channel, Set> values)
     {
-        if (type == DynamicFilter.Type.GLOBAL) {
-            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
-            if (isIncomplete) {
-                hashSetResultFuture.set(bloomFilterResult);
-                return;
-            }
-        }
-
         // Called concurrently by each DynamicFilterSourceOperator instance (when collection is over).
         partitionsLeft--;
         verify(partitionsLeft >= 0);
@@ -174,6 +203,7 @@ public class LocalDynamicFilter
                 result.putIfAbsent(key.getFilterId(), new HashSet<>());
                 Set set = result.get(key.getFilterId());
                 set.addAll(value);
+                channels.put(key.getFilterId(), key);
             });
         }
 
@@ -181,16 +211,73 @@ public class LocalDynamicFilter
         // See the comment at TupleDomain::columnWiseUnion() for more details.
         if (partitionsLeft == 0) {
             // No more partitions are left to be processed.
-            Map<Symbol, Set> bloomFilterResult = new HashMap<>();
+            Map<Symbol, Set> dynamicFilterResult = new HashMap<>();
             if (!isIncomplete) {
                 for (Map.Entry<String, Set> entry : result.entrySet()) {
                     for (Symbol probeSymbol : probeSymbols.get(entry.getKey())) {
-                        bloomFilterResult.put(probeSymbol, entry.getValue());
+                        dynamicFilterResult.put(probeSymbol, entry.getValue());
                     }
                 }
+                addPartialFilterToStateStore();
             }
-            hashSetResultFuture.set(bloomFilterResult);
+            dynamicFilterResultFuture.set(dynamicFilterResult);
         }
+    }
+
+    private void addPartialFilterToStateStore()
+    {
+        StateStore stateStore = stateStoreProvider.getStateStore();
+        if (stateStore == null) {
+            return;
+        }
+
+        DynamicFilter.DataType dataType = getDynamicFilterDataType(type, dynamicFilterDataType);
+        for (Map.Entry<String, Set> filter : result.entrySet()) {
+            DynamicFilterSourceOperator.Channel channel = channels.get(filter.getKey());
+            Set filterValues = filter.getValue();
+            String filterId = channel.getFilterId();
+            String key = createKey(PARTIALPREFIX, filterId, channel.getQueryId());
+
+            if (dataType == BLOOM_FILTER) {
+                byte[] finalOutput = convertBloomFilterToByteArray(createBloomFilterFromSet(channel, filterValues, bloomFilterFpp));
+                if (finalOutput != null) {
+                    ((StateSet) stateStore.getOrCreateStateCollection(key, SET)).add(finalOutput);
+                }
+            }
+            else {
+                ((StateSet) stateStore.getOrCreateStateCollection(key, SET)).add(filterValues);
+            }
+            ((StateSet) stateStore.getOrCreateStateCollection(createKey(TASKSPREFIX, filterId, channel.getQueryId()), SET)).add(taskId.toString());
+            log.debug("creating new " + dataType + " dynamic filter for size of: " + result.size() + ", key: " + key + ", taskId: " + taskId);
+        }
+    }
+
+    private BloomFilter createBloomFilterFromSet(DynamicFilterSourceOperator.Channel channel, Set values, double bloomFilterFpp)
+    {
+        BloomFilter bloomFilter = new BloomFilter(BloomFilterDynamicFilter.DEFAULT_DYNAMIC_FILTER_SIZE, bloomFilterFpp);
+        if (channel.getType().getJavaType() == long.class) {
+            for (Object value : values) {
+                long lv = (Long) value;
+                bloomFilter.add(lv);
+            }
+        }
+        else if (channel.getType().getJavaType() == double.class) {
+            for (Object value : values) {
+                double lv = (Double) value;
+                bloomFilter.add(lv);
+            }
+        }
+        else if (channel.getType().getJavaType() == Slice.class) {
+            for (Object value : values) {
+                bloomFilter.add((Slice) value);
+            }
+        }
+        else {
+            for (Object value : values) {
+                bloomFilter.add(String.valueOf(value).getBytes());
+            }
+        }
+        return bloomFilter;
     }
 
     public Map<String, Integer> getBuildChannels()
@@ -200,7 +287,7 @@ public class LocalDynamicFilter
 
     public ListenableFuture<Map<Symbol, Set>> getDynamicFilterResultFuture()
     {
-        return hashSetResultFuture;
+        return dynamicFilterResultFuture;
     }
 
     public Consumer<Map<DynamicFilterSourceOperator.Channel, Set>> getValueConsumer()

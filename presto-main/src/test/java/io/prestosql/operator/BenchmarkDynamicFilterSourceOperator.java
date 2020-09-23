@@ -18,13 +18,9 @@ import io.airlift.node.NodeInfo;
 import io.airlift.tpch.LineItem;
 import io.airlift.tpch.LineItemGenerator;
 import io.airlift.units.DataSize;
-import io.prestosql.filesystem.FileSystemClientManager;
-import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.testing.TestingTaskContext;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
@@ -52,7 +48,6 @@ import java.util.concurrent.TimeUnit;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
-import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -95,10 +90,7 @@ public class BenchmarkDynamicFilterSourceOperator
                     (tupleDomain -> {}),
                     ImmutableList.of(new DynamicFilterSourceOperator.Channel("0", BIGINT, 0, "--")),
                     getDynamicFilteringMaxPerDriverValueCount(TEST_SESSION),
-                    getDynamicFilteringMaxPerDriverSize(TEST_SESSION),
-                    getDynamicFilteringDataType(TEST_SESSION), DynamicFilter.Type.LOCAL,
-                    nodeInfo,
-                    new LocalStateStoreProvider(new SeedStoreManager(new FileSystemClientManager())));
+                    getDynamicFilteringMaxPerDriverSize(TEST_SESSION));
         }
 
         @TearDown

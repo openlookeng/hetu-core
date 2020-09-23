@@ -14,22 +14,12 @@
 package io.prestosql.operator;
 
 import io.airlift.log.Logger;
-import io.airlift.node.NodeInfo;
-import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
-import io.prestosql.spi.statestore.StateSet;
-import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
-import io.prestosql.spi.util.BloomFilter;
-import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,16 +30,6 @@ import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
-import static io.prestosql.SystemSessionProperties.getDynamicFilteringBloomFilterFpp;
-import static io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter.convertBloomFilterToByteArray;
-import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
-import static io.prestosql.spi.statestore.StateCollection.Type.SET;
-import static io.prestosql.utils.DynamicFilterUtils.FINISHPREFIX;
-import static io.prestosql.utils.DynamicFilterUtils.PARTIALPREFIX;
-import static io.prestosql.utils.DynamicFilterUtils.REGISTERPREFIX;
-import static io.prestosql.utils.DynamicFilterUtils.WORKERSPREFIX;
-import static io.prestosql.utils.DynamicFilterUtils.createKey;
-import static io.prestosql.utils.DynamicFilterUtils.getDynamicFilterDataType;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 
@@ -63,22 +43,14 @@ public class DynamicFilterSourceOperator
 {
     public static final Logger log = Logger.get(DynamicFilterSourceOperator.class);
     private final OperatorContext context;
-    private final double bloomFilterFpp;
     private final Consumer<Map<Channel, Set>> dynamicPredicateConsumer;
     private final int maxFilterPositionsCount;
     private final long maxFilterSizeInBytes;
-    private final DynamicFilterDataType dynamicFilterDataType;
     private final List<Channel> channels;
-    private final DynamicFilter.Type filterType;
-    private final NodeInfo nodeInfo;
-    private final StateStoreProvider stateStoreProvider;
     private boolean finished;
     private Page current;
 
     private Map<Channel, Set> values;
-
-    private long driverId;
-    private boolean haveRegistered;
 
     /**
      * Constructor for the Dynamic Filter Source Operator
@@ -89,61 +61,19 @@ public class DynamicFilterSourceOperator
             List<Channel> channels,
             PlanNodeId planNodeId,
             int maxFilterPositionsCount,
-            DataSize maxFilterSize,
-            DynamicFilterDataType dynamicFilteringDataType,
-            DynamicFilter.Type filterType,
-            NodeInfo nodeInfo,
-            StateStoreProvider stateStoreProvider)
+            DataSize maxFilterSize)
     {
         this.context = requireNonNull(context, "context is null");
-        this.bloomFilterFpp = getDynamicFilteringBloomFilterFpp(this.context.getSession());
         this.maxFilterPositionsCount = maxFilterPositionsCount;
         this.maxFilterSizeInBytes = maxFilterSize.toBytes();
-        this.dynamicFilterDataType = dynamicFilteringDataType;
 
         this.dynamicPredicateConsumer = requireNonNull(dynamicPredicateConsumer, "dynamicPredicateConsumer is null");
         this.channels = requireNonNull(channels, "channels is null");
-        this.nodeInfo = nodeInfo;
 
         this.values = new HashMap<>();
         for (Channel channel : channels) {
             values.put(channel, new HashSet<>());
         }
-
-        this.filterType = filterType;
-        this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
-        if (stateStoreProvider.getStateStore() != null) {
-            driverId = stateStoreProvider.getStateStore().generateId();
-            registerDynamicFilterTask(context.getSession().getQueryId().toString());
-        }
-    }
-
-    private static BloomFilter createBloomFilterFromSet(Channel channel, Set values, double bloomFilterFpp)
-    {
-        BloomFilter bloomFilter = new BloomFilter(BloomFilterDynamicFilter.DEFAULT_DYNAMIC_FILTER_SIZE, bloomFilterFpp);
-        if (channel.type.getJavaType() == long.class) {
-            for (Object value : values) {
-                long lv = (Long) value;
-                bloomFilter.add(lv);
-            }
-        }
-        else if (channel.type.getJavaType() == double.class) {
-            for (Object value : values) {
-                double lv = (Double) value;
-                bloomFilter.add(lv);
-            }
-        }
-        else if (channel.type.getJavaType() == Slice.class) {
-            for (Object value : values) {
-                bloomFilter.add((Slice) value);
-            }
-        }
-        else {
-            for (Object value : values) {
-                bloomFilter.add(String.valueOf(value).getBytes());
-            }
-        }
-        return bloomFilter;
     }
 
     @Override
@@ -220,63 +150,13 @@ public class DynamicFilterSourceOperator
             return;
         }
 
-        finishDynamicFilterTask();
-        if (filterType == DynamicFilter.Type.LOCAL) {
-            dynamicPredicateConsumer.accept(values);
-        }
+        dynamicPredicateConsumer.accept(values);
     }
 
     @Override
     public boolean isFinished()
     {
         return current == null && finished;
-    }
-
-    private void registerDynamicFilterTask(String queryId)
-    {
-        for (Channel channel : channels) {
-            try {
-                final StateStore stateStore = stateStoreProvider.getStateStore();
-                StateSet<Long> registeredTasks = (StateSet<Long>) stateStore.createStateCollection(createKey(REGISTERPREFIX, channel.filterId, queryId), SET);
-                stateStore.createStateCollection(createKey(WORKERSPREFIX, channel.filterId, queryId), SET);
-                stateStore.createStateCollection(createKey(PARTIALPREFIX, channel.filterId, queryId), SET);
-                stateStore.createStateCollection(createKey(FINISHPREFIX, channel.filterId, queryId), SET);
-                registeredTasks.add(driverId);
-                this.haveRegistered = true;
-            }
-            catch (Exception e) {
-                log.error("could not register dynamic filter, Exception happened:" + e.getMessage());
-            }
-        }
-    }
-
-    private void finishDynamicFilterTask()
-    {
-        if (!haveRegistered) {
-            return;
-        }
-
-        StateStore stateStore = stateStoreProvider.getStateStore();
-        DataType dataType = getDynamicFilterDataType(filterType, dynamicFilterDataType);
-        for (Map.Entry<Channel, Set> value : values.entrySet()) {
-            Channel channel = value.getKey();
-            Set values = value.getValue();
-            String id = channel.filterId;
-            String key = createKey(PARTIALPREFIX, id, channel.queryId);
-
-            if (dataType == BLOOM_FILTER) {
-                byte[] finalOutput = convertBloomFilterToByteArray(createBloomFilterFromSet(channel, values, bloomFilterFpp));
-                if (finalOutput != null) {
-                    ((StateSet) stateStore.getStateCollection(key)).add(finalOutput);
-                }
-            }
-            else {
-                ((StateSet) stateStore.getStateCollection(key)).add(values);
-            }
-            log.debug("creating new " + dataType + " dynamic filter for size of: " + values.size() + ", key: " + key + ", driver: " + driverId);
-            ((StateSet) stateStore.getStateCollection(createKey(FINISHPREFIX, channel.filterId, channel.queryId))).add(driverId);
-            ((StateSet) stateStore.getStateCollection(createKey(WORKERSPREFIX, channel.filterId, channel.queryId))).add(nodeInfo.getNodeId());
-        }
     }
 
     public static class Channel
@@ -303,6 +183,16 @@ public class DynamicFilterSourceOperator
         {
             return type;
         }
+
+        public String getQueryId()
+        {
+            return queryId;
+        }
+
+        public int getIndex()
+        {
+            return index;
+        }
     }
 
     public static class DynamicFilterSourceOperatorFactory
@@ -314,10 +204,6 @@ public class DynamicFilterSourceOperator
         private final List<Channel> channels;
         private final int maxFilterPositionsCount;
         private final DataSize maxFilterSize;
-        private final DynamicFilterDataType dynamicFilterDataType;
-        private final DynamicFilter.Type filterType;
-        private final StateStoreProvider stateStoreProvider;
-        private final NodeInfo nodeInfo;
         private boolean closed;
 
         /**
@@ -329,11 +215,7 @@ public class DynamicFilterSourceOperator
                 Consumer<Map<Channel, Set>> dynamicPredicateConsumer,
                 List<Channel> channels,
                 int maxFilterPositionsCount,
-                DataSize maxFilterSize,
-                DynamicFilterDataType dynamicFilteringDataType,
-                DynamicFilter.Type filterType,
-                NodeInfo nodeInfo,
-                StateStoreProvider stateStoreProvider)
+                DataSize maxFilterSize)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -345,10 +227,6 @@ public class DynamicFilterSourceOperator
                     "duplicate channel indices are not allowed");
             this.maxFilterPositionsCount = maxFilterPositionsCount;
             this.maxFilterSize = maxFilterSize;
-            this.dynamicFilterDataType = dynamicFilteringDataType;
-            this.filterType = filterType;
-            this.nodeInfo = nodeInfo;
-            this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
         }
 
         /**
@@ -367,11 +245,7 @@ public class DynamicFilterSourceOperator
                     channels,
                     planNodeId,
                     maxFilterPositionsCount,
-                    maxFilterSize,
-                    dynamicFilterDataType,
-                    filterType,
-                    nodeInfo,
-                    stateStoreProvider);
+                    maxFilterSize);
         }
 
         /**

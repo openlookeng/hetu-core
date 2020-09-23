@@ -68,7 +68,7 @@ public class TestDynamicFilterServiceWithHashSet
                 .setSystemProperty(DYNAMIC_FILTERING_DATA_TYPE, "HASHSET")
                 .build();
 
-        StateStore stateStore = setupMockStateStore(new HashMap<>(), new HashMap<>(), new HashSet<>(), new HashSet<>(),
+        StateStore stateStore = setupMockStateStore(new HashMap<>(), new HashMap<>(),
                 new HashSet<>(), new HashSet<>(), session.getQueryId().toString(), filterId);
 
         stateStoreProvider = mock(StateStoreProvider.class);
@@ -95,13 +95,8 @@ public class TestDynamicFilterServiceWithHashSet
                 ImmutableMap.of(new Symbol("name"), mockColumnHandle));
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set when dynamic filters are not available");
 
-        mockDynamicFilterSourceOperatorHashSet("w1", "d1", filterId, session.getQueryId().toString(), Arrays.asList("11", "12"));
-        mockDynamicFilterSourceOperatorHashSet("w1", "d2", filterId, session.getQueryId().toString(), Arrays.asList("13", "14"));
-        mockDynamicFilterSourceOperatorHashSet("w2", "d3", filterId, session.getQueryId().toString(), Arrays.asList("15", "16"));
-        mockDynamicFilterSourceOperatorHashSet("w2", "d4", filterId, session.getQueryId().toString(), Arrays.asList("17", "18"));
-
-        Assert.assertEquals(stateStoreProvider.getStateStore()
-                .getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, session.getQueryId().toString())).size(), 4);
+        mockLocalDynamicFilterHashSet("task1.0", filterId, session.getQueryId().toString(), Arrays.asList("11", "12", "13", "14"));
+        mockLocalDynamicFilterHashSet("task1.1", filterId, session.getQueryId().toString(), Arrays.asList("15", "16", "17", "18"));
 
         Thread.sleep(2000);
         Set hs = fetchDynamicFilterHashSet(filterId, session.getQueryId().toString());
@@ -127,15 +122,11 @@ public class TestDynamicFilterServiceWithHashSet
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set for invalid or non-existing queryId");
 
         String queryId = session.getQueryId().getId();
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId)).size(), 4);
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId)).size(), 4);
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 4);
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId)).size(), 2);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 2);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId)).size(), 2);
         dynamicFilterService.clearDynamicFiltersForQuery(queryId);
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId)).size(), 0);
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId)).size(), 0);
         assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 0);
-        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId)).size(), 0);
+        assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId)).size(), 0);
     }
 
     private Set fetchDynamicFilterHashSet(String filterId, String queryId)
@@ -147,10 +138,8 @@ public class TestDynamicFilterServiceWithHashSet
         return hashSet;
     }
 
-    private void mockDynamicFilterSourceOperatorHashSet(String workerId, String driverId, String filterId, String queryId, List<String> values)
+    private void mockLocalDynamicFilterHashSet(String taskId, String filterId, String queryId, List<String> values)
     {
-        ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId))).add(driverId);
-
         HashSet filter = new HashSet();
         for (String val : values) {
             filter.add(val);
@@ -160,8 +149,7 @@ public class TestDynamicFilterServiceWithHashSet
 
         try {
             ((StateSet) stateStoreProvider.getStateStore().getStateCollection(key)).add(filter);
-            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId))).add(driverId);
-            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId))).add(workerId);
+            ((StateSet) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId))).add(taskId);
         }
 
         catch (Exception e) {
