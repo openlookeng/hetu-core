@@ -540,6 +540,18 @@
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-hazelcast</artifactId>
+                <version>${project.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-state-store</artifactId>
                 <version>${project.version}</version>
             </dependency>

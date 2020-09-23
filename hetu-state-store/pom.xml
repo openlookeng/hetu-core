@@ -30,13 +30,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-hazelcast</artifactId>
-            <version>010</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.testng</groupId>
