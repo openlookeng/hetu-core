@@ -189,4 +189,6 @@ headless: true
     - [Statement Resource]({{< relref "./docs/rest/statement.md" >}})
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
-- [Release Notes]({{< relref "./docs/releasenotes/_index.md" >}})
+- [Release Notes]("#")
+    - [1.0.0]({{< relref "./docs/releasenotes/releasenotes-1.0.0.md" >}})
+    - [0.1.0]({{< relref "./docs/releasenotes/releasenotes-0.1.0.md" >}})
