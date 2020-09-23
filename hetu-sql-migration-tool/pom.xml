@@ -5,11 +5,10 @@
     <parent>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-root</artifactId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>hetu-sql-migration-tool</artifactId>
-    <version>${dep.hetu.version}</version>
     <name>hetu-sql-migration-tool</name>
 
     <properties>
@@ -22,7 +21,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-parser</artifactId>
-            <version>316</version>
         </dependency>
         <dependency>
             <groupId>javax.inject</groupId>

@@ -5,12 +5,11 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.hetu.core</groupId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>hetu-seed-store</artifactId>
-    <version>${dep.hetu.version}</version>
     <description>hetu seed store</description>
     <packaging>hetu-plugin</packaging>
     <properties>

@@ -4,12 +4,11 @@
     <parent>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-root</artifactId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>hetu-heuristic-index</artifactId>
-    <version>${dep.hetu.version}</version>
     <name>hetu-heuristic-index</name>
     <packaging>hetu-plugin</packaging>
 
@@ -290,7 +289,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-spi</artifactId>
-            <version>316</version>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
