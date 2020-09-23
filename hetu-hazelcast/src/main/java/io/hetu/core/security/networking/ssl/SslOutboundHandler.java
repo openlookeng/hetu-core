@@ -189,7 +189,7 @@ public class SslOutboundHandler
         if (logger.isFineEnabled()) {
             logger.fine("enlargeByteBuffer....");
         }
-        if (appByteBufferSize> buffer.capacity()) {
+        if (appByteBufferSize > buffer.capacity()) {
             buffer = ByteBuffer.allocate(appByteBufferSize);
         }
         else {
