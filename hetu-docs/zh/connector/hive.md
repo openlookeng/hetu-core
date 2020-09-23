@@ -1,4 +1,3 @@
-
 # Hive连接器
 
 ## 概述
@@ -25,7 +24,7 @@ Hive连接器支持以下文件类型：
 
 为了在使用Hive 3.x时能够对Avro表和CSV文件实现一级支持，需要在Hive元存储配置文件`hive-site.xml`中添加如下属性定义：
 
-``` xml
+```xml
 <property>
      <!-- https://community.hortonworks.com/content/supportkb/247055/errorjavalangunsupportedoperationexception-storage.html -->
      <name>metastore.storage.schema.reader.impl</name>
@@ -39,7 +38,7 @@ Hive连接器支持Apache Hadoop 2.x及其衍生发行版，包括Cloudera CDH 5
 
 用以下内容创建`etc/catalog/hive.properties`，以将`hive-hadoop2`连接器挂载为`hive`目录，将`example.net:9083`替换为Hive元存储Thrift服务的正确主机和端口：
 
-``` properties
+```properties
 connector.name=hive-hadoop2
 hive.metastore.uri=thrift://example.net:9083
 ```
@@ -52,7 +51,7 @@ hive.metastore.uri=thrift://example.net:9083
 
 对于基本设置，openLooKeng自动配置HDFS客户端，不需要任何配置文件。在某些情况下，例如使用联邦HDFS或NameNode高可用性时，需要指定额外的HDFS客户端选项，以便访问HDFS集群。要指定选项，添加`hive.config.resources`属性来引用HDFS配置文件：
 
-``` properties
+```properties
 hive.config.resources=/etc/hadoop/conf/core-site.xml,/etc/hadoop/conf/hdfs-site.xml
 ```
 
@@ -66,7 +65,7 @@ hive.config.resources=/etc/hadoop/conf/core-site.xml,/etc/hadoop/conf/hdfs-site.
 
 在不使用带HDFS的Kerberos时，openLooKeng会使用openLooKeng进程的操作系统用户来访问HDFS。例如，如果openLooKeng作为`nobody`运行，则openLooKeng将作为`nobody`访问HDFS。可以通过在openLooKeng [JVM配置](../installation/deployment.md#jvm配置)中设置`HADOOP_USER_NAME`系统属性来覆盖此用户名，用适当的用户名替换`hdfs_user`：
 
-``` properties
+```properties
 -DHADOOP_USER_NAME=hdfs_user
 ```
 
@@ -89,7 +88,7 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | hive.recursive-directories| 允许从表或分区位置的子目录读取数据。如果禁用，子目录将被忽略。这相当于Hive中的`hive.mapred.supports.subdirectories`属性。| |
 | `hive.storage-format`| 创建新表时使用的默认文件格式。| `ORC`|
 | `hive.compression-codec`| 写入文件时使用的压缩编解码器。| `GZIP`|
-| `hive.force-local-scheduling`| 强制将拆分调度到与拆分数据的Hadoop DataNode进程同一节点。  这对于openLooKeng与每个DataNode并置的安装非常有用。| `false`|
+| `hive.force-local-scheduling`| 强制将分片调度到与分片数据的Hadoop DataNode进程同一节点。  这对于openLooKeng与每个DataNode并置的安装非常有用。| `false`|
 | `hive.respect-table-format`| 应该使用现有的表格式还是默认的openLooKeng格式写入新的分区？| `true`|
 | `hive.immutable-partitions`| 新数据是否可以插入到现有分区中？| `false`|
 | `hive.create-empty-bucket-files`| 对于没有数据的桶，是否应该创建空文件？| `false`|
@@ -107,7 +106,13 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.s3select-pushdown.enabled`| 允许向AWS S3 Select服务的查询下推。| `false`|
 | `hive.s3select-pushdown.max-connections`| [S3 Select下推](#s3-select下推)同时打开到S3的最大连接数。| 500|
 | `hive.orc.use-column-names`| 为了支持alter表drop列，建议在Hive属性中添加`hive.orc.use-column-names=true`，否则drop列可能无法正常工作。| false|
-| `hive.orc-predicate-pushdown-enabled`     | 在读取ORC文件时启用pushdown处理。| `false` |
+| `hive.orc-predicate-pushdown-enabled`| 在读取ORC文件时启用算子下推（predicates pushdown）处理。| `false`|
+| `hive.vacuum-service-threads`| 清空服务中运行的线程数。| 2|
+| `hive.auto-vacuum-enabled`| 对Hive表启用自动清空功能。要在引擎侧启用自动清空，请在协调节点的config.properties中添加`auto-vacuum.enabled=true`。| `false`|
+| `hive.vacuum-delta-num-threshold`| 允许不压缩的增量目录的最大数量。最小值为2。| 10|
+| `hive.vacuum-delta-percent-threshold`| 允许不压缩的增量目录的最大百分比。值应在0.1到1.0之间。| 0.1|
+| `hive.vacuum-cleanup-recheck-interval`| 清空清理任务重新提交的间隔。最小值为5分钟| `5 Minutes`|
+| `hive.vacuum-collector-interval`| 清空回收器任务重新提交的间隔。| `5 Minutes`|
 
 ## Hive Thrift 元存储配置属性说明
 
@@ -116,7 +121,7 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.metastore.uri`| 使用Thrift协议连接Hive元存储的URI。如果提供了多个URI，则默认使用第一个URI，其余URI为回退元存储。该属性必选。示例：`thrift://192.0.2.3:9083`或`thrift://192.0.2.3:9083,thrift://192.0.2.4:9083`|
 | `hive.metastore.username`| openLooKeng用于访问Hive metastore的用户名。|
 | `hive.metastore.authentication.type`| Hive元存储身份验证类型。取值为`NONE`或`KERBEROS`（默认为`NONE`）。|
-| `hive.metastore.thrift.client.ssl.enabled`| 连接元存储时使用SSL。  默认为`false`。当为true时，表示需要keystore或truststore其中一个。keystore/truststore的路径和密码需要在`jvm.config`中设置。密钥列表如下：`-Djavax.net.ssl.keystoreType= e.g. jks` `-Djavax.net.ssl.keyStore=` `-Djavax.net.ssl.keyStorePassword=` `-Djavax.net.ssl.trustStore=` `-Djavax.net.ssl.trustStorePassword=`|
+| `hive.metastore.thrift.client.ssl.enabled`| 连接元存储时使用SSL。默认为`false`。当为true时，表示需要keystore或truststore其中一个。keystore/truststore的路径和密码需要在`jvm.config`中设置。密钥列表如下：`-Djavax.net.ssl.keystoreType= e.g. jks` `-Djavax.net.ssl.keyStore=` `-Djavax.net.ssl.keyStorePassword=` `-Djavax.net.ssl.trustStore=` `-Djavax.net.ssl.trustStorePassword=`|
 | `hive.metastore.service.principal`| Hive元存储服务的Kerberos主体。|
 | `hive.metastore.client.principal`| openLooKeng在连接到Hive元存储服务时将使用的Kerberos主体。|
 | `hive.metastore.client.keytab`| Hive元存储客户端keytab位置。|
@@ -168,7 +173,7 @@ openLooKeng对URI前缀`s3://`、`s3n://`和`s3a://`使用自己的S3文件系�
 
 ### 自定义S3凭据提供程序
 
-可以通过将Hadoop配置属性`presto.s3.credentials-provider`设置为自定义AWS凭据提供程序实现的完全限定类名，来配置自定义S3凭据提供程序。此类必须实现[AWSCredentialsProvider](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/AWSCredentialsProvider.html )接口，并提供将`java.net.URI`和Hadoop `org.apache.hadoop.conf.Configuration`作为参数的双参数构造函数。自定义凭据提供程序可用于提供来自STS的临时凭据（使用`STSSessionCredentialsProvider`）、基于IAM角色的凭据（使用`STSAssumeRoleSessionCredentialsProvider`）或特定用例的凭据（例如，桶/用户特定凭据）。此Hadoop配置属性必须在`hive.config.resources` Hive连接器属性引用的Hadoop配置文件中进行设置。
+可以通过将Hadoop配置属性`presto.s3.credentials-provider`设置为自定义AWS凭据提供程序实现的完全限定类名，来配置自定义S3凭据提供程序。此类必须实现[AWSCredentialsProvider](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/AWSCredentialsProvider.html)接口，并提供将`java.net.URI`和Hadoop `org.apache.hadoop.conf.Configuration`作为参数的双参数构造函数。自定义凭据提供程序可用于提供来自STS的临时凭据（使用`STSSessionCredentialsProvider`）、基于IAM角色的凭据（使用`STSAssumeRoleSessionCredentialsProvider`）或特定用例的凭据（例如，桶/用户特定凭据）。此Hadoop配置属性必须在`hive.config.resources` Hive连接器属性引用的Hadoop配置文件中进行设置。
 
 ### 调优属性
 
@@ -190,24 +195,24 @@ openLooKeng对URI前缀`s3://`、`s3n://`和`s3a://`使用自己的S3文件系�
 
 openLooKeng支持使用S3托管密钥的服务器端加密和使用Amazon KMS或软件插件管理AES加密密钥的客户端加密在S3中读取和写入加密数据。
 
-使用[S3服务器端加密](http://docs.aws.amazon.com/AmazonS3/latest/dev/serv-side-encryption.html )（在Amazon文档中称为*SSE-S3*）,S3基础架构负责所有加密和解密工作（客户端SSL除外，假设已将`hive.s3.ssl.enabled`设置为`true`）.S3还管理所有的加密密钥。将`hive.s3.sse.enabled`设置为`true`来开启此功能。
+使用[S3服务器端加密](http://docs.aws.amazon.com/AmazonS3/latest/dev/serv-side-encryption.html)（在Amazon文档中称为*SSE-S3*）,S3基础架构负责所有加密和解密工作（客户端SSL除外，假设已将`hive.s3.ssl.enabled`设置为`true`）.S3还管理所有的加密密钥。将`hive.s3.sse.enabled`设置为`true`来开启此功能。
 
-使用[S3客户端加密](http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html )，S3存储加密数据，加密密钥在S3基础架构之外进行管理。数据加解密由openLooKeng完成，不在S3基础架构中。在这种情况下，可以通过使用AWS KMS或自己的密钥管理系统来管理加密密钥。使用AWS KMS进行密钥管理时，将`hive.s3.kms-key-id`设置为KMS密钥的UUID。还需要授予AWS凭据或EC2 IAM角色使用给定密钥的权限。
+使用[S3客户端加密](http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html)，S3存储加密数据，加密密钥在S3基础架构之外进行管理。数据加解密由openLooKeng完成，不在S3基础架构中。在这种情况下，可以通过使用AWS KMS或自己的密钥管理系统来管理加密密钥。使用AWS KMS进行密钥管理时，将`hive.s3.kms-key-id`设置为KMS密钥的UUID。还需要授予AWS凭据或EC2 IAM角色使用给定密钥的权限。
 
-若要使用自定义的加密密钥管理系统，将`hive.s3.encryption-materials-provider`设置为实现来自AWS Java SDK的[EncryptionMaterialsProvider](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/model/EncryptionMaterialsProvider.html )接口的类的完全限定名。该类必须通过类路径对Hive连接器进行访问，并且必须能够与自定义密钥管理系统进行通信。如果该类也实现了来自Hadoop Java API的`org.apache.hadoop.conf.Configurable`接口，那么Hadoop配置将在对象实例创建之后，请求提供或检索任何加密密钥之前传入。
+若要使用自定义的加密密钥管理系统，将`hive.s3.encryption-materials-provider`设置为实现来自AWS Java SDK的[EncryptionMaterialsProvider](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/model/EncryptionMaterialsProvider.html)接口的类的完全限定名。该类必须通过类路径对Hive连接器进行访问，并且必须能够与自定义密钥管理系统进行通信。如果该类也实现了来自Hadoop Java API的`org.apache.hadoop.conf.Configurable`接口，那么Hadoop配置将在对象实例创建之后，请求提供或检索任何加密密钥之前传入。
 
 ### S3 Select下推
 
-S3 Select下推功能，可以将下推投影（SELECT）和谓词（WHERE）处理下推到[S3 Select](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectSELECTContent.html )。使用S3 Select下推，openLooKeng只从S3中而不是从所有S3对象检索所需的数据，从而降低了延迟和网络利用率。
+S3 Select下推功能，可以将下推投影（SELECT）和谓词（WHERE）处理下推到[S3 Select](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectSELECTContent.html)。使用S3 Select下推，openLooKeng只从S3中而不是从所有S3对象检索所需的数据，从而降低了延迟和网络利用率。
 
 #### S3 Select是否适合我的工作负载？
 
-S3 Select下推的性能取决于查询过滤的数据量。筛选大量行应能获得更好的性能。如果查询没有过滤任何数据，则下推可能不会增加任何附价值，并且用户将因S3 Select请求而被收费。因此，建议对使用S3 Select和不使用S3 Select的工作负载进行基准测试以查看使用S3 Select是否适合工作负载。默认情况下，S3 Select下推是禁用的。应在适当的基准测试和成本分析之后在生产中启用。有关S3 Select请求成本的更多信息，请参阅[Amazon S3云存储定价](https://aws.amazon.com/s3/pricing/ )。
+S3 Select下推的性能取决于查询过滤的数据量。筛选大量行应能获得更好的性能。如果查询没有过滤任何数据，则下推可能不会增加任何附价值，并且用户将因S3 Select请求而被收费。因此，建议对使用S3 Select和不使用S3 Select的工作负载进行基准测试以查看使用S3 Select是否适合工作负载。默认情况下，S3 Select下推是禁用的。应在适当的基准测试和成本分析之后在生产中启用。有关S3 Select请求成本的更多信息，请参阅[Amazon S3云存储定价](https://aws.amazon.com/s3/pricing/)。
 
 使用以下准则来确定S3 Select是否适合工作负载：
 
 - 查询过滤掉了超过一半的原始数据集。
-- 查询过滤谓词使用的列具有openLooKeng和S3 Select支持的数据类型。S3 Select下推不支持`TIMESTAMP`、`REAL`和`DOUBLE`数据类型。建议使用十进制数据类型来表示数值数据。有关S3选择所支持的数据类型的详细信息，见[数据类型文档](https://docs.aws.amazon.com/AmazonS3/latest/dev/s3-glacier-select-sql-reference-data-types.html )。
+- 查询过滤谓词使用的列具有openLooKeng和S3 Select支持的数据类型。S3 Select下推不支持`TIMESTAMP`、`REAL`和`DOUBLE`数据类型。建议使用十进制数据类型来表示数值数据。有关S3选择所支持的数据类型的详细信息，见[数据类型文档](https://docs.aws.amazon.com/AmazonS3/latest/dev/s3-glacier-select-sql-reference-data-types.html)。
 - Amazon S3和Amazon EMR集群之间的网络连接具有良好的传输速度和可用带宽。Amazon S3 Select不压缩HTTP响应，因此对于压缩的输入文件，响应大小可能会增加。
 
 #### 注意事项和限制
@@ -233,7 +238,6 @@ S3 Select下推在访问Amazon S3进行谓词操作时绕过文件系统。在�
 
 Hive连接器可以通过`gs://` URI前缀访问存储在GCS中的数据。请参阅`hive-gcs-tutorial`以获取详细说明。
 
-
 ### GCS配置属性
 
 | 属性名称| 说明|
@@ -243,7 +247,7 @@ Hive连接器可以通过`gs://` URI前缀访问存储在GCS中的数据。请�
 
 ## ORC缓存配置
 
-Hive连接器缓存ORC文件数据，以提供更好的性能并减少查询时延。工作节点将数据缓存在本地内存中。当启用ORC缓存时,工作节点会缓存ORC文件的尾部信息,stripe的页脚(stripe-footer)信息, 行索引(row-index), 布隆过滤(bloom-filter)信息。然而, 工作节点只会缓存特定的数据行,这些行应该与`cache table`语言句中谓语词相匹配。
+Hive连接器缓存ORC文件数据，以提供更好的性能并减少查询时延。工作节点将数据缓存在本地内存中。当启用ORC缓存时,工作节点会缓存ORC文件的尾部信息,stripe的页脚(stripe-footer)信息, 行索引(row-index), 布隆过滤(bloom-filter)信息。然而, 工作节点只会缓存特定的数据行,这些行应该与`cache table`语句中谓语词相匹配。
 
 ### ORC缓存属性
 
@@ -299,7 +303,6 @@ Hive连接器在写入数据时，总是收集基本的统计信息（`numFiles`
             ARRAY['p2_value1', 'p2_value2']])
 
 此查询将收集具有键`p1_value1, p1_value2`和`p2_value1, p2_value2`的两个分区的统计信息。
-
 
 ## Hive ACID支持
 
@@ -406,7 +409,7 @@ lk:default> SELECT * FROM hive_acid_table;
 
 ### 对事务表执行VACUUM
 
-Hive将所有事务（INSERT/UPDATE/DELETE）保存在单独的delta目录中，以进行簿记。DELETE事务并不物理删除存储数据中的旧行，而是在新文件中将其标记为已删除。UPDATE使用拆分更新机制更新数据。由于这些原因，对表的读操作需要读取许多文件，这增加了额外的开销。所有这些增量文件都需要合并，以获得合并后的数据，从而加快处理速度。openLooKeng中的VACUUM操作负责合并这些增量文件。
+Hive将所有事务（INSERT/UPDATE/DELETE）保存在单独的delta目录中，以进行簿记。DELETE事务并不物理删除存储数据中的旧行，而是在新文件中将其标记为已删除。UPDATE使用分片更新机制更新数据。由于这些原因，对表的读操作需要读取许多文件，这增加了额外的开销。所有这些增量文件都需要合并，以获得合并后的数据，从而加快处理速度。openLooKeng中的VACUUM操作负责合并这些增量文件。
 
 VACUUM操作在Hive中转换为`compaction`。在Hive中有两种类型的压缩，`Major`和`Minor`。
 
@@ -642,11 +645,16 @@ DROP TABLE hive.web.request_logs
 DROP SCHEMA hive.web
 ```
 
+## 已知问题
+
+- 在运行并发查询（包括选择、更新、删除、清空）或清空清理时，部分查询可能会由于冲突而失败。读查询也可能失败并报错“FileNotFoundException”。这些场景都是Hive ACID utils的bug导致，但不会造成数据丢失。此外，重新运行读取/选择查询也会成功。
+
 ## Hive连接器限制
 
 - 只有当表是非事务性，`WHERE`子句匹配整个分区时，才支持[DELETE](../sql/delete.md)。对于事务型表，`WHERE`子句可以是任何条件。
 
 - Hive元数据库不支持schema重命名，导致[ALTER SCHEMA](../sql/alter-schema.md)使用失败。
+
 - openLooKeng只支持Hive 3.x版本的Hive表的ACID事务。
 
 - openLooKeng目前仅支持`ORC`格式的事务表。

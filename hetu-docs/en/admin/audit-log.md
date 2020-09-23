@@ -15,7 +15,7 @@ In an openLooKeng cluster, only a single event listener plugin can be active at 
 ## Implementation
 
 Audit logging is an implementation of `io.prestosql.spi.eventlistener.EventListener` in `HetuListener` plugin. Methods overwritten include `AuditEventLogger#onQueryCreatedEvent`
-and `AuditEventLogger#onQueryCompletedEvent`
+and `AuditEventLogger#onQueryCompletedEvent`.
 
 ## Configuration
 To enable audit logging feature, the following configs must be present in `etc/event-listener.properties` for this feature to be active.
@@ -27,7 +27,8 @@ hetu.event.listener.listen.query.completion=true
 ```
 
 Other audit logging properties include: 
-`hetu.event.listener.audit.file`: Optional Property to define absolute file path for the audit file. Ensure the process running the openLooKeng server has write access to this directory.
+
+`hetu.event.listener.audit.file`: Optional property to define absolute file path for the audit file. Ensure the process running the openLooKeng server has write access to this directory.
 
 `hetu.event.listener.audit.filecount`: Optional property to define the number of files to use
 

@@ -1,8 +1,7 @@
-
 # CarbonData连接器
 
-
 ## 概述
+
 CarbonData连接器支持查询存储在CarbonData仓库中的数据。CarbonData由三个组件组成：
 
 - CarbonData存储格式的数据文件，一般存储在Hadoop分布式文件系统（HDFS）中。
@@ -28,7 +27,7 @@ hive.metastore.uri=thrift://example.net:9083
 
 对于基本设置，openLooKeng自动配置HDFS客户端，不需要任何配置文件。在某些情况下，例如使用联邦HDFS或NameNode高可用性时，需要指定额外的HDFS客户端选项，以便访问HDFS集群。要指定选项，添加`hive.config.resources`属性来引用HDFS配置文件：
 
-``` properties
+```properties
 hive.config.resources=/etc/hadoop/conf/core-site.xml,/etc/hadoop/conf/hdfs-site.xml,/etc/hadoop/conf/yarn-site.xml,/etc/hadoop/conf/mapred-site.xml
 ```
 
@@ -42,7 +41,7 @@ hive.config.resources=/etc/hadoop/conf/core-site.xml,/etc/hadoop/conf/hdfs-site.
 
 在不使用带HDFS的Kerberos时，openLooKeng会使用openLooKeng进程的操作系统用户来访问HDFS。例如，如果openLooKeng作为`nobody`运行，则openLooKeng将作为`nobody`访问HDFS。可以通过在openLooKeng [JVM配置](../installation/deployment.md#jvm配置)中设置`HADOOP_USER_NAME`系统属性来覆盖此用户名，用适当的用户名替换`hdfs_user`：
 
-``` properties
+```properties
 -DHADOOP_USER_NAME=hdfs_user
 ```
 
@@ -58,16 +57,19 @@ CarbonData连接器安全需要的属性在[CarbonData配置属性](./carbondata
 
 ## Carbondata配置属性
 
-| 属性名称| 说明| 默认值|
-|----------|:----------|----------|
-| carbondata.store-location| CarbonData仓库的存储位置。如果不指定，则使用默认的Hive仓库路径，即 */user/hive/warehouse/**carbon.store*** | `${hive.metastore.warehouse.dir} /carbon.store`|
-| `hive.metastore`| 要使用的Hive元存储的类型。openLooKeng目前支持默认的Hive Thrift元存储（`thrift`）。| `thrift`|
-| `hive.config.resources`| 以逗号分隔的HDFS配置文件列表。这些文件必须存在于运行openLooKeng的机器上。示例：`/etc/hdfs-site.xml`| 
-| `hive.hdfs.authentication.type`| HDFS身份验证类型。取值为`NONE`或`KERBEROS`。| `NONE`|
-| `hive.hdfs.impersonation.enabled`| 启用HDFS端用户模拟。| `false`||
-| `hive.hdfs.presto.principal`| openLooKeng在连接到HDFS时将使用的Kerberos主体。| |
-| `hive.hdfs.presto.keytab`| HDFS客户端keytab位置。| |
-| `hive.collect-column-statistics-on-write`| 启用写入时自动收集列级统计信息。详见[表统计](./hive.md#表统计信息)。| `true`|
+| 属性名称| 说明| 默认值| 
+|----------|:----------|----------|----------
+| `carbondata.store-location`| CarbonData仓库的存储位置。如果不指定，则使用默认的Hive仓库路径，即 */user/hive/warehouse/**carbon.store***| `${hive.metastore.warehouse.dir} /carbon.store`| 
+| `carbondata.minor-vacuum-seg-count`| 指定可考虑对Carbondata表进行Minor Vacuum的段数。如果未指定或设置为小于2的数，则考虑所有可用段。| `NONE`| 
+| `carbondata.major-vacuum-seg-size`| 指定对Carbondata表进行Major Vacuum的大小限制，单位为GB。累计大小小于此阈值的所有段都将纳入考虑范围。如果未指定，则使用默认清空值，即1GB。| `1GB`| 
+| `hive.metastore`| 要使用的Hive元存储的类型。openLooKeng目前支持默认的Hive Thrift元存储（`thrift`）。| `thrift`| 
+| `hive.config.resources`| 以逗号分隔的HDFS配置文件列表。这些文件必须存在于运行openLooKeng的机器上。示例：`/etc/hdfs-site.xml`| | 
+| `hive.hdfs.authentication.type`| HDFS身份验证类型。取值为`NONE`或`KERBEROS`。| `NONE`| 
+| `hive.hdfs.impersonation.enabled`| 启用HDFS端用户模拟。| `false`| 
+| `hive.hdfs.presto.principal`| openLooKeng在连接到HDFS时将使用的Kerberos主体。| | 
+| `hive.hdfs.presto.keytab`| HDFS客户端keytab位置。| | 
+| `hive.collect-column-statistics-on-write`| 启用写入时自动收集列级统计信息。详见[表统计](./hive.md#表统计信息)。| `true`| 
+| `carbondata.vacuum-service-threads`| 指定自动清理的线程数。最小值为1。| 2| 
 
 ## Hive Thrift元存储配置属性说明
 
@@ -98,6 +100,10 @@ CarbonData连接器在写入数据时，总是收集基本的统计信息（`num
 | `CHAR`完成| Y| Y| N|
 | `VARBINARY`完成| Y| N| N|
 | `BOOLEAN`完成| Y| Y| N|
+
+## 自动清理
+
+对Carbon表的清空操作完成后，将存在未使用的基础/陈旧文件夹和文件(例如：段文件夹、.segment和.lock文件)，这些文件夹和文件都留在HDFS中。所以Carbondata自动清理功能是用来自动清理这些文件。段文件夹和.segment文件在进行插入、更新、删除和清空操作时，在清空操作完成60分钟后删除（.lock文件在48小时后删除）。
 
 ## 示例
 
@@ -212,6 +218,40 @@ DELETE FROM orders WHERE orderstatus = 'Not Available';
 ```sql
 DROP TABLE orders;
 ```
+
+### Vacuum
+
+清空操作在Carbondata中转换为`compaction`。在Carbondata中有两种清空操作，`Major`和`Minor`。
+
+VACUUM与Carbondata compaction的对应关系如下：
+
+* `VACUUM TABLE table_name FULL`转换为Major compaction，根据累积大小限制压缩段。
+
+* `VACUUM TABLE table_name`转换为Minor compaction，根据计数限制压缩段。
+
+以下操作会触发对名称为`carbondata_table`的表进行Minor Vacuum，将多个段合并到单个段：
+
+```sql
+VACUUM TABLE carbondata_table;
+```
+
+##### VACUUM FULL
+
+Major Vacuum根据段的大小合并段。只要被合并的所有段的总大小不超过某个值，这些段就会被压缩到一个新段。
+
+```sql
+VACUUM TABLE carbondata_table FULL;
+```
+
+##### 支持AND WAIT
+
+可以使用以下命令以同步方式执行Minor Vacuum和Major Vacuum操作：
+
+```sql
+VACUUM TABLE carbondata_table (FULL) AND WAIT;
+```
+
+这还将显示表中正在压缩的行数。
 
 ## Carbondata连接器限制
 

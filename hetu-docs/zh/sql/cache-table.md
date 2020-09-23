@@ -4,7 +4,7 @@
 ## 摘要
 
 ``` sql
-CACHE TABLE table_name WHERE condition
+CACHE TABLE table_name WHERE condition;
 ```
 
 ## 说明
@@ -18,12 +18,12 @@ CACHE TABLE table_name WHERE condition
 缓存“ CA”中商店的所有销售数据:
 
 ``` sql
-    CACHE TABLE store_sales where location = 'CA';
+    CACHE TABLE store_sales WHERE location = 'CA';
 ```
 缓存2020年2月20日之后出售的商店中的所有销售数据。
  
 ``` sql 
-    CACHE TABLE store_sales where ss_sold_date_sk > 20200220;
+    CACHE TABLE store_sales WHERE ss_sold_date_sk > 20200220;
 ```
 缓存拥有复杂 condition 的数据
 ```sql

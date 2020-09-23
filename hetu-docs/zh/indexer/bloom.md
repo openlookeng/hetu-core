@@ -3,7 +3,7 @@
 
 ## 用例
 
-Bloom索引用于拆分过滤，且仅被**coordinator**节点使用。
+Bloom索引用于分片过滤，且仅被**coordinator**节点使用。
 
 - 如果查询中作为谓词一部分的列存在此索引，openLooKeng可以通过筛选预定Splits来提高查询性能。
 

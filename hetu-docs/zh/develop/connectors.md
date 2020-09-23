@@ -33,16 +33,16 @@
 
 ### ConnectorSplitManger
 
-拆分管理器将表的数据分区成多个块，这些块由 openLooKeng 分发至工作节点进行处理。
+分片管理器将表的数据分区成多个块，这些块由 openLooKeng 分发至工作节点进行处理。
 
-例如，Hive 连接器列出每个 Hive 分区的文件，并为每个文件创建一个或多个拆分。
+例如，Hive 连接器列出每个 Hive 分区的文件，并为每个文件创建一个或多个分片。
 
-对于没有已分区数据的数据源，此处一个比较好的策略是仅针对整个表返回单个拆分。
+对于没有已分区数据的数据源，此处一个比较好的策略是仅针对整个表返回单个分片。
 这是 Example HTTP 连接器使用的策略。
 
 ### ConnectorRecordSetProvider
 
-在给定一个拆分和一个列列表的情况下，记录集提供程序负责将数据提供给 openLooKeng 执行引擎。
+在给定一个分片和一个列列表的情况下，记录集提供程序负责将数据提供给 openLooKeng 执行引擎。
 
 记录集提供程序创建一个 ``RecordSet``，后者又相应地创建一个 ``RecordCursor``，openLooKeng 使用该 ``RecordCursor`` 来读取每行的列值。
 

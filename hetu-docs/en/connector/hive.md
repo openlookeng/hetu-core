@@ -703,6 +703,11 @@ DROP SCHEMA hive.web
 
 
 
+## Known Issues
+
+
+- During concurrent queries (involving select, update, delete, vacuum) or vacuum cleanups running parallelly, some queries might fail due to conflicts. And there is also a possibility of read queries to fail with "FileNotFoundException". These scenarios are caused due to a bug in Hive ACID utils but will not lead to any data loss. Also, re-running read/select queries would succeed. 
+
 
 ## Hive Connector Limitations
 

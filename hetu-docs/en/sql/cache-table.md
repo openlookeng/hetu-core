@@ -6,7 +6,7 @@ Synopsis
 --------
 
 ``` sql
-CACHE TABLE table_name WHERE condition
+CACHE TABLE table_name WHERE condition;
 ```
 
 Description

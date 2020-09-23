@@ -1,4 +1,3 @@
-
 # 入门指南
 
 ## 要求
@@ -54,6 +53,10 @@ openLooKeng Core附带的样例配置可以直接用于开发。使用以下选�
 然后在虚拟机选项列表中添加以下内容：
 
     -Dhive.metastore.thrift.client.socks-proxy=localhost:1080
+
+### 日志记录
+
+审计日志功能默认关闭。要使用默认设置开启，需要修改`etc/event-listener.properties`中的配置，确保运行服务端的进程对审计日志目录有写权限。
 
 ### 运行CLI
 

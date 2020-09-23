@@ -4,7 +4,7 @@
 ## 摘要
 
 ``` sql
-SHOW CACHE
+SHOW CACHE;
 ```
 
 ## 说明
