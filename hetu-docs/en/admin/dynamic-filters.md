@@ -18,29 +18,23 @@ dynamic-filtering-max-per-driver-row-count=10000
 dynamic-filtering-bloom-filter-fpp=0.1
 ```
 
-The above attributes are described below：
-
-- `enable-dynamic-filtering`：Enable dynamic filtering feature.
-- `dynamic-filtering-data-type`：Set dynamic filtering data type, default to BLOOM_FILTER.
-- `dynamic-filtering-max-per-driver-size`：Max data size collected for dynamic filter per driver, default to 10KB.
-- `dynamic-filtering-max-per-driver-row-count`：Max data count collected for dynamic filter per driver, default to 100.
-- `dynamic-filtering-bloom-filter-fpp`：Bloom filter FPP used for dynamic filter, default to 0.1.
-
-Session properties
-``` properties
-dynamic_filtering_wait_time='200ms'
-```
-
 The above attributes are described below:
-- `dynamic_filtering_wait_time`：Maximum waiting time for the dynamic filter to be ready, default to 0ms.
 
-If applied to `Hive connector`，we should change `catalog/hive.properties`：
+- `enable-dynamic-filtering`: Enable dynamic filtering feature.
+- `dynamic-filtering-wait-time`: Maximum waiting time for the dynamic filter to be ready, default to 0ms. (This feature requires the time of nodes in cluster to be highly sync-up)
+- `dynamic-filtering-data-type`: Set dynamic filtering data type, default to BLOOM_FILTER.
+- `dynamic-filtering-max-size`: Max dynamic filter size, cost based optimizer won't create dynamic filter that has estimate size exceeding this value based on statistics, default to 1000000.
+- `dynamic-filtering-max-per-driver-size`: Max data size collected for dynamic filter per driver, default to 1MB.
+- `dynamic-filtering-max-per-driver-row-count`: Max data count collected for dynamic filter per driver, default to 10000.
+- `dynamic-filtering-bloom-filter-fpp`: Bloom filter FPP used for dynamic filtering, default to 0.1.
+
+If applied to `Hive connector`: we should change `catalog/hive.properties`:
 ``` properties
 hive.dynamic-filter-partition-filtering=true
 hive.dynamic-filtering-row-filtering-threshold=5000
 ```
 
 The above attributes are described below:
-- `hive.dynamic-filter-partition-filtering`：Filter out hive splits early based on partition value using dynamic filter, default to false.
-- `hive.dynamic-filtering-row-filtering-threshold`：Filter out hive rows early if the dynamic filter size is below the threshold, default to 2000.
+- `hive.dynamic-filter-partition-filtering`: Filter out hive splits early based on partition value using dynamic filter, default to false.
+- `hive.dynamic-filtering-row-filtering-threshold`: Filter out hive rows early if the dynamic filter size is below the threshold, default to 2000.
 

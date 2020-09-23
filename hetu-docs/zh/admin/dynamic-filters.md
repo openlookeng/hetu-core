@@ -22,17 +22,12 @@ dynamic-filtering-bloom-filter-fpp=0.1
 上述属性说明如下：
 
 - `enable-dynamic-filtering`：是否开启动态过滤特性。
+- `dynamic-filtering-wait-time`：等待动态过滤条件生成的最长等待时间，默认值是0ms。（该配置要求集群不同节点之间的时间高度同步）
 - `dynamic-filtering-data-type`：设置动态过滤类型，可选包含`BLOOM_FILTER`以及`HASHSET`，默认类型为`BLOOM_FILTER`。
-- `dynamic-filtering-max-per-driver-size`：每个driver可以收集的数据大小上限，默认值是10KB。
-- `dynamic-filtering-max-per-driver-row-count`：每个driver可以收集的数据条目上限，默认值是100。
+- `dynamic-filtering-max-size`: 每个dynamic filter的大小上限，如果预估大小超过设定值，代价优化器不会生成对应的dynamic filter，默认值是1000000。
+- `dynamic-filtering-max-per-driver-size`：每个driver可以收集的数据大小上限，默认值是1MB。
+- `dynamic-filtering-max-per-driver-row-count`：每个driver可以收集的数据条目上限，默认值是10000。
 - `dynamic-filtering-bloom-filter-fpp`：动态过滤使用的bloomfilter的FPP值，默认是0.1。
-
-同时，提供session控制参数
-``` properties
-dynamic_filtering_wait_time='200ms'
-```
-上述属性说明如下：
-- `dynamic_filtering_wait_time`：等待动态过滤条件生成的最长等待时间，默认值是0ms。
 
 如果应用于`Hive connector`，需要对`catalog/hive.properties`如下修改：
 ``` properties

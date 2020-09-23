@@ -134,7 +134,7 @@ public final class SystemSessionProperties
     public static final String PUSH_LIMIT_THROUGH_SEMI_JOIN = "push_limit_through_semi_join";
     public static final String PUSH_LIMIT_THROUGH_OUTER_JOIN = "push_limit_through_outer_join";
     public static final String PUSH_LIMIT_DOWN = "push_limit_down";
-    public static final String DYNAMIC_FILTERING_MAX_SIZE = "dynamic_filtering_max_psize";
+    public static final String DYNAMIC_FILTERING_MAX_SIZE = "dynamic_filtering_max_size";
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_VALUE_COUNT = "dynamic_filtering_max_per_driver_value_count";
     public static final String DYNAMIC_FILTERING_WAIT_TIME = "dynamic_filtering_wait_time";
     public static final String DYNAMIC_FILTERING_DATA_TYPE = "dynamic_filtering_data_type";
