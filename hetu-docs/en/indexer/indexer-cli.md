@@ -27,22 +27,27 @@ DROP INDEX index_name;
 
 ## Examples
 
+Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
+
+`etc` directory includes config.properties, and --config should specify an absolute path,
+the path should be children directory of Path white list
+
 ### Create index
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", verbose=true) WHERE p=part1'
+$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", verbose=true) WHERE p=part1'
 ```
 
 ### Show index
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute "SHOW INDEX index_name"
+$ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX index_name"
 ```
 
 ### Delete index
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute "DELETE INDEX index_name"
+$ ./hetu-cli --config /xxx/etc --execute "DELETE INDEX index_name"
 ```
 
 ## Notes on resource usage
@@ -66,11 +71,11 @@ If creating the index for a large table is too slow on one machine, you can crea
 On machine 1:
 
 ``` bash 
-$ ./hetu-cli --config ../etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
+$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
 ```
 
 On machine 2:
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
+$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
 ```

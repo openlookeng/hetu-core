@@ -27,23 +27,25 @@ DROP INDEX index_name;
 
 ## 示例
 
+`etc` 目录包含config.properties，在指定config时，我们需要写绝对路径，该路径必须是白名单中路径的子目录
+
 ### 创建索引
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", debugEnabled=true) WHERE p=part1'
+$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", debugEnabled=true) WHERE p=part1'
 ```
 
 ### 显示索引
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute "SHOW INDEX index_name"
-$ ./hetu-cli --config ../etc --execute "SHOW INDEX"
+$ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX index_name"
+$ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX"
 ```
 
 ### 删除索引
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute "DELETE INDEX index_name"
+$ ./hetu-cli --config /xxx/etc --execute "DELETE INDEX index_name"
 ```
 
 ## 资源使用说明
@@ -66,11 +68,11 @@ export JAVA_TOOL_OPTIONS="-Xmx100G"
 在机器1上：
 
 ``` bash
-$ ./hetu-cli --config ../etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
+$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
 ```
 
 在机器2上：
 
 ``` shell
-$ ./hetu-cli --config ../etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
+$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
 ```
