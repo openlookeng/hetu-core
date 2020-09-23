@@ -26,6 +26,7 @@ headless: true
     - [内置系统访问控制]({{< relref "./docs/security/built-in-system-access-control.md" >}})
     - [内部通信安全]({{< relref "./docs/security/internal-communication.md" >}})
     - [密码加密]({{< relref "./docs/security/password-encryption.md" >}})
+    - [HAZELCAST认证]({{< relref "./docs/security/hazelcast.md" >}})
 - [管理]("#")
     - [Web界面]({{< relref "./docs/admin/web-interface.md" >}})
     - [openLooKeng调优]({{< relref "./docs/admin/tuning.md" >}})
