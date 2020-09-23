@@ -30,6 +30,12 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-cli</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>hetu-heuristic-index</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
