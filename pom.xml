@@ -56,7 +56,7 @@
         <dep.prestosql.version>316</dep.prestosql.version>
         <dep.hetu.version>${project.version}</dep.hetu.version>
         <dep.jetty.version>9.4.30.v20200611</dep.jetty.version>
-
+        <dep.bcprov.version>1.64</dep.bcprov.version>
         <!--
           America/Bahia_Banderas has:
            - offset change since 1970 (offset Jan 1970: -08:00, offset Jan 2018: -06:00)
