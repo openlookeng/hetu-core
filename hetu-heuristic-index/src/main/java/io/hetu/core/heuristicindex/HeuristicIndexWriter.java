@@ -60,6 +60,7 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexWriter
         implements IndexWriter
 {
+    private static final int PROGRESS_BAR_LENGTH = 48;
     private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
             new LocalConfig(new Properties()), Paths.get("/"));
 
@@ -156,7 +157,7 @@ public class HeuristicIndexWriter
         }
         AtomicDouble progress = new AtomicDouble();
         if (!IndexCommand.verbose) {
-            System.out.print("\rProgress: [" + Strings.repeat(" ", 48) + "] 0%");
+            System.out.print("\rProgress: [" + Strings.repeat(" ", PROGRESS_BAR_LENGTH) + "] 0%");
         }
 
         // Each datasource will read the specified table's column and will use the callback when a split has been read.
@@ -243,13 +244,13 @@ public class HeuristicIndexWriter
                         try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(indexFilePath)) {
                             splitIndex.persist(outputStream);
                             if (!IndexCommand.verbose) {
-                                currProgress *= 36;
+                                currProgress *= 0.75 * PROGRESS_BAR_LENGTH;
                                 synchronized (progress) {
                                     if (currProgress > progress.get()) {
                                         progress.addAndGet(currProgress - progress.get());
                                         int bars = (int) Math.ceil(currProgress);
-                                        System.out.printf("\rProgress: [" + Strings.repeat("|", bars) + Strings.repeat(" ", 48 - bars) + "] %d%%",
-                                                bars * 100 / 48);
+                                        System.out.printf("\rProgress: [" + Strings.repeat("|", bars) + Strings.repeat(" ", PROGRESS_BAR_LENGTH - bars) + "] %d%%",
+                                                bars * 100 / PROGRESS_BAR_LENGTH);
                                         System.out.flush();
                                     }
                                 }
@@ -265,8 +266,6 @@ public class HeuristicIndexWriter
                 System.out.println(msg);
                 throw new IllegalStateException(msg);
             }
-
-            double currProgress = 0;
 
             // move all part dirs
             // originalDir will be something like: /tmp/indicies/catalog.schema.table/UT_test_column/UT_test
@@ -343,11 +342,11 @@ public class HeuristicIndexWriter
                 fs.deleteRecursively(originalOnTarget);
                 IndexServiceUtils.archiveTar(LOCAL_FS_CLIENT, fs, originalDir, originalOnTarget);
                 if (!IndexCommand.verbose) {
-                    int bars = (int) Math.ceil(progress.addAndGet(12.0 / partFiles.size()));
-                    System.out.printf("\rProgress: [" + Strings.repeat("|", bars) + Strings.repeat(" ", 48 - bars) + "] %d%%",
-                            bars * 100 / 48);
+                    int bars = (int) Math.ceil(progress.addAndGet(0.25 * PROGRESS_BAR_LENGTH / partFiles.size()));
+                    bars = Math.min(bars, PROGRESS_BAR_LENGTH);
+                    System.out.printf("\rProgress: [" + Strings.repeat("|", bars) + Strings.repeat(" ", PROGRESS_BAR_LENGTH - bars) + "] %d%%",
+                            bars * 100 / PROGRESS_BAR_LENGTH);
                     System.out.flush();
-                    currProgress++;
                 }
             }
 

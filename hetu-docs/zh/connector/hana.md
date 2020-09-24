@@ -256,7 +256,7 @@ lk> select current_timezone();
 如果带用户时区启动openlk-cli，如下所示：
 
 ```shell
-java -jar ./hetu-cli-010-executable.jar
+java -jar java -jar ./hetu-cli-*.jar-010-executable.jar
 --client-request-timeout 30m --server ip:8080
 --session legacy_timestamp=false --catalog hana2
 ```

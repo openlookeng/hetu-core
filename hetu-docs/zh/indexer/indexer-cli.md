@@ -27,26 +27,31 @@ DROP INDEX index_name;
 
 ## 示例
 
+路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+
 `etc` 目录包含config.properties，在指定config时，我们需要写绝对路径，该路径必须是白名单中路径的子目录
 
 ### 创建索引
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", debugEnabled=true) WHERE p=part1'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", debugEnabled=true) WHERE p=part1'
 ```
 
 ### 显示索引
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX index_name"
-$ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX"
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute "SHOW INDEX index_name"
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute "SHOW INDEX"
 ```
 
 ### 删除索引
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute "DELETE INDEX index_name"
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute "DROP INDEX index_name"
 ```
+
+*注意*: 删除索引命令不会将索引文件从hetu server的内存中清除。意味着索引会被继续使用，直到达到`hetu.heuristicindex.filter.cache.ttl`所设置的值或者hetu server被重启.
+
 
 ## 资源使用说明
 
@@ -68,11 +73,11 @@ export JAVA_TOOL_OPTIONS="-Xmx100G"
 在机器1上：
 
 ``` bash
-$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
 ```
 
 在机器2上：
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
 ```

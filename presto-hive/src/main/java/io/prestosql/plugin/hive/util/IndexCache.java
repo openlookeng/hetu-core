@@ -49,7 +49,7 @@ public class IndexCache
 {
     private static final Logger LOG = Logger.get(IndexCache.class);
     private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Hive-IndexCache-pool-%d").setDaemon(true).build();
-    private static final List<String> INDEX_TYPES = ImmutableList.of("bloom", "minmax");
+    private static final List<String> INDEX_TYPES = ImmutableList.of("bloom", "bitmap");
 
     private static ScheduledExecutorService executor;
 

@@ -48,7 +48,7 @@ public class SecurePathWhiteList
         // if user config node.data-dir, then current workspace is node.data-dir; if not, the current workspace is the same as bin.
         // the working directory is automatically set to {INSTALL_DIR}/bin by the launcher
         // the white list includes the {INSTALL_DIR}
-        securePathwhiteList.add(new File(".").getCanonicalPath());
+        securePathwhiteList.add(new File("..").getCanonicalPath());
         return securePathwhiteList;
     }
 

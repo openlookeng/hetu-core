@@ -1,4 +1,3 @@
 #!/bin/bash
 
-java -jar "$(dirname "$0")/hetu-cli-010-executable.jar"\
-    "$@"
+java -jar $(dirname "$0")/$(ls $(dirname "$0") | grep "hetu-cli-.*-executable.jar" | head -1) "$@"

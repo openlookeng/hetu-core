@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -70,12 +71,26 @@ public class IndexCommand
         this.table = table;
         this.columns = columns;
         this.partitions = partitions;
-        this.indexType = indexType;
+        this.indexType = indexType.toLowerCase(Locale.ENGLISH);
         this.indexProps = indexProps;
         this.parallelCreation = parallelCreation;
         IndexCommand.verbose = verbose;
         this.indexName = name;
         this.user = user;
+    }
+
+    public IndexRecordManager.IndexRecord getIndex()
+    {
+        try {
+            validatePaths();
+            IndexFactory factory = IndexCommandUtils.getIndexFactory();
+            IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
+            return IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName);
+        }
+        catch (IOException e) {
+            e.printStackTrace(System.err);
+            return null;
+        }
     }
 
     public List<IndexRecordManager.IndexRecord> getIndexes()
@@ -156,7 +171,7 @@ public class IndexCommand
                 if (sameIndexRecord != null) {
                     if (!parallelCreation) {
                         System.out.printf("Same entry already exists. To update, please delete old index first. " +
-                                "If this is parallel creation, add parallel creation flag to WITH%n%n");
+                                "If this is parallel creation, add WITH (parallelCreation=true).%n%n");
                         return;
                     }
                 }
@@ -196,10 +211,10 @@ public class IndexCommand
     private void validatePaths()
             throws IOException
     {
-        checkArgument(!configDirPath.contains("../"),
-                "Config directory path must be absolute or current directory and at user workspace: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-        checkArgument(Paths.get(configDirPath).toFile().exists(), "Config directory does not exist");
-        checkArgument(SecurePathWhiteList.isSecurePath(configDirPath),
-                "Config directory path must at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(!configDirPath.contains("../") && SecurePathWhiteList.isSecurePath(configDirPath),
+                "Invalid config directory path " + configDirPath + ". " +
+                        "Config directory path must be absolute and under one of the following directories: "
+                        + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(Paths.get(configDirPath).toFile().exists(), "Config directory " + configDirPath + " does not exist");
     }
 }

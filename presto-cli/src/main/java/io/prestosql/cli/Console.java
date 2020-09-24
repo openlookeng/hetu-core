@@ -70,6 +70,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.CharMatcher.whitespace;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -165,11 +166,6 @@ public class Console
                 Optional.ofNullable(clientOptions.krb5CredentialCachePath),
                 !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization)) {
             if (hasQuery) {
-                if (createIndexPattern.matcher(query).matches()) {
-                    executeHeuristicIndexQuery(query.substring(0, query.length() - 1), exiting, queryRunner);
-                    return true;
-                }
-
                 return executeCommand(
                         queryRunner,
                         exiting,
@@ -188,19 +184,28 @@ public class Console
         }
     }
 
-    private void executeHeuristicIndexQuery(String query, AtomicBoolean exiting, QueryRunner queryRunner)
+    private boolean executeHeuristicIndexQuery(String query, AtomicBoolean exiting, QueryRunner queryRunner)
     {
+        checkArgument(clientOptions.configDirPath != null && !clientOptions.configDirPath.isEmpty(),
+                "INDEX statements require config directory to be set using the -c option when cli is started.");
+        try {
+            clientOptions.configDirPath = new File(clientOptions.configDirPath).getCanonicalPath();
+        }
+        catch (IOException e) {
+            System.out.println(e.getMessage());
+            return false;
+        }
+
         switch (query.split(" ", 2)[0].toLowerCase(ENGLISH)) {
             case "create":
-                createIndexCommand(query, queryRunner, exiting);
-                break;
+                return createIndexCommand(query, queryRunner, exiting);
             case "show":
-                showIndexCommand(query, queryRunner, exiting);
-                break;
+                return showIndexCommand(query, queryRunner, exiting);
             case "drop":
-                deleteIndexCommand(query, queryRunner, exiting);
-                break;
+                return deleteIndexCommand(query, queryRunner, exiting);
         }
+
+        return false;
     }
 
     private String getPassword()
@@ -231,155 +236,126 @@ public class Console
         }
     }
 
-    private void deleteIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    private boolean verifyAccess(QueryRunner queryRunner, AtomicBoolean exiting, String tableName)
     {
-        boolean hasAuthenticated = executeCommand(
+        return executeCommand(
                 queryRunner,
                 exiting,
-                "show catalogs;",
+                String.format("select * from %s limit 1;", tableName),
                 ClientOptions.OutputFormat.NULL,
-                false,
+                true,
                 false);
-
-        if (hasAuthenticated) {
-            SqlParser parser = new SqlParser();
-            try {
-                DropIndex deleteIndex = (DropIndex) parser.createStatement(query);
-                IndexCommand command = new IndexCommand(clientOptions.configDirPath, deleteIndex.getIndexName().toString(),
-                        false, clientOptions.user);
-                command.deleteIndex();
-            }
-            catch (ParsingException e) {
-                System.out.println(e.getMessage());
-                Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
-            }
-            catch (IllegalArgumentException e) {
-                System.out.println(e.getMessage());
-            }
-        }
     }
 
-    private void showIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    private boolean deleteIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
     {
-        boolean hasAuthenticated = executeCommand(
-                queryRunner,
-                exiting,
-                "show catalogs;",
-                ClientOptions.OutputFormat.NULL,
-                false,
-                false);
+        SqlParser parser = new SqlParser();
+        try {
+            DropIndex deleteIndex = (DropIndex) parser.createStatement(query);
+            IndexCommand command = new IndexCommand(clientOptions.configDirPath, deleteIndex.getIndexName().toString(),
+                    false, clientOptions.user);
 
-        if (hasAuthenticated) {
-            SqlParser parser = new SqlParser();
-            try {
-                ShowIndex showIndex = (ShowIndex) parser.createStatement(query);
-                IndexCommand command = new IndexCommand(clientOptions.configDirPath, (showIndex.getIndexName() == null ? "" : showIndex.getIndexName().toString()),
-                        false);
-
-                List<Column> columns = ImmutableList.<Column>builder()
-                        .add(new Column("Index Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
-                        .add(new Column("User", VARCHAR, new ClientTypeSignature(VARCHAR)))
-                        .add(new Column("Table Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
-                        .add(new Column("Column Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
-                        .add(new Column("Index Type", VARCHAR, new ClientTypeSignature(VARCHAR)))
-                        .add(new Column("Partitions", VARCHAR, new ClientTypeSignature(VARCHAR)))
-                        .build();
-                List<IndexRecordManager.IndexRecord> records = command.getIndexes();
-
-                List<List<?>> rows = new ArrayList<>();
-                for (IndexRecordManager.IndexRecord v : records) {
-                    List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, v.note.replaceAll("(.{70})", "$0\n"));
-                    rows.add(strings);
+            // Security check
+            if (command.getIndex() != null) {
+                if (!verifyAccess(queryRunner, exiting, command.getIndex().table)) {
+                    System.out.printf("Unable to access %s. %n", command.getIndex().table);
+                    return false;
                 }
-                StringWriter writer = new StringWriter();
-                OutputPrinter printer = new AlignedTablePrinter(columns, writer);
-                printer.printRows(rows, true);
-                printer.finish();
+            }
 
-                System.out.println(writer.getBuffer().toString());
-            }
-            catch (ParsingException e) {
-                System.out.println(e.getMessage());
-                Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
-            }
-            catch (IOException e) {
-                e.printStackTrace(System.err);
-            }
+            command.deleteIndex();
         }
+        catch (ParsingException e) {
+            System.out.println(e.getMessage());
+            Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
+            return false;
+        }
+        catch (Exception e) {
+            System.out.println("Failed to delete index.");
+            System.out.println(e.getMessage());
+            return false;
+        }
+
+        return true;
     }
 
-    private void createIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    private boolean showIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
     {
-        boolean hasAuthenticated = executeCommand(
-                queryRunner,
-                exiting,
-                "show catalogs;",
-                ClientOptions.OutputFormat.NULL,
-                false,
-                false);
+        SqlParser parser = new SqlParser();
+        try {
+            ShowIndex showIndex = (ShowIndex) parser.createStatement(query);
+            IndexCommand command = new IndexCommand(clientOptions.configDirPath, (showIndex.getIndexName() == null ? "" : showIndex.getIndexName().toString()),
+                    false);
 
-        if (hasAuthenticated) {
-            SqlParser parser = new SqlParser();
+            List<Column> columns = ImmutableList.<Column>builder()
+                    .add(new Column("Index Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                    .add(new Column("User", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                    .add(new Column("Table Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                    .add(new Column("Column Name", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                    .add(new Column("Index Type", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                    .add(new Column("Partitions", VARCHAR, new ClientTypeSignature(VARCHAR)))
+                    .build();
+            List<IndexRecordManager.IndexRecord> records = command.getIndexes();
 
-            try {
-                CreateIndex createIndex = (CreateIndex) parser.createStatement(query);
-                String[] columns = createIndex.getColumnAliases().stream()
-                        .map(Identifier::getValue)
-                        .toArray(String[]::new);
-
-                if (columns.length > 1) {
-                    System.out.println("Composite indices are currently not supported");
-                    return;
+            List<List<?>> rows = new ArrayList<>();
+            for (IndexRecordManager.IndexRecord v : records) {
+                if (!verifyAccess(queryRunner, exiting, v.table)) {
+                    continue;
                 }
-                Expression expression = null;
-
-                // Separating the properties needed by IndexCommand Class from the properties for creating the heuristic index
-                final String parallelCreation = "parallelCreation";
-                final String verbose = "verbose";
-                List<String> indexCommandClassProperties = Arrays.asList(parallelCreation, verbose);
-
-                Map<Boolean, List<Property>> properties = createIndex.getProperties().stream()
-                        .collect(Collectors.partitioningBy(property -> indexCommandClassProperties.stream().anyMatch(property.getName().getValue()::equalsIgnoreCase)));
-
-                String[] indexProperties = properties.get(false).stream()
-                        .map(property -> property.getName() + "=" + property.getValue())
-                        .toArray(String[]::new);
-                Map<String, Boolean> providedClassProperties = properties.get(true).stream()
-                        .collect(Collectors.toMap(property -> property.getName().getValue().toLowerCase(ENGLISH),
-                                property -> Boolean.parseBoolean(property.getValue().toString())));
-
-                if (createIndex.getExpression().isPresent()) {
-                    expression = createIndex.getExpression().get();
-                }
-                String[] partitions = extractPartitions(expression).toArray(new String[0]);
-
-                String indexTypes = createIndex.getIndexType();
-
-                IndexCommand command = new IndexCommand(clientOptions.configDirPath, createIndex.getIndexName().toString(), createIndex.getTableName().toString(),
-                        columns, partitions, indexTypes, indexProperties, providedClassProperties.getOrDefault(parallelCreation, false),
-                        providedClassProperties.getOrDefault(verbose, false), clientOptions.user);
-                command.createIndex();
+                String partitions = (v.note == null || v.note.isEmpty()) ? "all" : v.note;
+                List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, partitions.replaceAll("(.{70})", "$0\n"));
+                rows.add(strings);
             }
-            catch (ParsingException e) {
-                System.out.println(e.getMessage());
-                Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
-            }
+
+            StringWriter writer = new StringWriter();
+            OutputPrinter printer = new AlignedTablePrinter(columns, writer);
+            printer.printRows(rows, true);
+            printer.finish();
+
+            System.out.println(writer.getBuffer().toString());
         }
+        catch (ParsingException e) {
+            System.out.println(e.getMessage());
+            Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
+            return false;
+        }
+        catch (Exception e) {
+            System.out.println("Failed to show index.");
+            System.out.println(e.getMessage());
+            return false;
+        }
+
+        return true;
     }
 
     private List<String> extractPartitions(Expression expression)
     {
         if (expression instanceof ComparisonExpression) {
             ComparisonExpression exp = (ComparisonExpression) expression;
+
+            if (exp.getOperator() != ComparisonExpression.Operator.EQUAL) {
+                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator, " +
+                        "e.g. partition=1, partition=1 OR partition=2");
+            }
+
             return Collections.singletonList(exp.getLeft().toString() + "=" + exp.getRight().toString());
         }
         else if (expression instanceof LogicalBinaryExpression) {
             LogicalBinaryExpression exp = (LogicalBinaryExpression) expression;
+
+            if (exp.getOperator() != LogicalBinaryExpression.Operator.OR) {
+                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
+                        "e.g. partition=1, partition=1 OR partition=2");
+            }
+
             Expression left = exp.getLeft();
             Expression right = exp.getRight();
             return Stream.concat(extractPartitions(left).stream(), extractPartitions(right).stream()).collect(Collectors.toList());
         }
-        return Collections.emptyList();
+        else {
+            throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
+                    "e.g. partition=1, partition=1 OR partition=2");
+        }
     }
 
     private void runConsole(QueryRunner queryRunner, AtomicBoolean exiting)
@@ -460,7 +436,7 @@ public class Console
         }
     }
 
-    private static boolean executeCommand(
+    private boolean executeCommand(
             QueryRunner queryRunner,
             AtomicBoolean exiting,
             String query,
@@ -473,11 +449,25 @@ public class Console
         for (Statement split : splitter.getCompleteStatements()) {
             if (!isEmptyStatement(split.statement())) {
                 try (Terminal terminal = terminal()) {
-                    if (!process(queryRunner, split.statement(), outputFormat, () -> {}, false, showProgress, terminal, System.out, System.err)) {
-                        if (!ignoreErrors) {
-                            return false;
+                    String statement = split.statement();
+                    if (createIndexPattern.matcher(statement).matches()) {
+                        boolean result = executeHeuristicIndexQuery(statement, exiting, queryRunner);
+                        if (!result) {
+                            if (!ignoreErrors) {
+                                return false;
+                            }
+                            else {
+                                success = false;
+                            }
                         }
-                        success = false;
+                    }
+                    else {
+                        if (!process(queryRunner, split.statement(), outputFormat, () -> {}, false, showProgress, terminal, System.out, System.err)) {
+                            if (!ignoreErrors) {
+                                return false;
+                            }
+                            success = false;
+                        }
                     }
                 }
                 catch (IOException e) {
@@ -493,6 +483,79 @@ public class Console
             return false;
         }
         return success;
+    }
+
+    private boolean createIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
+    {
+        SqlParser parser = new SqlParser();
+
+        try {
+            CreateIndex createIndex = (CreateIndex) parser.createStatement(query);
+
+            String tableName = createIndex.getTableName().toString();
+
+            if (createIndex.getTableName().getOriginalParts().size() == 1) {
+                if (queryRunner.getSession().getCatalog() != null && queryRunner.getSession().getSchema() != null) {
+                    tableName = queryRunner.getSession().getCatalog() + "." + queryRunner.getSession().getSchema() + "." + tableName;
+                }
+            }
+
+            if (!verifyAccess(queryRunner, exiting, tableName)) {
+                System.out.printf("Unable to access table %s. %n", tableName);
+                return false;
+            }
+
+            String[] columns = createIndex.getColumnAliases().stream()
+                    .map(Identifier::getValue)
+                    .toArray(String[]::new);
+
+            if (columns.length > 1) {
+                System.out.println("Composite indices are currently not supported");
+                return false;
+            }
+
+            // Separating the properties needed by IndexCommand Class from the properties for creating the heuristic index
+            final String parallelCreation = "parallelCreation";
+            final String verbose = "verbose";
+            List<String> indexCommandClassProperties = Arrays.asList(parallelCreation, verbose);
+
+            Map<Boolean, List<Property>> properties = createIndex.getProperties().stream()
+                    .collect(Collectors.partitioningBy(property -> indexCommandClassProperties.stream().anyMatch(property.getName().getValue()::equalsIgnoreCase)));
+
+            String[] indexProperties = properties.get(false).stream()
+                    .map(property -> property.getName() + "=" + property.getValue())
+                    .toArray(String[]::new);
+            Map<String, Boolean> providedClassProperties = properties.get(true).stream()
+                    .collect(Collectors.toMap(property -> property.getName().getValue().toLowerCase(ENGLISH),
+                            property -> Boolean.parseBoolean(property.getValue().toString())));
+
+            String[] partitions = new String[0];
+            if (createIndex.getExpression().isPresent()) {
+                Expression expression = createIndex.getExpression().get();
+                partitions = extractPartitions(expression).toArray(new String[0]);
+            }
+
+            String indexTypes = createIndex.getIndexType();
+
+            IndexCommand command = new IndexCommand(clientOptions.configDirPath, createIndex.getIndexName().toString(), tableName,
+                    columns, partitions, indexTypes, indexProperties, providedClassProperties.getOrDefault(parallelCreation, false),
+                    providedClassProperties.getOrDefault(verbose, false), clientOptions.user);
+            command.createIndex();
+        }
+        catch (ParsingException e) {
+            System.out.println(e.getMessage());
+            Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
+            return false;
+        }
+        catch (Exception e) {
+            // Add blank line after progress bar
+            System.out.println();
+            System.out.println("Failed to create index.");
+            System.out.println(e.getMessage());
+            return false;
+        }
+
+        return true;
     }
 
     private static boolean process(

@@ -14,10 +14,16 @@
  */
 package io.hetu.core.plugin.heuristicindex.datasource.hive;
 
+import io.prestosql.plugin.hive.HiveColumnHandle;
+import io.prestosql.spi.type.Type;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
@@ -63,5 +69,54 @@ public class TestHdfsOrcDataSource
         source.setProperties(properties);
 
         assertEquals(source.getConcurrency(), TestConstantsHelper.DEFAULT_CONCURRENCY);
+    }
+
+    @Test
+    public void testValidatePartitions()
+    {
+        TableMetadata tableMetadata = getMockTableMetadata();
+
+        // valid
+        HdfsOrcDataSource.validatePartitions(
+                new String[] {"partitioncolumn=1", "partitioncolumn=2"},
+                tableMetadata);
+
+        HdfsOrcDataSource.validatePartitions(
+                new String[] {"partitioncolumn=1"},
+                tableMetadata);
+
+        HdfsOrcDataSource.validatePartitions(
+                new String[] {"PARTITIONCOLUMN=1"},
+                tableMetadata);
+
+        // invalid
+        assertThrows(IllegalArgumentException.class, () -> HdfsOrcDataSource.validatePartitions(
+                new String[] {"invalidpartitioncolumn=1", "partitioncolumn=2" },
+                tableMetadata));
+
+        assertThrows(IllegalArgumentException.class, () -> HdfsOrcDataSource.validatePartitions(
+                new String[] {"invalidpartitioncolumn=1"},
+                tableMetadata));
+
+        assertThrows(IllegalArgumentException.class, () -> HdfsOrcDataSource.validatePartitions(
+                new String[] {"partitioncolumn1", "partitioncolumn=2"},
+                tableMetadata));
+
+        assertThrows(IllegalArgumentException.class, () -> HdfsOrcDataSource.validatePartitions(
+                new String[] {"partitioncolumn1"},
+                tableMetadata));
+    }
+
+    private TableMetadata getMockTableMetadata()
+    {
+        TableMetadata tableMetadata = mock(TableMetadata.class);
+        Map<HiveColumnHandle, Type> validPartitions = new HashMap<>();
+        HiveColumnHandle columnHandle = mock(HiveColumnHandle.class);
+        when(columnHandle.getName()).thenReturn("partitionColumn");
+        Type columnType = mock(Type.class);
+        validPartitions.put(columnHandle, columnType);
+        when(tableMetadata.getPartitionColumns()).thenReturn(validPartitions);
+
+        return tableMetadata;
     }
 }

@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.heuristicindex.datasource.hive;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
@@ -307,6 +308,36 @@ public class HdfsOrcDataSource
         return result.build();
     }
 
+    /**
+     * Validates the provided partitions, ensuring they are on partition columns
+     *
+     * Throws
+     *
+     * @param partitions
+     * @param tableMetadata
+     * @throws IllegalArgumentException if any partition was not on a valid partition column
+     */
+    @VisibleForTesting
+    protected static void validatePartitions(String[] partitions, TableMetadata tableMetadata) throws IllegalArgumentException
+    {
+        Map<HiveColumnHandle, Type> validPartitionColumns = tableMetadata.getPartitionColumns();
+        Set<String> validPartitionColumnNames = validPartitionColumns.keySet().stream()
+                .map(HiveColumnHandle::getName)
+                .map(n -> n.toLowerCase(Locale.ENGLISH))
+                .collect(Collectors.toSet());
+
+        for (String partition : partitions) {
+            if (partition == null || partition.isEmpty()) {
+                continue;
+            }
+
+            if (!partition.contains("=")
+                    || !validPartitionColumnNames.contains(partition.split("=")[0].toLowerCase(ENGLISH))) {
+                throw new IllegalArgumentException(partition + " does not contain a valid partition column.");
+            }
+        }
+    }
+
     @Override
     public void readSplits(String database, String table, String[] columns, String[] partitions, Callback callback)
             throws IOException
@@ -317,6 +348,9 @@ public class HdfsOrcDataSource
         TableMetadata tableMetadata = HadoopUtil.getTableMetadata(database, table, getProperties());
 
         // validate and get columns
+        if (partitions != null && partitions.length != 0) {
+            validatePartitions(partitions, tableMetadata);
+        }
         Map<HiveColumnHandle, Type> columnsMap = validateAndGetColumns(tableMetadata, columns);
 
         // column idx -> column type

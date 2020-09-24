@@ -241,7 +241,7 @@ The other differences between hana and openLooKeng sql grammar, please refer to 
 
 When we use the openlk-cli to connect the openLooKeng server and handle the time and timestamp without time zone, the result return to the cli to display will depend on the openlk-cli\'s start up configuration. For example, if we start up the openlk-cli with user timezone as:
 
-    java -jar -Duser.timezone=Asia/Tokyo -jar ./hetu-cli-010-executable.jar
+    java -jar -Duser.timezone=Asia/Tokyo -jar ./hetu-cli-*.jar
     --client-request-timeout 30m --server ip:8080 --session legacy_timestamp=false
 
 When you handle time and timestamp dependent types, the openlk-cli will display Time dependent type with time zone:
@@ -261,7 +261,7 @@ lk> select current_timezone();
 If we start up the openlk-cli without user timezone as:
 
 ```shell
-java -jar ./hetu-cli-010-executable.jar
+java -jar ./hetu-cli-*.jar
 --client-request-timeout 30m --server ip:8080
 --session legacy_timestamp=false --catalog hana2
 ```

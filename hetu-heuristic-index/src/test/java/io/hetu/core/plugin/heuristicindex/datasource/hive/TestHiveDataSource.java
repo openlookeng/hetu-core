@@ -125,11 +125,11 @@ public class TestHiveDataSource
             throws IOException
     {
         synchronized (lock) {
-            String[] partitions = new String[] {"111OOOJJJbbbTTTQQQ"};
-            setTableUrl(DockerizedHive.DATABASE_NAME, DockerizedHive.TABLE_NAME, partitions);
+            String[] partitions = new String[] {"age=foo"};
+            setTableUrl(DockerizedHive.DATABASE_NAME, DockerizedHive.PARTITIONED_TABLE_NAME, partitions);
 
-            // No partition in this table, this should return 0
-            assertEquals(0, rowNumberForSplitGeneration(testSource, new String[] {"name", "age"}, 2));
+            // No matching partition, this should return 0
+            assertEquals(0, rowNumberForSplitGeneration(testSource, new String[] {"name"}, 1));
         }
     }
 
