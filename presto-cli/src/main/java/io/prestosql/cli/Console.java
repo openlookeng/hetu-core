@@ -271,6 +271,7 @@ public class Console
             return false;
         }
         catch (Exception e) {
+            System.out.println("Failed to delete index.");
             System.out.println(e.getMessage());
             return false;
         }
@@ -319,6 +320,7 @@ public class Console
             return false;
         }
         catch (Exception e) {
+            System.out.println("Failed to show index.");
             System.out.println(e.getMessage());
             return false;
         }
@@ -548,6 +550,7 @@ public class Console
         catch (Exception e) {
             // Add blank line after progress bar
             System.out.println();
+            System.out.println("Failed to create index.");
             System.out.println(e.getMessage());
             return false;
         }
