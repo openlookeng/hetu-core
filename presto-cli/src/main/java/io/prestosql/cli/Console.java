@@ -243,7 +243,7 @@ public class Console
                 exiting,
                 String.format("select * from %s limit 1;", tableName),
                 ClientOptions.OutputFormat.NULL,
-                false,
+                true,
                 false);
     }
 

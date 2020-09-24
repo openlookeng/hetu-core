@@ -77,7 +77,7 @@
 
 要创建索引，首先将工作目录cd至安装目录的`bin`文件夹，然后运行：
 
-    ./hetu-cli --config <your-etc-folder-directory> --execute 'CREATE INDEX index_name USING bloom ON table1 (column)'
+    java -jar ./hetu-cli-*.jar --config <your-etc-folder-directory> --execute 'CREATE INDEX index_name USING bloom ON table1 (column)'
     
 ### 运行语句
 

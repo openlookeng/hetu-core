@@ -35,19 +35,19 @@ the path should be children directory of Path white list
 ### Create index
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", verbose=true) WHERE p=part1'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", verbose=true) WHERE p=part1'
 ```
 
 ### Show index
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX index_name"
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute "SHOW INDEX index_name"
 ```
 
 ### Drop index
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute "DROP INDEX index_name"
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute "DROP INDEX index_name"
 ```
 
 *Note*: Dropping an index will not remove the cached index from hetu server. This means the index may still be used until it expires from cache based on `hetu.heuristicindex.filter.cache.ttl` value or hetu server is restarted.
@@ -73,11 +73,11 @@ If creating the index for a large table is too slow on one machine, you can crea
 On machine 1:
 
 ``` bash 
-$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
 ```
 
 On machine 2:
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
 ```

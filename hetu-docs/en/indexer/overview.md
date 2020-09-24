@@ -77,7 +77,7 @@ Note that you may create multiple filesystem profiles in `etc/filesystem`, sever
 
 To write index to the indexstore specified above, just change directory to your hetu installation's `bin` folder, then run:
 
-    ./hetu-cli --config <your-etc-folder-directory> --execute 'CREATE INDEX index_name USING bloom ON table1 (column)'
+    java -jar ./hetu-cli-*.jar --config <your-etc-folder-directory> --execute 'CREATE INDEX index_name USING bloom ON table1 (column)'
     
 ### Run query
 
