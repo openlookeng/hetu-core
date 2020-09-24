@@ -17,10 +17,7 @@ package io.hetu.core.plugin.hana;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.plugin.hana.rewrite.HanaSqlQueryWriter;
-import io.prestosql.configmanager.ConfigConstants;
-import io.prestosql.configmanager.ConfigManager;
-import io.prestosql.configmanager.ConfigUtil;
-import io.prestosql.configmanager.ConfigVersionFileHandler;
+import io.hetu.core.plugin.hana.rewrite.UdfFunctionRewriteConstants;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.DriverConnectionFactory;
@@ -103,7 +100,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -141,8 +137,6 @@ public class TestHanaSqlQueryWriter
     private List<String> tables = new ArrayList<>();
 
     private HanaConfig hanaConfig = new HanaConfig();
-
-    private ConfigManager configManager;
 
     /**
      * Create TestHanaSqlQueryWriter
@@ -938,7 +932,7 @@ public class TestHanaSqlQueryWriter
     {
         LOGGER.info("Testing config function call rewrite");
 
-        Map<String, String> propertiesMap = loadConfigMapInTest();
+        Map<String, String> propertiesMap = UdfFunctionRewriteConstants.DEFAULT_VERSION_UDF_REWRITE_PATTERNS;
         // config functions
         for (Map.Entry<String, String> entry : propertiesMap.entrySet()) {
             String key = entry.getKey();
@@ -967,17 +961,6 @@ public class TestHanaSqlQueryWriter
             }
             assertExpression(new FunctionCall(QualifiedName.of(functionName), argsListExp), rewriteResult);
         }
-    }
-
-    private Map<String, String> loadConfigMapInTest()
-    {
-        String versionName = "ut";
-        ConfigVersionFileHandler configVersionFileHandler = new ConfigVersionFileHandler();
-        String defaultConfigFileName = ConfigUtil.buildFileNameFromCoNameAndVerName(HanaConstants.CONNECTOR_NAME, versionName);
-        configVersionFileHandler.addVersionConfigFile(defaultConfigFileName, hanaConfig.getSqlConfigFilePath());
-        this.configManager = ConfigManager.newInstance(configVersionFileHandler, HanaConstants.CONNECTOR_NAME);
-        Map<String, String> proMap = this.configManager.getConfigItemsMap(HanaConstants.CONNECTOR_NAME, versionName, ConfigConstants.CONFIG_UDF_MODULE_NAME);
-        return new HashMap<>(proMap);
     }
 
     @Test
