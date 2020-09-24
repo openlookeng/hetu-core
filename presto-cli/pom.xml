@@ -166,7 +166,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>hetu-cli-${project.version}</finalName>
+                            <finalName>hetu-cli-${project.version}-executable</finalName>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>executable</shadedClassifierName>
                             <transformers>
