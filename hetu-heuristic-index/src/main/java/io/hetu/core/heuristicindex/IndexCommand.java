@@ -79,6 +79,20 @@ public class IndexCommand
         this.user = user;
     }
 
+    public IndexRecordManager.IndexRecord getIndex()
+    {
+        try {
+            validatePaths();
+            IndexFactory factory = IndexCommandUtils.getIndexFactory();
+            IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
+            return IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName);
+        }
+        catch (IOException e) {
+            e.printStackTrace(System.err);
+            return null;
+        }
+    }
+
     public List<IndexRecordManager.IndexRecord> getIndexes()
     {
         try {
