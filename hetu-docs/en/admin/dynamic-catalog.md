@@ -122,8 +122,8 @@ In `etc/node.properties`:
 
 Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
 
-Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is node.data_dir;
-otherwise, the current workspace is the parent directory of openlookeng server's bin directory.
+Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is the parent of node.data_dir;
+otherwise, the current workspace is the openlookeng server's directory.
 
 | Property Name              | Mandatory | Description                                                               | Default Value |
 |----------------------------|-----------|---------------------------------------------------------------------------|---------------|

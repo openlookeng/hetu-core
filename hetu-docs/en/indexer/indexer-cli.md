@@ -44,11 +44,13 @@ $ ./hetu-cli --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON
 $ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX index_name"
 ```
 
-### Delete index
+### Drop index
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute "DELETE INDEX index_name"
+$ ./hetu-cli --config /xxx/etc --execute "DROP INDEX index_name"
 ```
+
+*Note*: Dropping an index will not remove the cached index from hetu server. This means the index may still be used until it expires from cache based on `hetu.heuristicindex.filter.cache.ttl` value or hetu server is restarted.
 
 ## Notes on resource usage
 

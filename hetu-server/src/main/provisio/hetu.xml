@@ -13,7 +13,7 @@
 
     <fileSet to="bin">
         <directory path="${basedir}/../presto-cli/target/">
-            <include>hetu-cli-010-executable.jar</include>
+            <include>hetu-cli-*-executable.jar</include>
         </directory>
     </fileSet>
 

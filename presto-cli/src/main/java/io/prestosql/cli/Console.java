@@ -70,6 +70,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.CharMatcher.whitespace;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -190,6 +191,16 @@ public class Console
 
     private void executeHeuristicIndexQuery(String query, AtomicBoolean exiting, QueryRunner queryRunner)
     {
+        checkArgument(clientOptions.configDirPath != null && !clientOptions.configDirPath.isEmpty(),
+                "INDEX statements require config directory to be set using the -c option when cli is started.");
+        try {
+            clientOptions.configDirPath = new File(clientOptions.configDirPath).getCanonicalPath();
+        }
+        catch (IOException e) {
+            System.out.println(e.getMessage());
+            return;
+        }
+
         switch (query.split(" ", 2)[0].toLowerCase(ENGLISH)) {
             case "create":
                 createIndexCommand(query, queryRunner, exiting);
@@ -253,7 +264,7 @@ public class Console
                 System.out.println(e.getMessage());
                 Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
             }
-            catch (IllegalArgumentException e) {
+            catch (Exception e) {
                 System.out.println(e.getMessage());
             }
         }
@@ -302,7 +313,7 @@ public class Console
                 System.out.println(e.getMessage());
                 Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
             }
-            catch (IOException e) {
+            catch (Exception e) {
                 e.printStackTrace(System.err);
             }
         }
@@ -355,7 +366,15 @@ public class Console
 
                 String indexTypes = createIndex.getIndexType();
 
-                IndexCommand command = new IndexCommand(clientOptions.configDirPath, createIndex.getIndexName().toString(), createIndex.getTableName().toString(),
+                String tableName = createIndex.getTableName().toString();
+
+                if (createIndex.getTableName().getOriginalParts().size() == 1) {
+                    if (queryRunner.getSession().getCatalog() != null && queryRunner.getSession().getSchema() != null) {
+                        tableName = queryRunner.getSession().getCatalog() + "." + queryRunner.getSession().getSchema() + "." + tableName;
+                    }
+                }
+
+                IndexCommand command = new IndexCommand(clientOptions.configDirPath, createIndex.getIndexName().toString(), tableName,
                         columns, partitions, indexTypes, indexProperties, providedClassProperties.getOrDefault(parallelCreation, false),
                         providedClassProperties.getOrDefault(verbose, false), clientOptions.user);
                 command.createIndex();
@@ -364,6 +383,11 @@ public class Console
                 System.out.println(e.getMessage());
                 Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), System.out);
             }
+            catch (Exception e) {
+                // Add blank line after progress bar
+                System.out.println();
+                System.out.println(e.getMessage());
+            }
         }
     }
 
@@ -371,15 +395,30 @@ public class Console
     {
         if (expression instanceof ComparisonExpression) {
             ComparisonExpression exp = (ComparisonExpression) expression;
+
+            if (exp.getOperator() != ComparisonExpression.Operator.EQUAL) {
+                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator, " +
+                        "e.g. partition=1, partition=1 OR partition=2");
+            }
+
             return Collections.singletonList(exp.getLeft().toString() + "=" + exp.getRight().toString());
         }
         else if (expression instanceof LogicalBinaryExpression) {
             LogicalBinaryExpression exp = (LogicalBinaryExpression) expression;
+
+            if (exp.getOperator() != LogicalBinaryExpression.Operator.OR) {
+                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
+                        "e.g. partition=1, partition=1 OR partition=2");
+            }
+
             Expression left = exp.getLeft();
             Expression right = exp.getRight();
             return Stream.concat(extractPartitions(left).stream(), extractPartitions(right).stream()).collect(Collectors.toList());
         }
-        return Collections.emptyList();
+        else {
+            throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
+                    "e.g. partition=1, partition=1 OR partition=2");
+        }
     }
 
     private void runConsole(QueryRunner queryRunner, AtomicBoolean exiting)

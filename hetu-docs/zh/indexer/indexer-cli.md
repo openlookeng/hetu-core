@@ -27,6 +27,8 @@ DROP INDEX index_name;
 
 ## 示例
 
+路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+
 `etc` 目录包含config.properties，在指定config时，我们需要写绝对路径，该路径必须是白名单中路径的子目录
 
 ### 创建索引
@@ -45,8 +47,11 @@ $ ./hetu-cli --config /xxx/etc --execute "SHOW INDEX"
 ### 删除索引
 
 ``` shell
-$ ./hetu-cli --config /xxx/etc --execute "DELETE INDEX index_name"
+$ ./hetu-cli --config /xxx/etc --execute "DROP INDEX index_name"
 ```
+
+*注意*: 删除索引命令不会将索引文件从hetu server的内存中清除。意味着索引会被继续使用，直到达到`hetu.heuristicindex.filter.cache.ttl`所设置的值或者hetu server被重启.
+
 
 ## 资源使用说明
 

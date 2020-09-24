@@ -50,8 +50,8 @@
 
 路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
 
-注意：避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir；
-    如果没有配置，那么当前工作目录为openlookeng server的bin目录的上级目录
+注意：避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；
+    如果没有配置，那么当前工作目录为openlookeng server的目录
 
     hetu.heuristicindex.filter.enabled=true
     hetu.hetu.heuristicindex.filter.cache.max-memory=2GB
