@@ -3,7 +3,7 @@
 
 openLooKeng CLI提供了一个基于终端的交互shell，用于运行查询。CLI是一个可执行的JAR文件，可以通过`java -jar ./hetu-cli-*.jar`执行。
 
-下载：`hetu-cli-1.0.0-executable.jar`，运行：
+下载于服务器对应版本的 CLI 文件，例如：`hetu-cli-1.0.0-executable.jar`，运行：
 
 ``` shell
 java -jar ./hetu-cli-1.0.0-executable.jar --server localhost:8080 --catalog hive --schema default

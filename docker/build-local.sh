@@ -73,7 +73,8 @@ tar -C ${WORK_DIR} -xzf ${WORK_DIR}/hetu-server-${HETU_VERSION}.tar.gz
 rm ${WORK_DIR}/hetu-server-${HETU_VERSION}.tar.gz
 cp -R bin default ${WORK_DIR}/hetu-server-${HETU_VERSION}
 
-cp ../presto-cli/target/hetu-cli-${HETU_VERSION}-executable.jar ${WORK_DIR}
+cp ../presto-cli/target/hetu-cli-${HETU_VERSION}-executable.jar ${WORK_DIR}/hetu-server-${HETU_VERSION}
+cp bin/openlk ${WORK_DIR}
 
 docker build ${WORK_DIR} -f Dockerfile --build-arg "OPENLK_VERSION=${HETU_VERSION}" --build-arg "BASE_IMAGE=${BASE_IMAGE}" -t "openlookeng:${TAG}"
 

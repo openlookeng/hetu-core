@@ -36,7 +36,7 @@ ARG PORT=8080
 # Install OpenLooKeng Engine Executable
 COPY --chown=openlkadmin:openlkadmin hetu-server-${OPENLK_VERSION} /usr/lib/hetu
 # Install CLI
-COPY --chown=openlkadmin:openlkadmin hetu-cli-${OPENLK_VERSION}-executable.jar /usr/bin/openlk
+COPY --chown=openlkadmin:openlkadmin openlk /usr/bin/openlk
 
 EXPOSE $PORT
 USER openlkadmin:openlkadmin
