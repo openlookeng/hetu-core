@@ -44,6 +44,7 @@ import io.prestosql.plugin.hive.HiveTableProperties;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveTypeName;
 import io.prestosql.plugin.hive.HiveUpdateTableHandle;
+import io.prestosql.plugin.hive.HiveWriteUtils;
 import io.prestosql.plugin.hive.HiveWriterFactory;
 import io.prestosql.plugin.hive.HiveWrittenPartitions;
 import io.prestosql.plugin.hive.LocationHandle;
@@ -848,7 +849,7 @@ public class CarbondataMetadata
         }
     }
 
-    private LocationHandle getCarbonDataTableCreationPath(ConnectorSession session, ConnectorTableMetadata tableMetadata) throws PrestoException
+    private LocationHandle getCarbonDataTableCreationPath(ConnectorSession session, ConnectorTableMetadata tableMetadata, HiveWriteUtils.OpertionType opertionType) throws PrestoException
     {
         Path targetPath = null;
         SchemaTableName schemaTableName = tableMetadata.getTable();
@@ -879,7 +880,7 @@ public class CarbondataMetadata
         catch (IllegalArgumentException | IOException e) {
             throw new PrestoException(NOT_SUPPORTED, format("Error %s store path %s ", e.getMessage(), targetLocation));
         }
-        locationHandle = locationService.forNewTable(metastore, session, schemaName, tableName, Optional.empty(), Optional.of(targetPath));
+        locationHandle = locationService.forNewTable(metastore, session, schemaName, tableName, Optional.empty(), Optional.of(targetPath), opertionType);
         return locationHandle;
     }
 
@@ -902,7 +903,7 @@ public class CarbondataMetadata
 
         BaseStorageFormat hiveStorageFormat = CarbondataTableProperties.getCarbondataStorageFormat(tableMetadata.getProperties());
         // it will get final path to create carbon table
-        LocationHandle locationHandle = getCarbonDataTableCreationPath(session, tableMetadata);
+        LocationHandle locationHandle = getCarbonDataTableCreationPath(session, tableMetadata, HiveWriteUtils.OpertionType.CREATE_TABLE);
         Path targetPath = locationService.getQueryWriteInfo(locationHandle).getTargetPath();
 
         AbsoluteTableIdentifier absoluteTableIdentifier = AbsoluteTableIdentifier.from(targetPath.toString(),
@@ -1164,7 +1165,7 @@ public class CarbondataMetadata
         checkPartitionTypesSupported(partitionColumns);
 
         // it will get final path to create carbon table
-        LocationHandle locationHandle = getCarbonDataTableCreationPath(session, tableMetadata);
+        LocationHandle locationHandle = getCarbonDataTableCreationPath(session, tableMetadata, HiveWriteUtils.OpertionType.CREATE_TABLE_AS);
         Path targetPath = locationService.getTableWriteInfo(locationHandle, false).getTargetPath();
         AbsoluteTableIdentifier absoluteTableIdentifier = AbsoluteTableIdentifier.from(targetPath.toString(),
                 new CarbonTableIdentifier(schemaName, tableName, UUID.randomUUID().toString()));

@@ -51,7 +51,7 @@ public class HiveLocationService
     }
 
     @Override
-    public LocationHandle forNewTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, String schemaName, String tableName, Optional<WriteIdInfo> writeIdInfo, Optional<Path> tablePath)
+    public LocationHandle forNewTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, String schemaName, String tableName, Optional<WriteIdInfo> writeIdInfo, Optional<Path> tablePath, HiveWriteUtils.OpertionType opertionType)
     {
         Path targetPath;
         HdfsContext context = new HdfsContext(session, schemaName, tableName);
@@ -67,8 +67,8 @@ public class HiveLocationService
             throw new PrestoException(HiveErrorCode.HIVE_PATH_ALREADY_EXISTS, format("Target directory for table '%s.%s' already exists: %s", schemaName, tableName, targetPath));
         }
 
-        if (shouldUseTemporaryDirectory(session, context, targetPath)) {
-            Path writePath = createTemporaryPath(session, context, hdfsEnvironment, targetPath, HiveWriteUtils.OpertionType.NEW_TABLE);
+        if (shouldUseTemporaryDirectory(session, context, targetPath) && (opertionType == HiveWriteUtils.OpertionType.CREATE_TABLE_AS)) {
+            Path writePath = createTemporaryPath(session, context, hdfsEnvironment, targetPath, opertionType);
             return new LocationHandle(targetPath, writePath, false, STAGE_AND_MOVE_TO_TARGET_DIRECTORY, writeIdInfo);
         }
         else {
@@ -83,7 +83,7 @@ public class HiveLocationService
         Path targetPath = new Path(table.getStorage().getLocation());
 
         if (shouldUseTemporaryDirectory(session, context, targetPath)) {
-            Path writePath = createTemporaryPath(session, context, hdfsEnvironment, targetPath, HiveWriteUtils.OpertionType.EXISTING_TABLE);
+            Path writePath = createTemporaryPath(session, context, hdfsEnvironment, targetPath, HiveWriteUtils.OpertionType.INSERT);
             return new LocationHandle(targetPath, writePath, true, STAGE_AND_MOVE_TO_TARGET_DIRECTORY, writeIdInfo);
         }
         else {
