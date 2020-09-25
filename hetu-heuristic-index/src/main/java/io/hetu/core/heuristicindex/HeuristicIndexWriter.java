@@ -262,6 +262,7 @@ public class HeuristicIndexWriter
                     });
 
             if (partFiles.isEmpty()) {
+                System.out.println();
                 String msg = "No index was created. Table may be empty.";
                 System.out.println(msg);
                 throw new IllegalStateException(msg);
