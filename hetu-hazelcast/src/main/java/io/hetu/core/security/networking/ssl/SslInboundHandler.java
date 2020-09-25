@@ -214,7 +214,7 @@ public class SslInboundHandler
             if (task == null) {
                 return;
             }
-            task.run();
+            SslContext.executors.execute(task);
         }
     }
 
