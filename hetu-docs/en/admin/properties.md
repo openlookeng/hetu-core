@@ -21,6 +21,14 @@ This section describes the most important config properties that may be used to 
 >
 > This property enables redistribution of data before writing. This can eliminate the performance impact of data skew when writing by hashing it across nodes in the cluster. It can be disabled when it is known that the output data set is not skewed in order to avoid the overhead of hashing and redistributing all the data across the network. This can also be specified on a per-query basis using the `redistribute_writes` session property.
 
+### `stack-trace-visible`
+
+> - **Type：** `boolean`
+> - **Allowed values：** `true`, `false`
+> - **Default value：** `false`
+> 
+> This property make exception stack trace which happen in openLooKeng visible or invisible. While it is set to be `true`, the stack trace is visible for all users. While it is set as default or `false`, the stack trace is invisible for all users. 
+
 ## Memory Management Properties
 
 ### `query.max-memory-per-node`

@@ -149,7 +149,7 @@ public class FullConnectorSession
                 .toString();
     }
 
-    // for cbg supporting the hive view we need the catalog
+    // supporting the hive view we need the catalog
     @Override
     public Optional<String> getCatalog()
     {
