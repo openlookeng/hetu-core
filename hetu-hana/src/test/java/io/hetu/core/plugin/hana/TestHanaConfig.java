@@ -105,8 +105,5 @@ public class TestHanaConfig
 
         boolean isQueryPushDown = config.isQueryPushDownEnabled();
         assertEquals(isQueryPushDown, true);
-
-        String defaultFilePath = config.getSqlConfigFilePath();
-        assertEquals(defaultFilePath, "");
     }
 }

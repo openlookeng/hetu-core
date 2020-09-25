@@ -14,33 +14,22 @@
  */
 package io.prestosql.configmanager;
 
-/**
- * Config Constants
- * @since 2019-12-28
- */
-public class ConfigConstants
+import java.util.Map;
+import java.util.Optional;
+
+public interface ConfigSupplier
 {
-    private ConfigConstants()
-    {
-    }
+    /**
+     * This method reture the configuration key-values stored in a map
+     *
+     * @return a map store configuration key-values
+     */
+    Map<String, String> getConfigKeyValueMap();
 
     /**
-     * config pattern split string
+     * This method return the configurations value according to a key
+     *
+     * @return
      */
-    public static final String PATTERN_SPLIT = ":";
-
-    /**
-     * udf yaml file module name
-     */
-    public static final String CONFIG_UDF_MODULE_NAME = "rewrite_functions";
-
-    /**
-     * connector config file name mod
-     */
-    public static final String CONNECTOR_INJECT_CONFIG_FILE_NAME = "#1-#2-configurations.yml";
-
-    /**
-     * the default version name
-     */
-    public static final String DEFAULT_VERSION_NAME = "default";
+    Optional<String> getConfigValue(String key);
 }

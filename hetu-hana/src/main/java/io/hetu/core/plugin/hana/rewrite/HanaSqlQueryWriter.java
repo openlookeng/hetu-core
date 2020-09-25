@@ -23,7 +23,8 @@ import io.hetu.core.plugin.hana.rewrite.functioncall.DateAddFunctionCallRewrite;
 import io.hetu.core.plugin.hana.rewrite.functioncall.DateTimeFunctionCallRewriter;
 import io.hetu.core.plugin.hana.rewrite.functioncall.HanaUnsupportedFunctionCallRewriter;
 import io.hetu.core.plugin.hana.rewrite.functioncall.VarbinaryLiteralFunctionCallRewriter;
-import io.prestosql.configmanager.ConfigConstants;
+import io.prestosql.configmanager.ConfigSupplier;
+import io.prestosql.configmanager.DefaultUdfRewriteConfigSupplier;
 import io.prestosql.spi.sql.expression.Operators;
 import io.prestosql.spi.sql.expression.QualifiedName;
 import io.prestosql.spi.sql.expression.Time;
@@ -82,10 +83,14 @@ public class HanaSqlQueryWriter
 
     private void functionCallManagerHandle(HanaConfig hanaConfig)
     {
-        // use the default function result string builder in the HanaConfigUdfRewriter
-        DefaultConnectorConfigFunctionRewriter connectorConfigFunctionRewriter = new DefaultConnectorConfigFunctionRewriter(HanaConstants.CONNECTOR_NAME, hanaConfig.getSqlConfigFilePath());
+        // add inner config udf, use the default function result string builder in the HanaConfigUdfRewriter
+        ConfigSupplier configSupplier = new DefaultUdfRewriteConfigSupplier(UdfFunctionRewriteConstants.DEFAULT_VERSION_UDF_REWRITE_PATTERNS);
+        DefaultConnectorConfigFunctionRewriter connectorConfigFunctionRewriter =
+                new DefaultConnectorConfigFunctionRewriter(HanaConstants.CONNECTOR_NAME, configSupplier);
+
         // use the default function Signature Builder in the HanaFunctionRewriterManager
-        hanaFunctionRewriterManager = FunctionWriterManagerGroup.getFunctionWriterManagerInstance(HanaConstants.CONNECTOR_NAME, ConfigConstants.DEFAULT_VERSION_NAME, getInjectFunctionCallRewritersDefault(hanaConfig), connectorConfigFunctionRewriter);
+        hanaFunctionRewriterManager = FunctionWriterManagerGroup.newFunctionWriterManagerInstance(HanaConstants.CONNECTOR_NAME,
+                hanaConfig.getHanaSqlVersion(), getInjectFunctionCallRewritersDefault(hanaConfig), connectorConfigFunctionRewriter);
     }
 
     private Map<String, FunctionCallRewriter> getInjectFunctionCallRewritersDefault(HanaConfig hanaConfig)

@@ -14,12 +14,10 @@
  */
 package io.prestosql.sql.builder.functioncall.functions.config;
 
-import io.prestosql.configmanager.ConfigConstants;
-import io.prestosql.configmanager.ConfigManager;
-import io.prestosql.configmanager.ConfigUtil;
-import io.prestosql.configmanager.ConfigVersionFileHandler;
+import io.prestosql.configmanager.ConfigSupplier;
 import io.prestosql.sql.builder.functioncall.ConfigFunctionParser;
 import io.prestosql.sql.builder.functioncall.FunctionCallArgsPackage;
+import io.prestosql.sql.builder.functioncall.functions.FunctionCallRewriter;
 
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -33,6 +31,7 @@ import static java.util.Objects.requireNonNull;
  * @since 2019-12-17
  */
 public class DefaultConnectorConfigFunctionRewriter
+        implements FunctionCallRewriter
 {
     protected static volatile DefaultConnectorConfigFunctionRewriter instance;
 
@@ -42,21 +41,18 @@ public class DefaultConnectorConfigFunctionRewriter
 
     private String connectorName;
 
-    private String[] configModuleNames = {ConfigConstants.CONFIG_UDF_MODULE_NAME};
-
-    private ConfigVersionFileHandler configVersionFileHandler;
-
-    private ConfigManager configManager;
+    private ConfigSupplier configSupplier;
 
     /**
      * the constructor, use an default defined function call args matcher
      *
      * @param connectorName connectorName
-     * @param defaultFilePath defaultFilePath
+     * @param configSupplier default configSupplier
      */
-    public DefaultConnectorConfigFunctionRewriter(String connectorName, String defaultFilePath)
+    public DefaultConnectorConfigFunctionRewriter(String connectorName, ConfigSupplier configSupplier)
     {
-        this(connectorName, defaultFilePath, ConfigFunctionParser::baseFunctionArgsToConfigPropertyName, ConfigFunctionParser::baseConfigPropertyValueToFunctionPushDownString);
+        this(connectorName, configSupplier, ConfigFunctionParser::baseFunctionArgsToConfigPropertyName,
+                ConfigFunctionParser::baseConfigPropertyValueToFunctionPushDownString);
     }
 
     /**
@@ -67,15 +63,12 @@ public class DefaultConnectorConfigFunctionRewriter
      * @param propertyNameBuilder propertyNameBuilder
      * @param resultFunctionStringBuilder argsFunctionStringBuilder
      */
-    private DefaultConnectorConfigFunctionRewriter(String connectorName, String defaultFilePath, Function<FunctionCallArgsPackage, String> propertyNameBuilder, BiFunction<FunctionCallArgsPackage, String, String> resultFunctionStringBuilder)
+    private DefaultConnectorConfigFunctionRewriter(String connectorName, ConfigSupplier configSupplier, Function<FunctionCallArgsPackage, String> propertyNameBuilder, BiFunction<FunctionCallArgsPackage, String, String> resultFunctionStringBuilder)
     {
         this.connectorName = requireNonNull(connectorName, "versionName is null");
         this.propertyNameBuilder = requireNonNull(propertyNameBuilder, "signatureBuilder is null");
         this.resultFunctionStringBuilder = requireNonNull(resultFunctionStringBuilder, "argsFunction is null...");
-        this.configVersionFileHandler = new ConfigVersionFileHandler();
-        String defaultConfigFileName = ConfigUtil.buildFileNameFromCoNameAndVerName(connectorName, ConfigConstants.DEFAULT_VERSION_NAME);
-        this.configVersionFileHandler.addVersionConfigFile(defaultConfigFileName, defaultFilePath);
-        this.configManager = ConfigManager.newInstance(configVersionFileHandler, connectorName);
+        this.configSupplier = requireNonNull(configSupplier, "configSupplier is null");
     }
 
     /**
@@ -87,10 +80,7 @@ public class DefaultConnectorConfigFunctionRewriter
     public String rewriteFunctionCall(FunctionCallArgsPackage functionCallArgsPackage)
     {
         String functionPropertyName = propertyNameBuilder.apply(functionCallArgsPackage);
-        String[] modules = new String[configModuleNames.length + 1];
-        System.arraycopy(configModuleNames, 0, modules, 0, configModuleNames.length);
-        modules[modules.length - 1] = functionPropertyName;
-        Optional<String> propertyValue = this.configManager.getConfigPropertyValue(connectorName, ConfigConstants.DEFAULT_VERSION_NAME, modules);
+        Optional<String> propertyValue = this.configSupplier.getConfigValue(functionPropertyName);
         return propertyValue.map(s -> resultFunctionStringBuilder.apply(functionCallArgsPackage, s)).orElse(null);
     }
 }

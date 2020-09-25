@@ -16,7 +16,6 @@ package io.hetu.core.plugin.hana;
 
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
-import io.airlift.log.Logger;
 
 import java.util.Locale;
 
@@ -28,8 +27,6 @@ import java.util.Locale;
  */
 public class HanaConfig
 {
-    private final Logger logger = Logger.get(HanaConfig.class);
-
     private boolean isAutoCommit = true;
 
     private int communicationTimeout = HanaConstants.DEFAULT_COMMUNICATION_TIMEOUT;
@@ -52,9 +49,7 @@ public class HanaConfig
 
     private boolean isQueryPushDownEnabled = true;
 
-    private String sqlConfigFilePath = "";
-
-    private boolean isDefaultPath = true;
+    private String hanaSqlVersion = "DEFAULT";
 
     private boolean isByPassDsTzSetting = true;
 
@@ -228,23 +223,14 @@ public class HanaConfig
      *
      * @return String the usable file path
      */
-    public String getSqlConfigFilePath()
+    public String getHanaSqlVersion()
     {
-        return this.sqlConfigFilePath;
-    }
-
-    /**
-     * get is the Sql rewrite configuration properties file is DefaultPath
-     *
-     * @return String the usable file path
-     */
-    public boolean isDefaultPath()
-    {
-        return this.isDefaultPath;
+        return this.hanaSqlVersion;
     }
 
     /**
      * Is ignore data source's time zone,just use onquery's timezone
+     *
      * @param isByPassTz is bypass the hana time zone setting
      * @return HanaConfig
      */
@@ -258,6 +244,7 @@ public class HanaConfig
 
     /**
      * is bypass the data source's timezone setting.
+     *
      * @return boolean
      */
     public boolean isByPassDataSourceTimeZone()
@@ -267,6 +254,7 @@ public class HanaConfig
 
     /**
      * set data source's time zone key
+     *
      * @param timeZoneKey time zone key
      * @return HanaConfig
      */
@@ -280,6 +268,7 @@ public class HanaConfig
 
     /**
      * get datasource's time zone
+     *
      * @return time zone key
      */
     public String getDataSourceTimeZoneKey()
