@@ -14,6 +14,7 @@
  */
 package io.hetu.core.metastore.hetufilesystem;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
@@ -459,7 +460,12 @@ public class HetuFsMetastore
         checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
 
         List<DatabaseEntity> databases = new ArrayList<>();
-        assertCatalogExist(catalogName);
+        try {
+            assertCatalogExist(catalogName);
+        }
+        catch (CatalogNotFoundException e) {
+            return ImmutableList.of();
+        }
         try (Stream<Path> paths = client.list(getCatalogMetadataDir(catalogName))) {
             List<Path> databasePaths = paths.filter(path -> path.toString().endsWith(METADATA_SUFFIX))
                     .collect(Collectors.toList());
@@ -619,8 +625,13 @@ public class HetuFsMetastore
 
         List<TableEntity> tables = new ArrayList<>();
 
-        assertCatalogExist(catalogName);
-        assertDatabaseExist(catalogName, databaseName);
+        try {
+            assertCatalogExist(catalogName);
+            assertDatabaseExist(catalogName, databaseName);
+        }
+        catch (CatalogNotFoundException | SchemaNotFoundException e) {
+            return ImmutableList.of();
+        }
 
         try (Stream<Path> paths = client.list(getDatabaseMetadataDir(catalogName, databaseName))) {
             List<Path> tablePaths = paths.filter(path -> path.toString().endsWith(METADATA_SUFFIX))
