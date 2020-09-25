@@ -16,8 +16,12 @@ package io.hetu.core.security.networking.ssl;
 
 import javax.net.ssl.SSLEngine;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.hazelcast.internal.util.Preconditions.checkNotNull;
@@ -25,6 +29,7 @@ import static com.hazelcast.internal.util.Preconditions.checkNotNull;
 public class SslContext
 {
     public static ScheduledExecutorService scheduleExecutor = Executors.newScheduledThreadPool(20);
+    public static ExecutorService executors = new ThreadPoolExecutor(20, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
     private SSLEngine engine;
     private boolean startTls;
     private long sessionTimeout;
