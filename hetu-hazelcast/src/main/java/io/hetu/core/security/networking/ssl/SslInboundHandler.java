@@ -95,7 +95,7 @@ public class SslInboundHandler
                             src = newBuffer;
                             updateInboundPipeline();
                             if (logger.isFineEnabled()) {
-                                logger.fine("channel=" + channel + "....BUFFER_UNDERFLOW" );
+                                logger.fine("channel=" + channel + "....BUFFER_UNDERFLOW");
                             }
                         }
                         return HandlerStatus.CLEAN;

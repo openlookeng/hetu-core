@@ -75,7 +75,8 @@ public class ClientPlainChannelInitializerAspect
 
             ClientMessageDecoder decoder = new ClientMessageDecoder(connection, new Consumer<ClientMessage>() {
                 @Override
-                public void accept(ClientMessage message) {
+                public void accept(ClientMessage message)
+                {
                     connection.handleClientMessage(message);
                 }
             }, null);
