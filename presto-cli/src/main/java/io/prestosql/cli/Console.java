@@ -13,6 +13,7 @@
  */
 package io.prestosql.cli;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -29,6 +30,7 @@ import io.prestosql.client.ClientTypeSignature;
 import io.prestosql.client.Column;
 import io.prestosql.client.ErrorLocation;
 import io.prestosql.sql.parser.ParsingException;
+import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.parser.StatementSplitter;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -247,11 +249,56 @@ public class Console
                 false);
     }
 
+    @VisibleForTesting
+    protected static List<String> extractPartitions(Expression expression)
+    {
+        if (expression instanceof ComparisonExpression) {
+            ComparisonExpression exp = (ComparisonExpression) expression;
+
+            if (exp.getOperator() != ComparisonExpression.Operator.EQUAL) {
+                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator, " +
+                        "e.g. partition=1, partition=1 OR partition=2");
+            }
+
+            return Collections.singletonList(exp.getLeft().toString() + "=" + parseSpecialPartitionValues(exp.getRight().toString()));
+        }
+        else if (expression instanceof LogicalBinaryExpression) {
+            LogicalBinaryExpression exp = (LogicalBinaryExpression) expression;
+
+            if (exp.getOperator() != LogicalBinaryExpression.Operator.OR) {
+                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
+                        "e.g. partition=1, partition=1 OR partition=2");
+            }
+
+            Expression left = exp.getLeft();
+            Expression right = exp.getRight();
+            return Stream.concat(extractPartitions(left).stream(), extractPartitions(right).stream()).collect(Collectors.toList());
+        }
+        else {
+            throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
+                    "e.g. partition=1, partition=1 OR partition=2");
+        }
+    }
+
+    @VisibleForTesting
+    protected static String parseSpecialPartitionValues(String rightVal)
+    {
+        if (rightVal.matches("^'.*'$")) {
+            return rightVal.substring(1, rightVal.length() - 1);
+        }
+
+        else if (rightVal.matches("^date\\s'.*'$")) {
+            return rightVal.replaceAll("^date\\s*'(.*)'$", "$1");
+        }
+
+        return rightVal;
+    }
+
     private boolean deleteIndexCommand(String query, QueryRunner queryRunner, AtomicBoolean exiting)
     {
         SqlParser parser = new SqlParser();
         try {
-            DropIndex deleteIndex = (DropIndex) parser.createStatement(query);
+            DropIndex deleteIndex = (DropIndex) parser.createStatement(query, new ParsingOptions());
             IndexCommand command = new IndexCommand(clientOptions.configDirPath, deleteIndex.getIndexName().toString(),
                     false, clientOptions.user);
 
@@ -283,7 +330,7 @@ public class Console
     {
         SqlParser parser = new SqlParser();
         try {
-            ShowIndex showIndex = (ShowIndex) parser.createStatement(query);
+            ShowIndex showIndex = (ShowIndex) parser.createStatement(query, new ParsingOptions());
             IndexCommand command = new IndexCommand(clientOptions.configDirPath, (showIndex.getIndexName() == null ? "" : showIndex.getIndexName().toString()),
                     false);
 
@@ -326,36 +373,6 @@ public class Console
         }
 
         return true;
-    }
-
-    private List<String> extractPartitions(Expression expression)
-    {
-        if (expression instanceof ComparisonExpression) {
-            ComparisonExpression exp = (ComparisonExpression) expression;
-
-            if (exp.getOperator() != ComparisonExpression.Operator.EQUAL) {
-                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator, " +
-                        "e.g. partition=1, partition=1 OR partition=2");
-            }
-
-            return Collections.singletonList(exp.getLeft().toString() + "=" + exp.getRight().toString());
-        }
-        else if (expression instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression exp = (LogicalBinaryExpression) expression;
-
-            if (exp.getOperator() != LogicalBinaryExpression.Operator.OR) {
-                throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
-                        "e.g. partition=1, partition=1 OR partition=2");
-            }
-
-            Expression left = exp.getLeft();
-            Expression right = exp.getRight();
-            return Stream.concat(extractPartitions(left).stream(), extractPartitions(right).stream()).collect(Collectors.toList());
-        }
-        else {
-            throw new ParsingException("Unsupported WHERE expression. Only equality expressions are supported with OR operator. " +
-                    "e.g. partition=1, partition=1 OR partition=2");
-        }
     }
 
     private void runConsole(QueryRunner queryRunner, AtomicBoolean exiting)
@@ -490,7 +507,7 @@ public class Console
         SqlParser parser = new SqlParser();
 
         try {
-            CreateIndex createIndex = (CreateIndex) parser.createStatement(query);
+            CreateIndex createIndex = (CreateIndex) parser.createStatement(query, new ParsingOptions());
 
             String tableName = createIndex.getTableName().toString();
 
