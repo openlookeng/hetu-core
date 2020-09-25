@@ -27,7 +27,7 @@ then
 fi
 
 # Send shutdown request
-curl -X PUT -H "Content-Type: application/json" http://localhost:$HETU_PORT/v1/info/state -d '"SHUTTING_DOWN"'
+curl -X PUT -H "X-Presto-User: openlk" -H "Content-Type: application/json" http://localhost:$HETU_PORT/v1/info/state -d '"SHUTTING_DOWN"'
 
 # Wait for node to exit
 while true
