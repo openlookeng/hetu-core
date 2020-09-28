@@ -178,12 +178,47 @@ public class HttpUtil
                 .addHeader(USER_AGENT, USER_AGENT_VALUE);
         builder.addHeader(ACCEPT_ENCODING_HEADER, "");
         // add security header
-        builder.addHeader(HTTP_SECURITY_CSP, HTTP_SECURITY_CSP_VALUE);
-        builder.addHeader(HTTP_SECURITY_RP, HTTP_SECURITY_RP_VALUE);
-        builder.addHeader(HTTP_SECURITY_XCTO, HTTP_SECURITY_XCTO_VALUE);
-        builder.addHeader(HTTP_SECURITY_XFO, HTTP_SECURITY_XFO_VALUE);
-        builder.addHeader(HTTP_SECURITY_XPCDP, HTTP_SECURITY_XPCDP_VALUE);
-        builder.addHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
+        if (System.getProperty(HTTP_SECURITY_CSP) != null) {
+            builder.addHeader(HTTP_SECURITY_CSP, System.getProperty(HTTP_SECURITY_CSP));
+        }
+        else {
+            builder.addHeader(HTTP_SECURITY_CSP, HTTP_SECURITY_CSP_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_RP) != null) {
+            builder.addHeader(HTTP_SECURITY_RP, System.getProperty(HTTP_SECURITY_RP));
+        }
+        else {
+            builder.addHeader(HTTP_SECURITY_RP, HTTP_SECURITY_RP_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XCTO) != null) {
+            builder.addHeader(HTTP_SECURITY_XCTO, System.getProperty(HTTP_SECURITY_XCTO));
+        }
+        else {
+            builder.addHeader(HTTP_SECURITY_XCTO, HTTP_SECURITY_XCTO_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XFO) != null) {
+            builder.addHeader(HTTP_SECURITY_XFO, System.getProperty(HTTP_SECURITY_XFO));
+        }
+        else {
+            builder.addHeader(HTTP_SECURITY_XFO, HTTP_SECURITY_XFO_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XPCDP) != null) {
+            builder.addHeader(HTTP_SECURITY_XPCDP, System.getProperty(HTTP_SECURITY_XPCDP));
+        }
+        else {
+            builder.addHeader(HTTP_SECURITY_XPCDP, HTTP_SECURITY_XPCDP_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XXP) != null) {
+            builder.addHeader(HTTP_SECURITY_XXP, System.getProperty(HTTP_SECURITY_XXP));
+        }
+        else {
+            builder.addHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
+        }
         return builder.url(url);
     }
 

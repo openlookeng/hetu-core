@@ -14,6 +14,9 @@
  */
 package io.prestosql.client;
 
+/**
+ * default setting
+ */
 public class HttpSecurityHeadersConstants
 {
     /**
@@ -24,7 +27,7 @@ public class HttpSecurityHeadersConstants
     /**
      * Http security header: Content-Security-Policy
      */
-    public static final String HTTP_SECURITY_CSP_VALUE = "default-src 'self'";
+    public static final String HTTP_SECURITY_CSP_VALUE = "object-src 'none'";
 
     /**
      * Http security header: Referrer-Policy

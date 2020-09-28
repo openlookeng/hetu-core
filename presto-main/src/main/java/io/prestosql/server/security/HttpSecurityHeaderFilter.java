@@ -55,12 +55,47 @@ public class HttpSecurityHeaderFilter
             throws IOException, ServletException
     {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-        httpServletResponse.setHeader(HTTP_SECURITY_CSP, HTTP_SECURITY_CSP_VALUE);
-        httpServletResponse.setHeader(HTTP_SECURITY_RP, HTTP_SECURITY_RP_VALUE);
-        httpServletResponse.setHeader(HTTP_SECURITY_XCTO, HTTP_SECURITY_XCTO_VALUE);
-        httpServletResponse.setHeader(HTTP_SECURITY_XFO, HTTP_SECURITY_XFO_VALUE);
-        httpServletResponse.setHeader(HTTP_SECURITY_XPCDP, HTTP_SECURITY_XPCDP_VALUE);
-        httpServletResponse.setHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
+        if (System.getProperty(HTTP_SECURITY_CSP) != null) {
+            httpServletResponse.setHeader(HTTP_SECURITY_CSP, System.getProperty(HTTP_SECURITY_CSP));
+        }
+        else {
+            httpServletResponse.setHeader(HTTP_SECURITY_CSP, HTTP_SECURITY_CSP_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_RP) != null) {
+            httpServletResponse.setHeader(HTTP_SECURITY_RP, System.getProperty(HTTP_SECURITY_RP));
+        }
+        else {
+            httpServletResponse.setHeader(HTTP_SECURITY_RP, HTTP_SECURITY_RP_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XCTO) != null) {
+            httpServletResponse.setHeader(HTTP_SECURITY_XCTO, System.getProperty(HTTP_SECURITY_XCTO));
+        }
+        else {
+            httpServletResponse.setHeader(HTTP_SECURITY_XCTO, HTTP_SECURITY_XCTO_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XFO) != null) {
+            httpServletResponse.setHeader(HTTP_SECURITY_XFO, System.getProperty(HTTP_SECURITY_XFO));
+        }
+        else {
+            httpServletResponse.setHeader(HTTP_SECURITY_XFO, HTTP_SECURITY_XFO_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XPCDP) != null) {
+            httpServletResponse.setHeader(HTTP_SECURITY_XPCDP, System.getProperty(HTTP_SECURITY_XPCDP));
+        }
+        else {
+            httpServletResponse.setHeader(HTTP_SECURITY_XPCDP, HTTP_SECURITY_XPCDP_VALUE);
+        }
+
+        if (System.getProperty(HTTP_SECURITY_XXP) != null) {
+            httpServletResponse.setHeader(HTTP_SECURITY_XXP, System.getProperty(HTTP_SECURITY_XXP));
+        }
+        else {
+            httpServletResponse.setHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
+        }
         filterChain.doFilter(servletRequest, servletResponse);
     }
 }
