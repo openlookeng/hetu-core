@@ -98,7 +98,7 @@ public class NodeStateChangeHandler
                         waitAllQueriesToFinish(true);
                     }
                     // worker OR coordinator with scheduling tasks
-                    if (!isCoordinator || (isCoordinator && allowTaskOnCoordinator)) {
+                    if (!isCoordinator || allowTaskOnCoordinator) {
                         // wait all the tasks to be finished
                         waitAllTasksToFinish(true);
                     }

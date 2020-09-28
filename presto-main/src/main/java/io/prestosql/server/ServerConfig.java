@@ -15,6 +15,8 @@ package io.prestosql.server;
 
 import io.airlift.configuration.Config;
 import io.airlift.units.Duration;
+import io.airlift.units.MaxDuration;
+import io.airlift.units.MinDuration;
 
 import javax.validation.constraints.NotNull;
 
@@ -66,6 +68,8 @@ public class ServerConfig
         return this;
     }
 
+    @MinDuration("0ms")
+    @MaxDuration("1h")
     public Duration getGracePeriod()
     {
         return gracePeriod;
