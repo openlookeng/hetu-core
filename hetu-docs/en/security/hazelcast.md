@@ -1,5 +1,5 @@
 
-Hazelcast安全
+Hazelcast Security
 ===================================
 
 Hazelcast is embedded in the openLooKeng. When hazelcast is used in openLooKeng, in order to ensure the communication 
