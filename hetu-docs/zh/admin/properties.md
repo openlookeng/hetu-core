@@ -27,6 +27,50 @@
 > 
 > 此属性控制系统是否能够在CLI、WEB UI等对外展示系统出现Exception时的代码调用栈. 当设置为`true`时对外展示给所有用户，设置为`false`或者采用默认设置，不展示给任何用户。
 
+## http 安全头部属性
+
+### `http-header.content-security-policy`
+
+> - **类型：** `string`
+> - **默认值：** `object-src 'none'`
+> 
+> 此属性设置 `content-security-policy` 设置相关值。
+
+### `http-header.referrer-policy`
+
+> - **类型：** `string`
+> - **默认值：** `strict-origin-when-cross-origin`
+> 
+> 此属性设置 `referrer-policy` 设置相关值。
+
+### `http-header.x-content-type-options`
+
+> - **类型：** `string`
+> - **默认值：** `nosniff`
+> 
+> 此属性设置 `content-security-policy` 设置相关值。
+
+### `http-header.x-frame-options`
+
+> - **类型：** `string`
+> - **默认值：** `deny`
+> 
+> 此属性设置 `content-security-policy` 设置相关值。
+
+### `http-header.x-permitted-cross-domain-policies`
+
+> - **类型：** `string`
+> - **默认值：** `master-only`
+> 
+> 此属性设置 `x-permitted-cross-domain-policies` 设置相关值。
+
+### `http-header.x-xss-protection`
+
+> - **类型：** `string`
+> - **默认值：** `1; mode=block`
+> 
+> 此属性设置 `http-header.x-xss-protection` 设置相关值。
+
 ## 内存管理属性
 
 ### `query.max-memory-per-node`

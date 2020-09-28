@@ -29,7 +29,13 @@ public class TestSecurityConfig
     public void testDefaults()
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(SecurityConfig.class)
-                .setAuthenticationTypes(""));
+                .setAuthenticationTypes("")
+                .setHttpHeaderCsp("object-src 'none'")
+                .setHttpHeaderRp("strict-origin-when-cross-origin")
+                .setHttpHeaderXcto("nosniff")
+                .setHttpHeaderXfo("deny")
+                .setHttpHeaderXpcdp("master-only")
+                .setHttpHeaderXxp("1; mode=block"));
     }
 
     @Test
@@ -37,10 +43,22 @@ public class TestSecurityConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("http-server.authentication.type", "KERBEROS,PASSWORD")
+                .put("http-header.content-security-policy", "script-src 'self'")
+                .put("http-header.referrer-policy", "origin")
+                .put("http-header.x-content-type-options", "none")
+                .put("http-header.x-frame-options", "none")
+                .put("http-header.x-permitted-cross-domain-policies", "sameorigin")
+                .put("http-header.x-xss-protection", "0")
                 .build();
 
         SecurityConfig expected = new SecurityConfig()
-                .setAuthenticationTypes(ImmutableList.of(KERBEROS, PASSWORD));
+                .setAuthenticationTypes(ImmutableList.of(KERBEROS, PASSWORD))
+                .setHttpHeaderCsp("script-src 'self'")
+                .setHttpHeaderRp("origin")
+                .setHttpHeaderXcto("none")
+                .setHttpHeaderXfo("none")
+                .setHttpHeaderXpcdp("sameorigin")
+                .setHttpHeaderXxp("0");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

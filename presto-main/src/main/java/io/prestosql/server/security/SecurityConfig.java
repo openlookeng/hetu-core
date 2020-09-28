@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.configuration.DefunctConfig;
+import io.prestosql.client.HttpSecurityHeadersConstants;
 
 import javax.validation.constraints.NotNull;
 
@@ -39,6 +40,22 @@ public class SecurityConfig
         KERBEROS,
         PASSWORD,
         JWT
+    }
+
+    private String httpHeaderCsp = HttpSecurityHeadersConstants.HTTP_SECURITY_CSP_VALUE;
+    private String httpHeaderRp = HttpSecurityHeadersConstants.HTTP_SECURITY_RP_VALUE;
+    private String httpHeaderXcto = HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO_VALUE;
+    private String httpHeaderXfo = HttpSecurityHeadersConstants.HTTP_SECURITY_XFO_VALUE;
+    private String httpHeaderXpcdp = HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP_VALUE;
+    private String httpHeaderXxp = HttpSecurityHeadersConstants.HTTP_SECURITY_XXP_VALUE;
+
+    {
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_CSP, httpHeaderCsp);
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_RP, httpHeaderRp);
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO, httpHeaderXcto);
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XFO, httpHeaderXfo);
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP, httpHeaderXpcdp);
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XXP, httpHeaderXxp);
     }
 
     @NotNull
@@ -65,6 +82,84 @@ public class SecurityConfig
         authenticationTypes = stream(SPLITTER.split(types))
                 .map(AuthenticationType::valueOf)
                 .collect(toImmutableList());
+        return this;
+    }
+
+    public String getHttpHeaderCsp()
+    {
+        return this.httpHeaderCsp;
+    }
+
+    @Config("http-header.content-security-policy")
+    public SecurityConfig setHttpHeaderCsp(String httpHeaderCsp)
+    {
+        this.httpHeaderCsp = httpHeaderCsp;
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_CSP, httpHeaderCsp);
+        return this;
+    }
+
+    public String getHttpHeaderRp()
+    {
+        return httpHeaderRp;
+    }
+
+    @Config("http-header.referrer-policy")
+    public SecurityConfig setHttpHeaderRp(String httpHeaderRp)
+    {
+        this.httpHeaderRp = httpHeaderRp;
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_RP, httpHeaderRp);
+        return this;
+    }
+
+    public String getHttpHeaderXcto()
+    {
+        return httpHeaderXcto;
+    }
+
+    @Config("http-header.x-content-type-options")
+    public SecurityConfig setHttpHeaderXcto(String httpHeaderXcto)
+    {
+        this.httpHeaderXcto = httpHeaderXcto;
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XCTO, httpHeaderXcto);
+        return this;
+    }
+
+    public String getHttpHeaderXfo()
+    {
+        return httpHeaderXfo;
+    }
+
+    @Config("http-header.x-frame-options")
+    public SecurityConfig setHttpHeaderXfo(String httpHeaderXfo)
+    {
+        this.httpHeaderXfo = httpHeaderXfo;
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XFO, httpHeaderXfo);
+        return this;
+    }
+
+    public String getHttpHeaderXpcdp()
+    {
+        return httpHeaderXpcdp;
+    }
+
+    @Config("http-header.x-permitted-cross-domain-policies")
+    public SecurityConfig setHttpHeaderXpcdp(String httpHeaderXpcdp)
+    {
+        this.httpHeaderXpcdp = httpHeaderXpcdp;
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP, httpHeaderXpcdp);
+        return this;
+    }
+
+    public String getHttpHeaderXxp()
+    {
+        return httpHeaderXxp;
+    }
+
+    @Config("http-header.x-xss-protection")
+    public SecurityConfig setHttpHeaderXxp(String httpHeaderXxp)
+    {
+        this.httpHeaderXxp = httpHeaderXxp;
+        System.setProperty(HttpSecurityHeadersConstants.HTTP_SECURITY_XXP, httpHeaderXxp);
         return this;
     }
 }
