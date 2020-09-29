@@ -77,13 +77,13 @@ public class HiveLocationService
     }
 
     @Override
-    public LocationHandle forExistingTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo)
+    public LocationHandle forExistingTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo, HiveWriteUtils.OpertionType opertionType)
     {
         HdfsContext context = new HdfsContext(session, table.getDatabaseName(), table.getTableName());
         Path targetPath = new Path(table.getStorage().getLocation());
 
         if (shouldUseTemporaryDirectory(session, context, targetPath)) {
-            Path writePath = createTemporaryPath(session, context, hdfsEnvironment, targetPath, HiveWriteUtils.OpertionType.INSERT);
+            Path writePath = createTemporaryPath(session, context, hdfsEnvironment, targetPath, opertionType);
             return new LocationHandle(targetPath, writePath, true, STAGE_AND_MOVE_TO_TARGET_DIRECTORY, writeIdInfo);
         }
         else {

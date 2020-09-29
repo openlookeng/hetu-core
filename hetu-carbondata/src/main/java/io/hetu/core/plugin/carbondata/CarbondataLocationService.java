@@ -76,7 +76,7 @@ public class CarbondataLocationService
 
     @Override
     public LocationHandle forExistingTable(SemiTransactionalHiveMetastore metastore,
-                                           ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo)
+                                           ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo, HiveWriteUtils.OpertionType opertionType)
     {
         // TODO: check and make it compatible for cloud scenario
 

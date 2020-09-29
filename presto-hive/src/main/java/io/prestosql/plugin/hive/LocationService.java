@@ -27,7 +27,7 @@ public interface LocationService
 {
     LocationHandle forNewTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, String schemaName, String tableName, Optional<WriteIdInfo> writeIdInfo, Optional<Path> tablePath, HiveWriteUtils.OpertionType opertionType);
 
-    LocationHandle forExistingTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo);
+    LocationHandle forExistingTable(SemiTransactionalHiveMetastore metastore, ConnectorSession session, Table table, Optional<WriteIdInfo> writeIdInfo, HiveWriteUtils.OpertionType opertionType);
 
     /**
      * targetPath and writePath will be root directory of all partition and table paths

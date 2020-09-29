@@ -1497,7 +1497,11 @@ public class HiveMetadata
             writeIdInfo = Optional.of(new WriteIdInfo(writeId.get(), writeId.get(), 0));
         }
 
-        LocationHandle locationHandle = locationService.forExistingTable(metastore, session, table, writeIdInfo);
+        HiveWriteUtils.OpertionType operationType = HiveWriteUtils.OpertionType.INSERT;
+        if (writeType == HiveACIDWriteType.INSERT_OVERWRITE) {
+            operationType = HiveWriteUtils.OpertionType.INSERT_OVERWRITE;
+        }
+        LocationHandle locationHandle = locationService.forExistingTable(metastore, session, table, writeIdInfo, operationType);
         HiveInsertTableHandle result = new HiveInsertTableHandle(
                 tableName.getSchemaName(),
                 tableName.getTableName(),

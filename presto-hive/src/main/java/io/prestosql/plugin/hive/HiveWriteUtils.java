@@ -164,7 +164,8 @@ public final class HiveWriteUtils
     public enum OpertionType {
         CREATE_TABLE,
         CREATE_TABLE_AS,
-        INSERT
+        INSERT,
+        INSERT_OVERWRITE
     }
 
     public static RecordWriter createRecordWriter(Path target, JobConf conf, Properties properties, String outputFormatName, ConnectorSession session)
