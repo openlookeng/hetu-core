@@ -3031,7 +3031,7 @@ public abstract class AbstractTestHive
             SemiTransactionalHiveMetastore metastore = transaction.getMetastore(schemaTableName.getSchemaName());
             LocationService locationService = getLocationService();
             Table table = metastore.getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName()).get();
-            LocationHandle handle = locationService.forExistingTable(metastore, session, table, Optional.empty());
+            LocationHandle handle = locationService.forExistingTable(metastore, session, table, Optional.empty(), HiveWriteUtils.OpertionType.INSERT);
             return locationService.getPartitionWriteInfo(handle, Optional.empty(), partitionName).getTargetPath().toString();
         }
     }
