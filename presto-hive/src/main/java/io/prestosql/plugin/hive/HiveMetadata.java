@@ -1498,7 +1498,9 @@ public class HiveMetadata
         }
 
         HiveWriteUtils.OpertionType operationType = HiveWriteUtils.OpertionType.INSERT;
-        if (writeType == HiveACIDWriteType.INSERT_OVERWRITE) {
+        boolean isInsertExistingPartitionsOverwrite = HiveSessionProperties.getInsertExistingPartitionsBehavior(session) ==
+                HiveSessionProperties.InsertExistingPartitionsBehavior.OVERWRITE ? true : false;
+        if (isInsertExistingPartitionsOverwrite || writeType == HiveACIDWriteType.INSERT_OVERWRITE) {
             operationType = HiveWriteUtils.OpertionType.INSERT_OVERWRITE;
         }
         LocationHandle locationHandle = locationService.forExistingTable(metastore, session, table, writeIdInfo, operationType);
