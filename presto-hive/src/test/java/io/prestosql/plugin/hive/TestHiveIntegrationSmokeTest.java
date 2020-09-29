@@ -4985,6 +4985,10 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate(session1, "CREATE TABLE part2key (id1 int, id2 int, id3 int) with (format='orc', partitioned_by=ARRAY['id2','id3'])");
             assertUpdate(session1, "INSERT Into part2key values(1,2,3)", 1);
             assertQuery(session1, "select * from part2key where id2=2 and id3=3", "SELECT 1,2,3");
+            assertUpdate(session1, "CREATE TABLE multiin (id1 int, id2 int, id3 varchar(10)) with (format='orc')");
+            assertUpdate(session1, "INSERT Into multiin values(1,2,'abc'), (11,22,'xyz'), (111,222,'abcd'), (1111,2222,'zxy')", 4);
+            assertQuery(session1, "select * from multiin where id3 in ('abc', 'xyz', 'abcd', 'zxy') order by id1", "SELECT * from (values(1,2,'abc'), (11,22,'xyz'), (111,222,'abcd'), (1111,2222,'zxy'))");
+            assertQuery(session1, "select * from multiin where id3 in ('abc', 'yzx', 'adbc', 'abcde')", "SELECT 1,2,'abc'");
         }
         finally {
             assertUpdate("DROP TABLE IF EXISTS test_unsupport");
@@ -4992,6 +4996,7 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate("DROP TABLE IF EXISTS alldtype");
             assertUpdate("DROP TABLE IF EXISTS map_test");
             assertUpdate("DROP TABLE IF EXISTS array_test");
+            assertUpdate("DROP TABLE IF EXISTS multiin");
         }
     }
 }

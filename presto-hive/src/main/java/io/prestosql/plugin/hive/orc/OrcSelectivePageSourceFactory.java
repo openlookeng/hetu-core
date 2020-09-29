@@ -564,11 +564,9 @@ public class OrcSelectivePageSourceFactory
         // convert the predicate from column name based map to column id based map.
         // toFilter is the function which actually will convert o corresponding Comparator.
         // toFilter will be called lazily during initialization of corresponding column reader (createColumnReaders).
-        return Maps.transformValues(
-                domainPredicate.transform(columnHandle -> columnIndices.get(columnHandle.getColumnName()))
-                        .getDomains()
-            .get(),
-            TupleDomainFilterUtils::toFilter);
+        Map<Integer, TupleDomainFilter> tupleDomainFilterMap = new HashMap<>();
+        domainPredicate.transform(columnHandle -> columnIndices.get(columnHandle.getColumnName())).getDomains().get().forEach((k, v) -> tupleDomainFilterMap.put(k, TupleDomainFilterUtils.toFilter(v)));
+        return tupleDomainFilterMap;
     }
 
     interface FSDataInputStreamProvider
