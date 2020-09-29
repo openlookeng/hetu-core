@@ -186,7 +186,7 @@ If you can't access the download URL from the machine where you want to install 
 
 1. Download `https://download.openlookeng.io/auto-install/openlookeng.tar.gz` and extract its content to `/opt`.
 
-1. Create folder `/opt/openlookeng/resource` and save openLooKeng binary files under it: `https://download.openlookeng.io/010/hetu-server-010.tar.gz` and `https://download.openlookeng.io/010/hetu-cli-010-executable.jar`.
+1. Create folder `/opt/openlookeng/resource` and save openLooKeng binary files under it: `https://download.openlookeng.io/<version>/hetu-server-<version>.tar.gz` and `https://download.openlookeng.io/<version>/hetu-cli-<version>-executable.jar`, where `<version>` refers to the version being installed, e.g. `1.0.0`.
 
 1. Also save third party dependencies under `/opt/openlookeng/resource`. That is, download all files from either `https://download.openlookeng.io/auto-install/third-resource/x86/` or `https://download.openlookeng.io/auto-install/third-resource/aarch64/`, depending on the machine's architecture. This should include 1 `OpenJDK` file and 2 `sshpass` files.
 

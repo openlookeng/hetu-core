@@ -5,11 +5,10 @@
     <parent>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-root</artifactId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>hetu-oracle</artifactId>
-    <version>${dep.hetu.version}</version>
     <description>Hetu - Oracle Connector</description>
     <packaging>hetu-plugin</packaging>
 
@@ -126,6 +125,10 @@
                 <exclusion>
                     <groupId>com.sun</groupId>
                     <artifactId>tools</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk15on</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

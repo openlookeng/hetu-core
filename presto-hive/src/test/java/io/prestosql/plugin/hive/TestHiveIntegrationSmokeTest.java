@@ -4559,12 +4559,12 @@ public class TestHiveIntegrationSmokeTest
 
         session = Session.builder(getSession())
                 .setCatalogSessionProperty("hive", "temporary_staging_directory_enabled", "true")
-                .setCatalogSessionProperty("hive", "temporary_staging_directory_path", "/tmp/custom/temporary-${USER}")
                 .build();
 
         hiveInsertTableHandle = getHiveInsertTableHandle(session, tableName);
         assertNotEquals(hiveInsertTableHandle.getLocationHandle().getWritePath(), hiveInsertTableHandle.getLocationHandle().getTargetPath());
-        assertTrue(hiveInsertTableHandle.getLocationHandle().getWritePath().toString().startsWith("file:/tmp/custom/temporary-"));
+        // Since staging directory is getting created inside table path
+        assertTrue(hiveInsertTableHandle.getLocationHandle().getWritePath().toString().startsWith(hiveInsertTableHandle.getLocationHandle().getTargetPath().toString()));
 
         assertUpdate("DROP TABLE " + tableName);
     }

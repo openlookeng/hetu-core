@@ -14,6 +14,8 @@
  */
 package io.hetu.core.heuristicindex;
 
+import com.google.common.base.Strings;
+import com.google.common.util.concurrent.AtomicDouble;
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
@@ -24,8 +26,6 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -49,6 +49,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.printVerboseMsg;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -59,7 +60,7 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexWriter
         implements IndexWriter
 {
-    private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexWriter.class);
+    private static final int PROGRESS_BAR_LENGTH = 48;
     private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
             new LocalConfig(new Properties()), Paths.get("/"));
 
@@ -96,23 +97,27 @@ public class HeuristicIndexWriter
     }
 
     @Override
-    public void createIndex(String table, String[] columns, String[] partitions, String... indexTypes)
+    public void createIndex(String table, String[] columns, String[] partitions, String indexType)
             throws IOException
     {
-        createIndex(table, columns, partitions, indexTypes, true, false);
+        createIndex(table, columns, partitions, indexType, true);
     }
 
     @Override
-    public void createIndex(String table, String[] columns, String[] partitions, String[] indexTypes, boolean lockingEnabled, boolean debugEnabled)
+    public void createIndex(String table, String[] columns, String[] partitions, String indexType, boolean parallelCreation)
             throws IOException
     {
         requireNonNull(table, "no table specified");
         requireNonNull(columns, "no columns specified");
-        requireNonNull(indexTypes, "no index types specified");
-        checkIndexTypes(indexTypes);
+        requireNonNull(indexType, "no index type specified");
+        Index indexTypeBaseObj = indexTypesMap.get(indexType.toLowerCase(Locale.ENGLISH));
+        if (indexTypeBaseObj == null) {
+            String msg = String.format(Locale.ENGLISH, "Index type %s not supported.", indexType);
+            throw new IllegalArgumentException(msg);
+        }
 
-        LOG.info("Creating index for: table={} columns={} partitions={}", table, Arrays.toString(columns),
-                partitions == null ? "all" : Arrays.toString(partitions));
+        printVerboseMsg(String.format("Creating index for: table=%s columns=%s partitions=%s", table, Arrays.toString(columns),
+                partitions == null ? "all" : Arrays.toString(partitions)));
 
         String[] parts = IndexServiceUtils.getTableParts(table);
         String databaseName = parts[DATABASE_NAME_INDEX];
@@ -120,7 +125,7 @@ public class HeuristicIndexWriter
 
         Path tmpPath = Files.createTempDirectory("tmp-indexwriter-");
         String strTmpPath = tmpPath.toString();
-        LOG.info("Local folder to hold temp index files: " + strTmpPath);
+        printVerboseMsg("Local folder to hold temp index files: " + strTmpPath);
 
         Set<String> indexedColumns = ConcurrentHashMap.newKeySet();
 
@@ -134,7 +139,7 @@ public class HeuristicIndexWriter
                 "Create index temp directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
         Lock lock = null;
-        if (lockingEnabled) {
+        if (!parallelCreation) {
             lock = new FileBasedLock(LOCAL_FS_CLIENT, tableIndexDirPath);
             // cleanup hook in case regular execution is interrupted
             Lock finalLock = lock;
@@ -150,6 +155,10 @@ public class HeuristicIndexWriter
             }));
             lock.lock();
         }
+        AtomicDouble progress = new AtomicDouble();
+        if (!IndexCommand.verbose) {
+            System.out.print("\rProgress: [" + Strings.repeat(" ", PROGRESS_BAR_LENGTH) + "] 0%");
+        }
 
         // Each datasource will read the specified table's column and will use the callback when a split has been read.
         // The datasource will determine what a split is, for example for ORC, the datasource may read the file
@@ -158,17 +167,17 @@ public class HeuristicIndexWriter
         // The datasource will also return the lastModified date of the split that was read
         try {
             dataSource.readSplits(databaseName, tableName, columns, partitions,
-                    (column, values, uri, splitStart, lastModified) -> {
-                        LOG.debug("split read: column={}; uri={}; splitOffset={}", column, uri, splitStart);
+                    (column, values, uri, splitStart, lastModified, currProgress) -> {
+                        printVerboseMsg(String.format("split read: column=%s; uri=%s; splitOffset=%s", column, uri, splitStart));
 
                         if (values == null || values.length == 0) {
-                            LOG.debug("values were null or empty, skipping column={}; uri={}; splitOffset={}", column, uri, splitStart);
+                            printVerboseMsg(String.format("values were null or empty, skipping column=%s; uri=%s; splitOffset=%s", column, uri, splitStart));
                             return;
                         }
 
                         // security check required before using values in a Path
                         if (!column.matches("[\\p{Alnum}_]+")) {
-                            LOG.warn("Invalid column name " + column);
+                            printVerboseMsg("Invalid column name " + column);
                             return;
                         }
                         try {
@@ -179,13 +188,14 @@ public class HeuristicIndexWriter
                             throw new UncheckedIOException("Get secure path list error", e);
                         }
 
-                        Path columnIndexDirPath = tableIndexDirPath.resolve(column);
+                        // table/columns/indexType/
+                        Path columnAndIndexTypePath = tableIndexDirPath.resolve(column).resolve(indexType);
                         indexedColumns.add(column);
 
                         // save the indexes in a.part dir first, it will be moved later
                         URI uriObj = URI.create(uri);
                         String uriIndexDirPath = Paths.get(
-                                columnIndexDirPath.toString(), uriObj.getPath()).toString();
+                                columnAndIndexTypePath.toString(), uriObj.getPath()).toString();
                         partFiles.add(uriIndexDirPath); // store the path without the part suffix
                         uriIndexDirPath += PART_FILE_SUFFIX; // append the part suffix
 
@@ -203,70 +213,58 @@ public class HeuristicIndexWriter
                             }
                         }
                         catch (IOException e) {
-                            LOG.error(String.format(Locale.ENGLISH,
-                                    "error writing lastModified file: %s", lastModifiedFilePath), e);
                             throw new UncheckedIOException("error writing lastModified file: " + lastModifiedFilePath, e);
                         }
 
                         // write index files
-                        for (String indexType : indexTypes) {
-                            // the indexTypesMap contains all the supported index types
-                            // the instances in the map are the "base" instances bc they have their properties set
-                            // we need to create a new Index instance for each split and copy the properties the base has
-                            Index indexTypeBaseObj = indexTypesMap.get(indexType.toLowerCase(Locale.ENGLISH));
-                            Index splitIndex;
-                            try {
-                                Constructor<? extends Index> constructor = indexTypeBaseObj.getClass().getConstructor();
-                                splitIndex = constructor.newInstance();
-                                splitIndex.setProperties(indexTypeBaseObj.getProperties());
-                                splitIndex.setExpectedNumOfEntries(values.length);
-                                LOG.debug("creating split index: {}", splitIndex.getId());
-                            }
-                            catch (InstantiationException
-                                    | IllegalAccessException
-                                    | NoSuchMethodException
-                                    | InvocationTargetException e) {
-                                LOG.error("unable to create instance of index: ", e);
-                                throw new IllegalStateException("unable to create instance of index: " + indexType, e);
-                            }
+                        // the indexTypesMap contains all the supported index types
+                        // the instances in the map are the "base" instances bc they have their properties set
+                        // we need to create a new Index instance for each split and copy the properties the base has
+                        Index splitIndex;
+                        try {
+                            Constructor<? extends Index> constructor = indexTypeBaseObj.getClass().getConstructor();
+                            splitIndex = constructor.newInstance();
+                            splitIndex.setProperties(indexTypeBaseObj.getProperties());
+                            splitIndex.setExpectedNumOfEntries(values.length);
+                            printVerboseMsg(String.format("creating split index: %s", splitIndex.getId()));
+                        }
+                        catch (InstantiationException
+                                | IllegalAccessException
+                                | NoSuchMethodException
+                                | InvocationTargetException e) {
+                            throw new IllegalStateException("unable to create instance of index: " + indexType, e);
+                        }
 
-                            String indexFileName = indexFileNamePrefix + splitIndex.getId().toLowerCase(Locale.ENGLISH);
-                            Path indexFilePath = Paths.get(uriIndexDirPath, indexFileName);
+                        String indexFileName = indexFileNamePrefix + splitIndex.getId().toLowerCase(Locale.ENGLISH);
+                        Path indexFilePath = Paths.get(uriIndexDirPath, indexFileName);
 
-                            splitIndex.addValues(values);
+                        splitIndex.addValues(values);
 
-                            LOG.debug("writing split index to: {}", indexFilePath);
-                            try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(indexFilePath)) {
-                                splitIndex.persist(outputStream);
-                            }
-                            catch (IOException e) {
-                                LOG.error(String.format(Locale.ENGLISH,
-                                        "error writing index file: %s", indexFilePath), e);
-                                throw new UncheckedIOException("error writing index file: " + indexFilePath, e);
-                            }
-
-                            if (debugEnabled) {
-                                String dataFileName = indexFileNamePrefix + "data";
-                                Path dataFilePath = Paths.get(uriIndexDirPath, dataFileName);
-                                LOG.debug("writing split data to: {}", dataFilePath);
-                                try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(dataFilePath)) {
-                                    for (int i = 0; i < values.length; i++) {
-                                        outputStream.write(values[i] == null ? "NULL".getBytes() : values[i].toString().getBytes());
-                                        outputStream.write('\n');
+                        printVerboseMsg(String.format("writing split index to: %s", indexFilePath));
+                        try (OutputStream outputStream = LOCAL_FS_CLIENT.newOutputStream(indexFilePath)) {
+                            splitIndex.persist(outputStream);
+                            if (!IndexCommand.verbose) {
+                                currProgress *= 0.75 * PROGRESS_BAR_LENGTH;
+                                synchronized (progress) {
+                                    if (currProgress > progress.get()) {
+                                        progress.addAndGet(currProgress - progress.get());
+                                        int bars = (int) Math.ceil(currProgress);
+                                        System.out.printf("\rProgress: [" + Strings.repeat("|", bars) + Strings.repeat(" ", PROGRESS_BAR_LENGTH - bars) + "] %d%%",
+                                                bars * 100 / PROGRESS_BAR_LENGTH);
+                                        System.out.flush();
                                     }
                                 }
-                                catch (IOException e) {
-                                    LOG.error(String.format(Locale.ENGLISH,
-                                            "error writing data file: %s", dataFilePath), e);
-                                    throw new UncheckedIOException("error writing data file: " + dataFilePath, e);
-                                }
                             }
+                        }
+                        catch (IOException e) {
+                            throw new UncheckedIOException("error writing index file: " + indexFilePath, e);
                         }
                     });
 
             if (partFiles.isEmpty()) {
+                System.out.println();
                 String msg = "No index was created. Table may be empty.";
-                LOG.error(msg);
+                System.out.println(msg);
                 throw new IllegalStateException(msg);
             }
 
@@ -294,7 +292,7 @@ public class HeuristicIndexWriter
                     try {
                         try (Stream<Path> tarsOnRemote = fs.walk(originalOnTarget).filter(p -> p.toString().contains(".tar"))) {
                             for (Path tarFile : (Iterable<Path>) tarsOnRemote::iterator) {
-                                LOG.debug("Fetching index from target filesystem to local temp: " + tarFile);
+                                printVerboseMsg("Fetching index from target filesystem to local temp: " + tarFile);
                                 IndexServiceUtils.unArchive(fs, LOCAL_FS_CLIENT, tarFile, tmpPath);
                                 LOCAL_FS_CLIENT.createDirectories(Paths.get(strTmpPath, tarFile.getParent().toString()));
                                 Files.createFile(Paths.get(strTmpPath, tarFile.toString().replaceAll("\\.tar", "")));
@@ -317,7 +315,7 @@ public class HeuristicIndexWriter
                     // 2. expired original
                     if (previousLastModifiedTime != newLastModifiedTime) {
                         if (LOCAL_FS_CLIENT.exists(originalDir)) {
-                            LOG.debug("Removing expired index at {}.", originalDir);
+                            printVerboseMsg(String.format("Removing expired index at %s.", originalDir));
                             LOCAL_FS_CLIENT.deleteRecursively(originalDir);
                         }
                         LOCAL_FS_CLIENT.move(partDir, originalDir);
@@ -328,7 +326,7 @@ public class HeuristicIndexWriter
                             for (Path child : (Iterable<Path>) children::iterator) {
                                 String childName = child.getFileName().toString();
                                 Path newPath = originalDir.resolve(childName);
-                                LOG.debug("Moving {} to {}.", child, newPath);
+                                printVerboseMsg(String.format("Moving %s to %s.", child, newPath));
                                 // file "lastModified=..." with same name may exist
                                 LOCAL_FS_CLIENT.deleteIfExists(newPath);
                                 LOCAL_FS_CLIENT.move(child, newPath);
@@ -340,14 +338,21 @@ public class HeuristicIndexWriter
                     }
                 }
 
-                LOG.debug("Created index at {}.", originalDir);
+                printVerboseMsg(String.format("Created index at %s.", originalDir));
 
                 fs.deleteRecursively(originalOnTarget);
                 IndexServiceUtils.archiveTar(LOCAL_FS_CLIENT, fs, originalDir, originalOnTarget);
+                if (!IndexCommand.verbose) {
+                    int bars = (int) Math.ceil(progress.addAndGet(0.25 * PROGRESS_BAR_LENGTH / partFiles.size()));
+                    bars = Math.min(bars, PROGRESS_BAR_LENGTH);
+                    System.out.printf("\rProgress: [" + Strings.repeat("|", bars) + Strings.repeat(" ", PROGRESS_BAR_LENGTH - bars) + "] %d%%",
+                            bars * 100 / PROGRESS_BAR_LENGTH);
+                    System.out.flush();
+                }
             }
 
             for (String indexedColumn : indexedColumns) {
-                LOG.info("Created index for column {}.", indexedColumn);
+                printVerboseMsg(String.format("Created index for column %s.", indexedColumn));
             }
         }
         finally {
@@ -357,20 +362,8 @@ public class HeuristicIndexWriter
                 lock.unlock();
             }
 
-            LOG.info("Deleting local tmp folder: " + strTmpPath);
+            printVerboseMsg("Deleting local tmp folder: " + strTmpPath);
             LOCAL_FS_CLIENT.deleteRecursively(tmpPath);
-        }
-    }
-
-    private void checkIndexTypes(String[] indexTypes)
-    {
-        for (String indexType : indexTypes) {
-            Index indexTypeBaseObj = indexTypesMap.get(indexType.toLowerCase(Locale.ENGLISH));
-            if (indexTypeBaseObj == null) {
-                String msg = String.format(Locale.ENGLISH, "Index type %s not supported.", indexType);
-                LOG.error(msg);
-                throw new IllegalArgumentException(msg);
-            }
         }
     }
 
@@ -392,15 +385,16 @@ public class HeuristicIndexWriter
             }
 
             if (!failedDeletes.isEmpty()) {
-                LOG.warn("Failed to delete the following files, please delete them manually.");
-                failedDeletes.forEach(LOG::warn);
+                printVerboseMsg("Failed to delete the following files, please delete them manually.");
+                failedDeletes.forEach(IndexServiceUtils::printVerboseMsg);
             }
 
             isCleanedUp = true;
         }
     }
 
-    private long getLastModifiedTime(Path path) throws IOException
+    private long getLastModifiedTime(Path path)
+            throws IOException
     {
         try (Stream<Path> children = LOCAL_FS_CLIENT.list(path).filter(this::notDirectory)) {
             for (Path child : (Iterable<Path>) children::iterator) {
@@ -413,7 +407,7 @@ public class HeuristicIndexWriter
                     }
                 }
                 else {
-                    LOG.debug("File path not valid: {}", child);
+                    printVerboseMsg(String.format("File path not valid: %s", child));
                     return 0;
                 }
             }

@@ -480,7 +480,6 @@ public class TestCarbonAllDataType
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        //hetuServer.execute("drop table testdb.testtable2");
         hetuServer.execute("drop table testdb.testtable3");
     }
 
@@ -625,13 +624,11 @@ public class TestCarbonAllDataType
 
                     Date date = null;
                     try {
-                        //date = inputFormat.parse("22-10-1982");
                         date = inputFormat.parse(data);
                     } catch (ParseException e) {
                         e.printStackTrace();
                     }
                     String dateString = outuptformat.format(date);
-                    //System.out.println(dateString);
                     dateString = "date '" + dateString + "'";
                     return dateString;
                 }
@@ -641,13 +638,11 @@ public class TestCarbonAllDataType
 
                     Date date = null;
                     try {
-                        //date = inputFormat.parse("22-10-1982");
                         date = inputFormat.parse(data);
                     } catch (ParseException e) {
                         e.printStackTrace();
                     }
                     String dateString = outuptformat.format(date);
-                    //System.out.println(dateString);
                     dateString = "date '" + dateString + "'";
                     return dateString;
                 }
@@ -705,12 +700,10 @@ public class TestCarbonAllDataType
                     }
                     dateString = outuptformattime.format(date);
                 }
-                else //if (!isValidFormat("yyyy-MM-dd hh:mm:ss", data))
+                else
                 {
                     dateString = data;
-                    //System.out.println("timestamp formate : "+ data);
                 }
-                //System.out.println(dateString);
                 dateString = "timestamp '" + dateString + "'";
                 return dateString;
             }
@@ -763,8 +756,6 @@ public class TestCarbonAllDataType
                         inserData = inserData + ", ";
                     }
                     inserData = inserData + data;
-                    //String inserData = "INSERT INTO testdb.testtable VALUES ("+ data +")";
-                    //hetuServer.execute(inserData);
                     rowCount++;
                 }
                 isHeader = false;
@@ -774,7 +765,6 @@ public class TestCarbonAllDataType
             data = ", (" + data + ")";
             inserData = inserData + data;
             inserData = "INSERT INTO testdb.testtable VALUES" + inserData ;
-            //System.out.println(inserData);
             hetuServer.execute(inserData);
         }
         catch(Exception e) {
@@ -1842,7 +1832,6 @@ public class TestCarbonAllDataType
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            //boolean ret= CarbonUpdateUtil.isMaxQueryTimeoutExceeded(deletionTime);
         }
     }
 }

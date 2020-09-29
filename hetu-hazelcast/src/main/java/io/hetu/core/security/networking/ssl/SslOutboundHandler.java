@@ -33,6 +33,7 @@ import static com.hazelcast.internal.networking.ChannelOption.DIRECT_BUF;
 import static com.hazelcast.internal.nio.IOUtil.compactOrClear;
 import static com.hazelcast.internal.nio.IOUtil.newByteBuffer;
 import static com.hazelcast.internal.util.Preconditions.checkNotNull;
+import static java.lang.String.format;
 
 public class SslOutboundHandler
         extends OutboundHandler<ByteBuffer, ByteBuffer>
@@ -72,6 +73,9 @@ public class SslOutboundHandler
             // Do not encrypt the first write request if this handler is
             // created with startTLS flag turned on.
             if (startTls && !sentFirstMessage) {
+                if (logger.isFineEnabled()) {
+                    logger.fine("begin to handshake...");
+                }
                 sentFirstMessage = true;
                 // Explicit start handshake processing once we send the first message. This will also ensure
                 // we will schedule the timeout if needed.
@@ -86,10 +90,27 @@ public class SslOutboundHandler
                 // Wrap the buffer.
                 // src will be flip() at the end of previous handler, so we do not need flip() again.
                 while (src.hasRemaining()) {
+                    if (logger.isFineEnabled()) {
+                        logger.fine(format("channel=%s....before wrap, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
+                    }
                     SSLEngineResult result = engine.wrap(src, dst);
+                    if (logger.isFineEnabled()) {
+                        logger.fine(format("channel=%s....after wrap, src=[%s, %s, %s], dst=[%s, %s, %s], status=[%s, %s]",
+                                channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity(),
+                                result.getStatus(), result.getHandshakeStatus()));
+                    }
                     while (result.getStatus() == SSLEngineResult.Status.BUFFER_OVERFLOW) {
                         dst = enlargeByteBuffer(dst);
+                        if (logger.isFineEnabled()) {
+                            logger.fine(format("BUFFER_OVERFLOW....channel=%s....before wrap, src=[%s, %s, %s], dst=[%s, %s, %s]",
+                                    channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity()));
+                        }
                         result = engine.wrap(src, dst);
+                        if (logger.isFineEnabled()) {
+                            logger.fine(format("BUFFER_OVERFLOW....channel=%s....after wrap, src=[%s, %s, %s], dst=[%s, %s, %s], status=[%s, %s]",
+                                    channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity(),
+                                    result.getStatus(), result.getHandshakeStatus()));
+                        }
                     }
                     if (result.getStatus() == SSLEngineResult.Status.CLOSED) {
                         if (!engine.isOutboundDone()) {
@@ -112,7 +133,7 @@ public class SslOutboundHandler
         }
         catch (SSLException sslException) {
             engine.closeOutbound();
-            throw new SSLException("A problem was encountered while processing data caused the SSLEngine to abort. try to close connection...");
+            throw new SSLException("A problem was encountered while processing data caused the SSLEngine to abort. try to close connection..." + sslException.getMessage());
         }
         finally {
             dst.flip();
@@ -165,7 +186,10 @@ public class SslOutboundHandler
     private ByteBuffer enlargeByteBuffer(ByteBuffer buffer)
     {
         int appByteBufferSize = engine.getSession().getApplicationBufferSize();
-        if (appByteBufferSize> buffer.capacity()) {
+        if (logger.isFineEnabled()) {
+            logger.fine("enlargeByteBuffer....");
+        }
+        if (appByteBufferSize > buffer.capacity()) {
             buffer = ByteBuffer.allocate(appByteBufferSize);
         }
         else {

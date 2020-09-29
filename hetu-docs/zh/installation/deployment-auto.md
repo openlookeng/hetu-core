@@ -176,7 +176,7 @@ bash /opt/openlookeng/bin/uninstall.sh --all
 
 1. 下载 `https://download.openlookeng.io/auto-install/openlookeng.tar.gz` 并将其内容解压到 `/opt` 目录。
 
-1. 创建目录 `/opt/openlookeng/resource` 并保存 openLooKeng 执行文件 `https://download.openlookeng.io/010/hetu-server-010.tar.gz` 和 `https://download.openlookeng.io/010/hetu-cli-010-executable.jar`。
+1. 创建目录 `/opt/openlookeng/resource` 并保存 openLooKeng 执行文件 `https://download.openlookeng.io/<version>/hetu-server-<version>.tar.gz` 和 `https://download.openlookeng.io/<version>/hetu-cli-<version>-executable.jar`，其中`<version>`对应于正在安装的版本，例如`1.0.0`。
 
 1. 同时将第三方依赖保存在 `/opt/openlookeng/resource` 目录下。根据本机的架构，下载 `https://download.openlookeng.io/auto-install/third-resource/x86/` 或 `https://download.openlookeng.io/auto-install/third-resource/aarch64/` 下面的全部文件。这应该包括一个 `OpenJDK` 文件和两个 `sshpass` 文件。
 

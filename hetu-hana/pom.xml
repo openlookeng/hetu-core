@@ -6,11 +6,10 @@
     <parent>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-root</artifactId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>hetu-hana</artifactId>
-    <version>${dep.hetu.version}</version>
     <description>hetu - SAP HANA Connector</description>
     <packaging>hetu-plugin</packaging>
 
@@ -102,6 +101,12 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk15on</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

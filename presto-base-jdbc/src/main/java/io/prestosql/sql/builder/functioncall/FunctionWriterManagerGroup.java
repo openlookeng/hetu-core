@@ -18,8 +18,9 @@ import io.prestosql.sql.builder.functioncall.functions.FunctionCallRewriter;
 import io.prestosql.sql.builder.functioncall.functions.config.DefaultConnectorConfigFunctionRewriter;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -31,22 +32,40 @@ import static java.util.Objects.requireNonNull;
  */
 public class FunctionWriterManagerGroup
 {
-    private static Map<String, FunctionWriterManager> factoryInstances = new ConcurrentHashMap<>(Collections.emptyMap());
+    private static final Map<String, FunctionWriterManager> factoryInstances = new HashMap<>(Collections.emptyMap());
 
     private FunctionWriterManagerGroup()
     {
     }
 
     /**
-     * Get a Function Writer Manager Instance, every version of a connector can have only one FunctionWriterManager instance
+     * get a Function Writer Manager Instance, every version of a connector can have only one FunctionWriterManager instance
      *
      * @param connectorName connector name
-     * @param version the specific identify of a FunctionWriterManager Instance's version
+     * @param version the data source's sql version
+     */
+    public static Optional<FunctionWriterManager> getFunctionWriterManagerInstance(String connectorName, String version)
+    {
+        synchronized (FunctionWriterManagerGroup.class) {
+            if (factoryInstances.containsKey(version)) {
+                return Optional.of(factoryInstances.get(version));
+            }
+            else {
+                return Optional.empty();
+            }
+        }
+    }
+
+    /**
+     * New a Function Writer Manager Instance, every version of a connector can have only one FunctionWriterManager instance
+     *
+     * @param connectorName connector name
+     * @param version the data source's sql version
      * @param functionCallRewriterMap functionCallRewriterMap
      * @param connectorConfigFunctionRewriter Connector Config Function Re-writer
      * @return FunctionWriterManager Instance
      */
-    public static FunctionWriterManager getFunctionWriterManagerInstance(String connectorName, String version, Map<String, FunctionCallRewriter> functionCallRewriterMap, DefaultConnectorConfigFunctionRewriter connectorConfigFunctionRewriter)
+    public static FunctionWriterManager newFunctionWriterManagerInstance(String connectorName, String version, Map<String, FunctionCallRewriter> functionCallRewriterMap, DefaultConnectorConfigFunctionRewriter connectorConfigFunctionRewriter)
     {
         requireNonNull(connectorName);
         requireNonNull(version);

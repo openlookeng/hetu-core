@@ -48,8 +48,13 @@ We will use this example throughout this tutorial.
 
 In `etc/config.properties`, add these lines:
 
+Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
+
+Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is the parent of node.data_dir;
+otherwise, the current workspace is the openlookeng server's directory.
+
     hetu.heuristicindex.filter.enabled=true
-    hetu.heuristicindex.filter.cache.max-indices-number=2000000
+    hetu.heuristicindex.filter.cache.max-memory=2GB
     hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
     hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
     
@@ -72,7 +77,7 @@ Note that you may create multiple filesystem profiles in `etc/filesystem`, sever
 
 To write index to the indexstore specified above, just change directory to your hetu installation's `bin` folder, then run:
 
-    ./index -c <your-etc-folder-directory> --table table1 --column id --type bloom create
+    java -jar ./hetu-cli-*.jar --config <your-etc-folder-directory> --execute 'CREATE INDEX index_name USING bloom ON table1 (column)'
     
 ### Run query
 

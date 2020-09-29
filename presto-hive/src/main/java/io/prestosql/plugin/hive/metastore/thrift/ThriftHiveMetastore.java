@@ -248,10 +248,7 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("getTable", stats.getGetTable().wrap(() -> {
                         Table table = getTableFromMetastore(databaseName, tableName);
-                            //for cbg we need delete view type check
-//                            if (table.getTableType().equals(TableType.VIRTUAL_VIEW.name()) && !isPrestoView(table)) {
-//                                throw new HiveViewNotSupportedException(new SchemaTableName(databaseName, tableName));
-//                            }
+                        // we need delete view type check
                         return Optional.of(table);
                     }));
         }

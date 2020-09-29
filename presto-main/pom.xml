@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-root</artifactId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>presto-main</artifactId>
@@ -370,6 +370,12 @@
             <artifactId>jjwt</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk15on</artifactId>
+            <version>${dep.bcprov.version}</version>
+        </dependency>
+
         <!-- for testing -->
         <dependency>
             <groupId>org.testng</groupId>
@@ -451,6 +457,12 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-state-store</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j-impl</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
@@ -481,7 +493,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-filesystem-client</artifactId>
-            <version>${dep.hetu.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

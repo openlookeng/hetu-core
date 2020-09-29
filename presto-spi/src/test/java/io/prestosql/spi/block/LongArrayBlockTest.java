@@ -58,12 +58,10 @@ public class LongArrayBlockTest
                 result1[i] = bf1.test(value);
             }
             total1 += System.nanoTime() - start;
-            //System.out.println("original filter : " + (System.nanoTime() - start));
 
             start = System.nanoTime();
             block2.filter(bf2, result2);
             total2 += System.nanoTime() - start;
-            //System.out.println("   block filter : " + (System.nanoTime() - start));
 
             for (int i = 0; i < count; i++) {
                 if (result1[i] != result2[i]) {
@@ -73,7 +71,6 @@ public class LongArrayBlockTest
         }
 
         System.out.println("bfsize: " + size + "  origi: " + total1);
-        //System.out.println("bfsize: " + size + " gtotal: " + gtotal);
         System.out.println("bfsize: " + size + "  block: " + total2);
     }
 

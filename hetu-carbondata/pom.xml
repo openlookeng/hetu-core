@@ -22,11 +22,10 @@
   <parent>
     <groupId>io.hetu.core</groupId>
     <artifactId>presto-root</artifactId>
-    <version>316</version>
+    <version>1.0.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hetu-carbondata</artifactId>
-  <version>${dep.hetu.version}</version>
   <description>Hetu - Carbondata Connector</description>
   <packaging>hetu-plugin</packaging>
 
@@ -773,7 +772,7 @@
       <plugin>
         <groupId>io.hetu</groupId>
         <artifactId>presto-maven-plugin</artifactId>
-        <version>9-SNAPSHOT</version>
+        <version>9</version>
         <extensions>true</extensions>
         <configuration>
           <skipCheckSpiDependencies>true</skipCheckSpiDependencies>

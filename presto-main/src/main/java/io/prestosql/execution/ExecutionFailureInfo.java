@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.client.ErrorLocation;
 import io.prestosql.client.FailureInfo;
 import io.prestosql.spi.ErrorCode;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.sql.analyzer.SemanticErrorCode;
 
@@ -48,6 +49,7 @@ public class ExecutionFailureInfo
     private final Optional<SemanticErrorCode> semanticErrorCode;
     // use for transport errors
     private final HostAddress remoteHost;
+    private static final boolean isTraceStackVisible = Boolean.parseBoolean(System.getProperty(HetuConstant.TRACE_STACK_VISIBLE));
 
     @JsonCreator
     public ExecutionFailureInfo(
@@ -65,11 +67,16 @@ public class ExecutionFailureInfo
         requireNonNull(suppressed, "suppressed is null");
         requireNonNull(stack, "stack is null");
 
+        if (isTraceStackVisible) {
+            this.stack = ImmutableList.copyOf(stack);
+        }
+        else {
+            this.stack = ImmutableList.of();
+        }
         this.type = type;
         this.message = message;
         this.cause = cause;
         this.suppressed = ImmutableList.copyOf(suppressed);
-        this.stack = ImmutableList.copyOf(stack);
         this.errorLocation = errorLocation;
         this.errorCode = errorCode;
         this.semanticErrorCode = semanticErrorCode;

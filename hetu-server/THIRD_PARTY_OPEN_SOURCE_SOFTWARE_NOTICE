@@ -265,4 +265,18 @@ Copyright 1999-2019 The Apache Software Foundation.
 License: Apache License V2.0
 Please see above.
 
+Software: AdaptingJsonResponseHandler.java, BaseResponse.java, FullSmileResponseHandler.java,
+JsonResponseWrapper.java, SmileBodyGenerator.java, SmileObjectMapperProvider.java, ImmutablePerson.java,
+Person.java, TestSmileSupport.java, TestFullSmileResponseHandler.java,Codec.java, SmileCodec.java,
+ForSmile.java, SmileCodecBinder.java, SmileCodecFactory.java, SmileCodecProvider.java, SmileModule.java,
+TestSmileCodecBinder.java, TestSmileCodecFactory.java, JsonCodecWrapper.java
+Copyright notice:
+Those files are obtained from prestodb version 0.240, author are Nezih Yigitbasi <nezihy@fb.com>,
+Wenlei.Xie <wenlei.xie@gmail.com>, Tim Meehan <tdm@fb.com>
 
+
+Software: JsonMapperParsingException.java, ObjectMapperProvider.java, JsonKeySerde.java
+Copyright notice:
+Those files are obtained from airlift version 200, the author of JsonKeySerde.java is Palo Alto, CA <dain@iq80.com>
+Copyright 2012 Proofpoint, Inc.
+Copyright 2010 Proofpoint, Inc.

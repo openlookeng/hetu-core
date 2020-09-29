@@ -76,18 +76,6 @@ public final class MemoryPageSourceProvider
         OptionalDouble sampleRatio = memoryTable.getSampleRatio();
 
         // Commenting for Dynamic filter changes
-       /*        TupleDomain<ColumnHandle> predicate = memoryTable
-                .getPredicate().intersect(dynamicFilter);
-        if (predicate.isNone()) {
-            return new FixedPageSource(ImmutableList.of());
-        }
-        Map<Integer, Domain> domains = predicate
-                .transform(c -> {
-                    int channel = columns.indexOf(c);
-                    return channel >= 0 ? Integer.valueOf(channel) : null;
-                })
-                .getDomains()
-                .get();*/
 
         List<Integer> columnIndexes = columns.stream()
                                              .map(MemoryColumnHandle.class::cast)

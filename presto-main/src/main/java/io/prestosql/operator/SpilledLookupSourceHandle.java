@@ -108,7 +108,6 @@ final class SpilledLookupSourceHandle
     @GuardedBy("this")
     private void setState(State newState)
     {
-        //this.state.set(requireNonNull(newState, "newState is null"));
         this.state = requireNonNull(newState, "newState is null");
     }
 }

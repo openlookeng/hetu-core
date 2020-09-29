@@ -18,18 +18,24 @@ VDM使用openLooKeng元存储存储其数据库信息。信息可以存储在HDF
 * 下面是使用RDBMS作为VDM元数据的示例，创建`etc/hetu-metastore.properties`：
 ```
 hetu.metastore.type=jdbc
-hetu.meatstore.db.url=jdbc:mysql://localhost:3306
+hetu.meatstore.db.url=jdbc:mysql://....
 hetu.metastore.db.user=root
-hetu.metastore.db.password=my-mysql-pwd
+hetu.metastore.db.password=123456
 ```
 * 下面是使用HDFS作为元数据存储的实例，创建`etc/hetu-metastore.properties`：
+
+    路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+
+    注意：避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；
+        如果没有配置，那么当前工作目录为openlookeng server的目录
+
 ```
 # the type of metastore storage
 hetu.metastore.type=hetufilesystem
 # profile name of hetu file system
 hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
-#the path of metastore storage
-hetu.metastore.hetufilesystem.path=/etc/hetu/metastore
+#the path of metastore storage in the hetu file system
+hetu.metastore.hetufilesystem.path=/etc/openlookeng/metastore
 ```    
 可以从[文件系统](../develop/filesystem.md )中获取更多的文件系统相关的信息
 

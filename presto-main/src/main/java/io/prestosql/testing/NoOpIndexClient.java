@@ -23,7 +23,7 @@ public class NoOpIndexClient
         implements IndexClient
 {
     @Override
-    public List<IndexMetadata> readSplitIndex(String path, String... filterIndexTypes)
+    public List<IndexMetadata> readSplitIndex(String path)
             throws IOException
     {
         throw new UnsupportedOperationException("This is a no-op index client");
@@ -37,7 +37,7 @@ public class NoOpIndexClient
     }
 
     @Override
-    public void deleteIndex(String table, String[] columns)
+    public void deleteIndex(String table, String[] columns, String indexType)
             throws IOException
     {
         throw new UnsupportedOperationException("This is a no-op index client");

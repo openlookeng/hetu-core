@@ -191,5 +191,6 @@ headless: true
     - [任务资源]({{< relref "./docs/rest/task.md" >}})
 
 - [发行说明]("#")
+    - [1.0.1]({{< relref "./docs/releasenotes/releasenotes-1.0.1.md" >}})
     - [1.0.0]({{< relref "./docs/releasenotes/releasenotes-1.0.0.md" >}})
     - [0.1.0]({{< relref "./docs/releasenotes/releasenotes-0.1.0.md" >}})

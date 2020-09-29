@@ -19,6 +19,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
@@ -29,6 +30,7 @@ import io.prestosql.spi.service.PropertyService;
 
 import java.net.URI;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -42,6 +44,7 @@ public class IndexCache
 {
     private static final Logger LOG = Logger.get(IndexCache.class);
     private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Main-IndexCache-pool-%d").setDaemon(true).build();
+    private static final List<String> INDEX_TYPES = ImmutableList.of("bloom", "minmax");
 
     private static ScheduledExecutorService executor;
 
@@ -81,49 +84,49 @@ public class IndexCache
         }
 
         URI splitUri = URI.create(split.getConnectorSplit().getFilePath());
-        String filterKeyPath = getCacheKey(table, column, splitUri.getPath());
         long lastModifiedTime = split.getConnectorSplit().getLastModifiedTime();
-        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, "MINMAX", "BLOOM");
-        //it is possible to return multiple SplitIndexMetadata due to the range mismatch, especially in the case
-        //where the split has a wider range than the original splits used for index creation
-        // check if cache contains the key
-        List<IndexMetadata> indices;
+        List<IndexMetadata> indices = new LinkedList<>();
 
-        // if cache didn't contain the key, it has not been loaded, load it asynchronously
-        indices = cache.getIfPresent(filterKey);
+        for (String indexType : INDEX_TYPES) {
+            String filterKeyPath = table + "/" + column + "/" + indexType + splitUri.getPath();
+            IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime);
+            //it is possible to return multiple SplitIndexMetadata due to the range mismatch, especially in the case
+            //where the split has a wider range than the original splits used for index creation
+            // check if cache contains the key
+            List<IndexMetadata> indexOfThisType;
 
-        if (indices == null) {
-            executor.schedule(() -> {
-                try {
-                    cache.get(filterKey);
-                    LOG.debug("Loaded index for %s.", filterKey);
-                }
-                catch (ExecutionException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug(e, "Unable to load index for %s. ", filterKey);
+            // if cache didn't contain the key, it has not been loaded, load it asynchronously
+            indexOfThisType = cache.getIfPresent(filterKey);
+
+            if (indexOfThisType == null) {
+                executor.schedule(() -> {
+                    try {
+                        cache.get(filterKey);
+                        LOG.debug("Loaded index for %s.", filterKey);
+                    }
+                    catch (ExecutionException e) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug(e, "Unable to load index for %s. ", filterKey);
+                        }
+                    }
+                }, loadDelay, TimeUnit.MILLISECONDS);
+            }
+
+            if (indexOfThisType != null) {
+                // if key was present in cache, we still need to check if the index is validate based on the lastModifiedTime
+                // the index is only valid if the lastModifiedTime of the split matches the index's lastModifiedTime
+                for (IndexMetadata index : indexOfThisType) {
+                    if (index.getLastUpdated() != lastModifiedTime) {
+                        cache.invalidate(filterKey);
+                        indexOfThisType = Collections.emptyList();
+                        break;
                     }
                 }
-            }, loadDelay, TimeUnit.MILLISECONDS);
-        }
-
-        if (indices != null) {
-            // if key was present in cache, we still need to check if the index is validate based on the lastModifiedTime
-            // the index is only valid if the lastModifiedTime of the split matches the index's lastModifiedTime
-            for (IndexMetadata index : indices) {
-                if (index.getLastUpdated() != lastModifiedTime) {
-                    cache.invalidate(filterKey);
-                    indices = Collections.emptyList();
-                    break;
-                }
+                indices.addAll(indexOfThisType);
             }
         }
 
-        return indices == null ? Collections.emptyList() : indices;
-    }
-
-    private String getCacheKey(String tableName, String columnName, String filePath)
-    {
-        return tableName + "/" + columnName + filePath;
+        return indices;
     }
 
     @VisibleForTesting

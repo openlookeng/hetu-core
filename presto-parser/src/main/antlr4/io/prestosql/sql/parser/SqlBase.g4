@@ -54,6 +54,15 @@ statement
     | DROP CACHE (IF EXISTS)? qualifiedName
         (WHERE booleanExpression)?                                     #dropCache
     | SHOW CACHE qualifiedName?                            #showCache
+    | CREATE INDEX (IF NOT EXISTS)? indexName=qualifiedName
+        USING indexType
+        ON tableName=qualifiedName columnAliases
+        (WITH properties)?
+        (WHERE expression)?                                                     #createIndex
+    | DROP INDEX (IF EXISTS)? indexName=qualifiedName                           #dropIndex
+    | ALTER INDEX (IF EXISTS)? from=qualifiedName RENAME TO to=qualifiedName    #renameIndex
+    | UPDATE INDEX (IF EXISTS)? qualifiedName (SET properties)?                 #updateIndex
+    | SHOW INDEX (IF EXISTS)? qualifiedName?                                    #showIndex
     | INSERT INTO qualifiedName columnAliases? query                   #insertInto
     | INSERT OVERWRITE (TABLE)? qualifiedName columnAliases? query                   #insertOverwrite
     | DELETE FROM qualifiedName (WHERE booleanExpression)?             #delete
@@ -373,6 +382,10 @@ booleanValue
     : TRUE | FALSE
     ;
 
+indexType
+    : BITMAP | BLOOM | MINMAX
+    ;
+
 interval
     : INTERVAL sign=(PLUS | MINUS)? string from=intervalField (TO to=intervalField)?
     ;
@@ -531,6 +544,7 @@ nonReserved
     | WORK | WRITE
     | YEAR
     | ZONE
+    | INDEX
     ;
 
 ADD: 'ADD';
@@ -734,6 +748,10 @@ WORK: 'WORK';
 WRITE: 'WRITE';
 YEAR: 'YEAR';
 ZONE: 'ZONE';
+INDEX: 'INDEX';
+BITMAP: 'BITMAP';
+BLOOM: 'BLOOM';
+MINMAX: 'MINMAX';
 
 EQ  : '=';
 NEQ : '<>' | '!=';

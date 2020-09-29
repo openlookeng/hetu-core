@@ -4,24 +4,22 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.hetu.core</groupId>
+    <parent>
+        <artifactId>presto-root</artifactId>
+        <groupId>io.hetu.core</groupId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
     <artifactId>hetu-hazelcast</artifactId>
-    <version>010</version>
-    <name>hetu-hazelcast</name>
+    <description>hetu hazelcast</description>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <hazelcast.version>4.0</hazelcast.version>
+        <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+        <hazelcast.version>4.0.3</hazelcast.version>
         <aspectjweaver.version>1.9.4</aspectjweaver.version>
         <spring-context.version>5.2.0.RELEASE</spring-context.version>
-        <aspectjrt.version>1.8.13</aspectjrt.version>
         <cache-api.version>1.1.1</cache-api.version>
-        <airlift-security.version>0.193</airlift-security.version>
         <jmockit.version>1.38</jmockit.version>
-        <testng.version>6.10</testng.version>
-        <java.version>1.8</java.version>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
 
     <dependencies>
@@ -29,7 +27,7 @@
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
             <version>${hazelcast.version}</version>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
@@ -59,7 +57,6 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>26.0-jre</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.google.code.findbugs</groupId>
@@ -87,7 +84,6 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>security</artifactId>
-            <version>${airlift-security.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jmockit</groupId>
@@ -99,7 +95,11 @@
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <scope>test</scope>
-            <version>${testng.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -123,6 +123,39 @@
                         <goals>
                             <goal>compile</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.basepom.maven</groupId>
+                <artifactId>duplicate-finder-maven-plugin</artifactId>
+                <version>1.4.0</version>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.gaul</groupId>
+                <artifactId>modernizer-maven-plugin</artifactId>
+                <version>1.7.1</version>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>2.3</version>
+                <executions>
+                    <execution>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/src/*/resources/**</exclude>
+                                <exclude>**/SpiDataSerializerHookAspect.java</exclude>
+                                <exclude>**/ClientPlainChannelInitializerAspect.java</exclude>
+                                <exclude>**/UnifiedChannelInitializerAspect.java</exclude>
+                            </excludes>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

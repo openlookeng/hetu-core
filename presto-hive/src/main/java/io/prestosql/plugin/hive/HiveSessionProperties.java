@@ -614,11 +614,6 @@ public final class HiveSessionProperties
         return session.getProperty(TEMPORARY_STAGING_DIRECTORY_ENABLED, Boolean.class);
     }
 
-    public static String getTemporaryStagingDirectoryPath(ConnectorSession session)
-    {
-        return session.getProperty(TEMPORARY_STAGING_DIRECTORY_PATH, String.class);
-    }
-
     public static int getDynamicFilteringRowFilteringThreshold(ConnectorSession session)
     {
         return session.getProperty(DYNAMIC_FILTERING_ROW_FILTERING_THRESHOLD, Integer.class);

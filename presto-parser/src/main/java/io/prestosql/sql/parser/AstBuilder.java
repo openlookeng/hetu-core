@@ -40,6 +40,7 @@ import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -58,6 +59,7 @@ import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -147,6 +149,7 @@ import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
+import io.prestosql.sql.tree.ShowIndex;
 import io.prestosql.sql.tree.ShowRoleGrants;
 import io.prestosql.sql.tree.ShowRoles;
 import io.prestosql.sql.tree.ShowSchemas;
@@ -360,6 +363,49 @@ class AstBuilder
     public Node visitDropView(SqlBaseParser.DropViewContext context)
     {
         return new DropView(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
+    }
+
+    @Override
+    public Node visitCreateIndex(SqlBaseParser.CreateIndexContext context)
+    {
+        List<Property> properties = ImmutableList.of();
+        if (context.properties() != null) {
+            properties = visit(context.properties().property(), Property.class);
+        }
+        List<Identifier> columnAliases = ImmutableList.of();
+        if (context.columnAliases() != null) {
+            columnAliases = visit(context.columnAliases().identifier(), Identifier.class);
+        }
+        Optional<String> indexType = Optional.empty();
+        if (context.indexType() != null) {
+            indexType = Optional.of(visitIfPresent(context.indexType(), StringLiteral.class).get().getValue());
+        }
+        return new CreateIndex(
+                getLocation(context),
+                getQualifiedName(context.indexName),
+                getQualifiedName(context.tableName),
+                columnAliases,
+                indexType.orElse(null),
+                context.EXISTS() != null,
+                properties,
+                visitIfPresent(context.expression(), Expression.class));
+    }
+
+    @Override
+    public Node visitDropIndex(SqlBaseParser.DropIndexContext context)
+    {
+        return new DropIndex(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
+    }
+
+    @Override
+    public Node visitShowIndex(SqlBaseParser.ShowIndexContext context)
+    {
+        if (context.qualifiedName() != null) {
+            return new ShowIndex(getLocation(context), getQualifiedName(context.qualifiedName()));
+        }
+        else {
+            return new ShowIndex(getLocation(context));
+        }
     }
 
     @Override
@@ -1864,6 +1910,12 @@ class AstBuilder
     public Node visitBooleanValue(SqlBaseParser.BooleanValueContext context)
     {
         return new BooleanLiteral(getLocation(context), context.getText());
+    }
+
+    @Override
+    public Node visitIndexType(SqlBaseParser.IndexTypeContext context)
+    {
+        return new StringLiteral(getLocation(context), context.getText());
     }
 
     @Override

@@ -18,11 +18,17 @@ Therefore metastore must be configured first.
 * Here is an example of using RDBMS as metastore, create `etc/hetu-metastore.properties`:
 ```
 hetu.metastore.type=jdbc
-hetu.meatstore.db.url=jdbc:mysql://....
+hetu.metastore.db.url=jdbc:mysql://....
 hetu.metastore.db.user=root
 hetu.metastore.db.password=123456
 ```
 * Here is an example of using HDFS as metastore，create `etc/hetu-metastore.properties`：
+
+    Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
+    
+    Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is the parent of node.data_dir;
+    otherwise, the current workspace is the openlookeng server's directory.
+
 ```
 # the type of metastore storage
 hetu.metastore.type=hetufilesystem

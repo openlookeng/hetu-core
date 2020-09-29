@@ -26,6 +26,7 @@ import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageId;
+import io.prestosql.server.security.SecurityRequireNonNull;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 
@@ -90,8 +91,12 @@ public class QueryResource
     @Path("{queryId}")
     public Response getQueryInfo(@PathParam("queryId") QueryId queryId)
     {
-        requireNonNull(queryId, "queryId is null");
-
+        try {
+            requireNonNull(queryId, "queryId is null");
+        }
+        catch (Exception ex) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
         BasicQueryInfo basicQueryInfo = getBasicQueryInfo(queryId);
 
         if (basicQueryInfo == null) {
@@ -126,7 +131,7 @@ public class QueryResource
     @Path("{queryId}")
     public void cancelQuery(@PathParam("queryId") QueryId queryId)
     {
-        requireNonNull(queryId, "queryId is null");
+        SecurityRequireNonNull.requireNonNull(queryId, "queryId is null");
         queryManager.cancelQuery(queryId);
     }
 
@@ -134,14 +139,24 @@ public class QueryResource
     @Path("{queryId}/killed")
     public Response killQuery(@PathParam("queryId") QueryId queryId, String message)
     {
-        return failQuery(queryId, createKillQueryException(message));
+        try {
+            return failQuery(queryId, createKillQueryException(message));
+        }
+        catch (Exception ex) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
     }
 
     @PUT
     @Path("{queryId}/preempted")
     public Response preemptQuery(@PathParam("queryId") QueryId queryId, String message)
     {
-        return failQuery(queryId, createPreemptQueryException(message));
+        try {
+            return failQuery(queryId, createPreemptQueryException(message));
+        }
+        catch (Exception ex) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
     }
 
     private Response failQuery(QueryId queryId, PrestoException queryException)
@@ -174,7 +189,7 @@ public class QueryResource
     @Path("stage/{stageId}")
     public void cancelStage(@PathParam("stageId") StageId stageId)
     {
-        requireNonNull(stageId, "stageId is null");
+        SecurityRequireNonNull.requireNonNull(stageId, "stageId is null");
         queryManager.cancelStage(stageId);
     }
 

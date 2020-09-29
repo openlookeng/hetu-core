@@ -5,11 +5,10 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.hetu.core</groupId>
-        <version>316</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>hetu-vdm</artifactId>
-    <version>${dep.hetu.version}</version>
     <name>hetu-vdm</name>
     <description>Hetu - Vdm Connector</description>
     <packaging>hetu-plugin</packaging>
@@ -135,6 +134,12 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk15on</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

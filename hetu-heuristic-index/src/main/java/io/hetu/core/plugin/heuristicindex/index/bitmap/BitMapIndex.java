@@ -520,9 +520,11 @@ public class BitMapIndex<T>
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, CHARSET))) {
             writer.write(header.toString());
 
-            for (File f : files) {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f), CHARSET))) {
-                    IOUtils.copy(reader, writer);
+            if (files != null) {
+                for (File f : files) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f), CHARSET))) {
+                        IOUtils.copy(reader, writer);
+                    }
                 }
             }
         }

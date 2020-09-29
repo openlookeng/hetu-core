@@ -106,13 +106,18 @@ public class ServerInfoResource
     public Response updateState(NodeState state, @Context HttpServletRequest servletRequest)
             throws WebApplicationException
     {
-        requireNonNull(state, "state is null");
+        try {
+            requireNonNull(state, "state is null");
+        }
+        catch (Exception ex) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
         try {
             HttpRequestSessionContext httpRequestSessionContext = new HttpRequestSessionContext(servletRequest);
             accessControl.checkCanAccessNodeInfo(httpRequestSessionContext.getIdentity());
         }
         catch (AccessDeniedException e) {
-            throw new ForbiddenException();
+            throw new ForbiddenException("No permission");
         }
 
         try {

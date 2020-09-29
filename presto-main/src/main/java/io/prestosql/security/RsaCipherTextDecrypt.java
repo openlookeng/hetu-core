@@ -17,6 +17,7 @@ package io.prestosql.security;
 
 import io.prestosql.spi.security.CipherTextDecrypt;
 import io.prestosql.spi.security.SecurityKeyManager;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -27,6 +28,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.security.KeyFactory;
+import java.security.Security;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
@@ -38,12 +40,15 @@ public final class RsaCipherTextDecrypt
 {
     private static final Charset CHARSET = UTF_8;
     private static final String RSA = "RSA";
+    private static final String RSA_PADDING = "RSA/NONE/OAEPWITHSHA256AndMGF1Padding";
+    private static final String BC_PROVIDER = "BC";
     private final SecurityKeyManager keyManager;
 
     @Inject
     public RsaCipherTextDecrypt(SecurityKeyManager keyManagerProvider)
     {
         this.keyManager = keyManagerProvider;
+        Security.addProvider(new BouncyCastleProvider());
     }
 
     @Override
@@ -56,7 +61,7 @@ public final class RsaCipherTextDecrypt
             // generate the public key
             X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
             RSAPublicKey publicKey = (RSAPublicKey) factory.generatePublic(spec);
-            Cipher cipher = Cipher.getInstance(RSA);
+            Cipher cipher = Cipher.getInstance(RSA_PADDING, BC_PROVIDER);
             cipher.init(Cipher.DECRYPT_MODE, publicKey);
             // decode base64 of cipher text
             byte[] content = Base64.getDecoder().decode(cipherText);

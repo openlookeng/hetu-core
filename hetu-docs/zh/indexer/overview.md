@@ -1,11 +1,11 @@
 
-# openLooKeng启发式索引器
+# openLooKeng启发式索引
 
 ## 简介
 
 可以在数据库表的一个或多个列创建索引，从而提供更快的随机查找。大多数大数据格式，如ORC、Parquet和CarbonData，都已经内置了索引。
 
-启发式索引器允许在现有数据上创建索引，但将索引存储在外部的的原始数据源中。这样做好处如下：
+启发式索引允许在现有数据上创建索引，但将索引存储在外部的的原始数据源中。这样做好处如下：
 
   - 索引对底层数据源不可知，并且可由任何查询引擎使用
   - 无需重写现有数据文件即可对现有数据进行索引
@@ -20,7 +20,7 @@
 
 当引擎需要调度一个TableScan操作时，它可以调度worker节点上的Split。这些Split负责读取部分源数据。但是如果应用了谓词，则并非所有Split都会返回数据。
 
-通过为谓词列保留外部索引，启发式索引器可以确定每个Split是否包含正在搜索的值，并且只对可能包含该值的Split安排读操作。
+通过为谓词列保留外部索引，启发式索引可以确定每个Split是否包含正在搜索的值，并且只对可能包含该值的Split安排读操作。
 
 ![indexer_filter_splits](../images/indexer_filter_splits.png)
 
@@ -28,7 +28,7 @@
 
 当需要从ORC文件中读取数据时，使用ORCRecordReader读取器。此读取器从数据条带批量（例如1024行）读取数据，然后形成页。但是，如果有一个谓词存在，那么就不需要批量读取中的所有条目，有些条目可能会在稍后被Filter运算符过滤掉。
 
-通过为谓词列保留外部位图索引，启发式索引器甚至可以在应用Filter运算符之前筛选出与谓词不匹配的行。
+通过为谓词列保留外部位图索引，启发式索引甚至可以在应用Filter运算符之前筛选出与谓词不匹配的行。
 
 ## 示例教程
 
@@ -48,8 +48,13 @@
 
 在 `etc/config.properties` 中加入这些行：
 
+路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+
+注意：避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；
+    如果没有配置，那么当前工作目录为openlookeng server的目录
+
     hetu.heuristicindex.filter.enabled=true
-    hetu.heuristicindex.filter.cache.max-indices-number=2000000
+    hetu.hetu.heuristicindex.filter.cache.max-memory=2GB
     hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
     hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
     
@@ -72,7 +77,7 @@
 
 要创建索引，首先将工作目录cd至安装目录的`bin`文件夹，然后运行：
 
-    ./index -c <your-etc-folder-directory> --table table1 --column id --type bloom create
+    java -jar ./hetu-cli-*.jar --config <your-etc-folder-directory> --execute 'CREATE INDEX index_name USING bloom ON table1 (column)'
     
 ### 运行语句
 

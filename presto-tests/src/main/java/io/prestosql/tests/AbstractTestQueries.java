@@ -3456,7 +3456,6 @@ public abstract class AbstractTestQueries
                 UNSUPPORTED_CORRELATED_SUBQUERY_ERROR_MSG);
 
         // aggregation with having
-//        assertQuery("SELECT (SELECT avg(totalprice) FROM orders GROUP BY custkey, orderdate HAVING avg(totalprice) < a) FROM (VALUES 900) t(a)");
 
         // correlation in predicate
         assertQuery("SELECT name FROM nation n WHERE 'AFRICA' = (SELECT name FROM region WHERE regionkey = n.regionkey)");

@@ -80,7 +80,9 @@ public class SslConfig
 
     public static void setCipherSuites(String suites)
     {
-        cipherSuites = Optional.ofNullable(suites);
+        if (suites != null && !suites.equals("")) {
+            cipherSuites = Optional.of(suites);
+        }
     }
 
     public static Optional<String> getCipherSuites()
@@ -90,7 +92,9 @@ public class SslConfig
 
     public static void setProtocols(String protocols)
     {
-        sslProtocols = Optional.ofNullable(protocols);
+        if (protocols != null && !protocols.equals("")) {
+            sslProtocols = Optional.of(protocols);
+        }
     }
 
     public static Optional<String> getSslProtocols()

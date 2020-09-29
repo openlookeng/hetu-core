@@ -1,13 +1,12 @@
 
 # Command Line Interface
 
-The openLooKeng CLI provides a terminal-based interactive shell for running queries. The CLI is a [self-executing](http://skife.org/java/unix/2011/06/20/really_executable_jars.html) JAR file, which means it acts like a normal UNIX executable.
+The openLooKeng CLI provides a terminal-based interactive shell for running queries. The CLI is a runnable JAR file, so it can be run as `java -jar ./hetu-cli-*.jar`.
 
-Download `hetu-cli-010-executable.jar`, rename it to `openlk-cli`, make
-it executable with `chmod +x`, then run it:
+Download CLI jar file corresponding to the server's version, e.g. `hetu-cli-1.0.0-executable.jar`, and run:
 
 ``` shell
-./openlk-cli --server localhost:8080 --catalog hive --schema default
+java -jar ./hetu-cli-1.0.0-executable.jar --server localhost:8080 --catalog hive --schema default
 ```
 
 Run the CLI with the `--help` option to see the available options.

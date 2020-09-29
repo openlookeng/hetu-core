@@ -32,11 +32,11 @@ fs.client.type=local
 ```
 ## 使用
 
-目录操作是通过openLooKeng协调节点上的RESTful API来完成的。HTTP请求具有如下形态（以hive连接节点为例）：
+目录操作是通过openLooKeng协调节点上的RESTful API来完成的。HTTP请求具有如下形态（以hive连接节点为例），POST/PUT请求体形式为`multipart/form-data`：
 
     request: POST/DELETE/PUT
     
-    header: ``X-Presto-User: admin``
+    header: `X-Presto-User: admin`
     
     form: 'catalogInformation={
             "catalogName" : "hive",
@@ -119,6 +119,11 @@ UPDATE操作是DELETE和ADD操作的组合。首先管理员向协调节点发�
 
 在`etc/node.properties`中：
 
+路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+
+注意：避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；
+    如果没有配置，那么当前工作目录为openlookeng server的目录
+
 | 属性名称| 是否必选| 描述| 默认值|
 |----------|----------|----------|----------|
 | `catalog.config-dir`| 是| 本地磁盘存放配置文件的根目录。| 
@@ -126,6 +131,5 @@ UPDATE操作是DELETE和ADD操作的组合。首先管理员向协调节点发�
 
 ## 对查询的影响
 
-- 添加目录后，在扫描期间查询可能会失败。
-- 删除目录后，正在执行的查询可能会失败。查询可能能够在扫描期间完成。
-- 更新目录时，正在进行的查询可能会失败。更新目录后，在扫描期间查询可能会失败。
+- 删除目录后，正在执行的查询可能会失败。
+- 更新目录时，正在进行的查询可能会失败。

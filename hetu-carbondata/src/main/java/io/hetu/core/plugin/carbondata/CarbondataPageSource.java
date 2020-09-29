@@ -391,9 +391,7 @@ public class CarbondataPageSource
                                                                          HetuCarbondataReadSupport readSupport, Configuration conf)
     {
         QueryModel queryModel = createQueryModel(carbonSplit, tableHandle, columns, conf);
-        /*if (isDirectVectorFill) {
-            queryModel.setDirectVectorFill(true);
-        }*/
+
         QueryExecutor queryExecutor =
                 QueryExecutorFactory.getQueryExecutor(queryModel, new Configuration(conf));
         try {

@@ -74,7 +74,8 @@ public class TestHeuristicIndexFactory
             String table = "csv.schemaName.tableName";
             String[] columns = new String[] {"0", "2"};
             String[] partitons = new String[] {"p=bar"};
-            writer.createIndex(table, columns, partitons, "bloom", "minmax");
+            writer.createIndex(table, columns, partitons, "bloom");
+            writer.createIndex(table, columns, partitons, "minmax");
 
             IndexClient client = new HeuristicIndexFactory().getIndexClient(fs, folder.getRoot().toPath());
             List<IndexMetadata> splits = client.readSplitIndex(table);
@@ -83,9 +84,13 @@ public class TestHeuristicIndexFactory
 
             // read the index file for csv/schemaName/tableName/p=bar/000.csv, column 2
             File csvFile = new File("src/test/resources/csv/schemaName/tableName/p=bar/000.csv").getCanonicalFile();
-            String filePath = Paths.get("csv.schemaName.tableName", "2", csvFile.toString()).toString();
-            splits = client.readSplitIndex(filePath);
-            // there should be 2 splits (1 csv file * 1 columns * 2 index types)
+            String filePathBloom = Paths.get("csv.schemaName.tableName", "2", "bloom", csvFile.toString()).toString();
+            String filePathMinMax = Paths.get("csv.schemaName.tableName", "2", "minmax", csvFile.toString()).toString();
+            splits = client.readSplitIndex(filePathBloom);
+            // Bloom only
+            assertEquals(1, splits.size());
+            splits.addAll(client.readSplitIndex(filePathMinMax));
+            // Bloom and minmax
             assertEquals(2, splits.size());
             BloomIndex bloomIndex = null;
             MinMaxIndex minMaxIndex = null;

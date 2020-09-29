@@ -16,21 +16,40 @@ package io.hetu.core.common.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 public class SecurePathWhiteList
 {
+    private static Set<String> securePathwhiteList = new HashSet<>(Arrays.asList(
+            "/tmp",
+            "/opt/hetu",
+            "/opt/openlookeng",
+            "/etc/hetu",
+            "/etc/openlookeng"));
+
     private SecurePathWhiteList()
     {
     }
 
-    public static List<String> getSecurePathWhiteList() throws IOException
+    /**
+     * Due to security concerns, all data must be read from one of the whitelisted paths
+     * @return
+     * @throws IOException
+     */
+    public static Set<String> getSecurePathWhiteList() throws IOException
     {
-        return new ArrayList<>(Arrays.asList(
-                new File("..").getCanonicalPath(),
-                "/tmp"));
+        // current workspace can't be root directory.
+        if (new File(".").getCanonicalPath().equals("/")) {
+            throw new IllegalArgumentException("Current workspace can't be root directory," +
+                    "please make sure you have config node.data-dir in node.properties or don't put your bin directory under root directory");
+        }
+        // if user config node.data-dir, then current workspace is node.data-dir; if not, the current workspace is the same as bin.
+        // the working directory is automatically set to {INSTALL_DIR}/bin by the launcher
+        // the white list includes the {INSTALL_DIR}
+        securePathwhiteList.add(new File("..").getCanonicalPath());
+        return securePathwhiteList;
     }
 
     public static boolean isSecurePath(String absolutePath) throws IOException
