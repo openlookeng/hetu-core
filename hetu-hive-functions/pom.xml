@@ -118,6 +118,12 @@
         <dependency>
             <groupId>io.prestosql.hive</groupId>
             <artifactId>hive-apache</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.thrift</groupId>
+                    <artifactId>libthrift</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.prestosql.hadoop</groupId>

@@ -27,6 +27,7 @@ import io.prestosql.spi.predicate.SortedRangeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.druid.collections.bitmap.ImmutableBitmap;
+import org.apache.druid.common.config.NullHandling;
 import org.apache.druid.data.input.MapBasedInputRow;
 import org.apache.druid.data.input.impl.DimensionsSpec;
 import org.apache.druid.data.input.impl.StringDimensionSchema;
@@ -75,6 +76,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,6 +103,11 @@ import static java.util.stream.Collectors.toMap;
 public class BitMapIndex<T>
         implements Index<T>
 {
+    static
+    {
+        NullHandling.initializeForTests();
+    }
+
     static final int DEFAULT_EXPECTED_NUM_OF_SIZE = 200000;
     private static final Logger LOG = LoggerFactory.getLogger(BitMapIndex.class);
     private static final String COLUMN_NAME = "column";
@@ -449,10 +456,10 @@ public class BitMapIndex<T>
             BitmapResultFactory<?> bitmapResultFactory = new DefaultBitmapResultFactory(bitmapIndexSelector.getBitmapFactory());
 
             if (filters.size() == 0) {
-                filters.add(new TrueFilter());
+                filters.add(TrueFilter.instance());
             }
 
-            ImmutableBitmap bm = AndFilter.getBitmapIndex(bitmapIndexSelector, bitmapResultFactory, filters);
+            ImmutableBitmap bm = AndFilter.getBitmapIndex(bitmapIndexSelector, bitmapResultFactory, new HashSet(filters));
 
             if (lastBm == null) {
                 lastBm = bm;
