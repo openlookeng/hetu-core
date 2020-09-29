@@ -81,21 +81,22 @@ public class ClientPlainChannelInitializerAspect
                 }
             }, null);
 
-            SslContext sslContext = null;
             if (SslConfig.isSslEnabled()) {
-                sslContext = SslContextBuilder
+                SslContext sslContext = SslContextBuilder
                         .forClient()
                         .setupSsl()
                         .startTls(true)
                         .build();
                 channel.inboundPipeline().addLast(sslContext.newSslInboundHandler());
-            }
-            channel.inboundPipeline().addLast(decoder);
-
-            channel.outboundPipeline().addLast(new ClientMessageEncoder());
-            channel.outboundPipeline().addLast(new ClientProtocolEncoder());
-            if (SslConfig.isSslEnabled()) {
+                channel.inboundPipeline().addLast(decoder);
+                channel.outboundPipeline().addLast(new ClientMessageEncoder());
+                channel.outboundPipeline().addLast(new ClientProtocolEncoder());
                 channel.outboundPipeline().addLast(sslContext.newSslOutboundHandler());
+            }
+            else {
+                channel.inboundPipeline().addLast(decoder);
+                channel.outboundPipeline().addLast(new ClientMessageEncoder());
+                channel.outboundPipeline().addLast(new ClientProtocolEncoder());
             }
         }
         catch (NoSuchFieldException | IllegalAccessException e) {
