@@ -17,6 +17,7 @@ package io.prestosql.query;
 import com.google.common.cache.Cache;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.informationschema.InformationSchemaTransactionHandle;
 import io.prestosql.connector.system.GlobalSystemTransactionHandle;
 import io.prestosql.connector.system.SystemTransactionHandle;
@@ -174,6 +175,13 @@ public class CachedSqlQueryExecution
                 }
             }
         }
+
+        Set<String> connectors = tableNames.stream().map(table -> table.substring(0, table.indexOf("."))).collect(Collectors.toSet());
+        connectors.stream().forEach(connector -> {
+            for (Map.Entry<String, String> property : session.getConnectorProperties(new CatalogName(connector)).entrySet()) {
+                systemSessionProperties.put(connector + "." + property.getKey(), property.getValue());
+            }
+        });
 
         Plan plan;
         // TODO: Traverse the statement to build the key then combine tables/optimizers.. etc
