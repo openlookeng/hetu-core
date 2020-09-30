@@ -14,7 +14,6 @@
  */
 package io.prestosql.dynamicfilter;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
@@ -51,7 +50,9 @@ import javax.annotation.PreDestroy;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -92,9 +93,9 @@ public class DynamicFilterService
     private ScheduledFuture<?> backgroundTask;
 
     private Map<String, Map<String, DynamicFilterRegistryInfo>> dynamicFilters = new ConcurrentHashMap<>();
-    private ArrayListMultimap<String, String> mergedDynamicFilters = ArrayListMultimap.create();
     private Map<String, CopyOnWriteArraySet<TaskId>> dynamicFiltersToTask = new ConcurrentHashMap<>();
     private static Map<String, Map<String, DynamicFilter>> cachedDynamicFilters = new HashMap<>();
+    private List<String> finishedQuery = Collections.synchronizedList(new ArrayList<>());
 
     private final StateStoreProvider stateStoreProvider;
 
@@ -121,6 +122,7 @@ public class DynamicFilterService
             try {
                 if (this.stateStoreProvider.getStateStore() != null) {
                     mergeDynamicFilters();
+                    removeFinishedQuery();
                 }
             }
             catch (Exception e) {
@@ -152,6 +154,10 @@ public class DynamicFilterService
             Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId);
 
             for (Map.Entry<String, DynamicFilterRegistryInfo> columnToDynamicFilterEntry : queryToDynamicFiltersEntry.getValue().entrySet()) {
+                if (columnToDynamicFilterEntry.getValue().isMerged()) {
+                    continue;
+                }
+
                 final String filterId = columnToDynamicFilterEntry.getKey();
                 final Type filterType = columnToDynamicFilterEntry.getValue().getType();
                 final DataType filterDataType = columnToDynamicFilterEntry.getValue().getDataType();
@@ -171,7 +177,7 @@ public class DynamicFilterService
                             throw new PrestoException(GENERIC_INTERNAL_ERROR, "FPP too high: " + mergedBloomFilter.approximateElementCount());
                         }
                         mergedFilter = new BloomFilterDynamicFilter(filterKey, null, mergedBloomFilter, filterType);
-                        mergedDynamicFilters.put(queryId, filterId);
+                        columnToDynamicFilterEntry.getValue().setMerged();
 
                         if (filterType == GLOBAL) {
                             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -184,7 +190,7 @@ public class DynamicFilterService
                     else if (filterDataType == HASHSET) {
                         Set mergedSet = mergeHashSets(results);
                         mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
-                        mergedDynamicFilters.put(queryId, filterId);
+                        columnToDynamicFilterEntry.getValue().setMerged();
 
                         if (filterType == GLOBAL) {
                             ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, mergedSet);
@@ -202,12 +208,33 @@ public class DynamicFilterService
                 catch (IOException | PrestoException e) {
                     log.error("Could not merge dynamic filter: " + e.getLocalizedMessage());
                 }
-                finally {
-                    // remove the filter so we don't need to monitor it anymore
-                    queryToDynamicFiltersEntry.getValue().remove(filterId);
-                }
             }
         }
+    }
+
+    private void removeFinishedQuery()
+    {
+        List<String> handledQuery = new ArrayList<>();
+        StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP);
+        // Clear registered dynamic filter tasks
+        for (String queryId : finishedQuery) {
+            Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
+            if (filters != null) {
+                for (Entry<String, DynamicFilterRegistryInfo> entry : filters.entrySet()) {
+                    String filterId = entry.getKey();
+                    clearPartialResults(filterId, queryId);
+                    if (entry.getValue().isMerged() == true) {
+                        String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
+                        mergedStateCollection.remove(filterKey);
+                    }
+                }
+            }
+            dynamicFilters.remove(queryId);
+
+            cachedDynamicFilters.remove(queryId);
+            handledQuery.add(queryId);
+        }
+        finishedQuery.removeAll(handledQuery);
     }
 
     private static BloomFilter mergeBloomFilters(Collection partialBloomFilters)
@@ -298,26 +325,7 @@ public class DynamicFilterService
      */
     public void clearDynamicFiltersForQuery(String queryId)
     {
-        // Clear registered dynamic filter tasks
-        Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
-        if (filters != null) {
-            for (Entry<String, DynamicFilterRegistryInfo> entry : filters.entrySet()) {
-                String filterId = entry.getKey();
-                clearPartialResults(filterId, queryId);
-            }
-        }
-        dynamicFilters.remove(queryId);
-
-        // Clear merged filters
-        mergedDynamicFilters.get(queryId).forEach(filterId -> {
-            String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
-            ((StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).remove(filterKey);
-            clearPartialResults(filterId, queryId);
-        });
-        mergedDynamicFilters.removeAll(queryId);
-
-        // Clear cached dynamic filters locally
-        cachedDynamicFilters.remove(queryId);
+        finishedQuery.add(queryId);
     }
 
     /**
@@ -422,12 +430,14 @@ public class DynamicFilterService
         private Symbol symbol;
         private Type type;
         private DataType dataType;
+        private boolean isMerged;
 
         public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session)
         {
             this.symbol = symbol;
             this.type = type;
             this.dataType = getDynamicFilterDataType(type, getDynamicFilteringDataType(session));
+            this.isMerged = false;
         }
 
         public Symbol getSymbol()
@@ -443,6 +453,16 @@ public class DynamicFilterService
         public DataType getDataType()
         {
             return dataType;
+        }
+
+        public boolean isMerged()
+        {
+            return isMerged;
+        }
+
+        public void setMerged()
+        {
+            this.isMerged = true;
         }
     }
 }
