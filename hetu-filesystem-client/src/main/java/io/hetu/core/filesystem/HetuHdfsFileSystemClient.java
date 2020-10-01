@@ -15,6 +15,7 @@
 package io.hetu.core.filesystem;
 
 import com.google.common.base.Throwables;
+import io.airlift.log.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,8 +46,12 @@ import static java.nio.file.StandardOpenOption.CREATE_NEW;
 public class HetuHdfsFileSystemClient
         extends AbstractWorkspaceFileSystemClient
 {
+    private static final Logger LOG = Logger.get(HetuHdfsFileSystemClient.class);
+    private static final String ERROR_MSG_INITIATED_FAILED = "GSS initiate failed";
+    private static final String ERROR_MSG_NON_EMPTY_FOR_LOCAL_USE = "Directory .* is not empty";
+
     private FileSystem hdfs;
-    private Configuration config;
+    private Configuration hdfsConfig;
 
     /**
      * Instantiate an HetuHdfsFileSystemClient instance with the passed in parameters
@@ -58,7 +63,8 @@ public class HetuHdfsFileSystemClient
             throws IOException
     {
         super(allowAccessRoot);
-        this.hdfs = FileSystem.get(config.getHadoopConfig());
+        this.hdfsConfig = config.getHadoopConfig();
+        this.hdfs = FileSystem.get(hdfsConfig);
     }
 
     /**
@@ -292,6 +298,12 @@ public class HetuHdfsFileSystemClient
     private <T> T unwrapHdfsExceptions(ProcedureThrowingRemoteException<T> procedure)
             throws IOException
     {
+        return unwrapHdfsExceptions(procedure, false);
+    }
+
+    private <T> T unwrapHdfsExceptions(ProcedureThrowingRemoteException<T> procedure, boolean recursive)
+            throws IOException
+    {
         try {
             try {
                 return procedure.invoke();
@@ -311,11 +323,16 @@ public class HetuHdfsFileSystemClient
             throw new DirectoryNotEmptyException(Throwables.getStackTraceAsString(e));
         }
         catch (IOException e) {
-            // If hdfs is used locally, an IOException will be thrown by RawLocalFileSystem
-            // instead of PathIsNotEmptyDirectoryException. Check error message instead.
-            String errorMsgNonEmptyForLocalUse = "Directory .* is not empty";
-            if ((e.getMessage().matches(errorMsgNonEmptyForLocalUse))) {
+            if (e.getMessage().matches(ERROR_MSG_NON_EMPTY_FOR_LOCAL_USE)) {
+                // If hdfs is used locally, an IOException will be thrown by RawLocalFileSystem
+                // instead of PathIsNotEmptyDirectoryException. Check error message instead.
                 throw new DirectoryNotEmptyException(Throwables.getStackTraceAsString(e));
+            }
+            else if (e.getMessage().contains(ERROR_MSG_INITIATED_FAILED) && !recursive) {
+                // hdfs client expired, create a new one and retry
+                LOG.info("HDFS filesystem client expired, renewing a new one");
+                this.hdfs = FileSystem.get(hdfsConfig);
+                return unwrapHdfsExceptions(procedure, true);
             }
             else {
                 throw e;
