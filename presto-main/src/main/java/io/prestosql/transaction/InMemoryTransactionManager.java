@@ -157,6 +157,7 @@ public class InMemoryTransactionManager
         while (iterator.hasNext()) {
             Entry<TransactionId, TransactionMetadata> entry = iterator.next();
             if (entry.getValue().isExpired(idleTimeout)) {
+                removeStateStoreTransaction(entry.getKey());
                 iterator.remove();
                 log.info("Removing expired transaction: %s", entry.getKey());
                 entry.getValue().asyncAbort();
@@ -310,6 +311,7 @@ public class InMemoryTransactionManager
     private ListenableFuture<TransactionMetadata> removeTransactionMetadataAsFuture(TransactionId transactionId)
     {
         TransactionMetadata transactionMetadata = transactions.remove(transactionId);
+        removeStateStoreTransaction(transactionId);
         if (transactionMetadata == null) {
             return immediateFailedFuture(new NotInTransactionException(transactionId));
         }
@@ -333,6 +335,16 @@ public class InMemoryTransactionManager
     {
         // Mark transaction as failed, but don't remove it.
         tryGetTransactionMetadata(transactionId).ifPresent(TransactionMetadata::asyncAbort);
+    }
+
+    private void removeStateStoreTransaction(TransactionId transactionId)
+    {
+        if (stateStoreProvider != null && stateStoreProvider.getStateStore() != null) {
+            StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
+            if (stateMap != null) {
+                stateMap.remove(transactionId.toString());
+            }
+        }
     }
 
     @ThreadSafe
