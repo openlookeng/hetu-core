@@ -59,7 +59,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -93,7 +93,7 @@ public class DynamicFilterService
 
     private Map<String, Map<String, DynamicFilterRegistryInfo>> dynamicFilters = new ConcurrentHashMap<>();
     private ArrayListMultimap<String, String> mergedDynamicFilters = ArrayListMultimap.create();
-    private Map<String, CopyOnWriteArrayList<String>> dynamicFiltersToWorker = new ConcurrentHashMap<>();
+    private Map<String, CopyOnWriteArraySet<TaskId>> dynamicFiltersToTask = new ConcurrentHashMap<>();
     private static Map<String, Map<String, DynamicFilter>> cachedDynamicFilters = new HashMap<>();
 
     private final StateStoreProvider stateStoreProvider;
@@ -158,52 +158,53 @@ public class DynamicFilterService
                 final Symbol column = columnToDynamicFilterEntry.getValue().getSymbol();
                 final String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
 
-                if (hasMergeCondition(filterId, queryId)) {
-                    Collection<Object> results = ((StateSet) stateStore.getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId))).getAll();
+                if (!hasMergeCondition(filterId, queryId)) {
+                    continue;
+                }
 
-                    try {
-                        DynamicFilter mergedFilter;
-                        if (filterDataType == BLOOM_FILTER) {
-                            BloomFilter mergedBloomFilter = mergeBloomFilters(results);
-                            if (mergedBloomFilter.expectedFpp() > DynamicFilterUtils.BLOOM_FILTER_EXPECTED_FPP) {
-                                throw new PrestoException(GENERIC_INTERNAL_ERROR, "FPP too high: " + mergedBloomFilter.approximateElementCount());
-                            }
-                            mergedFilter = new BloomFilterDynamicFilter(filterKey, null, mergedBloomFilter, filterType);
-                            mergedDynamicFilters.put(queryId, filterId);
-
-                            if (filterType == GLOBAL) {
-                                try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                                    mergedBloomFilter.writeTo(out);
-                                    byte[] filter = out.toByteArray();
-                                    ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, filter);
-                                }
-                            }
+                Collection<Object> results = ((StateSet) stateStore.getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId))).getAll();
+                try {
+                    DynamicFilter mergedFilter;
+                    if (filterDataType == BLOOM_FILTER) {
+                        BloomFilter mergedBloomFilter = mergeBloomFilters(results);
+                        if (mergedBloomFilter.expectedFpp() > DynamicFilterUtils.BLOOM_FILTER_EXPECTED_FPP) {
+                            throw new PrestoException(GENERIC_INTERNAL_ERROR, "FPP too high: " + mergedBloomFilter.approximateElementCount());
                         }
-                        else if (filterDataType == HASHSET) {
-                            Set mergedSet = mergeHashSets(results);
-                            mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
-                            mergedDynamicFilters.put(queryId, filterId);
+                        mergedFilter = new BloomFilterDynamicFilter(filterKey, null, mergedBloomFilter, filterType);
+                        mergedDynamicFilters.put(queryId, filterId);
 
-                            if (filterType == GLOBAL) {
-                                ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, mergedSet);
+                        if (filterType == GLOBAL) {
+                            try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                                mergedBloomFilter.writeTo(out);
+                                byte[] filter = out.toByteArray();
+                                ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, filter);
                             }
                         }
-                        else {
-                            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unsupported filter data type: " + filterDataType);
-                        }
+                    }
+                    else if (filterDataType == HASHSET) {
+                        Set mergedSet = mergeHashSets(results);
+                        mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
+                        mergedDynamicFilters.put(queryId, filterId);
 
-                        log.debug("Merged successfully dynamic filter id: "
-                                + filterId + "-" + queryId + " type: " + filterDataType
-                                + ", column: " + column + ", item count: " + mergedFilter.getSize());
-                        cachedDynamicFiltersForQuery.put(filterId, mergedFilter);
+                        if (filterType == GLOBAL) {
+                            ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, mergedSet);
+                        }
                     }
-                    catch (IOException | PrestoException e) {
-                        log.error("Could not merge dynamic filter: " + e.getLocalizedMessage());
+                    else {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unsupported filter data type: " + filterDataType);
                     }
-                    finally {
-                        // remove the filter so we don't need to monitor it anymore
-                        queryToDynamicFiltersEntry.getValue().remove(filterId);
-                    }
+
+                    log.debug("Merged successfully dynamic filter id: "
+                            + filterId + "-" + queryId + " type: " + filterDataType
+                            + ", column: " + column + ", item count: " + mergedFilter.getSize());
+                    cachedDynamicFiltersForQuery.put(filterId, mergedFilter);
+                }
+                catch (IOException | PrestoException e) {
+                    log.error("Could not merge dynamic filter: " + e.getLocalizedMessage());
+                }
+                finally {
+                    // remove the filter so we don't need to monitor it anymore
+                    queryToDynamicFiltersEntry.getValue().remove(filterId);
                 }
             }
         }
@@ -241,30 +242,15 @@ public class DynamicFilterService
 
     private boolean hasMergeCondition(String filterKey, String queryId)
     {
-        int registeredNum = 0;
-        int workersNum = 0;
-        int finishedNum = 0;
+        int finishedDynamicFilterNumber = 0;
         final StateStore stateStore = stateStoreProvider.getStateStore();
 
-        //FIXME: KEN: can we merge the info into 1 collection?
-        StateCollection temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterKey, queryId));
+        StateCollection temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterKey, queryId));
         if (temp != null) {
-            registeredNum = temp.size();
-        }
-        temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterKey, queryId));
-        if (temp != null) {
-            finishedNum = temp.size();
-        }
-        temp = stateStore.getStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterKey, queryId));
-        if (temp != null) {
-            workersNum = temp.size();
+            finishedDynamicFilterNumber = temp.size();
         }
 
-        if (registeredNum > 0 &&
-                registeredNum == finishedNum && workersNum > 0 && workersNum == dynamicFiltersToWorker.get(filterKey + "-" + queryId).size()) {
-            return true;
-        }
-        return false;
+        return finishedDynamicFilterNumber > 0 && finishedDynamicFilterNumber == dynamicFiltersToTask.get(filterKey + "-" + queryId).size();
     }
 
     /**
@@ -287,18 +273,16 @@ public class DynamicFilterService
             Symbol buildSymbol = node.getCriteria().get(0).getRight();
             if (entry.getValue().getName().equals(buildSymbol.getName())) {
                 String filterId = entry.getKey();
-                stateStore.createStateCollection(createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId), SET);
-                stateStore.createStateCollection(createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId), SET);
+                stateStore.createStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId), SET);
                 stateStore.createStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId), SET);
-                stateStore.createStateCollection(createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId), SET);
 
                 dynamicFilters.putIfAbsent(queryId, new ConcurrentHashMap<>());
                 Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
                 filters.put(filterId, extractDynamicFilterRegistryInfo(node, stateMachine.getSession()));
 
-                dynamicFiltersToWorker.putIfAbsent(filterId + "-" + queryId, new CopyOnWriteArrayList<>());
-                CopyOnWriteArrayList workersSet = dynamicFiltersToWorker.get(filterId + "-" + queryId);
-                workersSet.addAll(workers.stream().map(x -> x.getNodeIdentifier()).collect(Collectors.toSet()));
+                dynamicFiltersToTask.putIfAbsent(filterId + "-" + queryId, new CopyOnWriteArraySet<>());
+                CopyOnWriteArraySet taskSet = dynamicFiltersToTask.get(filterId + "-" + queryId);
+                taskSet.addAll(taskIds);
 
                 log.debug("registerTasks source " + filterId + " filters:" + filters + ", workers: "
                         + workers.stream().map(x -> x.getNodeIdentifier()).collect(Collectors.joining(",")) +
@@ -346,12 +330,10 @@ public class DynamicFilterService
     {
         StateStore stateStore = stateStoreProvider.getStateStore();
         if (stateStore != null) {
-            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.REGISTERPREFIX, filterId, queryId));
-            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.FINISHPREFIX, filterId, queryId));
             clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId));
-            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.WORKERSPREFIX, filterId, queryId));
+            clearStatesInStateStore(stateStore, createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId));
         }
-        dynamicFiltersToWorker.remove(filterId + "-" + queryId);
+        dynamicFiltersToTask.remove(filterId + "-" + queryId);
     }
 
     private static void clearStatesInStateStore(StateStore stateStore, String stateCollectionName)
