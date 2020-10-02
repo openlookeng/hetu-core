@@ -129,6 +129,7 @@ public class TestDynamicFilterServiceWithBloomFilter
         assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 2);
         assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId)).size(), 2);
         dynamicFilterService.clearDynamicFiltersForQuery(queryId);
+        Thread.sleep(1000);
         assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId)).size(), 0);
         assertEquals(stateStoreProvider.getStateStore().getStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId)).size(), 0);
     }
