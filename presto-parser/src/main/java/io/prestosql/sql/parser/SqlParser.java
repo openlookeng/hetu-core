@@ -40,6 +40,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
 
+import static io.prestosql.sql.util.SpecialCommentFormatter.verifyAndSetTableDistinctColumns;
 import static java.util.Objects.requireNonNull;
 
 public class SqlParser
@@ -118,6 +119,7 @@ public class SqlParser
     private Node invokeParser(String name, String sql, Function<SqlBaseParser, ParserRuleContext> parseFunction, ParsingOptions parsingOptions)
     {
         try {
+            verifyAndSetTableDistinctColumns(sql);
             SqlBaseLexer lexer = new SqlBaseLexer(new CaseInsensitiveStream(CharStreams.fromString(sql)));
             CommonTokenStream tokenStream = new CommonTokenStream(lexer);
             SqlBaseParser parser = new SqlBaseParser(tokenStream);

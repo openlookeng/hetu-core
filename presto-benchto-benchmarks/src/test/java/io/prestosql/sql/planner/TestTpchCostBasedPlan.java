@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
+import static io.prestosql.SystemSessionProperties.PUSH_TABLE_THROUGH_SUBQUERY;
 import static io.prestosql.plugin.tpch.TpchConnectorFactory.TPCH_COLUMN_NAMING_PROPERTY;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
@@ -53,6 +54,7 @@ public class TestTpchCostBasedPlan
                     .setCatalog(catalog)
                     .setSchema("sf3000.0")
                     .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
+                    .setSystemProperty(PUSH_TABLE_THROUGH_SUBQUERY, "true")
                     .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
                     .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name());
 
@@ -68,9 +70,16 @@ public class TestTpchCostBasedPlan
     @Override
     protected Stream<String> getQueryResourcePaths()
     {
-        return IntStream.rangeClosed(1, 22)
-                .mapToObj(i -> format("q%02d", i))
-                .map(queryId -> format("/sql/presto/tpch/%s.sql", queryId));
+        return IntStream.range(1, 23)
+            .boxed()
+            .flatMap(i -> {
+                String queryId = format("q%02d", i);
+                if (i == 17) {
+                    return Stream.of(queryId + "_1", queryId + "_2");
+                }
+                return Stream.of(queryId);
+            })
+            .map(queryId -> format("/sql/presto/tpch/%s.sql", queryId));
     }
 
     @SuppressWarnings("unused")
