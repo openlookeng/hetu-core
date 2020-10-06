@@ -20,6 +20,7 @@ import io.airlift.node.NodeInfo;
 import io.airlift.resolver.ArtifactResolver;
 import io.airlift.resolver.DefaultArtifact;
 import io.prestosql.connector.ConnectorManager;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.filesystem.FileSystemClientManager;
@@ -34,6 +35,7 @@ import io.prestosql.spi.Plugin;
 import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.cube.CubeProvider;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.function.SqlFunction;
@@ -77,6 +79,7 @@ import static java.util.Objects.requireNonNull;
 public class PluginManager
 {
     private static final ImmutableList<String> SPI_PACKAGES = ImmutableList.<String>builder()
+            .add("io.hetu.core.spi.")
             .add("io.prestosql.spi.")
             .add("com.fasterxml.jackson.annotation.")
             .add("io.airlift.slice.")
@@ -100,6 +103,7 @@ public class PluginManager
     private final AccessControlManager accessControlManager;
     private final PasswordAuthenticatorManager passwordAuthenticatorManager;
     private final EventListenerManager eventListenerManager;
+    private final CubeManager cubeManager;
     private final StateStoreProvider localStateStoreProvider;
     private final StateStoreLauncher stateStoreLauncher;
     private final SeedStoreManager seedStoreManager;
@@ -124,6 +128,7 @@ public class PluginManager
             AccessControlManager accessControlManager,
             PasswordAuthenticatorManager passwordAuthenticatorManager,
             EventListenerManager eventListenerManager,
+            CubeManager cubeManager,
             StateStoreProvider localStateStoreProvider, // StateStoreProvider
             StateStoreLauncher stateStoreLauncher,
             SessionPropertyDefaults sessionPropertyDefaults,
@@ -152,6 +157,7 @@ public class PluginManager
         this.accessControlManager = requireNonNull(accessControlManager, "accessControlManager is null");
         this.passwordAuthenticatorManager = requireNonNull(passwordAuthenticatorManager, "passwordAuthenticatorManager is null");
         this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
+        this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
         // LocalStateProvider
         this.localStateStoreProvider = requireNonNull(localStateStoreProvider, "stateStoreManager is null");
         this.stateStoreLauncher = requireNonNull(stateStoreLauncher, "stateStoreLauncher is null");
@@ -302,6 +308,11 @@ public class PluginManager
         for (SeedStoreFactory seedStoreFactory : plugin.getSeedStoreFactories()) {
             log.info("Registering seed store %s", seedStoreFactory.getName());
             seedStoreManager.addSeedStoreFactory(seedStoreFactory);
+        }
+
+        for (CubeProvider cubeProvider : plugin.getCubeProviders()) {
+            log.info("Registering cube provider %s", cubeProvider.getName());
+            cubeManager.addCubeProvider(cubeProvider);
         }
 
         for (HetuFileSystemClientFactory fileSystemClientFactory : plugin.getFileSystemClientFactory()) {

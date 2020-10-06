@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -31,6 +32,7 @@ import io.prestosql.spi.predicate.Marker.Bound;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
@@ -528,6 +530,17 @@ public class IoPlanPrinter
             else {
                 throw new IllegalStateException(format("Unknown WriterTarget subclass %s", writerTarget.getClass().getSimpleName()));
             }
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitCubeFinish(CubeFinishNode node, IoPlanBuilder context)
+        {
+            QualifiedObjectName qualifiedObjectName = QualifiedObjectName.valueOf(node.getCubeName());
+            context.setOutputTable(new CatalogSchemaTableName(
+                    qualifiedObjectName.getCatalogName(),
+                    qualifiedObjectName.getSchemaName(),
+                    qualifiedObjectName.getObjectName()));
             return processChildren(node, context);
         }
 

@@ -52,4 +52,36 @@ public class TestFieldSetFilteringRecordSet
         RecordCursor recordCursor = fieldSetFilteringRecordSet.cursor();
         assertTrue(recordCursor.advanceNextPosition());
     }
+
+    @Test
+    public void testMultipleFieldRecordSet()
+    {
+        ArrayType arrayOfBigintType = new ArrayType(BIGINT);
+        FieldSetFilteringRecordSet fieldSetFilteringRecordSet = new FieldSetFilteringRecordSet(
+                createTestMetadataManager(),
+                new InMemoryRecordSet(
+                        ImmutableList.of(BIGINT, BIGINT, TIMESTAMP_WITH_TIME_ZONE, TIMESTAMP_WITH_TIME_ZONE, arrayOfBigintType, arrayOfBigintType),
+                        ImmutableList.of(
+                                ImmutableList.of(
+                                        100L,
+                                        100L,
+                                        // test same time in different time zone to make sure equal check was done properly
+                                        packDateTimeWithZone(100, getTimeZoneKeyForOffset(123)),
+                                        packDateTimeWithZone(100, getTimeZoneKeyForOffset(234)),
+                                        // test structural type
+                                        arrayBlockOf(BIGINT, 12, 34, 56),
+                                        arrayBlockOf(BIGINT, 12, 34, 56)),
+                                ImmutableList.of(
+                                        200L,
+                                        200L,
+                                        // test same time in different time zone to make sure equal check was done properly
+                                        packDateTimeWithZone(100, getTimeZoneKeyForOffset(123)),
+                                        packDateTimeWithZone(100, getTimeZoneKeyForOffset(234)),
+                                        // test structural type
+                                        arrayBlockOf(BIGINT, 12, 34, 56),
+                                        arrayBlockOf(BIGINT, 12, 34, 56)))),
+                ImmutableList.of(ImmutableSet.of(0, 1), ImmutableSet.of(2, 3), ImmutableSet.of(4, 5)));
+        RecordCursor recordCursor = fieldSetFilteringRecordSet.cursor();
+        assertTrue(recordCursor.advanceNextPosition());
+    }
 }

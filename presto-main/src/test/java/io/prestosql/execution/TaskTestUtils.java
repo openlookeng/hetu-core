@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.node.NodeInfo;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
@@ -45,6 +46,7 @@ import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spiller.GenericSpillerFactory;
 import io.prestosql.split.PageSinkManager;
 import io.prestosql.split.PageSourceManager;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.gen.ExpressionCompiler;
 import io.prestosql.sql.gen.JoinCompiler;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler;
@@ -122,6 +124,9 @@ public final class TaskTestUtils
         Metadata metadata = createTestMetadataManager();
 
         PageSourceManager pageSourceManager = new PageSourceManager();
+        HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
+        FeaturesConfig featuresConfig = new FeaturesConfig();
+        CubeManager cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
         pageSourceManager.addConnectorPageSourceProvider(CONNECTOR_ID, new TestingPageSourceProvider());
 
         // we don't start the finalizer so nothing will be collected, which is ok for a test
@@ -172,7 +177,8 @@ public final class TaskTestUtils
                 stateStoreProvider,
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                cubeManager);
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)

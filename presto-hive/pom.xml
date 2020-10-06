@@ -223,6 +223,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-cube</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>slice</artifactId>
             <scope>provided</scope>
@@ -253,7 +259,16 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>testing-mysql-server</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-metastore</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
@@ -348,6 +363,25 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-startree</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.objenesis</groupId>
+                    <artifactId>objenesis</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.checkerframework</groupId>
+                    <artifactId>checker-qual</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.errorprone</groupId>
+                    <artifactId>error_prone_annotations</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <profiles>

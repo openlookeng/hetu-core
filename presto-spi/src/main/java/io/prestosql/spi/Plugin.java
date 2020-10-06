@@ -15,6 +15,7 @@ package io.prestosql.spi;
 
 import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.cube.CubeProvider;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.heuristicindex.IndexFactory;
@@ -105,6 +106,11 @@ public interface Plugin
     }
 
     default Iterable<SeedStoreFactory> getSeedStoreFactories()
+    {
+        return emptyList();
+    }
+
+    default Iterable<CubeProvider> getCubeProviders()
     {
         return emptyList();
     }

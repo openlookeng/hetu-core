@@ -41,6 +41,7 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -221,6 +222,14 @@ public class AddLocalExchanges
 
         @Override
         public PlanWithProperties visitTableFinish(TableFinishNode node, StreamPreferredProperties parentPreferences)
+        {
+            // table commit requires that all data be in one stream
+            // this node changes the input organization completely, so we do not pass through parent preferences
+            return planAndEnforceChildren(node, singleStream(), defaultParallelism(session));
+        }
+
+        @Override
+        public PlanWithProperties visitCubeFinish(CubeFinishNode node, StreamPreferredProperties parentPreferences)
         {
             // table commit requires that all data be in one stream
             // this node changes the input organization completely, so we do not pass through parent preferences

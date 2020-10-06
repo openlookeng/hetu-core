@@ -274,6 +274,12 @@ public class TpchMetadata
                 .orElse(TableStatistics.empty());
     }
 
+    @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return -1L;
+    }
+
     private Map<TpchColumn<?>, List<Object>> getColumnValuesRestrictions(TpchTable<?> tpchTable, Constraint constraint)
     {
         TupleDomain<ColumnHandle> constraintSummary = constraint.getSummary();

@@ -27,6 +27,7 @@ import io.prestosql.sql.tree.CallArgument;
 import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
+import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
@@ -39,6 +40,7 @@ import io.prestosql.sql.tree.DescribeInput;
 import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
@@ -96,6 +98,7 @@ import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
+import io.prestosql.sql.tree.ShowCubes;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -900,6 +903,54 @@ public final class SqlFormatter
                     .append(" RENAME TO ")
                     .append(node.getTarget());
 
+            return null;
+        }
+
+        @Override
+        protected Void visitCreateCube(CreateCube node, Integer context)
+        {
+            builder.append("CREATE CUBE ");
+            if (node.isNotExists()) {
+                builder.append("IF NOT EXISTS ");
+            }
+            builder.append(formatName(node.getCubeName()));
+            builder.append(" ON ");
+            builder.append(formatName(node.getTableName()));
+            builder.append(" WITH ");
+            List<String> aggregations = node.getAggregations().stream().map(Expression::toString).collect(Collectors.toList());
+            String propertyList = node.getProperties().stream()
+                    .map(element -> formatExpression(element.getName(), parameters) + " = " +
+                            formatExpression(element.getValue(), parameters))
+                    .collect(joining(", "));
+            String groupsList = node.getGroupingSet().stream()
+                    .map(Identifier::toString)
+                    .collect(joining(", "));
+            builder.append(" ( AGGREGATIONS = (").append(String.join(", ", aggregations)).append(")");
+            builder.append(", GROUP=(").append(groupsList).append(")");
+            builder.append(", PROPERTIES = (").append(propertyList).append(")");
+            builder.append(" )");
+            return null;
+        }
+
+        @Override
+        protected Void visitDropCube(DropCube node, Integer context)
+        {
+            append(context, "DROP CUBE ");
+            if (node.isExists()) {
+                builder.append("IF EXISTS ");
+            }
+            builder.append(node.getCubeName());
+
+            return null;
+        }
+
+        @Override
+        protected Void visitShowCubes(ShowCubes node, Integer context)
+        {
+            builder.append("SHOW CUBES");
+            if (node.getTableName().isPresent()) {
+                builder.append(" FOR " + node.getTableName().get());
+            }
             return null;
         }
 

@@ -58,6 +58,7 @@ import io.prestosql.sql.planner.VariableReferenceSymbolConverter;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -426,6 +427,14 @@ public class UnaliasSymbolReferences
 
         @Override
         public PlanNode visitTableFinish(TableFinishNode node, RewriteContext<Void> context)
+        {
+            PlanNode source = context.rewrite(node.getSource());
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
+            return mapper.map(node, source);
+        }
+
+        @Override
+        public PlanNode visitCubeFinish(CubeFinishNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
             SymbolMapper mapper = new SymbolMapper(mapping, types);

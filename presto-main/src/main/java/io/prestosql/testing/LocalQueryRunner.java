@@ -43,6 +43,7 @@ import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.TaskCountEstimator;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.CommentTask;
@@ -274,6 +275,7 @@ public class LocalQueryRunner
     //loading the DC sub catalogs
     private final CatalogConnectorStore catalogConnectorStore = new CatalogConnectorStore();
     private final HeuristicIndexerManager heuristicIndexerManager;
+    private final CubeManager cubeManager;
     private boolean printPlan;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
@@ -356,6 +358,7 @@ public class LocalQueryRunner
         FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
+        this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
         this.connectorManager = new ConnectorManager(
                 hetuMetaStoreManager,
                 metadata,
@@ -407,6 +410,7 @@ public class LocalQueryRunner
                 accessControl,
                 new PasswordAuthenticatorManager(),
                 new EventListenerManager(),
+                cubeManager,
                 new LocalStateStoreProvider(seedStoreManager), // Hetu: LocalStateProvider
                 new EmbeddedStateStoreLauncher(seedStoreManager,
                         new InternalCommunicationConfig(),
@@ -454,7 +458,7 @@ public class LocalQueryRunner
         dataDefinitionTask = ImmutableMap.<Class<? extends Statement>, DataDefinitionTask<?>>builder()
                 .put(CreateTable.class, new CreateTableTask())
                 .put(CreateView.class, new CreateViewTask(sqlParser, featuresConfig))
-                .put(DropTable.class, new DropTableTask())
+                .put(DropTable.class, new DropTableTask(null))
                 .put(DropView.class, new DropViewTask())
                 .put(RenameColumn.class, new RenameColumnTask())
                 .put(RenameTable.class, new RenameTableTask())
@@ -782,7 +786,8 @@ public class LocalQueryRunner
                 stateStoreProvider,
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                cubeManager);
 
         // plan query
         StageExecutionDescriptor stageExecutionDescriptor = subplan.getFragment().getStageExecutionDescriptor();
@@ -895,7 +900,8 @@ public class LocalQueryRunner
                 costCalculator,
                 estimatedExchangesCostCalculator,
                 new CostComparator(featuresConfig),
-                taskCountEstimator).get();
+                taskCountEstimator,
+                cubeManager).get();
     }
 
     public Plan createPlan(Session session, @Language("SQL") String sql, List<PlanOptimizer> optimizers, WarningCollector warningCollector)
@@ -920,8 +926,9 @@ public class LocalQueryRunner
                 statsCalculator,
                 costCalculator,
                 dataDefinitionTask,
-                heuristicIndexerManager);
-        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector, heuristicIndexerManager);
+                heuristicIndexerManager,
+                cubeManager);
+        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector, heuristicIndexerManager, cubeManager);
 
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
 

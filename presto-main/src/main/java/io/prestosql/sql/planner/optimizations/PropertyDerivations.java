@@ -62,6 +62,7 @@ import io.prestosql.sql.planner.optimizations.ActualProperties.Global;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -389,6 +390,14 @@ public class PropertyDerivations
 
         @Override
         public ActualProperties visitTableFinish(TableFinishNode node, List<ActualProperties> inputProperties)
+        {
+            return ActualProperties.builder()
+                    .global(coordinatorSingleStreamPartition())
+                    .build();
+        }
+
+        @Override
+        public ActualProperties visitCubeFinish(CubeFinishNode node, List<ActualProperties> inputProperties)
         {
             return ActualProperties.builder()
                     .global(coordinatorSingleStreamPartition())

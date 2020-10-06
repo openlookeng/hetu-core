@@ -25,6 +25,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
@@ -124,6 +125,7 @@ public class SqlQueryExecution
     private final QueryStateMachine stateMachine;
     private final String slug;
     private final Metadata metadata;
+    private final CubeManager cubeManager;
     private final SqlParser sqlParser;
     private final SplitManager splitManager;
     private final NodePartitioningManager nodePartitioningManager;
@@ -154,6 +156,7 @@ public class SqlQueryExecution
             QueryStateMachine stateMachine,
             String slug,
             Metadata metadata,
+            CubeManager cubeManager,
             AccessControl accessControl,
             SqlParser sqlParser,
             SplitManager splitManager,
@@ -181,6 +184,7 @@ public class SqlQueryExecution
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
+            this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
             this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
             this.splitManager = requireNonNull(splitManager, "splitManager is null");
             this.nodePartitioningManager = requireNonNull(nodePartitioningManager, "nodePartitioningManager is null");
@@ -222,7 +226,8 @@ public class SqlQueryExecution
                     Optional.of(queryExplainer),
                     preparedQuery.getParameters(),
                     warningCollector,
-                    heuristicIndexerManager);
+                    heuristicIndexerManager,
+                    cubeManager);
             this.analysis = analyzer.analyze(preparedQuery.getStatement());
 
             stateMachine.setUpdateType(analysis.getUpdateType());
@@ -788,6 +793,7 @@ public class SqlQueryExecution
         private final SplitSchedulerStats schedulerStats;
         private final int scheduleSplitBatchSize;
         private final Metadata metadata;
+        private final CubeManager cubeManager;
         private final AccessControl accessControl;
         private final SqlParser sqlParser;
         private final SplitManager splitManager;
@@ -814,6 +820,7 @@ public class SqlQueryExecution
         SqlQueryExecutionFactory(QueryManagerConfig config,
                 HetuConfig hetuConfig,
                 Metadata metadata,
+                CubeManager cubeManager,
                 AccessControl accessControl,
                 SqlParser sqlParser,
                 LocationFactory locationFactory,
@@ -840,6 +847,7 @@ public class SqlQueryExecution
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
             this.scheduleSplitBatchSize = config.getScheduleSplitBatchSize();
             this.metadata = requireNonNull(metadata, "metadata is null");
+            this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
             this.accessControl = requireNonNull(accessControl, "accessControl is null");
             this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
             this.locationFactory = requireNonNull(locationFactory, "locationFactory is null");
@@ -895,6 +903,7 @@ public class SqlQueryExecution
                     stateMachine,
                     slug,
                     metadata,
+                    cubeManager,
                     accessControl,
                     sqlParser,
                     splitManager,

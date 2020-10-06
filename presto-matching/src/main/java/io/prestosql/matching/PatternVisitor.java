@@ -16,6 +16,7 @@ package io.prestosql.matching;
 import io.prestosql.matching.pattern.CapturePattern;
 import io.prestosql.matching.pattern.EqualsPattern;
 import io.prestosql.matching.pattern.FilterPattern;
+import io.prestosql.matching.pattern.OptionalCapturePattern;
 import io.prestosql.matching.pattern.TypeOfPattern;
 import io.prestosql.matching.pattern.WithPattern;
 
@@ -32,6 +33,13 @@ public interface PatternVisitor
     void visitEquals(EqualsPattern<?> equalsPattern);
 
     void visitFilter(FilterPattern<?> pattern);
+
+    /**
+     * This method visits the OptionalCapturePattern.
+     *
+     * @param pattern the OptionalCapturePattern
+     */
+    void visitOptionalCapture(OptionalCapturePattern<?> pattern);
 
     default void visitPrevious(Pattern<?> pattern)
     {

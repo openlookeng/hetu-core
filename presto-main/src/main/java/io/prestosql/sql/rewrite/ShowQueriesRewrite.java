@@ -19,8 +19,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
+import io.hetu.core.spi.cube.CubeMetadata;
+import io.hetu.core.spi.cube.CubeStatus;
+import io.hetu.core.spi.cube.aggregator.AggregationSignature;
+import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
 import io.prestosql.connector.DataCenterUtility;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
@@ -71,6 +76,7 @@ import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
+import io.prestosql.sql.tree.ShowCubes;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -88,11 +94,14 @@ import io.prestosql.sql.tree.Values;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.function.LongSupplier;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -102,6 +111,7 @@ import static io.prestosql.connector.informationschema.InformationSchemaMetadata
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_SCHEMATA;
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_TABLES;
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_TABLE_PRIVILEGES;
+import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static io.prestosql.metadata.MetadataListing.listCatalogs;
 import static io.prestosql.metadata.MetadataListing.listSchemas;
 import static io.prestosql.metadata.MetadataUtil.createCatalogSchemaName;
@@ -152,6 +162,7 @@ final class ShowQueriesRewrite
     public Statement rewrite(
             Session session,
             Metadata metadata,
+            CubeManager cubeManager,
             SqlParser parser,
             Optional<QueryExplainer> queryExplainer,
             Statement node,
@@ -160,12 +171,13 @@ final class ShowQueriesRewrite
             WarningCollector warningCollector,
             HeuristicIndexerManager heuristicIndexerManager)
     {
-        return (Statement) new Visitor(metadata, parser, session, parameters, accessControl, heuristicIndexerManager).process(node, null);
+        return (Statement) new Visitor(cubeManager, metadata, parser, session, parameters, accessControl, heuristicIndexerManager).process(node, null);
     }
 
     private static class Visitor
             extends AstVisitor<Node, Void>
     {
+        private final CubeManager cubeManager;
         private final Metadata metadata;
         private final Session session;
         private final SqlParser sqlParser;
@@ -173,8 +185,10 @@ final class ShowQueriesRewrite
         private final AccessControl accessControl;
         private final HeuristicIndexerManager heuristicIndexerManager;
 
-        public Visitor(Metadata metadata, SqlParser sqlParser, Session session, List<Expression> parameters, AccessControl accessControl, HeuristicIndexerManager heuristicIndexerManager)
+        public Visitor(CubeManager cubeManager, Metadata metadata, SqlParser sqlParser, Session session, List<Expression> parameters, AccessControl accessControl, HeuristicIndexerManager heuristicIndexerManager)
         {
+            //TODO: Replace with NoOpCubeManager. Here CubeManager can be null
+            this.cubeManager = cubeManager;
             this.metadata = requireNonNull(metadata, "metadata is null");
             this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
             this.session = requireNonNull(session, "session is null");
@@ -226,6 +240,72 @@ final class ShowQueriesRewrite
                     from(schema.getCatalogName(), TABLE_TABLES),
                     predicate,
                     ordering(ascending("table_name")));
+        }
+
+        @Override
+        protected Node visitShowCubes(ShowCubes node, Void context)
+        {
+            ImmutableList.Builder<Expression> rows = ImmutableList.builder();
+            CubeMetaStore cubeMetaStore = this.cubeManager.getMetaStore(STAR_TREE).orElseThrow(() -> new RuntimeException("HetuMetastore is not initialized"));
+            List<CubeMetadata> cubeMetadataList;
+            if (!node.getTableName().isPresent()) {
+                cubeMetadataList = cubeMetaStore.getAllCubes();
+            }
+            else {
+                QualifiedObjectName qualifiedTableName = createQualifiedObjectName(session, node, node.getTableName().get());
+                cubeMetadataList = cubeMetaStore.getMetadataList(qualifiedTableName.toString());
+            }
+            Map<String, String> cubeStatusMap = new HashMap<>();
+            cubeMetadataList.forEach(cubeMetadata -> {
+                QualifiedObjectName qualifiedTableName = QualifiedObjectName.valueOf(cubeMetadata.getOriginalTableName());
+                Map<QualifiedObjectName, Long> tableLastModifiedTimeMap = new HashMap<>();
+                long tableLastModifiedTime = tableLastModifiedTimeMap.computeIfAbsent(qualifiedTableName, ignored -> {
+                    TableHandle tableHandle = metadata.getTableHandle(session, qualifiedTableName).get();
+                    LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle);
+                    return lastModifiedTimeSupplier == null ? -1L : lastModifiedTimeSupplier.getAsLong();
+                });
+                CubeStatus status = cubeMetadata.getCubeStatus();
+                if (status == CubeStatus.INACTIVE) {
+                    cubeStatusMap.put(cubeMetadata.getCubeTableName(), "InActive");
+                }
+                else {
+                    cubeStatusMap.put(cubeMetadata.getCubeTableName(), tableLastModifiedTime > cubeMetadata.getLastUpdated() ? "Expired" : "Active");
+                }
+            });
+            rows.add(row(
+                    new StringLiteral(""),
+                    new StringLiteral(""),
+                    new StringLiteral(""),
+                    new StringLiteral(""),
+                    new StringLiteral(""),
+                    new StringLiteral(""),
+                    FALSE_LITERAL));
+            cubeMetadataList.forEach(cubeMetadata -> {
+                rows.add(row(
+                        new StringLiteral(cubeMetadata.getCubeTableName()),
+                        new StringLiteral(cubeMetadata.getOriginalTableName()),
+                        new StringLiteral(cubeStatusMap.get(cubeMetadata.getCubeTableName())),
+                        new StringLiteral(String.join(",", cubeMetadata.getDimensions())),
+                        new StringLiteral(cubeMetadata.getAggregationSignatures().stream().map(AggregationSignature::toString).collect(Collectors.joining(","))),
+                        new StringLiteral(String.join(",", cubeMetadata.getPredicateString())),
+                        TRUE_LITERAL));
+            });
+
+            ImmutableList<Expression> expressions = rows.build();
+            return simpleQuery(
+                    selectList(
+                            aliasedName("cube_name", "Cube Name"),
+                            aliasedName("table_name", "Table Name"),
+                            aliasedName("cube_status", "Status"),
+                            aliasedName("dimensions", "Dimensions"),
+                            aliasedName("aggregations", "Aggregations"),
+                            aliasedName("predicate_string", "Where Clause")),
+                    aliased(
+                            new Values(expressions),
+                            "Cube Result",
+                            ImmutableList.of("cube_name", "table_name", "cube_status", "dimensions", "aggregations", "predicate_string", "include")),
+                    identifier("include"),
+                    ordering(ascending("cube_name")));
         }
 
         @Override

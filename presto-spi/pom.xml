@@ -59,6 +59,11 @@
             <artifactId>gson</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-cube</artifactId>
+        </dependency>
+
         <!-- for testing -->
         <dependency>
             <groupId>org.testng</groupId>
@@ -131,6 +136,7 @@
             <artifactId>log</artifactId>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>

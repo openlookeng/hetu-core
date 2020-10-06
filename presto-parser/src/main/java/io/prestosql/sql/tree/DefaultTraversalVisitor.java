@@ -537,6 +537,16 @@ public abstract class DefaultTraversalVisitor<R, C>
     }
 
     @Override
+    protected R visitCreateCube(CreateCube node, C context)
+    {
+        for (Property property : node.getProperties()) {
+            process(property, context);
+        }
+
+        return null;
+    }
+
+    @Override
     protected R visitCreateTableAsSelect(CreateTableAsSelect node, C context)
     {
         process(node.getQuery(), context);

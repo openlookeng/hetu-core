@@ -32,6 +32,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
@@ -45,6 +46,7 @@ import io.prestosql.operator.AggregationOperator.AggregationOperatorFactory;
 import io.prestosql.operator.AssignUniqueIdOperator;
 import io.prestosql.operator.BloomFilterUtils;
 import io.prestosql.operator.CommonTableExecutionContext;
+import io.prestosql.operator.CubeFinishOperator.CubeFinishOperatorFactory;
 import io.prestosql.operator.DeleteOperator.DeleteOperatorFactory;
 import io.prestosql.operator.DevNullOperator.DevNullOperatorFactory;
 import io.prestosql.operator.DriverFactory;
@@ -180,6 +182,7 @@ import io.prestosql.sql.planner.optimizations.IndexJoinOptimizer;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -355,6 +358,7 @@ public class LocalExecutionPlanner
     private final OrderingCompiler orderingCompiler;
     private final StateStoreProvider stateStoreProvider;
     private final NodeInfo nodeInfo;
+    private final CubeManager cubeManager;
     private final StateStoreListenerManager stateStoreListenerManager;
     private final DynamicFilterCacheManager dynamicFilterCacheManager;
     private final HeuristicIndexerManager heuristicIndexerManager;
@@ -385,7 +389,8 @@ public class LocalExecutionPlanner
             StateStoreProvider stateStoreProvider,
             StateStoreListenerManager stateStoreListenerManager,
             DynamicFilterCacheManager dynamicFilterCacheManager,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            CubeManager cubeManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -415,6 +420,7 @@ public class LocalExecutionPlanner
         this.stateStoreListenerManager = requireNonNull(stateStoreListenerManager, "stateStoreListenerManager is null");
         this.dynamicFilterCacheManager = requireNonNull(dynamicFilterCacheManager, "dynamicFilterCacheManager is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+        this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
     }
 
     public LocalExecutionPlan plan(
@@ -2794,6 +2800,22 @@ public class LocalExecutionPlanner
                     session);
             Map<Symbol, Integer> layout = ImmutableMap.of(node.getOutputSymbols().get(0), 0);
 
+            return new PhysicalOperation(operatorFactory, layout, context, source);
+        }
+
+        @Override
+        public PhysicalOperation visitCubeFinish(CubeFinishNode node, LocalExecutionPlanContext context)
+        {
+            PhysicalOperation source = node.getSource().accept(this, context);
+            OperatorFactory operatorFactory = new CubeFinishOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    session,
+                    cubeManager,
+                    node.getCubeName(),
+                    node.getDataPredicate(),
+                    node.isOverwrite());
+            Map<Symbol, Integer> layout = ImmutableMap.of(node.getOutputSymbols().get(0), 0);
             return new PhysicalOperation(operatorFactory, layout, context, source);
         }
 

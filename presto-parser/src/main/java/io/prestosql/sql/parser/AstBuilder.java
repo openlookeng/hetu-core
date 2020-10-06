@@ -41,6 +41,7 @@ import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
@@ -53,6 +54,7 @@ import io.prestosql.sql.tree.CurrentTime;
 import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.Deallocate;
 import io.prestosql.sql.tree.DecimalLiteral;
+import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DescribeInput;
@@ -60,6 +62,7 @@ import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
@@ -91,6 +94,7 @@ import io.prestosql.sql.tree.IfExpression;
 import io.prestosql.sql.tree.InListExpression;
 import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Intersect;
 import io.prestosql.sql.tree.IntervalLiteral;
 import io.prestosql.sql.tree.IsNotNullPredicate;
@@ -149,6 +153,7 @@ import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
+import io.prestosql.sql.tree.ShowCubes;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -192,9 +197,12 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -278,6 +286,91 @@ class AstBuilder
     }
 
     @Override
+    public Node visitCreateCube(SqlBaseParser.CreateCubeContext context)
+    {
+        List<Identifier> groupingSet = visit(context.cubeGroup().identifier(), Identifier.class);
+        List<FunctionCall> aggregations = new ArrayList<>(visit(context.aggregations().expression(), FunctionCall.class));
+        Set<FunctionCall> decomposedAggregations = new LinkedHashSet<>();
+        aggregations.forEach(aggItem -> {
+            if (!"avg".equals(aggItem.getName().toString())) {
+                decomposedAggregations.add(aggItem);
+            }
+            else {
+                decomposedAggregations.add(new FunctionCall(
+                        aggItem.getLocation(),
+                        QualifiedName.of("sum"),
+                        aggItem.getWindow(),
+                        aggItem.getFilter(),
+                        aggItem.getOrderBy(),
+                        aggItem.isDistinct(),
+                        aggItem.getArguments()));
+                decomposedAggregations.add(new FunctionCall(
+                        aggItem.getLocation(),
+                        QualifiedName.of("count"),
+                        aggItem.getWindow(),
+                        aggItem.getFilter(),
+                        aggItem.getOrderBy(),
+                        aggItem.isDistinct(),
+                        aggItem.getArguments()));
+            }
+        });
+
+        QualifiedName cubeName = getQualifiedName(context.cubeName);
+        QualifiedName originalTableName = getQualifiedName(context.tableName);
+
+        List<Property> properties = ImmutableList.of();
+        if (context.cubeProperties() != null) {
+            properties = visit(context.cubeProperties().property(), Property.class);
+        }
+
+        return new CreateCube(getLocation(context), cubeName, originalTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties);
+    }
+
+    @Override
+    public Node visitInsertCube(SqlBaseParser.InsertCubeContext context)
+    {
+        QualifiedName cubeName = getQualifiedName(context.qualifiedName());
+        Optional<Expression> optionalExpression = visitIfPresent(context.expression(), Expression.class);
+        if (!optionalExpression.isPresent()) {
+            throw new IllegalArgumentException("WHERE expression is mandatory!");
+        }
+        return new InsertCube(getLocation(context), cubeName, optionalExpression.get(), null, false);
+    }
+
+    @Override
+    public Node visitInsertOverwriteCube(SqlBaseParser.InsertOverwriteCubeContext context)
+    {
+        QualifiedName cubeName = getQualifiedName(context.qualifiedName());
+        Optional<Expression> optionalExpression = visitIfPresent(context.expression(), Expression.class);
+        if (!optionalExpression.isPresent()) {
+            throw new IllegalArgumentException("WHERE expression is mandatory!");
+        }
+        return new InsertCube(getLocation(context), cubeName, optionalExpression.get(), null, true);
+    }
+
+    private static class IdentifierBuilderVisitor
+            extends DefaultExpressionTraversalVisitor<Void, ImmutableList.Builder<Identifier>>
+    {
+        @Override
+        protected Void visitIdentifier(Identifier node, ImmutableList.Builder<Identifier> builder)
+        {
+            builder.add(node);
+            return null;
+        }
+    }
+
+    @Override
+    public Node visitShowCubes(SqlBaseParser.ShowCubesContext context)
+    {
+        if (context.qualifiedName() != null) {
+            return new ShowCubes(getLocation(context), getQualifiedName(context.qualifiedName()));
+        }
+        else {
+            return new ShowCubes(getLocation(context));
+        }
+    }
+
+    @Override
     public Node visitCreateTableAsSelect(SqlBaseParser.CreateTableAsSelectContext context)
     {
         Optional<String> comment = Optional.empty();
@@ -335,7 +428,6 @@ class AstBuilder
     @Override
     public Node visitCacheTable(SqlBaseParser.CacheTableContext context)
     {
-        List<Property> properties = ImmutableList.of();
         return new Cache(getLocation(context), getQualifiedName(context.tableName), visitIfPresent(context.booleanExpression(), Expression.class));
     }
 
@@ -354,6 +446,12 @@ class AstBuilder
         else {
             return new ShowCache(getLocation(context));
         }
+    }
+
+    @Override
+    public Node visitDropCube(SqlBaseParser.DropCubeContext context)
+    {
+        return new DropCube(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
     }
 
     @Override
@@ -858,6 +956,12 @@ class AstBuilder
         return new GroupingSets(getLocation(context), context.groupingSet().stream()
                 .map(groupingSet -> visit(groupingSet.expression(), Expression.class))
                 .collect(toList()));
+    }
+
+    @Override
+    public Node visitGroupingSet(SqlBaseParser.GroupingSetContext context)
+    {
+        return new SimpleGroupBy(getLocation(context), visit(context.expression(), Expression.class));
     }
 
     @Override

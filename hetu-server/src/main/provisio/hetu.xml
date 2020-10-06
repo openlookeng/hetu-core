@@ -266,6 +266,12 @@
         </artifact>
     </artifactSet>
 
+    <artifactSet to="plugin/hetu-startree">
+        <artifact id="${project.groupId}:hetu-startree:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
     <artifactSet to="plugin/hetu-state-store">
         <artifact id="${project.groupId}:hetu-state-store:zip:${project.version}">
             <unpack />
@@ -283,11 +289,13 @@
             <unpack />
         </artifact>
     </artifactSet>
+
     <artifactSet to="plugin/hetu-metastore">
         <artifact id="${project.groupId}:hetu-metastore:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
+
     <artifactSet to="plugin/hetu-heuristic-index">
         <artifact id="${project.groupId}:hetu-heuristic-index:zip:${project.version}">
             <unpack />

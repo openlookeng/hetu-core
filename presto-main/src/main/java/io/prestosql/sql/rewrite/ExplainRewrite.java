@@ -14,6 +14,7 @@
 package io.prestosql.sql.rewrite;
 
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.QueryPreparer;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.warnings.WarningCollector;
@@ -50,6 +51,7 @@ final class ExplainRewrite
     public Statement rewrite(
             Session session,
             Metadata metadata,
+            CubeManager cubeManager,
             SqlParser parser,
             Optional<QueryExplainer> queryExplainer,
             Statement node,

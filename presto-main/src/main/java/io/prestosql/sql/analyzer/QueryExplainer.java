@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.DataDefinitionTask;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -59,6 +60,7 @@ public class QueryExplainer
     private final CostCalculator costCalculator;
     private final Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask;
     private final HeuristicIndexerManager heuristicIndexerManager;
+    private final CubeManager cubeManager;
 
     @Inject
     public QueryExplainer(
@@ -70,7 +72,8 @@ public class QueryExplainer
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            CubeManager cubeManager)
     {
         this(
                 planOptimizers.get(),
@@ -81,7 +84,8 @@ public class QueryExplainer
                 statsCalculator,
                 costCalculator,
                 dataDefinitionTask,
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                cubeManager);
     }
 
     public QueryExplainer(
@@ -93,7 +97,8 @@ public class QueryExplainer
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            CubeManager cubeManager)
     {
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
         this.planFragmenter = requireNonNull(planFragmenter, "planFragmenter is null");
@@ -104,11 +109,12 @@ public class QueryExplainer
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
         this.dataDefinitionTask = ImmutableMap.copyOf(requireNonNull(dataDefinitionTask, "dataDefinitionTask is null"));
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+        this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
     }
 
     public Analysis analyze(Session session, Statement statement, List<Expression> parameters, WarningCollector warningCollector)
     {
-        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(this), parameters, warningCollector, heuristicIndexerManager);
+        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(this), parameters, warningCollector, heuristicIndexerManager, cubeManager);
         return analyzer.analyze(statement);
     }
 

@@ -134,7 +134,7 @@ public interface HetuFileSystemClient
      *
      * @param path Path to the file.
      * @param options Open options to the file. Currently supports: {@code java.nio.file.StandardOpenOption.CREATE_NEW}.
-     * @return An opened {@code OutputStream} to read the file.
+     * @return An opened {@code OutputStream} to write the file.
      * @throws UnsupportedOperationException If the provided OpenOptions are not supported by the filesystem implementation.
      * @throws NoSuchFileException If the parent directory does not exist.
      * @throws FileAlreadyExistsException If the file already exists and open option is set to CREATE_NEW.

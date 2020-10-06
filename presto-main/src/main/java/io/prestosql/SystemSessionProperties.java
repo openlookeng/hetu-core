@@ -143,6 +143,7 @@ public final class SystemSessionProperties
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
     public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross_region_dynamic_filter_enabled";
     public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
+    public static final String ENABLE_STAR_TREE_INDEX = "enable_star_tree_index";
     public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
     public static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
     public static final String TRANSFORM_SELF_JOIN_TO_GROUPBY = "transform_self_join_to_groupby";
@@ -709,6 +710,11 @@ public final class SystemSessionProperties
                         CTE_MAX_PREFETCH_QUEUE_SIZE,
                         "Max prefetch queue size",
                         featuresConfig.getMaxPrefetchQueueSize(),
+                        false),
+                booleanProperty(
+                        ENABLE_STAR_TREE_INDEX,
+                        "Enable star-tree index",
+                        featuresConfig.isEnableStarTreeIndex(),
                         false));
     }
 
@@ -1246,5 +1252,10 @@ public final class SystemSessionProperties
     public static int getCteMaxQueueSize(Session session)
     {
         return session.getSystemProperty(CTE_MAX_QUEUE_SIZE, Integer.class);
+    }
+
+    public static boolean isEnableStarTreeIndex(Session session)
+    {
+        return session.getSystemProperty(ENABLE_STAR_TREE_INDEX, Boolean.class);
     }
 }

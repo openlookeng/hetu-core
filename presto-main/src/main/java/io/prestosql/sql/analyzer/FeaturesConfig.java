@@ -43,6 +43,7 @@ import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLO
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
 import static io.prestosql.sql.analyzer.RegexLibrary.JONI;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
@@ -160,6 +161,10 @@ public class FeaturesConfig
     private boolean cteReuseEnabled;
     private int maxQueueSize = 1024;
     private int maxPrefetchQueueSize = 512;
+
+    private boolean enableStarTreeIndex;
+    private long cubeMetadataCacheSize = 5;
+    private Duration cubeMetadataCacheTtl = new Duration(1, HOURS);
 
     public enum JoinReorderingStrategy
     {
@@ -1253,6 +1258,55 @@ public class FeaturesConfig
     public FeaturesConfig setMaxPrefetchQueueSize(int maxPrefetchQueueSize)
     {
         this.maxPrefetchQueueSize = maxPrefetchQueueSize;
+        return this;
+    }
+
+    /**
+     * HetuEngine configuration has the star-tree index enabled or not.
+     *
+     * @return true if the star-tree index is enabled in the config file
+     */
+    public boolean isEnableStarTreeIndex()
+    {
+        return enableStarTreeIndex;
+    }
+
+    /**
+     * Set the HetuEngine star-tree index enable/disable
+     *
+     * @param enableStarTreeIndex the boolean value
+     * @return the FeaturesConfig
+     */
+    @Config("optimizer.enable-star-tree-index")
+    public FeaturesConfig setEnableStarTreeIndex(boolean enableStarTreeIndex)
+    {
+        this.enableStarTreeIndex = enableStarTreeIndex;
+        return this;
+    }
+
+    public long getCubeMetadataCacheSize()
+    {
+        return cubeMetadataCacheSize;
+    }
+
+    @Config("cube.metadata-cache-size")
+    @ConfigDescription("The maximum number of cube metadata that could be loaded into cache before eviction happens")
+    public FeaturesConfig setCubeMetadataCacheSize(long cubeMetadataCacheSize)
+    {
+        this.cubeMetadataCacheSize = cubeMetadataCacheSize;
+        return this;
+    }
+
+    public Duration getCubeMetadataCacheTtl()
+    {
+        return cubeMetadataCacheTtl;
+    }
+
+    @Config("cube.metadata-cache-ttl")
+    @ConfigDescription("The maximum time to live that are be loaded into cache before eviction happens")
+    public FeaturesConfig setCubeMetadataCacheTtl(Duration cubeMetadataCacheTtl)
+    {
+        this.cubeMetadataCacheTtl = cubeMetadataCacheTtl;
         return this;
     }
 }

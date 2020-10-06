@@ -54,6 +54,16 @@ public class TpchTableHandle
         return tableName;
     }
 
+    @Override
+    public String getSchemaPrefixedTableName()
+    {
+        if (this.scaleFactor == 0.01) {
+            // See io.prestosql.plugin.tpch.TpchMetadata.schemaNameToScaleFactor
+            return "tiny." + this.tableName;
+        }
+        return "sf" + ((int) this.scaleFactor) + "." + this.tableName;
+    }
+
     @JsonProperty
     public double getScaleFactor()
     {

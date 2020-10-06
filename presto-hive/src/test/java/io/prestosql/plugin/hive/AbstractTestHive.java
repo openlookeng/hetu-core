@@ -3176,30 +3176,53 @@ public abstract class AbstractTestHive
             throws Exception
     {
         String queryId;
+        long creationTime;
+        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName, CREATE_TABLE_COLUMNS, createTableProperties(storageFormat));
         try (Transaction transaction = newTransaction()) {
             ConnectorSession session = newSession();
             ConnectorMetadata metadata = transaction.getMetadata();
             queryId = session.getQueryId();
 
             // begin creating the table
-            ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName, CREATE_TABLE_COLUMNS, createTableProperties(storageFormat));
-
             ConnectorOutputTableHandle outputHandle = metadata.beginCreateTable(session, tableMetadata, Optional.empty());
+            metadata.finishCreateTable(session, outputHandle, ImmutableList.of(), ImmutableList.of());
 
+            // commit table creation
+            transaction.commit();
+        }
+
+        try (Transaction transaction = newTransaction()) {
+            ConnectorSession session = newSession();
+            ConnectorMetadata metadata = transaction.getMetadata();
+
+            creationTime = metadata.getTableModificationTime(session, metadata.getTableHandle(session, tableName));
+
+            transaction.commit();
+        }
+
+        // We use this to add a second's gap between table creation and modification.
+        // The Hadoop FileStatus API seems to return times at the granularity of seconds.
+        Thread.sleep(1001);
+
+        try (Transaction transaction = newTransaction()) {
+            ConnectorSession session = newSession();
+            ConnectorMetadata metadata = transaction.getMetadata();
+            ConnectorTableHandle tableHandle = getTableHandle(metadata, tableName);
             // write the data
-            ConnectorPageSink sink = pageSinkProvider.createPageSink(transaction.getTransactionHandle(), session, outputHandle);
+            ConnectorInsertTableHandle insertTableHandle = metadata.beginInsert(session, tableHandle);
+            ConnectorPageSink sink = pageSinkProvider.createPageSink(transaction.getTransactionHandle(), session, insertTableHandle);
             sink.appendPage(CREATE_TABLE_DATA.toPage());
             Collection<Slice> fragments = getFutureValue(sink.finish());
 
             // verify all new files start with the unique prefix
             HdfsContext context = new HdfsContext(session, tableName.getSchemaName(), tableName.getTableName());
-            for (String filePath : listAllDataFiles(context, getStagingPathRoot(outputHandle))) {
+            for (String filePath : listAllDataFiles(context, getStagingPathRoot(insertTableHandle))) {
                 assertThat(new Path(filePath).getName()).startsWith(session.getQueryId());
             }
 
-            // commit the table
-            metadata.finishCreateTable(session, outputHandle, fragments, ImmutableList.of());
+            metadata.finishInsert(session, insertTableHandle, fragments, ImmutableList.of());
 
+            // commit table insertion
             transaction.commit();
         }
 
@@ -3212,7 +3235,7 @@ public abstract class AbstractTestHive
             List<ColumnHandle> columnHandles = filterNonHiddenColumnHandles(metadata.getColumnHandles(session, tableHandle).values());
 
             // verify the metadata
-            ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(session, getTableHandle(metadata, tableName));
+            tableMetadata = metadata.getTableMetadata(session, getTableHandle(metadata, tableName));
             assertEquals(filterNonHiddenColumnMetadata(tableMetadata.getColumns()), CREATE_TABLE_COLUMNS);
 
             // verify the data
@@ -3230,6 +3253,10 @@ public abstract class AbstractTestHive
             assertEquals(statistics.getFileCount().getAsLong(), 1L);
             assertGreaterThan(statistics.getInMemoryDataSizeInBytes().getAsLong(), 0L);
             assertGreaterThan(statistics.getOnDiskDataSizeInBytes().getAsLong(), 0L);
+
+            // verify the modification time
+            long modificationTime = metadata.getTableModificationTime(session, getTableHandle(metadata, tableName));
+            assertGreaterThan(modificationTime, creationTime);
         }
     }
 

@@ -21,6 +21,8 @@ public enum StandardWarningCode
 {
     TOO_MANY_STAGES(0x0000_0001),
     REDUNDANT_ORDER_BY(0x0000_0002),
+    EXPIRED_CUBE(0x0000_0003),
+    CUBE_NOT_FOUND(0x0000_0004),
 
     /**/;
     private final WarningCode warningCode;

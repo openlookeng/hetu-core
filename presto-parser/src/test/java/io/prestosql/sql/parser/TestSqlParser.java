@@ -52,6 +52,7 @@ import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -124,6 +125,7 @@ import io.prestosql.sql.tree.SetSession;
 import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
+import io.prestosql.sql.tree.ShowCubes;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowRoleGrants;
 import io.prestosql.sql.tree.ShowRoles;
@@ -827,6 +829,14 @@ public class TestSqlParser
     }
 
     @Test
+    public void testShowCubes()
+    {
+        assertStatement("SHOW CUBES", new ShowCubes(Optional.empty(), Optional.empty()));
+        assertStatement("SHOW CUBES FOR a", new ShowCubes(Optional.empty(), Optional.of(QualifiedName.of("a"))));
+        assertStatement("SHOW CUBES FOR a.b", new ShowCubes(Optional.empty(), Optional.of(QualifiedName.of("a", "b"))));
+    }
+
+    @Test
     public void testSubstringBuiltInFunction()
     {
         final String givenString = "ABCDEF";
@@ -1373,6 +1383,38 @@ public class TestSqlParser
     }
 
     @Test
+    public void testCreateCube()
+    {
+//        assertStatement("CREATE CUBE foo ON bar WITH (DIMENSIONS=key,val, AGGREGATIONS=count(\"*\"))",
+//                new CreateCube(QualifiedName.of("foo"),
+//                        QualifiedName.of("bar"),
+//                        ImmutableList.of(
+//                                new Identifier("key"),
+//                                new Identifier("val")),
+//                        false,
+//                        ImmutableList.of(new FunctionCall(QualifiedName.of("COUNT"), ImmutableList.of(new Identifier("*")))),
+//                        Optional.empty()));
+//        assertStatement("CREATE CUBE foo ON bar WITH (DIMENSIONS=key,val, AGGREGATIONS=sum(cost))",
+//                new CreateCube(QualifiedName.of("foo"),
+//                        QualifiedName.of("bar"),
+//                        ImmutableList.of(
+//                                new Identifier("key"),
+//                                new Identifier("val")),
+//                        false,
+//                        ImmutableList.of(new FunctionCall(QualifiedName.of("SUM"), ImmutableList.of(new Identifier("cost")))),
+//                        Optional.empty()));
+//        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (DIMENSIONS=key,val, AGGREGATIONS=sum(cost))",
+//                new CreateCube(QualifiedName.of("foo"),
+//                        QualifiedName.of("bar"),
+//                        ImmutableList.of(
+//                                new Identifier("key"),
+//                                new Identifier("val")),
+//                        true,
+//                        ImmutableList.of(new FunctionCall(QualifiedName.of("SUM"), ImmutableList.of(new Identifier("cost")))),
+//                        Optional.empty()));
+    }
+
+    @Test
     public void testCreateTable()
     {
         assertStatement("CREATE TABLE foo (a VARCHAR, b BIGINT COMMENT 'hello world', c IPADDRESS)",
@@ -1627,6 +1669,18 @@ public class TestSqlParser
         assertStatement("DROP CACHE IF EXISTS a", new DropCache(QualifiedName.of("a"), true));
         assertStatement("DROP CACHE IF EXISTS a.b", new DropCache(QualifiedName.of("a", "b"), true));
         assertStatement("DROP CACHE IF EXISTS a.b.c", new DropCache(QualifiedName.of("a", "b", "c"), true));
+    }
+
+    @Test
+    public void testDropCube()
+    {
+        assertStatement("DROP CUBE a", new DropCube(QualifiedName.of("a"), false));
+        assertStatement("DROP CUBE a.b", new DropCube(QualifiedName.of("a", "b"), false));
+        assertStatement("DROP CUBE a.b.c", new DropCube(QualifiedName.of("a", "b", "c"), false));
+
+        assertStatement("DROP CUBE IF EXISTS a", new DropCube(QualifiedName.of("a"), true));
+        assertStatement("DROP CUBE IF EXISTS a.b", new DropCube(QualifiedName.of("a", "b"), true));
+        assertStatement("DROP CUBE IF EXISTS a.b.c", new DropCube(QualifiedName.of("a", "b", "c"), true));
     }
 
     @Test

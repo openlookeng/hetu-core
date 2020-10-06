@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.LongSupplier;
 
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 
@@ -496,6 +497,11 @@ public interface Metadata
      */
     boolean isAggregationFunction(QualifiedName name);
 
+    default LongSupplier getTableLastModifiedTimeSupplier(Session session, TableHandle tableHandle)
+    {
+        return null;
+    }
+
     WindowFunctionSupplier getWindowFunctionImplementation(Signature signature);
 
     InternalAggregationFunction getAggregateFunctionImplementation(Signature signature);
@@ -529,7 +535,6 @@ public interface Metadata
     /**
      * Hetu can only cache execution plans for supported connectors.
      * This method checks if the property for supporting execution plan caching is enabled for a given connector.
-
      *
      * @param session Presto session
      * @param handle Connector specific table handle
@@ -543,4 +548,14 @@ public interface Metadata
      * @param tableName Connector specific tableName
      */
     boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName);
+
+    /**
+     * Cube pre-aggregation is applicable only for supported connectors.
+     *
+     * @param session Hetu session
+     * @param catalogName catalog name
+     * @return true, if underlying connector supports pre-aggregation
+     *         false, otherwise
+     */
+    boolean isPreAggregationSupported(Session session, CatalogName catalogName);
 }

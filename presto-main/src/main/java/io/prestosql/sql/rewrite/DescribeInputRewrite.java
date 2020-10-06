@@ -15,6 +15,7 @@ package io.prestosql.sql.rewrite;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
@@ -60,6 +61,7 @@ final class DescribeInputRewrite
     public Statement rewrite(
             Session session,
             Metadata metadata,
+            CubeManager cubeManager,
             SqlParser parser,
             Optional<QueryExplainer> queryExplainer,
             Statement node,
@@ -108,7 +110,7 @@ final class DescribeInputRewrite
             Statement statement = parser.createStatement(sqlString, createParsingOptions(session));
 
             // create  analysis for the query we are describing.
-            Analyzer analyzer = new Analyzer(session, metadata, parser, accessControl, queryExplainer, parameters, warningCollector);
+            Analyzer analyzer = new Analyzer(session, metadata, parser, accessControl, queryExplainer, parameters, warningCollector, CubeManager.getNoOpCubeManager());
             Analysis analysis = analyzer.analyze(statement, true);
 
             // get all parameters in query
