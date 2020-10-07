@@ -3,7 +3,7 @@
 
 基准驱动可用于测量openLooKeng集群中查询的性能。我们用它来连续测量主干的性能。
 
-下载：[presto-benchmark-driver-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/316/presto-benchmark-driver-316-executable.jar )，重命名为`presto-benchmark-driver`后，使用`chmod +x`使其可执行。
+从[Maven Central](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/)下载合适版本的基准驱动可执行Jar文件，例如[presto-benchmark-driver-1.0.1-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/1.0.1/presto-benchmark-driver-1.0.1-executable.jar)，重命名为`presto-benchmark-driver`后，使用`chmod +x`使其可执行。如果预期版本不存在，可以使用`1.0.1`。
 
 ## 套件
 

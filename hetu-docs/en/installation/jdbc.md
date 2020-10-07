@@ -3,18 +3,15 @@
 
 openLooKeng can be accessed from Java using the JDBC driver. Add the jar to the classpath of your Java application.
 
-The driver is also available from Maven Central: 
+Starting from version `1.0.1`, the driver is also available from Maven Central. Specify an appropriate version number:
 
 ```xml
 <dependency>
     <groupId>io.hetu.core</groupId>
     <artifactId>hetu-jdbc</artifactId>
-    <version>010</version>
+    <version>1.0.1</version>
 </dependency>
 ```
-
-
-
 
 ## Driver Name
 
@@ -24,7 +21,7 @@ The driver class name is `io.hetu.core.jdbc.OpenLooKengDriver`. Most users will 
 
 The following JDBC URL formats are supported:
 
-``` 
+```
 jdbc:lk://host:port
 jdbc:lk://host:port/catalog
 jdbc:lk://host:port/catalog/schema
@@ -32,7 +29,7 @@ jdbc:lk://host:port/catalog/schema
 
 For example, use the following URL to connect to openLooKeng running on `example.net` port `8080` with the catalog `hive` and the schema `sales`:
 
-``` 
+```
 jdbc:lk://example.net:8080/hive/sales
 ```
 

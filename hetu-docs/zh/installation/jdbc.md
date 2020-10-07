@@ -3,13 +3,13 @@
 
 可以使用JDBC驱动从Java访问openLooKeng，并将其添加到Java应用的类路径中。
 
-该驱动也可从Maven Central获得：
+从版本`1.0.1`开始，该驱动也可从Maven Central获得。请指定合适的版本：
 
 ```xml
 <dependency>
     <groupId>io.hetu.core</groupId>
     <artifactId>hetu-jdbc</artifactId>
-    <version>010</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 

@@ -236,7 +236,7 @@ Hana与openLooKeng SQL语法的其他差异，请参考以下官方文档列表�
 
 当使用openlk-cli连接openLooKeng服务器处理无时区时间和时间戳时，返回给cli显示的结果将取决于openlk-cli的启动配置。例如，我们带用户时区启动openlk-cli，如下所示：
 
-    java -jar -Duser.timezone=Asia/Tokyo -jar ./onequery-cli-316-executable.jar
+    java -jar -Duser.timezone=Asia/Tokyo -jar ./hetu-cli-*.jar
     --client-request-timeout 30m --server ip:8080 --session legacy_timestamp=false
 
 当处理时间和时间戳依赖类型时，openlk-cli将显示带有时区的时间依赖类型：
@@ -256,7 +256,7 @@ lk> select current_timezone();
 如果带用户时区启动openlk-cli，如下所示：
 
 ```shell
-java -jar java -jar ./hetu-cli-*.jar-010-executable.jar
+java -jar ./hetu-cli-*.jar
 --client-request-timeout 30m --server ip:8080
 --session legacy_timestamp=false --catalog hana2
 ```

@@ -37,9 +37,10 @@ test.gateway=jdbc:lk://localhost:8081
 thread-count=1
 ```
 
-Lastly, download [presto-verifier-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-verifier/316/presto-verifier-316-executable.jar), rename it to `verifier`, make it executable with `chmod +x`, then run it:
+Lastly, download the appropriate version of the verifier executable jar file from [Maven Central](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/), for example [presto-verifier-1.0.1-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-verifier/1.0.1/presto-verifier-1.0.1-executable.jar), rename it to `verifier`, make it executable with `chmod +x`, then run it:
 
 ``` shell
 ./verifier verify config.properties
 ```
 
+If the specific version is not available, use `1.0.1` instead.

@@ -3,7 +3,7 @@
 
 The benchmark driver can be used to measure the performance of queries in a openLooKeng cluster. We use it to continuously measure the performance of trunk.
 
-Download [presto-benchmark-driver-316-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/316/presto-benchmark-driver-316-executable.jar), rename it to `presto-benchmark-driver`, then make it executable with `chmod +x`.
+Download the appropriate version of the benchmark driver executable jar file from [Maven Central](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/), for example [presto-benchmark-driver-1.0.1-executable.jar](https://repo1.maven.org/maven2/io/hetu/core/presto-benchmark-driver/1.0.1/presto-benchmark-driver-1.0.1-executable.jar), rename it to `presto-benchmark-driver`, then make it executable with `chmod +x`. If the specific version is not available, use `1.0.1` instead.
 
 ## Suites
 
@@ -37,7 +37,7 @@ The SQL files are contained in a directory named `sql` and must have the `.sql` 
 
 The benchmark driver will measure the wall time, total CPU time used by all openLooKeng processes and the CPU time used by the query. For each timing, the driver reports median, mean and standard deviation of the query runs. The difference between process and query CPU times is the query overhead, which is normally from garbage collections. The following is the output from the `file_formats` suite above:
 
- 
+
 
 ```
 suite        query          compression format scale wallTimeP50 wallTimeMean wallTimeStd processCpuTimeP50 processCpuTimeMean processCpuTimeStd queryCpuTimeP50 queryCpuTimeMean queryCpuTimeStd
@@ -50,7 +50,7 @@ file_formats single_varchar zlib        orc    100   547         543          38
 file_formats single_bigint  zlib        orc    100   282         269          23          38990             39030              282               37574           37496            156
 ```
 
- 
+
 
 Note that the above output has been reformatted for readability from the standard TSV that the driver outputs.
 
@@ -60,7 +60,7 @@ output.
 
 Another way to create additional output columns is by adding tags to the SQL files. For example, the following SQL file declares two tags, `projection` and `filter`:
 
-``` 
+```
 projection=true
 filter=false
 =================
