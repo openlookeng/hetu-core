@@ -74,6 +74,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -817,6 +819,78 @@ public class TestHiveIntegrationSmokeTest
         assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1"), 1);
         assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("2"), 2);
         assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testVacuumOnPartitionedTable()
+    {
+        String table = "tab7_partitioned";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        String partitionedColumn = "b";
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc', partitioned_by=Array['%s'])",
+                schema, table, partitionedColumn));
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = (String) tableMetadata.getMetadata().getProperties().get("location");
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1,1),(1,2)", schema, table), 2);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (2,1),(2,2)", schema, table), 2);
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 4);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("2"), 1);
+        //INSERT ONLY to partition b=1 and CALL VACUUM FULL, should compact only partition b=1 with 4 rows.
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 1)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (4, 1)", schema, table), 1);
+        String[] part2Dirs = listPartition(tablePath, "b=2");
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 4);
+        verifyPartitionDirs(tablePath, "b=2", part2Dirs.length, part2Dirs);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("1"), 1);
+        //INSERT ONLY to partition b=3 and CALL VACUUM FULL, should compact only partition b=3 with 2 rows.
+        String[] part1Dirs = listPartition(tablePath, "b=1");
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 3)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (4, 3)", schema, table), 1);
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL AND WAIT", schema, table), 2);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 3)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (6, 3)", schema, table), 1);
+        //partition 3 should now have baseDir along with 2 delta dirs.
+        String[] part3Dirs = listPartition(tablePath, "b=3");
+        long minId = Long.MAX_VALUE;
+        long maxId = Long.MIN_VALUE;
+        for (String delta : part3Dirs) {
+            Matcher matcher = DELTA_PATTERN.matcher(delta);
+            if (matcher.matches()) {
+                minId = Math.min(Long.parseLong(matcher.group(2)), minId);
+                maxId = Math.max(Long.parseLong(matcher.group(3)), maxId);
+            }
+        }
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 2);
+        verifyPartitionDirs(tablePath, "b=2", part2Dirs.length, part2Dirs);
+        verifyPartitionDirs(tablePath, "b=1", part1Dirs.length, part1Dirs);
+        assertFilesAfterCleanupOnPartitionTable(tablePath, partitionedColumn, ImmutableList.of("3"), 2);
+        verifyPartitionDirs(tablePath, "b=3", 2, part3Dirs[0], String.format("delta_%07d_%07d", minId, maxId));
+    }
+
+    private static final Pattern DELTA_PATTERN = Pattern.compile("(delete_)?delta_(\\d+)_(\\d+)(_\\d+)?");
+    private static final Pattern BASE_PATTERN = Pattern.compile("base_(\\d+)");
+
+    private String[] listPartition(String tablePath, String partition)
+    {
+        if (tablePath.startsWith("file:")) {
+            tablePath = tablePath.replace("file:", "");
+        }
+        String[] partitionDirs = new File(tablePath + "/" + partition).list((f, s) -> !s.startsWith("."));
+        Arrays.sort(partitionDirs);
+        return partitionDirs;
+    }
+
+    private void verifyPartitionDirs(String tablePath, String partition, int expectedDirs, String... expectedBaseFile)
+    {
+        String[] partitionDirs = listPartition(tablePath, partition);
+        System.out.println(Arrays.toString(partitionDirs));
+        assertEquals(partitionDirs.length, expectedDirs);
+        for (int i = 0; i < expectedDirs; i++) {
+            assertEquals(partitionDirs[i], expectedBaseFile[i]);
+        }
     }
 
     private void assertFilesAfterCleanupOnPartitionTable(String tablePath, String partitionedColumn, ImmutableList<String> partitionValue, int expectedNumberOfDirectories)

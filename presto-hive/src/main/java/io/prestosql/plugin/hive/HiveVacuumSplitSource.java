@@ -57,7 +57,8 @@ class HiveVacuumSplitSource
      * Splits are grouped as below to execute in parallel.
      * buckets->partition->(type of delta)->List of HiveSplits
      */
-    private Map<Integer, Map<String, Map<Boolean, List<HiveSplit>>>> splitsMap = new HashMap<>();
+    private Map<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> splitsMap = new HashMap<>();
+    private Map<String, List<Range>> partitionToRanges = new HashMap<>();
     private HiveVacuumTableHandle vacuumTableHandle;
     private HdfsEnvironment hdfsEnvironment;
     private HdfsContext hdfsContext;
@@ -89,26 +90,26 @@ class HiveVacuumSplitSource
 
     private List<HiveSplit> getHiveSplitsFor(int bucketNumber, String partition, boolean isDeleteDelta)
     {
-        Map<String, Map<Boolean, List<HiveSplit>>> bucketMap = splitsMap.get(bucketNumber);
-        if (bucketMap == null) {
-            bucketMap = new HashMap<>();
-            splitsMap.put(bucketNumber, bucketMap);
-        }
-        Map<Boolean, List<HiveSplit>> partitionMap = getPartitionMap(partition, bucketMap);
-        return getSplitsFromPartition(isDeleteDelta, partitionMap);
-    }
-
-    private Map<Boolean, List<HiveSplit>> getPartitionMap(String partition, Map<String, Map<Boolean, List<HiveSplit>>> bucketMap)
-    {
         if (partition == null) {
             partition = "default";
         }
-        Map<Boolean, List<HiveSplit>> partitionMap = bucketMap.get(partition);
-        if (partitionMap == null) {
-            partitionMap = new HashMap<>();
-            bucketMap.put(partition, partitionMap);
+        Map<Integer, Map<Boolean, List<HiveSplit>>> bucketToSplits = splitsMap.get(partition);
+        if (bucketToSplits == null) {
+            bucketToSplits = new HashMap<>();
+            splitsMap.put(partition, bucketToSplits);
         }
-        return partitionMap;
+        Map<Boolean, List<HiveSplit>> partitionMap = getDeltaTypeToSplitsMap(bucketNumber, bucketToSplits);
+        return getSplitsFromPartition(isDeleteDelta, partitionMap);
+    }
+
+    private Map<Boolean, List<HiveSplit>> getDeltaTypeToSplitsMap(int bucketNumber, Map<Integer, Map<Boolean, List<HiveSplit>>> bucketsToSplits)
+    {
+        Map<Boolean, List<HiveSplit>> deltaTypeToSplits = bucketsToSplits.get(bucketNumber);
+        if (deltaTypeToSplits == null) {
+            deltaTypeToSplits = new HashMap<>();
+            bucketsToSplits.put(bucketNumber, deltaTypeToSplits);
+        }
+        return deltaTypeToSplits;
     }
 
     private List<HiveSplit> getSplitsFromPartition(boolean isDeleteDelta, Map<Boolean, List<HiveSplit>> partitionMap)
@@ -156,56 +157,55 @@ class HiveVacuumSplitSource
     private ConnectorSplitBatch getCurrentBatch(ConnectorPartitionHandle partitionHandle)
     {
         /*
-         * All splits are grouped separately based on the bucketNumber and type of the file if minor compaction is enabled.
-         *  if partitionHandle is available, then noMoreSplits=true indicates only for specific bucket.
-         *  else, noMoreSplits=true indicates all splits are over.
+         * All Splits are grouped based on partition->bucketNumber->(delta_type in case of Minor vacuum).
          */
         List<HiveSplit> bucketedSplits = null;
         int bucketNumber = 0;
-        boolean noMoreSplits = false;
 
         /*
-         * If partition handle is passed splits will be chosen only for that bucket, else will be choosen from overall.
+         * If partition handle is passed splits will be chosen only for that bucket, else will be choosen from available buckets.
          */
         int bucketToChoose = (partitionHandle instanceof HivePartitionHandle) ? ((HivePartitionHandle) partitionHandle).getBucket() : -1;
-        while (true) {
-            Map<String, Map<Boolean, List<HiveSplit>>> bucketEntry = null;
+        Iterator<Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>>> partitions = splitsMap.entrySet().iterator();
+        while (partitions.hasNext()) {
+            Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> currentPartitionEntry = partitions.next();
+            String currentPartition = currentPartitionEntry.getKey();
+            Map<Integer, Map<Boolean, List<HiveSplit>>> buckets = currentPartitionEntry.getValue();
+            Map<Boolean, List<HiveSplit>> deltaTypeToSplits = null;
             if (bucketToChoose != -1) {
-                bucketEntry = splitsMap.get(bucketToChoose);
+                deltaTypeToSplits = buckets.get(bucketToChoose);
                 bucketNumber = bucketToChoose;
             }
             else {
-                Iterator<Entry<Integer, Map<String, Map<Boolean, List<HiveSplit>>>>> it = splitsMap.entrySet().iterator();
-                if (it.hasNext()) {
-                    Entry<Integer, Map<String, Map<Boolean, List<HiveSplit>>>> entry = it.next();
-                    bucketEntry = entry.getValue();
+                Iterator<Entry<Integer, Map<Boolean, List<HiveSplit>>>> deltaTypeIterator = buckets.entrySet().iterator();
+                if (deltaTypeIterator.hasNext()) {
+                    Entry<Integer, Map<Boolean, List<HiveSplit>>> entry = deltaTypeIterator.next();
+                    deltaTypeToSplits = entry.getValue();
                     bucketNumber = entry.getKey();
                 }
             }
-            if (bucketEntry == null) {
-                //No more entries
-                noMoreSplits = true;
-                break;
+            if (deltaTypeToSplits == null) {
+                if (buckets.size() == 0) {
+                    partitions.remove();
+                }
+                continue;
             }
-            Iterator<Map<Boolean, List<HiveSplit>>> partitionMapIterator = bucketEntry.values().iterator();
-            while (partitionMapIterator.hasNext()) {
-                Map<Boolean, List<HiveSplit>> deltaTypeMap = partitionMapIterator.next();
-                Iterator<List<HiveSplit>> splitsIterator = deltaTypeMap.values().iterator();
-                if (splitsIterator.hasNext()) {
-                    //Choose the splits and remove the entry
-                    bucketedSplits = splitsIterator.next();
-                    splitsIterator.remove();
-                }
-                if (!splitsIterator.hasNext()) {
-                    partitionMapIterator.remove();
-                }
-                if (bucketedSplits != null) {
-                    break;
+            Iterator<Entry<Boolean, List<HiveSplit>>> splitsIterator = deltaTypeToSplits.entrySet().iterator();
+            boolean type;
+            if (splitsIterator.hasNext()) {
+                //Choose the splits and remove the entry
+                Entry<Boolean, List<HiveSplit>> entry = splitsIterator.next();
+                bucketedSplits = entry.getValue();
+                splitsIterator.remove();
+            }
+            if (!splitsIterator.hasNext()) {
+                buckets.remove(bucketNumber);
+                if (buckets.size() == 0) {
+                    partitions.remove();
                 }
             }
-            if (bucketEntry.size() == 0) {
-                //No more bucket entries available.
-                splitsMap.remove(bucketNumber);
+            if (bucketedSplits == null || bucketedSplits.isEmpty()) {
+                continue;
             }
 
             if (bucketedSplits != null) {
@@ -214,17 +214,8 @@ class HiveVacuumSplitSource
                     HiveSplit split = bucketedSplits.get(0);
 
                     Path bucketFile = new Path(split.getPath());
-                    Range range;
-                    try {
-                        Configuration configuration = hdfsEnvironment.getConfiguration(hdfsContext, bucketFile);
-                        Options options = hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () ->
-                                AcidUtils.parseBaseOrDeltaBucketFilename(bucketFile, configuration));
-                        range = new Range(options.getMinimumWriteId(), options.getMaximumWriteId());
-                    }
-                    catch (IOException e) {
-                        throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, "Error while parsing split info for vacuum", e);
-                    }
-                    Range suitableRange = getOnlyElement(vacuumTableHandle.getSuitableRange(range));
+                    Range range = getRange(bucketFile);
+                    Range suitableRange = getOnlyElement(vacuumTableHandle.getSuitableRange(currentPartition, range));
                     if (range.equals(suitableRange)) {
                         //Already compacted
                         // or only one participant, which makes no sense to compact
@@ -233,20 +224,33 @@ class HiveVacuumSplitSource
                         continue;
                     }
                 }
-                //Decide the noMoreSplits based on the request type.
-                //If the request was for specific bucket, then it noMoreSplits applies only for bucket, otherwise overall.
-                noMoreSplits = (bucketToChoose != -1) ? bucketEntry.size() == 0 : splitsMap.size() == 0;
                 break;
             }
         }
         if (bucketedSplits != null && !bucketedSplits.isEmpty()) {
             HiveSplitWrapper multiSplit = new HiveSplitWrapper(bucketedSplits, OptionalInt.of(bucketNumber));
-            //All of the splits for this bucket number are grouped, There are no more splits for this bucket.
-            return new ConnectorSplitBatch(ImmutableList.of(multiSplit), noMoreSplits);
+            //All of the splits for this bucket inside one partition are grouped.
+            //There may be some more splits for same bucket in different partition.
+            return new ConnectorSplitBatch(ImmutableList.of(multiSplit), false);
         }
         else {
             return new ConnectorSplitBatch(ImmutableList.of(), true);
         }
+    }
+
+    private Range getRange(Path bucketFile)
+    {
+        Range range;
+        try {
+            Configuration configuration = hdfsEnvironment.getConfiguration(hdfsContext, bucketFile);
+            Options options = hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () ->
+                    AcidUtils.parseBaseOrDeltaBucketFilename(bucketFile, configuration));
+            range = new Range(options.getMinimumWriteId(), options.getMaximumWriteId());
+        }
+        catch (IOException e) {
+            throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, "Error while parsing split info for vacuum", e);
+        }
+        return range;
     }
 
     @Override

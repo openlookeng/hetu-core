@@ -119,7 +119,7 @@ public class HivePageSink
     protected final List<HiveColumnHandle> inputColumns;
     private final TypeManager typeManager;
     protected final HiveWritableTableHandle writableTableHandle;
-    private final ThreadLocal<Options> vacuumOptions = ThreadLocal.withInitial(() -> null);
+    private final ThreadLocal<Map<String, Options>> vacuumOptionsMap = ThreadLocal.withInitial(() -> null);
     private VaccumOp vacuumOp;
 
     public HivePageSink(
@@ -345,7 +345,7 @@ public class HivePageSink
             splits.forEach(split -> {
                 hiveSplits.addAll(((HiveSplitWrapper) split).getSplits());
             });
-            vacuumOptions.set(getVacuumOptions(hiveSplits));
+            vacuumOptionsMap.set(initVacuumOptions(hiveSplits));
             //In case of no
             hiveSplits.stream().forEach(split -> {
                 String partitionName = split.getPartitionName();
@@ -451,8 +451,9 @@ public class HivePageSink
                 builder = new PageBuilder(ImmutableList.of());
             }
             Page partitionColumns = builder.build();
+            String partitionName = writerFactory.getPartitionName(partitionColumns, 0).orElse(HivePartition.UNPARTITIONED_ID);
             bucketNumbers.forEach((bucket) -> {
-                writers.add(writerFactory.createWriter(partitionColumns, 0, OptionalInt.of(bucket), Optional.of(vacuumOptions.get())));
+                writers.add(writerFactory.createWriter(partitionColumns, 0, OptionalInt.of(bucket), getVacuumOptions(partitionName)));
             });
             emptyfileWriten.compareAndSet(false, true);
         }
@@ -462,29 +463,35 @@ public class HivePageSink
             return !sortedPagesForVacuum.hasNext();
         }
 
-        private Options getVacuumOptions(List<HiveSplit> hiveSplits)
+        private Map<String, Options> initVacuumOptions(List<HiveSplit> hiveSplits)
         {
             return hdfsEnvironment.doAs(session.getUser(), () -> {
+                Map<String, Options> vacuumOptionsMap = new HashMap<>();
                 //Findout the minWriteId and maxWriteId for current compaction.
-                Options options = new Options(writerFactory.getConf()).maximumWriteId(-1).minimumWriteId(Long.MAX_VALUE);
                 HiveVacuumTableHandle vacuumTableHandle = (HiveVacuumTableHandle) writableTableHandle;
-                if (vacuumTableHandle.isFullVacuum()) {
-                    //Major compaction, need to write the base
-                    options.writingBase(true);
-                    Range range = getOnlyElement(vacuumTableHandle.getRanges());
-                    options.minimumWriteId(range.getMin());
-                    options.maximumWriteId(range.getMax());
-                    Path bucketFile = new Path(hiveSplits.get(0).getPath());
-                    OptionalInt bucketNumber = HiveUtil.getBucketNumber(bucketFile.getName());
-                    if (bucketNumber.isPresent()) {
-                        options.bucket(bucketNumber.getAsInt());
+                for (HiveSplit split : hiveSplits) {
+                    String partition = split.getPartitionName();
+                    Options options = vacuumOptionsMap.get(partition);
+                    if (options == null) {
+                        options = new Options(writerFactory.getConf()).maximumWriteId(-1).minimumWriteId(Long.MAX_VALUE);
+                        vacuumOptionsMap.put(partition, options);
+                    }
+                    if (vacuumTableHandle.isFullVacuum()) {
+                        //Major compaction, need to write the base
+                        options.writingBase(true);
+                        Range range = getOnlyElement(vacuumTableHandle.getRanges().get(partition));
+                        options.minimumWriteId(range.getMin());
+                        options.maximumWriteId(range.getMax());
+                        Path bucketFile = new Path(split.getPath());
+                        OptionalInt bucketNumber = HiveUtil.getBucketNumber(bucketFile.getName());
+                        if (bucketNumber.isPresent()) {
+                            options.bucket(bucketNumber.getAsInt());
+                        }
+                        else {
+                            throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, "Error while parsing split info for vacuum");
+                        }
                     }
                     else {
-                        throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, "Error while parsing split info for vacuum");
-                    }
-                }
-                else {
-                    for (HiveSplit split : hiveSplits) {
                         Path bucketFile = new Path(split.getPath());
                         try {
                             Options currentOptions = new Options(writerFactory.getConf());
@@ -507,8 +514,6 @@ public class HivePageSink
                             }
                             if (currentOptions.isWritingBase() || options.isWritingBase()) {
                                 options.writingBase(true);
-                                options.minimumWriteId(0);
-                                options.maximumWriteId(currentOptions.getMaximumWriteId());
                             }
                             else if (options.isWritingDeleteDelta() || AcidUtils.isDeleteDelta(bucketFile.getParent())) {
                                 options.writingDeleteDelta(true);
@@ -525,16 +530,12 @@ public class HivePageSink
                         catch (IOException e) {
                             throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, "Error while parsing split info for vacuum", e);
                         }
+                        Range suitableRange = getOnlyElement(vacuumTableHandle.getRanges().get(partition));
+                        options.minimumWriteId(suitableRange.getMin());
+                        options.maximumWriteId(suitableRange.getMax());
                     }
-                    Range currentRange = new Range(options.getMinimumWriteId(), options.getMaximumWriteId());
-                    Range suitableRange = getOnlyElement(vacuumTableHandle.getRanges().stream()
-                            .filter(range -> (currentRange.getMin() >= range.getMin()
-                                    && currentRange.getMax() <= range.getMax()))
-                            .collect(toList()));
-                    options.minimumWriteId(suitableRange.getMin());
-                    options.maximumWriteId(suitableRange.getMax());
                 }
-                return options;
+                return vacuumOptionsMap;
             });
         }
 
@@ -590,6 +591,15 @@ public class HivePageSink
             }
             return 1;
         }
+    }
+
+    private Optional<Options> getVacuumOptions(String partition)
+    {
+        Map<String, Options> partitionToOptions = vacuumOptionsMap.get();
+        if (partitionToOptions == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(partitionToOptions.get(partition));
     }
 
     @Override
@@ -690,19 +700,21 @@ public class HivePageSink
                 continue;
             }
 
+            Optional<String> partitionName = writerFactory.getPartitionName(partitionColumns, position);
+            String partition = partitionName.orElse(HivePartition.UNPARTITIONED_ID);
             OptionalInt bucketNumber = OptionalInt.empty();
+            Optional<Options> partitionOptions = getVacuumOptions(partition);
             if (bucketBlock != null) {
                 bucketNumber = OptionalInt.of(bucketBlock.getInt(position, 0));
             }
             else if (isVacuumOperationValid() && isInsertOnlyTable()) {
-                bucketNumber = OptionalInt.of(vacuumOptions.get().getBucketId());
+                bucketNumber = OptionalInt.of(partitionOptions.get().getBucketId());
             }
             else if (session.getTaskId().isPresent() && writerFactory.isTxnTable()) {
                 //Use the taskId and driverId to get bucketId for ACID table
                 bucketNumber = generateBucketNumber();
             }
-            Optional<Options> vOptions = (vacuumOptions.get() == null) ? Optional.empty() : Optional.of(vacuumOptions.get());
-            HiveWriter writer = writerFactory.createWriter(partitionColumns, position, bucketNumber, vOptions);
+            HiveWriter writer = writerFactory.createWriter(partitionColumns, position, bucketNumber, partitionOptions);
             writers.set(writerIndex, writer);
         }
         verify(writers.size() == pagePartitioner.getMaxIndex() + 1);
