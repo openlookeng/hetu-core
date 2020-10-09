@@ -150,3 +150,35 @@ If you want to allow users to use the  extactly same name as their Kerberos prin
   ]
 }
 ```
+
+### Node State Rules
+These rules govern the node state info particular users can access. The user is granted access to update a node state based on the first matching rule read from top to bottom. If no rule matches, access is denied. Each rule is
+composed of the following fields:
+
+- `user` (optional): regex to match against user name. Defaults to `.*`.
+- `allow` (required): boolean indicating whether a user has access to the catalog
+
+**Note**
+
+*By default, all users have no access to update the node state info. You can override this behavior by adding a rule.*
+
+For example, if you want to allow only the user `admin` and `alice` to update the node state, and deny all other access, you can use the following rules:
+
+``` json
+{
+  "nodeInfo": [
+    {
+      "user": "admin",
+      "allow": true
+    },
+    {
+      "user": "alice",
+      "allow": true
+    },
+    {
+      "user": "bob",
+      "allow": false
+    }
+  ]
+}
+```
