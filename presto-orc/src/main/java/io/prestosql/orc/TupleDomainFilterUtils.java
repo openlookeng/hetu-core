@@ -23,7 +23,9 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.not;
@@ -104,6 +106,21 @@ public class TupleDomainFilterUtils
             // So this is treatd as multiple range and filter will be consider to qualify if it falls
             // in any of these ranges.
             return TupleDomainFilter.BigintMultiRange.of(bigintRanges, nullAllowed);
+        }
+
+        if (rangeFilters.get(0) instanceof TupleDomainFilter.BytesRange) {
+            List<TupleDomainFilter.BytesRange> bytesRanges = rangeFilters.stream()
+                    .map(TupleDomainFilter.BytesRange.class::cast)
+                    .collect(toImmutableList());
+
+            Set byteValues = new HashSet<>();
+            if (bytesRanges.stream().allMatch(TupleDomainFilter.BytesRange::isSingleValue)) {
+                for (TupleDomainFilter.BytesRange bytesRange : bytesRanges) {
+                    byteValues.add(new TupleDomainFilter.ExtendedByte(bytesRange.getLower()));
+                }
+
+                return TupleDomainFilter.MultiValues.of(byteValues, nullAllowed);
+            }
         }
 
         return TupleDomainFilter.MultiRange.of(rangeFilters, nullAllowed);

@@ -16,6 +16,7 @@ package io.prestosql.orc;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -635,6 +636,16 @@ public interface TupleDomainFilter
             this.singleValue = !lowerExclusive && !upperExclusive && Arrays.equals(upper, lower);
         }
 
+        public boolean isSingleValue()
+        {
+            return singleValue;
+        }
+
+        public byte[] getLower()
+        {
+            return lower;
+        }
+
         public static BytesRange of(byte[] lower, boolean lowerExclusive, byte[] upper, boolean upperExclusive, boolean nullAllowed)
         {
             return new BytesRange(lower, lowerExclusive, upper, upperExclusive, nullAllowed);
@@ -1082,6 +1093,97 @@ public interface TupleDomainFilter
                     .add("upper", upper)
                     .add("upperUnbounded", upperUnbounded)
                     .add("upperExclusive", upperExclusive)
+                    .add("nullAllowed", nullAllowed)
+                    .toString();
+        }
+    }
+
+    class ExtendedByte
+    {
+        byte[] value;
+
+        ExtendedByte(byte[] value)
+        {
+            this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            ExtendedByte that = (ExtendedByte) o;
+            return Arrays.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Arrays.hashCode(value);
+        }
+    }
+
+    class MultiValues
+            extends AbstractTupleDomainFilter
+    {
+        Set values;
+
+        private MultiValues(Set values, boolean nullAllowed)
+        {
+            super(nullAllowed);
+            this.values = values;
+        }
+
+        public static MultiValues of(Set byteValues, boolean nullAllowed)
+        {
+            return new MultiValues(byteValues, nullAllowed);
+        }
+
+        @Override
+        public boolean testBytes(byte[] buffer, int offset, int length)
+        {
+            return values.contains(new ExtendedByte(Arrays.copyOfRange(buffer, offset, offset + length)));
+        }
+
+        @Override
+        public boolean testLength(int length)
+        {
+            return true;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(values, nullAllowed);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+
+            MultiValues other = (MultiValues) obj;
+            return this.values.equals(other.values) &&
+                    this.nullAllowed == other.nullAllowed;
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("values", values)
                     .add("nullAllowed", nullAllowed)
                     .toString();
         }
