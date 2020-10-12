@@ -38,12 +38,14 @@ import java.util.List;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
+import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
 import static io.prestosql.sql.analyzer.RegexLibrary.JONI;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
@@ -137,9 +139,11 @@ public class FeaturesConfig
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering;
-    private int dynamicFilteringMaxPerDriverRowCount = 100;
+    private Duration dynamicFilteringWaitTime = new Duration(0, MILLISECONDS);
+    private int dynamicFilteringMaxSize = 1000000;
+    private int dynamicFilteringMaxPerDriverRowCount = 10000;
     private DynamicFilterDataType dynamicFilteringDataType = BLOOM_FILTER;
-    private DataSize dynamicFilteringMaxPerDriverSize = new DataSize(10, KILOBYTE);
+    private DataSize dynamicFilteringMaxPerDriverSize = new DataSize(1, MEGABYTE);
     private double dynamicFilteringBloomFilterFpp = 0.1D;
     // enable or disable execution plan cache functionality via Session properties
     private boolean enableExecutionPlanCache = true;
@@ -838,6 +842,30 @@ public class FeaturesConfig
     public FeaturesConfig setDynamicFilteringDataType(DynamicFilterDataType dynamicFilteringDataType)
     {
         this.dynamicFilteringDataType = dynamicFilteringDataType;
+        return this;
+    }
+
+    public Duration getDynamicFilteringWaitTime()
+    {
+        return dynamicFilteringWaitTime;
+    }
+
+    @Config("dynamic-filtering-wait-time")
+    public FeaturesConfig setDynamicFilteringWaitTime(Duration dynamicFilteringWaitTime)
+    {
+        this.dynamicFilteringWaitTime = dynamicFilteringWaitTime;
+        return this;
+    }
+
+    public int getDynamicFilteringMaxSize()
+    {
+        return dynamicFilteringMaxSize;
+    }
+
+    @Config("dynamic-filtering-max-size")
+    public FeaturesConfig setDynamicFilteringMaxSize(int dynamicFilteringMaxSize)
+    {
+        this.dynamicFilteringMaxSize = dynamicFilteringMaxSize;
         return this;
     }
 

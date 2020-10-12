@@ -33,7 +33,6 @@ import javax.inject.Inject;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
@@ -135,6 +134,7 @@ public final class SystemSessionProperties
     public static final String PUSH_LIMIT_THROUGH_SEMI_JOIN = "push_limit_through_semi_join";
     public static final String PUSH_LIMIT_THROUGH_OUTER_JOIN = "push_limit_through_outer_join";
     public static final String PUSH_LIMIT_DOWN = "push_limit_down";
+    public static final String DYNAMIC_FILTERING_MAX_SIZE = "dynamic_filtering_max_size";
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_VALUE_COUNT = "dynamic_filtering_max_per_driver_value_count";
     public static final String DYNAMIC_FILTERING_WAIT_TIME = "dynamic_filtering_wait_time";
     public static final String DYNAMIC_FILTERING_DATA_TYPE = "dynamic_filtering_data_type";
@@ -612,7 +612,12 @@ public final class SystemSessionProperties
                 durationProperty(
                         DYNAMIC_FILTERING_WAIT_TIME,
                         "Maximum waiting time for dynamic filter to be ready",
-                        new Duration(0, TimeUnit.MILLISECONDS),
+                        featuresConfig.getDynamicFilteringWaitTime(),
+                        false),
+                integerProperty(
+                        DYNAMIC_FILTERING_MAX_SIZE,
+                        "Maximum number of build-side rows to be collected for each dynamic filter",
+                        featuresConfig.getDynamicFilteringMaxSize(),
                         false),
                 integerProperty(
                         DYNAMIC_FILTERING_MAX_PER_DRIVER_VALUE_COUNT,
@@ -1106,6 +1111,11 @@ public final class SystemSessionProperties
     public static boolean isEnableDynamicFiltering(Session session)
     {
         return session.getSystemProperty(ENABLE_DYNAMIC_FILTERING, Boolean.class);
+    }
+
+    public static int getDynamicFilteringMaxSize(Session session)
+    {
+        return session.getSystemProperty(DYNAMIC_FILTERING_MAX_SIZE, Integer.class);
     }
 
     public static int getDynamicFilteringMaxPerDriverValueCount(Session session)
