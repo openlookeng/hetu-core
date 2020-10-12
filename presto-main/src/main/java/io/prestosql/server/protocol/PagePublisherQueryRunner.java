@@ -242,11 +242,13 @@ public class PagePublisherQueryRunner
 
     public synchronized void stop()
     {
-        this.running.set(false);
-        for (PageConsumer consumer : this.consumersList) {
-            consumer.stop();
+        synchronized (this) {
+            this.running.set(false);
+            for (PageConsumer consumer : this.consumersList) {
+                consumer.stop();
+            }
+            queryManager.cancelQuery(queryId);
         }
-        queryManager.cancelQuery(queryId);
 
         // try to remove bloomFilter and columns type from hazelcast
         if (stateStoreProvider.getStateStore() != null) {
@@ -263,8 +265,8 @@ public class PagePublisherQueryRunner
             throw new IllegalArgumentException("queryId does not match with the expected queryId:" + this.globalQueryId);
         }
 
-        if (this.running.get()) {
-            synchronized (this) {
+        synchronized (this) {
+            if (this.running.get()) {
                 if (!this.consumers.containsKey(clientId)) {
                     PageConsumer consumer = new PageConsumer(RUNNING_RESULTS, FINISHED_RESULTS, FAILED_RESULTS, this.pageConsumerTimeout);
                     this.consumers.put(clientId, consumer);
