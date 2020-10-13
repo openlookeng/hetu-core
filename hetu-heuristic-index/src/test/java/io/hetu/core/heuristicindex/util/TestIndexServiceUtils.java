@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
 
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.getPropertiesSubset;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
@@ -163,5 +164,28 @@ public class TestIndexServiceUtils
         if (!input.equals(expected)) {
             throw new AssertionError("String not matched between input: " + input + " and expected: " + expected);
         }
+    }
+
+    @Test
+    public void testGetPropertiesSubset()
+    {
+        Properties input = new Properties();
+        input.put("key1", "value1");
+        input.put("\"key2\"", "\"value2\"");
+        input.put("'key3'", "'value3'");
+        input.put("key4", 4);
+        input.put("bloom.key5", "value5");
+        input.put("\"bloom.key6\"", "\"value6\"");
+        input.put("'bloom.key7'", "'value7'");
+        input.put("bloom.key8", 8);
+
+        Properties expectedOutput = new Properties();
+        expectedOutput.put("key5", "value5");
+        expectedOutput.put("key6", "value6");
+        expectedOutput.put("key7", "value7");
+        expectedOutput.put("key8", "8");
+
+        Properties output = getPropertiesSubset(input, "bloom.");
+        assertEquals(expectedOutput, output);
     }
 }

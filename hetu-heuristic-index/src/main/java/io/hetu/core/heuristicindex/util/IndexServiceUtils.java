@@ -175,7 +175,9 @@ public class IndexServiceUtils
     }
 
     /**
-     * Returns the subset of properties that start with the prefix, prefix is removed
+     * Returns the subset of properties that start with the prefix, prefix is removed.
+     *
+     * All keys and values are also converted to Strings
      *
      * @param properties <code>Properties</code> object to extract properties with
      * @param prefix A String prefix of some property key
@@ -186,9 +188,12 @@ public class IndexServiceUtils
     public static Properties getPropertiesSubset(Properties properties, String prefix)
     {
         Properties subsetProps = new Properties();
-        properties.stringPropertyNames().forEach(k -> {
-            if (k.startsWith(prefix)) {
-                subsetProps.put(k.substring(k.indexOf(prefix) + prefix.length()), properties.getProperty(k));
+        properties.keySet().forEach(key -> {
+            // convert all keys and values to string and remove any quotes around them
+            String keyStr = toStringRemoveQuotes(key);
+            if (keyStr.startsWith(prefix)) {
+                subsetProps.put(keyStr.substring(keyStr.indexOf(prefix) + prefix.length()),
+                        toStringRemoveQuotes(properties.get(key)));
             }
         });
 
@@ -261,5 +266,15 @@ public class IndexServiceUtils
         if (verbose) {
             System.out.println(msg);
         }
+    }
+
+    /**
+     * get object as string and remove surrounding quotes if present
+     * @param input
+     * @return
+     */
+    private static String toStringRemoveQuotes(Object input)
+    {
+        return input == null ? null : input.toString().replace("\"", "").replace("'", "");
     }
 }
