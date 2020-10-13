@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
@@ -97,7 +96,6 @@ public class DynamicCatalogService
             HttpRequestSessionContext sessionContext)
     {
         String catalogName = catalogInfo.getCatalogName();
-        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
 
         // check the permission.
         try {
@@ -129,7 +127,7 @@ public class DynamicCatalogService
                     securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
                 }
                 catch (SecurityKeyException e) {
-                    throw badRequest(BAD_REQUEST, e.getMessage());
+                    throw badRequest(BAD_REQUEST, "Failed to save key.");
                 }
 
                 // create catalog
@@ -139,7 +137,7 @@ public class DynamicCatalogService
                 }
                 catch (PrestoException | IllegalArgumentException ex) {
                     deleteSecurityKey(catalogName);
-                    throw badRequest(BAD_REQUEST, ex.getMessage());
+                    throw badRequest(BAD_REQUEST, "Failed to load catalog. Please check your configuration.");
                 }
             }
             finally {
@@ -147,7 +145,7 @@ public class DynamicCatalogService
             }
         }
         catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, ex.getMessage());
+            throw badRequest(BAD_REQUEST, "Failed to load catalog. Please check your configuration.");
         }
 
         return Response.status(CREATED).build();
@@ -172,7 +170,6 @@ public class DynamicCatalogService
             HttpRequestSessionContext sessionContext)
     {
         String catalogName = catalogInfo.getCatalogName();
-        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
 
         // check the permission.
         try {
@@ -208,7 +205,7 @@ public class DynamicCatalogService
                         securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
                     }
                     catch (SecurityKeyException e) {
-                        throw badRequest(BAD_REQUEST, e.getMessage());
+                        throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
                     }
                 }
 
@@ -226,7 +223,7 @@ public class DynamicCatalogService
                             deleteSecurityKey(catalogName);
                         }
                     }
-                    throw badRequest(BAD_REQUEST, ex.getMessage());
+                    throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
                 }
             }
             finally {
@@ -234,7 +231,7 @@ public class DynamicCatalogService
             }
         }
         catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, ex.getMessage());
+            throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
         }
 
         return Response.status(CREATED).build();
@@ -242,8 +239,6 @@ public class DynamicCatalogService
 
     public synchronized Response dropCatalog(String catalogName, HttpRequestSessionContext sessionContext)
     {
-        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
-
         // check the permission.
         try {
             accessControl.checkCanDropCatalog(sessionContext.getIdentity(), catalogName);
@@ -279,7 +274,7 @@ public class DynamicCatalogService
             }
         }
         catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, ex.getMessage());
+            throw badRequest(BAD_REQUEST, "drop catalog failed. please check your configuration.");
         }
 
         return Response.status(NO_CONTENT).build();
@@ -300,7 +295,7 @@ public class DynamicCatalogService
             return Response.ok(catalogNames).build();
         }
         catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, ex.getMessage());
+            throw badRequest(BAD_REQUEST, "list catalogs failed. please connect admin manager.");
         }
     }
 }

@@ -45,7 +45,6 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.CATALOG_FILE;
 import static io.prestosql.catalog.CatalogFileInputStream.CatalogFileType.GLOBAL_FILE;
 import static io.prestosql.catalog.DynamicCatalogService.badRequest;
@@ -56,8 +55,10 @@ import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 @MultipartConfig(maxFileSize = 20971520, maxRequestSize = 20971520)
 public class CatalogResource
 {
+    private static final int MAX_NAME_LENGTH = 255;
     private static final JsonCodec<CatalogInfo> CATALOG_INFO_CODEC = JsonCodec.jsonCodec(CatalogInfo.class);
-    private static final String VALID_NAME_REGEX = "[^\\s\\\\/:\\*\\?\\\"<>\\|](\\x20|[^\\s\\\\/:\\*\\?\\\"<>\\|])*[^\\s\\\\/:\\*\\?\\\"<>\\|\\.]$";
+    private static final String VALID_CATALOG_NAME_REGEX = "[\\p{Alnum}_]+";
+    private static final String VALID_FILE_NAME_REGEX = "[^\\s\\\\/:\\*\\?\\\"<>\\|](\\x20|[^\\s\\\\/:\\*\\?\\\"<>\\|])*[^\\s\\\\/:\\*\\?\\\"<>\\|\\.]$";
     private final DynamicCatalogService service;
     private final int catalogMaxFileSizeInBytes;
     private final int catalogMaxFileNumber;
@@ -77,7 +78,11 @@ public class CatalogResource
     @VisibleForTesting
     boolean checkFileName(String fileName)
     {
-        if (!fileName.matches(VALID_NAME_REGEX)) {
+        if (fileName.length() > MAX_NAME_LENGTH) {
+            return false;
+        }
+
+        if (!fileName.matches(VALID_FILE_NAME_REGEX)) {
             return false;
         }
 
@@ -133,6 +138,18 @@ public class CatalogResource
         }
     }
 
+    @VisibleForTesting
+    void checkCatalogName(String catalogName)
+    {
+        if (catalogName.length() > MAX_NAME_LENGTH) {
+            throw badRequest(BAD_REQUEST, "The length of catalog name is too long");
+        }
+
+        if (!catalogName.matches(VALID_CATALOG_NAME_REGEX)) {
+            throw badRequest(BAD_REQUEST, "Invalid catalog name");
+        }
+    }
+
     private CatalogInfo toCatalogInfo(String catalogInfoJson)
     {
         if (catalogInfoJson == null) {
@@ -141,9 +158,7 @@ public class CatalogResource
 
         try {
             CatalogInfo catalogInfo = CATALOG_INFO_CODEC.fromJson(catalogInfoJson);
-            if (!catalogInfo.getCatalogName().matches(VALID_NAME_REGEX)) {
-                throw badRequest(BAD_REQUEST, "Invalid catalog name");
-            }
+            checkCatalogName(catalogInfo.getCatalogName());
             return catalogInfo;
         }
         catch (IllegalArgumentException ex) {
@@ -167,7 +182,7 @@ public class CatalogResource
                     new HttpRequestSessionContext(servletRequest));
         }
         catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, ex.getMessage());
+            throw badRequest(BAD_REQUEST, "create catalog failed. please check your configuration.");
         }
         finally {
             closeInputStreams(catalogConfigFileBodyParts);
@@ -191,7 +206,7 @@ public class CatalogResource
                     new HttpRequestSessionContext(servletRequest));
         }
         catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, ex.getMessage());
+            throw badRequest(BAD_REQUEST, "update catalog failed. please check your configuration.");
         }
         finally {
             closeInputStreams(catalogConfigFileBodyParts);
@@ -205,7 +220,7 @@ public class CatalogResource
     public Response dropCatalog(@NotNull @PathParam("catalogName") String catalogName,
             @Context HttpServletRequest servletRequest)
     {
-        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkCatalogName(catalogName);
 
         return service.dropCatalog(catalogName, new HttpRequestSessionContext(servletRequest));
     }
