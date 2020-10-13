@@ -28,6 +28,8 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.testng.annotations.Test;
 
+import javax.ws.rs.WebApplicationException;
+
 import java.net.URL;
 import java.util.List;
 
@@ -40,6 +42,8 @@ import static org.testng.Assert.assertTrue;
 public class TestCatalogResource
         extends TestDynamicCatalogRunner
 {
+    CatalogResource resource = server.getInstance(Key.get(CatalogResource.class));
+
     public TestCatalogResource()
             throws Exception
     {
@@ -48,10 +52,22 @@ public class TestCatalogResource
     @Test
     public void testCheckFileName()
     {
-        CatalogResource resource = server.getInstance(Key.get(CatalogResource.class));
         assertTrue(resource.checkFileName("keystore.jks"));
         assertFalse(resource.checkFileName("/dir/keystore.jks"));
         assertFalse(resource.checkFileName("keystore.exe"));
+        assertFalse(resource.checkFileName("1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111.jks"));
+    }
+
+    @Test
+    public void testCheckCatalogName()
+    {
+        resource.checkCatalogName("catalogName");
+    }
+
+    @Test(expectedExceptions = WebApplicationException.class)
+    public void testInvalidCheckCatalogName()
+    {
+        resource.checkCatalogName("/dir/catalogName");
     }
 
     @Test
@@ -71,7 +87,7 @@ public class TestCatalogResource
         executeAddCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of());
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration. cause by No factory for connector \\[tpch1\\].  Available factories: \\[system, tpch\\]")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Failed to load catalog. Please check your configuration.")
     public void testAddCatalogWithInvalidPropertiesFile()
             throws Exception
     {
@@ -121,7 +137,7 @@ public class TestCatalogResource
         assertTrue(executeUpdateCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration. cause by No factory for connector \\[tpch1\\].  Available factories: \\[system, tpch\\]")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Failed to update catalog. Please check your configuration.")
     public void testUpdateCatalogWithInvalidPropertiesFile()
             throws Exception
     {
@@ -130,7 +146,7 @@ public class TestCatalogResource
         assertTrue(executeUpdateCatalogCall(catalogName, "tpch1", ImmutableMap.of(), ImmutableList.of(), ImmutableList.of()));
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Try to load catalog failed, check your configuration. cause by No factory for connector \\[hive-hadoop2\\].  Available factories: \\[system, tpch\\]")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Failed to load catalog. Please check your configuration.")
     public void testAddHiveCatalogFail()
             throws Exception
     {
