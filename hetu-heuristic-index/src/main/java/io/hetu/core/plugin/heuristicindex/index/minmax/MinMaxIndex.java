@@ -17,16 +17,18 @@ package io.hetu.core.plugin.heuristicindex.index.minmax;
 
 import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.heuristicindex.Index;
-import io.prestosql.spi.heuristicindex.Operator;
+import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.util.Map;
 import java.util.Objects;
 
 import static io.hetu.core.heuristicindex.util.IndexConstants.TYPES_WHITELIST;
+import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 
 /**
  * MinMax index implementation. It can be used to check whether a value is in or out of the given range.
@@ -68,9 +70,11 @@ public class MinMaxIndex<T>
     }
 
     @Override
-    public void addValues(T[] values)
+    public boolean addValues(Map<String, Object[]> values)
     {
-        for (T v : values) {
+        // Currently expecting only one column
+        Object[] columnIdxValue = values.values().iterator().next();
+        for (Object v : columnIdxValue) {
             if (v == null) {
                 continue;
             }
@@ -90,111 +94,41 @@ public class MinMaxIndex<T>
                 }
             }
         }
+        return true;
+    }
+
+    // For MinMax, expression should be an Expression object for now, until it's replaced by RowExpression
+    @Override
+    public boolean matches(Object expression)
+    {
+        if (expression instanceof ComparisonExpression) {
+            ComparisonExpression compExp = (ComparisonExpression) expression;
+            ComparisonExpression.Operator operator = compExp.getOperator();
+            Comparable value = (Comparable) extractSingleValue(compExp.getRight());
+            switch (operator) {
+                case EQUAL:
+                    return (value.compareTo(min) > 0 || value.compareTo(min) == 0)
+                            && (value.compareTo(max) < 0 || value.compareTo(max) == 0);
+                case LESS_THAN:
+                    return value.compareTo(min) > 0;
+                case LESS_THAN_OR_EQUAL:
+                    return value.compareTo(min) > 0 || value.compareTo(min) == 0;
+                case GREATER_THAN:
+                    return value.compareTo(max) < 0;
+                case GREATER_THAN_OR_EQUAL:
+                    return value.compareTo(max) < 0 || value.compareTo(max) == 0;
+                default:
+                    throw new IllegalArgumentException("Unsupported operator " + operator);
+            }
+        }
+
+        // Not supported expression. Don't filter out
+        return true;
     }
 
     @Override
-    public boolean matches(T value, Operator operator) throws IllegalArgumentException
-    {
-        if (operator == null) {
-            throw new IllegalArgumentException("No operator provided.");
-        }
-
-        Comparable v = (Comparable) value;
-
-        switch (operator) {
-            case EQUAL:
-                return (v.compareTo(min) > 0 || v.compareTo(min) == 0)
-                        && (v.compareTo(max) < 0 || v.compareTo(max) == 0);
-            case LESS_THAN:
-                return v.compareTo(min) > 0;
-            case LESS_THAN_OR_EQUAL:
-                return v.compareTo(min) > 0 || v.compareTo(min) == 0;
-            case GREATER_THAN:
-                return v.compareTo(max) < 0;
-            case GREATER_THAN_OR_EQUAL:
-                return v.compareTo(max) < 0 || v.compareTo(max) == 0;
-            default:
-                throw new IllegalArgumentException("Unsupported operator " + operator);
-        }
-    }
-
-    @Override
-    public boolean supports(Operator operator)
-    {
-        // If the min and max values are not set (usually this happens when user somehow created an empty index),
-        // then we should return false to disable the current index
-        if (min == null || max == null) {
-            return false;
-        }
-        switch (operator) {
-            case EQUAL:
-            case LESS_THAN:
-            case LESS_THAN_OR_EQUAL:
-            case GREATER_THAN:
-            case GREATER_THAN_OR_EQUAL:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Returns whether the provided value is within the min max values.
-     *
-     * @param v Value to be checked whether it is contained in this MinMax index.
-     * @return True if min <= v <= max
-     */
-    public boolean contains(T v)
-    {
-        return matches(v, Operator.EQUAL);
-    }
-
-    /**
-     * Matches Operator.GREATER_THAN
-     *
-     * @param v Value to be checked whether it is greater than the maximum value
-     * @return True if v > max
-     */
-    public boolean greaterThan(T v)
-    {
-        return matches(v, Operator.GREATER_THAN);
-    }
-
-    /**
-     * Matches Operator.GREATER_THAN_OR_EQUAL
-     *
-     * @param v Value to be checked whether it is greater than or equal to the maximum value
-     * @return true if v >= max
-     */
-    public boolean greaterThanEqual(T v)
-    {
-        return matches(v, Operator.GREATER_THAN_OR_EQUAL);
-    }
-
-    /**
-     * Matches Operator.LESS_THAN
-     *
-     * @param v Value to be checked whether it is less than the maximum value
-     * @return true if v < min
-     */
-    public boolean lessThan(T v)
-    {
-        return matches(v, Operator.LESS_THAN);
-    }
-
-    /**
-     * Matches Operator.LESS_THAN_OR_EQUAL
-     *
-     * @param v Value to be checked whether it is less than or equal to the maximum value
-     * @return true if v <= min
-     */
-    public boolean lessThanEqual(T v)
-    {
-        return matches(v, Operator.LESS_THAN_OR_EQUAL);
-    }
-
-    @Override
-    public void persist(OutputStream out) throws IOException
+    public void serialize(OutputStream out)
+            throws IOException
     {
         ObjectOutputStream oos = new ObjectOutputStream(out);
         oos.writeObject(min);
@@ -202,7 +136,8 @@ public class MinMaxIndex<T>
     }
 
     @Override
-    public void load(InputStream in) throws IOException
+    public Index deserialize(InputStream in)
+            throws IOException
     {
         try (ObjectInputStream ois = new SecureObjectInputStream(in, TYPES_WHITELIST)) {
             // read min value
@@ -226,18 +161,48 @@ public class MinMaxIndex<T>
         catch (ClassNotFoundException e) {
             throw new IOException(e);
         }
+
+        return this;
     }
 
     @Override
-    public void setExpectedNumOfEntries(int expectedNumOfEntries)
+    public Index intersect(Index another)
     {
-        // ignore
+        if (!(another instanceof MinMaxIndex)) {
+            throw new UnsupportedOperationException("MinMax Index cannot intersect with " + another.getClass().getCanonicalName());
+        }
+
+        MinMaxIndex theOther = (MinMaxIndex) another;
+        Comparable newMin = this.min.compareTo(theOther.min) < 0 ? theOther.min : this.min;
+        Comparable newMax = this.max.compareTo(theOther.max) < 0 ? this.max : theOther.max;
+
+        return new MinMaxIndex(newMin, newMax);
+    }
+
+    @Override
+    public Index union(Index another)
+    {
+        if (!(another instanceof MinMaxIndex)) {
+            throw new UnsupportedOperationException("MinMax Index cannot union with " + another.getClass().getCanonicalName());
+        }
+
+        MinMaxIndex theOther = (MinMaxIndex) another;
+        Comparable newMin = this.min.compareTo(theOther.min) > 0 ? theOther.min : this.min;
+        Comparable newMax = this.max.compareTo(theOther.max) > 0 ? this.max : theOther.max;
+
+        return new MinMaxIndex(newMin, newMax);
     }
 
     @Override
     public int getExpectedNumOfEntries()
     {
         return 0;
+    }
+
+    @Override
+    public void setExpectedNumOfEntries(int expectedNumOfEntries)
+    {
+        // ignore
     }
 
     @Override
@@ -270,5 +235,11 @@ public class MinMaxIndex<T>
     public void setMemorySize(long memorySize)
     {
         this.memorySize = memorySize;
+    }
+
+    @Override
+    public boolean supportMultiColumn()
+    {
+        return false;
     }
 }

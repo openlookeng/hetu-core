@@ -24,6 +24,8 @@ import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.sql.parser.ParsingOptions;
+import io.prestosql.sql.parser.SqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -107,11 +109,11 @@ public class TestHeuristicIndexFactory
             assertNotNull(bloomIndex);
             assertNotNull(minMaxIndex);
 
-            assertTrue(bloomIndex.mightContain(22));
-            assertFalse(bloomIndex.mightContain(99));
+            assertTrue(bloomIndex.matches(new SqlParser().createExpression("(2 = 22)", new ParsingOptions())));
+            assertFalse(bloomIndex.matches(new SqlParser().createExpression("(2 = 99)", new ParsingOptions())));
 
-            assertTrue(minMaxIndex.lessThan(25));
-            assertFalse(minMaxIndex.lessThan(15));
+            assertTrue(minMaxIndex.matches(new SqlParser().createExpression("(2 < 25)", new ParsingOptions())));
+            assertFalse(minMaxIndex.matches(new SqlParser().createExpression("(2 < 15)", new ParsingOptions())));
         }
     }
 

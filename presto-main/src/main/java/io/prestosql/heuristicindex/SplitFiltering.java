@@ -12,62 +12,164 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.utils;
+package io.prestosql.heuristicindex;
 
+import com.google.common.cache.CacheLoader;
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
+import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.metadata.Split;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.split.SplitSource;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.DecimalLiteral;
-import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
-import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.NotExpression;
-import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
-import io.prestosql.sql.tree.TimeLiteral;
-import io.prestosql.sql.tree.TimestampLiteral;
+import io.prestosql.utils.RangeUtil;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
-public class PredicateExtractor
+public class SplitFiltering
 {
-    private static final Logger LOG = Logger.get(PredicateExtractor.class);
+    private static final Logger LOG = Logger.get(SplitFiltering.class);
+    private static final AtomicLong totalSplitsProcessed = new AtomicLong();
+    private static final AtomicLong splitsFiltered = new AtomicLong();
+    private static final List<String> INDEX_ORDER = ImmutableList.of("MINMAX", "BLOOM");
+    private static IndexCache indexCache;
 
-    public static class Tuple<T1, T2>
+    private SplitFiltering()
     {
-        public final T1 first;
-        public final T2 second;
+    }
 
-        public Tuple(T1 v1, T2 v2)
-        {
-            first = v1;
-            second = v2;
+    private static synchronized void initCache(IndexClient indexClient)
+    {
+        if (indexCache == null) {
+            CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new IndexCacheLoader(indexClient);
+            indexCache = new IndexCache(cacheLoader);
         }
     }
 
-    private PredicateExtractor()
+    public static List<Split> getFilteredSplit(Optional<Expression> expression, Optional<String> tableName, Map<Symbol, ColumnHandle> assignments,
+            SplitSource.SplitBatch nextSplits, HeuristicIndexerManager heuristicIndexerManager)
     {
+        if (!expression.isPresent() || !tableName.isPresent()) {
+            return nextSplits.getSplits();
+        }
+
+        if (indexCache == null) {
+            initCache(heuristicIndexerManager.getIndexClient());
+        }
+
+        List<Split> allSplits = nextSplits.getSplits();
+        String fullQualifiedTableName = tableName.get();
+        long initialSplitsSize = allSplits.size();
+
+        // apply filtering use heuristic indexes
+        List<Split> splitsToReturn = splitFiltering(expression.get(), allSplits, fullQualifiedTableName, assignments, heuristicIndexerManager);
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("totalSplitsProcessed: " + totalSplitsProcessed.addAndGet(initialSplitsSize));
+            LOG.debug("splitsFiltered: " + splitsFiltered.addAndGet(initialSplitsSize - splitsToReturn.size()));
+        }
+
+        return splitsToReturn;
+    }
+
+    private static List<Split> splitFiltering(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments, HeuristicIndexerManager indexerManager)
+    {
+        Set<String> referencedColumns = new HashSet<>();
+        getAllColumns(expression, referencedColumns, assignments);
+        return inputSplits.parallelStream()
+                .filter(split -> {
+                    Map<String, List<IndexMetadata>> allIndices = new HashMap<>();
+
+                    for (String col : referencedColumns) {
+                        List<IndexMetadata> splitIndices = indexCache.getIndices(fullQualifiedTableName, col, split);
+
+                        if (splitIndices == null || splitIndices.size() == 0) {
+                            // no index found, keep split
+                            return true;
+                        }
+
+                        // Group each type of index together and make sure they are sorted in ascending order
+                        // with respect to their SplitStart
+                        Map<String, List<IndexMetadata>> indexGroupMap = new HashMap<>();
+                        for (IndexMetadata splitIndex : splitIndices) {
+                            List<IndexMetadata> indexGroup = indexGroupMap.get(splitIndex.getIndex().getId());
+                            if (indexGroup == null) {
+                                indexGroup = new ArrayList<>();
+                                indexGroupMap.put(splitIndex.getIndex().getId(), indexGroup);
+                            }
+
+                            insert(indexGroup, splitIndex);
+                        }
+
+                        List<String> sortedIndexTypeKeys = new LinkedList<>(indexGroupMap.keySet());
+                        sortedIndexTypeKeys.sort(Comparator.comparingInt(e -> INDEX_ORDER.contains(e) ? INDEX_ORDER.indexOf(e) : Integer.MAX_VALUE));
+
+                        for (String indexTypeKey : sortedIndexTypeKeys) {
+                            List<IndexMetadata> validIndices = indexGroupMap.get(indexTypeKey);
+                            if (validIndices != null) {
+                                validIndices = RangeUtil.subArray(validIndices, split.getConnectorSplit().getStartIndex(), split.getConnectorSplit().getEndIndex());
+                                List<IndexMetadata> indicesOfCol = allIndices.getOrDefault(col, new LinkedList<>());
+                                indicesOfCol.addAll(validIndices);
+                                allIndices.put(col, indicesOfCol);
+                            }
+                        }
+                    }
+
+                    return indexerManager.getIndexFilter(allIndices).matches(expression);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Performs list insertion that guarantees SplitStart are sorted in ascending order
+     * Cannot assure order when two SplitStarts are the same
+     *
+     * @param list List to be inserted element obj
+     * @param obj SplitIndexMetadata to be inserted to the list
+     */
+    private static void insert(List<IndexMetadata> list, IndexMetadata obj)
+    {
+        int listSize = list.size();
+        // If there's no element, just insert it
+        if (listSize == 0) {
+            list.add(obj);
+            return;
+        }
+
+        long splitStart = obj.getSplitStart();
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (list.get(i).getSplitStart() <= splitStart) {
+                list.add(i + 1, obj);
+                return;
+            }
+        }
     }
 
     private static List<PlanNode> getFilterNode(SqlStageExecution stage)
@@ -253,56 +355,39 @@ public class PredicateExtractor
         return Optional.of(fullQualifiedTableName);
     }
 
-    protected static Predicate processComparisonExpression(ComparisonExpression comparisonExpression, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
+    public static void getAllColumns(Expression expression, Set<String> columns, Map<Symbol, ColumnHandle> assignments)
     {
-        Predicate pred = null;
-        switch (comparisonExpression.getOperator()) {
-            case EQUAL:
-            case GREATER_THAN:
-            case LESS_THAN:
-            case LESS_THAN_OR_EQUAL:
-            case GREATER_THAN_OR_EQUAL:
-                pred = buildPredicate(comparisonExpression, fullQualifiedTableName, assignments);
-                break;
-            default:
-                LOG.warn("ComparisonExpression %s, not supported", comparisonExpression.getOperator().toString());
-                break;
+        if (expression instanceof ComparisonExpression || expression instanceof BetweenPredicate || expression instanceof InPredicate) {
+            Expression leftExpression;
+            if (expression instanceof ComparisonExpression) {
+                leftExpression = extractExpression(((ComparisonExpression) expression).getLeft());
+            }
+            else if (expression instanceof BetweenPredicate) {
+                leftExpression = extractExpression(((BetweenPredicate) expression).getValue());
+            }
+            else {
+                // InPredicate
+                leftExpression = extractExpression(((InPredicate) expression).getValue());
+            }
+
+            if (!(leftExpression instanceof SymbolReference)) {
+                LOG.warn("Invalid Left of expression %s, should be an SymbolReference", leftExpression.toString());
+                return;
+            }
+            String columnName = ((SymbolReference) leftExpression).getName();
+            Symbol columnSymbol = new Symbol(columnName);
+            if (assignments.containsKey(columnSymbol)) {
+                columnName = assignments.get(columnSymbol).getColumnName();
+            }
+            columns.add(columnName);
+            return;
         }
-        return pred;
-    }
 
-    private static Predicate buildPredicate(ComparisonExpression expression, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments)
-    {
-        Predicate predicate = new Predicate();
-        predicate.setTableName(fullQualifiedTableName);
-
-        Expression leftExpression = extractExpression(expression.getLeft());
-
-        // if not SymbolReference, return null or throw PrestoException
-        // skip the predicate
-        if (leftExpression instanceof SymbolReference == false) {
-            LOG.warn("Invalid Left of expression %s, should be an SymbolReference", leftExpression.toString());
-            return null;
+        if (expression instanceof LogicalBinaryExpression) {
+            LogicalBinaryExpression lbe = (LogicalBinaryExpression) expression;
+            getAllColumns(lbe.getLeft(), columns, assignments);
+            getAllColumns(lbe.getRight(), columns, assignments);
         }
-        String columnName = ((SymbolReference) leftExpression).getName();
-        Symbol columnSymbol = new Symbol(columnName);
-        if (assignments.containsKey(columnSymbol)) {
-            columnName = assignments.get(columnSymbol).getColumnName();
-        }
-        predicate.setColumnName(columnName);
-
-        // Get column value type
-        Expression rightExpression = expression.getRight();
-        Object object = extract(rightExpression);
-        if (object == null) {
-            return null;
-        }
-        predicate.setValue(object);
-
-        // set compare operator
-        predicate.setOperator(expression.getOperator());
-
-        return predicate;
     }
 
     private static Expression extractExpression(Expression expression)
@@ -316,65 +401,15 @@ public class PredicateExtractor
         }
     }
 
-    private static Object extract(Expression expression)
+    public static class Tuple<T1, T2>
     {
-        if (expression instanceof Cast) {
-            return extract(((Cast) expression).getExpression());
-        }
-        else if (expression instanceof BooleanLiteral) {
-            Boolean value = ((BooleanLiteral) expression).getValue();
-            return value;
-        }
-        else if (expression instanceof DecimalLiteral) {
-            String value = ((DecimalLiteral) expression).getValue();
-            return new BigDecimal(value);
-        }
-        else if (expression instanceof DoubleLiteral) {
-            double value = ((DoubleLiteral) expression).getValue();
-            return value;
-        }
-        else if (expression instanceof LongLiteral) {
-            Long value = ((LongLiteral) expression).getValue();
-            return value;
-        }
-        else if (expression instanceof StringLiteral) {
-            String value = ((StringLiteral) expression).getValue();
-            return value;
-        }
-        else if (expression instanceof TimeLiteral) {
-            String value = ((TimeLiteral) expression).getValue();
-            return value;
-        }
-        else if (expression instanceof TimestampLiteral) {
-            String value = ((TimestampLiteral) expression).getValue();
-            return Timestamp.valueOf(value).getTime();
-        }
-        else if (expression instanceof GenericLiteral) {
-            GenericLiteral genericLiteral = (GenericLiteral) expression;
+        public final T1 first;
+        public final T2 second;
 
-            if (genericLiteral.getType().equalsIgnoreCase("bigint")) {
-                return Long.valueOf(genericLiteral.getValue());
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("real")) {
-                return (long) Float.floatToIntBits(Float.parseFloat(genericLiteral.getValue()));
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("tinyint")) {
-                return Byte.valueOf(genericLiteral.getValue()).longValue();
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("smallint")) {
-                return Short.valueOf(genericLiteral.getValue()).longValue();
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("date")) {
-                return LocalDate.parse(genericLiteral.getValue()).toEpochDay();
-            }
-            else {
-                LOG.warn("Not Implemented Exception: %s", genericLiteral.toString());
-                return null;
-            }
-        }
-        else {
-            LOG.warn("Not Implemented Exception: %s", expression.toString());
-            return null;
+        public Tuple(T1 v1, T2 v2)
+        {
+            first = v1;
+            second = v2;
         }
     }
 }

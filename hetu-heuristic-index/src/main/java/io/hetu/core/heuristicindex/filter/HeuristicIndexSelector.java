@@ -12,11 +12,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.heuristicindex;
+
+package io.hetu.core.heuristicindex.filter;
+
+import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
 
-public interface Filter<R, T>
+public class HeuristicIndexSelector
 {
-    List<R> filter(List<R> containers, T value);
+    private HeuristicIndexSelector()
+    {
+    }
+
+    public static List<IndexMetadata> select(Expression expression, List<IndexMetadata> candidates)
+    {
+        return candidates;
+    }
 }

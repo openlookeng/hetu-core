@@ -140,8 +140,8 @@ public class CsvDataSource
                     if (Class.forName(types[i]).equals(String.class)) {
                         values.add(columns[i]);
                     }
-                    else if (Class.forName(types[i]).equals(Integer.class)) {
-                        values.add(Integer.valueOf(columns[i]));
+                    else if (Class.forName(types[i]).equals(Long.class)) {
+                        values.add(Long.valueOf(columns[i]));
                     }
                 }
             }

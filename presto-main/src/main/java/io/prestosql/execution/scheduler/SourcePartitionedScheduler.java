@@ -26,6 +26,7 @@ import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.scheduler.FixedSourcePartitionedScheduler.BucketedSplitPlacementPolicy;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
+import io.prestosql.heuristicindex.SplitFiltering;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -36,8 +37,6 @@ import io.prestosql.split.SplitSource.SplitBatch;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.utils.PredicateExtractor;
-import io.prestosql.utils.SplitUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -232,7 +231,7 @@ public class SourcePartitionedScheduler
         boolean anyBlockedOnPlacements = false;
         boolean anyBlockedOnNextSplitBatch = false;
         boolean anyNotBlocked = false;
-        boolean applyFilter = isHeuristicIndexFilterEnabled(session) && PredicateExtractor.isSplitFilterApplicable(stage);
+        boolean applyFilter = isHeuristicIndexFilterEnabled(session) && SplitFiltering.isSplitFilterApplicable(stage);
 
         for (Entry<Lifespan, ScheduleGroup> entry : scheduleGroups.entrySet()) {
             Lifespan lifespan = entry.getKey();
@@ -256,9 +255,9 @@ public class SourcePartitionedScheduler
                     scheduleGroup.nextSplitBatchFuture = null;
 
                     // add split filter to filter out split has no valid rows
-                    PredicateExtractor.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = PredicateExtractor.getExpression(stage);
-                    List<Split> filteredSplit = applyFilter ? SplitUtils.getFilteredSplit(pair.first,
-                            PredicateExtractor.getFullyQualifiedName(stage), pair.second, nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
+                    SplitFiltering.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
+                    List<Split> filteredSplit = applyFilter ? SplitFiltering.getFilteredSplit(pair.first,
+                            SplitFiltering.getFullyQualifiedName(stage), pair.second, nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
                     pendingSplits.addAll(filteredSplit);
                     if (nextSplits.isLastBatch()) {

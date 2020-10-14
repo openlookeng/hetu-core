@@ -17,6 +17,8 @@ package io.prestosql.spi.heuristicindex;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 public interface IndexFactory
@@ -42,4 +44,6 @@ public interface IndexFactory
      * @return An IndexClient which has the IndexStore configured
      */
     public IndexClient getIndexClient(HetuFileSystemClient fs, Path root);
+
+    public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices);
 }

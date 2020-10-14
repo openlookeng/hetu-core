@@ -16,9 +16,10 @@ package io.prestosql.spi.heuristicindex;
 
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Map;
+import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
 
@@ -36,33 +37,49 @@ public class TestIndexMetadata
             }
 
             @Override
-            public void addValues(Object[] values)
-            {
-                //do nothing
-            }
-
-            @Override
-            public boolean matches(Object value, Operator operator) throws IllegalArgumentException
+            public boolean addValues(Map values)
             {
                 return false;
             }
 
             @Override
-            public boolean supports(Operator operator)
+            public boolean matches(Object expression)
             {
                 return false;
             }
 
             @Override
-            public void persist(OutputStream out) throws IOException
+            public void serialize(OutputStream os)
             {
-                //do nothing
             }
 
             @Override
-            public void load(InputStream in) throws IOException
+            public Index deserialize(InputStream is)
             {
-                //do nothing
+                return this;
+            }
+
+            @Override
+            public Index intersect(Index another)
+            {
+                return null;
+            }
+
+            @Override
+            public Index union(Index another)
+            {
+                return null;
+            }
+
+            @Override
+            public Properties getProperties()
+            {
+                return null;
+            }
+
+            @Override
+            public void setProperties(Properties properties)
+            {
             }
 
             @Override
@@ -75,10 +92,27 @@ public class TestIndexMetadata
             public void setExpectedNumOfEntries(int expectedNumOfEntries)
             {
             }
+
+            @Override
+            public long getMemorySize()
+            {
+                return 0;
+            }
+
+            @Override
+            public void setMemorySize(long memorySize)
+            {
+            }
+
+            @Override
+            public boolean supportMultiColumn()
+            {
+                return false;
+            }
         };
 
         String table = "table";
-        String column = "column";
+        String[] columns = new String[] {"columns"};
         String rootUri = "/tmp";
         String uri = "foo";
         long splitStart = 10;
@@ -87,17 +121,17 @@ public class TestIndexMetadata
         IndexMetadata indexMetadata = new IndexMetadata(
                 index,
                 table,
-                column,
+                columns,
                 rootUri,
                 uri,
                 splitStart,
                 lastUpdated);
         assertEquals(indexMetadata.getIndex(), index);
         assertEquals(indexMetadata.getTable(), table);
-        assertEquals(indexMetadata.getColumn(), column);
+        assertEquals(indexMetadata.getColumns(), columns);
         assertEquals(indexMetadata.getRootUri(), rootUri);
         assertEquals(indexMetadata.getUri(), uri);
         assertEquals(indexMetadata.getSplitStart(), splitStart);
-        assertEquals(indexMetadata.getLastUpdated(), lastUpdated);
+        assertEquals(indexMetadata.getLastModifiedTime(), lastUpdated);
     }
 }

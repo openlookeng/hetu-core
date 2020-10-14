@@ -116,7 +116,7 @@ public class IndexCache
                 // if key was present in cache, we still need to check if the index is validate based on the lastModifiedTime
                 // the index is only valid if the lastModifiedTime of the split matches the index's lastModifiedTime
                 for (IndexMetadata index : indexOfThisType) {
-                    if (index.getLastUpdated() != lastModifiedTime) {
+                    if (index.getLastModifiedTime() != lastModifiedTime) {
                         cache.invalidate(filterKey);
                         indexOfThisType = Collections.emptyList();
                         break;

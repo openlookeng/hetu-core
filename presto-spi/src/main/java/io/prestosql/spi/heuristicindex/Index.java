@@ -43,69 +43,34 @@ public interface Index<T>
     /**
      * Adds the given values to the index.
      *
-     * @param values values to add
+     * @param values a map of columnName-columnValues
+     * @return whether the values are successfully added
      */
-    void addValues(T[] values);
+    boolean addValues(Map<String, Object[]> values);
 
     /**
-     * <pre>
-     * If the provided value matches the operator for this Index.
+     * The Index will apply the provided Expression but only return a
+     * boolean indicating whether the Expression matches any values in the index.
      *
-     * Each Index type will support different types of operations,
-     * for example, a search index like Bloom will support the Equality (=) operator,
-     * but another index like MinMax may support multiple operators
-     * Greater than (>), Less than (<), etc.
-     *
-     * This method allows the Index implementation to decide how to check if the
-     * index matches the provided value.
-     *
-     * Use Index#supports to check which operators are supported by the Index.
-     * </pre>
-     *
-     * @param value    Thing being searched for in the index
-     * @param operator Condition being applied in the search (ie, =, > , =>)
-     * @return true if the value matches
-     * the operator
-     * @throws IllegalArgumentException if operator is not supported
+     * @param expression the expression to apply
+     * @return whether the expression result contains
      */
-    boolean matches(T value, Operator operator) throws IllegalArgumentException;
+    boolean matches(Object expression);
 
     /**
-     * Get an iterator over all values matching the filter
-     *
-     * @param filter the filter to apply
-     * @param <I>    type of the list returned
-     * @return list of type I
-     */
-    default <I> Iterator<I> getMatches(Object filter)
-    {
-        return null;
-    }
-
-    /**
-     * Apply predicates on multiple index objects and intersect the result.
+     * Given an Expression, the Index should apply it and return the matching positions.
+     * For example given a > 5, a Bitmap index will return all positions that match.
      * <p>
-     * The current object should be included in the map if it should
-     * have a filter applied on it.
-     * <p>
-     * The Index objects provided should all be the same type.
+     * Not all Index implementations will support this, for example a BloomIndex does not return positions,
+     * instead it will implement the matches() method.
      *
-     * @param indexToPredicate list of indexes and their predicates
-     * @param <I>              type of list to return
-     * @return list of type I
+     * @param expression the expression to apply
+     * @return the Iterator of positions that matches the expression result
      */
-    default <I> Iterator<I> getMatches(Map<Index, Object> indexToPredicate)
+    default <I> Iterator<I> lookUp(Object expression)
     {
-        return null;
+        throw new UnsupportedOperationException(String.format("The current index type %s does not support lookUp() operation.", getId()));
     }
-
-    /**
-     * Returns true if the index Supports the operator, false otherwise
-     *
-     * @param operator Enum storing the operator (ie, =,<,=<)
-     * @return true if the Index supports the operator
-     */
-    boolean supports(Operator operator);
 
     /**
      * <pre>
@@ -118,7 +83,8 @@ public interface Index<T>
      * @param out OutputStream to write index to
      * @throws IOException In the case that an error with the filesystem occurs
      */
-    void persist(OutputStream out) throws IOException;
+    void serialize(OutputStream out)
+            throws IOException;
 
     /**
      * <pre>
@@ -131,7 +97,30 @@ public interface Index<T>
      * @param in InputStream to read index from
      * @throws IOException In the case that an error with the filesystem occurs
      */
-    void load(InputStream in) throws IOException;
+    Index deserialize(InputStream in)
+            throws IOException;
+
+    /**
+     * Intersect this index with another index and return the intersection index object.
+     *
+     * @param another another index to intersect with
+     * @return the intersect index
+     */
+    default Index intersect(Index another)
+    {
+        throw new UnsupportedOperationException(String.format("Intersect operation on %s index is not currently supported", getId()));
+    }
+
+    /**
+     * Union this index with another index and return the union index object.
+     *
+     * @param another another index to union with
+     * @return the union index
+     */
+    default Index union(Index another)
+    {
+        throw new UnsupportedOperationException(String.format("Union operation on %s index is not currently supported", getId()));
+    }
 
     /**
      * <pre>
@@ -198,4 +187,6 @@ public interface Index<T>
     default void setMemorySize(long memorySize)
     {
     }
+
+    boolean supportMultiColumn();
 }

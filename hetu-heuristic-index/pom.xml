@@ -13,6 +13,7 @@
     <packaging>hetu-plugin</packaging>
 
     <properties>
+        <air.check.skip-jacoco>false</air.check.skip-jacoco>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <air.check.fail-duplicate-finder>false</air.check.fail-duplicate-finder>
         <org.slf4j.version>1.7.30</org.slf4j.version>
@@ -230,6 +231,10 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-parser</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <scope>test</scope>
@@ -252,6 +257,10 @@
             <groupId>org.apache.thrift</groupId>
             <artifactId>libthrift</artifactId>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>log</artifactId>
         </dependency>
         <dependency>
             <groupId>org.testng</groupId>

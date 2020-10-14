@@ -85,6 +85,7 @@ public class PluginManager
             .add("io.hete.core.operator.scalar.")
             .add("io.hete.core.type.")
             .add("io.hete.core.util.")
+            .add("io.prestosql.sql.tree.")
             .build();
 
     private static final Logger log = Logger.get(PluginManager.class);

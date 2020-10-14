@@ -14,8 +14,14 @@
  */
 package io.hetu.core.plugin.heuristicindex.index.bloom;
 
+import com.google.common.collect.ImmutableMap;
 import io.hetu.core.common.filesystem.TempFolder;
-import io.prestosql.spi.heuristicindex.Operator;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.ValueSet;
+import io.prestosql.spi.type.Type;
+import io.prestosql.sql.parser.ParsingOptions;
+import io.prestosql.sql.parser.SqlParser;
+import io.prestosql.sql.tree.Expression;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -25,6 +31,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -41,69 +49,108 @@ public class TestBloomIndex
     }
 
     @Test
-    public void testFilterValues()
+    public void testMatches()
     {
-        // Test String bloom indexer
-        BloomIndex<String> stringBloomIndex = new BloomIndex<>();
-        String[] testValues = new String[]{"a", "ab", "测试", "\n", "%#!", ":dfs"};
-        stringBloomIndex.setExpectedNumOfEntries(testValues.length);
-        stringBloomIndex.addValues(testValues);
+        BloomIndex<String> bloomIndex = new BloomIndex<>();
+        String[] bloomValues = new String[] {"a", "b", "c", "d"};
+        bloomIndex.setExpectedNumOfEntries(bloomValues.length);
+        bloomIndex.addValues(ImmutableMap.of("testColumn", bloomValues));
 
-        assertTrue(stringBloomIndex.mightContain("a"));
-        assertTrue(stringBloomIndex.mightContain("ab"));
-        assertTrue(stringBloomIndex.mightContain("测试"));
-        assertTrue(stringBloomIndex.mightContain("\n"));
-        assertTrue(stringBloomIndex.mightContain("%#!"));
-        assertTrue(stringBloomIndex.mightContain(":dfs"));
-        assertFalse(stringBloomIndex.mightContain("random"));
-        assertFalse(stringBloomIndex.mightContain("abc"));
+        Expression expression1 = new SqlParser().createExpression("(testColumn = 'a')", new ParsingOptions());
+        Expression expression2 = new SqlParser().createExpression("(testColumn = 'e')", new ParsingOptions());
 
-        // Test with the generic type to be Object
-        BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-        testValues = new String[]{"a", "ab", "测试", "\n", "%#!", ":dfs"};
-        objectBloomIndex.addValues(testValues);
-
-        assertTrue(objectBloomIndex.mightContain("a"));
-        assertTrue(objectBloomIndex.mightContain("ab"));
-        assertTrue(objectBloomIndex.mightContain("测试"));
-        assertTrue(objectBloomIndex.mightContain("\n"));
-        assertTrue(objectBloomIndex.mightContain("%#!"));
-        assertTrue(objectBloomIndex.mightContain(":dfs"));
-        assertFalse(objectBloomIndex.mightContain("random"));
-        assertFalse(objectBloomIndex.mightContain("abc"));
-
-        // Test single insertion
-        BloomIndex<Object> simpleBloomIndex = new BloomIndex<>();
-        simpleBloomIndex.addValues(new String[]{"a"});
-        simpleBloomIndex.addValues(new String[]{"ab"});
-        simpleBloomIndex.addValues(new String[]{"测试"});
-        simpleBloomIndex.addValues(new String[]{"\n"});
-        simpleBloomIndex.addValues(new String[]{"%#!"});
-        simpleBloomIndex.addValues(new String[]{":dfs"});
-
-        assertTrue(simpleBloomIndex.mightContain("a"));
-        assertTrue(simpleBloomIndex.mightContain("ab"));
-        assertTrue(simpleBloomIndex.mightContain("测试"));
-        assertTrue(simpleBloomIndex.mightContain("\n"));
-        assertTrue(simpleBloomIndex.mightContain("%#!"));
-        assertTrue(simpleBloomIndex.mightContain(":dfs"));
-        assertFalse(simpleBloomIndex.mightContain("random"));
-        assertFalse(simpleBloomIndex.mightContain("abc"));
+        assertTrue(bloomIndex.matches(expression1));
+        assertFalse(bloomIndex.matches(expression2));
     }
 
     @Test
-    public void testPersist() throws IOException
+    public void testDomainMatching()
+    {
+        BloomIndex<String> stringBloomIndex = new BloomIndex<>();
+        String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+        stringBloomIndex.setExpectedNumOfEntries(testValues.length);
+        stringBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
+
+        ValueSet valueSet = mock(ValueSet.class);
+        Type mockType = mock(Type.class);
+        when(valueSet.isSingleValue()).thenReturn(true);
+        when(valueSet.getType()).thenReturn(mockType);
+
+        when(valueSet.getSingleValue()).thenReturn("a");
+        assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));
+
+        when(valueSet.getSingleValue()).thenReturn("%#!");
+        assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));
+
+        when(valueSet.getSingleValue()).thenReturn("bb");
+        assertFalse(stringBloomIndex.matches(Domain.create(valueSet, false)));
+    }
+
+    @Test
+    public void testMatching()
+    {
+        // Test String bloom indexer
+        BloomIndex<String> stringBloomIndex = new BloomIndex<>();
+        String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+        stringBloomIndex.setExpectedNumOfEntries(testValues.length);
+        stringBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
+
+        assertTrue(mightContain(stringBloomIndex, "a"));
+        assertTrue(mightContain(stringBloomIndex, "ab"));
+        assertTrue(mightContain(stringBloomIndex, "测试"));
+        assertTrue(mightContain(stringBloomIndex, "\n"));
+        assertTrue(mightContain(stringBloomIndex, "%#!"));
+        assertTrue(mightContain(stringBloomIndex, ":dfs"));
+        assertFalse(mightContain(stringBloomIndex, "random"));
+        assertFalse(mightContain(stringBloomIndex, "abc"));
+
+        // Test with the generic type to be Object
+        BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
+        testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+        objectBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
+
+        assertTrue(mightContain(objectBloomIndex, "a"));
+        assertTrue(mightContain(objectBloomIndex, "ab"));
+        assertTrue(mightContain(objectBloomIndex, "测试"));
+        assertTrue(mightContain(objectBloomIndex, "\n"));
+        assertTrue(mightContain(objectBloomIndex, "%#!"));
+        assertTrue(mightContain(objectBloomIndex, ":dfs"));
+        assertFalse(mightContain(objectBloomIndex, "random"));
+        assertFalse(mightContain(objectBloomIndex, "abc"));
+
+        // Test single insertion
+        BloomIndex<Object> simpleBloomIndex = new BloomIndex<>();
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"a"}));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"ab"}));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"测试"}));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"\n"}));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"%#!"}));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {":dfs"}));
+
+        assertTrue(mightContain(simpleBloomIndex, "a"));
+        assertTrue(mightContain(simpleBloomIndex, "ab"));
+        assertTrue(mightContain(simpleBloomIndex, "测试"));
+        assertTrue(mightContain(simpleBloomIndex, "\n"));
+        assertTrue(mightContain(simpleBloomIndex, "%#!"));
+        assertTrue(mightContain(simpleBloomIndex, ":dfs"));
+        assertFalse(mightContain(simpleBloomIndex, "random"));
+        assertFalse(mightContain(simpleBloomIndex, "abc"));
+    }
+
+    @Test
+    public void testPersist()
+            throws IOException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
             File testFile = folder.newFile();
 
             BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-            String[] testValues = new String[]{"%#!", ":dfs", "测试", "\n", "ab", "a"};
-            objectBloomIndex.addValues(testValues);
+            String[] testValues = new String[] {"%#!", ":dfs", "测试", "\n", "ab", "a"};
+            objectBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
 
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
-                objectBloomIndex.persist(fo);
+                objectBloomIndex.serialize(fo);
             }
             try (FileInputStream fi = new FileInputStream(testFile)) {
                 assertTrue(fi.available() != 0, "Persisted bloom index file is empty");
@@ -112,7 +159,8 @@ public class TestBloomIndex
     }
 
     @Test
-    public void testLoadEmpty() throws IOException
+    public void testLoadEmpty()
+            throws IOException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
@@ -120,13 +168,14 @@ public class TestBloomIndex
 
             BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
             try (InputStream is = new FileInputStream(testFile)) {
-                assertThrows(IOException.class, () -> objectBloomIndex.load(is));
+                assertThrows(IOException.class, () -> objectBloomIndex.deserialize(is));
             }
         }
     }
 
     @Test
-    public void testLoad() throws IOException
+    public void testLoad()
+            throws IOException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
@@ -134,36 +183,36 @@ public class TestBloomIndex
 
             // Persist it using one object
             BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-            String[] testValues = new String[]{"a", "ab", "测试", "\n", "%#!", ":dfs"};
-            objectBloomIndex.addValues(testValues);
+            String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+            objectBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
-                objectBloomIndex.persist(fo);
+                objectBloomIndex.serialize(fo);
             }
 
             // Load it using another object
             BloomIndex<String> readBloomIndex = new BloomIndex<>();
             try (FileInputStream fi = new FileInputStream(testFile)) {
-                readBloomIndex.load(fi);
+                readBloomIndex.deserialize(fi);
             }
             // Check the result validity
-            assertTrue(readBloomIndex.mightContain("a"));
-            assertTrue(readBloomIndex.mightContain("ab"));
-            assertTrue(readBloomIndex.mightContain("测试"));
-            assertTrue(readBloomIndex.mightContain("\n"));
-            assertTrue(readBloomIndex.mightContain("%#!"));
-            assertTrue(readBloomIndex.mightContain(":dfs"));
-            assertFalse(readBloomIndex.mightContain("random"));
-            assertFalse(readBloomIndex.mightContain("abc"));
+            assertTrue(mightContain(readBloomIndex, "a"));
+            assertTrue(mightContain(readBloomIndex, "ab"));
+            assertTrue(mightContain(readBloomIndex, "测试"));
+            assertTrue(mightContain(readBloomIndex, "\n"));
+            assertTrue(mightContain(readBloomIndex, "%#!"));
+            assertTrue(mightContain(readBloomIndex, ":dfs"));
+            assertFalse(mightContain(readBloomIndex, "random"));
+            assertFalse(mightContain(readBloomIndex, "abc"));
 
             // Load it using a weired object
             BloomIndex<Integer> intBloomIndex = new BloomIndex<>();
             try (FileInputStream fi = new FileInputStream(testFile)) {
-                intBloomIndex.load(fi);
+                intBloomIndex.deserialize(fi);
             }
-            assertFalse(intBloomIndex.mightContain(1));
-            assertFalse(intBloomIndex.mightContain(0));
-            assertFalse(intBloomIndex.mightContain(1000));
-            assertFalse(intBloomIndex.mightContain("a".hashCode()));
+            assertFalse(mightContain(intBloomIndex, 1));
+            assertFalse(mightContain(intBloomIndex, 0));
+            assertFalse(mightContain(intBloomIndex, 1000));
+            assertFalse(mightContain(intBloomIndex, "a".hashCode()));
         }
     }
 
@@ -187,45 +236,24 @@ public class TestBloomIndex
     }
 
     @Test
-    public void testSupports()
-    {
-        BloomIndex index = new BloomIndex();
-        assertTrue(index.supports(Operator.EQUAL));
-        assertFalse(index.supports(Operator.LESS_THAN));
-        assertFalse(index.supports(Operator.LESS_THAN_OR_EQUAL));
-        assertFalse(index.supports(Operator.GREATER_THAN));
-        assertFalse(index.supports(Operator.GREATER_THAN_OR_EQUAL));
-        assertFalse(index.supports(Operator.NOT_EQUAL));
-    }
-
-    @Test
-    public void testUnsupportedOperator()
-    {
-        BloomIndex index = new BloomIndex();
-        Integer[] testValues = new Integer[]{1, 2, 3};
-        index.addValues(testValues);
-        assertThrows(IllegalArgumentException.class, () -> index.matches(1, Operator.NOT_EQUAL));
-    }
-
-    @Test
     public void testSize()
     {
         // adding 3 values to default size should pass
         BloomIndex defaultSizedIndex = new BloomIndex();
         assertEquals(defaultSizedIndex.getExpectedNumOfEntries(), BloomIndex.DEFAULT_EXPECTED_NUM_OF_SIZE);
-        defaultSizedIndex.addValues(new Float[]{1f, 2f, 3f});
+        defaultSizedIndex.addValues(ImmutableMap.of("testColumn", new Float[] {1f, 2f, 3f}));
 
         // adding 2 values to an index of size 2 should pass
         BloomIndex equalSizedIndex = new BloomIndex();
         equalSizedIndex.setExpectedNumOfEntries(2);
         assertEquals(equalSizedIndex.getExpectedNumOfEntries(), 2);
-        equalSizedIndex.addValues(new Float[]{1f, 2f});
+        equalSizedIndex.addValues(ImmutableMap.of("testColumn", new Float[] {1f, 2f}));
 
         // adding 3 values to an index of size 2 should pass (bloom doesn't have strict size limit)
         BloomIndex smallSizedIndex = new BloomIndex();
         smallSizedIndex.setExpectedNumOfEntries(2);
         assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
-        smallSizedIndex.addValues(new Float[]{1f, 2f, 3f});
+        smallSizedIndex.addValues(ImmutableMap.of("testColumn", new Float[] {1f, 2f, 3f}));
     }
 
     @Test
@@ -234,5 +262,11 @@ public class TestBloomIndex
         BloomIndex index = new BloomIndex();
         index.setMemorySize(10);
         assertEquals(index.getMemorySize(), 10);
+    }
+
+    private boolean mightContain(BloomIndex index, Object value)
+    {
+        Expression expression = new SqlParser().createExpression(String.format("(testColumn = '%s')", value), new ParsingOptions());
+        return index.matches(expression);
     }
 }

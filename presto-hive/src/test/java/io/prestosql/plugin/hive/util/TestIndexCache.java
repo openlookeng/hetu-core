@@ -91,7 +91,7 @@ public class TestIndexCache
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
-        when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
         Index index = mock(Index.class);
         when(indexMetadata.getIndex()).thenReturn(index);
@@ -115,7 +115,7 @@ public class TestIndexCache
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
-        when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
         Index index = mock(Index.class);
         when(indexMetadata.getIndex()).thenReturn(index);
@@ -140,7 +140,7 @@ public class TestIndexCache
         when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
-        when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
         Index index = mock(Index.class);
         when(indexMetadata.getIndex()).thenReturn(index);
@@ -173,7 +173,7 @@ public class TestIndexCache
 
         List<IndexMetadata> expectedIndices = new LinkedList<>();
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
-        when(indexMetadata.getLastUpdated()).thenReturn(testLastModifiedTime);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         expectedIndices.add(indexMetadata);
         Index index = mock(Index.class);
         when(indexMetadata.getIndex()).thenReturn(index);
@@ -203,7 +203,7 @@ public class TestIndexCache
         //get index for split1
         List<IndexMetadata> expectedIndices1 = new LinkedList<>();
         IndexMetadata indexMetadata1 = mock(IndexMetadata.class);
-        when(indexMetadata1.getLastUpdated()).thenReturn(testLastModifiedTime);
+        when(indexMetadata1.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         expectedIndices1.add(indexMetadata1);
         Index index1 = mock(Index.class);
         when(indexMetadata1.getIndex()).thenReturn(index1);
@@ -224,7 +224,7 @@ public class TestIndexCache
         when(testHiveSplit.getPath()).thenReturn(testPath2);
         List<IndexMetadata> expectedIndices2 = new LinkedList<>();
         IndexMetadata indexMetadata2 = mock(IndexMetadata.class);
-        when(indexMetadata2.getLastUpdated()).thenReturn(testLastModifiedTime);
+        when(indexMetadata2.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         expectedIndices2.add(indexMetadata2);
         Index index2 = mock(Index.class);
         when(indexMetadata2.getIndex()).thenReturn(index2);

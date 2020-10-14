@@ -15,6 +15,9 @@
 
 package io.prestosql.spi.heuristicindex;
 
+import java.util.Arrays;
+import java.util.Properties;
+
 /**
  * Metadata for each individual index of a split
  *
@@ -24,32 +27,37 @@ public class IndexMetadata
 {
     private final Index index;
     private final String table;
-    private final String column;
+    private final String[] columns;
     private final String rootUri;
     private final String uri;
+    private final Properties connectorMetadata;
     private final long splitStart;
-    private final long lastUpdated;
+    private final long lastModifiedTime;
+    private final String checksum = "";
+    private final long valueCount = 0L;
+    private final long valueCardinality = 0L;
 
     /**
      * Constructor
      *
-     * @param index         Type of index being applied
-     * @param table         Table name of split
-     * @param column        Column of split
-     * @param rootUri       Base location where all indexes are stored
-     * @param uri           Absolute location from where this split is stored
-     * @param splitStart    The byte offset that the split starts at
-     * @param lastUpdated   Creation time of the index for this split.
+     * @param index Type of index being applied
+     * @param table Table name of split
+     * @param columns Column of split
+     * @param rootUri Base location where all indexes are stored
+     * @param uri Absolute location from where this split is stored
+     * @param splitStart The byte offset that the split starts at
+     * @param lastModifiedTime Creation time of the index for this split.
      */
-    public IndexMetadata(Index index, String table, String column, String rootUri, String uri, long splitStart, long lastUpdated)
+    public IndexMetadata(Index index, String table, String[] columns, String rootUri, String uri, long splitStart, long lastModifiedTime)
     {
         this.index = index;
         this.table = table;
-        this.column = column;
+        this.columns = columns;
         this.rootUri = rootUri;
         this.uri = uri;
         this.splitStart = splitStart;
-        this.lastUpdated = lastUpdated;
+        this.lastModifiedTime = lastModifiedTime;
+        this.connectorMetadata = new Properties();
     }
 
     public String getTable()
@@ -57,9 +65,9 @@ public class IndexMetadata
         return table;
     }
 
-    public String getColumn()
+    public String[] getColumns()
     {
-        return column;
+        return columns;
     }
 
     public String getRootUri()
@@ -82,9 +90,19 @@ public class IndexMetadata
         return index;
     }
 
-    public long getLastUpdated()
+    public long getLastModifiedTime()
     {
-        return lastUpdated;
+        return lastModifiedTime;
+    }
+
+    public String getConnectorMetadata(String key)
+    {
+        return connectorMetadata.getProperty(key);
+    }
+
+    public void setConnectorMetadata(String key, String value)
+    {
+        connectorMetadata.setProperty(key, value);
     }
 
     @Override
@@ -93,11 +111,11 @@ public class IndexMetadata
         return "SplitIndexMetadata{" +
                 "index=" + index +
                 ", table='" + table + '\'' +
-                ", column='" + column + '\'' +
+                ", column='" + Arrays.toString(columns) + '\'' +
                 ", rootUri='" + rootUri + '\'' +
                 ", uri='" + uri + '\'' +
                 ", splitStart=" + splitStart +
-                ", lastUpdated=" + lastUpdated +
+                ", lastUpdated=" + lastModifiedTime +
                 '}';
     }
 }

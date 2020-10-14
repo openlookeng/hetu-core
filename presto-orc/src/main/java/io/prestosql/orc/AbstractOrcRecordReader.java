@@ -25,6 +25,7 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
+import io.hetu.core.common.algorithm.SequenceUtils;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
@@ -309,7 +310,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             Domain columnDomain = domainEntry.getValue();
 
             // if the index exists, there should only be one index for this column within this stripe
-            List<IndexMetadata> indexMetadata = stripeIndex.stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
+            List<IndexMetadata> indexMetadata = stripeIndex.stream().filter(p -> p.getColumns()[0].equalsIgnoreCase(columnName)).collect(Collectors.toList());
             if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
                 continue;
             }
@@ -323,7 +324,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             List<Domain> columnDomain = domainEntry.getValue();
 
             // if the index exists, there should only be one index for this column within this stripe
-            List<IndexMetadata> indexMetadata = stripeIndex.stream().filter(p -> p.getColumn().equalsIgnoreCase(columnName)).collect(Collectors.toList());
+            List<IndexMetadata> indexMetadata = stripeIndex.stream().filter(p -> p.getColumns()[0].equalsIgnoreCase(columnName)).collect(Collectors.toList());
             if (indexMetadata.isEmpty() || indexMetadata.size() > 1) {
                 continue;
             }
@@ -333,26 +334,42 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
 
         if (!andDomainMap.isEmpty()) {
-            Iterator<Integer> thisStripeMatchingRows = ((andDomainMap.entrySet().iterator().next()).getKey()).getMatches(andDomainMap);
-            if (thisStripeMatchingRows != null && thisStripeMatchingRows.hasNext()) {
-                PeekingIterator<Integer> peekingIterator = Iterators.peekingIterator(thisStripeMatchingRows);
-                if (peekingIterator.peek() != null) {
-                    this.stripeMatchingRows.put(stripe, peekingIterator);
+            List<Iterator<Integer>> matchings = new ArrayList<>(andDomainMap.size());
+            for (Map.Entry<Index, Domain> e : andDomainMap.entrySet()) {
+                try {
+                    matchings.add(e.getKey().lookUp(e.getValue()));
                 }
-                return false;
+                catch (UnsupportedOperationException uoe) {
+                    if (!e.getKey().matches(e.getValue())) {
+                        return true;
+                    }
+                }
             }
-            return true;
+            if (!matchings.isEmpty()) {
+                Iterator<Integer> thisStripeMatchingRows = SequenceUtils.intersect(matchings);
+                PeekingIterator<Integer> peekingIterator = Iterators.peekingIterator(thisStripeMatchingRows);
+                this.stripeMatchingRows.put(stripe, peekingIterator);
+            }
+            return false;
         }
         if (!orDomainMap.isEmpty()) {
-            for (Map.Entry<Index, Domain> indexDomainEntry : orDomainMap.entrySet()) {
-                Iterator<Integer> thisStripeMatchingRows = (indexDomainEntry.getKey()).getMatches(indexDomainEntry.getValue());
-                if (thisStripeMatchingRows != null && thisStripeMatchingRows.hasNext()) {
-                    /* any one matched; then include the stripe */
-                    return false;
+            for (Map.Entry<Index, Domain> e : orDomainMap.entrySet()) {
+                try {
+                    Iterator<Integer> thisStripeMatchingRows = e.getKey().lookUp(e.getValue());
+                    if (thisStripeMatchingRows.hasNext()) {
+                        /* any one matched; then include the stripe */
+                        return false;
+                    }
+                }
+                catch (UnsupportedOperationException uoe) {
+                    if (!e.getKey().matches(e.getValue())) {
+                        return false;
+                    }
                 }
             }
             return true;
         }
+
         return false;
     }
 
