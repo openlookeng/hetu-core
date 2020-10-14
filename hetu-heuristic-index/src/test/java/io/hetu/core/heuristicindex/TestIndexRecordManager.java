@@ -110,6 +110,7 @@ public class TestIndexRecordManager
             throws IllegalAccessException
     {
         for (Field field : actual.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
             assertEquals(field.get(actual), field.get(expected));
         }
     }

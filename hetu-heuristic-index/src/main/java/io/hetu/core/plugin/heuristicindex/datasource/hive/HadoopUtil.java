@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import static io.hetu.core.plugin.heuristicindex.datasource.hive.ConstantsHelper.KRB5_CONF_KEY;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -86,8 +87,10 @@ public class HadoopUtil
 
             IndexServiceUtils.isFileExisting(keytabFile);
 
-            String krb5ConfigFile = properties.getProperty(ConstantsHelper.HIVE_METASTORE_KRB5_CONF);
-            requireNonNull(krb5ConfigFile, "kerberos authentication was enabled but no krb5.conf found ");
+            String krb5ConfigFile = properties.getProperty(ConstantsHelper.HIVE_METASTORE_KRB5_CONF, System.getProperty(KRB5_CONF_KEY));
+            requireNonNull(krb5ConfigFile, "kerberos authentication was enabled but no krb5.conf found. " +
+                    "Either " + ConstantsHelper.HIVE_METASTORE_KRB5_CONF + " must be set in the catalog file or " +
+                    KRB5_CONF_KEY + " system property must be set.");
 
             IndexServiceUtils.isFileExisting(krb5ConfigFile);
 
