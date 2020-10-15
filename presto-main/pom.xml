@@ -67,6 +67,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-matching</artifactId>
         </dependency>
