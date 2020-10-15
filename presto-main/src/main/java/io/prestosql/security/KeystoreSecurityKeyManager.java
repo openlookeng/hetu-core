@@ -20,6 +20,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.security.SecurityKeyException;
 import io.prestosql.spi.security.SecurityKeyManager;
+import org.codehaus.plexus.util.IOUtil;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -188,18 +189,8 @@ public class KeystoreSecurityKeyManager
             throw new SecurityKeyException(format("error in I/O: fail to delete alias[%s] from keystore.", catalogName));
         }
         finally {
-            try (InputStream inputStreamRelease = inputStream;
-                    OutputStream outputStreamRelease = outputStream) {
-                if (inputStreamRelease != null) {
-                    inputStreamRelease.close();
-                }
-                if (outputStreamRelease != null) {
-                    outputStreamRelease.close();
-                }
-            }
-            catch (IOException e) {
-                // do nothing
-            }
+            IOUtil.close(inputStream);
+            IOUtil.close(outputStream);
         }
     }
 
@@ -244,18 +235,8 @@ public class KeystoreSecurityKeyManager
             throw new SecurityKeyException("error in I/O: create file failed.");
         }
         finally {
-            try (InputStream inputStreamRelease = inputStream;
-                    OutputStream outputStreamRelease = outputStream) {
-                if (inputStreamRelease != null) {
-                    inputStreamRelease.close();
-                }
-                if (outputStreamRelease != null) {
-                    outputStreamRelease.close();
-                }
-            }
-            catch (IOException e) {
-                // do nothing
-            }
+            IOUtil.close(inputStream);
+            IOUtil.close(outputStream);
         }
     }
 
