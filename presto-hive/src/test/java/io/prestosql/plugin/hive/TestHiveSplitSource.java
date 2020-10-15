@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
+import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
@@ -27,6 +28,7 @@ import io.prestosql.spi.type.TypeManager;
 import io.prestosql.testing.TestingConnectorSession;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -62,7 +64,8 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null, new HiveConfig());
+                null, null, new HiveConfig(),
+                HiveStorageFormat.ORC);
 
         // add 10 splits
         for (int i = 0; i < 10; i++) {
@@ -98,7 +101,8 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null, new HiveConfig());
+                null, null, new HiveConfig(),
+                HiveStorageFormat.ORC);
 
         // add some splits
         for (int i = 0; i < 5; i++) {
@@ -158,7 +162,8 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null, new HiveConfig());
+                null, null, new HiveConfig(),
+                HiveStorageFormat.ORC);
 
         final SettableFuture<ConnectorSplit> splits = SettableFuture.create();
 
@@ -219,7 +224,8 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null, new HiveConfig());
+                null, null, new HiveConfig(),
+                HiveStorageFormat.ORC);
         int testSplitSizeInBytes = new TestSplit(0).getEstimatedSizeInBytes();
 
         int maxSplitCount = toIntExact(maxOutstandingSplitsSize.toBytes()) / testSplitSizeInBytes;
@@ -258,7 +264,8 @@ public class TestHiveSplitSource
                 Executors.newFixedThreadPool(5),
                 new CounterStat(),
                 null,
-                null, null, new HiveConfig());
+                null, null, new HiveConfig(),
+                HiveStorageFormat.ORC);
         hiveSplitSource.addToQueue(new TestSplit(0, OptionalInt.of(2)));
         hiveSplitSource.noMoreSplits();
         assertEquals(getSplits(hiveSplitSource, OptionalInt.of(0), 10).size(), 0);
@@ -288,7 +295,8 @@ public class TestHiveSplitSource
                 createTestDynamicFilterSupplier("pt_d", ImmutableList.of(1L)),
                 null,
                 typeManager,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
 
         for (int i = 0; i < 5; i++) {
             hiveSplitSource.addToQueue(new TestPartitionSplit(2 * i, ImmutableList.of(new HivePartitionKey("pt_d", "0")), "pt_d=0"));
@@ -331,23 +339,33 @@ public class TestHiveSplitSource
     private static class TestSplit
             extends InternalHiveSplit
     {
+        private TestSplit(int id, List<HostAddress> hostAddress)
+        {
+            this(id, OptionalInt.empty(), 100, hostAddress);
+        }
+
         private TestSplit(int id)
         {
-            this(id, OptionalInt.empty());
+            this(id, OptionalInt.empty(), 100, ImmutableList.of());
         }
 
         private TestSplit(int id, OptionalInt bucketNumber)
+        {
+            this(id, bucketNumber, 100, ImmutableList.of());
+        }
+
+        private TestSplit(int id, OptionalInt bucketNumber, long fileSize, List<HostAddress> hostAddress)
         {
             super(
                     "partition-name",
                     "path",
                     0,
                     100,
-                    100,
+                    fileSize,
                     0,
                     properties("id", String.valueOf(id)),
                     ImmutableList.of(),
-                    ImmutableList.of(new InternalHiveBlock(0, 100, ImmutableList.of())),
+                    ImmutableList.of(new InternalHiveBlock(0, 100, hostAddress)),
                     bucketNumber,
                     true,
                     false,
@@ -401,6 +419,433 @@ public class TestHiveSplitSource
             Properties properties = new Properties();
             properties.put(key, value);
             return properties;
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplit()
+    {
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(10);
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        List<HostAddress> hostAddress = new ArrayList<>();
+        hostAddress.add(new HostAddress("vm1", 1));
+        hostAddress.add(new HostAddress("vm3", 1));
+        hostAddress.add(new HostAddress("vm2", 1));
+
+        for (int i = 0; i < 12; i++) {
+            hiveSplitSource.addToQueue(new TestSplit(i, hostAddress));
+            assertEquals(hiveSplitSource.getBufferedInternalSplitCount(), i + 1);
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 3);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        assertEquals(hiveSplitWrappers.get(0).getSplits().size(), 4);
+        assertEquals(hiveSplitWrappers.get(1).getSplits().size(), 4);
+        assertEquals(hiveSplitWrappers.get(2).getSplits().size(), 4);
+    }
+
+    @Test
+    public void testGroupSmallSplitReplicationFactor1()
+    {
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(10);
+        // ReplicationFactor 1 & all splits have same location
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        List<HostAddress> hostAddress = new ArrayList<>();
+        hostAddress.add(new HostAddress("vm1", 1));
+
+        for (int i = 0; i < 30; i++) {
+            hiveSplitSource.addToQueue(new TestSplit(i, hostAddress));
+            assertEquals(hiveSplitSource.getBufferedInternalSplitCount(), i + 1);
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 3);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        assertEquals(hiveSplitWrappers.get(0).getSplits().size(), 10);
+        assertEquals(hiveSplitWrappers.get(1).getSplits().size(), 10);
+        assertEquals(hiveSplitWrappers.get(2).getSplits().size(), 10);
+    }
+
+    @Test
+    public void testGroupSmallSplitReplicationFactor2()
+    {
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(10);
+        // ReplicationFactor 2 & Number of nodes 3 , split should be distributed equally among 3 nodes
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        for (int i = 0; i < 24; i++) {
+            List<HostAddress> hostAddress = new ArrayList<>();
+            hostAddress.add(new HostAddress("vm" + (i % 3), 1));
+            hostAddress.add(new HostAddress("vm" + ((i + 1) % 3), 1));
+            hiveSplitSource.addToQueue(new TestSplit(i, hostAddress));
+            assertEquals(hiveSplitSource.getBufferedInternalSplitCount(), i + 1);
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 6);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        for (int i = 0; i < 6; i++) {
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 4);
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplitReplicationFactor2MoreThan10SplitsPerNode()
+    {
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(10);
+        // ReplicationFactor 2 & Number of nodes 3, 10 splits need to form one group
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        for (int i = 0; i < 90; i++) {
+            List<HostAddress> hostAddress = new ArrayList<>();
+            hostAddress.add(new HostAddress("vm" + (i % 3), 1));
+            hostAddress.add(new HostAddress("vm" + ((i + 1) % 3), 1));
+            hiveSplitSource.addToQueue(new TestSplit(i, hostAddress));
+        }
+
+        // remove 1 split
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 9);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        for (int i = 0; i < 9; i++) {
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 10);
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplitConfigSetMaxSmallSplitsGrouped()
+    {
+        // testing setMaxSmallSplitsGrouped, need to 30 splits
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(30);
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        for (int i = 0; i < 90; i++) {
+            List<HostAddress> hostAddress = new ArrayList<>();
+            hostAddress.add(new HostAddress("vm1", 1));
+            hiveSplitSource.addToQueue(new TestSplit(i, hostAddress));
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 3);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        for (int i = 0; i < 3; i++) {
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 30);
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplitBucket()
+    {
+        // test with 4 different bucket values
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(100);
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        for (int i = 0; i < 100; i++) {
+            List<HostAddress> hostAddress = new ArrayList<>();
+            hostAddress.add(new HostAddress("vm1", 1));
+            hiveSplitSource.addToQueue(new TestSplit(i, OptionalInt.of(i % 4), 100, hostAddress));
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 4);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        for (int i = 0; i < 4; i++) {
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 25);
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplitAlternativeFileSize()
+    {
+        // alternative big and small size total 100 files
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(100);
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        for (int i = 0; i < 100; i++) {
+            List<HostAddress> hostAddress = new ArrayList<>();
+            hostAddress.add(new HostAddress("vm1", 1));
+            hiveSplitSource.addToQueue(new TestSplit(i, OptionalInt.empty(), 67108864 / (((i + 1) % 2) + 1), hostAddress));
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        //assertEquals(groupedConnectorSplits.size(), 51);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        System.out.println("hiveSplitWrappers.get(i).getSplits().size() " + groupedConnectorSplits.size());
+        for (int i = 0; i < 50; i++) {
+            //System.out.println(hiveSplitWrappers.get(i).getSplits().size());
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 1);
+        }
+        for (int i = 50; i < groupedConnectorSplits.size(); i++) {
+            System.out.println(hiveSplitWrappers.get(i).getSplits().size());
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 2);
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplitAllBigSizeFiles()
+    {
+        // alternative big and small size total 100 files
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(100);
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        for (int i = 0; i < 100; i++) {
+            List<HostAddress> hostAddress = new ArrayList<>();
+            hostAddress.add(new HostAddress("vm1", 1));
+            hiveSplitSource.addToQueue(new TestSplit(i, OptionalInt.empty(), 67108864, hostAddress));
+        }
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 100);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        System.out.println("hiveSplitWrappers.get(i).getSplits().size() " + groupedConnectorSplits.size());
+        for (int i = 0; i < groupedConnectorSplits.size(); i++) {
+            //System.out.println(hiveSplitWrappers.get(i).getSplits().size());
+            assertEquals(hiveSplitWrappers.get(i).getSplits().size(), 1);
+        }
+    }
+
+    @Test
+    public void testGroupSmallSplitDifferentFileSize()
+    {
+        // alternative big and small size total 100 files
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(100);
+        HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+
+        List<HostAddress> hostAddress = new ArrayList<>();
+        hostAddress.add(new HostAddress("vm1", 1));
+        hiveSplitSource.addToQueue(new TestSplit(1, OptionalInt.empty(), 67108864 / 2, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(2, OptionalInt.empty(), 67108864 / 100, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(3, OptionalInt.empty(), 67108864 / 10, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(4, OptionalInt.empty(), 67108864 / 2, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(5, OptionalInt.empty(), 67108864 / 4, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(6, OptionalInt.empty(), 67108864 / 100, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(7, OptionalInt.empty(), 67108864 / 20, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(8, OptionalInt.empty(), 67108864 / 100, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(9, OptionalInt.empty(), 67108864 / 2, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(10, OptionalInt.empty(), 67108864 / 4, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(11, OptionalInt.empty(), 67108864 / 4, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(12, OptionalInt.empty(), 67108864 / 4, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(13, OptionalInt.empty(), 67108864 / 5, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(14, OptionalInt.empty(), 67108864 * 2, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(15, OptionalInt.empty(), 7000, hostAddress));
+        hiveSplitSource.addToQueue(new TestSplit(16, OptionalInt.empty(), 20000, hostAddress));
+
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        //assertEquals(groupedConnectorSplits.size(), 51);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        assertEquals(groupedConnectorSplits.size(), 6);
+    }
+
+    @Test
+    public void testBucketedGroupSmallSplit()
+    {
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(10);
+        final HiveSplitSource hiveSplitSource = HiveSplitSource.bucketed(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+        for (int i = 0; i < 10; i++) {
+            hiveSplitSource.addToQueue(new TestSplit(i, OptionalInt.of(2)));
+        }
+        hiveSplitSource.noMoreSplits();
+        List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, OptionalInt.of(2), 100);
+        List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+        assertEquals(groupedConnectorSplits.size(), 1);
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+        assertEquals(hiveSplitWrappers.get(0).getSplits().size(), 10);
+    }
+
+    @Test
+    public void testBucketedGroupSmallSplitDifferentBucket()
+    {
+        HiveConfig hiveConfig = new HiveConfig();
+        hiveConfig.setMaxSplitsToGroup(10);
+        final HiveSplitSource hiveSplitSource = HiveSplitSource.bucketed(
+                HiveTestUtils.SESSION,
+                "database",
+                "table",
+                10,
+                10,
+                new DataSize(1, MEGABYTE),
+                Integer.MAX_VALUE,
+                new TestingHiveSplitLoader(),
+                Executors.newFixedThreadPool(5),
+                new CounterStat(),
+                null,
+                null, null, hiveConfig,
+                HiveStorageFormat.ORC);
+        for (int i = 0; i < 100; i++) {
+            hiveSplitSource.addToQueue(new TestSplit(i, OptionalInt.of(i % 4)));
+        }
+        hiveSplitSource.noMoreSplits();
+
+        for (int i = 0; i < 4; i++) {
+            List<ConnectorSplit> connectorSplits = getSplits(hiveSplitSource, OptionalInt.of(i), 100);
+            List<ConnectorSplit> groupedConnectorSplits = hiveSplitSource.groupSmallSplits(connectorSplits);
+            List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+            groupedConnectorSplits.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+            assertEquals(hiveSplitWrappers.get(0).getSplits().size(), 10);
+            assertEquals(hiveSplitWrappers.get(1).getSplits().size(), 10);
+            assertEquals(hiveSplitWrappers.get(2).getSplits().size(), 5);
         }
     }
 }

@@ -45,6 +45,7 @@ import io.prestosql.plugin.hive.metastore.thrift.MetastoreLocator;
 import io.prestosql.plugin.hive.metastore.thrift.TestingMetastoreLocator;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastore;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastoreConfig;
+import io.prestosql.plugin.hive.orc.OrcConcatPageSource;
 import io.prestosql.plugin.hive.orc.OrcPageSource;
 import io.prestosql.plugin.hive.parquet.ParquetPageSource;
 import io.prestosql.plugin.hive.rcfile.RcFilePageSource;
@@ -4451,6 +4452,10 @@ public abstract class AbstractTestHive
 
     protected static void assertPageSourceType(ConnectorPageSource pageSource, HiveStorageFormat hiveStorageFormat)
     {
+        if (pageSource instanceof OrcConcatPageSource) {
+            pageSource = ((OrcConcatPageSource) pageSource).getConnectorPageSource();
+        }
+
         if (pageSource instanceof RecordPageSource) {
             RecordCursor hiveRecordCursor = ((RecordPageSource) pageSource).getCursor();
             hiveRecordCursor = ((HiveRecordCursor) hiveRecordCursor).getRegularColumnRecordCursor();

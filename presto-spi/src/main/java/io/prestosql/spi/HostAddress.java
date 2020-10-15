@@ -73,7 +73,7 @@ public class HostAddress
      */
     private final int port;
 
-    private HostAddress(String host, int port)
+    public HostAddress(String host, int port)
     {
         this.host = host;
         this.port = port;

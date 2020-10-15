@@ -58,4 +58,9 @@ public interface ConnectorSplitSource
             return noMoreSplits;
         }
     }
+
+    default List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> pendingSplits)
+    {
+        return pendingSplits;
+    }
 }

@@ -253,6 +253,7 @@ public class HiveSplitManager
                 typeManager);
 
         HiveSplitSource splitSource;
+        HiveStorageFormat hiveStorageFormat = HiveMetadata.extractHiveStorageFormat(table);
         switch (splitSchedulingStrategy) {
             case UNGROUPED_SCHEDULING:
                 splitSource = HiveSplitSource.allAtOnce(
@@ -269,7 +270,8 @@ public class HiveSplitManager
                         dynamicFilterSupplier,
                         userDefinedCachePredicates,
                         typeManager,
-                        hiveConfig);
+                        hiveConfig,
+                        hiveStorageFormat);
                 break;
             case GROUPED_SCHEDULING:
                 splitSource = HiveSplitSource.bucketed(
@@ -286,7 +288,8 @@ public class HiveSplitManager
                         dynamicFilterSupplier,
                         userDefinedCachePredicates,
                         typeManager,
-                        hiveConfig);
+                        hiveConfig,
+                        hiveStorageFormat);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown splitSchedulingStrategy: " + splitSchedulingStrategy);

@@ -65,6 +65,12 @@ public class BufferingSplitSource
         return source.isFinished();
     }
 
+    @Override
+    public List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan)
+    {
+        return source.groupSmallSplits(pendingSplits, lifespan);
+    }
+
     private static class GetNextBatch
     {
         private final SplitSource splitSource;

@@ -19,6 +19,7 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.coercions.HiveCoercer;
+import io.prestosql.plugin.hive.orc.OrcConcatPageSource;
 import io.prestosql.plugin.hive.util.IndexCache;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
@@ -56,7 +57,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveColumnHandle.MAX_PARTITION_KEY_COLUMN_INDEX;
@@ -124,7 +124,25 @@ public class HivePageSourceProvider
                 .map(HiveColumnHandle.class::cast)
                 .collect(toList());
 
-        HiveSplit hiveSplit = getOnlyElement(((HiveSplitWrapper) split).getSplits());
+        List<HiveSplit> hiveSplits = (((HiveSplitWrapper) split).getSplits());
+        if (hiveSplits.size() == 1) {
+            HiveSplit hiveSplit = hiveSplits.get(0);
+            return createPageSourceInternal(session, dynamicFilterSupplier, dynamicFilters, hiveTable, hiveColumns, hiveSplit);
+        }
+        Map<ColumnHandle, DynamicFilter> finalDynamicFilters = dynamicFilters;
+        List<ConnectorPageSource> pageSources = hiveSplits.stream()
+                .map(hiveSplit -> createPageSourceInternal(session, dynamicFilterSupplier, finalDynamicFilters, hiveTable, hiveColumns, hiveSplit))
+                .collect(toList());
+        return new OrcConcatPageSource(pageSources);
+    }
+
+    private ConnectorPageSource createPageSourceInternal(ConnectorSession session,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
+            Map<ColumnHandle, DynamicFilter> dynamicFilters,
+            HiveTableHandle hiveTable,
+            List<HiveColumnHandle> hiveColumns,
+            HiveSplit hiveSplit)
+    {
         Path path = new Path(hiveSplit.getPath());
 
         // Filter out splits using partition values and dynamic filters
@@ -138,17 +156,17 @@ public class HivePageSourceProvider
         List<IndexMetadata> indexes = new ArrayList<>();
         if (indexCache != null && session.isHeuristicIndexFilterEnabled()) {
             indexes.addAll(this.indexCache.getIndices(session
-                    .getCatalog().orElse(null), hiveTable
-                    .getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
+                            .getCatalog().orElse(null), hiveTable
+                            .getSchemaTableName().toString(), hiveSplit, hiveTable.getCompactEffectivePredicate(),
                     hiveTable.getPartitionColumns()));
 
             /* Bloom/Bitmap indices are checked for given table and added to the possible matchers for pushdown. */
             if (hiveTable.getDisjunctCompactEffectivePredicate().isPresent() && hiveTable.getDisjunctCompactEffectivePredicate().get().size() > 0) {
                 hiveTable.getDisjunctCompactEffectivePredicate().get().forEach(orPredicate ->
                         indexes.addAll(this.indexCache.getIndices(session
-                        .getCatalog().orElse(null), hiveTable
-                        .getSchemaTableName().toString(), hiveSplit, orPredicate, hiveTable
-                        .getPartitionColumns())));
+                                .getCatalog().orElse(null), hiveTable
+                                .getSchemaTableName().toString(), hiveSplit, orPredicate, hiveTable
+                                .getPartitionColumns())));
             }
         }
         Optional<List<IndexMetadata>> indexOptional =
