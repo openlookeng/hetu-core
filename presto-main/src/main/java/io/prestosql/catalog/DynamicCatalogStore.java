@@ -128,9 +128,9 @@ public class DynamicCatalogStore
             }
             String throwMessage = "Try to load catalog failed, check your configuration.";
             if (ex.getMessage() != null) {
-                throwMessage = throwMessage + " cause by " + ex.getMessage();
+                log.warn("%s cause by %s", throwMessage, ex.getMessage());
             }
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, throwMessage, ex);
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, throwMessage);
         }
     }
 
