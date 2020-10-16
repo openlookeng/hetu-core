@@ -166,6 +166,10 @@ public class Console
                         outputFile += fileName.substring(0, dotIndex) + "_" + System.currentTimeMillis();
                     }
                 }
+                if (new File(outputFile).exists()) {
+                    System.out.println(format("Output file %s already exists!", outputFile));
+                    return false;
+                }
             }
             session.setDebugEnable(cliOptions.debug != null && cliOptions.debug.equalsIgnoreCase("true"));
             session.setConsolePrintEnable(cliOptions.execute != null || session.isDebugEnable());
@@ -341,11 +345,11 @@ public class Console
 
     private static Path getHistoryFile()
     {
-        String path = System.getenv("PRESTO_HISTORY_FILE");
+        String path = System.getenv("MIGRATION_TOOL_HISTORY_FILE");
         if (!isNullOrEmpty(path)) {
             return Paths.get(path);
         }
-        return Paths.get(nullToEmpty(USER_HOME.value()), ".presto_history");
+        return Paths.get(nullToEmpty(USER_HOME.value()), ".migration_tool_history");
     }
 
     public boolean executeCommand(String query, String outputFile, SessionProperties session)
