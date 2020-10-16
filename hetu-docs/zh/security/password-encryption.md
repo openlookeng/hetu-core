@@ -35,7 +35,7 @@ openLooKeng 可以开启密码加密功能，这些密码就可以被加密存�
 security.password.decryption-type=RSA
 security.key.manager-type=keystore
 security.key.keystore-password=my-keystore-pwd
-security.key.store-file-path=/openlookeng/keystore/
+security.key.store-file-path=/openlookeng/keystore/keystore.jks
 ```
 
 | 属性                          | 描述                                                  |

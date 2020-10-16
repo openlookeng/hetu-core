@@ -70,7 +70,6 @@ public class CatalogInfo
         return connectorName;
     }
 
-    @JsonProperty
     public long getCreatedTime()
     {
         return createdTime;

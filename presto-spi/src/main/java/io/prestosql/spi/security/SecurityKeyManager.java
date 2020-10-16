@@ -17,16 +17,10 @@ package io.prestosql.spi.security;
 
 public interface SecurityKeyManager
 {
-    default void saveKey(String key, String catalogName)
+    default void saveKey(char[] key, String catalogName)
             throws SecurityKeyException
     {
         // do nothing
-    }
-
-    default String loadKey(String catalogName)
-            throws SecurityKeyException
-    {
-        return "";
     }
 
     default void deleteKey(String catalogName)
@@ -35,7 +29,7 @@ public interface SecurityKeyManager
         // do nothing
     }
 
-    default String getKey(String catalogName)
+    default char[] getKey(String catalogName)
     {
         return null;
     }
