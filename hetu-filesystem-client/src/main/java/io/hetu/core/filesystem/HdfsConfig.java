@@ -15,6 +15,7 @@
 package io.hetu.core.filesystem;
 
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -152,6 +153,16 @@ public class HdfsConfig
 
     private void checkConfigFile(String path)
     {
+        try {
+            checkArgument(!path.contains("../"),
+                    path + "Path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(path),
+                    path + "Path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
+
         checkArgument(new File(path).exists(), String.format(Locale.ROOT, "%s is not found", path));
     }
 }

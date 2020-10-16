@@ -45,6 +45,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.hetu.core.heuristicindex.util.IndexConstants.COLUMN_DELIMITER;
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.printVerboseMsg;
 import static java.util.Objects.requireNonNull;
@@ -154,6 +155,14 @@ public class HeuristicIndexClient
     public void deleteIndex(String table, String[] columns, String indexType)
             throws IOException
     {
+        checkArgument(table.matches("([\\p{Alnum}_]+\\.){2,3}[\\p{Alnum}_]+"), "Invalid table name");
+        if (columns != null) {
+            for (String column : columns) {
+                checkArgument(column.matches("[\\p{Alnum}_]+"), "Invalid column name");
+            }
+        }
+        checkArgument(indexType.matches("[\\p{Alnum}_]+"), "Invalid index type");
+
         Path toDelete = root.resolve(table).resolve(String.join(COLUMN_DELIMITER, columns)).resolve(indexType);
 
         if (!fs.exists(toDelete)) {

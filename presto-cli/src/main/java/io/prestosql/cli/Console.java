@@ -103,6 +103,7 @@ public class Console
     private static final String PROMPT_NAME = "lk";
     private static final Duration EXIT_DELAY = new Duration(3, SECONDS);
     private static final Pattern createIndexPattern = Pattern.compile("^(drop|create|show)\\s*index.*", Pattern.CASE_INSENSITIVE);
+    private static final int COL_MAX_LENGTH = 70;
 
     @Inject
     public HelpOption helpOption;
@@ -240,6 +241,7 @@ public class Console
 
     private boolean verifyAccess(QueryRunner queryRunner, AtomicBoolean exiting, String tableName)
     {
+        checkArgument(tableName.matches("([\\p{Alnum}_]+\\.){2,3}[\\p{Alnum}_]+"), "Invalid table name");
         return executeCommand(
                 queryRunner,
                 exiting,
@@ -350,7 +352,12 @@ public class Console
                     continue;
                 }
                 String partitions = (v.note == null || v.note.isEmpty()) ? "all" : v.note;
-                List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, partitions.replaceAll("(.{70})", "$0\n"));
+                StringBuilder partitionsStrToDisplay = new StringBuilder();
+                for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
+                    partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
+                    partitionsStrToDisplay.append("\n");
+                }
+                List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, partitionsStrToDisplay.toString());
                 rows.add(strings);
             }
 

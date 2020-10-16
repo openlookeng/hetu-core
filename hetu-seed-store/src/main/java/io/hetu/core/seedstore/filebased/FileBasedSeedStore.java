@@ -168,6 +168,7 @@ public class FileBasedSeedStore
     @Override
     public void setName(String name)
     {
+        checkArgument(name.matches("[\\p{Alnum}_\\-]+"), "Invalid cluster name");
         this.name = name;
         this.seedFilePath = seedDir.resolve(name).resolve(FileBasedSeedConstants.SEED_FILE_NAME);
     }
