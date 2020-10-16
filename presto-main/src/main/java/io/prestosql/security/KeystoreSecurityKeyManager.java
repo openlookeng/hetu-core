@@ -71,71 +71,15 @@ public class KeystoreSecurityKeyManager
      * @throws SecurityKeyException throw exception as SecurityKeyException
      */
     @Override
-    public synchronized void saveKey(String key, String catalogName)
+    public synchronized void saveKey(char[] key, String catalogName)
             throws SecurityKeyException
     {
-        if (key == null || key.isEmpty()) {
+        if (key == null || key.length < 1) {
             LOG.info("key is null or empty, will not create keystore for catalog[%s].", catalogName);
             return;
         }
         createStoreDirIfNotExists();
         createAndSaveKeystore(key, catalogName);
-    }
-
-    /**
-     * load publicKey or privateKey from keystore in hdfs
-     *
-     * @param catalogName catalog name that the key belong to
-     * @return return the key as string
-     * @throws SecurityKeyException throw exception as SecurityKeyException
-     */
-    @Override
-    public synchronized String loadKey(String catalogName)
-            throws SecurityKeyException
-    {
-        Path keystorePath = Paths.get(config.getFileStorePath());
-        String keyStr = "";
-        try (HetuFileSystemClient hetuFileSystemClient =
-                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
-                InputStream inputStream = hetuFileSystemClient.newInputStream(keystorePath)) {
-            KeyStore keyStore = KeyStore.getInstance(PKCS12);
-            keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
-            Key key = keyStore.getKey(catalogName, config.getKeystorePassword().toCharArray());
-
-            if (key instanceof SecretKey) {
-                keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8));
-                LOG.info("success to load key for catalog[%s]...", catalogName);
-            }
-            else if (key instanceof PrivateKey) {
-                Certificate certificate = keyStore.getCertificate(catalogName);
-                PublicKey publicKey = certificate.getPublicKey();
-                keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8));
-            }
-
-            if (key == null) {
-                Certificate certificate = keyStore.getCertificate(catalogName);
-                if (certificate != null) {
-                    PublicKey publicKey = certificate.getPublicKey();
-                    keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8));
-                }
-            }
-        }
-        catch (KeyStoreException e) {
-            throw new SecurityKeyException(format("something wrong when use KeyStore: %s", e.getMessage()));
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new SecurityKeyException(format("not exists such algorithm:", e.getMessage()));
-        }
-        catch (CertificateException e) {
-            throw new SecurityKeyException(format("certification is error: %s", e.getMessage()));
-        }
-        catch (UnrecoverableKeyException e) {
-            throw new SecurityKeyException(format("not found the key for catalog[%s]: %s", catalogName, e.getMessage()));
-        }
-        catch (IOException e) {
-            throw new SecurityKeyException(format("error happened when load key from keystore  %s", e.getMessage()));
-        }
-        return keyStr;
     }
 
     /**
@@ -145,9 +89,9 @@ public class KeystoreSecurityKeyManager
      * @return the key, if not exist, return null
      */
     @Override
-    public synchronized String getKey(String catalogName)
+    public synchronized char[] getKey(String catalogName)
     {
-        String key;
+        char[] key;
         try {
             key = loadKey(catalogName);
         }
@@ -177,16 +121,19 @@ public class KeystoreSecurityKeyManager
             LOG.info("success to delete the alias[%s] from keystore file.", catalogName);
         }
         catch (KeyStoreException e) {
-            throw new SecurityKeyException(format("something wrong when use KeyStore: %s", e.getMessage()));
+            LOG.error("something wrong when use KeyStore: %s", e.getMessage());
+            throw new SecurityKeyException("something wrong when use KeyStore");
         }
         catch (NoSuchAlgorithmException e) {
             throw new SecurityKeyException("not exists 'AES' algorithm");
         }
         catch (CertificateException e) {
-            throw new SecurityKeyException(format("certification is error: %s", e.getMessage()));
+            LOG.error("certification is error: %s", e.getMessage());
+            throw new SecurityKeyException("certification is error");
         }
         catch (IOException e) {
-            throw new SecurityKeyException(format("error in I/O: fail to delete alias[%s] from keystore.", catalogName));
+            LOG.error("error in I/O: create file failed,cause by: %s", e.getMessage());
+            throw new SecurityKeyException("error in I/O: fail to delete catalog[%s] from keystore.");
         }
         finally {
             IOUtil.close(inputStream);
@@ -194,12 +141,63 @@ public class KeystoreSecurityKeyManager
         }
     }
 
-    private void createAndSaveKeystore(String key, String catalogName)
+    private synchronized char[] loadKey(String catalogName)
+            throws SecurityKeyException
+    {
+        Path keystorePath = Paths.get(config.getFileStorePath());
+        char[] keyStr = null;
+        try (HetuFileSystemClient hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
+                InputStream inputStream = hetuFileSystemClient.newInputStream(keystorePath)) {
+            KeyStore keyStore = KeyStore.getInstance(PKCS12);
+            keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
+            Key key = keyStore.getKey(catalogName, config.getKeystorePassword().toCharArray());
+
+            if (key instanceof SecretKey) {
+                keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+                LOG.info("success to load key for catalog[%s]...", catalogName);
+            }
+            else if (key instanceof PrivateKey) {
+                Certificate certificate = keyStore.getCertificate(catalogName);
+                PublicKey publicKey = certificate.getPublicKey();
+                keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+            }
+
+            if (key == null) {
+                Certificate certificate = keyStore.getCertificate(catalogName);
+                if (certificate != null) {
+                    PublicKey publicKey = certificate.getPublicKey();
+                    keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+                }
+            }
+        }
+        catch (KeyStoreException e) {
+            LOG.error("something wrong when use KeyStore: %s", e.getMessage());
+            throw new SecurityKeyException("something wrong when use KeyStore");
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new SecurityKeyException("not exists 'AES' algorithm");
+        }
+        catch (CertificateException e) {
+            LOG.error("certification is error: %s", e.getMessage());
+            throw new SecurityKeyException("certification is error");
+        }
+        catch (UnrecoverableKeyException e) {
+            LOG.error("not found the key for catalog[%s]: %s", catalogName, e.getMessage());
+            throw new SecurityKeyException(format("not found the key for catalog[%s]", catalogName));
+        }
+        catch (IOException e) {
+            LOG.error("error happened when load key from keystore  %s", e.getMessage());
+            throw new SecurityKeyException("error happened when load key from keystore");
+        }
+        return keyStr;
+    }
+
+    private void createAndSaveKeystore(char[] key, String catalogName)
             throws SecurityKeyException
     {
         Path keystorPath = Paths.get(config.getFileStorePath());
 
-        byte[] keyBytes = Base64.getEncoder().encode(key.getBytes(Charset.forName(UTF_8)));
+        byte[] keyBytes = Base64.getEncoder().encode(new String(key).getBytes(Charset.forName(UTF_8)));
         SecretKey secretKey = new SecretKeySpec(keyBytes, 0, keyBytes.length, "AES");
 
         InputStream inputStream = null;
@@ -222,16 +220,18 @@ public class KeystoreSecurityKeyManager
             LOG.info("success to save the key for catalog[%s]..", catalogName);
         }
         catch (KeyStoreException e) {
-            throw new SecurityKeyException(format("something wrong when use KeyStore: %s", e.getMessage()));
+            LOG.error("something wrong when use KeyStore: %s", e.getMessage());
+            throw new SecurityKeyException("something wrong when use KeyStore");
         }
         catch (NoSuchAlgorithmException e) {
             throw new SecurityKeyException("not exists 'RSA' algorithm");
         }
         catch (CertificateException e) {
-            throw new SecurityKeyException(format("certification is error: %s", e.getMessage()));
+            LOG.error("certification is error: %s", e.getMessage());
+            throw new SecurityKeyException("certification is error");
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("error in I/O: create file failed,cause by: %s", e.getMessage());
             throw new SecurityKeyException("error in I/O: create file failed.");
         }
         finally {

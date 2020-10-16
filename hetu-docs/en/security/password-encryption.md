@@ -35,7 +35,7 @@ To enable password encryption, you need add these properties in the `etc/config.
 security.password.decryption-type=RSA
 security.key.manager-type=keystore
 security.key.keystore-password=my-keystore-pwd
-security.key.store-file-path=/openlookeng/keystore/
+security.key.store-file-path=/openlookeng/keystore/keystore.jks
 ```
 
 | Property                          | Description                                                  |

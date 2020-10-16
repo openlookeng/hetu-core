@@ -38,7 +38,7 @@ public class TestPasswordDecryption
         // save the key
         String publicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArEhOFoAk46GQzet7C/tmod5Sju91+dDl28TtuFXqOvSz5vvjuEkIK6NI411Lb11vF2P1a9J4ctcA3V3VvXk+H9IsW2jzuXZ774RaACNfMyslmHB+JOoPbTzUSVLyNfb3eSmEhkfYYUrKqlz4tvXUm5FJRX2Xh83yYX1FAnOpuMwzbwaMVLqb8k7LP2uI9+2dTTocE51K3SDH0KoFMyW/uSF9Jj9HLQ1rI9DxCH8UIf7SEwSZ0Pq42fxNW1qjjanYF5tHIp/5l2/O4LUNnZaMTISmT9m9lYt8FTudMtWCMNWarTk8JNkui4x7cSbmE5QaP+s994LK2umBXl95esUSsQIDAQAB";
         String catalogName = "mysql001";
-        securityKeyManager.saveKey(publicKey, catalogName);
+        securityKeyManager.saveKey(publicKey.toCharArray(), catalogName);
 
         // set parameters
         String connectionPasswordCipherText = "huOJCr35k6K2Dgn4InAMJHTyzGvcg+bgOvG+eUxcefML5jPBc3nWc4Wm0nedt1c6g/CKbQksUps/6KP1bcirdkBVwlfpmABwdfGMWuqAQLSUKyi4N1i0zexwDGRgTz0/FuTudlPFDF0XM3iJODB5XfStjxptBPGNAwnRxlmVYnxP2hXHxmY0wmFzk9ZbOj8fLM88dft5T03zBSnErftZ71MNyyskmksI+l9CVB7QDGEaMvhVDb9gSz1t8wTDrxlb0MTmJVl7n7Kw0B1MGmMqWKJA49YhfJJG8ZUPSMkrgTeIGwMqCDs1y2KOZORx5IXYdMJtL01td25OjcKenTuNwQ==";

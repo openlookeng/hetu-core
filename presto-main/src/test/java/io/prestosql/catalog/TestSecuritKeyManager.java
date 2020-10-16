@@ -19,7 +19,7 @@ import io.prestosql.spi.security.SecurityKeyException;
 import org.testng.annotations.Test;
 
 import static io.prestosql.testing.assertions.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNull;
 
 public class TestSecuritKeyManager
         extends TestDynamicCatalogRunner
@@ -39,18 +39,17 @@ public class TestSecuritKeyManager
         String publicKey = "fkasdlkf-erjlskdf-lkf234-werjd-fsdf23-df23-sdfgdfa3-4dsfksdlf-4234s-fjk234";
         String catalogName = "testCatalog";
 
-        securityKeyManager.saveKey(publicKey, catalogName);
-        securityKeyManager.saveKey(publicKey, TESTCATALOG);
+        securityKeyManager.saveKey(publicKey.toCharArray(), catalogName);
+        securityKeyManager.saveKey(publicKey.toCharArray(), TESTCATALOG);
 
-        String key = securityKeyManager.loadKey(catalogName);
-        String test2Key = securityKeyManager.loadKey(TESTCATALOG);
+        String key = new String(securityKeyManager.getKey(catalogName));
+        String test2Key = new String(securityKeyManager.getKey(TESTCATALOG));
 
         assertEquals(key, publicKey);
         assertEquals(test2Key, publicKey);
 
         securityKeyManager.deleteKey(TESTCATALOG);
         securityKeyManager.deleteKey(TESTCATALOG);
-        key = securityKeyManager.loadKey(TESTCATALOG);
-        assertNotEquals(key, publicKey);
+        assertNull(securityKeyManager.getKey(TESTCATALOG));
     }
 }

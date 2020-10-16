@@ -126,7 +126,7 @@ public class DynamicCatalogService
 
                 // save security key
                 try {
-                    securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
+                    securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
                 }
                 catch (SecurityKeyException e) {
                     throw badRequest(BAD_REQUEST, e.getMessage());
@@ -153,7 +153,7 @@ public class DynamicCatalogService
         return Response.status(CREATED).build();
     }
 
-    private void rollbackKey(String catalogName, String key)
+    private void rollbackKey(String catalogName, char[] key)
             throws IOException
     {
         try {
@@ -201,11 +201,11 @@ public class DynamicCatalogService
 
                 // update security key
                 boolean updateKey = (catalogInfo.getSecurityKey() != null);
-                String preSecurityKey = "";
+                char[] preSecurityKey = null;
                 if (updateKey) {
                     try {
                         preSecurityKey = securityKeyManager.getKey(catalogName);
-                        securityKeyManager.saveKey(catalogInfo.getSecurityKey(), catalogName);
+                        securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
                     }
                     catch (SecurityKeyException e) {
                         throw badRequest(BAD_REQUEST, e.getMessage());

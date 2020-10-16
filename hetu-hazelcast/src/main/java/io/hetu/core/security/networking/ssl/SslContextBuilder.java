@@ -35,7 +35,6 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -174,7 +173,7 @@ public final class SslContextBuilder
             // get X509TrustManager
             TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
             if ((trustManagers.length != 1) || !(trustManagers[0] instanceof X509TrustManager)) {
-                throw new RuntimeException("Unexpected default trust managers:" + Arrays.toString(trustManagers));
+                throw new RuntimeException("Unexpected default trust managers");
             }
             X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
 

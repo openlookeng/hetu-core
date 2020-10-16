@@ -33,6 +33,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public final class RsaCipherTextDecrypt
@@ -57,7 +58,11 @@ public final class RsaCipherTextDecrypt
         try {
             KeyFactory factory = KeyFactory.getInstance(RSA);
             // decode base64 of public key
-            byte[] key = Base64.getDecoder().decode(keyManager.loadKey(keyName));
+            char[] secretKey = keyManager.getKey(keyName);
+            if (secretKey == null) {
+                throw new RuntimeException(format("%s not exist.", keyName));
+            }
+            byte[] key = Base64.getDecoder().decode(new String(secretKey));
             // generate the public key
             X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
             RSAPublicKey publicKey = (RSAPublicKey) factory.generatePublic(spec);
