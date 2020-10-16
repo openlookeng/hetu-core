@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
 import io.prestosql.orc.OrcColumn;
+import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcDataSourceId;
 import io.prestosql.orc.OrcPredicate;
@@ -398,8 +399,11 @@ public class HdfsOrcDataSource
                                 true, in, new FileFormatDataSourceStats())) {
                             readOrcFile(source, path, isFullAcid, columnTypes, columnNames, lastModified, progress, callback);
                         }
-                        catch (Exception e) {
-                            LOG.error(String.format(ENGLISH, "Error reading file: %s. Skipping.", path), e);
+                        catch (OrcCorruptionException orcCorruptionException) {
+                            LOG.error(String.format(ENGLISH, "Error reading file: %s. Skipping.", path), orcCorruptionException);
+                        }
+                        catch (IOException e) {
+                            throw new RuntimeException(e);
                         }
                     }
             )).collect(Collectors.toList());
@@ -410,6 +414,12 @@ public class HdfsOrcDataSource
         }
         catch (InterruptedException | ExecutionException e) {
             throw new IOException(e);
+        }
+        catch (Exception e) {
+            if (e.getCause() instanceof IOException) {
+                throw (IOException) e.getCause();
+            }
+            throw e;
         }
         finally {
             executorServices.shutdown();

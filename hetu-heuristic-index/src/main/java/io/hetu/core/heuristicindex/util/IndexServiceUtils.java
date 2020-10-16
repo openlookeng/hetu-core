@@ -259,6 +259,10 @@ public class IndexServiceUtils
                 }
             }
         }
+        catch (IOException ioe) {
+            // Failed to unarchive, delete temporary dump directory
+            outputFs.deleteRecursively(prefix);
+        }
     }
 
     public static void printVerboseMsg(String msg)

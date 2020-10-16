@@ -350,11 +350,14 @@ public class Console
                 if (!verifyAccess(queryRunner, exiting, v.table)) {
                     continue;
                 }
-                String partitions = (v.note == null || v.note.isEmpty()) ? "all" : v.note;
+                String partitions = (v.partitions == null || v.partitions.isEmpty()) ? "all" : String.join(",", v.partitions);
                 StringBuilder partitionsStrToDisplay = new StringBuilder();
                 for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
                     partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
-                    partitionsStrToDisplay.append("\n");
+                    if (i + COL_MAX_LENGTH < partitions.length()) {
+                        // have next line
+                        partitionsStrToDisplay.append("\n");
+                    }
                 }
                 List<String> strings = Arrays.asList(v.name, v.user, v.table, String.join(",", v.columns), v.indexType, partitionsStrToDisplay.toString());
                 rows.add(strings);
@@ -517,7 +520,7 @@ public class Console
 
             String tableName = createIndex.getTableName().toString();
 
-            if (!tableName.matches("[\\p{Alnum}_]+")) {
+            if (!tableName.matches("[\\p{Alnum}_.]+")) {
                 System.out.println("Invalid table name " + tableName);
                 return false;
             }
@@ -543,9 +546,8 @@ public class Console
             }
 
             // Separating the properties needed by IndexCommand Class from the properties for creating the heuristic index
-            final String parallelCreation = "parallelCreation";
             final String verbose = "verbose";
-            List<String> indexCommandClassProperties = Arrays.asList(parallelCreation, verbose);
+            List<String> indexCommandClassProperties = ImmutableList.of(verbose);
 
             Map<Boolean, List<Property>> properties = createIndex.getProperties().stream()
                     .collect(Collectors.partitioningBy(property -> indexCommandClassProperties.stream().anyMatch(property.getName().getValue()::equalsIgnoreCase)));
@@ -566,7 +568,7 @@ public class Console
             String indexTypes = createIndex.getIndexType();
 
             IndexCommand command = new IndexCommand(clientOptions.configDirPath, createIndex.getIndexName().toString(), tableName,
-                    columns, partitions, indexTypes, indexProperties, providedClassProperties.getOrDefault(parallelCreation, false),
+                    columns, partitions, indexTypes, indexProperties,
                     providedClassProperties.getOrDefault(verbose, false), clientOptions.user);
             command.createIndex();
         }

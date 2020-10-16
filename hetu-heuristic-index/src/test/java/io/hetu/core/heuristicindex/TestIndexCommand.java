@@ -37,7 +37,6 @@ import static io.hetu.core.heuristicindex.util.IndexCommandUtils.loadDataSourceP
 import static io.hetu.core.heuristicindex.util.IndexCommandUtils.loadIndexStore;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -62,7 +61,7 @@ public class TestIndexCommand
             assertTrue(tempFile.delete());
 
             IndexCommand indexCommand = new IndexCommand(tempFile.getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
-                    "bloom", null, true, false, null);
+                    "bloom", null, false, null);
 
             indexCommand.createIndex();
         }
@@ -80,7 +79,7 @@ public class TestIndexCommand
             when(loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
 
             IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
-                    null, null, true, false, null);
+                    null, null, false, null);
 
             indexCommand.createIndex();
         }
@@ -104,10 +103,10 @@ public class TestIndexCommand
             when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
 
             IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
-                    "bloom", null, false, false, null);
+                    "bloom", null, false, null);
             indexCommand.createIndex();
 
-            verify(writer, times(1)).createIndex(any(), any(), any(), any(), eq(false));
+            verify(writer, times(1)).createIndex(any(), any(), any(), any());
         }
     }
 
@@ -129,7 +128,7 @@ public class TestIndexCommand
             when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
 
             IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
-                    "bloom", null, false, false, null);
+                    "bloom", null, false, null);
             indexCommand.deleteIndex();
 
             verify(client, times(1)).deleteIndex(any(), any(), any());

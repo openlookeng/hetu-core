@@ -25,6 +25,8 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,7 +48,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.hetu.core.heuristicindex.util.IndexConstants.COLUMN_DELIMITER;
-import static io.hetu.core.heuristicindex.util.IndexServiceUtils.printVerboseMsg;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -59,6 +60,7 @@ public class HeuristicIndexClient
 {
     private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
             new LocalConfig(new Properties()), Paths.get("/"));
+    private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexClient.class);
 
     private HetuFileSystemClient fs;
     private Path root;
@@ -141,7 +143,7 @@ public class HeuristicIndexClient
                     }
                 }
                 else {
-                    printVerboseMsg(String.format("File path not valid: %s", child));
+                    LOG.debug("File path not valid: {}", child);
                     return 0;
                 }
             }
@@ -214,13 +216,13 @@ public class HeuristicIndexClient
         try (Stream<Path> tarsOnRemote = fs.walk(absolutePath).filter(p -> p.toString().contains(".tar"))) {
             for (Path tarFile : (Iterable<Path>) tarsOnRemote::iterator) {
                 Path localTmpDir = Files.createTempDirectory("tmp-index-dump-").toAbsolutePath();
-                printVerboseMsg("Fetching index from remote filesystem to local: " + tarFile);
+                LOG.debug("Fetching index from remote filesystem to local: " + tarFile);
                 IndexServiceUtils.unArchive(fs, LOCAL_FS_CLIENT, tarFile, localTmpDir);
                 Path tarReadPath = Paths.get(localTmpDir.toString(), absolutePath.toString());
 
                 try (Stream<Path> children = LOCAL_FS_CLIENT.walk(tarReadPath).filter(this::notDirectory)) {
                     for (Path child : (Iterable<Path>) children::iterator) {
-                        printVerboseMsg(String.format("Processing file %s.", child));
+                        LOG.debug("Processing file {}.", child);
 
                         Path childFilePath = child.getFileName();
                         if (childFilePath == null) {
@@ -248,7 +250,7 @@ public class HeuristicIndexClient
                                 index.deserialize(is);
                             }
 
-                            printVerboseMsg(String.format("Loaded %s index from %s.", index.getId(), child));
+                            LOG.debug("Loaded {} index from {}.", index.getId(), child);
 
                             Object fileSize = LOCAL_FS_CLIENT.getAttribute(child, SupportedFileAttributes.SIZE);
                             if (fileSize instanceof Long) {

@@ -44,7 +44,6 @@ public class IndexCommand
     String[] partitions;
     String indexType;
     String[] indexProps;
-    boolean parallelCreation;
     public static boolean verbose; // disabled by default
     String indexName;
     String user;
@@ -64,7 +63,7 @@ public class IndexCommand
         this.user = user;
     }
 
-    public IndexCommand(String configDirPath, String name, String table, String[] columns, String[] partitions, String indexType, String[] indexProps, boolean parallelCreation,
+    public IndexCommand(String configDirPath, String name, String table, String[] columns, String[] partitions, String indexType, String[] indexProps,
             boolean verbose, String user)
     {
         this.configDirPath = configDirPath;
@@ -73,7 +72,6 @@ public class IndexCommand
         this.partitions = partitions;
         this.indexType = indexType.toLowerCase(Locale.ENGLISH);
         this.indexProps = indexProps;
-        this.parallelCreation = parallelCreation;
         IndexCommand.verbose = verbose;
         this.indexName = name;
         this.user = user;
@@ -169,9 +167,19 @@ public class IndexCommand
             }
             else {
                 if (sameIndexRecord != null) {
-                    if (!parallelCreation) {
-                        System.out.printf("Same entry already exists. To update, please delete old index first. " +
-                                "If this is parallel creation, add WITH (parallelCreation=true).%n%n");
+                    boolean partitionMerge = partitions.length != 0;
+                    String conflict = String.join(",", sameIndexRecord.partitions);
+
+                    for (String partition : partitions) {
+                        if (sameIndexRecord.partitions.isEmpty() || sameIndexRecord.partitions.contains(partition)) {
+                            partitionMerge = false;
+                            conflict = partition;
+                            break;
+                        }
+                    }
+
+                    if (!partitionMerge) {
+                        System.out.printf("Same entry already exists and partitions contain conflicts: [%s]. To update, please delete old index first.%n%n", conflict);
                         return;
                     }
                 }
@@ -196,7 +204,7 @@ public class IndexCommand
             requireNonNull(indexType, "No index type specified for create command");
             requireNonNull(columns, "No columns specified for create command");
             IndexWriter writer = factory.getIndexWriter(dsProperties, ixProperties, indexStore.getFs(), indexStore.getRoot());
-            writer.createIndex(table, columns, partitions, indexType, parallelCreation);
+            writer.createIndex(table, columns, partitions, indexType);
             IndexRecordManager.addIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName, user, table, columns, indexType, partitions);
             if (!verbose) {
                 System.out.print("\n");
