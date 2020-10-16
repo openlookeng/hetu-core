@@ -4967,6 +4967,10 @@ public class TestHiveIntegrationSmokeTest
         Session session1 = Session.builder(session)
                 .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
                 .build();
+        Session session2 = Session.builder(session)
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_disjunct_predicate_pushdown_enabled", "false")
+                .build();
         try {
             assertUpdate(session1, "CREATE TABLE test_unsupport (a int, b int) with (transactional=true, format='orc')");
             assertUpdate(session1, "INSERT INTO test_unsupport VALUES (1, 2),(11,22)", 2);
@@ -4985,6 +4989,7 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate(session1, "CREATE TABLE part2key (id1 int, id2 int, id3 int) with (format='orc', partitioned_by=ARRAY['id2','id3'])");
             assertUpdate(session1, "INSERT Into part2key values(1,2,3)", 1);
             assertQuery(session1, "select * from part2key where id2=2 and id3=3", "SELECT 1,2,3");
+            assertQuery(session2, "select * from part2key where id2=2 and id3=3", "SELECT 1,2,3");
         }
         finally {
             assertUpdate("DROP TABLE IF EXISTS test_unsupport");
