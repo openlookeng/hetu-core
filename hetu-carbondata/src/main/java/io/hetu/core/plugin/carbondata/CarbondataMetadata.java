@@ -122,6 +122,7 @@ import org.apache.carbondata.processing.merger.CarbonDataMergerUtil;
 import org.apache.carbondata.processing.merger.CompactionType;
 import org.apache.carbondata.processing.util.CarbonLoaderUtil;
 import org.apache.carbondata.processing.util.TableOptionConstant;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -1071,7 +1072,7 @@ public class CarbondataMetadata
                 .stream()
                 .map(PartitionUpdate::getMiscData)
                 .flatMap(List::stream)
-                .map(json -> gson.fromJson(json, SegmentUpdateDetails.class))
+                .map(json -> gson.fromJson(StringEscapeUtils.unescapeJson(json), SegmentUpdateDetails.class))
                 .collect(Collectors.toList());
 
         hdfsEnvironment.doAs(user, () -> {
