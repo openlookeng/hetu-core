@@ -363,12 +363,13 @@ public class FileBasedLock
                     }
                 }
                 else {
-                    InputStream is = fs.newInputStream(lockInfoPath);
-                    InputStreamReader reader = new InputStreamReader(is, Charset.forName("utf8"));
-                    int idLength = uuid.toString().length();
-                    char[] firstIdChars = new char[idLength];
-                    return reader.read(firstIdChars, 0, idLength) > 0
-                            && uuid.toString().equals(new String(firstIdChars));
+                    try (InputStream is = fs.newInputStream(lockInfoPath);
+                            InputStreamReader reader = new InputStreamReader(is, Charset.forName("utf8"))) {
+                        int idLength = uuid.toString().length();
+                        char[] firstIdChars = new char[idLength];
+                        return reader.read(firstIdChars, 0, idLength) > 0
+                                && uuid.toString().equals(new String(firstIdChars));
+                    }
                 }
             }
             writeToFile(lockInfoPath, uuid.toString(), false);
