@@ -48,6 +48,7 @@ import org.apache.carbondata.processing.exception.MultipleMatchingException;
 import org.apache.carbondata.processing.loading.model.CarbonLoadModel;
 import org.apache.carbondata.processing.util.TableOptionConstant;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
@@ -449,7 +450,7 @@ public class CarbondataFileWriter
 
         Gson gsonObjectToWrite = new Gson();
         segmentUpdateDetailMap.forEach((k, sud) ->
-                listBuilder.add(gsonObjectToWrite.toJson(sud, SegmentUpdateDetails.class)));
+                listBuilder.add(StringEscapeUtils.escapeJson(gsonObjectToWrite.toJson(sud, SegmentUpdateDetails.class))));
 
         return listBuilder.build();
     }
