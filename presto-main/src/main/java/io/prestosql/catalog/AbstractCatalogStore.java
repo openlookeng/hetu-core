@@ -240,14 +240,13 @@ public abstract class AbstractCatalogStore
             throws IOException
     {
         CatalogFilePath catalogPath = new CatalogFilePath(baseDirectory, catalogName);
-        CatalogFileInputStream.Builder builder = new CatalogFileInputStream.Builder(maxFileSizeInBytes);
-
         Properties metadata = new Properties();
+
         try (InputStream metadataInputStream = fileSystemClient.newInputStream(catalogPath.getMetadataPath())) {
             metadata.load(metadataInputStream);
         }
 
-        try {
+        try (CatalogFileInputStream.Builder builder = new CatalogFileInputStream.Builder(maxFileSizeInBytes)) {
             if (metadata.getProperty("catalogFiles") != null) {
                 List<String> catalogFileNames = LIST_CODEC.fromJson(metadata.getProperty("catalogFiles"));
                 for (String catalogFileName : catalogFileNames) {
@@ -267,13 +266,12 @@ public abstract class AbstractCatalogStore
                     }
                 }
             }
+            return builder.build();
         }
         catch (IOException ex) {
             // close inputStreams.
-            builder.close();
             throw ex;
         }
-        return builder.build();
     }
 
     public Set<String> listCatalogNames()
