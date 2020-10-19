@@ -75,12 +75,14 @@ public class PasswordSecurityConfig
         return this;
     }
 
-    public String getRsaPadding() {
+    public String getRsaPadding()
+    {
         return rsaPadding;
     }
 
     @Config("security.key.rsa-padding")
-    public void setRsaPadding(String rsaPadding) {
+    public void setRsaPadding(String rsaPadding)
+    {
         this.rsaPadding = rsaPadding;
     }
 }
