@@ -25,6 +25,7 @@ public class PasswordSecurityConfig
     private String keyManagerType = "keystore";
     private String keystorePassword;
     private String fileStorePath = File.separator + "catalogs" + File.separator + "keys" + File.separator + "keystore.jks";
+    private String rsaPadding = "RSA/ECB/OAEPWITHSHA256AndMGF1Padding";
 
     public String getDecryptionType()
     {
@@ -72,5 +73,16 @@ public class PasswordSecurityConfig
     {
         this.fileStorePath = fileStorePath;
         return this;
+    }
+
+    public String getRsaPadding()
+    {
+        return rsaPadding;
+    }
+
+    @Config("security.key.rsa-padding")
+    public void setRsaPadding(String rsaPadding)
+    {
+        this.rsaPadding = rsaPadding;
     }
 }

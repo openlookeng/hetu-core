@@ -41,14 +41,15 @@ public final class RsaCipherTextDecrypt
 {
     private static final Charset CHARSET = UTF_8;
     private static final String RSA = "RSA";
-    private static final String RSA_PADDING = "RSA/NONE/OAEPWITHSHA256AndMGF1Padding";
     private static final String BC_PROVIDER = "BC";
     private final SecurityKeyManager keyManager;
+    private final PasswordSecurityConfig config;
 
     @Inject
-    public RsaCipherTextDecrypt(SecurityKeyManager keyManagerProvider)
+    public RsaCipherTextDecrypt(SecurityKeyManager keyManagerProvider, PasswordSecurityConfig config)
     {
         this.keyManager = keyManagerProvider;
+        this.config = config;
         Security.addProvider(new BouncyCastleProvider());
     }
 
@@ -66,7 +67,7 @@ public final class RsaCipherTextDecrypt
             // generate the public key
             X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
             RSAPublicKey publicKey = (RSAPublicKey) factory.generatePublic(spec);
-            Cipher cipher = Cipher.getInstance(RSA_PADDING, BC_PROVIDER);
+            Cipher cipher = Cipher.getInstance(config.getRsaPadding(), BC_PROVIDER);
             cipher.init(Cipher.DECRYPT_MODE, publicKey);
             // decode base64 of cipher text
             byte[] content = Base64.getDecoder().decode(cipherText);
