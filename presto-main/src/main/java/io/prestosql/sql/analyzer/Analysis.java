@@ -147,6 +147,9 @@ public class Analysis
     // for recursive view detection
     private final Deque<Table> tablesForView = new ArrayDeque<>();
 
+    // for create index
+    private Statement originalStatement;
+
     public Analysis(@Nullable Statement root, List<Expression> parameters, boolean isDescribe)
     {
         requireNonNull(parameters);
@@ -154,6 +157,16 @@ public class Analysis
         this.root = root;
         this.parameters = ImmutableList.copyOf(requireNonNull(parameters, "parameters is null"));
         this.isDescribe = isDescribe;
+    }
+
+    public Statement getOriginalStatement()
+    {
+        return originalStatement;
+    }
+
+    public void setOriginalStatement(Statement originalStatement)
+    {
+        this.originalStatement = originalStatement;
     }
 
     public Statement getStatement()

@@ -16,41 +16,55 @@ package io.prestosql.spi.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.type.Type;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 
 import static io.prestosql.spi.connector.SchemaUtil.checkNotEmpty;
 import static java.util.Objects.requireNonNull;
 
 public class CreateIndexMetadata
 {
+    public static final String LEVEL_PROP_KEY = "level";
+    public static final Level LEVEL_DEFAULT = Level.STRIPE;
+
     private final String indexName;
     private final String tableName;
     private final String indexType;
-    private final List<String> indexColumns;
-    private final String expression;
-    private final List<String> properties;
+    private final List<Map.Entry<String, Type>> indexColumns;
+    private final List<String> partitions;
+    private final Properties properties;
+    private final String user;
+    private final Level createLevel;
 
     @JsonCreator
     public CreateIndexMetadata(
             @JsonProperty("indexName") String indexName,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("indexType") String indexType,
-            @JsonProperty("indexColumns") List<String> indexColumns,
-            @JsonProperty("expression") String expression,
-            @JsonProperty("properties") List<String> properties)
+            @JsonProperty("indexColumns") List<Map.Entry<String, Type>> indexColumns,
+            @JsonProperty("partitions") List<String> partitions,
+            @JsonProperty("properties") Properties properties,
+            @JsonProperty("user") String user,
+            @JsonProperty("createLevel") Level createLevel)
     {
-        checkNotEmpty(indexName, "indexName");
-        this.indexName = indexName;
-        requireNonNull(tableName, "tableName is null");
-        this.tableName = tableName;
-        requireNonNull(indexType, "indexType is null");
-        this.indexType = indexType;
+        this.indexName = checkNotEmpty(indexName, "indexName");
+        this.tableName = requireNonNull(tableName, "tableName is null");
+        this.indexType = requireNonNull(indexType, "indexType is null");
         this.indexColumns = indexColumns;
-        this.expression = expression;
-        this.properties = ImmutableList.copyOf(requireNonNull(properties, "properties is null"));
+        this.partitions = partitions;
+        this.properties = properties;
+        this.user = requireNonNull(user, "user is null");
+        this.createLevel = createLevel == null ? LEVEL_DEFAULT : createLevel;
+    }
+
+    @JsonProperty
+    public Level getCreateLevel()
+    {
+        return createLevel;
     }
 
     @JsonProperty
@@ -72,21 +86,33 @@ public class CreateIndexMetadata
     }
 
     @JsonProperty
-    public List<String> getIndexColumns()
+    public List<Map.Entry<String, Type>> getIndexColumns()
     {
         return indexColumns;
     }
 
     @JsonProperty
-    public String getExpression()
+    public List<String> getPartitions()
     {
-        return expression;
+        return partitions;
     }
 
     @JsonProperty
-    public List<String> getProperties()
+    public Properties getProperties()
     {
         return properties;
+    }
+
+    @JsonProperty
+    public String getUser()
+    {
+        return user;
+    }
+
+    public enum Level
+    {
+        STRIPE,
+        PARTITION
     }
 
     @Override
@@ -99,12 +125,13 @@ public class CreateIndexMetadata
         if (!indexColumns.isEmpty()) {
             sb.append(", indexColumns=").append(indexColumns);
         }
-        if (expression != null) {
-            sb.append(", expression='").append(expression).append('\'');
+        if (partitions != null) {
+            sb.append(", partitions='").append(partitions).append('\'');
         }
         if (!properties.isEmpty()) {
             sb.append(", properties=").append(properties);
         }
+        sb.append("user=").append(user).append('\'');
         sb.append('}');
         return sb.toString();
     }
@@ -112,7 +139,7 @@ public class CreateIndexMetadata
     @Override
     public int hashCode()
     {
-        return Objects.hash(indexName, tableName, indexType, indexColumns, expression, properties);
+        return Objects.hash(indexName, tableName, indexType, indexColumns, partitions, properties, user);
     }
 
     @Override
@@ -125,11 +152,12 @@ public class CreateIndexMetadata
             return false;
         }
         CreateIndexMetadata other = (CreateIndexMetadata) obj;
-        return Objects.equals(this.indexName, other.indexName) &&
-                Objects.equals(this.tableName, other.tableName) &&
-                Objects.equals(this.indexType, other.indexType) &&
-                Objects.equals(this.indexColumns, other.indexColumns) &&
-                Objects.equals(this.expression, other.expression) &&
-                Objects.equals(this.properties, other.properties);
+        return Objects.equals(this.indexName, other.indexName)
+                && Objects.equals(this.tableName, other.tableName)
+                && Objects.equals(this.indexType, other.indexType)
+                && Objects.equals(this.indexColumns, other.indexColumns)
+                && Objects.equals(this.partitions, other.partitions)
+                && Objects.equals(this.properties, other.properties)
+                && Objects.equals(this.user, other.user);
     }
 }

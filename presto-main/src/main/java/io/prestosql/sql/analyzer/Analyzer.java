@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.sql.parser.SqlParser;
@@ -44,6 +45,7 @@ public class Analyzer
     private final Optional<QueryExplainer> queryExplainer;
     private final List<Expression> parameters;
     private final WarningCollector warningCollector;
+    private HeuristicIndexerManager heuristicIndexerManager;
 
     public Analyzer(Session session,
             Metadata metadata,
@@ -53,6 +55,18 @@ public class Analyzer
             List<Expression> parameters,
             WarningCollector warningCollector)
     {
+        this(session, metadata, sqlParser, accessControl, queryExplainer, parameters, warningCollector, HeuristicIndexerManager.getNoOpHeuristicIndexerManager());
+    }
+
+    public Analyzer(Session session,
+            Metadata metadata,
+            SqlParser sqlParser,
+            AccessControl accessControl,
+            Optional<QueryExplainer> queryExplainer,
+            List<Expression> parameters,
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
+    {
         this.session = requireNonNull(session, "session is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
@@ -60,6 +74,7 @@ public class Analyzer
         this.queryExplainer = requireNonNull(queryExplainer, "query explainer is null");
         this.parameters = parameters;
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
     public Analysis analyze(Statement statement)
@@ -69,9 +84,11 @@ public class Analyzer
 
     public Analysis analyze(Statement statement, boolean isDescribe)
     {
-        Statement rewrittenStatement = StatementRewrite.rewrite(session, metadata, sqlParser, queryExplainer, statement, parameters, accessControl, warningCollector);
+        Statement rewrittenStatement = StatementRewrite.rewrite(session, metadata, sqlParser, queryExplainer, statement, parameters, accessControl, warningCollector, heuristicIndexerManager);
         Analysis analysis = new Analysis(rewrittenStatement, parameters, isDescribe);
-        StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector);
+        analysis.setOriginalStatement(statement);
+
+        StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector, heuristicIndexerManager);
         analyzer.analyze(rewrittenStatement, Optional.empty());
 
         // check column access permissions for each table

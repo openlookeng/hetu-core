@@ -19,11 +19,13 @@ import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -49,14 +51,14 @@ public class TestIndexRecordManager
             IndexRecordManager indexRecordManager1 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
             IndexRecordManager indexRecordManager2 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
 
-            indexRecordManager1.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            indexRecordManager1.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
             List<IndexRecord> original1 = indexRecordManager1.getIndexRecords();
             List<IndexRecord> original2 = indexRecordManager2.getIndexRecords();
             assertEquals(original2.size(), 1);
             assertEquals(original1, original2);
 
             List<IndexRecord> beforeadd1 = indexRecordManager1.getIndexRecords();
-            indexRecordManager2.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "bloom", "cp=1");
+            indexRecordManager2.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Arrays.asList("cp=1"));
             List<IndexRecord> added2 = indexRecordManager2.getIndexRecords();
             assertEquals(added2.size(), 2);
 
@@ -71,7 +73,7 @@ public class TestIndexRecordManager
         }
     }
 
-    @Test(timeOut = 20000)
+    @Test(timeOut = 30000)
     public void testConcurrentMultipleManagers()
             throws IOException, InterruptedException
     {
@@ -87,7 +89,7 @@ public class TestIndexRecordManager
                 threads[i] = new Thread(() -> {
                     try {
                         new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath())
-                                .addIndexRecord(names[finalI], "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+                                .addIndexRecord(names[finalI], "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
                     }
                     catch (IOException e) {
                         throw new RuntimeException(e);
@@ -128,7 +130,7 @@ public class TestIndexRecordManager
         }
     }
 
-    @Test(timeOut = 5000)
+    @Test(timeOut = 20000)
     public void testConcurrentSingleManager()
             throws IOException, InterruptedException
     {
@@ -145,7 +147,7 @@ public class TestIndexRecordManager
                 int finalI = i;
                 threads[i] = new Thread(() -> {
                     try {
-                        indexRecordManager.addIndexRecord(names[finalI], "u", "t", new String[] {"c"}, "minmax", "cp=1");
+                        indexRecordManager.addIndexRecord(names[finalI], "u", "t", new String[] {"c"}, "minmax", Arrays.asList("cp=1"));
                     }
                     catch (IOException e) {
                         throw new RuntimeException(e);
@@ -191,8 +193,8 @@ public class TestIndexRecordManager
         try (TempFolder folder = new TempFolder()) {
             folder.create();
             IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-            indexRecordManager.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
-            indexRecordManager.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            indexRecordManager.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
+            indexRecordManager.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
             assertNotNull(indexRecordManager.lookUpIndexRecord("1"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 2);
 
@@ -259,7 +261,7 @@ public class TestIndexRecordManager
             IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
             IndexRecord expected = new IndexRecord("testName", "testUser", "testTable", new String[] {
                     "testColumn"}, "minmax", ImmutableList.of(""));
-            indexRecordManager.addIndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            indexRecordManager.addIndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
             IndexRecord actual = indexRecordManager.lookUpIndexRecord("testName");
             assertIndexRecordFullyEqual(actual, expected);
         }
@@ -272,7 +274,7 @@ public class TestIndexRecordManager
             folder.create();
             IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
             IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, note);
-            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, note.toArray(new String[0]));
+            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, note);
 
             IndexRecord actual1 = indexRecordManager.lookUpIndexRecord(name);
             assertNotNull(actual1);

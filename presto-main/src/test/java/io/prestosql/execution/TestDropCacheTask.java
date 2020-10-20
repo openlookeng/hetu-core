@@ -18,6 +18,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.ColumnPropertyManager;
@@ -148,14 +150,14 @@ public class TestDropCacheTask
     {
         QualifiedName tableName = QualifiedName.of(CATALOG_NAME, schema, table);
         DropCache statement = new DropCache(tableName, true);
-        getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList()));
+        getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
         assertFalse(SplitCacheMap.getInstance().cacheExists(tableName));
 
         QualifiedName table2Name = QualifiedName.of(CATALOG_NAME, schema, table2);
         DropCache statement2 = new DropCache(table2Name, true);
         assertTrue(SplitCacheMap.getInstance().cacheExists(table2Name));
 
-        getFutureValue(new DropCacheTask().execute(statement2, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList()));
+        getFutureValue(new DropCacheTask().execute(statement2, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
         assertFalse(SplitCacheMap.getInstance().cacheExists(table2Name));
     }
 
@@ -166,7 +168,7 @@ public class TestDropCacheTask
         QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", testSession, transactionManager);
 
         try {
-            getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList()));
+            getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
             fail("expected exception");
         }
         catch (RuntimeException e) {
@@ -192,7 +194,7 @@ public class TestDropCacheTask
                 .build();
         QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
 
-        getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList()));
+        getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
         assertFalse(SplitCacheMap.getInstance().cacheExists(fullName));
     }
 

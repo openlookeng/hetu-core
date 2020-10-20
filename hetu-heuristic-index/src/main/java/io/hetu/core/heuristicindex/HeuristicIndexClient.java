@@ -15,39 +15,34 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.hetu.core.heuristicindex.IndexRecord.COLUMN_DELIMITER;
+import static io.prestosql.spi.heuristicindex.IndexRecord.COLUMN_DELIMITER;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -60,21 +55,17 @@ public class HeuristicIndexClient
 {
     private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
             new LocalConfig(new Properties()), Paths.get("/"));
-    private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexClient.class);
+    private static final Logger LOG = Logger.get(HeuristicIndexClient.class);
 
     private HetuFileSystemClient fs;
     private Path root;
     private IndexRecordManager indexRecordManager;
-    private Map<String, Index> indexTypesMap;
 
-    public HeuristicIndexClient(Set<Index> indexTypes, HetuFileSystemClient fs, Path root)
+    public HeuristicIndexClient(HetuFileSystemClient fs, Path root)
     {
         this.fs = fs;
         this.root = root;
         this.indexRecordManager = new IndexRecordManager(fs, root);
-        indexTypesMap = indexTypes.stream().collect(Collectors.toMap(
-                type -> type.getId().toLowerCase(Locale.ENGLISH),
-                Function.identity()));
     }
 
     @Override
@@ -97,7 +88,6 @@ public class HeuristicIndexClient
             // On exception, log and continue reading from disk
             LOG.debug("Error reading index records: " + path);
         }
-
         for (Map.Entry<String, Index> entry : readIndexMap(path).entrySet()) {
             String absolutePath = entry.getKey();
             Path remainder = Paths.get(absolutePath.replaceFirst(root.toString(), ""));
@@ -158,7 +148,7 @@ public class HeuristicIndexClient
                     }
                 }
                 else {
-                    LOG.debug("File path not valid: {}", child);
+                    LOG.debug("File path not valid: %s", child);
                     return 0;
                 }
             }
@@ -168,10 +158,80 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public void deleteIndex(String table, String[] columns, String indexType)
+    public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        Path toDelete = root.resolve(table).resolve(String.join(COLUMN_DELIMITER, columns)).resolve(indexType);
+        IndexRecord sameNameRecord = indexRecordManager.lookUpIndexRecord(createIndexMetadata.getIndexName());
+        IndexRecord sameIndexRecord = indexRecordManager.lookUpIndexRecord(createIndexMetadata.getTableName(),
+                createIndexMetadata.getIndexColumns().stream().map(Map.Entry::getKey).toArray(String[]::new),
+                createIndexMetadata.getIndexType());
+
+        if (sameNameRecord == null) {
+            if (sameIndexRecord != null) {
+                LOG.error("Index with same (table,column,indexType) already exists with name [%s]%n%n", sameIndexRecord.name);
+                return true;
+            }
+        }
+        else {
+            if (sameIndexRecord != null) {
+                boolean partitionMerge = createIndexMetadata.getPartitions().size() != 0;
+                String conflict = String.join(",", sameIndexRecord.partitions);
+
+                for (String partition : createIndexMetadata.getPartitions()) {
+                    if (sameIndexRecord.partitions.isEmpty() || sameIndexRecord.partitions.contains(partition)) {
+                        partitionMerge = false;
+                        conflict = partition;
+                        break;
+                    }
+                }
+
+                if (!partitionMerge) {
+                    LOG.error("Same entry already exists and partitions contain conflicts: [%s]. To update, please delete old index first.%n%n", conflict);
+                    return true;
+                }
+            }
+            else {
+                LOG.error("Index with name [%s] already exists with different content: [%s]%n%n", createIndexMetadata.getIndexName(), sameNameRecord);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public List<IndexRecord> getAllIndexRecords()
+            throws IOException
+    {
+        return indexRecordManager.getIndexRecords();
+    }
+
+    @Override
+    public IndexRecord getIndexRecord(String name)
+            throws IOException
+    {
+        return indexRecordManager.lookUpIndexRecord(name);
+    }
+
+    @Override
+    public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
+            throws IOException
+    {
+        indexRecordManager.addIndexRecord(
+                createIndexMetadata.getIndexName(),
+                createIndexMetadata.getUser(),
+                createIndexMetadata.getTableName(),
+                createIndexMetadata.getIndexColumns().stream().map(Map.Entry::getKey).toArray(String[]::new),
+                createIndexMetadata.getIndexType(),
+                createIndexMetadata.getPartitions());
+    }
+
+    @Override
+    public void deleteIndex(String indexName)
+            throws IOException
+    {
+        IndexRecord indexRecord = indexRecordManager.lookUpIndexRecord(indexName);
+        Path toDelete = root.resolve(indexRecord.table).resolve(String.join(COLUMN_DELIMITER, indexRecord.columns)).resolve(indexRecord.indexType);
 
         if (!fs.exists(toDelete)) {
             return;
@@ -196,6 +256,7 @@ public class HeuristicIndexClient
             lock.unlock();
         }
 
+        indexRecordManager.deleteIndexRecord(indexName);
         return;
     }
 
@@ -243,25 +304,12 @@ public class HeuristicIndexClient
                             continue;
                         }
 
-                        String indexType = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ENGLISH);
+                        String indexType = filename.substring(filename.lastIndexOf('.') + 1);
+                        Index index = HeuristicIndexFactory.createIndex(indexType);
 
-                        Index index = indexTypesMap.get(indexType);
-                        if (index != null) {
-                            try {
-                                Constructor<? extends Index> constructor = index.getClass().getConstructor();
-                                index = constructor.newInstance();
-                            }
-                            catch (InstantiationException | IllegalAccessException | InvocationTargetException
-                                    | NoSuchMethodException e) {
-                                throw new IOException(e);
-                            }
-
-                            index.deserialize(new CloseShieldInputStream(i));
-
-                            LOG.debug("Loaded {} index from {}.", index.getId(), tarFile.toAbsolutePath());
-
-                            result.put(tarFile.getParent().resolve(filename).toString(), index);
-                        }
+                        index.deserialize(new CloseShieldInputStream(i));
+                        LOG.debug("Loaded %s index from %s.", index.getId(), tarFile.toAbsolutePath());
+                        result.put(tarFile.getParent().resolve(filename).toString(), index);
                     }
                 }
             }

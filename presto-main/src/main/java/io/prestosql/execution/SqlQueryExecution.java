@@ -203,7 +203,8 @@ public class SqlQueryExecution
                     accessControl,
                     Optional.of(queryExplainer),
                     preparedQuery.getParameters(),
-                    warningCollector);
+                    warningCollector,
+                    heuristicIndexerManager);
             this.analysis = analyzer.analyze(preparedQuery.getStatement());
 
             stateMachine.setUpdateType(analysis.getUpdateType());

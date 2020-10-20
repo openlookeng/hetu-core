@@ -24,6 +24,7 @@ import io.prestosql.sql.tree.ComparisonExpression;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -31,16 +32,14 @@ import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 
 /**
  * Bloom index implementation
- *
- * @param <T> type to be indexed on
  */
-public class BloomIndex<T>
-        implements Index<T>
+public class BloomIndex
+        implements Index
 {
     public static final String ID = "BLOOM";
     protected static final int DEFAULT_EXPECTED_NUM_OF_SIZE = 200000;
-    private static final String FPP_KEY = "fpp";
-    private static final double DEFAULT_FPP = 0.05;
+    private static final String FPP_KEY = "bloom.fpp";
+    private static final double DEFAULT_FPP = 0.001;
     private Properties properties;
     private BloomFilter filter;
     private double fpp = DEFAULT_FPP;
@@ -54,10 +53,10 @@ public class BloomIndex<T>
     }
 
     @Override
-    public boolean addValues(Map<String, Object[]> values)
+    public boolean addValues(Map<String, List<Object>> values)
     {
         // Currently expecting only one column
-        Object[] columnIdxValue = values.values().iterator().next();
+        List<Object> columnIdxValue = values.values().iterator().next();
         for (Object value : columnIdxValue) {
             if (value != null) {
                 getFilter().add(value.toString().getBytes());
@@ -66,9 +65,8 @@ public class BloomIndex<T>
         return true;
     }
 
-    // For Bloom, expression should be an Expression object for now, until it's replaced by RowExpression
     @Override
-    public boolean matches(Object expression)
+    public synchronized boolean matches(Object expression)
     {
         if (expression instanceof Domain) {
             Domain predicate = (Domain) expression;

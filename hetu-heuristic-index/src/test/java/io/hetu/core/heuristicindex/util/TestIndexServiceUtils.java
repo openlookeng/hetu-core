@@ -18,6 +18,8 @@ import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -25,10 +27,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.getPropertiesSubset;
 import static org.testng.Assert.assertEquals;
@@ -124,25 +129,32 @@ public class TestIndexServiceUtils
     }
 
     @Test
-    public void testArchiveAndUnarchive()
+    public void testArchive()
             throws IOException
     {
         try (TempFolder folder = new TempFolder()) {
-            String lastModifiedStr = IndexConstants.LAST_MODIFIED_FILE_PREFIX + "123456";
             folder.create();
-            folder.newFile("testIndex");
-            folder.newFile(lastModifiedStr);
-            IndexServiceUtils.archiveTar(LOCAL_FS_CLIENT, LOCAL_FS_CLIENT, folder.getRoot().toPath(), folder.getRoot().toPath());
-            Path tarFile = folder.getRoot().toPath().resolve(lastModifiedStr + ".tar");
-            // current file structure: folderRoot/testIndex, folderRoot/lastModified=123456, folderRoot/lastModified=123456.tar (containing testIndex)
-            assertTrue(Files.exists(tarFile));
+            Path tarPath = Paths.get(folder.getRoot().getAbsolutePath(), IndexConstants.LAST_MODIFIED_FILE_PREFIX + "123456.tar");
+            folder.newFile("100000.bloom");
+            folder.newFile("200000.bloom");
+            IndexServiceUtils.writeToHdfs(LOCAL_FS_CLIENT, LOCAL_FS_CLIENT, folder.getRoot().toPath(), tarPath);
 
-            File unArchiveDir = folder.newFolder();
-            IndexServiceUtils.unArchive(LOCAL_FS_CLIENT, LOCAL_FS_CLIENT, tarFile, unArchiveDir.toPath());
-            // current file structure: folderRoot/testIndex, folderRoot/lastModified=123456, folderRoot/lastModified=123456.tar (containing testIndex),
-            // folderRoot/<unArchiveDirName>/tmp/<folderRootName>/testIndex
-            assertTrue(Files.exists(unArchiveDir.toPath()));
-            assertTrue(Files.exists(Paths.get(unArchiveDir.getAbsolutePath(), folder.getRoot().getAbsolutePath(), "testIndex")));
+            assertTrue(Files.exists(tarPath));
+            Set<String> filesInTar = new HashSet<>();
+            try (TarArchiveInputStream i = new TarArchiveInputStream(Files.newInputStream(tarPath))) {
+                ArchiveEntry entry;
+                while ((entry = i.getNextEntry()) != null) {
+                    if (!i.canReadEntryData(entry)) {
+                        throw new FileSystemException("Unable to read archive entry: " + entry.toString());
+                    }
+
+                    String filename = entry.getName();
+                    filesInTar.add(filename);
+                }
+            }
+            assertEquals(filesInTar.size(), 2);
+            assertTrue(filesInTar.contains("100000.bloom"));
+            assertTrue(filesInTar.contains("200000.bloom"));
         }
     }
 

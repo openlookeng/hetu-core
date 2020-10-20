@@ -18,6 +18,8 @@ import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.Session.SessionBuilder;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControlManager;
@@ -83,7 +85,7 @@ public class TestStartTransactionTask
         assertFalse(stateMachine.getSession().getTransactionId().isPresent());
 
         assertPrestoExceptionThrownBy(
-                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList())))
+                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()))))
                 .hasErrorCode(INCOMPATIBLE_CLIENT);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -103,7 +105,7 @@ public class TestStartTransactionTask
         QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
 
         assertPrestoExceptionThrownBy(
-                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList())))
+                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()))))
                 .hasErrorCode(NOT_SUPPORTED);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -122,7 +124,7 @@ public class TestStartTransactionTask
         QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
         assertFalse(stateMachine.getSession().getTransactionId().isPresent());
 
-        getFutureValue(new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList()));
+        getFutureValue(new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
@@ -147,7 +149,8 @@ public class TestStartTransactionTask
                 metadata,
                 new AllowAllAccessControl(),
                 stateMachine,
-                emptyList()));
+                emptyList(),
+                new HeuristicIndexerManager(new FileSystemClientManager())));
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
@@ -175,7 +178,8 @@ public class TestStartTransactionTask
                         metadata,
                         new AllowAllAccessControl(),
                         stateMachine,
-                        emptyList())))
+                        emptyList(),
+                        new HeuristicIndexerManager(new FileSystemClientManager()))))
                 .hasErrorCode(INVALID_TRANSACTION_MODE);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -201,7 +205,8 @@ public class TestStartTransactionTask
                         metadata,
                         new AllowAllAccessControl(),
                         stateMachine,
-                        emptyList())))
+                        emptyList(),
+                        new HeuristicIndexerManager(new FileSystemClientManager()))))
                 .hasErrorCode(INVALID_TRANSACTION_MODE);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -233,7 +238,8 @@ public class TestStartTransactionTask
                 metadata,
                 new AllowAllAccessControl(),
                 stateMachine,
-                emptyList()));
+                emptyList(),
+                new HeuristicIndexerManager(new FileSystemClientManager())));
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
 

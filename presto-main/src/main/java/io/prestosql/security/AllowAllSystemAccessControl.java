@@ -159,6 +159,26 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
+    public void checkCanCreateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
+    public void checkCanDropIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
+    public void checkCanRenameIndex(Identity identity, CatalogSchemaTableName index, CatalogSchemaTableName newIndex)
+    {
+    }
+
+    @Override
+    public void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
     public void checkCanCreateView(Identity identity, CatalogSchemaTableName view)
     {
     }

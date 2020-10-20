@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.heuristicindex.index.bloom;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.prestosql.spi.predicate.Domain;
@@ -29,6 +30,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Properties;
 
 import static org.mockito.Mockito.mock;
@@ -45,15 +47,15 @@ public class TestBloomIndex
     @Test
     public void testGetId()
     {
-        assertEquals("BLOOM", new BloomIndex<>().getId());
+        assertEquals("BLOOM", new BloomIndex().getId());
     }
 
     @Test
     public void testMatches()
     {
-        BloomIndex<String> bloomIndex = new BloomIndex<>();
-        String[] bloomValues = new String[] {"a", "b", "c", "d"};
-        bloomIndex.setExpectedNumOfEntries(bloomValues.length);
+        BloomIndex bloomIndex = new BloomIndex();
+        List<Object> bloomValues = ImmutableList.of("a", "b", "c", "d");
+        bloomIndex.setExpectedNumOfEntries(bloomValues.size());
         bloomIndex.addValues(ImmutableMap.of("testColumn", bloomValues));
 
         Expression expression1 = new SqlParser().createExpression("(testColumn = 'a')", new ParsingOptions());
@@ -66,9 +68,9 @@ public class TestBloomIndex
     @Test
     public void testDomainMatching()
     {
-        BloomIndex<String> stringBloomIndex = new BloomIndex<>();
-        String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
-        stringBloomIndex.setExpectedNumOfEntries(testValues.length);
+        BloomIndex stringBloomIndex = new BloomIndex();
+        List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
+        stringBloomIndex.setExpectedNumOfEntries(testValues.size());
         stringBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
 
         ValueSet valueSet = mock(ValueSet.class);
@@ -90,9 +92,9 @@ public class TestBloomIndex
     public void testMatching()
     {
         // Test String bloom indexer
-        BloomIndex<String> stringBloomIndex = new BloomIndex<>();
-        String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
-        stringBloomIndex.setExpectedNumOfEntries(testValues.length);
+        BloomIndex stringBloomIndex = new BloomIndex();
+        List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
+        stringBloomIndex.setExpectedNumOfEntries(testValues.size());
         stringBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
 
         assertTrue(mightContain(stringBloomIndex, "a"));
@@ -105,8 +107,8 @@ public class TestBloomIndex
         assertFalse(mightContain(stringBloomIndex, "abc"));
 
         // Test with the generic type to be Object
-        BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-        testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+        BloomIndex objectBloomIndex = new BloomIndex();
+        testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
         objectBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
 
         assertTrue(mightContain(objectBloomIndex, "a"));
@@ -119,13 +121,13 @@ public class TestBloomIndex
         assertFalse(mightContain(objectBloomIndex, "abc"));
 
         // Test single insertion
-        BloomIndex<Object> simpleBloomIndex = new BloomIndex<>();
-        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"a"}));
-        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"ab"}));
-        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"测试"}));
-        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"\n"}));
-        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {"%#!"}));
-        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", new String[] {":dfs"}));
+        BloomIndex simpleBloomIndex = new BloomIndex();
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of("a")));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of("ab")));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of("测试")));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of("\n")));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of("%#!")));
+        simpleBloomIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(":dfs")));
 
         assertTrue(mightContain(simpleBloomIndex, "a"));
         assertTrue(mightContain(simpleBloomIndex, "ab"));
@@ -145,8 +147,8 @@ public class TestBloomIndex
             folder.create();
             File testFile = folder.newFile();
 
-            BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-            String[] testValues = new String[] {"%#!", ":dfs", "测试", "\n", "ab", "a"};
+            BloomIndex objectBloomIndex = new BloomIndex();
+            List<Object> testValues = ImmutableList.of("%#!", ":dfs", "测试", "\n", "ab", "a");
             objectBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
 
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
@@ -166,7 +168,7 @@ public class TestBloomIndex
             folder.create();
             File testFile = folder.newFile();
 
-            BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
+            BloomIndex objectBloomIndex = new BloomIndex();
             try (InputStream is = new FileInputStream(testFile)) {
                 assertThrows(IOException.class, () -> objectBloomIndex.deserialize(is));
             }
@@ -182,15 +184,15 @@ public class TestBloomIndex
             File testFile = folder.newFile();
 
             // Persist it using one object
-            BloomIndex<Object> objectBloomIndex = new BloomIndex<>();
-            String[] testValues = new String[] {"a", "ab", "测试", "\n", "%#!", ":dfs"};
+            BloomIndex objectBloomIndex = new BloomIndex();
+            List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
             objectBloomIndex.addValues(ImmutableMap.of("testColumn", testValues));
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
                 objectBloomIndex.serialize(fo);
             }
 
             // Load it using another object
-            BloomIndex<String> readBloomIndex = new BloomIndex<>();
+            BloomIndex readBloomIndex = new BloomIndex();
             try (FileInputStream fi = new FileInputStream(testFile)) {
                 readBloomIndex.deserialize(fi);
             }
@@ -205,7 +207,7 @@ public class TestBloomIndex
             assertFalse(mightContain(readBloomIndex, "abc"));
 
             // Load it using a weired object
-            BloomIndex<Integer> intBloomIndex = new BloomIndex<>();
+            BloomIndex intBloomIndex = new BloomIndex();
             try (FileInputStream fi = new FileInputStream(testFile)) {
                 intBloomIndex.deserialize(fi);
             }
@@ -219,14 +221,14 @@ public class TestBloomIndex
     @Test
     public void testGetProperties()
     {
-        BloomIndex<Object> testBloomIndex = new BloomIndex<>();
+        BloomIndex testBloomIndex = new BloomIndex();
         assertNull(testBloomIndex.getProperties());
     }
 
     @Test
     public void testSetProperties()
     {
-        BloomIndex<Object> testBloomIndex = new BloomIndex<>();
+        BloomIndex testBloomIndex = new BloomIndex();
         Properties properties = new Properties();
         properties.setProperty("abc", "test");
         testBloomIndex.setProperties(properties);
@@ -241,19 +243,19 @@ public class TestBloomIndex
         // adding 3 values to default size should pass
         BloomIndex defaultSizedIndex = new BloomIndex();
         assertEquals(defaultSizedIndex.getExpectedNumOfEntries(), BloomIndex.DEFAULT_EXPECTED_NUM_OF_SIZE);
-        defaultSizedIndex.addValues(ImmutableMap.of("testColumn", new Float[] {1f, 2f, 3f}));
+        defaultSizedIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f, 3f)));
 
         // adding 2 values to an index of size 2 should pass
         BloomIndex equalSizedIndex = new BloomIndex();
         equalSizedIndex.setExpectedNumOfEntries(2);
         assertEquals(equalSizedIndex.getExpectedNumOfEntries(), 2);
-        equalSizedIndex.addValues(ImmutableMap.of("testColumn", new Float[] {1f, 2f}));
+        equalSizedIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f)));
 
         // adding 3 values to an index of size 2 should pass (bloom doesn't have strict size limit)
         BloomIndex smallSizedIndex = new BloomIndex();
         smallSizedIndex.setExpectedNumOfEntries(2);
         assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
-        smallSizedIndex.addValues(ImmutableMap.of("testColumn", new Float[] {1f, 2f, 3f}));
+        smallSizedIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f, 3f)));
     }
 
     @Test

@@ -16,6 +16,7 @@ package io.prestosql.sql.rewrite;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableHandle;
@@ -89,7 +90,15 @@ public class ShowStatsRewrite
     private static final Expression NULL_VARCHAR = new Cast(new NullLiteral(), VARCHAR);
 
     @Override
-    public Statement rewrite(Session session, Metadata metadata, SqlParser parser, Optional<QueryExplainer> queryExplainer, Statement node, List<Expression> parameters, AccessControl accessControl, WarningCollector warningCollector)
+    public Statement rewrite(
+            Session session,
+            Metadata metadata,
+            SqlParser parser,
+            Optional<QueryExplainer> queryExplainer,
+            Statement node, List<Expression> parameters,
+            AccessControl accessControl,
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         return (Statement) new Visitor(metadata, session, parameters, queryExplainer, warningCollector).process(node, null);
     }

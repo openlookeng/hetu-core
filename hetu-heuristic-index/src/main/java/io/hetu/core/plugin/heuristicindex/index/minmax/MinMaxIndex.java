@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -32,11 +33,9 @@ import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 
 /**
  * MinMax index implementation. It can be used to check whether a value is in or out of the given range.
- *
- * @param <T> Type to be created index for
  */
-public class MinMaxIndex<T>
-        implements Index<T>
+public class MinMaxIndex
+        implements Index
 {
     public static final String ID = "MINMAX";
 
@@ -57,7 +56,7 @@ public class MinMaxIndex<T>
      * @param min Minimum value of range
      * @param max Maximum value of range
      */
-    public MinMaxIndex(T min, T max)
+    public MinMaxIndex(Object min, Object max)
     {
         this.min = (Comparable) min;
         this.max = (Comparable) max;
@@ -70,10 +69,10 @@ public class MinMaxIndex<T>
     }
 
     @Override
-    public boolean addValues(Map<String, Object[]> values)
+    public synchronized boolean addValues(Map<String, List<Object>> values)
     {
         // Currently expecting only one column
-        Object[] columnIdxValue = values.values().iterator().next();
+        List<Object> columnIdxValue = values.values().iterator().next();
         for (Object v : columnIdxValue) {
             if (v == null) {
                 continue;
@@ -97,7 +96,6 @@ public class MinMaxIndex<T>
         return true;
     }
 
-    // For MinMax, expression should be an Expression object for now, until it's replaced by RowExpression
     @Override
     public boolean matches(Object expression)
     {
@@ -214,7 +212,7 @@ public class MinMaxIndex<T>
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        MinMaxIndex<?> that = (MinMaxIndex<?>) o;
+        MinMaxIndex that = (MinMaxIndex) o;
         return min.equals(that.min)
                 && max.equals(that.max);
     }

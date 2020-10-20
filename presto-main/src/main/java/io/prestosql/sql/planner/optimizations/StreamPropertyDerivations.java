@@ -30,6 +30,7 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -277,6 +278,14 @@ public final class StreamPropertyDerivations
                 return new StreamProperties(MULTIPLE, Optional.empty(), false);
             }
             return new StreamProperties(MULTIPLE, streamPartitionSymbols, false);
+        }
+
+        @Override
+        public StreamProperties visitCreateIndex(CreateIndexNode node, List<StreamProperties> inputProperties)
+        {
+            StreamProperties properties = Iterables.getOnlyElement(inputProperties);
+            // create index only outputs the plan string
+            return properties.withUnspecifiedPartitioning();
         }
 
         private static Optional<Set<Symbol>> getNonConstantSymbols(Set<ColumnHandle> columnHandles, Map<ColumnHandle, Symbol> assignments, Set<ColumnHandle> globalConstants)

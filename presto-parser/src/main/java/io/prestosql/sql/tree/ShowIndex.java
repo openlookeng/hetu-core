@@ -42,9 +42,9 @@ public class ShowIndex
         this.indexName = indexName;
     }
 
-    public QualifiedName getIndexName()
+    public String getIndexName()
     {
-        return indexName.isPresent() ? indexName.get() : null;
+        return indexName.isPresent() ? indexName.get().toString() : null;
     }
 
     @Override

@@ -16,6 +16,7 @@ package io.prestosql.sql.rewrite;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
@@ -61,7 +62,8 @@ final class DescribeOutputRewrite
             Statement node,
             List<Expression> parameters,
             AccessControl accessControl,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         return (Statement) new Visitor(session, parser, metadata, queryExplainer, parameters, accessControl, warningCollector).process(node, null);
     }

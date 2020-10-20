@@ -27,6 +27,7 @@ import io.prestosql.execution.scheduler.LegacyNetworkTopology;
 import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
@@ -125,6 +126,7 @@ public final class TaskTestUtils
         NodeInfo nodeInfo = new NodeInfo("test");
 
         SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
+        HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
 
         return new LocalExecutionPlanner(
                 metadata,
@@ -154,7 +156,8 @@ public final class TaskTestUtils
                 new LookupJoinOperators(),
                 new OrderingCompiler(),
                 nodeInfo,
-                new LocalStateStoreProvider(seedStoreManager));
+                new LocalStateStoreProvider(seedStoreManager),
+                heuristicIndexerManager);
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)

@@ -17,7 +17,6 @@ package io.hetu.core.heuristicindex.util;
 
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
 
@@ -26,18 +25,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.FileSystemException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.hetu.core.heuristicindex.IndexCommand.verbose;
 
 /**
  * Util class for creating external index.
@@ -200,75 +195,41 @@ public class IndexServiceUtils
         return subsetProps;
     }
 
-    public static void archiveTar(HetuFileSystemClient srcFs, HetuFileSystemClient targetFs, Path toArchive, Path outputDir)
+    /**
+     * Tar the files in a source directory into a tarball on remote filesystem
+     * <p>
+     * This method expects the source directory to have index files name as [offset].[indextype] (e.g. {@code 3.bloom}) in the srcDir,
+     * and will tar them into one remote tar file named as [lastModifiedTime].tar with all index files.
+     *
+     * @param srcFs FileSystemClient for the source directory
+     * @param targetFs FileSystemClient on which the tar will be created
+     * @param srcDir the dir containing all index files
+     * @param tarPath a tar file path, whose file name must be /path/to/orc/file/[lastModifiedTime].tar
+     * @throws IOException when exception occurs during taring
+     */
+    public static void writeToHdfs(HetuFileSystemClient srcFs, HetuFileSystemClient targetFs, Path srcDir, Path tarPath)
             throws IOException
     {
         AtomicReference<String> tarFileName = new AtomicReference<>();
         Collection<File> filesToArchive = srcFs
-                .walk(toArchive)
-                .flatMap(path -> {
-                    String fileName = path.getFileName().toString();
-                    if (fileName.startsWith(IndexConstants.LAST_MODIFIED_FILE_PREFIX)) {
-                        // set the tar file name and meanwhile filter out lastModified file
-                        tarFileName.set(fileName + ".tar");
-                        return Stream.empty();
-                    }
-                    return srcFs.isDirectory(path) ? Stream.empty() : Stream.of(path);
-                })
+                .list(srcDir)
                 .map(Path::toFile)
                 .collect(Collectors.toList());
 
-        targetFs.createDirectories(outputDir);
-        try (OutputStream out = targetFs.newOutputStream(outputDir.resolve(tarFileName.get()))) {
+        targetFs.createDirectories(tarPath.getParent());
+        try (OutputStream out = targetFs.newOutputStream(tarPath)) {
             try (TarArchiveOutputStream o = new TarArchiveOutputStream(out)) {
-                o.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
                 for (File f : filesToArchive) {
                     ArchiveEntry entry = o.createArchiveEntry(f, f.getName());
                     o.putArchiveEntry(entry);
                     if (f.isFile()) {
-                        try (InputStream i = Files.newInputStream(f.toPath())) {
+                        try (InputStream i = srcFs.newInputStream(f.toPath())) {
                             IOUtils.copy(i, o);
                         }
                     }
                     o.closeArchiveEntry();
                 }
             }
-        }
-    }
-
-    public static void unArchive(HetuFileSystemClient remoteFs, HetuFileSystemClient outputFs, Path archive, Path prefix)
-            throws IOException
-    {
-        if (prefix == null) {
-            // no prefix tmp folder, just untar to the corresponding local directory
-            prefix = Paths.get("/");
-        }
-
-        try (TarArchiveInputStream i = new TarArchiveInputStream(remoteFs.newInputStream(archive))) {
-            ArchiveEntry entry;
-            while ((entry = i.getNextEntry()) != null) {
-                if (!i.canReadEntryData(entry)) {
-                    throw new FileSystemException("Unable to read archive entry: " + entry.toString());
-                }
-
-                outputFs.createDirectories(Paths.get(prefix.toString(), archive.getParent().toString()));
-                Path unArchivedFile = Paths.get(prefix.toString(), archive.getParent().toString(), entry.getName());
-
-                try (OutputStream o = outputFs.newOutputStream(unArchivedFile)) {
-                    IOUtils.copy(i, o);
-                }
-            }
-        }
-        catch (IOException ioe) {
-            // Failed to unarchive, delete temporary dump directory
-            outputFs.deleteRecursively(prefix);
-        }
-    }
-
-    public static void printVerboseMsg(String msg)
-    {
-        if (verbose) {
-            System.out.println(msg);
         }
     }
 

@@ -18,6 +18,7 @@ import org.testng.annotations.Test;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -37,7 +38,7 @@ public class TestIndexMetadata
             }
 
             @Override
-            public boolean addValues(Map values)
+            public boolean addValues(Map<String, List<Object>> values)
             {
                 return false;
             }

@@ -18,6 +18,7 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
@@ -34,6 +35,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public class HeuristicIndexerManager
 {
@@ -41,8 +43,15 @@ public class HeuristicIndexerManager
     private static IndexFactory factory;
     private static final Logger LOG = Logger.get(HeuristicIndexerManager.class);
 
+    private Path root;
+    private HetuFileSystemClient fs;
     private IndexClient indexClient = new NoOpIndexClient();
     private IndexWriter indexWriter = new NoOpIndexWriter();
+
+    public static HeuristicIndexerManager getNoOpHeuristicIndexerManager()
+    {
+        return new HeuristicIndexerManager(new FileSystemClientManager());
+    }
 
     @Inject
     public HeuristicIndexerManager(FileSystemClientManager fileSystemClientManager)
@@ -62,30 +71,13 @@ public class HeuristicIndexerManager
             String fsProfile = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE);
             String indexStoreRoot = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI);
 
-            Path root = Paths.get(indexStoreRoot);
-            HetuFileSystemClient fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
-
-            indexClient = factory.getIndexClient(fs, root);
+            root = Paths.get(indexStoreRoot);
+            fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
+            if (factory != null) {
+                indexClient = factory.getIndexClient(fs, root);
+            }
             LOG.info("Heuristic Indexer Client created on %s at %s", fsProfile, indexStoreRoot);
         }
-    }
-
-    public void buildIndexWriter()
-            throws IOException
-    {
-        String fsProfile = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE);
-        String indexStoreRoot = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI);
-
-        Path root = Paths.get(indexStoreRoot);
-        HetuFileSystemClient fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
-
-        // TODO: Update IndexWriter API, should remove the data source properties part
-        // TODO: Index properties should be provided through create index command
-        Properties dataSourceProperties = new Properties();
-        Properties indexProperties = new Properties();
-
-        indexWriter = factory.getIndexWriter(dataSourceProperties, indexProperties, fs, root);
-        LOG.info("Heuristic Indexer Writer created on %s at %s", fsProfile, indexStoreRoot);
     }
 
     public IndexClient getIndexClient()
@@ -93,13 +85,25 @@ public class HeuristicIndexerManager
         return indexClient;
     }
 
-    public IndexWriter getIndexWriter()
+    public IndexWriter getIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata)
     {
+        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
+            if (factory != null) {
+                LOG.info("Heuristic Indexer Writer created on %s at %s", createIndexMetadata.getTableName(), root.toString());
+                return factory.getIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
+            }
+        }
+
         return indexWriter;
     }
 
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         return factory.getIndexFilter(indices);
+    }
+
+    public Set<String> getSupportedCatalog()
+    {
+        return factory.getSupportedConnector();
     }
 }

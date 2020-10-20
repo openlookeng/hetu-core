@@ -59,6 +59,11 @@ public abstract class PlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitCreateIndex(CreateIndexNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitDistinctLimit(DistinctLimitNode node, C context)
     {
         return visitPlan(node, context);

@@ -275,4 +275,28 @@ public abstract class ForwardingSystemAccessControl
     {
         return null;
     }
+
+    @Override
+    public void checkCanCreateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+        delegate().checkCanCreateIndex(identity, index);
+    }
+
+    @Override
+    public void checkCanDropIndex(Identity identity, CatalogSchemaTableName index)
+    {
+        delegate().checkCanDropIndex(identity, index);
+    }
+
+    @Override
+    public void checkCanRenameIndex(Identity identity, CatalogSchemaTableName index, CatalogSchemaTableName newIndex)
+    {
+        delegate().checkCanRenameIndex(identity, index, newIndex);
+    }
+
+    @Override
+    public void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+        delegate().checkCanUpdateIndex(identity, index);
+    }
 }

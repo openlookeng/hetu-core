@@ -17,6 +17,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.QueryPreparer;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.sql.analyzer.QueryExplainer;
@@ -54,7 +55,8 @@ final class ExplainRewrite
             Statement node,
             List<Expression> parameters,
             AccessControl accessControl,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         return (Statement) new Visitor(session, parser, queryExplainer, warningCollector).process(node, null);
     }

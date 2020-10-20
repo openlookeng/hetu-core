@@ -126,7 +126,7 @@ public class OrcPageSource
         for (int i = 0; i < columnAdaptations.size(); i++) {
             blocks[i] = columnAdaptations.get(i).block(page, maskDeletedRowsFunction);
         }
-        return new Page(maskDeletedRowsFunction.getPositionCount(), blocks);
+        return new Page(maskDeletedRowsFunction.getPositionCount(), page.getPageMetadata(), blocks);
     }
 
     static PrestoException handleException(OrcDataSourceId dataSourceId, Exception exception)

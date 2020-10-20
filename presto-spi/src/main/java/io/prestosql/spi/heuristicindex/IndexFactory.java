@@ -14,27 +14,28 @@
  */
 package io.prestosql.spi.heuristicindex;
 
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public interface IndexFactory
 {
     /**
      * Creates an IndexWriter configured with config files, HetuFileSystemClient and root Path
-     * tableName + configRoot/catalog -> dsProperty
      * configRoot/config.properties -> ixProperty
      *
-     * @param dataSourceProps properties for datasource
-     * @param indexProps properties for index
+     * @param createIndexMetadata index metadata
+     * @param connectorMetadata datasource information
      * @param fs filesystem client to read index
      * @param root path to the index root folder
-     * @return Returns the IndexWriter loaded with the corresponding DataSource, Index and filesystem client
+     * @return Returns the IndexWriter loaded with the corresponding indexMetadata, Index and filesystem client
      */
-    public IndexWriter getIndexWriter(Properties dataSourceProps, Properties indexProps, HetuFileSystemClient fs, Path root);
+    public IndexWriter getIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root);
 
     /**
      * Creates an IndexClient configured with the IndexStore using the provided filesystem client and root folder.
@@ -46,4 +47,6 @@ public interface IndexFactory
     public IndexClient getIndexClient(HetuFileSystemClient fs, Path root);
 
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices);
+
+    public Set<String> getSupportedConnector();
 }

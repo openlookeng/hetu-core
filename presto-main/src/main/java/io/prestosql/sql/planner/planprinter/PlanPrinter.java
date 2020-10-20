@@ -55,6 +55,7 @@ import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -709,6 +710,12 @@ public class PlanPrinter
             }
             printTableScanInfo(nodeOutput, node);
             return null;
+        }
+
+        @Override
+        public Void visitCreateIndex(CreateIndexNode node, Void context)
+        {
+            return processChildren(node, context);
         }
 
         @Override

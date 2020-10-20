@@ -22,6 +22,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
@@ -59,6 +60,7 @@ public class DataDefinitionExecution<T extends Statement>
     private final AccessControl accessControl;
     private final QueryStateMachine stateMachine;
     private final List<Expression> parameters;
+    private final HeuristicIndexerManager heuristicIndexerManager;
 
     private DataDefinitionExecution(
             DataDefinitionTask<T> task,
@@ -68,7 +70,8 @@ public class DataDefinitionExecution<T extends Statement>
             Metadata metadata,
             AccessControl accessControl,
             QueryStateMachine stateMachine,
-            List<Expression> parameters)
+            List<Expression> parameters,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         this.task = requireNonNull(task, "task is null");
         this.statement = requireNonNull(statement, "statement is null");
@@ -78,6 +81,7 @@ public class DataDefinitionExecution<T extends Statement>
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
         this.parameters = parameters;
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
     @Override
@@ -164,7 +168,7 @@ public class DataDefinitionExecution<T extends Statement>
                 return;
             }
 
-            ListenableFuture<?> future = task.execute(statement, transactionManager, metadata, accessControl, stateMachine, parameters);
+            ListenableFuture<?> future = task.execute(statement, transactionManager, metadata, accessControl, stateMachine, parameters, heuristicIndexerManager);
             Futures.addCallback(future, new FutureCallback<Object>()
             {
                 @Override
@@ -282,18 +286,21 @@ public class DataDefinitionExecution<T extends Statement>
         private final Metadata metadata;
         private final AccessControl accessControl;
         private final Map<Class<? extends Statement>, DataDefinitionTask<?>> tasks;
+        private final HeuristicIndexerManager heuristicIndexerManager;
 
         @Inject
         public DataDefinitionExecutionFactory(
                 TransactionManager transactionManager,
                 Metadata metadata,
                 AccessControl accessControl,
-                Map<Class<? extends Statement>, DataDefinitionTask<?>> tasks)
+                Map<Class<? extends Statement>, DataDefinitionTask<?>> tasks,
+                HeuristicIndexerManager heuristicIndexerManager)
         {
             this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
             this.accessControl = requireNonNull(accessControl, "accessControl is null");
             this.tasks = requireNonNull(tasks, "tasks is null");
+            this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         }
 
         @Override
@@ -303,21 +310,22 @@ public class DataDefinitionExecution<T extends Statement>
                 String slug,
                 WarningCollector warningCollector)
         {
-            return createDataDefinitionExecution(preparedQuery.getStatement(), preparedQuery.getParameters(), stateMachine, slug);
+            return createDataDefinitionExecution(preparedQuery.getStatement(), preparedQuery.getParameters(), stateMachine, slug, heuristicIndexerManager);
         }
 
         private <T extends Statement> DataDefinitionExecution<T> createDataDefinitionExecution(
                 T statement,
                 List<Expression> parameters,
                 QueryStateMachine stateMachine,
-                String slug)
+                String slug,
+                HeuristicIndexerManager heuristicIndexerManager)
         {
             @SuppressWarnings("unchecked")
             DataDefinitionTask<T> task = (DataDefinitionTask<T>) tasks.get(statement.getClass());
             checkArgument(task != null, "no task for statement: %s", statement.getClass().getSimpleName());
 
             stateMachine.setUpdateType(task.getName());
-            return new DataDefinitionExecution<>(task, statement, slug, transactionManager, metadata, accessControl, stateMachine, parameters);
+            return new DataDefinitionExecution<>(task, statement, slug, transactionManager, metadata, accessControl, stateMachine, parameters, heuristicIndexerManager);
         }
     }
 }

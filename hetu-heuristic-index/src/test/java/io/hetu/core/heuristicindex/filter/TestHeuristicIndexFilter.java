@@ -42,29 +42,29 @@ import static org.testng.Assert.assertTrue;
 
 public class TestHeuristicIndexFilter
 {
-    BloomIndex<String> bloomIndex1;
-    BloomIndex<String> bloomIndex2;
-    MinMaxIndex<Integer> minMaxIndex1;
-    MinMaxIndex<Integer> minMaxIndex2;
+    BloomIndex bloomIndex1;
+    BloomIndex bloomIndex2;
+    MinMaxIndex minMaxIndex1;
+    MinMaxIndex minMaxIndex2;
 
     @BeforeClass
     public void setup()
     {
-        bloomIndex1 = new BloomIndex<>();
+        bloomIndex1 = new BloomIndex();
         bloomIndex1.setExpectedNumOfEntries(2);
-        bloomIndex1.addValues(ImmutableMap.of("testColumn", new String[] {"a", "b"}));
+        bloomIndex1.addValues(ImmutableMap.of("testColumn", ImmutableList.of("a", "b")));
 
-        bloomIndex2 = new BloomIndex<>();
+        bloomIndex2 = new BloomIndex();
         bloomIndex2.setExpectedNumOfEntries(2);
-        bloomIndex2.addValues(ImmutableMap.of("testColumn", new String[] {"c", "d"}));
+        bloomIndex2.addValues(ImmutableMap.of("testColumn", ImmutableList.of("c", "d")));
 
-        minMaxIndex1 = new MinMaxIndex<>();
+        minMaxIndex1 = new MinMaxIndex();
         minMaxIndex1.setExpectedNumOfEntries(3);
-        minMaxIndex1.addValues(ImmutableMap.of("testColumn", new Long[] {1L, 5L, 10L}));
+        minMaxIndex1.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1L, 5L, 10L)));
 
-        minMaxIndex2 = new MinMaxIndex<>();
+        minMaxIndex2 = new MinMaxIndex();
         minMaxIndex2.setExpectedNumOfEntries(3);
-        minMaxIndex2.addValues(ImmutableMap.of("testColumn", new Long[] {50L, 80L, 100L}));
+        minMaxIndex2.addValues(ImmutableMap.of("testColumn", ImmutableList.of(50L, 80L, 100L)));
     }
 
     @Test

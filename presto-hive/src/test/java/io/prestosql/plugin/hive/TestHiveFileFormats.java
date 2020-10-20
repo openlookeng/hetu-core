@@ -601,6 +601,7 @@ public class TestHiveFileFormats
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                null,
                 false);
 
         RecordCursor cursor = ((RecordPageSource) pageSource.get()).getCursor();
@@ -652,6 +653,7 @@ public class TestHiveFileFormats
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                null,
                 false);
 
         assertTrue(pageSource.isPresent());

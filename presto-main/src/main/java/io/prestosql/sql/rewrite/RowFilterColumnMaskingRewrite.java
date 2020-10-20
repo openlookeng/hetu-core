@@ -18,6 +18,7 @@ import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.QualifiedObjectName;
@@ -32,6 +33,7 @@ import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.AstVisitor;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Except;
 import io.prestosql.sql.tree.Expression;
@@ -64,7 +66,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+import static io.prestosql.sql.ParsingUtil.createParsingOptions;
 import static java.util.Objects.requireNonNull;
 
 public class RowFilterColumnMaskingRewrite
@@ -74,7 +78,15 @@ public class RowFilterColumnMaskingRewrite
     private static final String INFORMATION_SCHEMA_NAME = "information_schema";
 
     @Override
-    public Statement rewrite(Session session, Metadata metadata, SqlParser parser, Optional<QueryExplainer> queryExplainer, Statement node, List<Expression> parameters, AccessControl accessControl, WarningCollector warningCollector)
+    public Statement rewrite(
+            Session session,
+            Metadata metadata,
+            SqlParser parser,
+            Optional<QueryExplainer> queryExplainer,
+            Statement node, List<Expression> parameters,
+            AccessControl accessControl,
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         return (Statement) new Visitor(metadata, parser, session, parameters, accessControl, queryExplainer).process(node, null);
     }
@@ -332,6 +344,33 @@ public class RowFilterColumnMaskingRewrite
                         context), node
                         .getOrderBy(), node.getOffset(), node.getLimit());
             }
+        }
+
+        @Override
+        protected Node visitCreateIndex(CreateIndex createIndex, Void context)
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.append("select ");
+
+            if (createIndex.getColumnAliases() == null) {
+                builder.append("* ");
+            }
+            else {
+                List<String> columns = createIndex.getColumnAliases().stream()
+                        .map(Identifier::getValue).collect(Collectors.toList());
+                builder.append(String.join(", ", columns));
+            }
+
+            builder.append(" from ");
+            builder.append(createIndex.getTableName());
+            if (createIndex.getExpression().isPresent()) {
+                builder.append(" where");
+                String whereStr = createIndex.getExpression().get().toString();
+                builder.append(" ").append(whereStr.substring(1, whereStr.length() - 1));
+            }
+            Statement statement = sqlParser.createStatement(builder.toString(), createParsingOptions(session));
+
+            return statement;
         }
 
         @Override
