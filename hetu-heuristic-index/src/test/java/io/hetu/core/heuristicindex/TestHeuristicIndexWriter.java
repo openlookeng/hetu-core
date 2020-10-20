@@ -287,7 +287,7 @@ public class TestHeuristicIndexWriter
             HeuristicIndexWriter writer = new HeuristicIndexWriter(ds, indices, fs, folder.getRoot().toPath());
             String tableName = "catalog.schema.table";
 
-            writer.createIndex(tableName, new String[] {"test"}, new String[] {}, "bloom", true);
+            writer.createIndex(tableName, new String[] {"test"}, new String[] {}, "bloom");
 
             File indexFolder = new File(folder.getRoot().getAbsolutePath() + "/" + tableName);
             LOG.info("Previous files:");

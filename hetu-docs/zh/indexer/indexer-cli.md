@@ -66,18 +66,30 @@ export JAVA_TOOL_OPTIONS="-Xmx100G"
 
 在此示例中，MaxHeapSize被设置为100 GB。
 
+### 磁盘使用
+启发式索引使用本地临时文件夹存储创建的索引，然后打包上传至hdfs。因此，它需要临时文件夹（例如，linux上的`/tmp`)挂载的磁盘分区在本地有足够的可用空间。如果挂载的磁盘分区可用空间不足，用户可以在运行命令行时通过`-Djava.io.tmpdir`来指定使用的临时路径：
+```bash
+java -Djava.io.tmpdir=/path/to/another/dir -jar ./hetu-cli-*.jar
+```
+
+下面的公式给出了一个对于Bloom索引占用磁盘空间的大致估计。Bloom索引使用的空间大致与用于创建索引的表的大小成正比，同时与指定的`fpp`值的对数相反数成正比。因此，更小的fpp值和更大的数据集会使得创建的索引更大：
+
+索引大小 = -log(fpp) * 表占用空间 * C
+
+系数C还与其他许多因素相关，例如创建索引的列占表总数据的比重，但这些因素的影响应当不如fpp和表的大小重要，且变化较小。作为一个典型的拥有几个列的数据表，这个系数C在0.04左右。这就是说，为一个100GB的数据表的一列创建一个`fpp=0.001`的索引大致需要12GB磁盘空间，而创建`fpp=0.0001`的索引则需要16GB左右。
+
 ### 并行索引
 
-如果在一台机器上为一个大表创建索引的速度太慢，则可以在不同的机器上并行为不同的分区创建索引。这需要设置parallelCreation标志并指定分区。例如：
+如果在一台机器上为一个大表创建索引的速度太慢，则可以在不同的机器上并行为不同的分区创建索引。只要保证这些并行创建的分区不冲突即可。例如：
 
 在机器1上：
 
 ``` bash
-$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part1'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01") WHERE p=part1'
 ```
 
 在机器2上：
 
 ``` shell
-$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01", parallelCreation=true) WHERE p=part2'
+$ java -jar ./hetu-cli-*.jar --config /xxx/etc --execute 'CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01") WHERE p=part2'
 ```

@@ -19,12 +19,6 @@ public class NoOpIndexWriter
         implements IndexWriter
 {
     @Override
-    public void createIndex(String table, String[] columns, String[] partitions, String indexType, boolean lockingEnabled)
-    {
-        throw new UnsupportedOperationException("This is a no-op index writer");
-    }
-
-    @Override
     public void createIndex(String table, String[] columns, String[] partitions, String indexType)
     {
         throw new UnsupportedOperationException("This is a no-op index writer");

@@ -14,6 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
+import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
@@ -23,7 +24,9 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
@@ -69,19 +72,21 @@ public class TestIndexRecordManager
     public void testAddAndLookUp()
             throws IOException, IllegalAccessException
     {
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "");
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", "");
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "12");
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "12", "123");
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", ImmutableList.of("12"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", ImmutableList.of("12", "123"));
     }
 
     @Test
     public void testRecordEqualAndHash()
     {
-        IndexRecordManager.IndexRecord r1 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "");
-        IndexRecordManager.IndexRecord r2 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "note");
-        IndexRecordManager.IndexRecord r3 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", "");
-        IndexRecordManager.IndexRecord r4 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", "");
+        IndexRecordManager.IndexRecord r1 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList());
+        IndexRecordManager.IndexRecord r2 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {
+                "testColumn"}, "minmax", ImmutableList.of("note"));
+        IndexRecordManager.IndexRecord r3 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList());
+        IndexRecordManager.IndexRecord r4 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn",
+                "testColumn2"}, "minmax", Collections.emptyList());
         assertEquals(r1, r1);
         assertEquals(r1, r2);
         assertNotEquals(r1, r3);
@@ -104,20 +109,21 @@ public class TestIndexRecordManager
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager.IndexRecord expected = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "");
+            IndexRecordManager.IndexRecord expected = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {
+                    "testColumn"}, "minmax", ImmutableList.of(""));
             IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
             IndexRecordManager.IndexRecord actual = IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "testName");
             assertIndexRecordFullyEqual(actual, expected);
         }
     }
 
-    private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, String... note)
+    private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, List<String> note)
             throws IOException, IllegalAccessException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager.IndexRecord expected = new IndexRecordManager.IndexRecord(name, user, table, columns, indexType, String.join(",", note));
-            IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), name, user, table, columns, indexType, note);
+            IndexRecordManager.IndexRecord expected = new IndexRecordManager.IndexRecord(name, user, table, columns, indexType, note);
+            IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), name, user, table, columns, indexType, note.toArray(new String[0]));
 
             IndexRecordManager.IndexRecord actual1 = IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), name);
             assertNotNull(actual1);

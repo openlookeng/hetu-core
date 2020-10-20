@@ -14,6 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
+import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -25,7 +26,9 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
@@ -97,7 +100,7 @@ public class IndexRecordManager
      * Add IndexRecord into record file. If the method is called with a name that already exists,
      * it will OVERWRITE the existing entry but combine the note part
      */
-    public static synchronized void addIndexRecord(HetuFileSystemClient fs, Path root, String name, String user, String table, String[] columns, String indexType, String... note)
+    public static synchronized void addIndexRecord(HetuFileSystemClient fs, Path root, String name, String user, String table, String[] columns, String indexType, String... partitions)
             throws IOException
     {
         validatePath(root);
@@ -106,16 +109,16 @@ public class IndexRecordManager
         try {
             lock.lock();
             List<IndexRecord> records = readAllIndexRecords(fs, root);
-            String noteToWrite = String.join(",", note);
             Iterator<IndexRecord> iterator = records.iterator();
+            List<String> partitionsToWrite = new LinkedList<>(Arrays.asList(partitions));
             while (iterator.hasNext()) {
                 IndexRecord record = iterator.next();
                 if (name.equals(record.name)) {
-                    noteToWrite = record.note.equals("") ? noteToWrite : record.note + "," + noteToWrite;
+                    partitionsToWrite.addAll(0, record.partitions);
                     iterator.remove();
                 }
             }
-            records.add(new IndexRecord(name, user, table, columns, indexType, noteToWrite));
+            records.add(new IndexRecord(name, user, table, columns, indexType, partitionsToWrite));
             writeIndexRecords(fs, root, records);
         }
         finally {
@@ -153,7 +156,7 @@ public class IndexRecordManager
         boolean writeHead = false;
         try (OutputStream os = fs.newOutputStream(recordFile)) {
             // Use IndexRecord to generate a special "entry" as table head so it's easier to maintain when csv format changes
-            String head = new IndexRecord("Name", "User", "Table", new String[] {"Columns"}, "IndexType", "Notes").toCsvRecord();
+            String head = new IndexRecord("Name", "User", "Table", new String[] {"Columns"}, "IndexType", ImmutableList.of("Partitions")).toCsvRecord();
             os.write(head.getBytes());
             for (IndexRecord record : records) {
                 os.write(record.toCsvRecord().getBytes());
@@ -180,16 +183,16 @@ public class IndexRecordManager
         public final String table;
         public final String[] columns;
         public final String indexType;
-        public final String note;
+        public final List<String> partitions;
 
-        public IndexRecord(String name, String user, String table, String[] columns, String indexType, String note)
+        public IndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> partitions)
         {
             this.name = name;
             this.user = user == null ? "" : user;
             this.table = table;
             this.columns = columns;
             this.indexType = indexType;
-            this.note = note;
+            this.partitions = partitions;
         }
 
         public IndexRecord(String csvRecord)
@@ -200,12 +203,12 @@ public class IndexRecordManager
             this.table = records[2];
             this.columns = records[3].split(COLUMN_DELIMITER);
             this.indexType = records[4];
-            this.note = records.length > 5 ? records[5] : "";
+            this.partitions = records.length > 5 ? Arrays.asList(records[5].split(",")) : Collections.emptyList();
         }
 
         public String toCsvRecord()
         {
-            return String.format("%s\t%s\t%s\t%s\t%s\t%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType, note);
+            return String.format("%s\t%s\t%s\t%s\t%s\t%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType, String.join(",", partitions));
         }
 
         @Override

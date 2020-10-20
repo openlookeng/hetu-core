@@ -27,7 +27,8 @@ public class SecurePathWhiteList
             "/opt/hetu",
             "/opt/openlookeng",
             "/etc/hetu",
-            "/etc/openlookeng"));
+            "/etc/openlookeng",
+            System.getProperty("java.io.tmpdir")));
 
     private SecurePathWhiteList()
     {

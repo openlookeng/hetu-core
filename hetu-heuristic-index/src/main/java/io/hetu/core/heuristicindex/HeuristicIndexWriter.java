@@ -22,7 +22,6 @@ import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
-import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
@@ -46,7 +45,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -101,13 +99,6 @@ public class HeuristicIndexWriter
     public void createIndex(String table, String[] columns, String[] partitions, String indexType)
             throws IOException
     {
-        createIndex(table, columns, partitions, indexType, true);
-    }
-
-    @Override
-    public void createIndex(String table, String[] columns, String[] partitions, String indexType, boolean parallelCreation)
-            throws IOException
-    {
         requireNonNull(table, "no table specified");
         requireNonNull(columns, "no columns specified");
         requireNonNull(indexType, "no index type specified");
@@ -139,23 +130,6 @@ public class HeuristicIndexWriter
         checkArgument(SecurePathWhiteList.isSecurePath(tableIndexDirPath.toString()),
                 "Create index temp directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
-        Lock lock = null;
-        if (!parallelCreation) {
-            lock = new FileBasedLock(LOCAL_FS_CLIENT, tableIndexDirPath);
-            // cleanup hook in case regular execution is interrupted
-            Lock finalLock = lock;
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                cleanPartFiles(partFiles);
-                finalLock.unlock();
-                try {
-                    LOCAL_FS_CLIENT.close();
-                }
-                catch (IOException e) {
-                    throw new UncheckedIOException("Error closing FileSystem Client: " + LOCAL_FS_CLIENT.getClass().getName(), e);
-                }
-            }));
-            lock.lock();
-        }
         AtomicDouble progress = new AtomicDouble();
         if (!IndexCommand.verbose) {
             System.out.print("\rProgress: [" + Strings.repeat(" ", PROGRESS_BAR_LENGTH) + "] 0%");
@@ -358,10 +332,6 @@ public class HeuristicIndexWriter
         }
         finally {
             cleanPartFiles(partFiles);
-
-            if (lock != null) {
-                lock.unlock();
-            }
 
             printVerboseMsg("Deleting local tmp folder: " + strTmpPath);
             LOCAL_FS_CLIENT.deleteRecursively(tmpPath);
