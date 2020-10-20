@@ -26,13 +26,11 @@ import io.prestosql.spi.block.LazyBlockLoader;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.statestore.StateStoreProvider;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -41,9 +39,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 public class DynamicFilterOperator
         implements Operator
@@ -57,6 +59,7 @@ public class DynamicFilterOperator
     private boolean finished;
     private Page currentPage;
     private Map<Integer, BloomFilter> bloomFilterMap = new HashMap<>();
+    private final ScheduledExecutorService queryBloomFilter = newSingleThreadScheduledExecutor(threadsNamed("dynamic-filter"));
 
     public DynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, StateStoreProvider stateStoreProvider, Optional<List<String>> columns)
     {
@@ -76,6 +79,10 @@ public class DynamicFilterOperator
         if (stateStoreProvider.getStateStore() != null) {
             stateStoreProvider.getStateStore().createStateCollection(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION, StateCollection.Type.MAP);
         }
+        this.queryBloomFilter.scheduleWithFixedDelay(
+                () -> {
+                    updateBloomFilter();
+                }, 50, 10, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -98,46 +105,12 @@ public class DynamicFilterOperator
             return;
         }
 
-        // get bloom filter from hazelcast using queryId
-        if (stateStoreProvider.getStateStore() != null) {
-            StateMap<String, byte[]> bloomFilters = (StateMap<String, byte[]>) stateStoreProvider.getStateStore().getStateCollection(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION);
-            if (bloomFilters != null && bloomFilters.size() > bloomFilterMap.size()) {
-                for (int i = 0; i < symbols.size(); i++) {
-                    Symbol symbol = symbols.get(i);
-                    String columnName;
-                    // if symbols not equals columns, we use columns
-                    if (columns.isPresent()) {
-                        columnName = columns.get().get(i);
-                    }
-                    else {
-                        columnName = symbol.getName();
-                    }
-                    if (bloomFilters.containsKey(columnName) && !bloomFilterMap.containsKey(i)) {
-                        // Deserialize new bloomfilters
-                        try (ByteArrayInputStream input = new ByteArrayInputStream(bloomFilters.get(columnName))) {
-                            bloomFilterMap.put(i, BloomFilter.readFrom(input));
-                        }
-                        catch (IOException e) {
-                            // ignore the bloomfilter if broken
-                        }
-                    }
-                }
-            }
+        if (bloomFilterMap.isEmpty()) {
+            updateBloomFilter();
         }
 
         if (!bloomFilterMap.isEmpty()) {
-            IntArrayList rowsToKeep = filterRows(page);
-            Block[] adaptedBlocks = new Block[page.getChannelCount()];
-            for (int i = 0; i < adaptedBlocks.length; i++) {
-                Block block = page.getBlock(i);
-                if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
-                    adaptedBlocks[i] = new LazyBlock(rowsToKeep.size(), new RowFilterLazyBlockLoader(page.getBlock(i), rowsToKeep.elements()));
-                }
-                else {
-                    adaptedBlocks[i] = block.getPositions(rowsToKeep.elements(), 0, rowsToKeep.size());
-                }
-            }
-            currentPage = new Page(rowsToKeep.size(), adaptedBlocks);
+            currentPage = filter(page);
         }
         else {
             currentPage = page;
@@ -156,6 +129,13 @@ public class DynamicFilterOperator
     public void finish()
     {
         finished = true;
+        this.queryBloomFilter.shutdownNow();
+    }
+
+    @Override
+    public synchronized void close()
+    {
+        this.queryBloomFilter.shutdownNow();
     }
 
     @Override
@@ -176,6 +156,10 @@ public class DynamicFilterOperator
 
         Block[] adaptedBlocks = new Block[page.getChannelCount()];
         int[] rowsToKeep = toPositions(result);
+        if (rowsToKeep.length == page.getPositionCount()) {
+            return page;
+        }
+
         for (int i = 0; i < adaptedBlocks.length; i++) {
             Block block = page.getBlock(i);
             if (block instanceof LazyBlock && !((LazyBlock) block).isLoaded()) {
@@ -186,6 +170,44 @@ public class DynamicFilterOperator
             }
         }
         return new Page(rowsToKeep.length, adaptedBlocks);
+    }
+
+    private void updateBloomFilter()
+    {
+        try {
+            if (stateStoreProvider.getStateStore() == null) {
+                this.queryBloomFilter.shutdownNow();
+                return;
+            }
+            // get bloom filter from hazelcast using queryId
+            StateMap<String, byte[]> bloomFilters = (StateMap<String, byte[]>) stateStoreProvider.getStateStore().getStateCollection(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION);
+            if (bloomFilters == null || bloomFilters.size() <= bloomFilterMap.size()) {
+                return;
+            }
+
+            for (int i = 0; i < symbols.size(); i++) {
+                String columnName;
+                // if symbols is not null, we use columns to get columnName
+                if (columns.isPresent()) {
+                    columnName = columns.get().get(i);
+                }
+                else {
+                    columnName = symbols.get(i).getName();
+                }
+                if (bloomFilters.containsKey(columnName) && !bloomFilterMap.containsKey(i)) {
+                    // Deserialize new bloomfilters
+                    try (ByteArrayInputStream input = new ByteArrayInputStream(bloomFilters.get(columnName))) {
+                        bloomFilterMap.put(i, BloomFilter.readFrom(input));
+                    }
+                    catch (IOException e) {
+                        // ignore the bloomfilter if broken
+                    }
+                }
+            }
+        }
+        catch (Throwable e) {
+            // ignore any exception and error
+        }
     }
 
     /**
@@ -201,41 +223,11 @@ public class DynamicFilterOperator
         int idx = 0;
         for (int i = 0; i < keep.length; i++) {
             if (keep[i]) {
-                result[idx] = i + 1; //position is 1-based
+                result[idx] = i; //position is 0-based
                 idx++;
             }
         }
         return result;
-    }
-
-    private IntArrayList filterRows(Page page)
-    {
-        IntArrayList ids = new IntArrayList(page.getPositionCount());
-
-        for (int position = 0; position < page.getPositionCount(); position++) {
-            boolean shouldKeep = true;
-            for (Map.Entry<Integer, BloomFilter> entry : bloomFilterMap.entrySet()) {
-                int columnIndex = entry.getKey();
-
-                if (columnIndex >= page.getChannelCount()) {
-                    // Index out of array range
-                    continue;
-                }
-
-                Block block = page.getBlock(columnIndex).getLoadedBlock();
-                String nativeValue = TypeUtils.readNativeValueForDynamicFilter(columnTypes.get(columnIndex), block, position);
-
-                if (nativeValue != null && !entry.getValue().test(nativeValue.getBytes())) {
-                    shouldKeep = false;
-                    break;
-                }
-            }
-            if (shouldKeep) {
-                ids.add(position);
-            }
-        }
-
-        return ids;
     }
 
     public static class DynamicFilterOperatorFactory
