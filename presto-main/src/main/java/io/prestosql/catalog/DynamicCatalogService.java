@@ -122,12 +122,15 @@ public class DynamicCatalogService
                     throw badRequest(FOUND, "The catalog [" + catalogName + "] already exists");
                 }
 
+                boolean needSaveKey = catalogInfo.getSecurityKey() != null && !catalogInfo.getSecurityKey().isEmpty();
                 // save security key
-                try {
-                    securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
-                }
-                catch (SecurityKeyException e) {
-                    throw badRequest(BAD_REQUEST, "Failed to save key.");
+                if (needSaveKey) {
+                    try {
+                        securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
+                    }
+                    catch (SecurityKeyException e) {
+                        throw badRequest(BAD_REQUEST, "Failed to save key.");
+                    }
                 }
 
                 // create catalog
@@ -136,7 +139,9 @@ public class DynamicCatalogService
                     dynamicCatalogStore.loadCatalogAndCreateShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
                 }
                 catch (PrestoException | IllegalArgumentException ex) {
-                    deleteSecurityKey(catalogName);
+                    if (needSaveKey) {
+                        deleteSecurityKey(catalogName);
+                    }
                     throw badRequest(BAD_REQUEST, "Failed to load catalog. Please check your configuration.");
                 }
             }

@@ -36,6 +36,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -181,7 +182,10 @@ public class CatalogResource
                     configFiles,
                     new HttpRequestSessionContext(servletRequest));
         }
-        catch (IOException ex) {
+        catch (WebApplicationException ex) {
+            throw ex;
+        }
+        catch (Throwable ex) {
             throw badRequest(BAD_REQUEST, "create catalog failed. please check your configuration.");
         }
         finally {
@@ -205,7 +209,10 @@ public class CatalogResource
                     configFiles,
                     new HttpRequestSessionContext(servletRequest));
         }
-        catch (IOException ex) {
+        catch (WebApplicationException ex) {
+            throw ex;
+        }
+        catch (Throwable ex) {
             throw badRequest(BAD_REQUEST, "update catalog failed. please check your configuration.");
         }
         finally {
@@ -221,14 +228,35 @@ public class CatalogResource
             @Context HttpServletRequest servletRequest)
     {
         checkCatalogName(catalogName);
+        Response response;
+        try {
+            response = service.dropCatalog(catalogName, new HttpRequestSessionContext(servletRequest));
+        }
+        catch (WebApplicationException ex) {
+            throw ex;
+        }
+        catch (Throwable ex) {
+            throw badRequest(BAD_REQUEST, "update catalog failed. please check your configuration.");
+        }
 
-        return service.dropCatalog(catalogName, new HttpRequestSessionContext(servletRequest));
+        return response;
     }
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Response showCatalogs(@Context HttpServletRequest servletRequest)
     {
-        return service.showCatalogs(new HttpRequestSessionContext(servletRequest));
+        Response response;
+        try {
+            response = service.showCatalogs(new HttpRequestSessionContext(servletRequest));
+        }
+        catch (WebApplicationException ex) {
+            throw ex;
+        }
+        catch (Throwable ex) {
+            throw badRequest(BAD_REQUEST, "update catalog failed. please check your configuration.");
+        }
+
+        return response;
     }
 }
