@@ -1520,4 +1520,359 @@ public abstract class AbstractTestDistributedQueries
             assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
         }
     }
+
+    @Test
+    public void testLargeFilterExpression()
+    {
+        String sql = "SELECT * FROM orders WHERE (custkey=1 AND shippriority=1)" +
+                " OR (custkey=2 AND shippriority= 2)" +
+                " OR (custkey=3 AND shippriority= 3)" +
+                " OR (custkey=4 AND shippriority= 4)" +
+                " OR (custkey=5 AND shippriority= 5)" +
+                " OR (custkey=6 AND shippriority= 6)" +
+                " OR (custkey=7 AND shippriority= 7)" +
+                " OR (custkey=8 AND shippriority= 8)" +
+                " OR (custkey=9 AND shippriority= 9)" +
+                " OR (custkey=10 AND shippriority= 10)" +
+                " OR (custkey=11 AND shippriority= 11)" +
+                " OR (custkey=12 AND shippriority= 12)" +
+                " OR (custkey=13 AND shippriority= 13)" +
+                " OR (custkey=14 AND shippriority= 14)" +
+                " OR (custkey=15 AND shippriority= 15)" +
+                " OR (custkey=16 AND shippriority= 16)" +
+                " OR (custkey=17 AND shippriority= 17)" +
+                " OR (custkey=18 AND shippriority= 18)" +
+                " OR (custkey=19 AND shippriority= 19)" +
+                " OR (custkey=20 AND shippriority= 20)" +
+                " OR (custkey=21 AND shippriority= 21)" +
+                " OR (custkey=22 AND shippriority= 22)" +
+                " OR (custkey=23 AND shippriority= 23)" +
+                " OR (custkey=24 AND shippriority= 24)" +
+                " OR (custkey=25 AND shippriority= 25)" +
+                " OR (custkey=26 AND shippriority= 26)" +
+                " OR (custkey=27 AND shippriority= 27)" +
+                " OR (custkey=28 AND shippriority= 28)" +
+                " OR (custkey=29 AND shippriority= 29)" +
+                " OR (custkey=30 AND shippriority= 30)" +
+                " OR (custkey=31 AND shippriority= 31)" +
+                " OR (custkey=32 AND shippriority= 32)";
+        MaterializedResult result = computeActual(sql);
+        System.out.println("Query Output: " + result);
+    }
+
+    @Test
+    public void testDefectCase()
+    {
+        if (!supportsViews()) {
+            return;
+        }
+        assertUpdate("create table error(t int, u int)");
+
+        String sql = "select *\n" +
+                "from error\n" +
+                "where\n" +
+                "(t=51 and u=-4)\n" +
+                "or (t=52 and u=-10)\t\t\n" +
+                "or (t=46 and u=-2)\n" +
+                "or (t=46 and u=-1)\n" +
+                "or (t=43 and u=3)\n" +
+                "or (t=39 and u=-7)\n" +
+                "or (t=48 and u=-4)\n" +
+                "or (t=42 and u=-8)\n" +
+                "or (t=43 and u=-6)\n" +
+                "or (t=44 and u=4)\n" +
+                "or (t=37 and u=-6)\n" +
+                "or (t=38 and u=-8)\n" +
+                "or (t=46 and u=12)\n" +
+                "or (t=39 and u=17)\n" +
+                "or (t=42 and u=-9)\n" +
+                "or (t=45 and u=9)\n" +
+                "or (t=46 and u=3)\n" +
+                "or (t=37 and u=-9)\n" +
+                "or (t=47 and u=9)\n" +
+                "or (t=40 and u=-6)\n" +
+                "or (t=48 and u=20)\n" +
+                "or (t=49 and u=12)\n" +
+                "or (t=49 and u=17)\n" +
+                "or (t=48 and u=1)\n" +
+                "or (t=50 and u=11)\n" +
+                "or (t=50 and u=22)\n" +
+                "or (t=51 and u=1)\n" +
+                "or (t=52 and u=-8)\n" +
+                "or (t=47 and u=-2)\n" +
+                "or (t=40 and u=0)\n" +
+                "or (t=47 and u=-1)\n" +
+                "or (t=51 and u=-5)\n" +
+                "or (t=42 and u=15)\n" +
+                "or (t=44 and u=-2)\n" +
+                "or (t=44 and u=-1)\n" +
+                "or (t=51 and u=12)\n" +
+                "or (t=39 and u=-4)\n" +
+                "or (t=47 and u=19)\n" +
+                "or (t=42 and u=-3)\n" +
+                "or (t=43 and u=-7)\n" +
+                "or (t=46 and u=9)\n" +
+                "or (t=37 and u=-3)\n" +
+                "or (t=48 and u=14)\n" +
+                "or (t=49 and u=15)\n" +
+                "or (t=41 and u=-6)\n" +
+                "or (t=47 and u=12)\n" +
+                "or (t=45 and u=12)\n" +
+                "or (t=48 and u=17)\n" +
+                "or (t=50 and u=1)\n" +
+                "or (t=50 and u=12)\n" +
+                "or (t=40 and u=-9)\n" +
+                "or (t=51 and u=19)\n" +
+                "or (t=48 and u=-1)\n" +
+                "or (t=52 and u=8)\n" +
+                "or (t=52 and u=12)\n" +
+                "or (t=51 and u=22)\n" +
+                "or (t=52 and u=-3)\n" +
+                "or (t=47 and u=-3)\n" +
+                "or (t=45 and u=-2)\n" +
+                "or (t=42 and u=0)\n" +
+                "or (t=39 and u=-10)\n" +
+                "or (t=40 and u=16)\n" +
+                "or (t=38 and u=15)\n" +
+                "or (t=45 and u=-1)\n" +
+                "or (t=44 and u=3)\n" +
+                "or (t=43 and u=13)\n" +
+                "or (t=51 and u=21)\n" +
+                "or (t=49 and u=5)\n" +
+                "or (t=48 and u=11)\n" +
+                "or (t=42 and u=-2)\n" +
+                "or (t=42 and u=-1)\n" +
+                "or (t=45 and u=2)\n" +
+                "or (t=46 and u=10)\n" +
+                "or (t=50 and u=2)\n" +
+                "or (t=49 and u=10)\n" +
+                "or (t=47 and u=3)\n" +
+                "or (t=51 and u=6)\n" +
+                "or (t=52 and u=1)\n" +
+                "or (t=50 and u=17)\n" +
+                "or (t=48 and u=5)\n" +
+                "or (t=43 and u=-2)\n" +
+                "or (t=43 and u=-1)\n" +
+                "or (t=44 and u=0)\n" +
+                "or (t=38 and u=-4)\n" +
+                "or (t=49 and u=0)\n" +
+                "or (t=47 and u=21)\n" +
+                "or (t=46 and u=7)\n" +
+                "or (t=45 and u=5)\n" +
+                "or (t=48 and u=3)\n" +
+                "or (t=48 and u=8)\n" +
+                "or (t=50 and u=7)\n" +
+                "or (t=40 and u=-2)\n" +
+                "or (t=40 and u=-1)\n" +
+                "or (t=47 and u=6)\n" +
+                "or (t=49 and u=21)\n" +
+                "or (t=51 and u=5)\n" +
+                "or (t=51 and u=11)\n" +
+                "or (t=50 and u=18)\n" +
+                "or (t=52 and u=6)\n" +
+                "or (t=40 and u=4)\n" +
+                "or (t=51 and u=14)\n" +
+                "or (t=52 and u=-9)\n" +
+                "or (t=48 and u=-5)\n" +
+                "or (t=43 and u=2)\n" +
+                "or (t=39 and u=-8)\n" +
+                "or (t=48 and u=-3)\n" +
+                "or (t=42 and u=-7)\n" +
+                "or (t=43 and u=-3)\n" +
+                "or (t=44 and u=5)\n" +
+                "or (t=37 and u=-7)\n" +
+                "or (t=38 and u=-7)\n" +
+                "or (t=46 and u=13)\n" +
+                "or (t=41 and u=-2)\n" +
+                "or (t=41 and u=-1)\n" +
+                "or (t=45 and u=8)\n" +
+                "or (t=46 and u=0)\n" +
+                "or (t=47 and u=8)\n" +
+                "or (t=48 and u=21)\n" +
+                "or (t=40 and u=-5)\n" +
+                "or (t=47 and u=5)\n" +
+                "or (t=49 and u=3)\n" +
+                "or (t=49 and u=16)\n" +
+                "or (t=50 and u=8)\n" +
+                "or (t=51 and u=0)\n" +
+                "or (t=50 and u=23)\n" +
+                "or (t=41 and u=15)\n" +
+                "or (t=42 and u=12)\n" +
+                "or (t=43 and u=-9)\n" +
+                "or (t=43 and u=1)\n" +
+                "or (t=38 and u=-9)\n" +
+                "or (t=41 and u=17)\n" +
+                "or (t=47 and u=18)\n" +
+                "or (t=42 and u=-6)\n" +
+                "or (t=43 and u=-8)\n" +
+                "or (t=44 and u=10)\n" +
+                "or (t=37 and u=-4)\n" +
+                "or (t=38 and u=-6)\n" +
+                "or (t=48 and u=15)\n" +
+                "or (t=41 and u=-7)\n" +
+                "or (t=47 and u=15)\n" +
+                "or (t=45 and u=11)\n" +
+                "or (t=48 and u=18)\n" +
+                "or (t=49 and u=14)\n" +
+                "or (t=50 and u=13)\n" +
+                "or (t=40 and u=-8)\n" +
+                "or (t=49 and u=19)\n" +
+                "or (t=52 and u=13)\n" +
+                "or (t=48 and u=0)\n" +
+                "or (t=52 and u=-2)\n" +
+                "or (t=52 and u=-1)\n" +
+                "or (t=37 and u=15)\n" +
+                "or (t=42 and u=1)\n" +
+                "or (t=43 and u=12)\n" +
+                "or (t=51 and u=20)\n" +
+                "or (t=49 and u=4)\n" +
+                "or (t=39 and u=9)\n" +
+                "or (t=46 and u=11)\n" +
+                "or (t=45 and u=1)\n" +
+                "or (t=47 and u=17)\n" +
+                "or (t=48 and u=12)\n" +
+                "or (t=50 and u=3)\n" +
+                "or (t=49 and u=9)\n" +
+                "or (t=47 and u=2)\n" +
+                "or (t=51 and u=9)\n" +
+                "or (t=51 and u=13)\n" +
+                "or (t=52 and u=2)\n" +
+                "or (t=50 and u=14)\n" +
+                "or (t=51 and u=16)\n" +
+                "or (t=52 and u=15)\n" +
+                "or (t=42 and u=2)\n" +
+                "or (t=48 and u=6)\n" +
+                "or (t=44 and u=1)\n" +
+                "or (t=43 and u=11)\n" +
+                "or (t=38 and u=-3)\n" +
+                "or (t=49 and u=7)\n" +
+                "or (t=47 and u=20)\n" +
+                "or (t=46 and u=4)\n" +
+                "or (t=45 and u=4)\n" +
+                "or (t=44 and u=12)\n" +
+                "or (t=48 and u=9)\n" +
+                "or (t=50 and u=4)\n" +
+                "or (t=49 and u=20)\n" +
+                "or (t=41 and u=-9)\n" +
+                "or (t=47 and u=1)\n" +
+                "or (t=51 and u=4)\n" +
+                "or (t=52 and u=7)\n" +
+                "or (t=52 and u=17)\n" +
+                "or (t=50 and u=19)\n" +
+                "or (t=52 and u=16)\n" +
+                "or (t=51 and u=-2)\n" +
+                "or (t=51 and u=-1)\n" +
+                "or (t=41 and u=0)\n" +
+                "or (t=39 and u=-5)\n" +
+                "or (t=48 and u=-2)\n" +
+                "or (t=46 and u=18)\n" +
+                "or (t=43 and u=-4)\n" +
+                "or (t=44 and u=6)\n" +
+                "or (t=37 and u=-8)\n" +
+                "or (t=38 and u=-1)\n" +
+                "or (t=38 and u=-2)\n" +
+                "or (t=41 and u=-3)\n" +
+                "or (t=46 and u=1)\n" +
+                "or (t=45 and u=7)\n" +
+                "or (t=47 and u=11)\n" +
+                "or (t=48 and u=22)\n" +
+                "or (t=49 and u=2)\n" +
+                "or (t=40 and u=-4)\n" +
+                "or (t=47 and u=4)\n" +
+                "or (t=48 and u=2)\n" +
+                "or (t=50 and u=9)\n" +
+                "or (t=51 and u=3)\n" +
+                "or (t=52 and u=4)\n" +
+                "or (t=50 and u=20)\n" +
+                "or (t=41 and u=14)\n" +
+                "or (t=51 and u=-3)\n" +
+                "or (t=42 and u=13)\n" +
+                "or (t=51 and u=15)\n" +
+                "or (t=49 and u=-2)\n" +
+                "or (t=49 and u=-1)\n" +
+                "or (t=43 and u=-10)\n" +
+                "or (t=43 and u=0)\n" +
+                "or (t=39 and u=-2)\n" +
+                "or (t=39 and u=-1)\n" +
+                "or (t=41 and u=16)\n" +
+                "or (t=42 and u=-5)\n" +
+                "or (t=43 and u=-5)\n" +
+                "or (t=37 and u=-5)\n" +
+                "or (t=38 and u=-5)\n" +
+                "or (t=44 and u=11)\n" +
+                "or (t=41 and u=-8)\n" +
+                "or (t=46 and u=2)\n" +
+                "or (t=45 and u=10)\n" +
+                "or (t=47 and u=14)\n" +
+                "or (t=48 and u=19)\n" +
+                "or (t=49 and u=13)\n" +
+                "or (t=40 and u=-7)\n" +
+                "or (t=49 and u=18)\n" +
+                "or (t=50 and u=10)\n" +
+                "or (t=52 and u=9)\n" +
+                "or (t=52 and u=14)\n" +
+                "or (t=41 and u=9)\n" +
+                "or (t=42 and u=14)\n" +
+                "or (t=38 and u=13)\n" +
+                "or (t=51 and u=23)\n" +
+                "or (t=39 and u=-3)\n" +
+                "or (t=47 and u=16)\n" +
+                "or (t=38 and u=16)\n" +
+                "or (t=42 and u=-4)\n" +
+                "or (t=44 and u=8)\n" +
+                "or (t=37 and u=-2)\n" +
+                "or (t=45 and u=0)\n" +
+                "or (t=46 and u=8)\n" +
+                "or (t=41 and u=-5)\n" +
+                "or (t=47 and u=13)\n" +
+                "or (t=48 and u=13)\n" +
+                "or (t=48 and u=16)\n" +
+                "or (t=49 and u=8)\n" +
+                "or (t=50 and u=15)\n" +
+                "or (t=51 and u=8)\n" +
+                "or (t=52 and u=3)\n" +
+                "or (t=40 and u=9)\n" +
+                "or (t=52 and u=-4)\n" +
+                "or (t=42 and u=3)\n" +
+                "or (t=39 and u=-9)\n" +
+                "or (t=48 and u=7)\n" +
+                "or (t=38 and u=14)\n" +
+                "or (t=44 and u=2)\n" +
+                "or (t=51 and u=18)\n" +
+                "or (t=49 and u=6)\n" +
+                "or (t=48 and u=10)\n" +
+                "or (t=46 and u=5)\n" +
+                "or (t=45 and u=3)\n" +
+                "or (t=51 and u=7)\n" +
+                "or (t=50 and u=5)\n" +
+                "or (t=49 and u=11)\n" +
+                "or (t=47 and u=0)\n" +
+                "or (t=51 and u=10)\n" +
+                "or (t=52 and u=0)\n" +
+                "or (t=50 and u=16)\n" +
+                "or (t=42 and u=9)\n" +
+                "or (t=39 and u=-6)\n" +
+                "or (t=48 and u=4)\n" +
+                "or (t=46 and u=19)\n" +
+                "or (t=44 and u=7)\n" +
+                "or (t=51 and u=17)\n" +
+                "or (t=52 and u=11)\n" +
+                "or (t=49 and u=1)\n" +
+                "or (t=41 and u=-4)\n" +
+                "or (t=46 and u=6)\n" +
+                "or (t=45 and u=6)\n" +
+                "or (t=47 and u=10)\n" +
+                "or (t=51 and u=2)\n" +
+                "or (t=50 and u=6)\n" +
+                "or (t=40 and u=-3)\n" +
+                "or (t=47 and u=7)\n" +
+                "or (t=49 and u=22)\n" +
+                "or (t=52 and u=10) " +
+                "or (t=52 and u=5) " +
+                "or (t=50 and u=21) " +
+                "or (t=52 and u=-5)";
+
+        MaterializedResult result = computeActual(sql);
+        System.out.println("Query Output: " + result);
+    }
 }

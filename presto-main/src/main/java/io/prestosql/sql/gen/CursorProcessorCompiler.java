@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.gen;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Primitives;
@@ -237,7 +238,52 @@ public class CursorProcessorCompiler
                 cachedInstanceBinder,
                 fieldReferenceCompiler(cursor),
                 metadata,
-                compiledLambdaMap);
+                compiledLambdaMap,
+                new ClassContext(classDefinition, scope, (newFilterName, rowExpressionCompiler, generator, subFilter, callerScope) -> {
+                    MethodDefinition newFilterMethod = classDefinition.declareMethod(
+                            a(PUBLIC),
+                            newFilterName,
+                            type(boolean.class),
+                            ImmutableList.<Parameter>builder()
+                                    .add(session)
+                                    .add(cursor)
+                                    .build());
+                    newFilterMethod.comment("Filter: %s", subFilter.toString());
+                    Scope innerScope = newFilterMethod.getScope();
+                    Variable wasNullVariable1 = innerScope.declareVariable(type(boolean.class), "wasNull");
+                    LabelNode end1 = new LabelNode("end");
+                    BytecodeGeneratorContext generatorContext = new BytecodeGeneratorContext(
+                            rowExpressionCompiler,
+                            innerScope,
+                            callSiteBinder,
+                            cachedInstanceBinder,
+                            metadata);
+                    newFilterMethod.getBody().comment("boolean wasNull = false;")
+                            .putVariable(wasNullVariable1, false)
+                            .comment("evaluate filter: " + subFilter)
+                            .append(generator.generateExpression(null, generatorContext, subFilter.getType(), subFilter.getArguments()))
+                            .comment("if (wasNull) return false;")
+                            .getVariable(wasNullVariable1)
+                            .ifFalseGoto(end1)
+                            .pop(boolean.class)
+                            .push(false)
+                            .visitLabel(end1)
+                            .retBoolean();
+
+                    /* Call the sub-method: Important use caller scope to pass parameters to new function */
+                    BytecodeBlock block = new BytecodeBlock()
+                            .setDescription("INVOKE " + newFilterName);
+                    LabelNode endCall = new LabelNode("end");
+
+                    block.append(callerScope.getThis())
+                            .getVariable(session)
+                            .getVariable(cursor)
+                            .invokeVirtual(classDefinition.getType(), newFilterName,
+                                    type(boolean.class), type(ConnectorSession.class),
+                                    type(RecordCursor.class));
+                    block.visitLabel(endCall);
+                    return block;
+                }));
 
         LabelNode end = new LabelNode("end");
         method.getBody()
