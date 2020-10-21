@@ -26,6 +26,7 @@ import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.IndexNotRegisteredException;
 import io.prestosql.spi.service.PropertyService;
 
 import java.net.URI;
@@ -105,7 +106,10 @@ public class IndexCache
                         LOG.debug("Loaded index for %s.", filterKey);
                     }
                     catch (ExecutionException e) {
-                        if (LOG.isDebugEnabled()) {
+                        if (e.getCause() instanceof IndexNotRegisteredException) {
+                            // Do nothing. Index not registered.
+                        }
+                        else if (LOG.isDebugEnabled()) {
                             LOG.debug(e, "Unable to load index for %s. ", filterKey);
                         }
                     }

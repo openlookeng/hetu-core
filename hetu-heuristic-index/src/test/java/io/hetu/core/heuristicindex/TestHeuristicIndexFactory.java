@@ -70,6 +70,7 @@ public class TestHeuristicIndexFactory
             indexes.add(new BloomIndex());
 
             HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
+            IndexRecordManager indexRecordManager = new IndexRecordManager(fs, folder.getRoot().toPath());
 
             HeuristicIndexWriter writer = new HeuristicIndexWriter(dataSource, indexes, fs, folder.getRoot().toPath());
 
@@ -78,6 +79,10 @@ public class TestHeuristicIndexFactory
             String[] partitons = new String[] {"p=bar"};
             writer.createIndex(table, columns, partitons, "bloom");
             writer.createIndex(table, columns, partitons, "minmax");
+            indexRecordManager.addIndexRecord("i1", "testUser", table, new String[] {"0"}, "bloom", partitons);
+            indexRecordManager.addIndexRecord("i2", "testUser", table, new String[] {"2"}, "bloom", partitons);
+            indexRecordManager.addIndexRecord("i3", "testUser", table, new String[] {"0"}, "minmax", partitons);
+            indexRecordManager.addIndexRecord("i4", "testUser", table, new String[] {"2"}, "minmax", partitons);
 
             IndexClient client = new HeuristicIndexFactory().getIndexClient(fs, folder.getRoot().toPath());
             List<IndexMetadata> splits = client.readSplitIndex(table);

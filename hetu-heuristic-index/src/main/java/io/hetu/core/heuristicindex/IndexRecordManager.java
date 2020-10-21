@@ -16,6 +16,7 @@ package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.util.SecurePathWhiteList;
+import io.hetu.core.filesystem.SupportedFileAttributes;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
@@ -26,51 +27,72 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.hetu.core.heuristicindex.util.IndexConstants.COLUMN_DELIMITER;
 
 public class IndexRecordManager
 {
     private static final String RECORD_FILE_NAME = "INDEX_RECORDS";
+    private final HetuFileSystemClient fs;
+    private final Path root;
 
-    private IndexRecordManager() {}
+    private List<IndexRecord> cache;
+    private long cacheLastModifiedTime;
 
-    public static List<IndexRecord> readAllIndexRecords(HetuFileSystemClient fs, Path root)
+    public IndexRecordManager(HetuFileSystemClient fs, Path root)
+    {
+        this.fs = fs;
+        this.root = root;
+        try {
+            checkArgument(!root.toString().contains("../"), "Index store directory path must be absolute");
+            checkArgument(SecurePathWhiteList.isSecurePath(root.toString()),
+                    "Index store directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
+    }
+
+    public List<IndexRecord> getIndexRecords()
             throws IOException
     {
-        validatePath(root);
         Path recordFile = root.resolve(RECORD_FILE_NAME);
         List<IndexRecord> records = new ArrayList<>();
 
         if (!fs.exists(recordFile)) {
-            return records;
+            // invalidate cache
+            cache = records;
+            cacheLastModifiedTime = 0;
+            return cache;
         }
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.newInputStream(recordFile)))) {
-            reader.readLine(); // skip header
-            while (true) {
-                String line = reader.readLine();
-                if (line == null) {
-                    break;
+        long modifiedTime = (long) fs.getAttribute(recordFile, SupportedFileAttributes.LAST_MODIFIED_TIME);
+        if (modifiedTime != cacheLastModifiedTime) {
+            // invalidate cache
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.newInputStream(recordFile)))) {
+                reader.readLine(); // skip header
+                while (true) {
+                    String line = reader.readLine();
+                    if (line == null) {
+                        break;
+                    }
+                    records.add(new IndexRecord(line));
                 }
-                records.add(new IndexRecord(line));
             }
+            cache = records;
+            cacheLastModifiedTime = modifiedTime;
         }
 
-        return records;
+        return cache;
     }
 
-    public static IndexRecord lookUpIndexRecord(HetuFileSystemClient fs, Path root, String name)
+    public IndexRecord lookUpIndexRecord(String name)
             throws IOException
     {
-        validatePath(root);
-        List<IndexRecord> records = readAllIndexRecords(fs, root);
+        List<IndexRecord> records = getIndexRecords();
 
         for (IndexRecord record : records) {
             if (record.name.equals(name)) {
@@ -81,11 +103,10 @@ public class IndexRecordManager
         return null;
     }
 
-    public static IndexRecord lookUpIndexRecord(HetuFileSystemClient fs, Path root, String table, String[] columns, String indexType)
+    public IndexRecord lookUpIndexRecord(String table, String[] columns, String indexType)
             throws IOException
     {
-        validatePath(root);
-        List<IndexRecord> records = readAllIndexRecords(fs, root);
+        List<IndexRecord> records = getIndexRecords();
 
         for (IndexRecord record : records) {
             if (record.table.equals(table) && Arrays.equals(record.columns, columns) && record.indexType.equals(indexType)) {
@@ -100,15 +121,14 @@ public class IndexRecordManager
      * Add IndexRecord into record file. If the method is called with a name that already exists,
      * it will OVERWRITE the existing entry but combine the note part
      */
-    public static synchronized void addIndexRecord(HetuFileSystemClient fs, Path root, String name, String user, String table, String[] columns, String indexType, String... partitions)
+    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, String... partitions)
             throws IOException
     {
-        validatePath(root);
         // Protect root directory
         FileBasedLock lock = new FileBasedLock(fs, root);
         try {
             lock.lock();
-            List<IndexRecord> records = readAllIndexRecords(fs, root);
+            List<IndexRecord> records = getIndexRecords();
             Iterator<IndexRecord> iterator = records.iterator();
             List<String> partitionsToWrite = new LinkedList<>(Arrays.asList(partitions));
             while (iterator.hasNext()) {
@@ -119,24 +139,23 @@ public class IndexRecordManager
                 }
             }
             records.add(new IndexRecord(name, user, table, columns, indexType, partitionsToWrite));
-            writeIndexRecords(fs, root, records);
+            writeIndexRecords(records);
         }
         finally {
             lock.unlock();
         }
     }
 
-    public static synchronized void deleteIndexRecord(HetuFileSystemClient fs, Path root, String name)
+    public synchronized void deleteIndexRecord(String name)
             throws IOException
     {
-        validatePath(root);
         // Protect root directory
         FileBasedLock lock = new FileBasedLock(fs, root);
         try {
             lock.lock();
-            List<IndexRecord> records = readAllIndexRecords(fs, root);
+            List<IndexRecord> records = getIndexRecords();
             records.removeIf(record -> record.name.equals(name));
-            writeIndexRecords(fs, root, records);
+            writeIndexRecords(records);
         }
         finally {
             lock.unlock();
@@ -147,10 +166,9 @@ public class IndexRecordManager
      * Write the given records into the record file. This operation OVERWRITES the existing file and is NOT atomoc.
      * Therefore it should only be called from lock-protected block to avoid overwriting data.
      */
-    private static void writeIndexRecords(HetuFileSystemClient fs, Path root, List<IndexRecord> records)
+    private void writeIndexRecords(List<IndexRecord> records)
             throws IOException
     {
-        validatePath(root);
         Path recordFile = root.resolve(RECORD_FILE_NAME);
 
         boolean writeHead = false;
@@ -161,89 +179,6 @@ public class IndexRecordManager
             for (IndexRecord record : records) {
                 os.write(record.toCsvRecord().getBytes());
             }
-        }
-    }
-
-    private static void validatePath(Path root)
-    {
-        try {
-            checkArgument(!root.toString().contains("../"), "Index store directory path must be absolute");
-            checkArgument(SecurePathWhiteList.isSecurePath(root.toString()),
-                    "Index store directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-        }
-        catch (IOException e) {
-            throw new IllegalArgumentException("Failed to get secure path list.", e);
-        }
-    }
-
-    public static class IndexRecord
-    {
-        public final String name;
-        public final String user;
-        public final String table;
-        public final String[] columns;
-        public final String indexType;
-        public final List<String> partitions;
-
-        public IndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> partitions)
-        {
-            this.name = name;
-            this.user = user == null ? "" : user;
-            this.table = table;
-            this.columns = columns;
-            this.indexType = indexType;
-            this.partitions = partitions;
-        }
-
-        public IndexRecord(String csvRecord)
-        {
-            String[] records = csvRecord.split("\\t");
-            this.name = records[0];
-            this.user = records[1];
-            this.table = records[2];
-            this.columns = records[3].split(COLUMN_DELIMITER);
-            this.indexType = records[4];
-            this.partitions = records.length > 5 ? Arrays.asList(records[5].split(",")) : Collections.emptyList();
-        }
-
-        public String toCsvRecord()
-        {
-            return String.format("%s\t%s\t%s\t%s\t%s\t%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType, String.join(",", partitions));
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof IndexRecord)) {
-                return false;
-            }
-            IndexRecord that = (IndexRecord) o;
-            return Objects.equals(name, that.name) &&
-                    Objects.equals(user, that.user) &&
-                    Objects.equals(table, that.table) &&
-                    Arrays.equals(columns, that.columns) &&
-                    Objects.equals(indexType, that.indexType);
-        }
-
-        @Override
-        public int hashCode()
-        {
-            int result = Objects.hash(name, user, table, indexType);
-            result = 31 * result + Arrays.hashCode(columns);
-            return result;
-        }
-
-        @Override
-        public String toString()
-        {
-            return name + ","
-                    + user + ","
-                    + table + ","
-                    + "[" + String.join(",", columns) + "],"
-                    + indexType;
         }
     }
 }

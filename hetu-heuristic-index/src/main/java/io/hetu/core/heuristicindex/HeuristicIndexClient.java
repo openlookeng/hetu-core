@@ -47,7 +47,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.hetu.core.heuristicindex.util.IndexConstants.COLUMN_DELIMITER;
+import static io.hetu.core.heuristicindex.IndexRecord.COLUMN_DELIMITER;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -64,12 +64,14 @@ public class HeuristicIndexClient
 
     private HetuFileSystemClient fs;
     private Path root;
+    private IndexRecordManager indexRecordManager;
     private Map<String, Index> indexTypesMap;
 
     public HeuristicIndexClient(Set<Index> indexTypes, HetuFileSystemClient fs, Path root)
     {
         this.fs = fs;
         this.root = root;
+        this.indexRecordManager = new IndexRecordManager(fs, root);
         indexTypesMap = indexTypes.stream().collect(Collectors.toMap(
                 type -> type.getId().toLowerCase(Locale.ENGLISH),
                 Function.identity()));
@@ -82,6 +84,19 @@ public class HeuristicIndexClient
         requireNonNull(path, "no path specified");
 
         List<IndexMetadata> indexes = new LinkedList<>();
+
+        Path indexKeyPath = Paths.get(path);
+        try {
+            if (indexRecordManager.lookUpIndexRecord(indexKeyPath.subpath(0, 1).toString(),
+                    new String[] {indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
+                // Use index record file to pre-screen. If record does not contain the index, skip loading
+                return null;
+            }
+        }
+        catch (Exception e) {
+            // On exception, log and continue reading from disk
+            LOG.debug("Error reading index records: " + path);
+        }
 
         for (Map.Entry<String, Index> entry : readIndexMap(path).entrySet()) {
             String absolutePath = entry.getKey();

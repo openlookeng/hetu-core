@@ -17,9 +17,7 @@ package io.hetu.core.heuristicindex;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.heuristicindex.util.IndexCommandUtils;
 import io.hetu.core.heuristicindex.util.IndexConstants;
-import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
-import io.prestosql.spi.heuristicindex.IndexWriter;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.testng.PowerMockTestCase;
@@ -29,23 +27,17 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Properties;
 
 import static io.hetu.core.heuristicindex.util.IndexCommandUtils.loadDataSourceProperties;
 import static io.hetu.core.heuristicindex.util.IndexCommandUtils.loadIndexStore;
-import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
-@PrepareForTest({IndexCommandUtils.class, IndexRecordManager.class})
+@PrepareForTest(IndexCommandUtils.class)
 @PowerMockIgnore("javax.management.*")
 @Test(singleThreaded = true)
 public class TestIndexCommand
@@ -86,63 +78,12 @@ public class TestIndexCommand
     }
 
     @Test
-    public void testCreateCommand()
-            throws IOException
-    {
-        try (TempFolder testFolder = new TempFolder()) {
-            testFolder.create();
-
-            IndexFactory factory = mock(IndexFactory.class);
-            IndexWriter writer = mock(IndexWriter.class);
-            when(factory.getIndexWriter(any(), any(), any(), any())).thenReturn(writer);
-            mockStatic(IndexRecordManager.class);
-            when(IndexRecordManager.readAllIndexRecords(any(), any())).thenReturn(null);
-            mockStatic(IndexCommandUtils.class);
-            when(loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
-            when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
-
-            IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
-                    "bloom", null, false, null);
-            indexCommand.createIndex();
-
-            verify(writer, times(1)).createIndex(any(), any(), any(), any());
-        }
-    }
-
-    @Test
-    public void testDeleteCommand()
-            throws IOException
-    {
-        try (TempFolder testFolder = new TempFolder()) {
-            testFolder.create();
-
-            IndexFactory factory = mock(IndexFactory.class);
-            IndexClient client = mock(IndexClient.class);
-            when(factory.getIndexClient(any(), any())).thenReturn(client);
-            mockStatic(IndexRecordManager.class);
-            when(IndexRecordManager.lookUpIndexRecord(any(), any(), anyString())).thenReturn(new IndexRecordManager.IndexRecord(null, null, null, null, null, null));
-            mockStatic(IndexCommandUtils.class);
-            when(loadDataSourceProperties(anyString(), anyString())).thenReturn(new Properties());
-            when(loadIndexStore(anyString())).thenReturn(new IndexCommandUtils.IndexStore(null, null));
-            when(IndexCommandUtils.getIndexFactory()).thenReturn(factory);
-
-            IndexCommand indexCommand = new IndexCommand(testFolder.getRoot().getAbsolutePath(), "abc", "catalog.schema.table", new String[] {"column"}, null,
-                    "bloom", null, false, null);
-            indexCommand.deleteIndex();
-
-            verify(client, times(1)).deleteIndex(any(), any(), any());
-        }
-    }
-
-    @Test
     public void testLoadIndexWriterFromConfigFile()
             throws IOException
     {
         IndexFactory factory = new HeuristicIndexFactory();
 
         Properties dsProps = new Properties();
-        Path root = Paths.get("/tmp");
         dsProps.setProperty("connector.name", "empty");
 
         Properties ixProps = new Properties();
