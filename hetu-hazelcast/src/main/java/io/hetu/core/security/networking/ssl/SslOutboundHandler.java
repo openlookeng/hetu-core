@@ -47,6 +47,7 @@ public class SslOutboundHandler
     private final SSLEngine engine;
     private boolean isTimeout;
     private ScheduledFuture timeoutFuture;
+    private boolean ignoreHandlerAdded;
 
     public SslOutboundHandler(SSLEngine engine, boolean startTls, long handshakeTimeoutMillis, AtomicBoolean handshakeFinished)
     {
@@ -60,7 +61,12 @@ public class SslOutboundHandler
     @Override
     public void handlerAdded()
     {
-        initDstBuffer();
+        if (!ignoreHandlerAdded) {
+            initDstBuffer();
+        }
+        else {
+            ignoreHandlerAdded = false;
+        }
     }
 
     @Override
@@ -101,6 +107,7 @@ public class SslOutboundHandler
                     }
                     while (result.getStatus() == SSLEngineResult.Status.BUFFER_OVERFLOW) {
                         dst = enlargeByteBuffer(dst);
+                        updateOutboundPipeline();
                         if (logger.isFineEnabled()) {
                             logger.fine(format("BUFFER_OVERFLOW....channel=%s....before wrap, src=[%s, %s, %s], dst=[%s, %s, %s]",
                                     channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity()));
@@ -165,6 +172,12 @@ public class SslOutboundHandler
         return timeoutFuture;
     }
 
+    private void updateOutboundPipeline()
+    {
+        ignoreHandlerAdded = true;
+        channel.outboundPipeline().replace(this, this);
+    }
+
     private void handshake()
     {
         if (engine.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
@@ -189,13 +202,15 @@ public class SslOutboundHandler
         if (logger.isFineEnabled()) {
             logger.fine("enlargeByteBuffer....");
         }
+        ByteBuffer newBuffer;
         if (appByteBufferSize > buffer.capacity()) {
-            buffer = ByteBuffer.allocate(appByteBufferSize);
+            newBuffer = ByteBuffer.allocate(appByteBufferSize);
         }
         else {
-            buffer = ByteBuffer.allocate(buffer.capacity() * 2);
+            newBuffer = ByteBuffer.allocate(buffer.capacity() * 2);
         }
-        channel.outboundPipeline().replace(this, this);
-        return buffer;
+        buffer.flip();
+        newBuffer.put(buffer);
+        return newBuffer;
     }
 }

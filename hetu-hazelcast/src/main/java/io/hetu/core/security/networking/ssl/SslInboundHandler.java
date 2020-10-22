@@ -44,6 +44,7 @@ public class SslInboundHandler
     private final ILogger logger;
     private SSLEngine engine;
     private AtomicBoolean handshakeFinished;
+    private boolean ignoreHandlerAdded;
 
     public SslInboundHandler(SSLEngine engine, AtomicBoolean handshakeFinished)
     {
@@ -61,8 +62,13 @@ public class SslInboundHandler
     @Override
     public void handlerAdded()
     {
-        initSrcBuffer();
-        initDstBuffer();
+        if (!ignoreHandlerAdded) {
+            initSrcBuffer();
+            initDstBuffer();
+        }
+        else {
+            ignoreHandlerAdded = false;
+        }
     }
 
     @Override
@@ -80,7 +86,7 @@ public class SslInboundHandler
                 }
                 SSLEngineResult result = engine.unwrap(src, byteBuffer);
                 if (logger.isFineEnabled()) {
-                    logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s], byteBuffer=[%s, %s, %s], status=[%s, %s]",
+                    logger.fine(format("channel=%s....after unwrap, src=[%s, %s, %s], byteBuffer=[%s, %s, %s], status=[%s, %s]",
                             channel, src.position(), src.limit(), src.capacity(), byteBuffer.position(), byteBuffer.limit(), byteBuffer.capacity(),
                             result.getStatus(), result.getHandshakeStatus()));
                 }
@@ -95,7 +101,7 @@ public class SslInboundHandler
                             src = newBuffer;
                             updateInboundPipeline();
                             if (logger.isFineEnabled()) {
-                                logger.fine("channel=" + channel + "....BUFFER_UNDERFLOW");
+                                logger.fine(format("BUFFER_UNDERFLOW....enlargePacketBuffer....channel=%s, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
                             }
                         }
                         return HandlerStatus.CLEAN;
@@ -111,9 +117,7 @@ public class SslInboundHandler
                 }
 
                 SSLEngineResult.HandshakeStatus handshakeStatus = result.getHandshakeStatus();
-                if (logger.isFineEnabled()) {
-                    logger.fine("enlargePacketBuffer, src=" + src.toString());
-                }
+
                 outer:
                 while (true) {
                     switch (handshakeStatus) {
@@ -153,7 +157,7 @@ public class SslInboundHandler
                     dst.put(byteBuffer);
                     compactOrClear(byteBuffer);
                     if (logger.isFineEnabled()) {
-                        logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s]", channel, dst.position(), dst.limit(), dst.capacity()));
+                        logger.fine(format("channel=%s.... src=[%s, %s, %s]", channel, dst.position(), dst.limit(), dst.capacity()));
                     }
                     // Do not call flip() here, because it will flip() at the start of next handler.
                 }
@@ -181,6 +185,7 @@ public class SslInboundHandler
 
     private void updateInboundPipeline()
     {
+        ignoreHandlerAdded = true;
         channel.inboundPipeline().replace(this, this);
     }
 
