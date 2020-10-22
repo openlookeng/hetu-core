@@ -100,6 +100,9 @@ public class TestHiveSqlMigrate
     {
         String sql = "DESCRIBE SCHEMA EXTENDED TEST";
         assertUnsupported(sql, Optional.of("DESCRIBE SCHEMA"));
+
+        sql = "DESCRIBE DATABASE TEST";
+        assertUnsupported(sql, Optional.of("DESCRIBE DATABASE"));
     }
 
     @Test
@@ -146,10 +149,10 @@ public class TestHiveSqlMigrate
         String sql5 = "create temporary table temporary_table (id1 integer, id2 integer)";
         assertUnsupported(sql5, Optional.of("TEMPORARY"));
 
-        String sql6 = "CREATE TRANSACTIONAL TABLE transactional_table_test(key string, value string) PARTITIONED BY(ds string) STORED AS ORC";
+        String sql6 = "CREATE TRANSACTIONAL TABLE transactional_table_test(key string comment 'key', value string comment 'value') PARTITIONED BY(ds string) STORED AS ORC";
         expectedSql = "CREATE TABLE transactional_table_test (\n" +
-                "   key string,\n" +
-                "   value string,\n" +
+                "   key string COMMENT 'key',\n" +
+                "   value string COMMENT 'value',\n" +
                 "   ds string\n" +
                 ")\n" +
                 "WITH (\n" +
@@ -158,6 +161,40 @@ public class TestHiveSqlMigrate
                 "   format = 'ORC'\n" +
                 ")";
         assertSuccess(sql6, expectedSql);
+
+        String sql7 = "create table constraints7(id1 integer, id2 integer primary key)";
+        assertUnsupported(sql7, Optional.of("PRIMARY KEY"));
+
+        String sql8 = "create table constraints8(id1 integer, id2 integer not null)";
+        assertUnsupported(sql8, Optional.of("NOT NULL"));
+
+        String sql9 = "create table constraints9(id1 integer, id2 integer default null)";
+        assertUnsupported(sql9, Optional.of("DEFAULT"));
+
+        String sql10 = "create table constraints9(id1 integer, id2 integer check(id2 > 10))";
+        assertUnsupported(sql10, Optional.of("CHECK"));
+
+        String sql11 = "create table constraints9(id1 integer, id2 integer) skewed by (id1) on (1,3)";
+        assertUnsupported(sql11, Optional.of("SKEWED"));
+
+        String sql12 = "create table constraints9(id1 integer, id2 integer) row format delimited";
+        assertUnsupported(sql12, Optional.of("ROW FORMAT"));
+
+        String sql13 = "create table constraints9(id1 integer, id2 integer) stored by 'test'";
+        assertUnsupported(sql13, Optional.of("STORED BY"));
+
+        String sql14 = "create external table constraints9(id1 integer, id2 integer)";
+        assertUnsupported(sql14, Optional.of("EXTERNAL"));
+
+        String sql15 = "create EXTERNAL table IF NOT EXISTS \n" +
+                "p2 (id int, name string, level binary) \n" +
+                "comment 'test' \n" +
+                "partitioned by (score int, gender string) \n" +
+                "clustered by (id, name) sorted by (name ASC, level) into 3 buckets \n" +
+                "stored as ORC \n" +
+                "location 'hdfs://xxx' \n" +
+                "TBLPROPERTIES(\"debug\"=\"true\")";
+        assertUnsupported(sql15, Optional.of("TBLPROPERTIES"));
     }
 
     @Test
@@ -197,6 +234,19 @@ public class TestHiveSqlMigrate
                 "   location = 'hdfs://xxx'\n" +
                 ")";
         assertSuccess(sql, expectedSql);
+
+        sql = "create external table p3 like p1 location 'hdfs://xxx'";
+        expectedSql = "CREATE TABLE p3 (\n" +
+                "   LIKE p1 EXCLUDING PROPERTIES\n" +
+                ")\n" +
+                "WITH (\n" +
+                "   external = true,\n" +
+                "   location = 'hdfs://xxx'\n" +
+                ")";
+        assertSuccess(sql, expectedSql);
+
+        sql = "create external table p3 like p1";
+        assertUnsupported(sql, Optional.of("EXTERNAL"));
     }
 
     @Test
@@ -209,6 +259,73 @@ public class TestHiveSqlMigrate
                 "FROM\n" +
                 "  T1\n";
         assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TABLE T3 COMMENT 'hetu' AS SELECT ID, NAME FROM T1";
+        expectedSql = "CREATE TABLE T3\n" +
+                "COMMENT 'hetu' AS SELECT\n" +
+                "  ID\n" +
+                ", NAME\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TABLE T3 (ID, NAME) AS SELECT ID, NAME FROM T1";
+        expectedSql = "CREATE TABLE T3( ID, NAME ) AS SELECT\n" +
+                "  ID\n" +
+                ", NAME\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TABLE T3 LOCATION '/USR/HIVE/TEST' AS SELECT ID, NAME FROM T1";
+        expectedSql = "CREATE TABLE T3\n" +
+                "WITH (\n" +
+                "   location = '/USR/HIVE/TEST'\n" +
+                ") AS SELECT\n" +
+                "  ID\n" +
+                ", NAME\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TRANSACTIONAL TABLE T3 AS SELECT ID, NAME FROM T1";
+        expectedSql = "CREATE TABLE T3\n" +
+                "WITH (\n" +
+                "   transactional = true\n" +
+                ") AS SELECT\n" +
+                "  ID\n" +
+                ", NAME\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TABLE T3 STORED AS ORC AS SELECT ID, NAME FROM T1";
+        expectedSql = "CREATE TABLE T3\n" +
+                "WITH (\n" +
+                "   format = 'ORC'\n" +
+                ") AS SELECT\n" +
+                "  ID\n" +
+                ", NAME\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TABLE T3 TBLPROPERTIES('transactional'='true') AS SELECT ID, NAME FROM T1";
+        expectedSql = "CREATE TABLE T3\n" +
+                "WITH (\n" +
+                "   transactional = true\n" +
+                ") AS SELECT\n" +
+                "  ID\n" +
+                ", NAME\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "CREATE TEMPORARY TABLE T3 AS SELECT ID, NAME FROM T1";
+        assertUnsupported(sql, Optional.of("TEMPORARY"));
+
+        sql = "CREATE TABLE T3 TBLPROPERTIES('debug'='true') AS SELECT ID, NAME FROM T1";
+        assertUnsupported(sql, Optional.of("TBLPROPERTIES"));
     }
 
     @Test
@@ -322,6 +439,51 @@ public class TestHiveSqlMigrate
 
         String sql12 = "ALTER TABLE D1.T1 UNSET SERDEPROPERTIES('FIELD.DELIM')";
         assertUnsupported(sql12, Optional.of("UNSET SERDEPROPERTIES"));
+
+        String sql13 = "ALTER TABLE D1.T1 PARTITION (ID=10) RENAME TO PARTITION(NAME='HETU')";
+        assertUnsupported(sql13, Optional.of("RENAME PARTITION"));
+
+        String sql14 = "ALTER TABLE D1.T1 EXCHANGE PARTITION (ID=10) WITH TABLE D1.T2";
+        assertUnsupported(sql14, Optional.of("EXCHANGE PARTITION"));
+
+        String sql15 = "ALTER TABLE D1.T1 RECOVER PARTITIONS";
+        assertUnsupported(sql15, Optional.of("RECOVER PARTITION"));
+
+        String sql16 = "ALTER TABLE D1.T1 ARCHIVE PARTITION(NAME='HETU')";
+        assertUnsupported(sql16, Optional.of("ARCHIVE PARTITION"));
+
+        String sql17 = "ALTER TABLE D1.T1 UNARCHIVE PARTITION(NAME='HETU')";
+        assertUnsupported(sql17, Optional.of("UNARCHIVE PARTITION"));
+
+        String sql18 = "ALTER TABLE D1.T1 SET FILEFORMAT ORC";
+        assertUnsupported(sql18, Optional.of("SET FILEFORMAT"));
+
+        String sql19 = "ALTER TABLE D1.T1 SET LOCATION 'usr/hive/test'";
+        assertUnsupported(sql19, Optional.of("SET LOCATION"));
+
+        String sql20 = "ALTER TABLE D1.T1 TOUCH";
+        assertUnsupported(sql20, Optional.of("TOUCH PARTITION"));
+
+        String sql21 = "ALTER TABLE D1.T1 PARTITION(NAME='HETU') ENABLE NO_DROP";
+        assertUnsupported(sql21, Optional.of("PARTITION PROTECTION"));
+
+        String sql22 = "ALTER TABLE D1.T1 PARTITION(NAME='HETU') COMPACT MAJOR";
+        assertUnsupported(sql22, Optional.of("PARTITION COMPACT"));
+
+        String sql23 = "ALTER TABLE D1.T1 PARTITION(NAME='HETU') CONCATENATE";
+        assertUnsupported(sql23, Optional.of("PARTITION CONCATENATE"));
+
+        String sql24 = "ALTER TABLE D1.T1 PARTITION(NAME='HETU') UPDATE COLUMNS";
+        assertUnsupported(sql24, Optional.of("UPDATE COLUMNS"));
+
+        String sql25 = "alter table t100 partition(name='hetu') add columns (name string comment 'hetu')";
+        assertUnsupported(sql25, Optional.of("PARTITION"));
+
+        String sql26 = "alter table t100 replace columns (name string comment 'hetu')";
+        assertUnsupported(sql26, Optional.of("REPLACE"));
+
+        String sql27 = "alter table t100 add columns (name string comment 'hetu') cascade";
+        assertUnsupported(sql27, Optional.of("CASCADE"));
     }
 
     @Test
@@ -369,6 +531,12 @@ public class TestHiveSqlMigrate
                 "FROM\n" +
                 "  T1\n";
         assertWarning(sql, expectedSql);
+
+        sql = "CREATE VIEW V1 (ID, NAME) COMMENT 'HETU' AS SELECT (ID) FROM T1";
+        assertUnsupported(sql, Optional.of("COLUMN ALIASES"));
+
+        sql = "CREATE VIEW V1 COMMENT 'HETU' TBLPROPERTIES(NAME='HETU') AS SELECT (ID) FROM T1";
+        assertUnsupported(sql, Optional.of("TBLPROPERTIES"));
     }
 
     @Test
@@ -438,6 +606,10 @@ public class TestHiveSqlMigrate
         String sql = "SET ROLE ALL";
         String expectedSql = "SET ROLE ALL";
         assertSuccess(sql, expectedSql);
+
+        sql = "SET ROLE NONE";
+        expectedSql = "SET ROLE NONE";
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -462,6 +634,12 @@ public class TestHiveSqlMigrate
         String sql = "SHOW GRANT ON TABLE T1";
         String expectedSql = "SHOW GRANTS ON TABLE t1";
         assertSuccess(sql, expectedSql);
+
+        sql = "SHOW GRANT USER ON TABLE T1";
+        assertUnsupported(sql, Optional.of("PRINCIPAL"));
+
+        sql = "SHOW GRANT ON ALL";
+        assertUnsupported(sql, Optional.of("ALL"));
     }
 
     @Test
@@ -473,6 +651,27 @@ public class TestHiveSqlMigrate
                 "FROM\n" +
                 "  T1\n";
         assertSuccess(sql, expectedSql);
+
+        sql = "EXPLAIN EXTENDED SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("EXTENDED"));
+
+        sql = "EXPLAIN CBO SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("CBO"));
+
+        sql = "EXPLAIN AST SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("AST"));
+
+        sql = "EXPLAIN DEPENDENCY SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("DEPENDENCY"));
+
+        sql = "EXPLAIN AUTHORIZATION SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("AUTHORIZATION"));
+
+        sql = "EXPLAIN LOCKS SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("LOCKS"));
+
+        sql = "EXPLAIN VECTORIZATIONANALYZE SELECT * FROM T1";
+        assertUnsupported(sql, Optional.of("VECTORIZATIONANALYZE"));
     }
 
     @Test
@@ -489,6 +688,9 @@ public class TestHiveSqlMigrate
         String sql = "SHOW TABLES FROM TEST";
         String expectedSql = "SHOW TABLES FROM TEST";
         assertSuccess(sql, expectedSql);
+
+        sql = "SHOW TABLES FROM TEST LIKE 'HETU|TEST'";
+        assertUnsupported(sql, Optional.of("LIKE"));
     }
 
     @Test
@@ -520,6 +722,9 @@ public class TestHiveSqlMigrate
 
         String sql3 = "DESCRIBE DEFAULT.SRC_THRIFT LINTSTRING.$ELEM$.MYINT";
         assertUnsupported(sql3, Optional.of("DESCRIBE TABLE OPTION"));
+
+        String sql4 = "DESCRIBE EXTENDED DB.TB1";
+        assertUnsupported(sql4, Optional.of("EXTENDED"));
     }
 
     @Test
@@ -539,6 +744,18 @@ public class TestHiveSqlMigrate
 
         sql = "SHOW FUNCTIONS LIKE 'YEAR'";
         assertUnsupported(sql, Optional.of("LIKE"));
+
+        sql = "SELECT IF(ID=10, 1, 2) FROM T1";
+        expectedSql = "SELECT IF((ID = 10), 1, 2)\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "SELECT NULLIF(ID1, ID2) FROM T1";
+        expectedSql = "SELECT NULLIF(ID1, ID2)\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
     }
 
     @Test
@@ -875,9 +1092,14 @@ public class TestHiveSqlMigrate
                 "GROUP BY URL, GROUPING SETS ((ID, NAME), (ID, SEX))\n";
         assertSuccess(sql, expectedSql);
 
-        // test function "current_date()"
+        // test function "current_date()" and "current_timestamp()"
         sql = "select current_date()";
         expectedSql = "SELECT current_date\n" +
+                "\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "select current_timestamp()";
+        expectedSql = "SELECT current_timestamp\n" +
                 "\n";
         assertSuccess(sql, expectedSql);
 

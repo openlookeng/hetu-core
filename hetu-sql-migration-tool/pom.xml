@@ -63,11 +63,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
-<!--        <dependency>-->
-<!--            <groupId>jline</groupId>-->
-<!--            <artifactId>jline</artifactId>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline-reader</artifactId>
@@ -142,6 +137,32 @@
                         <phase>package</phase>
                         <goals>
                             <goal>really-executable-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.2</version>
+                <configuration>
+                    <skip>false</skip>
+                    <excludes>
+                        <exclude>**/source/hive/**</exclude>
+                        <exclude>**/source/impala/**</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>
