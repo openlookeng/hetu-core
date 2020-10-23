@@ -14,7 +14,7 @@
  */
 package io.prestosql.spi.heuristicindex;
 
-public class IndexNotRegisteredException
+public class IndexNotCreatedException
         extends Exception
 {
 }

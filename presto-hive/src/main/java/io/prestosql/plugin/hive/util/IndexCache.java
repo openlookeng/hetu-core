@@ -28,7 +28,7 @@ import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import io.prestosql.spi.heuristicindex.IndexNotRegisteredException;
+import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
 import org.apache.hadoop.fs.Path;
@@ -137,7 +137,7 @@ public class IndexCache
                                     LOG.debug("Loaded index for %s.", indexCacheKeyPath);
                                 }
                                 catch (ExecutionException e) {
-                                    if (e.getCause() instanceof IndexNotRegisteredException) {
+                                    if (e.getCause() instanceof IndexNotCreatedException) {
                                         // Do nothing. Index not registered.
                                     }
                                     if (LOG.isDebugEnabled()) {

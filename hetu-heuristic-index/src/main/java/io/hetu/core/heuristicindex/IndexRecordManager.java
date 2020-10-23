@@ -39,6 +39,7 @@ public class IndexRecordManager
     private final HetuFileSystemClient fs;
     private final Path root;
 
+    private final Object cacheLock = new Object();
     private List<IndexRecord> cache;
     private long cacheLastModifiedTime;
 
@@ -63,27 +64,32 @@ public class IndexRecordManager
         List<IndexRecord> records = new ArrayList<>();
 
         if (!fs.exists(recordFile)) {
-            // invalidate cache
-            cache = records;
-            cacheLastModifiedTime = 0;
+            synchronized (cacheLock) {
+                // invalidate cache
+                cache = records;
+                cacheLastModifiedTime = 0;
+            }
             return cache;
         }
 
         long modifiedTime = (long) fs.getAttribute(recordFile, SupportedFileAttributes.LAST_MODIFIED_TIME);
         if (modifiedTime != cacheLastModifiedTime) {
-            // invalidate cache
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.newInputStream(recordFile)))) {
-                reader.readLine(); // skip header
-                while (true) {
-                    String line = reader.readLine();
-                    if (line == null) {
-                        break;
-                    }
-                    records.add(new IndexRecord(line));
+            synchronized (cacheLock) {
+                if (modifiedTime == cacheLastModifiedTime) {
+                    // already updated by another call
+                    return cache;
                 }
+                // invalidate cache
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.newInputStream(recordFile)))) {
+                    reader.readLine(); // skip header
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        records.add(new IndexRecord(line));
+                    }
+                }
+                cache = records;
+                cacheLastModifiedTime = modifiedTime;
             }
-            cache = records;
-            cacheLastModifiedTime = modifiedTime;
         }
 
         return cache;
