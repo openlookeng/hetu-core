@@ -47,6 +47,7 @@ public class SslOutboundHandler
     private final SSLEngine engine;
     private boolean isTimeout;
     private ScheduledFuture timeoutFuture;
+    private boolean ignoreHandlerAdded;
 
     public SslOutboundHandler(SSLEngine engine, boolean startTls, long handshakeTimeoutMillis, AtomicBoolean handshakeFinished)
     {
@@ -60,7 +61,12 @@ public class SslOutboundHandler
     @Override
     public void handlerAdded()
     {
-        initDstBuffer();
+        if (!ignoreHandlerAdded) {
+            initDstBuffer();
+        }
+        else {
+            ignoreHandlerAdded = false;
+        }
     }
 
     @Override
@@ -91,23 +97,24 @@ public class SslOutboundHandler
                 // src will be flip() at the end of previous handler, so we do not need flip() again.
                 while (src.hasRemaining()) {
                     if (logger.isFineEnabled()) {
-                        logger.fine(format("channel=%s....before wrap, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
+                        logger.fine(format("channel=%s, before wrap, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
                     }
                     SSLEngineResult result = engine.wrap(src, dst);
                     if (logger.isFineEnabled()) {
-                        logger.fine(format("channel=%s....after wrap, src=[%s, %s, %s], dst=[%s, %s, %s], status=[%s, %s]",
+                        logger.fine(format("channel=%s, after wrap, src=[%s, %s, %s], dst=[%s, %s, %s], status=[%s, %s]",
                                 channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity(),
                                 result.getStatus(), result.getHandshakeStatus()));
                     }
                     while (result.getStatus() == SSLEngineResult.Status.BUFFER_OVERFLOW) {
                         dst = enlargeByteBuffer(dst);
+                        updateOutboundPipeline();
                         if (logger.isFineEnabled()) {
-                            logger.fine(format("BUFFER_OVERFLOW....channel=%s....before wrap, src=[%s, %s, %s], dst=[%s, %s, %s]",
+                            logger.fine(format("BUFFER_OVERFLOW, channel=%s, before wrap, src=[%s, %s, %s], dst=[%s, %s, %s]",
                                     channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity()));
                         }
                         result = engine.wrap(src, dst);
                         if (logger.isFineEnabled()) {
-                            logger.fine(format("BUFFER_OVERFLOW....channel=%s....after wrap, src=[%s, %s, %s], dst=[%s, %s, %s], status=[%s, %s]",
+                            logger.fine(format("BUFFER_OVERFLOW, channel=%s, after wrap, src=[%s, %s, %s], dst=[%s, %s, %s], status=[%s, %s]",
                                     channel, src.position(), src.limit(), src.capacity(), dst.position(), dst.limit(), dst.capacity(),
                                     result.getStatus(), result.getHandshakeStatus()));
                         }
@@ -165,6 +172,12 @@ public class SslOutboundHandler
         return timeoutFuture;
     }
 
+    private void updateOutboundPipeline()
+    {
+        ignoreHandlerAdded = true;
+        channel.outboundPipeline().replace(this, this);
+    }
+
     private void handshake()
     {
         if (engine.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
@@ -187,15 +200,21 @@ public class SslOutboundHandler
     {
         int appByteBufferSize = engine.getSession().getApplicationBufferSize();
         if (logger.isFineEnabled()) {
-            logger.fine("enlargeByteBuffer....");
+            logger.fine(format("begin to enlargeByteBuffer, channel=%s, oldBuffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
+        ByteBuffer newBuffer;
         if (appByteBufferSize > buffer.capacity()) {
-            buffer = ByteBuffer.allocate(appByteBufferSize);
+            newBuffer = ByteBuffer.allocate(appByteBufferSize);
         }
         else {
-            buffer = ByteBuffer.allocate(buffer.capacity() * 2);
+            newBuffer = ByteBuffer.allocate(buffer.capacity() * 2);
         }
-        channel.outboundPipeline().replace(this, this);
-        return buffer;
+        buffer.flip();
+        newBuffer.put(buffer);
+        if (logger.isFineEnabled()) {
+            logger.fine(format("end to enlargeByteBuffer and rewrite, channel=%s, oldBuffer=[%s, %s, %s], newBuffer=[%s, %s, %s]",
+                    channel, buffer.position(), buffer.limit(), buffer.capacity(), newBuffer.position(), newBuffer.limit(), newBuffer.capacity()));
+        }
+        return newBuffer;
     }
 }
