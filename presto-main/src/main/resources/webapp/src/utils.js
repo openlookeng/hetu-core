@@ -19,14 +19,14 @@ import * as d3 from "d3";
 // Query display
 // =============
 
-export const GLYPHICON_DEFAULT = {color: '#1edcff'};
+export const GLYPHICON_DEFAULT = {color: '#0e5201'};
 export const GLYPHICON_HIGHLIGHT = {color: '#999999'};
 
 const STATE_COLOR_MAP = {
     QUEUED: '#1b8f72',
     RUNNING: '#19874e',
     PLANNING: '#674f98',
-    FINISHED: '#1a4629',
+    FINISHED: '#678975',
     BLOCKED: '#61003b',
     USER_ERROR: '#9a7d66',
     CANCELED: '#858959',

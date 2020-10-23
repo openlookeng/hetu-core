@@ -99,7 +99,32 @@ public final class LocalMemoryManager
         for (Map.Entry<MemoryPoolId, MemoryPool> entry : pools.entrySet()) {
             builder.put(entry.getKey(), entry.getValue().getInfo());
         }
-        return new MemoryInfo(OPERATING_SYSTEM_MX_BEAN.getAvailableProcessors(), maxMemory, builder.build());
+        return new MemoryInfo(OPERATING_SYSTEM_MX_BEAN.getAvailableProcessors(),
+                getProcessCpuLoad(),
+                getSystemCpuLoad(),
+                maxMemory, builder.build());
+    }
+
+    private double getProcessCpuLoad()
+    {
+        try {
+            return ((com.sun.management.OperatingSystemMXBean) OPERATING_SYSTEM_MX_BEAN).getProcessCpuLoad();
+        }
+        catch (ClassCastException e) {
+            //If SunJDK/OpenJDK is not available, then consider system load average as CPU usage.
+            return OPERATING_SYSTEM_MX_BEAN.getSystemLoadAverage();
+        }
+    }
+
+    private double getSystemCpuLoad()
+    {
+        try {
+            return ((com.sun.management.OperatingSystemMXBean) OPERATING_SYSTEM_MX_BEAN).getSystemCpuLoad();
+        }
+        catch (ClassCastException e) {
+            //If SunJDK/OpenJDK is not available, then consider system load average as CPU usage.
+            return OPERATING_SYSTEM_MX_BEAN.getSystemLoadAverage();
+        }
     }
 
     public List<MemoryPool> getPools()

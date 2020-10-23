@@ -1,0 +1,24 @@
+[
+ {
+  "queryWithPlaceholders":{
+    "query":"USE tpcds.sf1;\nWITH customer_total_return \n     AS (SELECT sr_customer_sk     AS ctr_customer_sk, \n                sr_store_sk        AS ctr_store_sk, \n                Sum(sr_return_amt) AS ctr_total_return \n         FROM   store_returns, \n                date_dim \n         WHERE  sr_returned_date_sk = d_date_sk \n                AND d_year = 2001 \n         GROUP  BY sr_customer_sk, \n                   sr_store_sk) \nSELECT c_customer_id \nFROM   customer_total_return ctr1, \n       store, \n       customer \nWHERE  ctr1.ctr_total_return > (SELECT Avg(ctr_total_return) * 1.2 \n                                FROM   customer_total_return ctr2 \n                                WHERE  ctr1.ctr_store_sk = ctr2.ctr_store_sk) \n       AND s_store_sk = ctr1.ctr_store_sk \n       AND s_state = 'TN' \n       AND ctr1.ctr_customer_sk = c_customer_sk \nORDER  BY c_customer_id\nLIMIT 100;",
+    "placeholders":[]
+  },
+  "user":"hetu",
+  "name":"TPCDS Query 1 (SF1)",
+  "description":"TPCDS Query#1 with Scaling Factor 1 using TPCDS Connector",
+  "uuid":"ff35a9cf-8cfc-4ff5-be2f-a6389c144f9a",
+  "featured":true
+ },
+ {
+  "queryWithPlaceholders":{
+    "query":"select * from system.information_schema.tables", 
+    "placeholders":[]
+  },
+  "user":"hetu",
+  "name":"SYSTEM tables",
+  "description":"SHOW Tables from system schema",
+  "uuid":"ff35a9cf-8cfc-4ff5-be2f-a6389c144f9b",
+  "featured":true
+ }
+]

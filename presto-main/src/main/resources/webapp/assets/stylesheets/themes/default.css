@@ -1,0 +1,293 @@
+/**
+ * CONTENTS
+ *
+ * SETTINGS
+ * Global...............Globally-available variables and config.
+ *
+ * LAYOUT
+ * Bootstrap............Modifications on bootstrap
+ *
+ * COMPONENTS
+ * editor...............The editor that is used to query
+ * indicator............Indicates that something is happening
+ * selectize-indicator..Indicator for a selectize element
+ * selectize-header.....The customized selectize header
+ * selectize-dropdown...The customized body of the dropdown
+ * tab-pane.............The customized tab pane
+ * user-info............The user information section
+ * saved-query..........The saved query component
+ * query-information....The queries tabs
+ * runs-table...........The RunsTable component
+ * query-save-modal.....The QuerySaveModal
+ *
+ * PLUGINS
+ * CodeMirror...........The CSS for the CodeMirror plugin
+ * Blackboard...........The custom Blackboard theme for CodeMirror
+ */
+
+/*------------------------------------*\
+    #SETTINGS
+\*------------------------------------*/
+/**
+ * Global
+ */
+.text-overflow-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/*------------------------------------*\
+    #LAYOUT
+\*------------------------------------*/
+/**
+ * Bootstrap
+ */
+
+.spaced { margin-bottom: 15px; }
+
+/*------------------------------------*\
+    #COMPONENTS
+\*------------------------------------*/
+
+/**
+ * Editor
+ */
+.editor-container {
+    position: relative;
+    z-index: 1;
+}
+
+/* pre */.editor {
+             display: block;
+             float: left;
+             width: 100%;
+             height: 30vh;
+         }
+
+.editor-resize-handles {
+    position: absolute;
+    bottom: 15px;
+    right: 30px;
+}
+
+.editor-resize-handle {
+    color: #ffffff;
+    margin-left: 5px;
+
+    cursor: pointer;
+}
+
+/**
+ * Errors
+ */
+.connection-errors {
+    margin-top: 15px;
+}
+
+/**
+ * Indicator
+ */
+.indicator { float: left; }
+
+.indicator-spinner {
+    -webkit-animation-name: spin;
+    -webkit-animation-duration: 2000ms;
+    -webkit-animation-iteration-count: infinite;
+    -webkit-animation-timing-function: linear;
+
+    -moz-animation-name: spin;
+    -moz-animation-duration: 2000ms;
+    -moz-animation-iteration-count: infinite;
+    -moz-animation-timing-function: linear;
+
+    -ms-animation-name: spin;
+    -ms-animation-duration: 2000ms;
+    -ms-animation-iteration-count: infinite;
+    -ms-animation-timing-function: linear;
+
+    animation-name: spin;
+    animation-duration: 2000ms;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+}
+
+@-ms-keyframes spin {
+    from { -ms-transform: rotate(0deg); }
+    to { -ms-transform: rotate(360deg); }
+}
+
+@-moz-keyframes spin {
+    from { -moz-transform: rotate(0deg); }
+    to { -moz-transform: rotate(360deg); }
+}
+
+@-webkit-keyframes spin {
+    from { -webkit-transform: rotate(0deg); }
+    to { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+    from { transform:rotate(0deg); }
+    to { transform:rotate(360deg); }
+}
+
+/**
+ * Selectize indicator
+ */
+
+.selectize-container {
+    position: relative;
+}
+
+.selectize-indicator {
+    position: absolute;
+    z-index: 1;
+    right: 8px;
+    top: 10px;
+}
+
+/**
+ * Selectize header
+ */
+
+.selectize-header {
+    padding: 5px 8px 5px 8px;
+    font-weight: bold;
+}
+
+.selectize-header:before,
+.selectize-header:after,
+.selectize-dropdown-content:before,
+.selectize-dropdown-content:after {
+    content: " ";
+    display: table;
+}
+
+.selectize-dropdown-content:after,
+.selectize-header:after {
+    clear: both;
+}
+
+.selectize-dropdown-content .col-sm-6,
+.selectize-dropdown-content .col-sm-3,
+.selectize-header > div {
+    position: relative;
+    float: left;
+    min-height: 1px;
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+.selectize-dropdown-content .col-sm-6,
+.selectize-header .row-0,
+.selectize-header-partitions .row-0,
+.selectize-header-partitions .row-1 {
+    width: 50%;
+}
+
+.selectize-dropdown-content .col-sm-3,
+.selectize-header .row-1,
+.selectize-header .row-2 {
+    width: 25%;
+}
+
+.selectize-dropdown { overflow: hidden; }
+.selectize-dropdown-content p { margin-bottom: 0; }
+
+/*
+ * Selectize dropdown
+ */
+
+/* Wrap long table names */
+.selectize-dropdown-content .col-name {
+    overflow-x: hidden;
+    word-wrap: break-word;
+}
+
+/**
+ * Tab pane
+ */
+
+.tab-pane {
+    padding: 10px 5px;
+    max-height: 250px;
+    overflow-y: scroll;
+}
+
+/**
+ * User info
+ */
+
+.user-info {
+    padding-top: 20px;
+}
+
+/**
+ * Saved Query
+ */
+
+.saved-query {
+
+}
+
+.saved-query pre {
+    cursor: hand;
+    cursor: pointer;
+}
+
+.saved-query pre:hover {
+    opacity: 0.8;
+}
+
+/**
+ * Query Information
+ */
+
+.query-information .tab-pane {
+    max-height: 420px;
+}
+
+.query-information-table-tab {
+    /**
+     * Because we hard-code the height of tabs containing tables,
+     * remove the scrollbar.
+     */
+    overflow-y: visible;
+}
+
+.query-information .table {
+    /**
+     * Remove horizontal scrollbar.
+     */
+    width: 99.9%;
+}
+
+/**
+ * RunsTable
+ */
+
+.runs-table-progress-killable .progress {
+    margin-right: 20px;
+}
+
+.runs-table-progress .glyphicon-remove {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+    cursor: pointer;
+}
+
+.runs-table-progress .glyphicon-remove:hover {
+    opacity: 0.8;
+}
+
+/**
+ * QuerySaveModal
+ */
+
+.query-save-modal pre {
+    min-height: 100px;
+    max-height: 300px;
+}

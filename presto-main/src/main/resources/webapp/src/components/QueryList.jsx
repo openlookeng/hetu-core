@@ -27,6 +27,9 @@ import {
     parseDuration,
     truncateString
 } from "../utils";
+import Header from "../queryeditor/components/Header";
+import Footer from "../queryeditor/components/Footer";
+import NavigationMenu from "../NavigationMenu";
 
 export class QueryListItem extends React.Component {
     static stripQueryTextWhitespace(queryText) {
@@ -201,7 +204,7 @@ class DisplayedQueriesList extends React.Component {
             );
         }.bind(this));
         return (
-            <div>
+            <div className="queryListContainer">
                 {queryNodes}
             </div>
         );
@@ -246,7 +249,7 @@ export class QueryList extends React.Component {
             reorderInterval: 5000,
             currentSortType: SORT_TYPE.CREATED,
             currentSortOrder: SORT_ORDER.DESCENDING,
-            stateFilters: [FILTER_TYPE.RUNNING, FILTER_TYPE.QUEUED],
+            stateFilters: [FILTER_TYPE.RUNNING, FILTER_TYPE.QUEUED, FILTER_TYPE.FINISHED],
             errorTypeFilters: [ERROR_TYPE.INTERNAL_ERROR, ERROR_TYPE.INSUFFICIENT_RESOURCES, ERROR_TYPE.EXTERNAL],
             searchString: '',
             maxQueries: 100,
@@ -565,6 +568,12 @@ export class QueryList extends React.Component {
 
         return (
             <div>
+                <div className='flex flex-row flex-initial header'>
+                    <Header />
+                </div>
+                <div className='flex flex-row content'>
+                <NavigationMenu active={"queryhistory"}/>
+                <div className="container">
                 <div className="row toolbar-row">
                     <div className="col-xs-12 toolbar-col">
                         <div className="input-group input-group-sm">
@@ -630,6 +639,11 @@ export class QueryList extends React.Component {
                     </div>
                 </div>
                 {queryList}
+                </div>
+                </div>
+                <div className='flex flex-row flex-initial footer'>
+                    <Footer/>
+                </div>
             </div>
         );
     }

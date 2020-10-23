@@ -28,16 +28,22 @@ import static java.util.Objects.requireNonNull;
 public class MemoryInfo
 {
     private final int availableProcessors;
+    private final double processCpuLoad;
+    private final double systemCpuLoad;
     private final DataSize totalNodeMemory;
     private final Map<MemoryPoolId, MemoryPoolInfo> pools;
 
     @JsonCreator
     public MemoryInfo(
             @JsonProperty("availableProcessors") int availableProcessors,
+            @JsonProperty("processCpuLoad") double processCpuLoad,
+            @JsonProperty("systemCpuLoad") double systemCpuLoad,
             @JsonProperty("totalNodeMemory") DataSize totalNodeMemory,
             @JsonProperty("pools") Map<MemoryPoolId, MemoryPoolInfo> pools)
     {
         this.totalNodeMemory = requireNonNull(totalNodeMemory, "totalNodeMemory is null");
+        this.processCpuLoad = requireNonNull(processCpuLoad, "processCpuLoad is null");
+        this.systemCpuLoad = requireNonNull(systemCpuLoad, "systemCpuLoad is null");
         this.pools = ImmutableMap.copyOf(requireNonNull(pools, "pools is null"));
         this.availableProcessors = availableProcessors;
     }
@@ -55,6 +61,18 @@ public class MemoryInfo
     }
 
     @JsonProperty
+    public double getProcessCpuLoad()
+    {
+        return processCpuLoad;
+    }
+
+    @JsonProperty
+    public double getSystemCpuLoad()
+    {
+        return systemCpuLoad;
+    }
+
+    @JsonProperty
     public Map<MemoryPoolId, MemoryPoolInfo> getPools()
     {
         return pools;
@@ -65,6 +83,8 @@ public class MemoryInfo
     {
         return toStringHelper(this)
                 .add("availableProcessors", availableProcessors)
+                .add("processCpuLoad", processCpuLoad)
+                .add("systemCpuLoad", systemCpuLoad)
                 .add("totalNodeMemory", totalNodeMemory)
                 .add("pools", pools)
                 .toString();

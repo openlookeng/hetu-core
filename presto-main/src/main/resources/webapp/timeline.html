@@ -2,15 +2,31 @@
 <html lang="en">
 <head xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
     <meta charset="utf-8">
+    <!--EMPTY ICON-->
+    <link rel="icon" href="assets/favicon.ico"/>
 
     <script src="vendor/d3/d3-3.3.4.js"></script>
 
     <link href="vendor/bootstrap/css/bootstrap.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="assets/fonts/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="assets/stylesheets/headerfooter.css">
 
     <link rel="stylesheet" href="vendor/vis/dist/vis.min.css">
     <script src="vendor/vis/dist/vis.min.js"></script>
-
     <style type="text/css">
+        body {
+            background: #f1f1f1;
+            color: #000;
+        }
+        .timeline h1 {
+            font-size: 18px;
+        }
+        .timeline{
+            background: #E6E6E6;
+        }
+        .timeline h2 {
+            font-size: 18px;
+        }
         .vis.timeline .item {
             padding: 0px;
         }
@@ -18,7 +34,7 @@
             padding: 0px;
         }
         .vis.timeline .item.range {
-            height: 3px;
+            height: 10px;
         }
         .vis.timeline .red {
             background-color: #F2DEDE;
@@ -26,7 +42,7 @@
         }
         .vis.timeline .green {
             background-color: #DFF0DB;
-            border-color: #B8F0AA;
+            border-color: #33ad15;
         }
         .vis.timeline .blue {
             background-color: #E3E9FC;
@@ -43,7 +59,7 @@
             border-style: solid;
             border-width: 1px;
             width: 200px;
-            height: 4px;
+            height: 10px;
         }
         #legend .text {
             margin-left: -20px;
@@ -54,7 +70,7 @@
         }
         #legend .green {
             background-color: #DFF0DB;
-            border-color: #B8F0AA;
+            border-color: #33ad15;
         }
         #legend .blue {
             background-color: #E3E9FC;
@@ -70,15 +86,39 @@
         #legend>div {
             display: inline-block;
         }
+        .vis.timeline .labelset .vlabel {
+            border: none;
+        }
+        .vis.timeline .foreground .group {
+            border: none;
+        }
+        .vis.timeline .timeaxis .text {
+            padding: 3px 3px 3px 38px;
+        }
+        .vispanel .horizontal {
+            border:none;
+        }
+        .vis.timeline .vispanel.bottom, .vis.timeline .vispanel.center, .vis.timeline .vispanel.top {
+            border: none;
+        }
+        .vis.timeline .vispanel.center, .vis.timeline .vispanel.left, .vis.timeline .vispanel.right {
+            border: none;
+        }
+        .vis.timeline.root {
+            border: none;
+        }
     </style>
 </head>
 
 <body>
 
+<div id="page-header">
 
-<div class="container">
+</div>
+
+<div class="container timeline">
     <div class="page-header">
-        <h1>Presto :: Query <span id="queryId"></span></h1>
+        <h1>Query Timeline :: Query <span id="queryId"></span></h1>
     </div>
 
     <h2>Timeline</h2>
@@ -104,8 +144,12 @@
     <div id="timeline"></div>
 </div>
 
+<div id="page-footer">
+</div>
+
 </body>
 
+<script type="text/javascript" src="dist/headerfooter.js"></script>
 <script>
 d3.json('../v1/query/' + window.location.search.substring(1), function (query) {
     d3.select('#queryId').text(query.queryId);
@@ -142,7 +186,7 @@ function renderTimeline(data) {
             groups.add({
                 id: stageId,
                 content: stageId,
-                sort: stageId,
+                sort: parseInt(stageId, 10) * -1,
                 subgroupOrder: 'sort',
             });
         }

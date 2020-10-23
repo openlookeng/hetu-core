@@ -333,6 +333,15 @@
             <groupId>io.airlift</groupId>
             <artifactId>http-client</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.jetbrains</groupId>
@@ -373,6 +382,14 @@
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
         </dependency>
 
         <dependency>
@@ -504,6 +521,16 @@
 
     <build>
         <plugins>
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <ignoredDependencies>
+                        <ignoredDependency>org.eclipse.jetty:jetty-server:jar</ignoredDependency>
+                        <ignoredDependency>org.glassfish.jersey.media:jersey-media-sse:jar</ignoredDependency>
+                        <ignoredDependency>org.apache.commons:commons-lang3:jar</ignoredDependency>
+                    </ignoredDependencies>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.gaul</groupId>
                 <artifactId>modernizer-maven-plugin</artifactId>

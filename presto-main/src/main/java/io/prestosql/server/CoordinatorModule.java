@@ -108,6 +108,7 @@ import io.prestosql.memory.TotalReservationLowMemoryKiller;
 import io.prestosql.memory.TotalReservationOnBlockedNodesLowMemoryKiller;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.operator.ForScheduler;
+import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
@@ -191,7 +192,7 @@ public class CoordinatorModule
     @Override
     protected void setup(Binder binder)
     {
-        httpServerBinder(binder).bindResource("/ui", "webapp").withWelcomeFile("index.html");
+        httpServerBinder(binder).bindResource("/ui", "webapp").withWelcomeFile("queryeditor.html");
         httpServerBinder(binder).bindResource("/tableau", "webapp/tableau");
 
         // discovery server
@@ -211,6 +212,9 @@ public class CoordinatorModule
         jaxrsBinder(binder).bind(io.prestosql.server.protocol.ExecutingStatementResource.class);
         binder.bind(StatementHttpExecutionMBean.class).in(Scopes.SINGLETON);
         newExporter(binder).export(StatementHttpExecutionMBean.class).withGeneratedName();
+
+        //hetu-ui module
+        binder.install(new QueryEditorUIModule());
 
         // catalog resource
         install(installModuleIf(DynamicCatalogConfig.class, DynamicCatalogConfig::isDynamicCatalogEnabled, new CatalogModule()));

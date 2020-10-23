@@ -1,0 +1,175 @@
+body{
+    background-color: #f1f1f1;
+}
+.font-16{
+    font-size: 18px;
+}
+.font-18{
+    font-size: 18px;
+}
+.font-20{
+    font-size: 20px;
+}
+.color-2b610a{
+    color: #2b610a;
+}
+.float-right{
+    float: right;
+}
+.border-bottom{
+    border-bottom: 1px solid #eee;
+}
+.color-eee{
+    color:#666;
+}
+.padding-top-10{
+    padding-top: 10px;
+}
+.overview {
+    display: flex;
+}
+.overview ul{
+    list-style: none;
+    padding-left: 0;
+}
+.overview .line-right{
+    flex: 1;
+    padding: 0 20px;
+}
+.overview .line-right>h2{
+    margin-top: 0;
+    padding-top: 15px;
+    padding-bottom: 0;
+}
+.overview .line-right .checkbox-group ul{
+    display: flex;
+    flex-wrap: wrap;
+    margin: 30px 0;
+}
+.overview .line-right .checkbox-group ul li{
+    margin-right: 30px;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+.overview .line-right .checkbox-group ul li i{
+    margin-right: 6px;
+    width: 15px;
+}
+.overview .line-right .line-show{
+    display: flex;
+}
+.overview .line-right .line-show .line-part{
+    flex: 1;
+    padding-top: 0;
+}
+.overview .line-right .line-show .summary-info{
+    max-width: 20vw;
+    width: 20vw;
+    margin-top: 65px;
+    padding-left: 20px;
+}
+.overview .line-right .line-show .summary-info .summary-detail,.overview .line-right .line-show .summary-info .summary-table{
+    background-color: #fff;
+    padding: 20px 20px 10px;
+    margin-bottom: 20px;
+    border: 1px solid #b2b2b2;
+    border-radius: 5px;
+}
+.overview .line-right .line-show .summary-info .summary-detail h3,.overview .line-right .line-show .summary-info .summary-table h3{
+    margin-top: 0;
+    text-align: center;
+}
+.display-none{
+    display: none;
+}
+.select-part {
+    float: left;
+    font-size: 12px;
+    margin-top: 10px;
+}
+.selectItemContainer {
+    float: right;
+}
+.selectChart {
+    float: left;
+    margin-top: 10px;
+    margin-right: 10px;
+}
+.multiSelect {
+    text-align: right;
+}
+.multiSelect .koaemg {
+    background: #f5f5f5;
+    border: 1px solid #675d5d;
+    padding: 0px 10px;
+    outline: none;
+    border-radius: 5px;
+    font-weight: normal;
+    font-size: 16px;
+    height: 40px;
+}
+.multiSelect .koaemg:hover {
+    background: #fff;
+    cursor: pointer;
+}
+.multiSelect .hrsxMP {
+    font-size: 16px;
+    margin-left: 8px;
+}
+.multiSelect .bNEwgs {
+    padding: 10px;
+}
+.multiSelect ul .ihQlfX{
+    font-size: 16px;
+    font-weight: normal;
+    margin: 3px 0px;
+    padding: 0;
+}
+.multiSelect ul .ihQlfX:hover {
+    padding: 0;
+    background-color: #fff;
+}
+.multiSelect ul li label {
+    vertical-align: middle;
+    font-weight: normal;
+}
+.select-part select {
+    background: #f5f5f5;
+    border: 1px solid #675d5d;
+    padding: 0px 10px;
+    outline: none;
+    border-radius: 5px;
+    font-weight: normal;
+    font-size: 16px;
+    height: 40px;
+}
+.flex-initial.header{
+}
+
+.flex-initial.footer{
+    margin-top: 10px;
+}
+
+.overviewGraphContainerParent {
+    max-height: calc(100vh - 210px);
+    height: calc(100vh - 210px);
+    overflow-y: auto;
+    display: inline-flex;
+    margin-top: 10px;
+}
+
+.overviewGraphContainer {
+    min-width: calc(80vw - 120px);
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.overviewChart {
+    background-color: #fff;
+    height: 30vh;
+    width: calc(40vw - 70px);
+    margin: 5px;
+    padding: 5px;
+    border: 1px solid #b2b2b2;
+    border-radius: 5px;
+}

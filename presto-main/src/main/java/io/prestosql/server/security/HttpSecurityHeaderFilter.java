@@ -20,6 +20,7 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpFilter;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
@@ -55,7 +56,7 @@ public class HttpSecurityHeaderFilter
             throws IOException, ServletException
     {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-        if (System.getProperty(HTTP_SECURITY_CSP) != null) {
+        if (System.getProperty(HTTP_SECURITY_CSP) != null && !(servletRequest instanceof HttpServletRequest && AuthenticationFilter.isWebUi((HttpServletRequest) servletRequest))) {
             httpServletResponse.setHeader(HTTP_SECURITY_CSP, System.getProperty(HTTP_SECURITY_CSP));
         }
         else {

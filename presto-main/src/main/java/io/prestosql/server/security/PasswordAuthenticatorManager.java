@@ -15,6 +15,7 @@ package io.prestosql.server.security;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.PasswordAuthenticator;
 import io.prestosql.spi.security.PasswordAuthenticatorFactory;
 
@@ -80,7 +81,10 @@ public class PasswordAuthenticatorManager
 
     public PasswordAuthenticator getAuthenticator()
     {
-        checkState(authenticator.get() != null, "authenticator was not loaded");
+        if (authenticator.get() == null) {
+            //to avoid printing huge logs during startup
+            throw new AccessDeniedException("authenticator was not loaded");
+        }
         return authenticator.get();
     }
 }

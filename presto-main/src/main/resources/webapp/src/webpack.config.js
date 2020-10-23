@@ -6,6 +6,10 @@ module.exports = {
         'embedded_plan': __dirname +'/embedded_plan.jsx',
         'stage': __dirname +'/stage.jsx',
         'worker': __dirname +'/worker.jsx',
+        'hetuqueryeditor': __dirname +'/hetuqueryeditor.jsx',
+        'overview': __dirname +'/overview.jsx',
+        'nodes': __dirname +'/nodes.jsx',
+        'headerfooter': __dirname +'/HeaderFooter.jsx'
     },
     mode: "development",
     module: {

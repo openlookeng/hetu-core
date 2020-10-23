@@ -4,11 +4,12 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-    <meta name="description" content="Query Details - Presto">
-    <title>Worker Status - Presto</title>
+    <meta name="description" content="Query Details - OpenLooKeng">
+    <title>Worker Status - OpenLooKeng</title>
 
-    <link rel="icon" href="assets/favicon.ico">
-
+<!--    <link rel="icon" href="assets/favicon.ico">-->
+    <!--EMPTY ICON-->
+    <link rel="icon" href="assets/favicon.ico"/>
     <!-- Bootstrap core -->
     <link href="vendor/bootstrap/css/bootstrap.css" rel="stylesheet">
 
@@ -34,14 +35,16 @@
     <script src="vendor/clipboardjs/clipboard.min.js"></script>
 
     <!-- Custom CSS -->
+    <link href="assets/stylesheets/headerfooter.css" rel="stylesheet">
     <link href="assets/presto.css" rel="stylesheet">
 </head>
 
 <body>
 
-<div class="container">
-    <div id="title"></div>
+<div id="page-header">
+</div>
 
+<div class="container">
     <div id="worker-status">
         <div class="loader">Loading...</div>
     </div>
@@ -49,8 +52,11 @@
         <div class="loader">Loading...</div>
     </div>
 </div> <!-- /container -->
+<div id="page-footer">
+</div>
 
 <script type="text/javascript" src="dist/worker.js"></script>
+<script type="text/javascript" src="dist/headerfooter.js"></script>
 
 <!-- Fonts -->
 <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700" rel="stylesheet">

@@ -1,0 +1,103 @@
+[
+  {
+    "connectorWithProperties": {
+      "connectorName": "tpch",
+      "connectorLabel": "TPC-H : TPC Benchmark™ H, data is generated on the fly",
+      "propertiesEnabled": false,
+      "catalogConfigFilesEnabled": false,
+      "globalConfigFilesEnabled": false,
+      "properties": []
+    },
+    "user": "lk",
+    "uuid": "ff35a9cf-8cfc-4ff5-be2f-a6389c144f9a",
+    "docLink": "https://openlookeng.io/docs/docs/connector/tpch.html",
+    "configLink": "https://openlookeng.io/docs/docs/connector/tpch.html#configuration"
+  },
+  {
+    "connectorWithProperties": {
+      "connectorName": "tpcds",
+      "connectorLabel": "TPC-DS : TPC Benchmark™ DS, data is generated on the fly",
+      "propertiesEnabled": false,
+      "catalogConfigFilesEnabled": false,
+      "globalConfigFilesEnabled": false,
+      "properties": []
+    },
+    "user": "lk",
+    "uuid": "ff35a9cf-8cfc-4ff5-be2f-a6389c144f9b",
+    "docLink": "https://openlookeng.io/docs/docs/connector/tpcds.html",
+    "configLink": "https://openlookeng.io/docs/docs/connector/tpcds.html#configuration"
+  },
+  {
+    "connectorWithProperties": {
+      "connectorName": "memory",
+      "connectorLabel": "Memory: All data and metadata is only stored in memory",
+      "propertiesEnabled": false,
+      "catalogConfigFilesEnabled": false,
+      "globalConfigFilesEnabled": false,
+      "properties": []
+    },
+    "user": "lk",
+    "uuid": "ff35a9cf-8cfc-4ff5-be2f-a6389c144f9d",
+    "docLink": "https://openlookeng.io/docs/docs/connector/memory.html",
+    "configLink": "https://openlookeng.io/docs/docs/connector/memory.html#configuration"
+  },
+  {
+    "connectorWithProperties": {
+      "connectorName": "hive-hadoop2",
+      "connectorLabel": "Hive-Hadoop2: Data stored in Hive data warehouse / HDFS",
+      "propertiesEnabled": true,
+      "catalogConfigFilesEnabled": true,
+      "globalConfigFilesEnabled": true,
+      "properties": [
+        {
+          "name": "hive.metastore.uri",
+          "value": "thrift://localhost:9083",
+          "description": "The URI(s) of the Hive metastore to connect to using the Thrift protocol.\nIf multiple URIs are provided, the first URI is used by default and the rest of the URIs are fallback metastores.\nThis property is required.\nExample: thrift://192.0.2.3:9083 or thrift://192.0.2.3:9083,thrift://192.0.2.4:9083",
+          "required" : true,
+          "type" : "string"
+        },
+        {
+          "name": "hive.config.resources",
+          "value": "core-site.xml,hdfs-site.xml",
+          "description": "An optional comma-separated list of HDFS configuration files.\nThese files must exist on the machines running openLooKeng.\nOnly specify this if absolutely necessary to access HDFS.\n\nEnsure to upload these files.",
+          "readOnly": true,
+          "type": "files"
+        }
+      ]
+    },
+    "user": "lk",
+    "uuid": "ff35a9cf-8cfc-4ff5-be2f-a6389c144f9c",
+    "docLink": "https://openlookeng.io/docs/docs/connector/hive.html",
+    "configLink": "https://openlookeng.io/docs/docs/connector/hive.html#configuration"
+  },
+  {
+    "connectorWithProperties": {
+      "connectorName": "dc",
+      "connectorLabel": "DataCenter: Query data in remote OpenLooKeng data center",
+      "propertiesEnabled": true,
+      "catalogConfigFilesEnabled": false,
+      "globalConfigFilesEnabled": false,
+      "properties": [
+        {
+          "name": "connection-url",
+          "value": "http://localhost:8080",
+          "description": "The connection URL of remote OpenLooKeng data center",
+          "required" : true,
+          "type" : "string"
+        },
+        {
+          "name": "connection-user",
+          "value": "lk",
+          "description": "User to connect to remote data center",
+          "required" : true,
+          "readOnly": true,
+          "type": "string"
+        }
+      ]
+    },
+    "user": "lk",
+    "uuid": "ff35a9cf-8cfc-4ff5-be2f-a6389c144f9e",
+    "docLink": "https://openlookeng.io/docs/docs/connector/datacenter.html",
+    "configLink": "https://openlookeng.io/docs/docs/connector/datacenter.html#configuration"
+  }
+]
