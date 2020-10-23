@@ -288,6 +288,19 @@ public class HiveWriterFactory
         return conf;
     }
 
+    Optional<String> getPartitionName(Page partitionColumns, int position)
+    {
+        List<String> partitionValues = createPartitionValues(partitionColumnTypes, partitionColumns, position);
+        Optional<String> partitionName;
+        if (!partitionColumnNames.isEmpty()) {
+            partitionName = Optional.of(FileUtils.makePartName(partitionColumnNames, partitionValues));
+        }
+        else {
+            partitionName = Optional.empty();
+        }
+        return partitionName;
+    }
+
     public HiveWriter createWriter(Page partitionColumns, int position, OptionalInt bucketNumber, Optional<Options> vacuumOptions)
     {
         boolean isTxnTable = isTxnTable();

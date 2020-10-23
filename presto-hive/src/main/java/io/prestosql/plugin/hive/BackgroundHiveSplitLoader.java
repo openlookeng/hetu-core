@@ -568,7 +568,7 @@ public class BackgroundHiveSplitLoader
                 Object vacuumHandle = queryInfo.get("vacuumHandle");
                 if (vacuumHandle != null && vacuumHandle instanceof HiveVacuumTableHandle) {
                     HiveVacuumTableHandle hiveVacuumTableHandle = (HiveVacuumTableHandle) vacuumHandle;
-                    hiveVacuumTableHandle.addRange(new Range(min, max));
+                    hiveVacuumTableHandle.addRange(partitionName, new Range(min, max));
                 }
             }
         }

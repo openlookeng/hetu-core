@@ -21,11 +21,14 @@ import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 public class HiveVacuumTableHandle
@@ -33,7 +36,7 @@ public class HiveVacuumTableHandle
         implements ConnectorVacuumTableHandle
 {
     boolean full;
-    List<Range> ranges;
+    Map<String, List<Range>> ranges;
 
     @JsonCreator
     public HiveVacuumTableHandle(
@@ -46,7 +49,7 @@ public class HiveVacuumTableHandle
             @JsonProperty("tableStorageFormat") HiveStorageFormat tableStorageFormat,
             @JsonProperty("partitionStorageFormat") HiveStorageFormat partitionStorageFormat,
             @JsonProperty("full") boolean full,
-            @JsonProperty("ranges") List<Range> ranges)
+            @JsonProperty("ranges") Map<String, List<Range>> ranges)
     {
         super(
                 schemaName,
@@ -69,12 +72,18 @@ public class HiveVacuumTableHandle
      * Usually there will be only one range per partition. When multiple partitions are involved,
      * ranges has to be corrected involving all together.
      */
-    synchronized void addRange(Range range)
+    synchronized void addRange(String partitionName, Range range)
     {
+        requireNonNull(partitionName, "Partition name is null");
         if (ranges == null) {
-            ranges = new ArrayList<>();
+            ranges = new HashMap<>();
         }
-        addRange(range, ranges);
+        List<Range> partitionRanges = ranges.get(partitionName);
+        if (partitionRanges == null) {
+            partitionRanges = new ArrayList<>();
+            ranges.put(partitionName, partitionRanges);
+        }
+        addRange(range, partitionRanges);
     }
 
     static void addRange(Range range, List<Range> ranges)
@@ -124,9 +133,13 @@ public class HiveVacuumTableHandle
         }
     }
 
-    List<Range> getSuitableRange(Range range)
+    List<Range> getSuitableRange(String partitionName, Range range)
     {
-        return getSuitableRange(range, ranges);
+        List<Range> partitionRanges = this.ranges.get(partitionName);
+        if (partitionRanges == null || partitionRanges.isEmpty()) {
+            return partitionRanges;
+        }
+        return getSuitableRange(range, partitionRanges);
     }
 
     static List<Range> getSuitableRange(Range range, List<Range> ranges)
@@ -144,7 +157,7 @@ public class HiveVacuumTableHandle
     }
 
     @JsonProperty("ranges")
-    public synchronized List<Range> getRanges()
+    public synchronized Map<String, List<Range>> getRanges()
     {
         return ranges;
     }

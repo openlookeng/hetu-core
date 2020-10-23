@@ -1282,9 +1282,11 @@ public class SemiTransactionalHiveMetastore
 
             VacuumTableInfoForCleaner info;
             long maxId = Long.MIN_VALUE;
-            for (HiveVacuumTableHandle.Range range : vacuumTableHandle.getRanges()) {
-                if (maxId < range.getMax()) {
-                    maxId = range.getMax();
+            for (List<HiveVacuumTableHandle.Range> partitionRange : vacuumTableHandle.getRanges().values()) {
+                for (HiveVacuumTableHandle.Range range : partitionRange) {
+                    if (maxId < range.getMax()) {
+                        maxId = range.getMax();
+                    }
                 }
             }
             for (int index = 0; index < partitionUpdates.size(); index++) {

@@ -127,7 +127,7 @@ public class VacuumTableOperator
 
         public String getOperatorType()
         {
-            return VacuumTableOperator.class.getName();
+            return VacuumTableOperator.class.getSimpleName();
         }
 
         @Override
