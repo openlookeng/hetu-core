@@ -23,7 +23,7 @@ import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.airlift.units.Duration;
 import io.hetu.core.heuristicindex.IndexCommand;
-import io.hetu.core.heuristicindex.IndexRecordManager;
+import io.hetu.core.heuristicindex.IndexRecord;
 import io.prestosql.client.ClientSelectedRole;
 import io.prestosql.client.ClientSession;
 import io.prestosql.client.ClientTypeSignature;
@@ -343,10 +343,10 @@ public class Console
                     .add(new Column("Index Type", VARCHAR, new ClientTypeSignature(VARCHAR)))
                     .add(new Column("Partitions", VARCHAR, new ClientTypeSignature(VARCHAR)))
                     .build();
-            List<IndexRecordManager.IndexRecord> records = command.getIndexes();
+            List<IndexRecord> records = command.getIndexes();
 
             List<List<?>> rows = new ArrayList<>();
-            for (IndexRecordManager.IndexRecord v : records) {
+            for (IndexRecord v : records) {
                 if (!verifyAccess(queryRunner, exiting, v.table)) {
                     continue;
                 }

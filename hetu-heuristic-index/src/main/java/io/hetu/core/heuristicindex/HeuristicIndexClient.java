@@ -17,23 +17,23 @@ package io.hetu.core.heuristicindex;
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
-import io.hetu.core.filesystem.SupportedFileAttributes;
 import io.hetu.core.heuristicindex.util.IndexConstants;
-import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.file.Files;
+import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedList;
@@ -47,7 +47,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.hetu.core.heuristicindex.util.IndexConstants.COLUMN_DELIMITER;
+import static io.hetu.core.heuristicindex.IndexRecord.COLUMN_DELIMITER;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -64,12 +64,14 @@ public class HeuristicIndexClient
 
     private HetuFileSystemClient fs;
     private Path root;
+    private IndexRecordManager indexRecordManager;
     private Map<String, Index> indexTypesMap;
 
     public HeuristicIndexClient(Set<Index> indexTypes, HetuFileSystemClient fs, Path root)
     {
         this.fs = fs;
         this.root = root;
+        this.indexRecordManager = new IndexRecordManager(fs, root);
         indexTypesMap = indexTypes.stream().collect(Collectors.toMap(
                 type -> type.getId().toLowerCase(Locale.ENGLISH),
                 Function.identity()));
@@ -82,6 +84,19 @@ public class HeuristicIndexClient
         requireNonNull(path, "no path specified");
 
         List<IndexMetadata> indexes = new LinkedList<>();
+
+        Path indexKeyPath = Paths.get(path);
+        try {
+            if (indexRecordManager.lookUpIndexRecord(indexKeyPath.subpath(0, 1).toString(),
+                    new String[] {indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
+                // Use index record file to pre-screen. If record does not contain the index, skip loading
+                return null;
+            }
+        }
+        catch (Exception e) {
+            // On exception, log and continue reading from disk
+            LOG.debug("Error reading index records: " + path);
+        }
 
         for (Map.Entry<String, Index> entry : readIndexMap(path).entrySet()) {
             String absolutePath = entry.getKey();
@@ -215,20 +230,14 @@ public class HeuristicIndexClient
 
         try (Stream<Path> tarsOnRemote = fs.walk(absolutePath).filter(p -> p.toString().contains(".tar"))) {
             for (Path tarFile : (Iterable<Path>) tarsOnRemote::iterator) {
-                Path localTmpDir = Files.createTempDirectory("tmp-index-dump-").toAbsolutePath();
-                LOG.debug("Fetching index from remote filesystem to local: " + tarFile);
-                IndexServiceUtils.unArchive(fs, LOCAL_FS_CLIENT, tarFile, localTmpDir);
-                Path tarReadPath = Paths.get(localTmpDir.toString(), absolutePath.toString());
-
-                try (Stream<Path> children = LOCAL_FS_CLIENT.walk(tarReadPath).filter(this::notDirectory)) {
-                    for (Path child : (Iterable<Path>) children::iterator) {
-                        LOG.debug("Processing file {}.", child);
-
-                        Path childFilePath = child.getFileName();
-                        if (childFilePath == null) {
-                            throw new IllegalStateException("Path cannot be resolved: " + child);
+                try (TarArchiveInputStream i = new TarArchiveInputStream(fs.newInputStream(tarFile))) {
+                    ArchiveEntry entry;
+                    while ((entry = i.getNextEntry()) != null) {
+                        if (!i.canReadEntryData(entry)) {
+                            throw new FileSystemException("Unable to read archive entry: " + entry.toString());
                         }
-                        String filename = childFilePath.toString();
+
+                        String filename = entry.getName();
 
                         if (!filename.contains(".")) {
                             continue;
@@ -246,29 +255,14 @@ public class HeuristicIndexClient
                                     | NoSuchMethodException e) {
                                 throw new IOException(e);
                             }
-                            try (InputStream is = LOCAL_FS_CLIENT.newInputStream(child)) {
-                                index.deserialize(is);
-                            }
 
-                            LOG.debug("Loaded {} index from {}.", index.getId(), child);
+                            index.deserialize(new CloseShieldInputStream(i));
 
-                            Object fileSize = LOCAL_FS_CLIENT.getAttribute(child, SupportedFileAttributes.SIZE);
-                            if (fileSize instanceof Long) {
-                                index.setMemorySize((long) fileSize);
-                            }
+                            LOG.debug("Loaded {} index from {}.", index.getId(), tarFile.toAbsolutePath());
 
-                            if (localTmpDir != null) {
-                                // remove the temp folder path at the beginning
-                                result.put(child.toString().replaceAll(localTmpDir.toString(), ""), index);
-                            }
-                            else {
-                                result.put(child.toString(), index);
-                            }
+                            result.put(tarFile.getParent().resolve(filename).toString(), index);
                         }
                     }
-                }
-                finally {
-                    LOCAL_FS_CLIENT.deleteRecursively(localTmpDir);
                 }
             }
         }

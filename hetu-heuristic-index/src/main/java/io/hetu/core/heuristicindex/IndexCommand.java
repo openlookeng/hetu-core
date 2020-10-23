@@ -77,13 +77,14 @@ public class IndexCommand
         this.user = user;
     }
 
-    public IndexRecordManager.IndexRecord getIndex()
+    public IndexRecord getIndex()
     {
         try {
             validatePaths();
             IndexFactory factory = IndexCommandUtils.getIndexFactory();
             IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
-            return IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName);
+            IndexRecordManager indexRecordManager = new IndexRecordManager(indexStore.getFs(), indexStore.getRoot());
+            return indexRecordManager.lookUpIndexRecord(indexName);
         }
         catch (IOException e) {
             e.printStackTrace(System.err);
@@ -91,18 +92,19 @@ public class IndexCommand
         }
     }
 
-    public List<IndexRecordManager.IndexRecord> getIndexes()
+    public List<IndexRecord> getIndexes()
     {
         try {
             validatePaths();
             IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
+            IndexRecordManager indexRecordManager = new IndexRecordManager(indexStore.getFs(), indexStore.getRoot());
 
             if (indexName.equals("")) {
-                return IndexRecordManager.readAllIndexRecords(indexStore.getFs(), indexStore.getRoot());
+                return indexRecordManager.getIndexRecords();
             }
             else {
-                List<IndexRecordManager.IndexRecord> records = Collections.singletonList(
-                        IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName));
+                List<IndexRecord> records = Collections.singletonList(
+                        indexRecordManager.lookUpIndexRecord(indexName));
                 if (records.get(0) == null) {
                     return Collections.emptyList();
                 }
@@ -122,7 +124,8 @@ public class IndexCommand
             IndexFactory factory = IndexCommandUtils.getIndexFactory();
             IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
             IndexClient deleteClient = factory.getIndexClient(indexStore.getFs(), indexStore.getRoot());
-            IndexRecordManager.IndexRecord record = IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName);
+            IndexRecordManager indexRecordManager = new IndexRecordManager(indexStore.getFs(), indexStore.getRoot());
+            IndexRecord record = indexRecordManager.lookUpIndexRecord(indexName);
             if (record == null) {
                 System.out.printf("Index with name [%s] does not exist.%n%n", indexName);
                 return;
@@ -132,7 +135,7 @@ public class IndexCommand
                 return;
             }
             deleteClient.deleteIndex(record.table, record.columns, record.indexType);
-            IndexRecordManager.deleteIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName);
+            indexRecordManager.deleteIndexRecord(indexName);
             System.out.format("Deleted index [%s].%n%n", indexName);
         }
         catch (IOException e) {
@@ -156,8 +159,9 @@ public class IndexCommand
             validatePaths();
             IndexCommandUtils.IndexStore indexStore = loadIndexStore(configDirPath);
             IndexFactory factory = IndexCommandUtils.getIndexFactory();
-            IndexRecordManager.IndexRecord sameNameRecord = IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName);
-            IndexRecordManager.IndexRecord sameIndexRecord = IndexRecordManager.lookUpIndexRecord(indexStore.getFs(), indexStore.getRoot(), table, columns, indexType);
+            IndexRecordManager indexRecordManager = new IndexRecordManager(indexStore.getFs(), indexStore.getRoot());
+            IndexRecord sameNameRecord = indexRecordManager.lookUpIndexRecord(indexName);
+            IndexRecord sameIndexRecord = indexRecordManager.lookUpIndexRecord(table, columns, indexType);
 
             if (sameNameRecord == null) {
                 if (sameIndexRecord != null) {
@@ -205,7 +209,7 @@ public class IndexCommand
             requireNonNull(columns, "No columns specified for create command");
             IndexWriter writer = factory.getIndexWriter(dsProperties, ixProperties, indexStore.getFs(), indexStore.getRoot());
             writer.createIndex(table, columns, partitions, indexType);
-            IndexRecordManager.addIndexRecord(indexStore.getFs(), indexStore.getRoot(), indexName, user, table, columns, indexType, partitions);
+            indexRecordManager.addIndexRecord(indexName, user, table, columns, indexType, partitions);
             if (!verbose) {
                 System.out.print("\n");
             }

@@ -18,6 +18,7 @@ import com.google.common.cache.CacheLoader;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -63,6 +64,11 @@ public class IndexCacheLoader
         }
         catch (Exception e) {
             throw new Exception("No valid index file found for key " + key, e);
+        }
+
+        // null indicates that the index is not registered in index records
+        if (indices == null) {
+            throw new IndexNotCreatedException();
         }
 
         // lastModified file was valid, but no index files for the given types

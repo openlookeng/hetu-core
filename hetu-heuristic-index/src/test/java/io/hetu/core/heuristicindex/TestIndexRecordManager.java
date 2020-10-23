@@ -32,11 +32,157 @@ import java.util.Properties;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 public class TestIndexRecordManager
 {
-    private static final HetuFileSystemClient FILE_SYSTEM_CLIENT = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/"));
+    private static final HetuFileSystemClient FILE_SYSTEM_CLIENT = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(System.getProperty("java.io.tmpdir")));
+
+    @Test
+    public void testIndexRecordExpire()
+            throws IOException
+    {
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+            IndexRecordManager indexRecordManager1 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            IndexRecordManager indexRecordManager2 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+
+            indexRecordManager1.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            List<IndexRecord> original1 = indexRecordManager1.getIndexRecords();
+            List<IndexRecord> original2 = indexRecordManager2.getIndexRecords();
+            assertEquals(original2.size(), 1);
+            assertEquals(original1, original2);
+
+            List<IndexRecord> beforeadd1 = indexRecordManager1.getIndexRecords();
+            indexRecordManager2.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "bloom", "cp=1");
+            List<IndexRecord> added2 = indexRecordManager2.getIndexRecords();
+            assertEquals(added2.size(), 2);
+
+            indexRecordManager2.deleteIndexRecord("2");
+            List<IndexRecord> deleted1 = indexRecordManager1.getIndexRecords();
+            List<IndexRecord> deleted2 = indexRecordManager2.getIndexRecords();
+            assertEquals(deleted2.size(), 1);
+            assertEquals(deleted1, deleted2);
+
+            assertSame(original1, beforeadd1);
+            assertNotSame(original1, deleted1);
+        }
+    }
+
+    @Test(timeOut = 20000)
+    public void testConcurrentMultipleManagers()
+            throws IOException, InterruptedException
+    {
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+
+            // 6 entries will be created by different threads in parallel, in which the first four will be deleted also in parallel
+            String[] names = new String[] {"a", "b", "c", "d", "e", "f"};
+            Thread[] threads = new Thread[10];
+
+            for (int i = 0; i < 6; i++) {
+                int finalI = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath())
+                                .addIndexRecord(names[finalI], "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                threads[i].start();
+            }
+
+            for (int i = 6; i < 10; i++) {
+                int finalI = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+                        while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
+                            Thread.sleep(50L);
+                        }
+                        indexRecordManager.deleteIndexRecord(names[finalI - 6]);
+                    }
+                    catch (IOException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                threads[i].start();
+            }
+
+            for (Thread thread : threads) {
+                thread.join();
+            }
+
+            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            assertEquals(indexRecordManager.getIndexRecords().size(), 2);
+            assertNull(indexRecordManager.lookUpIndexRecord(names[0]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[1]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[2]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[3]));
+            assertNotNull(indexRecordManager.lookUpIndexRecord(names[4]));
+            assertNotNull(indexRecordManager.lookUpIndexRecord(names[5]));
+        }
+    }
+
+    @Test(timeOut = 5000)
+    public void testConcurrentSingleManager()
+            throws IOException, InterruptedException
+    {
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+
+            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+
+            // 6 entries will be created by different threads in parallel, in which the first four will be deleted also in parallel
+            String[] names = new String[] {"a", "b", "c", "d", "e", "f"};
+            Thread[] threads = new Thread[10];
+
+            for (int i = 0; i < 6; i++) {
+                int finalI = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        indexRecordManager.addIndexRecord(names[finalI], "u", "t", new String[] {"c"}, "minmax", "cp=1");
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                threads[i].start();
+            }
+
+            for (int i = 6; i < 10; i++) {
+                int finalI = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
+                            Thread.sleep(50L);
+                        }
+                        indexRecordManager.deleteIndexRecord(names[finalI - 6]);
+                    }
+                    catch (IOException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                threads[i].start();
+            }
+
+            for (Thread thread : threads) {
+                thread.join();
+            }
+
+            assertEquals(indexRecordManager.getIndexRecords().size(), 2);
+            assertNull(indexRecordManager.lookUpIndexRecord(names[0]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[1]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[2]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[3]));
+            assertNotNull(indexRecordManager.lookUpIndexRecord(names[4]));
+            assertNotNull(indexRecordManager.lookUpIndexRecord(names[5]));
+        }
+    }
 
     @Test
     public void testDelete()
@@ -44,27 +190,28 @@ public class TestIndexRecordManager
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
-            IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
-            assertNotNull(IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "1"));
-            assertEquals(IndexRecordManager.readAllIndexRecords(FILE_SYSTEM_CLIENT, folder.getRoot().toPath()).size(), 2);
+            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            indexRecordManager.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            indexRecordManager.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            assertNotNull(indexRecordManager.lookUpIndexRecord("1"));
+            assertEquals(indexRecordManager.getIndexRecords().size(), 2);
 
             // Delete 1
-            IndexRecordManager.deleteIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "1");
-            assertNull(IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "1"));
-            assertNotNull(IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "2"));
-            assertEquals(IndexRecordManager.readAllIndexRecords(FILE_SYSTEM_CLIENT, folder.getRoot().toPath()).size(), 1);
+            indexRecordManager.deleteIndexRecord("1");
+            assertNull(indexRecordManager.lookUpIndexRecord("1"));
+            assertNotNull(indexRecordManager.lookUpIndexRecord("2"));
+            assertEquals(indexRecordManager.getIndexRecords().size(), 1);
 
             // Delete 1 again
-            IndexRecordManager.deleteIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "1");
-            assertNull(IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "1"));
-            assertNotNull(IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "2"));
-            assertEquals(IndexRecordManager.readAllIndexRecords(FILE_SYSTEM_CLIENT, folder.getRoot().toPath()).size(), 1);
+            indexRecordManager.deleteIndexRecord("1");
+            assertNull(indexRecordManager.lookUpIndexRecord("1"));
+            assertNotNull(indexRecordManager.lookUpIndexRecord("2"));
+            assertEquals(indexRecordManager.getIndexRecords().size(), 1);
 
             // Delete 2
-            IndexRecordManager.deleteIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "2");
-            assertNull(IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "2"));
-            assertEquals(IndexRecordManager.readAllIndexRecords(FILE_SYSTEM_CLIENT, folder.getRoot().toPath()).size(), 0);
+            indexRecordManager.deleteIndexRecord("2");
+            assertNull(indexRecordManager.lookUpIndexRecord("2"));
+            assertEquals(indexRecordManager.getIndexRecords().size(), 0);
         }
     }
 
@@ -81,18 +228,18 @@ public class TestIndexRecordManager
     @Test
     public void testRecordEqualAndHash()
     {
-        IndexRecordManager.IndexRecord r1 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList());
-        IndexRecordManager.IndexRecord r2 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {
+        IndexRecord r1 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList());
+        IndexRecord r2 = new IndexRecord("testName", "testUser", "testTable", new String[] {
                 "testColumn"}, "minmax", ImmutableList.of("note"));
-        IndexRecordManager.IndexRecord r3 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList());
-        IndexRecordManager.IndexRecord r4 = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn",
+        IndexRecord r3 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList());
+        IndexRecord r4 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn",
                 "testColumn2"}, "minmax", Collections.emptyList());
         assertEquals(r1, r1);
         assertEquals(r1, r2);
         assertNotEquals(r1, r3);
         assertNotEquals(r1, r4);
 
-        HashSet<IndexRecordManager.IndexRecord> testSet = new HashSet<>();
+        HashSet<IndexRecord> testSet = new HashSet<>();
         testSet.add(r1);
         assertEquals(testSet.size(), 1);
         testSet.add(r2);
@@ -109,10 +256,11 @@ public class TestIndexRecordManager
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager.IndexRecord expected = new IndexRecordManager.IndexRecord("testName", "testUser", "testTable", new String[] {
+            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            IndexRecord expected = new IndexRecord("testName", "testUser", "testTable", new String[] {
                     "testColumn"}, "minmax", ImmutableList.of(""));
-            IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
-            IndexRecordManager.IndexRecord actual = IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), "testName");
+            indexRecordManager.addIndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", "cp=1");
+            IndexRecord actual = indexRecordManager.lookUpIndexRecord("testName");
             assertIndexRecordFullyEqual(actual, expected);
         }
     }
@@ -122,14 +270,15 @@ public class TestIndexRecordManager
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager.IndexRecord expected = new IndexRecordManager.IndexRecord(name, user, table, columns, indexType, note);
-            IndexRecordManager.addIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), name, user, table, columns, indexType, note.toArray(new String[0]));
+            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, note);
+            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, note.toArray(new String[0]));
 
-            IndexRecordManager.IndexRecord actual1 = IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), name);
+            IndexRecord actual1 = indexRecordManager.lookUpIndexRecord(name);
             assertNotNull(actual1);
             assertIndexRecordFullyEqual(actual1, expected);
 
-            IndexRecordManager.IndexRecord actual2 = IndexRecordManager.lookUpIndexRecord(FILE_SYSTEM_CLIENT, folder.getRoot().toPath(), table, columns, indexType);
+            IndexRecord actual2 = indexRecordManager.lookUpIndexRecord(table, columns, indexType);
             assertNotNull(actual2);
             assertIndexRecordFullyEqual(actual2, expected);
         }
@@ -137,7 +286,7 @@ public class TestIndexRecordManager
 
     // Compare two IndexRecord objects and assert all fields are equal.
     // Unlike the equals() method of IndexRecord, this method compares ALL fields for testing.
-    private void assertIndexRecordFullyEqual(IndexRecordManager.IndexRecord actual, IndexRecordManager.IndexRecord expected)
+    private void assertIndexRecordFullyEqual(IndexRecord actual, IndexRecord expected)
             throws IllegalAccessException
     {
         for (Field field : actual.getClass().getDeclaredFields()) {
