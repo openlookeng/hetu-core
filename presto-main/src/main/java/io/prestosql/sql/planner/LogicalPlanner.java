@@ -540,7 +540,7 @@ public class LogicalPlanner
     {
         TableHandle handle = analysis.getTableHandle(node.getTable());
         if (handle.getConnectorHandle().isDeleteAsInsertSupported()) {
-            QueryPlanner.DeleteRelationPlan deletePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+            QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
                         .planDeleteRowAsInsert(node);
 
             RelationPlan plan = deletePlan.getPlan();
@@ -550,7 +550,7 @@ public class LogicalPlanner
             return createTableWriterPlan(
                     analysis,
                     plan,
-                    new TableWriterNode.DeleteAsInsertReference(handle),
+                    new TableWriterNode.DeleteAsInsertReference(handle, deletePlan.getPredicate(), deletePlan.getColumnAssignments()),
                     deletePlan.getColumNames(),
                     newTableLayout,
                     TableStatisticsMetadata.empty());
@@ -566,7 +566,7 @@ public class LogicalPlanner
 
     private RelationPlan createUpdatePlan(Analysis analysis, Update updateStatement)
     {
-        QueryPlanner.UpdateRelationPlan updatePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
                 .plan(updateStatement);
         RelationPlan plan = updatePlan.getPlan();
         Analysis.Update update = analysis.getUpdate().get();
@@ -578,7 +578,7 @@ public class LogicalPlanner
         return createTableWriterPlan(
                 analysis,
                 plan,
-                new TableWriterNode.UpdateReference(update.getTarget()),
+                new TableWriterNode.UpdateReference(update.getTarget(), updatePlan.getPredicate(), updatePlan.getColumnAssignments()),
                 updatePlan.getColumNames(),
                 newTableLayout,
                 statisticsMetadata);
