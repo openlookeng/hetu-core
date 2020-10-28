@@ -13,19 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# check validity of user
+if [ "$(id -un)" != "openlkadmin" ]
+then
+    echo "unexpected user"
+    exit 1
+fi
+echo "shutting down hetu process"
+
 # Read Hetu port number from config file. Default to 8080.
 HETU_PORT=
 CONFIG_FILE='/usr/lib/hetu/etc/config.properties'
 if [ -f $CONFIG_FILE ]
 then
-    HETU_PORT=$(grep "http-server.http.port" $CONFIG_FILE | cut -d "=" -f2)
+    HETU_PORT="$(grep "http-server.http.port" $CONFIG_FILE | cut -d "=" -f2)"
 fi
 
-if [ -z $HETU_PORT ]
+if [ -z "${HETU_PORT}" ]
 then
     HETU_PORT=8080
+elif [[ ! "${HETU_PORT}" =~ ^[0-9]+$ ]]
+then
+    echo "unexpected value: port"
+    exit 1
 fi
-
 # Send shutdown request
 curl -X PUT -H "X-Presto-User: openlk" -H "Content-Type: application/json" http://localhost:$HETU_PORT/v1/info/state -d '"SHUTTING_DOWN"'
 
@@ -34,10 +45,10 @@ while true
 do
     # Query current node state every second
     sleep 1
-    state=$(curl --silent http://localhost:$HETU_PORT/v1/info/state)
+    state="$(curl --silent http://localhost:$HETU_PORT/v1/info/state)"
 
     # Exit if state is no longer "SHUTTING_DOWN"
-    if [[ -z $state || $state != '"SHUTTING_DOWN"' ]]
+    if [[ -z "${state}" || "${state}" != '"SHUTTING_DOWN"' ]]
     then
     break
     fi
