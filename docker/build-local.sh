@@ -15,8 +15,13 @@
 
 CUSTOM_TAG=
 BASE_IMAGE="centos:centos7"
-TAG=$(date +%s)
-IS_GIT_FOLDER=$(git rev-parse --is-inside-work-tree)
+TAG="$(date +%s)"
+IS_GIT_FOLDER="$(git rev-parse --is-inside-work-tree)"
+if [[ ! "${TAG}" =~ ^[0-9]+$ ]]
+then
+    echo "unexpected value from date"
+    exit 1
+fi
 
 if [[ $# != 0 ]]; then
     while [[ $# != 0 && -n "$1" ]]; do
@@ -49,10 +54,24 @@ if [[ $IS_GIT_FOLDER = true ]] && [[ -z "$CUSTOM_TAG" ]]; then
     else
         # By default, tag the image using the latest git commit hash, e.g. openlookeng:23555bf9
         TAG=$(git rev-parse HEAD | cut -c 1-8)
+        if [[ ! "${TAG}" =~ ^[0-9a-zA-Z]{8}$ ]]
+        then
+            echo "unexpected value from git"
+            exit 1
+        fi
     fi
 fi
 
-[ -n "$CUSTOM_TAG" ] && TAG="$CUSTOM_TAG"
+if [[ -n "$CUSTOM_TAG" ]];
+then
+    if [[  "${CUSTOM_TAG}" =~ ^[^/:\ ]+$ ]];
+    then
+        TAG="$CUSTOM_TAG"
+    else
+        echo "unexpected value for custom_tag"
+        exit 1
+    fi
+fi
 
 set -euo pipefail
 
@@ -62,12 +81,14 @@ cd ${SCRIPT_DIR}
 
 # Move to the root directory to run maven for current version.
 pushd ..
-#HETU_VERSION=$(mvn --quiet help:evaluate -Dexpression=project.version -DforceStdout)
 HETU_VERSION=$(mvn --quiet help:evaluate -Dexpression=dep.hetu.version -DforceStdout)
 popd
 
-set -x
+trap '[ -n "${WORK_DIR}" ] && rm -rf "${WORK_DIR}"' EXIT
+save_mask=$(umask)
+umask 077
 WORK_DIR="$(mktemp -d)"
+
 cp ../hetu-server/target/hetu-server-${HETU_VERSION}.tar.gz ${WORK_DIR}
 tar -C ${WORK_DIR} -xzf ${WORK_DIR}/hetu-server-${HETU_VERSION}.tar.gz
 rm ${WORK_DIR}/hetu-server-${HETU_VERSION}.tar.gz
@@ -75,10 +96,9 @@ cp -R bin default ${WORK_DIR}/hetu-server-${HETU_VERSION}
 
 cp ../presto-cli/target/hetu-cli-${HETU_VERSION}-executable.jar ${WORK_DIR}/hetu-server-${HETU_VERSION}
 cp bin/openlk ${WORK_DIR}
+umask "${save_mask}"
 
 docker build ${WORK_DIR} -f Dockerfile --build-arg "OPENLK_VERSION=${HETU_VERSION}" --build-arg "BASE_IMAGE=${BASE_IMAGE}" -t "openlookeng:${TAG}"
-
-rm -r ${WORK_DIR}
 
 # Source common testing functions
 . container-test.sh

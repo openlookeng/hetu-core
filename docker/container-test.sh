@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -euxo pipefail
+set -euo pipefail
 
 CONTAINER_ID=
 
@@ -24,15 +24,24 @@ function cleanup {
 }
 
 function test_container {
-    { set +x; } 2>/dev/null
     local QUERY_TIMEOUT=150
     local QUERY_PERIOD=15
     local QUERY_RETRIES=$((QUERY_TIMEOUT/QUERY_PERIOD))
 
     trap cleanup EXIT
 
-    local CONTAINER_NAME=$1
+    local CONTAINER_NAME="$1"
+    if [[ ! "${CONTAINER_NAME}" =~ ^[^/]+$ ]];
+    then
+        echo "unexpected argument: container name"
+        exit 1
+    fi
     CONTAINER_ID=$(docker run -d --rm ${CONTAINER_NAME})
+    if [[ ! "${CONTAINER_ID}" =~ ^[0-9a-zA-Z]+$ ]]
+    then
+        echo "unexpected value from docker run"
+        exit 1
+    fi
     echo "Running container $CONTAINER_ID to test Hetu image..."
 
     set +e
@@ -46,7 +55,7 @@ function test_container {
         fi
         sleep ${QUERY_PERIOD}
     done
-    set -ex
+    set -e
 
     # Return proper exit code.
     [[ ${RESULT} == '"success"' ]]

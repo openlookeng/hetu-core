@@ -17,18 +17,18 @@ LABEL maintainer="OpenLooKeng Community"
 
 ENV JAVA_HOME /usr/lib/jvm/java-8
 RUN \
-    set -xeu &&\
+    set -eu &&\
     yum -y -q update &&\
     yum -y -q install  java-1.8.0-openjdk-devel sudo less &&\
     yum -q clean all &&\
     rm -rf /var/cache/yum /tmp/* /var/tmp/* && \
     groupadd openlkadmin --gid 1000 && \
     useradd openlkadmin --uid 1000 --gid 1000 && \
-    echo 'openlkadmin:admin' | chpasswd &&\
     gpasswd -a openlkadmin wheel &&\
     echo 'openlkadmin ALL=(ALL) NOPASSWD:ALL' | tee -a /etc/sudoers > /dev/null &&\
-    mkdir -p /usr/lib/hetu /var/lib/hetu/data /var/log/hetu &&\
-    chown -RL "openlkadmin:openlkadmin" /var/lib/hetu/data /usr/lib/hetu /var/log/hetu
+    mkdir -p /usr/lib/hetu /var/lib/hetu/data /var/log/hetu /etc/hetu &&\
+    chmod 750 /usr/lib/hetu /var/lib/hetu/data /var/log/hetu /etc/hetu &&\
+    chown -RL "openlkadmin:openlkadmin" /var/lib/hetu/data /usr/lib/hetu /var/log/hetu /etc/hetu
 
 ARG OPENLK_VERSION
 ARG PORT=8080
@@ -41,4 +41,5 @@ COPY --chown=openlkadmin:openlkadmin openlk /usr/bin/openlk
 EXPOSE $PORT
 USER openlkadmin:openlkadmin
 ENV LANG en_US.UTF-8
+HEALTHCHECK CMD curl --fail http://localhost:8080/v1/info/state || exit 1
 ENTRYPOINT ["/usr/lib/hetu/bin/run-hetu"]
