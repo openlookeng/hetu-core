@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -xeuo pipefail
+set -euo pipefail
+
+if [ "$(id -un)" != "openlkadmin" ]
+then
+    echo "unexpected user"
+    exit 1
+fi
+echo "starting hetu process"
 
 CONFIG_PATH='/usr/lib/hetu/etc'
 
-if [[ ! -d $CONFIG_PATH ]]; then
-    if [[ -d /etc/hetu ]]; then
-        ln -s /etc/hetu $CONFIG_PATH
-    else
-        ln -s /usr/lib/hetu/default/etc /usr/lib/hetu/etc
-    fi
+if [[ ! -d "$CONFIG_PATH" ]]; then
+    ln -s /usr/lib/hetu/default/etc /usr/lib/hetu/etc
 fi
 if [[ ! -d /etc/hetu/catalog ]]; then
-    if [[ -d $CONFIG_PATH/catalog ]]; then
-        [[ ! -d /etc/hetu ]] && sudo mkdir -p /etc/hetu
-        sudo ln -s $CONFIG_PATH/catalog /etc/hetu/catalog
+    if [[ -d "$CONFIG_PATH"/catalog ]]; then
+        ln -s $CONFIG_PATH/catalog /etc/hetu/catalog
     fi
 fi
 if [[ ! -d /usr/lib/hetu/lib/plugin ]]; then
@@ -57,6 +59,8 @@ setConfig() {
             attributes+=( "${patterns[$i]}" )
         fi
     done
+    touch "$1.tmp"
+    chmod --reference="$1" "$1.tmp"
     for ((i=0; i<${#attributes[@]}; i++)); do
         for ((k=0; k<$numPattern; k++)); do
             attributes[$i]=$(echo ${attributes[$i]}| sed -e "s|${patterns[$k]}|${values[$k]}|m")
@@ -71,8 +75,8 @@ setConfig() {
 }
 
 updateConfigByFile() {
-    local thisConfig=$1
-    local thatConfig=$2
+    local thisConfig="$1"
+    local thatConfig="$2"
     local numAttri=0
 
     unset attributes
@@ -122,7 +126,8 @@ updateConfigByFile() {
             fi
         fi
     done
-
+    touch "$thisConfig.tmp"
+    chmod --reference="$thisConfig" "$thisConfig.tmp"
     for ((i=0; i<$numAttri; i++)); do
         echo "${attributes[$i]}" >> "$thisConfig.tmp"
     done
@@ -169,16 +174,17 @@ if [[ $# != 0 ]]; then
                 ;;
             -discoveryURI)
                 discoveryURI="$2"
-                shift
-                shift
-                ;;
-            -nodeEnv)
-                nodeEnv="$2"
+                if [[ $discoveryURI = *" "* ]]; then
+                    echo "URI cannot contain spaces"
+                    exit 1
                 shift
                 shift
                 ;;
             -includeCoordinator)
                 includeCoordinator="$2"
+                if [[ $includeCoordinator != true && $includeCoordinator != false ]]; then
+                    echo "includeCoordinator must be boolean"
+                    exit 1
                 shift
                 shift
                 ;;
@@ -189,6 +195,9 @@ if [[ $# != 0 ]]; then
                 ;;
             -jvmXmx)
                 xmx="$2"
+                if [[ ! $xmx =~ ^[0-9]+[g|G|m|M|k|K]$ ]]; then
+                    echo "Invalid xmx"
+                    exit 1
                 shift
                 shift
                 ;;
