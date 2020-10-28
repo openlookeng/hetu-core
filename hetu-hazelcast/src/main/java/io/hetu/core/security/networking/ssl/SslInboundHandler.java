@@ -44,6 +44,7 @@ public class SslInboundHandler
     private final ILogger logger;
     private SSLEngine engine;
     private AtomicBoolean handshakeFinished;
+    private boolean ignoreHandlerAdded;
 
     public SslInboundHandler(SSLEngine engine, AtomicBoolean handshakeFinished)
     {
@@ -61,8 +62,13 @@ public class SslInboundHandler
     @Override
     public void handlerAdded()
     {
-        initSrcBuffer();
-        initDstBuffer();
+        if (!ignoreHandlerAdded) {
+            initSrcBuffer();
+            initDstBuffer();
+        }
+        else {
+            ignoreHandlerAdded = false;
+        }
     }
 
     @Override
@@ -76,11 +82,11 @@ public class SslInboundHandler
 
             while (src.hasRemaining()) {
                 if (logger.isFineEnabled()) {
-                    logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
+                    logger.fine(format("channel=%s,before unwrap, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
                 }
                 SSLEngineResult result = engine.unwrap(src, byteBuffer);
                 if (logger.isFineEnabled()) {
-                    logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s], byteBuffer=[%s, %s, %s], status=[%s, %s]",
+                    logger.fine(format("channel=%s,after unwrap, src=[%s, %s, %s], byteBuffer=[%s, %s, %s], status=[%s, %s]",
                             channel, src.position(), src.limit(), src.capacity(), byteBuffer.position(), byteBuffer.limit(), byteBuffer.capacity(),
                             result.getStatus(), result.getHandshakeStatus()));
                 }
@@ -95,7 +101,7 @@ public class SslInboundHandler
                             src = newBuffer;
                             updateInboundPipeline();
                             if (logger.isFineEnabled()) {
-                                logger.fine("channel=" + channel + "....BUFFER_UNDERFLOW");
+                                logger.fine(format("BUFFER_UNDERFLOW, enlarge src bytebuffer,channel=%s, src=[%s, %s, %s]", channel, src.position(), src.limit(), src.capacity()));
                             }
                         }
                         return HandlerStatus.CLEAN;
@@ -111,22 +117,20 @@ public class SslInboundHandler
                 }
 
                 SSLEngineResult.HandshakeStatus handshakeStatus = result.getHandshakeStatus();
-                if (logger.isFineEnabled()) {
-                    logger.fine("enlargePacketBuffer, src=" + src.toString());
-                }
+
                 outer:
                 while (true) {
                     switch (handshakeStatus) {
                         case NOT_HANDSHAKING:
                         case FINISHED:
                             if (logger.isFineEnabled()) {
-                                logger.fine("handshakeStatus=" + handshakeStatus);
+                                logger.fine("handshakeStatus: " + handshakeStatus);
                             }
                             setHandshakeSuccess();
                             break outer;
                         case NEED_TASK:
                             if (logger.isFineEnabled()) {
-                                logger.fine("need-task");
+                                logger.fine("handshakeStatus: need-task");
                             }
                             runAllDelegatedTasks();
                             handshakeStatus = engine.getHandshakeStatus();
@@ -153,7 +157,7 @@ public class SslInboundHandler
                     dst.put(byteBuffer);
                     compactOrClear(byteBuffer);
                     if (logger.isFineEnabled()) {
-                        logger.fine(format("channel=%s....before unwrap, src=[%s, %s, %s]", channel, dst.position(), dst.limit(), dst.capacity()));
+                        logger.fine(format("channel=%s, write src to dst=[%s, %s, %s]", channel, dst.position(), dst.limit(), dst.capacity()));
                     }
                     // Do not call flip() here, because it will flip() at the start of next handler.
                 }
@@ -181,6 +185,7 @@ public class SslInboundHandler
 
     private void updateInboundPipeline()
     {
+        ignoreHandlerAdded = true;
         channel.inboundPipeline().replace(this, this);
     }
 
@@ -223,13 +228,16 @@ public class SslInboundHandler
         ChannelOptions config = channel.options();
         int appBufferSize = engine.getSession().getApplicationBufferSize();
         if (logger.isFineEnabled()) {
-            logger.fine("enlargeApplicationBuffer....");
+            logger.fine(format("begin to enlargeApplicationBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
         if (appBufferSize > buffer.capacity()) {
             buffer = newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF));
         }
         else {
             buffer = ByteBuffer.allocate(buffer.capacity() * 2);
+        }
+        if (logger.isFineEnabled()) {
+            logger.fine(format("end to enlargeApplicationBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
         return buffer;
     }
@@ -239,13 +247,16 @@ public class SslInboundHandler
         ChannelOptions config = channel.options();
         int appBufferSize = engine.getSession().getPacketBufferSize();
         if (logger.isFineEnabled()) {
-            logger.fine("enlargePacketBuffer....");
+            logger.fine(format("begin to enlargePacketBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
         if (appBufferSize > buffer.capacity()) {
             buffer = newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF));
         }
         else {
             buffer = ByteBuffer.allocate(buffer.capacity() * 2);
+        }
+        if (logger.isFineEnabled()) {
+            logger.fine(format("end to enlargePacketBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
         return buffer;
     }
@@ -255,10 +266,13 @@ public class SslInboundHandler
         ChannelOptions config = channel.options();
         if (buffer.capacity() < otherBufferLimit) {
             if (logger.isFineEnabled()) {
-                logger.fine("adapterByteBufferIfNotEnough....");
+                logger.fine(format("adapterByteBufferIfNotEnough, begin to enlarge, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
             }
             buffer = newByteBuffer(otherBufferLimit, config.getOption(DIRECT_BUF));
             updateInboundPipeline();
+            if (logger.isFineEnabled()) {
+                logger.fine(format("adapterByteBufferIfNotEnough, end to enlarge, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
+            }
         }
 
         return buffer;
