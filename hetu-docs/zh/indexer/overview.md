@@ -54,7 +54,7 @@
     如果没有配置，那么当前工作目录为openlookeng server的目录
 
     hetu.heuristicindex.filter.enabled=true
-    hetu.hetu.heuristicindex.filter.cache.max-memory=2GB
+    hetu.heuristicindex.filter.cache.max-memory=2GB
     hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
     hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
     
