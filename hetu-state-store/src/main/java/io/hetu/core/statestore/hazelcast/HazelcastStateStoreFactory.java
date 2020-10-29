@@ -34,6 +34,7 @@ import io.prestosql.spi.statestore.StateStoreFactory;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,6 +49,7 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MOD
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_MULTICAST;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_TCPIP;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_TCPIP_SEEDS;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HAZELCAST_SSL_ENABLED;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.JAAS_CONFIG_FILE;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_ENABLED;
@@ -77,6 +79,7 @@ public class HazelcastStateStoreFactory
     // Retry 30 seconds to grab the seeds from seed store
     private static final int SEED_IP_FETCHING_RETRY_TIMES = 10;
     private static final long SEED_IP_FETCHING_INITIAL_RETRY_INTERVAL = 500L;
+    private static final String COMMA = ",";
     private String name = "hazelcast";
 
     private final Map<String, StateStoreFactory> stateStoreFactories = new ConcurrentHashMap<>(0);
@@ -134,13 +137,17 @@ public class HazelcastStateStoreFactory
             clientConfig.getNetworkConfig().getDiscoveryConfig().addDiscoveryStrategyConfig(strategy);
         }
         else if (discoveryMode.equalsIgnoreCase(DISCOVERY_MODE_TCPIP)) {
-            if (seedStore == null) {
-                throw new PrestoException(STATE_STORE_FAILURE, "Using TCP-IP discovery but seed store is null");
+            String tcpipSeeds = properties.get(DISCOVERY_TCPIP_SEEDS);
+            Collection<String> seedLocation = new HashSet<>();
+            if (tcpipSeeds != null && !tcpipSeeds.trim().isEmpty()) {
+                for (String seed : tcpipSeeds.split(COMMA)) {
+                    seedLocation.add(seed);
+                }
             }
-
-            seedStore.setName(clusterId);
-
-            Collection<String> seedLocation = getSeedLocation(seedStore);
+            else {
+                seedStore.setName(clusterId);
+                seedLocation = getSeedLocation(seedStore);
+            }
 
             log.info("Using TCP-IP discovery for Hazelcast, seed nodes are: %s", String.join(",", seedLocation));
             seedLocation.stream().forEach(ip -> {

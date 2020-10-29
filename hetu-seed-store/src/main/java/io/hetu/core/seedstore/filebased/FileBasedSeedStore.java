@@ -69,7 +69,7 @@ public class FileBasedSeedStore
         this.fs = fs;
         this.config = config;
 
-        seedDir = Paths.get(config.get(FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR).trim());
+        seedDir = Paths.get(config.getOrDefault(FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR, FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR_DEFAULT_VALUE).trim());
         try {
             checkArgument(!seedDir.toString().contains("../"),
                     "SeedStore directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());

@@ -47,6 +47,11 @@ public final class HazelcastConstants
     public static final String DISCOVERY_MODE_TCPIP = "tcp-ip";
 
     /**
+     * Hazelcast tcp-ip seeds
+     */
+    public static final String DISCOVERY_TCPIP_SEEDS = "hazelcast.discovery.tcp-ip.seeds";
+
+    /**
      * Minimum member count for Hazelcast CP system
      */
     public static final int MINIMUM_CP_MEMBER_COUNT = 3;

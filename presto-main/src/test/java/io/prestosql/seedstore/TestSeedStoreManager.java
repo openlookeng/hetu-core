@@ -28,11 +28,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static io.prestosql.statestore.StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_PROFILE;
+import static io.prestosql.statestore.StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -53,23 +56,24 @@ public class TestSeedStoreManager
     private void prepareConfigFiles()
             throws IOException
     {
-        File seedStoreConfigFile = new File("etc/seed-store.properties");
-        if (!seedStoreConfigFile.exists()) {
-            seedStoreConfigFile.createNewFile();
-        }
-        else {
-            seedStoreConfigFile.delete();
-            seedStoreConfigFile.createNewFile();
-        }
-        FileWriter configWritter = new FileWriter("etc/seed-store.properties");
-        configWritter.write("seed-store.type=filebased\n");
-        // Any profile, must be provided but will not be used
-        configWritter.write("seed-store.filesystem.profile=etc/filesystem/hdfs-config-default.properties\n");
-        // Set heartbeat to 1 seconds
-        configWritter.write("seed-store.seed.heartbeat=1000\n");
-        // Set heartbeat timeout to 3 seconds
-        configWritter.write("seed-store.seed.heartbeat.timeout=3000");
-        configWritter.close();
+        // prepare seed store configs
+        Map<String, String> seedStoreConfigs = new HashMap<String, String>(){{
+                put("seed-store.type", "filebased");
+                put("seed-store.filesystem.profile", "etc/filesystem/hdfs-config-default.properties");
+                put("seed-store.seed.heartbeat", "1000");
+                put("seed-store.seed.heartbeat.timeout", "3000");
+            }};
+        createConfigFile("etc/seed-store.properties", seedStoreConfigs);
+
+        // prepare state store configs
+        Map<String, String> stateStoreConfigs = new HashMap<String, String>(){{
+                put("state-store.type", "hazelcast");
+                put("state-store.name", "test");
+                put("state-store.cluster", "test-cluster");
+                put("hazelcast.discovery.mode", "tcp-ip");
+                put("hazelcast.discovery.port", "7980");
+            }};
+        createConfigFile("etc/state-store.properties", stateStoreConfigs);
     }
 
     @BeforeMethod
@@ -165,6 +169,45 @@ public class TestSeedStoreManager
         SeedStoreFactory mockSeedStoreFactory2 = mock(SeedStoreFactory.class);
         when(mockSeedStoreFactory2.getName()).thenReturn("filebased");
         seedStoreManager.addSeedStoreFactory(mockSeedStoreFactory2);
+    }
+
+    /**
+     * The test case is used to test that if 'hazelcast.discovery.tcp-ip.seeds' is configured
+     * by client, seed store will not be enabled.
+     *
+     * @throws IOException
+     */
+    @Test
+    void testSeedStoreNotEnabled()
+            throws IOException
+    {
+        Map<String, String> stateStoreConfigs = new HashMap<String, String>() {{
+                put(HAZELCAST_DISCOVERY_TCPIP_SEEDS, "10.0.0.1:7901, 10.0.0.2:7980");
+                put(HAZELCAST_DISCOVERY_TCPIP_PROFILE, "local-config");
+            }};
+        createConfigFile("etc/state-store.properties", stateStoreConfigs);
+        seedStoreManager.loadSeedStore();
+        Assert.assertNull(seedStoreManager.getSeedStore());
+        // reset config files
+        prepareConfigFiles();
+    }
+
+    private static void createConfigFile(String filePath, Map<String, String> configs)
+            throws IOException
+    {
+        File configFile = new File(filePath);
+        if (!configFile.exists()) {
+            configFile.createNewFile();
+        }
+        else {
+            configFile.delete();
+            configFile.createNewFile();
+        }
+        FileWriter configWritter = new FileWriter(filePath);
+        for (Map.Entry<String, String> entry : configs.entrySet()) {
+            configWritter.write(entry.getKey().trim() + "=" + entry.getValue().trim() + "\n");
+        }
+        configWritter.close();
     }
 
     class MockSeed

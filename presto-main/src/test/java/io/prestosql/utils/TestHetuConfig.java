@@ -50,7 +50,6 @@ public class TestHetuConfig
                 .setStateExpireTime(new Duration(10, TimeUnit.SECONDS))
                 .setDataCenterSplits(5)
                 .setDataCenterConsumerTimeout(new Duration(10, TimeUnit.MINUTES))
-                .setSeedStoreEnabled(false)
                 .setSplitCacheMapEnabled(false)
                 .setSplitCacheStateUpdateInterval(new Duration(2, TimeUnit.SECONDS))
                 .setTraceStackVisible(false));
@@ -77,7 +76,6 @@ public class TestHetuConfig
                 .put("hetu.multiple-coordinator.state-expire-time", "20s")
                 .put("hetu.multiple-coordinator.state-fetch-interval", "5s")
                 .put("hetu.multiple-coordinator.state-update-interval", "5s")
-                .put("hetu.seed-store.enabled", "true")
                 .put("hetu.data.center.split.count", "10")
                 .put("hetu.data.center.consumer.timeout", "5m")
                 .put("hetu.split-cache-map.enabled", "true")
@@ -103,7 +101,6 @@ public class TestHetuConfig
                 .setStateExpireTime(new Duration(20, TimeUnit.SECONDS))
                 .setStateFetchInterval(new Duration(5, TimeUnit.SECONDS))
                 .setStateUpdateInterval(new Duration(5, TimeUnit.SECONDS))
-                .setSeedStoreEnabled(true)
                 .setDataCenterSplits(10)
                 .setDataCenterConsumerTimeout(new Duration(5, TimeUnit.MINUTES))
                 .setSplitCacheMapEnabled(true)

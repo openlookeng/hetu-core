@@ -139,4 +139,14 @@ public class StateStoreConstants
      * Cross region dynamic filter collection columns
      */
     public static final String CROSS_REGION_DYNAMIC_FILTER_COLLECTION_COLUMNS_TYPE = "-dynamic-filters-columns-type";
+
+    /**
+     * Hazelcast tcp-ip members
+     */
+    public static final String HAZELCAST_DISCOVERY_TCPIP_SEEDS = "hazelcast.discovery.tcp-ip.seeds";
+
+    /**
+     * Hazelcast tcp-ip profile
+     */
+    public static final String HAZELCAST_DISCOVERY_TCPIP_PROFILE = "hazelcast.discovery.tcp-ip.profile";
 }

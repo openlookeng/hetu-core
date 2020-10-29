@@ -36,6 +36,7 @@ import static io.hetu.core.statestore.Constants.STATE_STORE_CLUSTER_CONFIG_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MODE_TCPIP;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_TCPIP_SEEDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -49,7 +50,9 @@ public class TestHazelcastStateStoreFactory
 {
     private static final String LOCALHOST = "127.0.0.1";
     private static final String PORT = "5708";
+    private static final String PORT2 = "5728";
     private static final String MEMBER_ADDRESS = LOCALHOST + ":" + PORT;
+    private static final String MEMBER_ADDRESS2 = LOCALHOST + ":" + PORT2;
     private static final String TEST_STATE_STORE_NAME = "test-state-store";
     private static final String TEST_CLUSTER_NAME = "cluster-" + UUID.randomUUID();
     private static final String TEST_KEY = "test-key";
@@ -82,6 +85,39 @@ public class TestHazelcastStateStoreFactory
 
         StateStore stateStore = factory.create(TEST_STATE_STORE_NAME, seedStore, properties);
         assertEquals(stateStore.getName(), TEST_STATE_STORE_NAME);
+
+        StateCollection collection = stateStore.createStateCollection("test", StateCollection.Type.MAP);
+        ((StateMap<String, String>) collection).put(TEST_KEY, TEST_VALUE);
+        assertEquals(collection.size(), 1);
+        assertEquals(((StateMap<String, String>) collection).get(TEST_KEY), TEST_VALUE);
+
+        ((HazelcastStateStore) stateStore).shutdown();
+    }
+
+    /**
+     * Test state store creation with tcp-ip with static seeds configured
+     */
+    @Test
+    public void testTcpipCreateWithStaticSeeds()
+    {
+        HazelcastStateStoreFactory factory = new HazelcastStateStoreFactory();
+        assertEquals(factory.getName(), HAZELCAST);
+        SeedStoreFactory seedStoreFactory = new FileBasedSeedStoreFactory();
+        assertEquals(seedStoreFactory.getName(), "filebased");
+
+        // bootstrap state store with static seeds
+        Map<String, String> config = new HashMap<>(0);
+        config.put(DISCOVERY_MODE_CONFIG_NAME, DISCOVERY_MODE_TCPIP);
+        config.put(STATE_STORE_CLUSTER_CONFIG_NAME, "static-seed-cluster");
+        config.put(DISCOVERY_PORT_CONFIG_NAME, PORT2);
+        config.put(DISCOVERY_TCPIP_SEEDS, MEMBER_ADDRESS2);
+        StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
+        bootstrapper.bootstrap(ImmutableSet.of(MEMBER_ADDRESS2), config);
+
+        // create state store client
+        String stateStoreName = "static-seed-state-store";
+        StateStore stateStore = factory.create(stateStoreName, null, config);
+        assertEquals(stateStore.getName(), stateStoreName);
 
         StateCollection collection = stateStore.createStateCollection("test", StateCollection.Type.MAP);
         ((StateMap<String, String>) collection).put(TEST_KEY, TEST_VALUE);
