@@ -13,4 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# check validity of user
+if [ "$(id -un)" != "openlkadmin" ]
+then
+    echo "unexpected user"
+    exit 1
+fi
+echo "starting hetu cli"
 java -jar /usr/lib/hetu/hetu-cli-*-executable.jar "$@"
