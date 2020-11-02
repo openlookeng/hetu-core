@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.log.Logger;
 import io.prestosql.client.QueryData;
 import io.prestosql.client.StatementClient;
+import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryeditorui.execution.BackgroundCacheLoader;
 import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
@@ -81,7 +82,7 @@ public class PreviewTableCache
     private List<List<Object>> queryRows(String query)
     {
         final ImmutableList.Builder<List<Object>> cache = ImmutableList.builder();
-        QueryRunner queryRunner = queryRunnerFactory.create("ui-server", "lk");
+        QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, "lk");
         QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), query);
 
         try {

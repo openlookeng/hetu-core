@@ -31,6 +31,7 @@ import io.prestosql.client.StatementClient;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
+import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryeditorui.execution.BackgroundCacheLoader;
 import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
@@ -108,7 +109,7 @@ public class SchemaCache
     private Map<String, List<String>> queryMetadata(String query)
     {
         final Map<String, List<String>> cache = new HashMap<>();
-        QueryRunner queryRunner = queryRunnerFactory.create("ui-server", "lk");
+        QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, "lk");
         QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), query);
 
         try {
@@ -152,7 +153,7 @@ public class SchemaCache
     private List<String> querySchemas(String query)
     {
         final ImmutableList.Builder<String> resultsBuilder = ImmutableList.builder();
-        QueryRunner queryRunner = queryRunnerFactory.create("ui-server", "lk");
+        QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, "lk");
         QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(120), query);
 
         try {

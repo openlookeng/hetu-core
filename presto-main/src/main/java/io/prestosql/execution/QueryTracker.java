@@ -279,6 +279,11 @@ public class QueryTracker<T extends TrackedQuery>
         return lastHeartbeat != null && lastHeartbeat.isBefore(oldestAllowedHeartbeat);
     }
 
+    public void removeQuery(QueryId queryId)
+    {
+        tryGetQuery(queryId).ifPresent(query -> queries.remove(query.getQueryId()));
+    }
+
     public interface TrackedQuery
     {
         QueryId getQueryId();
