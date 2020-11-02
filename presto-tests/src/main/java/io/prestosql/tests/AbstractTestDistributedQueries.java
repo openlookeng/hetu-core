@@ -1484,4 +1484,40 @@ public abstract class AbstractTestDistributedQueries
             assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
         }
     }
+
+    @Test
+    public void testPushdownCacheFilterKey()
+    {
+        if (supportsPushdown()) {
+            assertUpdate("DROP TABLE IF EXISTS test_cache_predicate");
+            assertUpdate("CREATE TABLE test_cache_predicate (id int, name varchar, p1 int) WITH (partitioned_by=ARRAY['p1'])");
+            assertTrue(getQueryRunner().tableExists(getSession(), "test_cache_predicate"));
+            assertTableColumnNames("test_cache_predicate", "id", "name", "p1");
+
+            assertUpdate("INSERT INTO test_cache_predicate VALUES (1,'---',1), (2,'---',1), (3,'abc',1)", 3);
+
+            Session sessionPushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "false")
+                    .build();
+            Session sessionCachePushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "true")
+                    .build();
+
+            MaterializedResult resultNormal;
+            MaterializedResult resultPushdown;
+            MaterializedResult resultCachePushdown;
+
+            String sql = "SELECT * FROM test_cache_predicate WHERE id=3 AND name='abc'";
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(sessionPushdown, sql);
+
+            assertQuery("CACHE TABLE test_cache_predicate WHERE p1 <> 0", "VALUES('OK')");
+            resultCachePushdown = computeActual(sessionCachePushdown, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+        }
+    }
 }

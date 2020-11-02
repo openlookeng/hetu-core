@@ -246,7 +246,7 @@ public class VariableWidthBlock
                 }
             }
             else {
-                byte[] value = slice.slice(offsets[i + arrayOffset], offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]).getBytes();
+                byte[] value = slice.slice(offsets[positions[i] + arrayOffset], offsets[positions[i] + arrayOffset + 1] - offsets[positions[i] + arrayOffset]).getBytes();
                 if (test.apply(value)) {
                     matchedPositions[matchCount++] = positions[i];
                 }
