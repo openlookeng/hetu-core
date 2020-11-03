@@ -18,57 +18,40 @@ import io.prestosql.matching.Pattern;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
 
 import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
 
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.PARTIAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
-import static io.prestosql.sql.planner.plan.Patterns.aggregation;
+import static io.prestosql.sql.planner.plan.Patterns.markDistinct;
 import static java.lang.Math.min;
-import static java.util.Objects.requireNonNull;
 
-public class AggregationStatsRule
-        extends SimpleStatsRule<AggregationNode>
+public class MarkDistinctStatsRule
+        extends SimpleStatsRule<MarkDistinctNode>
 {
-    private static final Pattern<AggregationNode> PATTERN = aggregation();
+    private static final Pattern<MarkDistinctNode> PATTERN = markDistinct();
 
-    public AggregationStatsRule(StatsNormalizer normalizer)
+    public MarkDistinctStatsRule(StatsNormalizer normalizer)
     {
         super(normalizer);
     }
 
     @Override
-    public Pattern<AggregationNode> getPattern()
+    public Pattern<MarkDistinctNode> getPattern()
     {
         return PATTERN;
     }
 
     @Override
-    protected Optional<PlanNodeStatsEstimate> doCalculate(AggregationNode node, StatsProvider statsProvider, Lookup lookup, Session session, TypeProvider types)
+    protected Optional<PlanNodeStatsEstimate> doCalculate(MarkDistinctNode node, StatsProvider statsProvider, Lookup lookup, Session session, TypeProvider types)
     {
-        if (node.getGroupingSetCount() != 1) {
-            // In this case there will be GroupId node below which would have calculated actual stats, so we can
-            // directly use source stats itself.
-            return Optional.of(statsProvider.getStats(node.getSource()));
-        }
-
-        if (node.getStep() != FINAL && node.getStep() != PARTIAL && node.getStep() != SINGLE) {
-            return Optional.empty();
-        }
-
         return Optional.of(groupBy(
                 statsProvider.getStats(node.getSource()),
-                node.getGroupingKeys(),
-                node.getAggregations()));
+                node.getDistinctSymbols()));
     }
 
-    public static PlanNodeStatsEstimate groupBy(PlanNodeStatsEstimate sourceStats, Collection<Symbol> groupBySymbols, Map<Symbol, Aggregation> aggregations)
+    public static PlanNodeStatsEstimate groupBy(PlanNodeStatsEstimate sourceStats, Collection<Symbol> groupBySymbols)
     {
         PlanNodeStatsEstimate.Builder result = PlanNodeStatsEstimate.builder();
         for (Symbol groupBySymbol : groupBySymbols) {
@@ -82,21 +65,21 @@ public class AggregationStatsRule
         }
 
         double rowsCount = 1;
-        boolean knowsStatsFound = false;
+        boolean knowStatsFound = false;
         for (Symbol groupBySymbol : groupBySymbols) {
             SymbolStatsEstimate symbolStatistics = sourceStats.getSymbolStatistics(groupBySymbol);
             if (symbolStatistics.isUnknown()) {
-                // Incase there is group on any function, then we will not have stats for the groupSymbol
+                // Incase there is distinct on any function, then we will not have stats for the markerSymbol
                 // so for now we dont consider the same for overall stats calculation.
                 continue;
             }
 
-            knowsStatsFound = true;
+            knowStatsFound = true;
             int nullRow = (symbolStatistics.getNullsFraction() == 0.0) ? 0 : 1;
             rowsCount *= symbolStatistics.getDistinctValuesCount() + nullRow;
         }
 
-        if (knowsStatsFound) {
+        if (knowStatsFound) {
             result.setOutputRowCount(min(rowsCount, sourceStats.getOutputRowCount()));
         }
         else {
@@ -104,19 +87,6 @@ public class AggregationStatsRule
             result.setOutputRowCount(sourceStats.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);
         }
 
-        for (Map.Entry<Symbol, Aggregation> aggregationEntry : aggregations.entrySet()) {
-            result.addSymbolStatistics(aggregationEntry.getKey(), estimateAggregationStats(aggregationEntry.getValue(), sourceStats));
-        }
-
         return result.build();
-    }
-
-    private static SymbolStatsEstimate estimateAggregationStats(Aggregation aggregation, PlanNodeStatsEstimate sourceStats)
-    {
-        requireNonNull(aggregation, "aggregation is null");
-        requireNonNull(sourceStats, "sourceStats is null");
-
-        // TODO implement simple aggregations like: min, max, count, sum
-        return SymbolStatsEstimate.unknown();
     }
 }
