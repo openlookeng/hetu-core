@@ -43,6 +43,7 @@ import static io.airlift.bytecode.instruction.Constant.loadInt;
 import static io.airlift.bytecode.instruction.Constant.loadLong;
 import static io.airlift.bytecode.instruction.Constant.loadString;
 import static io.prestosql.sql.gen.BytecodeUtils.loadConstant;
+import static io.prestosql.sql.gen.ClassContext.SPLIT_EXPRESSION_DEPTH_THRESHOLD;
 import static io.prestosql.sql.gen.LambdaBytecodeGenerator.generateLambda;
 import static io.prestosql.sql.relational.Signatures.CAST;
 
@@ -53,6 +54,7 @@ public class RowExpressionCompiler
     private final RowExpressionVisitor<BytecodeNode, Scope> fieldReferenceCompiler;
     private final Metadata metadata;
     private final Map<LambdaDefinitionExpression, CompiledLambda> compiledLambdaMap;
+    private final ClassContext functionContext;
 
     RowExpressionCompiler(
             CallSiteBinder callSiteBinder,
@@ -61,11 +63,23 @@ public class RowExpressionCompiler
             Metadata metadata,
             Map<LambdaDefinitionExpression, CompiledLambda> compiledLambdaMap)
     {
+        this(callSiteBinder, cachedInstanceBinder, fieldReferenceCompiler, metadata, compiledLambdaMap, null);
+    }
+
+    RowExpressionCompiler(
+            CallSiteBinder callSiteBinder,
+            CachedInstanceBinder cachedInstanceBinder,
+            RowExpressionVisitor<BytecodeNode, Scope> fieldReferenceCompiler,
+            Metadata metadata,
+            Map<LambdaDefinitionExpression, CompiledLambda> compiledLambdaMap,
+            ClassContext functionContext)
+    {
         this.callSiteBinder = callSiteBinder;
         this.cachedInstanceBinder = cachedInstanceBinder;
         this.fieldReferenceCompiler = fieldReferenceCompiler;
         this.metadata = metadata;
         this.compiledLambdaMap = compiledLambdaMap;
+        this.functionContext = functionContext;
     }
 
     public BytecodeNode compile(RowExpression rowExpression, Scope scope)
@@ -107,6 +121,7 @@ public class RowExpressionCompiler
         public BytecodeNode visitSpecialForm(SpecialForm specialForm, Context context)
         {
             BytecodeGenerator generator;
+            ClassContext classContext = null;
             // special-cased in function registry
             switch (specialForm.getForm()) {
                 // lazy evaluation
@@ -136,9 +151,19 @@ public class RowExpressionCompiler
                     break;
                 // optimized implementations (shortcircuiting behavior)
                 case AND:
+                    classContext = functionContext;
+                    if (classContext != null) {
+                        classContext.incrementDepth();
+                        classContext.addWeight(1);
+                    }
                     generator = new AndCodeGenerator();
                     break;
                 case OR:
+                    classContext = functionContext;
+                    if (classContext != null) {
+                        classContext.incrementDepth();
+                        classContext.addWeight(1);
+                    }
                     generator = new OrCodeGenerator();
                     break;
                 case DEREFERENCE:
@@ -161,7 +186,30 @@ public class RowExpressionCompiler
                     cachedInstanceBinder,
                     metadata);
 
-            return generator.generateExpression(null, generatorContext, specialForm.getType(), specialForm.getArguments());
+            BytecodeNode bytecodeNode = null;
+            if (classContext != null) {
+                /* if (classContext.getWeight() >= SPLIT_EXPRESSION_WEIGHT) */
+                if (classContext.getWeight() > SPLIT_EXPRESSION_DEPTH_THRESHOLD) {
+                    /* Generate a function and change the Scope variable */
+                    functionContext.incrementFuncSeq();
+                    String newFunctionName = "filterInternal" + functionContext.getFuncSeq();
+
+                    /* call the new method and return the expression */
+                    bytecodeNode = functionContext.getFilterMethodGenerator()
+                            .generateNewFilterMethod(newFunctionName, RowExpressionCompiler.this,
+                                    generator, specialForm, context.getScope());
+                    classContext.resetWeight();
+                }
+                else {
+                    bytecodeNode = generator.generateExpression(null, generatorContext, specialForm.getType(), specialForm.getArguments());
+                }
+                classContext.decrementDepth();
+            }
+            else {
+                bytecodeNode = generator.generateExpression(null, generatorContext, specialForm.getType(), specialForm.getArguments());
+            }
+
+            return bytecodeNode;
         }
 
         @Override

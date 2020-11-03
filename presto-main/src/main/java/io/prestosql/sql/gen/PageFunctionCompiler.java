@@ -522,7 +522,52 @@ public class PageFunctionCompiler
                 cachedInstanceBinder,
                 fieldReferenceCompiler(callSiteBinder),
                 metadata,
-                compiledLambdaMap);
+                compiledLambdaMap,
+                new ClassContext(classDefinition, scope, (newFilterName, rowExpressionCompiler, generator, subFilter, callerScope) -> {
+                    MethodDefinition newMethod = classDefinition.declareMethod(
+                            a(PUBLIC),
+                            newFilterName,
+                            type(boolean.class),
+                            ImmutableList.<Parameter>builder()
+                                    .add(session)
+                                    .add(page)
+                                    .add(position)
+                                    .build());
+
+                    newMethod.comment("Filter: %s", subFilter.toString());
+                    Scope innerScope = newMethod.getScope();
+                    BytecodeBlock innerBody = newMethod.getBody();
+
+                    declareBlockVariables(subFilter, page, innerScope, innerBody);
+
+                    Variable wasNullVariable1 = innerScope.declareVariable("wasNull", innerBody, constantFalse());
+                    Variable result1 = innerScope.declareVariable(boolean.class, "result");
+
+                    BytecodeGeneratorContext generatorContext = new BytecodeGeneratorContext(
+                            rowExpressionCompiler,
+                            innerScope,
+                            callSiteBinder,
+                            cachedInstanceBinder,
+                            metadata);
+
+                    innerBody.append(generator.generateExpression(null, generatorContext, subFilter.getType(), subFilter.getArguments()))
+                            .putVariable(result1)
+                            .append(and(not(wasNullVariable1), result1).ret());
+
+                    /* Call the sub-method: Important use caller scope to pass parameters to new function */
+                    BytecodeBlock block = new BytecodeBlock()
+                            .comment("INVOKE")
+                            .setDescription("INVOKE " + newFilterName);
+
+                    block.append(callerScope.getThis())
+                            .getVariable(session)
+                            .getVariable(page)
+                            .getVariable(position)
+                            .invokeVirtual(classDefinition.getType(), newFilterName,
+                                    type(boolean.class), type(ConnectorSession.class),
+                                    type(Page.class), type(int.class));
+                    return block;
+                }));
 
         Variable result = scope.declareVariable(boolean.class, "result");
         body.append(compiler.compile(filter, scope))
@@ -579,7 +624,7 @@ public class PageFunctionCompiler
         body.ret();
     }
 
-    private static void declareBlockVariables(RowExpression expression, Parameter page, Scope scope, BytecodeBlock body)
+    public static void declareBlockVariables(RowExpression expression, Parameter page, Scope scope, BytecodeBlock body)
     {
         for (int channel : getInputChannels(expression)) {
             scope.declareVariable("block_" + channel, body, page.invoke("getBlock", Block.class, constantInt(channel)));
