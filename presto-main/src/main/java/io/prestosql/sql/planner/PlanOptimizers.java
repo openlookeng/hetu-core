@@ -33,7 +33,6 @@ import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.iterative.rule.AddExchangesBelowPartialAggregationOverGroupIdRuleSet;
 import io.prestosql.sql.planner.iterative.rule.AddIntermediateAggregations;
 import io.prestosql.sql.planner.iterative.rule.CanonicalizeExpressions;
-import io.prestosql.sql.planner.iterative.rule.CreateDynamicFilters;
 import io.prestosql.sql.planner.iterative.rule.CreatePartialTopN;
 import io.prestosql.sql.planner.iterative.rule.DesugarAtTimeZone;
 import io.prestosql.sql.planner.iterative.rule.DesugarCurrentPath;
@@ -549,11 +548,6 @@ public class PlanOptimizers
                             estimatedExchangesCostCalculator,
                             ImmutableSet.of(new PushTableWriteThroughUnion()))); // Must run before AddExchanges
         }
-        builder.add(new IterativeOptimizer(
-                ruleStats,
-                statsCalculator,
-                costCalculator,
-                ImmutableSet.of(new CreateDynamicFilters(metadata)))); // Must run before AddExchanges
         if (!forceSingleNode) {
             builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeAnalyzer, false)));
         }
@@ -585,7 +579,7 @@ public class PlanOptimizers
                         ImmutableSet.of(new RemoveEmptyDelete()))); // Run RemoveEmptyDelete after table scan is removed by PickTableLayout/AddExchanges
 
         builder.add(predicatePushDown); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
-        builder.add(new RemoveUnsupportedDynamicFilters());
+        builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
         builder.add(simplifyOptimizer); // Should be always run after PredicatePushDown
         builder.add(projectionPushDown);
         builder.add(inlineProjections);
