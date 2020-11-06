@@ -26,6 +26,7 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
 import io.prestosql.spi.seedstore.SeedStoreFactory;
+import io.prestosql.statestore.StateStoreConstants;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,6 +60,7 @@ public class SeedStoreManager
     private static final Logger LOG = Logger.get(SeedStoreManager.class);
     // properties name
     private static final File SEED_STORE_CONFIGURATION = new File("etc/seed-store.properties");
+    private static final File STATE_STORE_CONFIGURATION = new File("etc/state-store.properties");
     private static final String SEED_STORE_TYPE_PROPERTY_NAME = "seed-store.type";
     private static final String SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME = "seed-store.seed.heartbeat";
     private static final String SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME = "seed-store.seed.heartbeat.timeout";
@@ -80,6 +82,7 @@ public class SeedStoreManager
     private HetuFileSystemClient fileSystemClient;
     private long seedHeartBeat;
     private long seedHeartBeatTimeout;
+    private boolean isSeedStoreEnabled;
     private ConcurrentHashMap<String, Seed> refreshableSeedsMap = new ConcurrentHashMap<>();
 
     @Inject
@@ -108,10 +111,11 @@ public class SeedStoreManager
     public void loadSeedStore()
             throws IOException
     {
-        LOG.info("-- Loading seed store --");
-        if (SEED_STORE_CONFIGURATION.exists()) {
-            // load configuration
-            Map<String, String> config = loadConfiguration(SEED_STORE_CONFIGURATION);
+        // load configuration
+        Map<String, String> config = loadConfiguration(STATE_STORE_CONFIGURATION, SEED_STORE_CONFIGURATION);
+
+        if (isSeedStoreEnabled) {
+            LOG.info("-- Loading seed store --");
             // create seed store
             SeedStoreFactory seedStoreFactory = seedStoreFactories.get(seedStoreType);
             checkState(seedStoreFactory != null, "SeedStoreFactory %s is not registered", seedStoreFactory);
@@ -311,19 +315,41 @@ public class SeedStoreManager
         }
     }
 
-    private Map<String, String> loadConfiguration(File configFile)
+    private Map<String, String> loadConfiguration(File stateStoreConfig, File seedStoreConfig)
             throws IOException
     {
-        Map<String, String> properties = new HashMap<>(loadProperties(configFile));
-        seedStoreType = properties.getOrDefault(SEED_STORE_TYPE_PROPERTY_NAME, SEED_STORE_TYPE_DEFAULT_VALUE);
-        filesystemProfile = properties.getOrDefault(SEED_STORE_FILESYSTEM_PROFILE, SEED_STORE_FILESYSTEM_PROFILE_DEFAULT_VALUE);
-        seedHeartBeat = Long.parseLong(
-                properties.getOrDefault(SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME, SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE));
-        seedHeartBeatTimeout = Long.parseLong(
-                properties.getOrDefault(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME, SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE));
-        if (seedHeartBeat > seedHeartBeatTimeout) {
-            throw new InvalidParameterException(format("The value of %s cannot be greater than the value of %s in the property file",
-                    SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME, SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME));
+        Map<String, String> properties = new HashMap<>();
+
+        // initialize variables
+        seedStoreType = SEED_STORE_TYPE_DEFAULT_VALUE;
+        filesystemProfile = SEED_STORE_FILESYSTEM_PROFILE_DEFAULT_VALUE;
+        seedHeartBeat = Long.parseLong(SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE);
+        seedHeartBeatTimeout = Long.parseLong(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE);
+
+        // load state store config if exist
+        if (stateStoreConfig.exists()) {
+            Map<String, String> stateStoreProperties = new HashMap<>(loadProperties(stateStoreConfig));
+            filesystemProfile = stateStoreProperties.getOrDefault(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_PROFILE, filesystemProfile);
+            // for now, seed store is started only if tcp-ip seeds is not set
+            isSeedStoreEnabled = stateStoreProperties.get(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS) == null;
+        }
+
+        // load seed store config if exist
+        if (seedStoreConfig.exists()) {
+            Map<String, String> seedStoreProperties = new HashMap<>(loadProperties(seedStoreConfig));
+            properties.putAll(seedStoreProperties);
+            seedStoreType = properties.getOrDefault(SEED_STORE_TYPE_PROPERTY_NAME, seedStoreType);
+            filesystemProfile = properties.getOrDefault(SEED_STORE_FILESYSTEM_PROFILE, filesystemProfile);
+            if (properties.get(SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME) != null) {
+                seedHeartBeat = Long.parseLong(properties.get(SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME));
+            }
+            if (properties.get(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME) != null) {
+                seedHeartBeatTimeout = Long.parseLong(properties.get(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME));
+            }
+            if (seedHeartBeat > seedHeartBeatTimeout) {
+                throw new InvalidParameterException(format("The value of %s cannot be greater than the value of %s in the property file",
+                        SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME, SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME));
+            }
         }
         return properties;
     }

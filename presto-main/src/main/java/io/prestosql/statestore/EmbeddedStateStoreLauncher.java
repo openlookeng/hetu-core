@@ -46,6 +46,7 @@ import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
 import static io.prestosql.statestore.StateStoreConstants.DEFAULT_HAZELCAST_DISCOVERY_PORT;
 import static io.prestosql.statestore.StateStoreConstants.HAZELCAST;
 import static io.prestosql.statestore.StateStoreConstants.HAZELCAST_DISCOVERY_PORT_PROPERTY_NAME;
+import static io.prestosql.statestore.StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CLUSTER_PROPERTY_NAME;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_TYPE_PROPERTY_NAME;
@@ -63,6 +64,7 @@ public class EmbeddedStateStoreLauncher
     private static final File STATE_STORE_LAUNCHER_CONFIGURATION = new File(STATE_STORE_CONFIGURATION_PATH);
     private static final String DISCOVERY_SERVICE_LOCK = "discovery-service-lock";
     private static final String DISCOVERY_SERVICE = "discovery-service";
+    private static final String COMMA = ",";
     private static final long DISCOVERY_REGISTRY_LOCK_TIMEOUT = 3000L;
     private static final int DISCOVERY_REGISTRY_RETRY_TIMES = 60;
     private static final long DISCOVERY_REGISTRY_RETRY_INTERVAL = 5000L; //5 seconds
@@ -105,8 +107,11 @@ public class EmbeddedStateStoreLauncher
 
         if (STATE_STORE_LAUNCHER_CONFIGURATION.exists()) {
             Map<String, String> properties = new HashMap<>(loadProperties(STATE_STORE_LAUNCHER_CONFIGURATION));
-
-            if (seedStoreManager.getSeedStore() != null) {
+            Set<String> staticSeeds = getStateStoreStaticSeeds(properties);
+            if (staticSeeds.size() > 0) {
+                launchStateStore(staticSeeds, properties);
+            }
+            else if (seedStoreManager.getSeedStore() != null) {
                 // Set seed store name
                 seedStoreManager.getSeedStore().setName(properties.get(STATE_STORE_CLUSTER_PROPERTY_NAME));
                 // Clear expired seeds
@@ -305,5 +310,19 @@ public class EmbeddedStateStoreLauncher
             }
         }
         return port;
+    }
+
+    // This function will get static seeds manually configured by client
+    private Set<String> getStateStoreStaticSeeds(Map<String, String> properties)
+    {
+        Set<String> members = new HashSet<>();
+        // now only support hazelcast tcp-ip seeds
+        String memberString = properties.get(HAZELCAST_DISCOVERY_TCPIP_SEEDS);
+        if (memberString != null) {
+            for (String m : memberString.split(COMMA)) {
+                members.add(m.trim());
+            }
+        }
+        return members;
     }
 }

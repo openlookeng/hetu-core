@@ -140,7 +140,7 @@ public class PrestoServer
             injector.getInstance(EventListenerManager.class).loadConfiguredEventListener();
 
             // Seed Store
-            loadSeedStore(injector.getInstance(HetuConfig.class), injector.getInstance(SeedStoreManager.class));
+            injector.getInstance(SeedStoreManager.class).loadSeedStore();
             // State Store
             launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
             injector.getInstance(StateStoreProvider.class).loadStateStore();
@@ -168,15 +168,6 @@ public class PrestoServer
         // Only launch embedded state store when enabled
         if (config.isEmbeddedStateStoreEnabled()) {
             launcher.launchStateStore();
-        }
-    }
-
-    private static void loadSeedStore(HetuConfig config, SeedStoreManager manager)
-            throws Exception
-    {
-        // Only load seed store when enabled
-        if (config.isSeedStoreEnabled()) {
-            manager.loadSeedStore();
         }
     }
 

@@ -28,6 +28,9 @@ public class FileBasedSeedConstants
     // dir config properties name
     static final String SEED_STORE_FILESYSTEM_DIR = "seed-store.filesystem.seed-dir";
 
+    // default seed store directory
+    static final String SEED_STORE_FILESYSTEM_DIR_DEFAULT_VALUE = "/opt/hetu/seedstore";
+
     private FileBasedSeedConstants()
     {
     }

@@ -1,0 +1,79 @@
+# State Store
+This section describes the openlookeng state store. State store is used to store states that are shared between state store members and state store clients.
+
+State store cluster is composed of state store members, and state store clients can do all state store operations without being a member of cluster.
+
+It is highly recommended that configure coordinators as state store members and workers as state store clients.
+
+## Usage
+State store is currently used by HA and dynamic filters features.
+
+## Configuring State Store
+
+### Configuring State Store Members
+- Add `hetu.embedded-state-store.enabled=true` in `etc/config.properties`.
+- Configure state store properties, described in the section `Configuring State Store Properties`.    
+
+### Configuring State Store Clients
+- Configure state store properties, described in the section `Configuring State Store Properties`.    
+
+### Configuring State Store Properties
+- There are 2 mechanisms of configuring state store properties.
+    1. TCP-IP : State store members discover each other based on their seeds (ie. member's IP address).
+    2. Multicast : State store members discover each other under the same network.
+
+- Multicast mechanism is not recommended for production since UDP is often blocked in production environments.
+
+### Configuring State Store Properties with TCP-IP
+
+Create an `etc\state-store.properties` property file inside both state store members and clients installation directories.
+
+``` properties
+state-store.type=hazelcast
+state-store.name=query
+state-store.cluster=cluster1
+
+hazelcast.discovery.mode=tcp-ip   
+hazelcast.discovery.port=5701
+#configure either hazelcast.discovery.tcp-ip.seeds OR hazelcast.discovery.tcp-ip.profile
+hazelcast.discovery.tcp-ip.seeds=<member1_ip:member1_hazelcast.discovery.port>,<member2_ip:member2_hazelcast.discovery.port>,...
+hazelcast.discovery.tcp-ip.profile=hdfs-config-default
+```
+
+The above properties are described below:
+- `state-store.type`: The type of the state store. For now, only support hazelcast.
+- `state-store.name`: User defined name of state store.
+- `state-store.cluster`: User defined cluster name of state store.
+- `hazelcast.discovery.mode` : The discovery mode of hazelcast state store, now support tcp-ip and multicast(default).  
+- `hazelcast.discovery.port` : The user defined port of hazelcast state store to launch. This property is optional and the default is 5701. Only state store members need to configure this.
+- `hazelcast.discovery.tcp-ip.seeds` : A list of state store members' seeds used to form state store cluster.
+- `hazelcast.discovery.tcp-ip.profile` : The name of configuration file that represents a shared storage accessed by state store members and clients. Now it only supports `Filesystem` profile, described in the section `Filesystem Properties`.
+
+Note: Please configure `hazelcast.discovery.tcp-ip.seeds` if state store members' ips are static. 
+If state store members' ips are dynamic, user can configure `hazelcast.discovery.tcp-ip.profile` where members will store its ip:port in the profile, and discover each other automatically. 
+If both are configured, `hazelcast.discovery.tcp-ip.seeds` will be used.
+
+### Filesystem Properties
+
+Create an `etc\filesystem\hdfs-config-default.properties` property file inside both state store members and clients installation directories.
+
+Filesystem is required to be distributed filesystem so that all state store members and clients can access (ie. HDFS).
+```
+fs.client.type=hdfs
+hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
+hdfs.authentication.type=NONE
+fs.hdfs.impl.disable.cache=true
+```
+The above properties are described in [Filesystem Access Utilities](../develop/filesystem.md).
+
+### Configuring State Store Properties with Multicast
+
+Create an `etc\state-store.properties` file inside both state store members and clients installation directories.
+``` properties
+state-store.type=hazelcast
+state-store.name=query
+state-store.cluster=cluster1
+
+hazelcast.discovery.mode=multicast 
+hazelcast.discovery.port=5701       
+```

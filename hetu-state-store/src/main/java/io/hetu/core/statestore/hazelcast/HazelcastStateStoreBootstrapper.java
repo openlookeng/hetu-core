@@ -138,8 +138,7 @@ public class HazelcastStateStoreBootstrapper
         }
         else if (discoveryMode.equals(DISCOVERY_MODE_TCPIP)) {
             if (locations == null || locations.isEmpty()) {
-                throw new PrestoException(STATE_STORE_FAILURE, "Using TCP-IP discovery but no seed ip found."
-                        + "Please check whether seed store is enabled");
+                throw new PrestoException(STATE_STORE_FAILURE, "Using TCP-IP discovery but no seed ip:port found.");
             }
             // Hardcode seed IP for testing
             NetworkConfig network = hzConfig.getNetworkConfig();

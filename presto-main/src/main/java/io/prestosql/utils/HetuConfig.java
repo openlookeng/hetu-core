@@ -44,7 +44,6 @@ public class HetuConfig
     private String indexStoreFileSystemProfile = "local-config-default";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
     private Boolean enableMultipleCoordinator = Boolean.FALSE;
-    private Boolean enableSeedStore = Boolean.FALSE;
     private Duration stateUpdateInterval = new Duration(100, TimeUnit.MILLISECONDS);
     private Duration stateFetchInterval = new Duration(100, TimeUnit.MILLISECONDS);
     private Duration querySubmitTimeout = new Duration(10, TimeUnit.SECONDS);
@@ -181,20 +180,6 @@ public class HetuConfig
     {
         this.enableEmbeddedStateStore = enableEmbeddedStateStore;
         return this;
-    }
-
-    @Config("hetu.seed-store.enabled")
-    @ConfigDescription("Is seed store enabled")
-    public HetuConfig setSeedStoreEnabled(Boolean enableSeedStore)
-    {
-        this.enableSeedStore = enableSeedStore;
-        return this;
-    }
-
-    @NotNull
-    public boolean isSeedStoreEnabled()
-    {
-        return this.enableSeedStore;
     }
 
     @NotNull
