@@ -43,6 +43,7 @@ import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
+import static io.prestosql.spi.type.VarbinaryType.isVarbinaryType;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
@@ -168,7 +169,7 @@ public class TupleDomainFilterUtils
             return longDecimalRangeToFilter(range, nullAllowed);
         }
 
-        if (isVarcharType(type) || type instanceof CharType) {
+        if (isVarcharType(type) || type instanceof CharType || isVarbinaryType(type)) {
             return varcharRangeToFilter(range, nullAllowed);
         }
 

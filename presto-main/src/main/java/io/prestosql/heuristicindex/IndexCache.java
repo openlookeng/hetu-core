@@ -84,7 +84,7 @@ public class IndexCache
             return Collections.emptyList();
         }
 
-        URI splitUri = URI.create(split.getConnectorSplit().getFilePath());
+        URI splitUri = URI.create(split.getConnectorSplit().getFilePath().replaceAll(" ", "%20"));
         long lastModifiedTime = split.getConnectorSplit().getLastModifiedTime();
         List<IndexMetadata> indices = new LinkedList<>();
 
