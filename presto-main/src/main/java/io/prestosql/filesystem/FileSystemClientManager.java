@@ -147,10 +147,11 @@ public class FileSystemClientManager
      * Get a file system client with a user-defined properties object
      *
      * @param properties properties used to construct the file system client
+     * @param root Workspace root of the filesystem client. It will only be allowed to access filesystem within this directory.
      * @return a {@link HetuFileSystemClient}
      * @throws IOException exception thrown during constructing the client
      */
-    public HetuFileSystemClient getFileSystemClient(Properties properties)
+    public HetuFileSystemClient getFileSystemClient(Properties properties, Path root)
             throws IOException
     {
         String type = checkProperty(properties, FS_CLIENT_TYPE);
@@ -158,7 +159,7 @@ public class FileSystemClientManager
                 "Factory for file system type %s not found", type);
         HetuFileSystemClientFactory factory = fileSystemFactories.get(type);
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
-            return factory.getFileSystemClient(properties);
+            return factory.getFileSystemClient(properties, root);
         }
     }
 

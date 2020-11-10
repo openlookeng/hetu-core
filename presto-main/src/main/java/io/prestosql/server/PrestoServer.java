@@ -31,6 +31,7 @@ import io.airlift.log.Logger;
 import io.airlift.node.NodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
 import io.prestosql.catalog.DynamicCatalogScanner;
+import io.prestosql.catalog.DynamicCatalogStore;
 import io.prestosql.discovery.HetuDiscoveryModule;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.eventlistener.EventListenerModule;
@@ -132,6 +133,7 @@ public class PrestoServer
             injector.getInstance(HetuMetaStoreManager.class).loadHetuMetatstore(fileSystemClientManager);
             injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
+            injector.getInstance(DynamicCatalogStore.class).loadCatalogStores(fileSystemClientManager);
             injector.getInstance(DynamicCatalogScanner.class).start();
             injector.getInstance(SessionPropertyDefaults.class).loadConfigurationManager();
             injector.getInstance(ResourceGroupManager.class).loadConfigurationManager();

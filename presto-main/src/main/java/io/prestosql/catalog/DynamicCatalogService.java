@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
+import static io.prestosql.catalog.DynamicCatalogStore.CatalogStoreType.SHARE;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
@@ -47,22 +48,19 @@ public class DynamicCatalogService
     private final CatalogManager catalogManager;
     private final DynamicCatalogStore dynamicCatalogStore;
     private final AccessControl accessControl;
-    private final CatalogStoreUtil catalogStoreUtil;
     private final SecurityKeyManager securityKeyManager;
 
     @Inject
-    public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl, CatalogStoreUtil catalogStoreUtil, SecurityKeyManager securityKeyManager)
+    public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl, SecurityKeyManager securityKeyManager)
     {
         this.catalogManager = requireNonNull(catalogManager, "catalogManager is null");
         this.dynamicCatalogStore = requireNonNull(dynamicCatalogStore, "dynamicCatalogStore is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
-        this.catalogStoreUtil = requireNonNull(catalogStoreUtil, "catalogStoreUtil is null");
         this.securityKeyManager = securityKeyManager;
     }
 
     public static WebApplicationException badRequest(Response.Status status, String message)
     {
-        log.error(message);
         throw new WebApplicationException(
                 Response.status(status)
                         .type(TEXT_PLAIN_TYPE)
@@ -70,10 +68,10 @@ public class DynamicCatalogService
                         .build());
     }
 
-    private Lock tryLock(CatalogStore shareCatalogStore, String catalogName)
+    private Lock tryLock(String catalogName)
             throws IOException
     {
-        Lock lock = dynamicCatalogStore.getCatalogLock(shareCatalogStore, catalogName);
+        Lock lock = dynamicCatalogStore.getCatalogLock(catalogName);
         if (!lock.tryLock()) {
             throw badRequest(CONFLICT, "There are other requests operating this catalog");
         }
@@ -91,9 +89,16 @@ public class DynamicCatalogService
         }
     }
 
+    private boolean isCatalogExist(String catalogName)
+            throws IOException
+    {
+        return dynamicCatalogStore.listCatalogNames(SHARE).contains(catalogName);
+    }
+
     public synchronized Response createCatalog(CatalogInfo catalogInfo,
             CatalogFileInputStream configFiles,
             HttpRequestSessionContext sessionContext)
+            throws IOException
     {
         String catalogName = catalogInfo.getCatalogName();
 
@@ -105,54 +110,39 @@ public class DynamicCatalogService
             throw badRequest(UNAUTHORIZED, "No permission");
         }
 
-        try (CatalogStore localCatalogStore = catalogStoreUtil.getLocalCatalogStore();
-                CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
-            Lock lock = tryLock(shareCatalogStore, catalogName);
+        Lock lock = tryLock(catalogName);
+        try {
+            // check this catalog exists or not, if this catalog has existed in the share file system, return catalog is exist.
+            if (catalogManager.getCatalog(catalogName).isPresent() || isCatalogExist(catalogName)) {
+                throw badRequest(FOUND, "The catalog [" + catalogName + "] already exists");
+            }
+
+            boolean needSaveKey = catalogInfo.getSecurityKey() != null && !catalogInfo.getSecurityKey().isEmpty();
+            // save security key
+            if (needSaveKey) {
+                try {
+                    securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
+                }
+                catch (SecurityKeyException e) {
+                    throw badRequest(BAD_REQUEST, "Failed to save key.");
+                }
+            }
+
+            // create catalog
             try {
-                // check this catalog exists or not, if this catalog has existed in the share file system, return catalog is exist.
-                boolean isExistInRemoteStore;
-                try {
-                    isExistInRemoteStore = dynamicCatalogStore.listCatalogNames(shareCatalogStore).contains(catalogName);
-                }
-                catch (IOException ex) {
-                    throw badRequest(BAD_REQUEST, "Failed to list existing catalogs");
-                }
-
-                if (catalogManager.getCatalog(catalogName).isPresent() || isExistInRemoteStore) {
-                    throw badRequest(FOUND, "The catalog [" + catalogName + "] already exists");
-                }
-
-                boolean needSaveKey = catalogInfo.getSecurityKey() != null && !catalogInfo.getSecurityKey().isEmpty();
-                // save security key
+                // load catalog and store related configuration files to share file system.
+                dynamicCatalogStore.loadCatalogAndCreateShareFiles(catalogInfo, configFiles);
+            }
+            catch (PrestoException | IllegalArgumentException ex) {
                 if (needSaveKey) {
-                    try {
-                        securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
-                    }
-                    catch (SecurityKeyException e) {
-                        throw badRequest(BAD_REQUEST, "Failed to save key.");
-                    }
+                    deleteSecurityKey(catalogName);
                 }
-
-                // create catalog
-                try {
-                    // load catalog and store related configuration files to share file system.
-                    dynamicCatalogStore.loadCatalogAndCreateShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
-                }
-                catch (PrestoException | IllegalArgumentException ex) {
-                    if (needSaveKey) {
-                        deleteSecurityKey(catalogName);
-                    }
-                    throw badRequest(BAD_REQUEST, "Failed to load catalog. Please check your configuration.");
-                }
-            }
-            finally {
-                lock.unlock();
+                throw badRequest(BAD_REQUEST, "Failed to load catalog. Please check your configuration.");
             }
         }
-        catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, "Failed to load catalog. Please check your configuration.");
+        finally {
+            lock.unlock();
         }
-
         return Response.status(CREATED).build();
     }
 
@@ -173,6 +163,7 @@ public class DynamicCatalogService
     public synchronized Response updateCatalog(CatalogInfo catalogInfo,
             CatalogFileInputStream configFiles,
             HttpRequestSessionContext sessionContext)
+            throws IOException
     {
         String catalogName = catalogInfo.getCatalogName();
 
@@ -184,65 +175,52 @@ public class DynamicCatalogService
             throw badRequest(UNAUTHORIZED, "No permission");
         }
 
-        try (CatalogStore localCatalogStore = catalogStoreUtil.getLocalCatalogStore();
-                CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
-            Lock lock = tryLock(shareCatalogStore, catalogName);
-            try {
-                // check this catalog exists.
-                boolean isExistInRemoteStore;
+        Lock lock = tryLock(catalogName);
+        try {
+            // check this catalog exists.
+            if (!isCatalogExist(catalogName)) {
+                throw badRequest(NOT_FOUND, "The catalog [" + catalogName + "] does not exist");
+            }
+
+            // update security key
+            boolean updateKey = (catalogInfo.getSecurityKey() != null);
+            char[] preSecurityKey = null;
+            if (updateKey) {
                 try {
-                    isExistInRemoteStore = dynamicCatalogStore.listCatalogNames(shareCatalogStore).contains(catalogName);
+                    preSecurityKey = securityKeyManager.getKey(catalogName);
+                    securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
                 }
-                catch (IOException ex) {
-                    throw badRequest(BAD_REQUEST, "Failed to list existing catalogs");
-                }
-
-                if (!isExistInRemoteStore) {
-                    throw badRequest(NOT_FOUND, "The catalog [" + catalogName + "] does not exist");
-                }
-
-                // update security key
-                boolean updateKey = (catalogInfo.getSecurityKey() != null);
-                char[] preSecurityKey = null;
-                if (updateKey) {
-                    try {
-                        preSecurityKey = securityKeyManager.getKey(catalogName);
-                        securityKeyManager.saveKey(catalogInfo.getSecurityKey().toCharArray(), catalogName);
-                    }
-                    catch (SecurityKeyException e) {
-                        throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
-                    }
-                }
-
-                // update catalog
-                try {
-                    // update the catalog and update related configuration files in the share file system.
-                    dynamicCatalogStore.updateCatalogAndShareFiles(localCatalogStore, shareCatalogStore, catalogInfo, configFiles);
-                }
-                catch (PrestoException | IllegalArgumentException ex) {
-                    if (updateKey) {
-                        if (preSecurityKey != null) {
-                            rollbackKey(catalogName, preSecurityKey);
-                        }
-                        else {
-                            deleteSecurityKey(catalogName);
-                        }
-                    }
+                catch (SecurityKeyException e) {
                     throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
                 }
             }
-            finally {
-                lock.unlock();
+
+            // update catalog
+            try {
+                // update the catalog and update related configuration files in the share file system.
+                dynamicCatalogStore.updateCatalogAndShareFiles(catalogInfo, configFiles);
+            }
+            catch (PrestoException | IllegalArgumentException ex) {
+                if (updateKey) {
+                    if (preSecurityKey != null) {
+                        rollbackKey(catalogName, preSecurityKey);
+                    }
+                    else {
+                        deleteSecurityKey(catalogName);
+                    }
+                }
+                throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
             }
         }
-        catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, "Failed to update catalog. Please check your configuration.");
+        finally {
+            lock.unlock();
         }
 
         return Response.status(CREATED).build();
     }
 
     public synchronized Response dropCatalog(String catalogName, HttpRequestSessionContext sessionContext)
+            throws IOException
     {
         // check the permission.
         try {
@@ -252,55 +230,38 @@ public class DynamicCatalogService
             throw badRequest(UNAUTHORIZED, "No permission");
         }
 
-        try (CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
-            Lock lock = tryLock(shareCatalogStore, catalogName);
-            try {
-                // check this catalog exists.
-                boolean isExistInRemoteStore;
-                try {
-                    isExistInRemoteStore = dynamicCatalogStore.listCatalogNames(shareCatalogStore).contains(catalogName);
-                }
-                catch (IOException ex) {
-                    throw badRequest(BAD_REQUEST, "Failed to list existing catalogs");
-                }
-
-                if (!isExistInRemoteStore) {
-                    throw badRequest(NOT_FOUND, "The catalog [" + catalogName + "] does not exist");
-                }
-
-                // delete security key
-                deleteSecurityKey(catalogName);
-
-                // delete from share file system.
-                dynamicCatalogStore.deleteCatalogShareFiles(shareCatalogStore, catalogName);
+        Lock lock = tryLock(catalogName);
+        try {
+            // check this catalog exists.
+            if (!isCatalogExist(catalogName)) {
+                throw badRequest(NOT_FOUND, "The catalog [" + catalogName + "] does not exist");
             }
-            finally {
-                lock.unlock();
-            }
+
+            // delete security key
+            deleteSecurityKey(catalogName);
+
+            // delete from share file system.
+            dynamicCatalogStore.deleteCatalogShareFiles(catalogName);
         }
-        catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, "drop catalog failed. please check your configuration.");
+        finally {
+            lock.unlock();
         }
 
         return Response.status(NO_CONTENT).build();
     }
 
     public Response showCatalogs(HttpRequestSessionContext sessionContext)
+            throws IOException
     {
-        // check the permission.
+        Set<String> catalogNames = dynamicCatalogStore.listCatalogNames(SHARE);
+        Set<String> allowedCatalogs;
         try {
-            accessControl.checkCanAccessCatalogs(sessionContext.getIdentity());
+            allowedCatalogs = accessControl.filterCatalogs(sessionContext.getIdentity(), catalogNames);
+            return Response.ok(allowedCatalogs).build();
         }
-        catch (Exception ex) {
+        catch (Exception e) {
+            log.error("Filter catalogs error : %s.", e.getMessage());
             throw badRequest(UNAUTHORIZED, "No permission");
-        }
-
-        try (CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
-            Set<String> catalogNames = dynamicCatalogStore.listCatalogNames(shareCatalogStore);
-            return Response.ok(catalogNames).build();
-        }
-        catch (IOException ex) {
-            throw badRequest(BAD_REQUEST, "list catalogs failed. please connect admin manager.");
         }
     }
 }
