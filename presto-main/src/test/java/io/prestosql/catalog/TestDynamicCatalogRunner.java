@@ -101,6 +101,7 @@ public class TestDynamicCatalogRunner
                 .put("catalog.config-dir", localPath)
                 .put("catalog.share.config-dir", sharePath)
                 .put("catalog.valid-file-suffixes", "jks,keytab,conf,xml")
+                .put("security.share.filesystem.profile", "local-config-default")
                 .put("security.key.manager-type", "keystore")
                 .put("security.key.keystore-password", "password")
                 .put("security.key.store-file-path", storePath)

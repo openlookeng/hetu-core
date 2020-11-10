@@ -50,7 +50,6 @@ public class KeystoreSecurityKeyManager
         implements SecurityKeyManager
 {
     private static final Logger LOG = Logger.get(KeystoreSecurityKeyManager.class);
-    private static final String SHARE_FS_CLIENT_CONFIG_NAME = "hdfs-config-catalog";
     private static final String UTF_8 = "UTF-8";
     private static final String PKCS12 = "pkcs12";
     private final FileSystemClientManager fileSystemClientManager;
@@ -111,7 +110,7 @@ public class KeystoreSecurityKeyManager
         InputStream inputStream = null;
         OutputStream outputStream = null;
         try (HetuFileSystemClient hetuFileSystemClient =
-                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
+                fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"))) {
             inputStream = hetuFileSystemClient.newInputStream(keystorPath);
             keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
@@ -146,7 +145,7 @@ public class KeystoreSecurityKeyManager
     {
         Path keystorePath = Paths.get(config.getFileStorePath());
         char[] keyStr = null;
-        try (HetuFileSystemClient hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
+        try (HetuFileSystemClient hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"));
                 InputStream inputStream = hetuFileSystemClient.newInputStream(keystorePath)) {
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
@@ -203,7 +202,7 @@ public class KeystoreSecurityKeyManager
         InputStream inputStream = null;
         OutputStream outputStream = null;
         try (HetuFileSystemClient hetuFileSystemClient =
-                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
+                fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"))) {
             boolean isStoreFileExists = hetuFileSystemClient.exists(keystorPath);
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             if (isStoreFileExists) {
@@ -244,7 +243,7 @@ public class KeystoreSecurityKeyManager
     {
         String file = config.getFileStorePath();
         try (HetuFileSystemClient hetuFileSystemClient =
-                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
+                fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"))) {
             int lastIndex = file.lastIndexOf(File.separator);
             String tmpFileDir = file.substring(0, lastIndex);
             if (hetuFileSystemClient.exists(Paths.get(tmpFileDir))) {
