@@ -13,6 +13,7 @@
  */
 package io.prestosql.security;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
@@ -21,6 +22,8 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 import io.prestosql.transaction.TransactionId;
 
 import java.security.Principal;
@@ -353,22 +356,27 @@ public interface AccessControl
     void checkCanShowRoleGrants(TransactionId transactionId, Identity identity, String catalogName);
 
     /**
-     * Check if identity and table combination has some row level filtering
+     * Get a row filter associated with the given table and identity.
      *
-     * @return {@link io.prestosql.sql.tree.Expression} as string. Null if no row filters are present
+     * The filter must be a scalar SQL expression of boolean type over the columns in the table.
+     *
+     * @return the filter, or {@link Optional#empty()} if not applicable
      */
-    default String applyRowFilters(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    default List<ViewExpression> getRowFilters(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
-        return null;
+        return ImmutableList.of();
     }
 
     /**
-     * Check if identity, table and column has some column making enabled
+     * Get a column mask associated with the given table, column and identity.
      *
-     * @return {@link io.prestosql.sql.tree.Expression} as string. Null if no column filters are present
+     * The mask must be a scalar SQL expression of a type coercible to the type of the column being masked. The expression
+     * must be written in terms of columns in the table.
+     *
+     * @return the mask, or {@link Optional#empty()} if not applicable
      */
-    default String applyColumnMasking(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, String columnName)
+    default List<ViewExpression> getColumnMasks(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, String columnName, Type type)
     {
-        return null;
+        return ImmutableList.of();
     }
 }

@@ -29,6 +29,8 @@ import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.SystemAccessControl;
 import io.prestosql.spi.security.SystemAccessControlFactory;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.nio.file.Paths;
 import java.security.Principal;
@@ -384,15 +386,15 @@ public class FileBasedSystemAccessControl
     }
 
     @Override
-    public String applyRowLevelFiltering(Identity identity, CatalogSchemaTableName table)
+    public Optional<ViewExpression> getRowFilter(Identity identity, CatalogSchemaTableName tableName)
     {
-        return null;
+        return Optional.empty();
     }
 
     @Override
-    public String applyColumnMasking(Identity identity, CatalogSchemaTableName asCatalogSchemaTableName, String columnName)
+    public Optional<ViewExpression> getColumnMask(Identity identity, CatalogSchemaTableName tableName, String columnName, Type type)
     {
-        return null;
+        return Optional.empty();
     }
 
     @Override

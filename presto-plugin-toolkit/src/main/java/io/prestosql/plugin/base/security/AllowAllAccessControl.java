@@ -21,6 +21,8 @@ import io.prestosql.spi.security.ConnectorIdentity;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.util.List;
 import java.util.Optional;
@@ -228,14 +230,14 @@ public class AllowAllAccessControl
     }
 
     @Override
-    public String applyRowlevelFiltering(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
     {
-        return null;
+        return Optional.empty();
     }
 
     @Override
-    public String applyColumnMasking(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName, String columnName)
+    public Optional<ViewExpression> getColumnMask(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName, String columnName, Type type)
     {
-        return null;
+        return Optional.empty();
     }
 }

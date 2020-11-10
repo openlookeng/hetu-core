@@ -21,6 +21,8 @@ import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.SystemAccessControl;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.security.Principal;
 import java.util.List;
@@ -265,15 +267,15 @@ public abstract class ForwardingSystemAccessControl
     }
 
     @Override
-    public String applyRowLevelFiltering(Identity identity, CatalogSchemaTableName table)
+    public Optional<ViewExpression> getRowFilter(Identity identity, CatalogSchemaTableName tableName)
     {
-        return null;
+        return delegate().getRowFilter(identity, tableName);
     }
 
     @Override
-    public String applyColumnMasking(Identity identity, CatalogSchemaTableName asCatalogSchemaTableName, String columnName)
+    public Optional<ViewExpression> getColumnMask(Identity identity, CatalogSchemaTableName tableName, String columnName, Type type)
     {
-        return null;
+        return delegate().getColumnMask(identity, tableName, columnName, type);
     }
 
     @Override

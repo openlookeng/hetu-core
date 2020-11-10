@@ -37,7 +37,6 @@ public final class StatementRewrite
             new ShowQueriesRewrite(),
             new ShowStatsRewrite(),
             new ExplainRewrite(),
-            new RowFilterColumnMaskingRewrite(),
             new CacheTableRewrite());
 
     private StatementRewrite() {}
