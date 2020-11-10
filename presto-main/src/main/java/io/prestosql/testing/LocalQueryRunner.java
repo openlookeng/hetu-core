@@ -44,6 +44,7 @@ import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.TaskCountEstimator;
+import io.prestosql.dynamicfilter.DynamicFilterListenerService;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.CommentTask;
 import io.prestosql.execution.CommitTask;
@@ -173,6 +174,8 @@ import io.prestosql.sql.tree.StartTransaction;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.EmbeddedStateStoreLauncher;
 import io.prestosql.statestore.LocalStateStoreProvider;
+import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.testing.PageConsumerOperator.PageConsumerOutputFactory;
 import io.prestosql.transaction.InMemoryTransactionManager;
 import io.prestosql.transaction.TransactionManager;
@@ -738,6 +741,7 @@ public class LocalQueryRunner
         NodeInfo nodeInfo = new NodeInfo("test");
 
         SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
+        StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         LocalExecutionPlanner executionPlanner = new LocalExecutionPlanner(
                 metadata,
                 new TypeAnalyzer(sqlParser, metadata),
@@ -760,7 +764,9 @@ public class LocalQueryRunner
                 new LookupJoinOperators(),
                 new OrderingCompiler(),
                 nodeInfo,
-                new LocalStateStoreProvider(seedStoreManager),
+                stateStoreProvider,
+                new StateStoreListenerManager(stateStoreProvider),
+                new DynamicFilterListenerService(stateStoreProvider),
                 heuristicIndexerManager);
 
         // plan query

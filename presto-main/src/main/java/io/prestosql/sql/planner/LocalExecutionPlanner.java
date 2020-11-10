@@ -32,6 +32,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.dynamicfilter.DynamicFilterListenerService;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
@@ -200,6 +201,7 @@ import io.prestosql.sql.tree.LambdaExpression;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.type.FunctionType;
 
 import javax.inject.Inject;
@@ -294,6 +296,7 @@ import static io.prestosql.util.SpatialJoinUtils.ST_INTERSECTS;
 import static io.prestosql.util.SpatialJoinUtils.ST_WITHIN;
 import static io.prestosql.util.SpatialJoinUtils.extractSupportedSpatialComparisons;
 import static io.prestosql.util.SpatialJoinUtils.extractSupportedSpatialFunctions;
+import static io.prestosql.utils.DynamicFilterUtils.MERGEMAP;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.IntStream.range;
 
@@ -326,6 +329,8 @@ public class LocalExecutionPlanner
     private final OrderingCompiler orderingCompiler;
     private final StateStoreProvider stateStoreProvider;
     private final NodeInfo nodeInfo;
+    private final StateStoreListenerManager stateStoreListenerManager;
+    private final DynamicFilterListenerService dynamicFilterListenerService;
     private final HeuristicIndexerManager heuristicIndexerManager;
 
     @Inject
@@ -352,6 +357,8 @@ public class LocalExecutionPlanner
             OrderingCompiler orderingCompiler,
             NodeInfo nodeInfo,
             StateStoreProvider stateStoreProvider,
+            StateStoreListenerManager stateStoreListenerManager,
+            DynamicFilterListenerService dynamicFilterListenerService,
             HeuristicIndexerManager heuristicIndexerManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
@@ -379,6 +386,8 @@ public class LocalExecutionPlanner
         this.orderingCompiler = requireNonNull(orderingCompiler, "orderingCompiler is null");
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStore is null");
         this.nodeInfo = nodeInfo;
+        this.stateStoreListenerManager = requireNonNull(stateStoreListenerManager, "stateStoreListenerManager is null");
+        this.dynamicFilterListenerService = requireNonNull(dynamicFilterListenerService, "dynamicFilterListenerService is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
@@ -474,7 +483,10 @@ public class LocalExecutionPlanner
             OutputFactory outputOperatorFactory)
     {
         Session session = taskContext.getSession();
-        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, stateStoreProvider);
+        if (isEnableDynamicFiltering(session) && stateStoreProvider.getStateStore() != null) {
+            registerDynamicFilterListener();
+        }
+        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, stateStoreProvider, dynamicFilterListenerService);
 
         Optional<List<String>> columns = Optional.empty();
         if (plan instanceof OutputNode) {
@@ -515,6 +527,11 @@ public class LocalExecutionPlanner
                 .forEach(LocalPlannerAware::localPlannerComplete);
 
         return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor);
+    }
+
+    private void registerDynamicFilterListener()
+    {
+        stateStoreListenerManager.addStateStoreListener(dynamicFilterListenerService, MERGEMAP);
     }
 
     private static void addLookupOuterDrivers(LocalExecutionPlanContext context)
@@ -565,9 +582,9 @@ public class LocalExecutionPlanner
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
 
-        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, StateStoreProvider stateStoreProvider)
+        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, StateStoreProvider stateStoreProvider, DynamicFilterListenerService dynamicFilterListenerService)
         {
-            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, stateStoreProvider), new AtomicInteger(0));
+            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, stateStoreProvider, dynamicFilterListenerService), new AtomicInteger(0));
         }
 
         private LocalExecutionPlanContext(

@@ -32,6 +32,7 @@ import io.airlift.node.NodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
 import io.prestosql.catalog.DynamicCatalogScanner;
 import io.prestosql.discovery.HetuDiscoveryModule;
+import io.prestosql.dynamicfilter.DynamicFilterListenerService;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.eventlistener.EventListenerModule;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
@@ -48,9 +49,11 @@ import io.prestosql.security.PasswordSecurityModule;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.server.security.ServerSecurityModule;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.statestore.StateStoreLauncher;
 import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.utils.HetuConfig;
 import org.weakref.jmx.guice.MBeanModule;
 
@@ -61,6 +64,7 @@ import java.nio.file.Paths;
 
 import static io.prestosql.server.PrestoSystemRequirements.verifyJvmRequirements;
 import static io.prestosql.server.PrestoSystemRequirements.verifySystemTimeIsReasonable;
+import static io.prestosql.utils.DynamicFilterUtils.MERGEMAP;
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 import static java.util.Objects.requireNonNull;
 
@@ -144,6 +148,11 @@ public class PrestoServer
             // State Store
             launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
             injector.getInstance(StateStoreProvider.class).loadStateStore();
+            // register dynamic filter listener
+            registerDynamicFilterListener(injector.getInstance(FeaturesConfig.class),
+                    injector.getInstance(ServerConfig.class),
+                    injector.getInstance(StateStoreListenerManager.class),
+                    injector.getInstance(DynamicFilterListenerService.class));
 
             injector.getInstance(Announcer.class).start();
 
@@ -185,5 +194,14 @@ public class PrestoServer
             return;
         }
         log.info("%s: %s", name, path);
+    }
+
+    private static void registerDynamicFilterListener(FeaturesConfig featuresConfig, ServerConfig serverConfig,
+                                                      StateStoreListenerManager stateStoreListenerManager,
+                                                      DynamicFilterListenerService dynamicFilterListenerService)
+    {
+        if (featuresConfig.isEnableDynamicFiltering() && !serverConfig.isCoordinator()) {
+            stateStoreListenerManager.addStateStoreListener(dynamicFilterListenerService, MERGEMAP);
+        }
     }
 }

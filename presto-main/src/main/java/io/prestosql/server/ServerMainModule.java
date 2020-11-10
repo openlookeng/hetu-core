@@ -42,6 +42,7 @@ import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.connector.system.SystemConnectorModule;
+import io.prestosql.dynamicfilter.DynamicFilterListenerService;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.ExecutionFailureInfo;
 import io.prestosql.execution.ExplainAnalyzeContext;
@@ -141,6 +142,7 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.transaction.TransactionManagerConfig;
 import io.prestosql.type.TypeDeserializer;
 import io.prestosql.util.FinalizerService;
@@ -520,6 +522,12 @@ public class ServerMainModule
 
         // State store
         binder.bind(StateStoreProvider.class).to(LocalStateStoreProvider.class).in(Scopes.SINGLETON);
+
+        // State store listener manager
+        binder.bind(StateStoreListenerManager.class).in(Scopes.SINGLETON);
+
+        // dynamic filter listener service
+        binder.bind(DynamicFilterListenerService.class).in(Scopes.SINGLETON);
     }
 
     public static class ExecutorCleanup
