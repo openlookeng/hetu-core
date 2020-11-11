@@ -11,20 +11,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.elasticsearch;
+package io.prestosql.elasticsearch.client;
 
-public enum SearchGuardCertificateFormat
+import static java.util.Objects.requireNonNull;
+
+public class Shard
 {
-    /**
-     * Use X.509 PEM certificates and PKCS #8 keys
-     */
-    PEM,
-    /**
-     * Use Keystore and Truststore files
-     */
-    JKS,
-    /**
-     * Default value
-     */
-    NONE
+    private final int id;
+    private final String address;
+
+    public Shard(int id, String address)
+    {
+        this.id = id;
+        this.address = requireNonNull(address, "address is null");
+    }
+
+    public int getId()
+    {
+        return id;
+    }
+
+    public String getAddress()
+    {
+        return address;
+    }
+
+    @Override
+    public String toString()
+    {
+        return id + "@" + address;
+    }
 }
