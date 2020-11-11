@@ -48,7 +48,7 @@ public class DataCenterConfig
 
     private URI connectionUrl;
 
-    private String connectionUser;
+    private String connectionUser = System.getProperty("user.name");
 
     private String connectionPassword;
 

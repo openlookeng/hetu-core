@@ -36,7 +36,7 @@ public class TestDataCenterConfig
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(DataCenterConfig.class)
                 .setConnectionUrl(null)
-                .setConnectionUser(null)
+                .setConnectionUser(System.getProperty("user.name"))
                 .setRemoteClusterId(null)
                 .setConnectionPassword(null)
                 .setSocksProxy(null)
@@ -75,7 +75,7 @@ public class TestDataCenterConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>().put("connection-url",
                 "http://127.0.0.1:9002")
-                .put("connection-user", "root")
+                .put("connection-user", "test")
                 .put("dc.remote.cluster.id", "remote.cluster.id")
                 .put("connection-password", "paxxx")
                 .put("dc.accesstoken", "accesstoken")
@@ -110,7 +110,7 @@ public class TestDataCenterConfig
                 .build();
 
         DataCenterConfig expected = new DataCenterConfig().setConnectionUrl(URI.create("http://127.0.0.1:9002"))
-                .setConnectionUser("root")
+                .setConnectionUser("test")
                 .setRemoteClusterId("remote.cluster.id")
                 .setConnectionPassword("paxxx")
                 .setSocksProxy("socksproxy")
