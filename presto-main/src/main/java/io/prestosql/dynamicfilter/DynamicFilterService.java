@@ -92,10 +92,10 @@ public class DynamicFilterService
     private static final int MERGE_DYNAMIC_FILTER_INTERVAL = 1;
     private ScheduledFuture<?> backgroundTask;
 
-    private Map<String, Map<String, DynamicFilterRegistryInfo>> dynamicFilters = new ConcurrentHashMap<>();
-    private Map<String, CopyOnWriteArraySet<TaskId>> dynamicFiltersToTask = new ConcurrentHashMap<>();
-    private static Map<String, Map<String, DynamicFilter>> cachedDynamicFilters = new HashMap<>();
-    private List<String> finishedQuery = Collections.synchronizedList(new ArrayList<>());
+    private final Map<String, Map<String, DynamicFilterRegistryInfo>> dynamicFilters = new ConcurrentHashMap<>();
+    private final Map<String, CopyOnWriteArraySet<TaskId>> dynamicFiltersToTask = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, DynamicFilter>> cachedDynamicFilters = new HashMap<>();
+    private final List<String> finishedQuery = Collections.synchronizedList(new ArrayList<>());
 
     private final StateStoreProvider stateStoreProvider;
 
@@ -152,6 +152,7 @@ public class DynamicFilterService
                 cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
             }
             Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId);
+            StateMap mergedDynamicFilters = (StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP);
 
             for (Map.Entry<String, DynamicFilterRegistryInfo> columnToDynamicFilterEntry : queryToDynamicFiltersEntry.getValue().entrySet()) {
                 if (columnToDynamicFilterEntry.getValue().isMerged()) {
@@ -177,23 +178,21 @@ public class DynamicFilterService
                             throw new PrestoException(GENERIC_INTERNAL_ERROR, "FPP too high: " + mergedBloomFilter.approximateElementCount());
                         }
                         mergedFilter = new BloomFilterDynamicFilter(filterKey, null, mergedBloomFilter, filterType);
-                        columnToDynamicFilterEntry.getValue().setMerged();
 
                         if (filterType == GLOBAL) {
                             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                                 mergedBloomFilter.writeTo(out);
                                 byte[] filter = out.toByteArray();
-                                ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, filter);
+                                mergedDynamicFilters.put(filterKey, filter);
                             }
                         }
                     }
                     else if (filterDataType == HASHSET) {
                         Set mergedSet = mergeHashSets(results);
                         mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
-                        columnToDynamicFilterEntry.getValue().setMerged();
 
                         if (filterType == GLOBAL) {
-                            ((StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP)).put(filterKey, mergedSet);
+                            mergedDynamicFilters.put(filterKey, mergedSet);
                         }
                     }
                     else {
@@ -206,7 +205,11 @@ public class DynamicFilterService
                     cachedDynamicFiltersForQuery.put(filterId, mergedFilter);
                 }
                 catch (IOException | PrestoException e) {
-                    log.error("Could not merge dynamic filter: " + e.getLocalizedMessage());
+                    log.warn("Could not merge dynamic filter: " + e.getLocalizedMessage());
+                }
+                finally {
+                    // for each dynamic filter we only try to merge it once
+                    columnToDynamicFilterEntry.getValue().setMerged();
                 }
             }
         }
@@ -223,7 +226,7 @@ public class DynamicFilterService
                 for (Entry<String, DynamicFilterRegistryInfo> entry : filters.entrySet()) {
                     String filterId = entry.getKey();
                     clearPartialResults(filterId, queryId);
-                    if (entry.getValue().isMerged() == true) {
+                    if (entry.getValue().isMerged()) {
                         String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
                         mergedStateCollection.remove(filterKey);
                     }
@@ -237,7 +240,7 @@ public class DynamicFilterService
         finishedQuery.removeAll(handledQuery);
     }
 
-    private static BloomFilter mergeBloomFilters(Collection partialBloomFilters)
+    private static BloomFilter mergeBloomFilters(Collection<Object> partialBloomFilters)
             throws IOException
     {
         BloomFilter mergedFilter = null;
@@ -253,16 +256,15 @@ public class DynamicFilterService
         return mergedFilter;
     }
 
-    private static Set mergeHashSets(Collection results)
+    private static Set<?> mergeHashSets(Collection<Object> results)
             throws IOException
     {
-        Set merged = new HashSet<>();
+        Set<?> merged = new HashSet<>();
         for (Object o : results) {
             if (!(o instanceof Set)) {
                 throw new IOException("Partial HashSet DynamicFilter is invalid.");
             }
-            Set s = (Set) o;
-            merged.addAll(s);
+            merged.addAll((Set) o);
         }
         return merged;
     }
@@ -308,7 +310,7 @@ public class DynamicFilterService
                 filters.put(filterId, extractDynamicFilterRegistryInfo(node, stateMachine.getSession()));
 
                 dynamicFiltersToTask.putIfAbsent(filterId + "-" + queryId, new CopyOnWriteArraySet<>());
-                CopyOnWriteArraySet taskSet = dynamicFiltersToTask.get(filterId + "-" + queryId);
+                CopyOnWriteArraySet<TaskId> taskSet = dynamicFiltersToTask.get(filterId + "-" + queryId);
                 taskSet.addAll(taskIds);
 
                 log.debug("registerTasks source " + filterId + " filters:" + filters + ", workers: "
@@ -427,9 +429,9 @@ public class DynamicFilterService
 
     private static class DynamicFilterRegistryInfo
     {
-        private Symbol symbol;
-        private Type type;
-        private DataType dataType;
+        private final Symbol symbol;
+        private final Type type;
+        private final DataType dataType;
         private boolean isMerged;
 
         public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session)
