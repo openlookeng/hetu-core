@@ -61,24 +61,6 @@ public class JoinNode
     private final Optional<DistributionType> distributionType;
     private final Optional<Boolean> spillable;
     private final Map<String, Symbol> dynamicFilters;
-    private final boolean dynamicFiltersCreated;
-
-    public JoinNode(
-            @JsonProperty("id") PlanNodeId id,
-            @JsonProperty("type") Type type,
-            @JsonProperty("left") PlanNode left,
-            @JsonProperty("right") PlanNode right,
-            @JsonProperty("criteria") List<EquiJoinClause> criteria,
-            @JsonProperty("outputSymbols") List<Symbol> outputSymbols,
-            @JsonProperty("filter") Optional<Expression> filter,
-            @JsonProperty("leftHashSymbol") Optional<Symbol> leftHashSymbol,
-            @JsonProperty("rightHashSymbol") Optional<Symbol> rightHashSymbol,
-            @JsonProperty("distributionType") Optional<DistributionType> distributionType,
-            @JsonProperty("spillable") Optional<Boolean> spillable,
-            @JsonProperty("dynamicFilters") Map<String, Symbol> dynamicFilters)
-    {
-        this(id, type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType, spillable, dynamicFilters, false);
-    }
 
     @JsonCreator
     public JoinNode(
@@ -93,8 +75,7 @@ public class JoinNode
             @JsonProperty("rightHashSymbol") Optional<Symbol> rightHashSymbol,
             @JsonProperty("distributionType") Optional<DistributionType> distributionType,
             @JsonProperty("spillable") Optional<Boolean> spillable,
-            @JsonProperty("dynamicFilters") Map<String, Symbol> dynamicFilters,
-            boolean dynamicFiltersCreated)
+            @JsonProperty("dynamicFilters") Map<String, Symbol> dynamicFilters)
     {
         super(id);
         requireNonNull(type, "type is null");
@@ -119,7 +100,6 @@ public class JoinNode
         this.distributionType = distributionType;
         this.spillable = spillable;
         this.dynamicFilters = ImmutableMap.copyOf(requireNonNull(dynamicFilters, "dynamicFilters is null"));
-        this.dynamicFiltersCreated = dynamicFiltersCreated;
 
         Set<Symbol> inputSymbols = ImmutableSet.<Symbol>builder()
                 .addAll(left.getOutputSymbols())
@@ -165,8 +145,7 @@ public class JoinNode
                 leftHashSymbol,
                 distributionType,
                 spillable,
-                ImmutableMap.of(),
-                dynamicFiltersCreated); // dynamicFilters are invalid after flipping children
+                ImmutableMap.of()); // dynamicFilters are invalid after flipping children
     }
 
     private static Type flipType(Type type)
@@ -339,27 +318,22 @@ public class JoinNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         checkArgument(newChildren.size() == 2, "expected newChildren to contain 2 nodes");
-        return new JoinNode(getId(), type, newChildren.get(0), newChildren.get(1), criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType, spillable, dynamicFilters, dynamicFiltersCreated);
+        return new JoinNode(getId(), type, newChildren.get(0), newChildren.get(1), criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType, spillable, dynamicFilters);
     }
 
     public JoinNode withDistributionType(DistributionType distributionType)
     {
-        return new JoinNode(getId(), type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, Optional.of(distributionType), spillable, dynamicFilters, dynamicFiltersCreated);
+        return new JoinNode(getId(), type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, Optional.of(distributionType), spillable, dynamicFilters);
     }
 
     public JoinNode withSpillable(boolean spillable)
     {
-        return new JoinNode(getId(), type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType, Optional.of(spillable), dynamicFilters, dynamicFiltersCreated);
+        return new JoinNode(getId(), type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType, Optional.of(spillable), dynamicFilters);
     }
 
     public boolean isCrossJoin()
     {
         return criteria.isEmpty() && !filter.isPresent() && type == INNER;
-    }
-
-    public boolean isDynamicFiltersCreated()
-    {
-        return dynamicFiltersCreated;
     }
 
     public static class EquiJoinClause

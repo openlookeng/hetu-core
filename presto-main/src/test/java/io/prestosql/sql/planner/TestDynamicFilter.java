@@ -15,6 +15,7 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.Session;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.FilterNode;
@@ -23,6 +24,7 @@ import org.testng.annotations.Test;
 
 import java.util.Optional;
 
+import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_MAX_SIZE;
 import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyNot;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
@@ -87,14 +89,60 @@ public class TestDynamicFilter
     }
 
     @Test
+    public void testJoinNoFilter()
+    {
+        assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
+                anyTree(
+                        join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
+                                Optional.empty(),
+                                anyTree(
+                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))),
+                                anyTree(
+                                        anyTree(
+                                                tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey")))))));
+    }
+
+    @Test
+    public void testJoinHighSelectivity()
+    {
+        assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey AND l.discount < 0.08",
+                anyTree(
+                        join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
+                                Optional.empty(),
+                                project(
+                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))),
+                                exchange(
+                                        project(
+                                                node(FilterNode.class,
+                                                        tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))))))));
+    }
+
+    @Test
+    public void testJoinExceedMaxSize()
+    {
+        Session session = Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(DYNAMIC_FILTERING_MAX_SIZE, "10")
+                .build();
+        assertPlanWithSession("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey AND l.partkey < 100", session, true,
+                anyTree(
+                        join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
+                                Optional.empty(),
+                                project(
+                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))),
+                                exchange(
+                                        project(
+                                                node(FilterNode.class,
+                                                        tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))))))));
+    }
+
+    @Test
     public void testJoinOnCast()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE cast(l.orderkey as int) = cast(o.orderkey as int)",
                 anyTree(
                         node(JoinNode.class,
                                 anyTree(
-                                        node(FilterNode.class,
-                                                tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey")))),
+                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))),
                                 anyTree(
                                         tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))))));
     }
@@ -113,7 +161,7 @@ public class TestDynamicFilter
                                 exchange(
                                         project(
                                                 node(FilterNode.class,
-                                                    tableScan("lineitem", ImmutableMap.of("LINEITEM_PK", "partkey", "LINEITEM_OK", "orderkey"))))))));
+                                                        tableScan("lineitem", ImmutableMap.of("LINEITEM_PK", "partkey", "LINEITEM_OK", "orderkey"))))))));
     }
 
     @Test
@@ -128,7 +176,7 @@ public class TestDynamicFilter
                                 exchange(
                                         project(
                                                 node(FilterNode.class,
-                                                    tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))))))));
+                                                        tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))))))));
     }
 
     @Test
@@ -199,8 +247,8 @@ public class TestDynamicFilter
                                                 tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey")),
                                                 exchange(
                                                         project(
-                                                            node(FilterNode.class,
-                                                                tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))))))));
+                                                                node(FilterNode.class,
+                                                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))))))));
     }
 
     @Test
@@ -210,7 +258,7 @@ public class TestDynamicFilter
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("LINEITEM_OK", "PART_PK")),
                                 join(INNER, ImmutableList.of(equiJoinClause("LINEITEM_OK", "ORDERS_OK")),
-                                    project(
+                                        project(
                                                 tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))),
                                         exchange(project(
                                                 tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))),

@@ -15,46 +15,74 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
+import io.prestosql.cost.CachingStatsProvider;
+import io.prestosql.cost.PlanNodeStatsEstimate;
+import io.prestosql.cost.StatsCalculator;
+import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.connector.Constraint;
+import io.prestosql.spi.statistics.Estimate;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxSize;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.DynamicFilters.getDescriptor;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 /**
  * Dynamic filters are supported only right after TableScan and only if the subtree is on the probe side of some downstream join node
  * Dynamic filters are removed from JoinNode if there is no consumer for it on probe side
+ * Dynamic filters are removed from JoinNode and TableScan when the selectivity of dynamic filter is too high
  */
 public class RemoveUnsupportedDynamicFilters
         implements PlanOptimizer
 {
+    private static final double DEFAULT_SELECTIVITY_THRESHOLD = 0.5D;
+
+    private final Metadata metadata;
+    private final StatsCalculator statsCalculator;
+    private Session session;
+    private StatsProvider statsProvider;
+
+    public RemoveUnsupportedDynamicFilters(Metadata metadata, StatsCalculator statsCalculator)
+    {
+        this.metadata = requireNonNull(metadata, "metadata is null");
+        this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
+    }
+
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
+        this.session = session;
+        this.statsProvider = new CachingStatsProvider(statsCalculator, session, symbolAllocator.getTypes());
         PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(), ImmutableSet.of());
         return result.getNode();
     }
@@ -86,10 +114,11 @@ public class RemoveUnsupportedDynamicFilters
         @Override
         public PlanWithConsumedDynamicFilters visitJoin(JoinNode node, Set<String> allowedDynamicFilterIds)
         {
-            ImmutableSet<String> allowedDynamicFilterIdsProbeSide = ImmutableSet.<String>builder()
-                    .addAll(node.getDynamicFilters().keySet())
-                    .addAll(allowedDynamicFilterIds)
-                    .build();
+            ImmutableSet.Builder<String> builder = ImmutableSet.<String>builder().addAll(allowedDynamicFilterIds);
+            if (!hasHighSelectivity(node.getRight())) {
+                builder.addAll(node.getDynamicFilters().keySet());
+            }
+            ImmutableSet<String> allowedDynamicFilterIdsProbeSide = builder.build();
 
             PlanWithConsumedDynamicFilters leftResult = node.getLeft().accept(this, allowedDynamicFilterIdsProbeSide);
             Set<String> consumedProbeSide = leftResult.getConsumedDynamicFilterIds();
@@ -152,6 +181,66 @@ public class RemoveUnsupportedDynamicFilters
             }
 
             return new PlanWithConsumedDynamicFilters(node, consumedDynamicFilterIds.build());
+        }
+
+        private boolean hasHighSelectivity(PlanNode node)
+        {
+            Optional<PlanNode> buildSideTableScanNode = Optional.empty();
+            if (node instanceof ProjectNode) {
+                return hasHighSelectivity(((ProjectNode) node).getSource());
+            }
+
+            if (node instanceof ExchangeNode && node.getSources().size() == 1) {
+                return hasHighSelectivity(node.getSources().get(0));
+            }
+
+            // Only handle the case that build side of JoinNode is0
+            // TableScanNode or FilterNode above TableScanNode
+            // as the estimates will be more accurate
+            if (node instanceof TableScanNode) {
+                buildSideTableScanNode = Optional.of(node);
+            }
+
+            if (node instanceof FilterNode) {
+                PlanNode sourceNode = ((FilterNode) node).getSource();
+                if (sourceNode instanceof TableScanNode) {
+                    buildSideTableScanNode = Optional.of(sourceNode);
+                }
+            }
+
+            if (buildSideTableScanNode.isPresent()) {
+                Optional<Expression> predicates = ((TableScanNode) buildSideTableScanNode.get()).getPredicate();
+                // If there is dynamic filters applied on the build side,
+                // the selectivity cannot be easily calculated,
+                // thus we assume it's not high selectivity
+                if (predicates.isPresent()) {
+                    long numDynamicFilters = extractConjuncts(predicates.get()).stream().filter(DynamicFilters::isDynamicFilter).count();
+                    if (numDynamicFilters > 0) {
+                        return false;
+                    }
+                }
+
+                // If no predicate at all, the selectivity will be high
+                if (node instanceof TableScanNode && ((TableScanNode) buildSideTableScanNode.get()).getEnforcedConstraint().isAll()) {
+                    return true;
+                }
+
+                Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) buildSideTableScanNode.get()).getTable(), Constraint.alwaysTrue()).getRowCount();
+                PlanNodeStatsEstimate filteredStats = statsProvider.getStats(node);
+
+                if (!filteredStats.isOutputRowCountUnknown() && !totalRowCount.isUnknown()) {
+                    // If filtered row count is too big, no need to create Dynamic Filter
+                    if (filteredStats.getOutputRowCount() > getDynamicFilteringMaxSize(session)) {
+                        return true;
+                    }
+
+                    // If selectivity too low, no need to create Dynamic Filter
+                    double selectivity = filteredStats.getOutputRowCount() / totalRowCount.getValue();
+                    return selectivity > DEFAULT_SELECTIVITY_THRESHOLD;
+                }
+            }
+
+            return false;
         }
 
         private Expression removeDynamicFilters(Expression expression, Set<String> allowedDynamicFilterIds, ImmutableSet.Builder<String> consumedDynamicFilterIds)
