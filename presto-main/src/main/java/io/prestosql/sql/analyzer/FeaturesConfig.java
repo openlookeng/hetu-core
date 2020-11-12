@@ -152,6 +152,8 @@ public class FeaturesConfig
     private DataSize filterAndProjectMinOutputPageSize = new DataSize(500, KILOBYTE);
     private int filterAndProjectMinOutputPageRowCount = 256;
     private int maxGroupingSets = 2048;
+    //transform selfjoin to aggregates if applicable
+    private boolean transformSelfJoinToGroupby;
 
     public enum JoinReorderingStrategy
     {
@@ -503,6 +505,18 @@ public class FeaturesConfig
     {
         this.optimizeHashGeneration = optimizeHashGeneration;
         return this;
+    }
+
+    @Config("optimizer.transform-self-join-to-groupby")
+    public FeaturesConfig setTransformSelfJoinToGroupby(boolean transformSelfJoinToGroupby)
+    {
+        this.transformSelfJoinToGroupby = transformSelfJoinToGroupby;
+        return this;
+    }
+
+    public boolean isTransformSelfJoinToGroupby()
+    {
+        return transformSelfJoinToGroupby;
     }
 
     public boolean isQueryPushDown()
