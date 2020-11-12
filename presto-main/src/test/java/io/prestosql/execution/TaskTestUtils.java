@@ -19,7 +19,7 @@ import io.airlift.json.ObjectMapperProvider;
 import io.airlift.node.NodeInfo;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsAndCosts;
-import io.prestosql.dynamicfilter.DynamicFilterListenerService;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.TestSqlTaskManager.MockExchangeClientSupplier;
@@ -162,7 +162,7 @@ public final class TaskTestUtils
                 nodeInfo,
                 stateStoreProvider,
                 new StateStoreListenerManager(stateStoreProvider),
-                new DynamicFilterListenerService(stateStoreProvider),
+                new DynamicFilterCacheManager(),
                 heuristicIndexerManager);
     }
 

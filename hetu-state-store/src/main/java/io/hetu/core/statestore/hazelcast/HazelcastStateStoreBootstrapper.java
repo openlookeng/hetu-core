@@ -71,7 +71,7 @@ public class HazelcastStateStoreBootstrapper
         implements StateStoreBootstrapper
 {
     private HazelcastInstance hzInstance;
-    private static final String MERGEMAP = "merged";
+    private static final String MERGED_DYNAMIC_FILTERS = "merged-dynamic-filters";
     private static final int MAXIDLESECONDS = 30;
     private static final int EVICTIONSIZE = 200;
     private static final int TIMETOLIVESECONDS = 300;
@@ -98,7 +98,7 @@ public class HazelcastStateStoreBootstrapper
         hzConfig = setCpSystemConfigs(config, hzConfig);
 
         // Set eviction rules
-        hzConfig = setEvictionConfigs(hzConfig, MERGEMAP);
+        hzConfig = setEvictionConfigs(hzConfig, MERGED_DYNAMIC_FILTERS);
 
         // Set discovery port
         hzConfig = setPortConfigs(config, hzConfig);

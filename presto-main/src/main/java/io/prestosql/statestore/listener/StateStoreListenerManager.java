@@ -15,6 +15,7 @@
 package io.prestosql.statestore.listener;
 
 import io.airlift.log.Logger;
+import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.listener.MapListener;
 import io.prestosql.statestore.StateStoreProvider;
@@ -28,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static java.util.Objects.requireNonNull;
 
 /**
- * StateStore Listener Manager
+ * StateStore Listener Manager to add/remove state store listeners for different collections
  */
 public class StateStoreListenerManager
 {
@@ -48,10 +49,10 @@ public class StateStoreListenerManager
             return;
         }
 
-        StateMap stateMap = stateStoreProvider.getStateStore().createStateMap(map);
+        StateMap<?, ?> stateMap = (StateMap<?, ?>) stateStoreProvider.getStateStore().getOrCreateStateCollection(map, StateCollection.Type.MAP);
         stateMap.addEntryListener(listener);
         listeners.putIfAbsent(map, listener);
-        LOG.info("Added dynamic filter state store listener " + listener + " for map " + map);
+        LOG.info("Added state store listener " + listener + " for map " + map);
     }
 
     @PreDestroy
@@ -60,7 +61,7 @@ public class StateStoreListenerManager
         for (Map.Entry<String, MapListener> entry : listeners.entrySet()) {
             String map = entry.getKey();
             MapListener listener = entry.getValue();
-            StateMap stateMap = stateStoreProvider.getStateStore().createStateMap(map);
+            StateMap<?, ?> stateMap = (StateMap<?, ?>) stateStoreProvider.getStateStore().getOrCreateStateCollection(map, StateCollection.Type.MAP);
             stateMap.removeEntryListener(listener);
             LOG.info("Remove state store listener " + listener + " for map " + map);
         }

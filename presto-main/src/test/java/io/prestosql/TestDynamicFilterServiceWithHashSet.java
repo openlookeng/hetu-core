@@ -132,7 +132,7 @@ public class TestDynamicFilterServiceWithHashSet
 
     private Set fetchDynamicFilterHashSet(String filterId, String queryId)
     {
-        Set hashSet = (Set) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP))
+        Set hashSet = (Set) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS))
                 .get(DynamicFilterUtils.createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId));
         Assert.assertNotNull(hashSet);
 

@@ -14,44 +14,51 @@
  */
 package io.prestosql.sql.rewrite;
 
-import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.statestore.StateStore;
+import com.google.common.collect.ImmutableSet;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.tree.SymbolReference;
-import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * this is a query specific dynamic filter context design to avoid any duplication of calculation
  */
 public class DynamicFilterContext
 {
-    private final StateStore stateStore;
     private final List<DynamicFilters.Descriptor> descriptors;
     private Map<String, String> filterIds = new HashMap<>();
 
-    public DynamicFilterContext(Map<Symbol, ColumnHandle> columns, List<DynamicFilters.Descriptor> descriptors, StateStoreProvider stateStoreProvider)
+    public DynamicFilterContext(List<DynamicFilters.Descriptor> descriptors)
     {
         this.descriptors = descriptors;
-        this.stateStore = stateStoreProvider.getStateStore();
 
         initFilterIds();
     }
 
     /**
-     * for a specific set of descriptor, the id for a column is unique
+     * For a specific set of descriptor, the id for a column is unique
      *
-     * @param column
-     * @return
+     * @param column column symbol
+     * @return Id of dynamic filter for the column
      */
     public String getId(Symbol column)
     {
         return filterIds.get(column.getName());
+    }
+
+    /**
+     * Get id for all the dynamic filters
+     *
+     * @return Set of dynamic filter ids
+     */
+    public Set<String> getFilterIds()
+    {
+        return ImmutableSet.copyOf(filterIds.values());
     }
 
     private void initFilterIds()
@@ -69,15 +76,5 @@ public class DynamicFilterContext
                 }
             }
         }
-    }
-
-    /**
-     * Returns a state store guaranteed to be initialized
-     *
-     * @return
-     */
-    public StateStore getStateStore()
-    {
-        return stateStore;
     }
 }

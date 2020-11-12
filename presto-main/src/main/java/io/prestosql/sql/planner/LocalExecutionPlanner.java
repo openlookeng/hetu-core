@@ -32,7 +32,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.dynamicfilter.DynamicFilterListenerService;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
@@ -248,6 +248,7 @@ import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
 import static io.prestosql.SystemSessionProperties.isSpillWindowOperator;
+import static io.prestosql.dynamicfilter.DynamicFilterCacheManager.createCacheKey;
 import static io.prestosql.operator.CreateIndexOperator.CreateIndexOperatorFactory;
 import static io.prestosql.operator.DistinctLimitOperator.DistinctLimitOperatorFactory;
 import static io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFactory;
@@ -296,7 +297,6 @@ import static io.prestosql.util.SpatialJoinUtils.ST_INTERSECTS;
 import static io.prestosql.util.SpatialJoinUtils.ST_WITHIN;
 import static io.prestosql.util.SpatialJoinUtils.extractSupportedSpatialComparisons;
 import static io.prestosql.util.SpatialJoinUtils.extractSupportedSpatialFunctions;
-import static io.prestosql.utils.DynamicFilterUtils.MERGEMAP;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.IntStream.range;
 
@@ -330,7 +330,7 @@ public class LocalExecutionPlanner
     private final StateStoreProvider stateStoreProvider;
     private final NodeInfo nodeInfo;
     private final StateStoreListenerManager stateStoreListenerManager;
-    private final DynamicFilterListenerService dynamicFilterListenerService;
+    private final DynamicFilterCacheManager dynamicFilterCacheManager;
     private final HeuristicIndexerManager heuristicIndexerManager;
 
     @Inject
@@ -358,7 +358,7 @@ public class LocalExecutionPlanner
             NodeInfo nodeInfo,
             StateStoreProvider stateStoreProvider,
             StateStoreListenerManager stateStoreListenerManager,
-            DynamicFilterListenerService dynamicFilterListenerService,
+            DynamicFilterCacheManager dynamicFilterCacheManager,
             HeuristicIndexerManager heuristicIndexerManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
@@ -387,7 +387,7 @@ public class LocalExecutionPlanner
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStore is null");
         this.nodeInfo = nodeInfo;
         this.stateStoreListenerManager = requireNonNull(stateStoreListenerManager, "stateStoreListenerManager is null");
-        this.dynamicFilterListenerService = requireNonNull(dynamicFilterListenerService, "dynamicFilterListenerService is null");
+        this.dynamicFilterCacheManager = requireNonNull(dynamicFilterCacheManager, "dynamicFilterCacheManager is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
@@ -483,10 +483,7 @@ public class LocalExecutionPlanner
             OutputFactory outputOperatorFactory)
     {
         Session session = taskContext.getSession();
-        if (isEnableDynamicFiltering(session) && stateStoreProvider.getStateStore() != null) {
-            registerDynamicFilterListener();
-        }
-        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, stateStoreProvider, dynamicFilterListenerService);
+        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, dynamicFilterCacheManager);
 
         Optional<List<String>> columns = Optional.empty();
         if (plan instanceof OutputNode) {
@@ -527,11 +524,6 @@ public class LocalExecutionPlanner
                 .forEach(LocalPlannerAware::localPlannerComplete);
 
         return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor);
-    }
-
-    private void registerDynamicFilterListener()
-    {
-        stateStoreListenerManager.addStateStoreListener(dynamicFilterListenerService, MERGEMAP);
     }
 
     private static void addLookupOuterDrivers(LocalExecutionPlanContext context)
@@ -582,9 +574,9 @@ public class LocalExecutionPlanner
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
 
-        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, StateStoreProvider stateStoreProvider, DynamicFilterListenerService dynamicFilterListenerService)
+        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, DynamicFilterCacheManager dynamicFilterCacheManager)
         {
-            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, stateStoreProvider, dynamicFilterListenerService), new AtomicInteger(0));
+            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, dynamicFilterCacheManager), new AtomicInteger(0));
         }
 
         private LocalExecutionPlanContext(
@@ -1376,7 +1368,8 @@ public class LocalExecutionPlanner
                 if (sourceNode instanceof TableScanNode) {
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-                    collector.initContext(tableScanNode.getAssignments(), dynamicFilters.get());
+                    collector.initContext(dynamicFilters.get());
+                    dynamicFilters.get().forEach(dynamicFilter -> dynamicFilterCacheManager.registerTask(createCacheKey(dynamicFilter.getId(), session.getQueryId().getId()), context.getTaskId()));
                     return () -> collector.getDynamicFilters(tableScanNode);
                 }
             }

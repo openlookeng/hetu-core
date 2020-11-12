@@ -42,7 +42,7 @@ import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.connector.system.SystemConnectorModule;
-import io.prestosql.dynamicfilter.DynamicFilterListenerService;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.ExecutionFailureInfo;
 import io.prestosql.execution.ExplainAnalyzeContext;
@@ -527,7 +527,7 @@ public class ServerMainModule
         binder.bind(StateStoreListenerManager.class).in(Scopes.SINGLETON);
 
         // dynamic filter listener service
-        binder.bind(DynamicFilterListenerService.class).in(Scopes.SINGLETON);
+        binder.bind(DynamicFilterCacheManager.class).in(Scopes.SINGLETON);
     }
 
     public static class ExecutorCleanup

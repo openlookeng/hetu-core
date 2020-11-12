@@ -39,7 +39,7 @@ public class DynamicFilterUtils
     public static final String FILTERPREFIX = "filter-";
     public static final String PARTIALPREFIX = "partial-";
     public static final String TASKSPREFIX = "tasks-";
-    public static final String MERGEMAP = "merged";
+    public static final String MERGED_DYNAMIC_FILTERS = "merged-dynamic-filters";
     public static final double BLOOM_FILTER_EXPECTED_FPP = 0.25F;
 
     private DynamicFilterUtils()

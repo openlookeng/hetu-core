@@ -44,7 +44,7 @@ import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.TaskCountEstimator;
-import io.prestosql.dynamicfilter.DynamicFilterListenerService;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.CommentTask;
 import io.prestosql.execution.CommitTask;
@@ -766,7 +766,7 @@ public class LocalQueryRunner
                 nodeInfo,
                 stateStoreProvider,
                 new StateStoreListenerManager(stateStoreProvider),
-                new DynamicFilterListenerService(stateStoreProvider),
+                new DynamicFilterCacheManager(),
                 heuristicIndexerManager);
 
         // plan query

@@ -136,7 +136,7 @@ public class TestDynamicFilterServiceWithBloomFilter
 
     private BloomFilter fetchDynamicFilter(String filterId, String queryId)
     {
-        byte[] bloomFilter = (byte[]) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP))
+        byte[] bloomFilter = (byte[]) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS))
                 .get(DynamicFilterUtils.createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId));
         Assert.assertNotNull(bloomFilter);
 

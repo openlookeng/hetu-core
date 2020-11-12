@@ -13,9 +13,11 @@
  */
 package io.prestosql.sql.planner;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
-import io.prestosql.dynamicfilter.DynamicFilterListenerService;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
+import io.prestosql.execution.TaskId;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
@@ -23,56 +25,53 @@ import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.rewrite.DynamicFilterContext;
-import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
+import static io.prestosql.dynamicfilter.DynamicFilterCacheManager.createCacheKey;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.LOCAL;
 import static java.util.Objects.requireNonNull;
 
 public class LocalDynamicFiltersCollector
 {
     public static final Logger LOG = Logger.get(LocalDynamicFiltersCollector.class);
-    private StateStoreProvider stateStoreProvider;
     private DynamicFilterContext context;
 
     /**
      * May contains domains for dynamic filters for different table scans
      * (e.g. in case of co-located joins).
      */
-    private Map<Symbol, Set> predicates = new ConcurrentHashMap<>();
-    private Map<String, DynamicFilter> cachedDynamicFilters = new ConcurrentHashMap<>();
-    private Set<String> cacheKeys = new CopyOnWriteArraySet<>();
-    private final DynamicFilterListenerService dynamicFilterListenerService;
+    private final Map<Symbol, Set<?>> predicates = new ConcurrentHashMap<>();
+    private final Map<String, DynamicFilter> cachedDynamicFilters = new ConcurrentHashMap<>();
+    private final DynamicFilterCacheManager dynamicFilterCacheManager;
     private final String queryId;
+    private final TaskId taskId;
 
     /**
      * Constructor for the LocalDynamicFiltersCollector
      */
-    LocalDynamicFiltersCollector(TaskContext taskContext, StateStoreProvider stateStoreProvider,
-                                 DynamicFilterListenerService dynamicFilterListenerService)
+    LocalDynamicFiltersCollector(TaskContext taskContext, DynamicFilterCacheManager dynamicFilterCacheManager)
     {
         requireNonNull(taskContext, "taskContext is null");
         Session session = taskContext.getSession();
-        this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
         this.queryId = session.getQueryId().getId();
-        this.dynamicFilterListenerService = requireNonNull(dynamicFilterListenerService, "dynamicFilterListenerService is null");
+        this.taskId = taskContext.getTaskId();
+        this.dynamicFilterCacheManager = requireNonNull(dynamicFilterCacheManager, "dynamicFilterCacheManager is null");
 
-        if (isEnableDynamicFiltering(session) && stateStoreProvider.getStateStore() != null) {
+        if (isEnableDynamicFiltering(session)) {
             taskContext.onTaskFinished(this::removeDynamicFilter);
         }
     }
 
-    void initContext(Map<Symbol, ColumnHandle> columns, List<DynamicFilters.Descriptor> descriptors)
+    void initContext(List<DynamicFilters.Descriptor> descriptors)
     {
         if (context == null) {
-            context = new DynamicFilterContext(columns, descriptors, stateStoreProvider);
+            context = new DynamicFilterContext(descriptors);
         }
     }
 
@@ -86,9 +85,7 @@ public class LocalDynamicFiltersCollector
 
             Set predicateSet = predicates.get(entry.getKey());
             Set newValues = entry.getValue();
-            for (Object value : newValues) {
-                predicateSet.add(value);
-            }
+            predicateSet.addAll(newValues);
         }
     }
 
@@ -113,13 +110,10 @@ public class LocalDynamicFiltersCollector
             }
 
             // Try to get dynamic filter from local cache first
-            String cacheKey = filterId + "-" + queryId;
+            String cacheKey = createCacheKey(filterId, queryId);
             DynamicFilter cachedDynamicFilter = cachedDynamicFilters.get(filterId);
             if (cachedDynamicFilter == null) {
-                cachedDynamicFilter = dynamicFilterListenerService.getDynamicFilter(cacheKey);
-                if (cachedDynamicFilter != null) {
-                    cacheKeys.add(cacheKey);
-                }
+                cachedDynamicFilter = dynamicFilterCacheManager.getDynamicFilter(cacheKey);
             }
 
             if (cachedDynamicFilter != null) {
@@ -138,10 +132,13 @@ public class LocalDynamicFiltersCollector
         return result;
     }
 
-    private void removeDynamicFilter(Boolean queryFinished)
+    @VisibleForTesting
+    public void removeDynamicFilter(Boolean taskFinished)
     {
-        for (String cacheKey : cacheKeys) {
-            dynamicFilterListenerService.removeDynamicFilter(cacheKey);
+        if (context != null) {
+            for (String filterId : context.getFilterIds()) {
+                dynamicFilterCacheManager.removeDynamicFilter(createCacheKey(filterId, queryId), taskId);
+            }
         }
     }
 }
