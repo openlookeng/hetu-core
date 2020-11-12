@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
+import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.stream.BooleanInputStream;
@@ -339,5 +340,15 @@ public class TimestampColumnReader
     public long getRetainedSizeInBytes()
     {
         return INSTANCE_SIZE + sizeOf(nullVector) + sizeOf(secondsVector) + sizeOf(nanosVector);
+    }
+
+    @Override
+    public boolean filterTest(TupleDomainFilter filter, Long value)
+    {
+        if (value == null) {
+            return filter.testNull();
+        }
+
+        return filter.testLong(value);
     }
 }

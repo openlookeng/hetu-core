@@ -1522,6 +1522,78 @@ public abstract class AbstractTestDistributedQueries
     }
 
     @Test
+    public void testPushdownTimestampCacheFilterKey()
+    {
+        if (supportsPushdown()) {
+            assertUpdate("DROP TABLE IF EXISTS test_cache_predicate_ts");
+            assertUpdate("CREATE TABLE test_cache_predicate_ts (id int, name timestamp, p1 int) WITH (partitioned_by=ARRAY['p1'])");
+            assertTrue(getQueryRunner().tableExists(getSession(), "test_cache_predicate_ts"));
+            assertTableColumnNames("test_cache_predicate_ts", "id", "name", "p1");
+
+            assertUpdate("INSERT INTO test_cache_predicate_ts VALUES (1,timestamp '2019-09-09 09:09:09.909',1), (2,timestamp '2019-09-09 09:09:09.909',1), (3,timestamp '2020-02-02 02:02:02.202',1)", 3);
+
+            Session sessionPushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "false")
+                    .build();
+            Session sessionCachePushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "true")
+                    .build();
+
+            MaterializedResult resultNormal;
+            MaterializedResult resultPushdown;
+            MaterializedResult resultCachePushdown;
+
+            String sql = "SELECT * FROM test_cache_predicate_ts WHERE id=3 AND name=timestamp '2020-02-02 02:02:02.202'";
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(sessionPushdown, sql);
+
+            assertQuery("CACHE TABLE test_cache_predicate_ts WHERE p1 <> 0", "VALUES('OK')");
+            resultCachePushdown = computeActual(sessionCachePushdown, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+        }
+    }
+
+    @Test
+    public void testPushdownVarbinary()
+    {
+        if (supportsPushdown()) {
+            assertUpdate("DROP TABLE IF EXISTS test_pushdown_varbinary");
+            assertUpdate("CREATE TABLE test_pushdown_varbinary (id int, name varbinary, p1 int) WITH (partitioned_by=ARRAY['p1'])");
+            assertTrue(getQueryRunner().tableExists(getSession(), "test_pushdown_varbinary"));
+            assertTableColumnNames("test_pushdown_varbinary", "id", "name", "p1");
+
+            assertUpdate("INSERT INTO test_pushdown_varbinary VALUES (1,varbinary '2019-09-09 09:09:09.909',1), (2,varbinary '2019-09-09 09:09:09.909',1), (3,varbinary '2020-02-02 02:02:02.202',1)", 3);
+
+            Session sessionPushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "false")
+                    .build();
+            Session sessionCachePushdown = Session.builder(getSession())
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                    .setCatalogSessionProperty(getSession().getCatalog().get(), "orc_row_data_cache_enabled", "true")
+                    .build();
+
+            MaterializedResult resultNormal;
+            MaterializedResult resultPushdown;
+            MaterializedResult resultCachePushdown;
+
+            String sql = "SELECT * FROM test_pushdown_varbinary WHERE id=3 AND name=varbinary '2020-02-02 02:02:02.202'";
+            resultNormal = computeActual(sql);
+            resultPushdown = computeActual(sessionPushdown, sql);
+
+            assertQuery("CACHE TABLE test_pushdown_varbinary WHERE p1 <> 0", "VALUES('OK')");
+            resultCachePushdown = computeActual(sessionCachePushdown, sql);
+
+            assertEquals(resultNormal.getMaterializedRows(), resultPushdown.getMaterializedRows());
+            assertEquals(resultNormal.getMaterializedRows(), resultCachePushdown.getMaterializedRows());
+        }
+    }
+
+    @Test
     public void testLargeFilterExpression()
     {
         String sql = "SELECT * FROM orders WHERE (custkey=1 AND shippriority=1)" +
