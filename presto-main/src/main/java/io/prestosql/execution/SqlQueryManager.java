@@ -28,6 +28,7 @@ import io.prestosql.execution.QueryExecution.QueryOutputInfo;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -250,8 +251,17 @@ public class SqlQueryManager
                 queryMonitor.queryCompletedEvent(finalQueryInfo);
             }
             finally {
-                // execution MUST be added to the expiration queue or there will be a leak
-                queryTracker.expireQuery(queryExecution.getQueryId());
+                boolean isUiQuery = finalQueryInfo.getSession().getSource()
+                        .map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source))
+                        .orElse(false);
+                if (isUiQuery && finalQueryInfo.getState() == QueryState.FINISHED) {
+                    // UI related queries need not take up the history space.
+                    queryTracker.removeQuery(queryExecution.getQueryId());
+                }
+                else {
+                    // execution MUST be added to the expiration queue or there will be a leak
+                    queryTracker.expireQuery(queryExecution.getQueryId());
+                }
             }
         });
 

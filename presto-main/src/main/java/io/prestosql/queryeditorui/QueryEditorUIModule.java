@@ -87,6 +87,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public class QueryEditorUIModule
         extends AbstractConfigurationAwareModule
 {
+    public static final String UI_QUERY_SOURCE = "ui-server";
     private static final ConfigDefaults<HttpClientConfig> HTTP_CLIENT_CONFIG_DEFAULTS = d -> new HttpClientConfig()
             .setConnectTimeout(new Duration(10, TimeUnit.SECONDS));
 

@@ -23,9 +23,11 @@ import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.QueryManagerStats;
 import io.prestosql.execution.QueryPreparer;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
+import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryTracker;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.SessionContext;
@@ -269,12 +271,21 @@ public class DispatchManager
     {
         boolean queryAdded = queryTracker.addQuery(dispatchQuery);
 
+        boolean isUiQuery = dispatchQuery.getSession().getSource()
+                .map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source))
+                .orElse(false);
         // only add state tracking if this query instance will actually be used for the execution
         if (queryAdded) {
             dispatchQuery.addStateChangeListener(newState -> {
                 if (newState.isDone()) {
-                    // execution MUST be added to the expiration queue or there will be a leak
-                    queryTracker.expireQuery(dispatchQuery.getQueryId());
+                    if (isUiQuery && newState == QueryState.FINISHED) {
+                        // UI related queries need not take up the history space.
+                        queryTracker.removeQuery(dispatchQuery.getQueryId());
+                    }
+                    else {
+                        // execution MUST be added to the expiration queue or there will be a leak
+                        queryTracker.expireQuery(dispatchQuery.getQueryId());
+                    }
                 }
             });
             stats.trackQueryStats(dispatchQuery);

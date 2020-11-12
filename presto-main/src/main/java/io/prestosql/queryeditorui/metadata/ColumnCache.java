@@ -23,6 +23,7 @@ import io.airlift.log.Logger;
 import io.prestosql.client.Column;
 import io.prestosql.client.QueryData;
 import io.prestosql.client.StatementClient;
+import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryeditorui.execution.BackgroundCacheLoader;
 import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
@@ -76,7 +77,7 @@ public class ColumnCache
     private List<Column> queryColumns(String query)
     {
         final ImmutableList.Builder<Column> cache = ImmutableList.builder();
-        QueryRunner queryRunner = queryRunnerFactory.create("ui-server", "lk");
+        QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, "lk");
         QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), query);
 
         try {
