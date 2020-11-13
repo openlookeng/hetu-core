@@ -330,8 +330,10 @@ public class SeedStoreManager
         if (stateStoreConfig.exists()) {
             Map<String, String> stateStoreProperties = new HashMap<>(loadProperties(stateStoreConfig));
             filesystemProfile = stateStoreProperties.getOrDefault(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_PROFILE, filesystemProfile);
-            // for now, seed store is started only if tcp-ip seeds is not set
-            isSeedStoreEnabled = stateStoreProperties.get(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS) == null;
+            // for now, seed store is started only if tcp-ip mode enabled and tcp-ip.seeds is not set
+            String discoveryMode = stateStoreProperties.get(StateStoreConstants.DISCOVERY_MODE_PROPERTY_NAME);
+            isSeedStoreEnabled = discoveryMode != null && discoveryMode.equals(StateStoreConstants.DISCOVERY_MODE_TCPIP)
+                    && stateStoreProperties.get(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS) == null;
         }
 
         // load seed store config if exist
