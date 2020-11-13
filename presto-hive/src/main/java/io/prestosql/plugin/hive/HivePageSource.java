@@ -258,7 +258,7 @@ public class HivePageSource
                         throw new UnsupportedOperationException();
                 }
             }
-            return new Page(batchSize, blocks.toArray(new Block[0]));
+            return new Page(batchSize, dataPage.getPageMetadata(), blocks.toArray(new Block[0]));
         }
         catch (PrestoException e) {
             closeWithSuppression(e);

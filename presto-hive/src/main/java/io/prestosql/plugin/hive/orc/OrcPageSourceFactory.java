@@ -47,6 +47,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.RowType;
@@ -162,6 +163,7 @@ public class OrcPageSourceFactory
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
+            SplitMetadata splitMetadata,
             boolean splitCacheable)
     {
         if (!HiveUtil.isDeserializerClass(schema, OrcSerde.class)) {
@@ -204,9 +206,11 @@ public class OrcPageSourceFactory
                 deleteDeltaLocations,
                 startRowOffsetOfFile,
                 indexes,
+                splitMetadata,
                 orcCacheStore,
                 orcCacheProperties,
-                domainCompactionThreshold));
+                domainCompactionThreshold,
+                session.isPageMetadataEnabled()));
     }
 
     public static OrcPageSource createOrcPageSource(
@@ -235,9 +239,11 @@ public class OrcPageSourceFactory
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
+            SplitMetadata splitMetadata,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
-            int domainCompactionThreshold)
+            int domainCompactionThreshold,
+            boolean pageMetadataEnabled)
     {
         for (HiveColumnHandle column : columns) {
             checkArgument(
@@ -387,9 +393,11 @@ public class OrcPageSourceFactory
                     INITIAL_BATCH_SIZE,
                     exception -> handleException(orcDataSource.getId(), exception),
                     indexes,
+                    splitMetadata,
                     domains,
                     orcCacheStore,
-                    orcCacheProperties);
+                    orcCacheProperties,
+                    pageMetadataEnabled);
 
             OrcDeletedRows deletedRows = new OrcDeletedRows(
                     path.getName(),

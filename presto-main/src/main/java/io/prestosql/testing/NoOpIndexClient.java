@@ -13,8 +13,10 @@
  */
 package io.prestosql.testing;
 
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,7 +39,35 @@ public class NoOpIndexClient
     }
 
     @Override
-    public void deleteIndex(String table, String[] columns, String indexType)
+    public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
+            throws IOException
+    {
+        throw new UnsupportedOperationException("This is a no-op index client");
+    }
+
+    @Override
+    public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
+            throws IOException
+    {
+        throw new UnsupportedOperationException("This is a no-op index client");
+    }
+
+    @Override
+    public void deleteIndex(String indexName)
+            throws IOException
+    {
+        throw new UnsupportedOperationException("This is a no-op index client");
+    }
+
+    @Override
+    public List<IndexRecord> getAllIndexRecords()
+            throws IOException
+    {
+        throw new UnsupportedOperationException("This is a no-op index client");
+    }
+
+    @Override
+    public IndexRecord getIndexRecord(String name)
             throws IOException
     {
         throw new UnsupportedOperationException("This is a no-op index client");

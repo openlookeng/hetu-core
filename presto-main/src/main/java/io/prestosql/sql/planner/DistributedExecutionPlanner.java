@@ -40,6 +40,7 @@ import io.prestosql.split.SplitSource;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -478,6 +479,12 @@ public class DistributedExecutionPlanner
             }
 
             return result.build();
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitCreateIndex(CreateIndexNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
         }
 
         @Override

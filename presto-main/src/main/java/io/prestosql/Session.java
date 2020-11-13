@@ -79,6 +79,7 @@ public final class Session
     private final Map<String, Map<String, String>> unprocessedCatalogProperties;
     private final SessionPropertyManager sessionPropertyManager;
     private final Map<String, String> preparedStatements;
+    private boolean pageMetadataEnabled;
 
     public Session(
             QueryId queryId,
@@ -103,7 +104,8 @@ public final class Session
             Map<CatalogName, Map<String, String>> connectorProperties,
             Map<String, Map<String, String>> unprocessedCatalogProperties,
             SessionPropertyManager sessionPropertyManager,
-            Map<String, String> preparedStatements)
+            Map<String, String> preparedStatements,
+            boolean pageMetadataEnabled)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.transactionId = requireNonNull(transactionId, "transactionId is null");
@@ -126,6 +128,7 @@ public final class Session
         this.systemProperties = ImmutableMap.copyOf(requireNonNull(systemProperties, "systemProperties is null"));
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.preparedStatements = requireNonNull(preparedStatements, "preparedStatements is null");
+        this.pageMetadataEnabled = pageMetadataEnabled;
 
         ImmutableMap.Builder<CatalogName, Map<String, String>> catalogPropertiesBuilder = ImmutableMap.builder();
         connectorProperties.entrySet().stream()
@@ -287,6 +290,16 @@ public final class Session
         return sql;
     }
 
+    public boolean isPageMetadataEnabled()
+    {
+        return pageMetadataEnabled;
+    }
+
+    public void setPageMetadataEnabled(boolean pageMetadataEnabled)
+    {
+        this.pageMetadataEnabled = pageMetadataEnabled;
+    }
+
     public Session beginTransactionId(TransactionId transactionId, TransactionManager transactionManager, AccessControl accessControl)
     {
         requireNonNull(transactionId, "transactionId is null");
@@ -370,7 +383,8 @@ public final class Session
                 connectorProperties.build(),
                 ImmutableMap.of(),
                 sessionPropertyManager,
-                preparedStatements);
+                preparedStatements,
+                pageMetadataEnabled);
     }
 
     public Session withDefaultProperties(Map<String, String> systemPropertyDefaults, Map<String, Map<String, String>> catalogPropertyDefaults)
@@ -421,7 +435,8 @@ public final class Session
                 ImmutableMap.of(),
                 connectorProperties,
                 sessionPropertyManager,
-                preparedStatements);
+                preparedStatements,
+                pageMetadataEnabled);
     }
 
     public ConnectorSession toConnectorSession()
@@ -482,7 +497,8 @@ public final class Session
                 connectorProperties,
                 unprocessedCatalogProperties,
                 identity.getRoles(),
-                preparedStatements);
+                preparedStatements,
+                pageMetadataEnabled);
     }
 
     @Override
@@ -546,6 +562,7 @@ public final class Session
         private final Map<String, Map<String, String>> catalogSessionProperties = new HashMap<>();
         private final SessionPropertyManager sessionPropertyManager;
         private final Map<String, String> preparedStatements = new HashMap<>();
+        private boolean pageMetadataEnabled;
 
         private SessionBuilder(SessionPropertyManager sessionPropertyManager)
         {
@@ -576,6 +593,7 @@ public final class Session
             this.systemProperties.putAll(session.systemProperties);
             this.catalogSessionProperties.putAll(session.unprocessedCatalogProperties);
             this.preparedStatements.putAll(session.preparedStatements);
+            this.pageMetadataEnabled = session.pageMetadataEnabled;
         }
 
         public SessionBuilder setQueryId(QueryId queryId)
@@ -714,6 +732,12 @@ public final class Session
             return this;
         }
 
+        public SessionBuilder setPageMetadataEnabled(boolean pageMetadataEnabled)
+        {
+            this.pageMetadataEnabled = pageMetadataEnabled;
+            return this;
+        }
+
         public Session build()
         {
             return new Session(
@@ -739,7 +763,8 @@ public final class Session
                     ImmutableMap.of(),
                     catalogSessionProperties,
                     sessionPropertyManager,
-                    preparedStatements);
+                    preparedStatements,
+                    pageMetadataEnabled);
         }
     }
 

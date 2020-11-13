@@ -98,7 +98,7 @@ public class PagesSerde
             slice = Slices.copyOf(slice);
         }
 
-        return new SerializedPage(slice, markers, page.getPositionCount(), uncompressedSize);
+        return new SerializedPage(slice, markers, page.getPositionCount(), uncompressedSize, page.getPageMetadata());
     }
 
     public Page deserialize(SerializedPage serializedPage)
@@ -137,6 +137,6 @@ public class PagesSerde
             slice = Slices.wrappedBuffer(decompressed);
         }
 
-        return readRawPage(serializedPage.getPositionCount(), slice.getInput(), blockEncodingSerde);
+        return readRawPage(serializedPage.getPositionCount(), serializedPage.getPageMetadata(), slice.getInput(), blockEncodingSerde);
     }
 }

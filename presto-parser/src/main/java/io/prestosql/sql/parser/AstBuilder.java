@@ -128,6 +128,7 @@ import io.prestosql.sql.tree.QueryBody;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.RenameColumn;
+import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
 import io.prestosql.sql.tree.RenameTable;
 import io.prestosql.sql.tree.ResetSession;
@@ -176,6 +177,7 @@ import io.prestosql.sql.tree.TryExpression;
 import io.prestosql.sql.tree.Union;
 import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
+import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Use;
 import io.prestosql.sql.tree.VacuumTable;
 import io.prestosql.sql.tree.Values;
@@ -375,6 +377,11 @@ class AstBuilder
         List<Identifier> columnAliases = ImmutableList.of();
         if (context.columnAliases() != null) {
             columnAliases = visit(context.columnAliases().identifier(), Identifier.class);
+            columnAliases.forEach(identifier -> {
+                if (identifier.getValue().contains("=")) {
+                    throw new IllegalArgumentException("Index can not be created on a partitioned column");
+                }
+            });
         }
         Optional<String> indexType = Optional.empty();
         if (context.indexType() != null) {
@@ -406,6 +413,26 @@ class AstBuilder
         else {
             return new ShowIndex(getLocation(context));
         }
+    }
+
+    @Override
+    public Node visitRenameIndex(SqlBaseParser.RenameIndexContext context)
+    {
+        return new RenameIndex(getLocation(context), getQualifiedName(context.from), getQualifiedName(context.to), context.EXISTS() != null);
+    }
+
+    @Override
+    public Node visitUpdateIndex(SqlBaseParser.UpdateIndexContext context)
+    {
+        List<Property> properties = ImmutableList.of();
+        if (context.properties() != null) {
+            properties = visit(context.properties().property(), Property.class);
+        }
+        return new UpdateIndex(
+                getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                context.EXISTS() != null,
+                properties);
     }
 
     @Override

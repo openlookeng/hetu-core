@@ -221,6 +221,46 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("Cannot delete from table %s%s", tableName, formatExtraInfo(extraInfo)));
     }
 
+    public static void denyCreateIndex(String indexName)
+    {
+        denyCreateIndex(indexName, null);
+    }
+
+    public static void denyCreateIndex(String indexName, String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot create index %s%s", indexName, formatExtraInfo(extraInfo)));
+    }
+
+    public static void denyDropIndex(String indexName)
+    {
+        denyDropIndex(indexName, null);
+    }
+
+    public static void denyDropIndex(String indexName, String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot drop index %s%s", indexName, formatExtraInfo(extraInfo)));
+    }
+
+    public static void denyRenameIndex(String indexName, String newIndexName)
+    {
+        denyRenameIndex(indexName, newIndexName, null);
+    }
+
+    public static void denyRenameIndex(String indexName, String newIndexName, String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot rename table from %s to %s%s", indexName, newIndexName, formatExtraInfo(extraInfo)));
+    }
+
+    public static void denyUpdateIndex(String indexName)
+    {
+        denyUpdateIndex(indexName, null);
+    }
+
+    public static void denyUpdateIndex(String indexName, String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot update table %s%s", indexName, formatExtraInfo(extraInfo)));
+    }
+
     public static void denyCreateView(String viewName)
     {
         denyCreateView(viewName, null);

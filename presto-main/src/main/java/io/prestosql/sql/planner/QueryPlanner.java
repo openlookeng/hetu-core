@@ -20,11 +20,13 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Field;
@@ -35,7 +37,9 @@ import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
+import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.LimitNode;
@@ -49,6 +53,7 @@ import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Cast;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FetchFirst;
@@ -63,24 +68,31 @@ import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.Offset;
 import io.prestosql.sql.tree.OrderBy;
+import io.prestosql.sql.tree.Property;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.SortItem;
+import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.Window;
 import io.prestosql.sql.tree.WindowFrame;
 import io.prestosql.type.TypeCoercion;
+import io.prestosql.utils.HeuristicIndexUtils;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -91,6 +103,8 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.isSkipRedundantSort;
+import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_DEFAULT;
+import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_PROP_KEY;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.sql.NodeUtils.getSortItemsFromOrderBy;
@@ -202,6 +216,7 @@ class QueryPlanner
         builder = offset(builder, node.getOffset());
         builder = limit(builder, node.getLimit(), orderingScheme);
         builder = project(builder, outputs);
+        builder = createIndex(builder, analysis.getOriginalStatement());
 
         return new RelationPlan(
                 builder.getRoot(),
@@ -573,6 +588,57 @@ class QueryPlanner
                 subPlan.getRoot(),
                 projections.build()),
                 analysis.getParameters());
+    }
+
+    /**
+     * CREATE INDEX statements are rewritten as SELECT statements,
+     * if the original statement was CREATE INDEX, create the necessary plan nodes
+     * to create the index
+     */
+    private PlanBuilder createIndex(PlanBuilder subPlan, Statement originalStatement)
+    {
+        if (!(originalStatement instanceof CreateIndex)) {
+            return subPlan;
+        }
+
+        // in order to create index, we need page metadata from the connector
+        session.setPageMetadataEnabled(true);
+
+        // rewrite sub queries
+        CreateIndex createIndex = (CreateIndex) originalStatement;
+        String tableName = MetadataUtil.createQualifiedObjectName(session, originalStatement, createIndex.getTableName()).toString();
+        List<String> partitions = new ArrayList<>();
+        if (createIndex.getExpression().isPresent()) {
+            partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
+        }
+
+        Iterator<Type> types = Arrays.stream(analysis.getRootScope().getRelationType().getAllFields()
+                .stream().map(Field::getType).toArray(Type[]::new)).iterator();
+
+        Properties indexProperties = new Properties();
+        CreateIndexMetadata.Level indexCreationLevel = LEVEL_DEFAULT;
+
+        for (Property property : createIndex.getProperties()) {
+            String key = property.getName().toString().replaceAll("\"", "");
+            String val = property.getValue().toString().replaceAll("\"", "").toUpperCase(Locale.ENGLISH);
+            if (key.equals(LEVEL_PROP_KEY)) {
+                indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
+                continue;
+            }
+            indexProperties.setProperty(key, val);
+        }
+
+        return subPlan.withNewRoot(new CreateIndexNode(
+                idAllocator.getNextId(),
+                ExchangeNode.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.REMOTE, subPlan.getRoot()),
+                new CreateIndexMetadata(createIndex.getIndexName().toString(),
+                        tableName,
+                        createIndex.getIndexType(),
+                        createIndex.getColumnAliases().stream().map(identifier -> new AbstractMap.SimpleEntry<>(identifier.toString(), types.next())).collect(Collectors.toList()),
+                        partitions,
+                        indexProperties,
+                        session.getUser(),
+                        indexCreationLevel)));
     }
 
     private Map<Symbol, Expression> coerce(Iterable<? extends Expression> expressions, PlanBuilder subPlan, TranslationMap translations)

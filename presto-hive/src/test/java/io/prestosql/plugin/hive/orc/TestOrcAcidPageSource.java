@@ -181,6 +181,7 @@ public class TestOrcAcidPageSource
                 deleteDeltaLocations,
                 Optional.empty(),
                 Optional.empty(),
+                null,
                 false).get();
 
         int nationKeyColumn = columnNames.indexOf("n_nationkey");

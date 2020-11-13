@@ -172,7 +172,8 @@ public class OrcSelectiveRecordReader
                 domains,
                 orcCacheStore,
                 orcCacheProperties,
-                orDomains);
+                orDomains,
+                false);
 
         int fieldCount = orcTypes.get(OrcColumnId.ROOT_COLUMN).getFieldCount();
         this.columnReaderOrder = new ArrayList<>(fieldCount);

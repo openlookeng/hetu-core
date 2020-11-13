@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
@@ -89,7 +90,8 @@ final class CacheTableRewrite
             Statement node,
             List<Expression> parameters,
             AccessControl accessControl,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         return (Statement) new Visitor(session, parser, metadata, node, queryExplainer, parameters, accessControl, warningCollector).process(node, null);
     }

@@ -19,6 +19,7 @@ import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.filesystem.SupportedFileAttributes;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,7 +29,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -127,7 +127,7 @@ public class IndexRecordManager
      * Add IndexRecord into record file. If the method is called with a name that already exists,
      * it will OVERWRITE the existing entry but combine the note part
      */
-    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, String... partitions)
+    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> partitions)
             throws IOException
     {
         // Protect root directory
@@ -136,15 +136,14 @@ public class IndexRecordManager
             lock.lock();
             List<IndexRecord> records = getIndexRecords();
             Iterator<IndexRecord> iterator = records.iterator();
-            List<String> partitionsToWrite = new LinkedList<>(Arrays.asList(partitions));
             while (iterator.hasNext()) {
                 IndexRecord record = iterator.next();
                 if (name.equals(record.name)) {
-                    partitionsToWrite.addAll(0, record.partitions);
+                    partitions.addAll(0, record.partitions);
                     iterator.remove();
                 }
             }
-            records.add(new IndexRecord(name, user, table, columns, indexType, partitionsToWrite));
+            records.add(new IndexRecord(name, user, table, columns, indexType, partitions));
             writeIndexRecords(records);
         }
         finally {

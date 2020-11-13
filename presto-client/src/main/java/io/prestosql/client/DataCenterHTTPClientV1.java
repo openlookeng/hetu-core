@@ -437,7 +437,12 @@ public class DataCenterHTTPClientV1
             if (response.getStatusCode() != HTTP_UNAVAILABLE) {
                 state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
                 log.error("response.getStatusCode=%s", response.getStatusCode());
-                throw new RuntimeException("fetching next result: " + response.toString());
+                if (response.getException() != null) {
+                    throw new RuntimeException("fetching next result: " + response.toString(), response.getException());
+                }
+                else {
+                    throw new RuntimeException("fetching next result: " + response.toString());
+                }
             }
         }
     }

@@ -309,6 +309,26 @@ public class FileBasedAccessControl
     {
     }
 
+    @Override
+    public void checkCanCreateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+    }
+
+    @Override
+    public void checkCanDropIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+    }
+
+    @Override
+    public void checkCanRenameIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName, SchemaTableName newIndexName)
+    {
+    }
+
+    @Override
+    public void checkCanUpdateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+    }
+
     private boolean canSetSessionProperty(ConnectorIdentity identity, String property)
     {
         for (SessionPropertyAccessControlRule rule : sessionPropertyRules) {

@@ -104,6 +104,26 @@ public class FileBasedSystemAccessControl
     }
 
     @Override
+    public void checkCanCreateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
+    public void checkCanDropIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
+    public void checkCanRenameIndex(Identity identity, CatalogSchemaTableName index, CatalogSchemaTableName indexNew)
+    {
+    }
+
+    @Override
+    public void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
     public void checkCanSetUser(Optional<Principal> principal, String userName)
     {
         requireNonNull(principal, "principal is null");

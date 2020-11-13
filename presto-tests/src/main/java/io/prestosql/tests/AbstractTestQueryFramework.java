@@ -25,6 +25,7 @@ import io.prestosql.cost.TaskCountEstimator;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.type.Type;
@@ -370,7 +371,8 @@ public abstract class AbstractTestQueryFramework
                 sqlParser,
                 queryRunner.getStatsCalculator(),
                 costCalculator,
-                ImmutableMap.of());
+                ImmutableMap.of(),
+                new HeuristicIndexerManager(null));
     }
 
     protected static void skipTestUnless(boolean requirement)

@@ -35,6 +35,7 @@ import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -229,6 +230,13 @@ public class UnaliasSymbolReferences
         public PlanNode visitTableScan(TableScanNode node, RewriteContext<Void> context)
         {
             return node;
+        }
+
+        @Override
+        public PlanNode visitCreateIndex(CreateIndexNode node, RewriteContext<Void> context)
+        {
+            return new CreateIndexNode(node.getId(), context.rewrite(node.getSource()),
+                    node.getCreateIndexMetadata());
         }
 
         @Override

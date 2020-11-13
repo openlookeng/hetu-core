@@ -32,6 +32,7 @@ import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
@@ -153,6 +154,8 @@ public class HivePageSourceProvider
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
+        SplitMetadata splitMetadata = new SplitMetadata(hiveSplit.getPath(), hiveSplit.getLastModifiedTime());
+
         /**
          * This is main logical division point to process filter pushdown enabled case (aka as selective read flow).
          * If user configuration orc_predicate_pushdown_enabled is true and if all clause of query can be handled by hive
@@ -195,6 +198,7 @@ public class HivePageSourceProvider
                 hiveSplit.getDeleteDeltaLocations(),
                 hiveSplit.getStartRowOffsetOfFile(),
                 indexOptional,
+                splitMetadata,
                 hiveSplit.isCacheable());
         if (pageSource.isPresent()) {
             return pageSource.get();
@@ -356,6 +360,7 @@ public class HivePageSourceProvider
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
+            SplitMetadata splitMetadata,
             boolean splitCacheable)
     {
         List<ColumnMapping> columnMappings = ColumnMapping.buildColumnMappings(
@@ -387,6 +392,7 @@ public class HivePageSourceProvider
                     deleteDeltaLocations,
                     startRowOffsetOfFile,
                     indexes,
+                    splitMetadata,
                     splitCacheable);
             if (pageSource.isPresent()) {
                 return Optional.of(

@@ -16,26 +16,21 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.hetu.core.heuristicindex.filter.HeuristicIndexFilter;
-import io.hetu.core.heuristicindex.util.IndexConstants;
-import io.hetu.core.heuristicindex.util.IndexServiceUtils;
-import io.hetu.core.plugin.heuristicindex.datasource.base.EmptyDataSource;
-import io.hetu.core.plugin.heuristicindex.datasource.hive.HiveDataSource;
-import io.hetu.core.plugin.heuristicindex.index.bitmap.BitMapIndex;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
 import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
+import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
-import io.prestosql.spi.heuristicindex.DataSource;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.prestosql.spi.heuristicindex.IndexWriter;
 
 import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -53,49 +48,42 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexFactory
         implements IndexFactory
 {
-    private static final Logger LOG = LoggerFactory.getLogger(HeuristicIndexFactory.class);
-
-    // Add new Index and DataSources here in the future
-    private final Set<Index> supportedIndex = ImmutableSet.of(new BloomIndex(), new MinMaxIndex(), new BitMapIndex());
-    private final Set<DataSource> supportedDataSource = ImmutableSet.of(new EmptyDataSource(), new HiveDataSource());
+    private static final Logger LOG = Logger.get(HeuristicIndexFactory.class);
+    private final Set<String> supportedConnector = ImmutableSet.of("hive");
 
     public HeuristicIndexFactory()
     {
     }
 
-    @Override
-    public HeuristicIndexWriter getIndexWriter(Properties dataSourceProps, Properties indexProps, HetuFileSystemClient fs, Path root)
+    public static Index createIndex(String indexType)
     {
-        LOG.debug("dataSourceProps: {}", dataSourceProps);
-        LOG.debug("indexProps: {}", indexProps);
-
-        // Load DataSource
-        String dataSourceName = dataSourceProps.getProperty(IndexConstants.DATASTORE_TYPE_KEY);
-        requireNonNull(dataSourceName, "No datasource found");
-        DataSource dataSource = null;
-        for (DataSource ds : supportedDataSource) {
-            if (dataSourceName.equalsIgnoreCase(ds.getId())) {
-                dataSource = ds;
-                break;
-            }
+        switch (indexType.toUpperCase(Locale.ENGLISH)) {
+            case BloomIndex.ID:
+                return new BloomIndex();
+            case MinMaxIndex.ID:
+                return new MinMaxIndex();
+            default:
+                throw new IllegalArgumentException("Index type " + indexType + " not supported.");
         }
+    }
 
-        if (dataSource == null) {
-            throw new IllegalArgumentException("DataSource not supported: " + dataSourceName);
+    @Override
+    public IndexWriter getIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root)
+    {
+        LOG.debug("Creating index writer for catalogName: %s", connectorMetadata.getProperty(HetuConstant.DATASOURCE_CATALOG));
+
+        Properties indexProps = createIndexMetadata.getProperties();
+        LOG.debug("indexProps: %s", indexProps);
+
+        String indexType = createIndexMetadata.getIndexType();
+
+        switch (indexType.toUpperCase(Locale.ENGLISH)) {
+            case BloomIndex.ID:
+            case MinMaxIndex.ID:
+                return new FileIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
+            default:
+                throw new IllegalArgumentException(indexType + " has no supported index writer");
         }
-
-        LOG.debug("Using DataSource: {}", dataSource);
-        dataSource.setProperties(dataSourceProps);
-
-        // Load Index
-        Set<Index> indices = new HashSet<>(supportedIndex);
-        for (Index index : indices) {
-            LOG.debug("Using Index: {}", index);
-            index.setProperties(IndexServiceUtils.getPropertiesSubset(
-                    indexProps, index.getId().toLowerCase(Locale.ENGLISH) + "."));
-        }
-
-        return new HeuristicIndexWriter(dataSource, indices, fs, root);
     }
 
     @Override
@@ -103,14 +91,20 @@ public class HeuristicIndexFactory
     {
         requireNonNull(root, "No root path specified");
 
-        LOG.debug("Creating IndexClient with given filesystem client with root path {}", root);
+        LOG.debug("Creating IndexClient with given filesystem client with root path %s", root);
 
-        return new HeuristicIndexClient(new HashSet<>(supportedIndex), fs, root);
+        return new HeuristicIndexClient(fs, root);
     }
 
     @Override
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         return new HeuristicIndexFilter(indices);
+    }
+
+    @Override
+    public Set<String> getSupportedConnector()
+    {
+        return supportedConnector;
     }
 }

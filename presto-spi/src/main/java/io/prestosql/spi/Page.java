@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.airlift.slice.SizeOf.sizeOf;
@@ -42,9 +43,16 @@ public class Page
     private final AtomicLong retainedSizeInBytes = new AtomicLong(-1);
     private final AtomicLong logicalSizeInBytes = new AtomicLong(-1);
 
+    private Properties pageMetadata = new Properties();
+
     public Page(Block... blocks)
     {
         this(determinePositionCount(blocks), blocks);
+    }
+
+    public Page(Properties pageMetadata, Block... blocks)
+    {
+        this(determinePositionCount(blocks), pageMetadata, blocks);
     }
 
     public Page(int positionCount, Block... blocks)
@@ -52,6 +60,14 @@ public class Page
         requireNonNull(blocks, "blocks is null");
         this.blocks = Arrays.copyOf(blocks, blocks.length);
         this.positionCount = positionCount;
+    }
+
+    public Page(int positionCount, Properties pageMetadata, Block... blocks)
+    {
+        requireNonNull(blocks, "blocks is null");
+        this.blocks = Arrays.copyOf(blocks, blocks.length);
+        this.positionCount = positionCount;
+        this.pageMetadata = pageMetadata;
     }
 
     public int getChannelCount()
@@ -268,7 +284,7 @@ public class Page
             return this;
         }
 
-        return new Page(loadedBlocks);
+        return new Page(this.pageMetadata, loadedBlocks);
     }
 
     @Override
@@ -343,5 +359,15 @@ public class Page
         {
             return indexes;
         }
+    }
+
+    public Properties getPageMetadata()
+    {
+        return pageMetadata;
+    }
+
+    public void setPageMetadata(String key, String value)
+    {
+        pageMetadata.setProperty(key, value);
     }
 }

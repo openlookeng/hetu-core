@@ -25,6 +25,7 @@ import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager.SessionPropertyValue;
@@ -39,6 +40,7 @@ import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.SqlFunction;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.spi.service.PropertyService;
@@ -71,6 +73,7 @@ import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
+import io.prestosql.sql.tree.ShowIndex;
 import io.prestosql.sql.tree.ShowRoleGrants;
 import io.prestosql.sql.tree.ShowRoles;
 import io.prestosql.sql.tree.ShowSchemas;
@@ -82,6 +85,7 @@ import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.TableElement;
 import io.prestosql.sql.tree.Values;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -141,6 +145,8 @@ import static java.util.stream.Collectors.toList;
 final class ShowQueriesRewrite
         implements StatementRewrite.Rewrite
 {
+    private static final int COL_MAX_LENGTH = 70;
+
     @Override
     public Statement rewrite(
             Session session,
@@ -150,9 +156,10 @@ final class ShowQueriesRewrite
             Statement node,
             List<Expression> parameters,
             AccessControl accessControl,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
-        return (Statement) new Visitor(metadata, parser, session, parameters, accessControl).process(node, null);
+        return (Statement) new Visitor(metadata, parser, session, parameters, accessControl, heuristicIndexerManager).process(node, null);
     }
 
     private static class Visitor
@@ -163,14 +170,16 @@ final class ShowQueriesRewrite
         private final SqlParser sqlParser;
         private final List<Expression> parameters;
         private final AccessControl accessControl;
+        private final HeuristicIndexerManager heuristicIndexerManager;
 
-        public Visitor(Metadata metadata, SqlParser sqlParser, Session session, List<Expression> parameters, AccessControl accessControl)
+        public Visitor(Metadata metadata, SqlParser sqlParser, Session session, List<Expression> parameters, AccessControl accessControl, HeuristicIndexerManager heuristicIndexerManager)
         {
             this.metadata = requireNonNull(metadata, "metadata is null");
             this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
             this.session = requireNonNull(session, "session is null");
             this.parameters = requireNonNull(parameters, "parameters is null");
             this.accessControl = requireNonNull(accessControl, "accessControl is null");
+            this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         }
 
         @Override
@@ -630,6 +639,62 @@ final class ShowQueriesRewrite
         }
 
         @Override
+        protected Node visitShowIndex(ShowIndex node, Void context)
+        {
+            List<IndexRecord> indexRecords = null;
+            try {
+                indexRecords = readIndexRecords(node.getIndexName());
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            ImmutableList.Builder<Expression> rows = ImmutableList.builder();
+            for (IndexRecord v : indexRecords) {
+                String partitions = (v.partitions == null || v.partitions.isEmpty()) ? "all" : String.join(",", v.partitions);
+                StringBuilder partitionsStrToDisplay = new StringBuilder();
+                for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
+                    partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
+                    if (i + COL_MAX_LENGTH < partitions.length()) {
+                        // have next line
+                        partitionsStrToDisplay.append("\n");
+                    }
+                }
+
+                rows.add(row(
+                        new StringLiteral(v.name),
+                        new StringLiteral(v.user),
+                        new StringLiteral(v.table),
+                        new StringLiteral(String.join(",", v.columns)),
+                        new StringLiteral(v.indexType),
+                        new StringLiteral(partitionsStrToDisplay.toString()),
+                        new StringLiteral(""),
+                        TRUE_LITERAL));
+            }
+
+            //bogus row to support empty index
+            rows.add(row(new StringLiteral(""), new StringLiteral(""), new StringLiteral(""),
+                    new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
+
+            ImmutableList<Expression> expressions = rows.build();
+            return simpleQuery(
+                    selectList(
+                            aliasedName("index_name", "Index Name"),
+                            aliasedName("user", "User"),
+                            aliasedName("table_name", "Table Name"),
+                            aliasedName("index_columns", "Index Columns"),
+                            aliasedName("index_type", "Index Type"),
+                            aliasedName("partitions", "Partitions"),
+                            aliasedName("index_props", "IndexProps")),
+                    aliased(
+                            new Values(expressions),
+                            "Index Result",
+                            ImmutableList.of("index_name", "user", "table_name", "index_columns", "index_type", "partitions", "index_props", "include")),
+                    identifier("include"),
+                    ordering(ascending("index_name")));
+        }
+
+        @Override
         protected Node visitShowSession(ShowSession node, Void context)
         {
             ImmutableList.Builder<Expression> rows = ImmutableList.builder();
@@ -688,6 +753,22 @@ final class ShowQueriesRewrite
         protected Node visitNode(Node node, Void context)
         {
             return node;
+        }
+
+        private List<IndexRecord> readIndexRecords(String indexName)
+                throws IOException
+        {
+            if (indexName == null || indexName.equals(Optional.empty().toString())) {
+                return heuristicIndexerManager.getIndexClient().getAllIndexRecords();
+            }
+            else {
+                List<IndexRecord> records = Collections.singletonList(
+                        heuristicIndexerManager.getIndexClient().getIndexRecord(indexName));
+                if (records.get(0) == null) {
+                    return Collections.emptyList();
+                }
+                return records;
+            }
         }
     }
 }

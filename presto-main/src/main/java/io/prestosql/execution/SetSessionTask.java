@@ -16,6 +16,7 @@ package io.prestosql.execution;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
 import io.prestosql.connector.CatalogName;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
@@ -46,7 +47,7 @@ public class SetSessionTask
     }
 
     @Override
-    public ListenableFuture<?> execute(SetSession statement, TransactionManager transactionManager, Metadata metadata, AccessControl accessControl, QueryStateMachine stateMachine, List<Expression> parameters)
+    public ListenableFuture<?> execute(SetSession statement, TransactionManager transactionManager, Metadata metadata, AccessControl accessControl, QueryStateMachine stateMachine, List<Expression> parameters, HeuristicIndexerManager heuristicIndexerManager)
     {
         Session session = stateMachine.getSession();
         QualifiedName propertyName = statement.getName();

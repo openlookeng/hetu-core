@@ -28,18 +28,21 @@ import static io.prestosql.spi.security.AccessDeniedException.denyAccessNodeInfo
 import static io.prestosql.spi.security.AccessDeniedException.denyAddColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.prestosql.spi.security.AccessDeniedException.denyCommentTable;
+import static io.prestosql.spi.security.AccessDeniedException.denyCreateIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyCreateSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyCreateTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyCreateView;
 import static io.prestosql.spi.security.AccessDeniedException.denyCreateViewWithSelect;
 import static io.prestosql.spi.security.AccessDeniedException.denyDeleteTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropColumn;
+import static io.prestosql.spi.security.AccessDeniedException.denyDropIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropView;
 import static io.prestosql.spi.security.AccessDeniedException.denyGrantTablePrivilege;
 import static io.prestosql.spi.security.AccessDeniedException.denyInsertTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameColumn;
+import static io.prestosql.spi.security.AccessDeniedException.denyRenameIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
@@ -314,6 +317,43 @@ public interface SystemAccessControl
     {
         denyDeleteTable(table.toString());
     }
+
+    /**
+     * Check if identity is allowed to create the specified index in a catalog.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanCreateIndex(Identity identity, CatalogSchemaTableName index)
+    {
+        denyCreateIndex(index.toString());
+    }
+
+    /**
+     * Check if identity is allowed to drop the specified index in a catalog.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanDropIndex(Identity identity, CatalogSchemaTableName index)
+    {
+        denyDropIndex(index.toString());
+    }
+
+    /**
+     * Check if identity is allowed to rename the specified index in a catalog.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanRenameIndex(Identity identity, CatalogSchemaTableName index, CatalogSchemaTableName newIndex)
+    {
+        denyRenameIndex(index.toString(), newIndex.toString());
+    }
+
+    /**
+     * Check if identity is allowed to update the specified index
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index) {}
 
     /**
      * Check if identity is allowed to create the specified view in a catalog.

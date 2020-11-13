@@ -2666,7 +2666,8 @@ public abstract class AbstractTestQueries
                         .put("connector_long", "11")
                         .build()),
                 getQueryRunner().getMetadata().getSessionPropertyManager(),
-                getSession().getPreparedStatements());
+                getSession().getPreparedStatements(),
+                getSession().isPageMetadataEnabled());
         MaterializedResult result = computeActual(session, "SHOW SESSION");
 
         ImmutableMap<String, MaterializedRow> properties = Maps.uniqueIndex(result.getMaterializedRows(), input -> {

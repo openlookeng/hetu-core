@@ -173,4 +173,16 @@ public class FullConnectorSession
     {
         return SystemSessionProperties.isHeuristicIndexFilterEnabled(session);
     }
+
+    @Override
+    public boolean isPageMetadataEnabled()
+    {
+        return session.isPageMetadataEnabled();
+    }
+
+    @Override
+    public void setPageMetadataEnabled(boolean pageMetadataEnabled)
+    {
+        session.setPageMetadataEnabled(pageMetadataEnabled);
+    }
 }

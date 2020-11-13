@@ -252,6 +252,30 @@ public abstract class ForwardingConnectorAccessControl
     }
 
     @Override
+    public void checkCanCreateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+        delegate().checkCanCreateIndex(transactionHandle, identity, indexName);
+    }
+
+    @Override
+    public void checkCanDropIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+        delegate().checkCanDropIndex(transactionHandle, identity, indexName);
+    }
+
+    @Override
+    public void checkCanRenameIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName, SchemaTableName newIndexName)
+    {
+        delegate().checkCanRenameIndex(transactionHandle, identity, indexName, newIndexName);
+    }
+
+    @Override
+    public void checkCanUpdateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+        delegate().checkCanUpdateIndex(transactionHandle, identity, indexName);
+    }
+
+    @Override
     public String applyRowlevelFiltering(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
     {
         return null;

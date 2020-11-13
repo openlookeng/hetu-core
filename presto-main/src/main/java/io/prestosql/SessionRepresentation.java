@@ -62,6 +62,7 @@ public final class SessionRepresentation
     private final Map<String, Map<String, String>> unprocessedCatalogProperties;
     private final Map<String, SelectedRole> roles;
     private final Map<String, String> preparedStatements;
+    private final boolean pageMetadataEnabled;
 
     @JsonCreator
     public SessionRepresentation(
@@ -88,7 +89,8 @@ public final class SessionRepresentation
             @JsonProperty("catalogProperties") Map<CatalogName, Map<String, String>> catalogProperties,
             @JsonProperty("unprocessedCatalogProperties") Map<String, Map<String, String>> unprocessedCatalogProperties,
             @JsonProperty("roles") Map<String, SelectedRole> roles,
-            @JsonProperty("preparedStatements") Map<String, String> preparedStatements)
+            @JsonProperty("preparedStatements") Map<String, String> preparedStatements,
+            @JsonProperty("pageMetadataEnabled") boolean pageMetadataEnabled)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.transactionId = requireNonNull(transactionId, "transactionId is null");
@@ -112,6 +114,7 @@ public final class SessionRepresentation
         this.systemProperties = ImmutableMap.copyOf(systemProperties);
         this.roles = ImmutableMap.copyOf(roles);
         this.preparedStatements = ImmutableMap.copyOf(preparedStatements);
+        this.pageMetadataEnabled = pageMetadataEnabled;
 
         ImmutableMap.Builder<CatalogName, Map<String, String>> catalogPropertiesBuilder = ImmutableMap.builder();
         for (Entry<CatalogName, Map<String, String>> entry : catalogProperties.entrySet()) {
@@ -270,6 +273,12 @@ public final class SessionRepresentation
         return preparedStatements;
     }
 
+    @JsonProperty
+    public boolean getPageMetadataEnabled()
+    {
+        return pageMetadataEnabled;
+    }
+
     public Session toSession(SessionPropertyManager sessionPropertyManager)
     {
         return toSession(sessionPropertyManager, emptyMap());
@@ -300,6 +309,7 @@ public final class SessionRepresentation
                 catalogProperties,
                 unprocessedCatalogProperties,
                 sessionPropertyManager,
-                preparedStatements);
+                preparedStatements,
+                pageMetadataEnabled);
     }
 }

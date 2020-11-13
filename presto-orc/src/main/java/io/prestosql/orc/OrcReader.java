@@ -31,6 +31,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
 import org.joda.time.DateTimeZone;
@@ -174,9 +175,11 @@ public class OrcReader
                 initialBatchSize,
                 exceptionTransform,
                 Optional.empty(),
+                null,
                 Collections.emptyMap(),
                 OrcCacheStore.CACHE_NOTHING,
-                new OrcCacheProperties());
+                new OrcCacheProperties(),
+                false);
     }
 
     public OrcRecordReader createRecordReader(
@@ -217,9 +220,11 @@ public class OrcReader
                 initialBatchSize,
                 exceptionTransform,
                 Optional.empty(),
+                null,
                 Collections.emptyMap(),
                 OrcCacheStore.CACHE_NOTHING,
-                new OrcCacheProperties());
+                new OrcCacheProperties(),
+                false);
     }
 
     public OrcRecordReader createRecordReader(
@@ -245,9 +250,11 @@ public class OrcReader
                 initialBatchSize,
                 exceptionTransform,
                 Optional.empty(),
+                null,
                 Collections.emptyMap(),
                 orcCacheStore,
-                orcCacheProperties);
+                orcCacheProperties,
+                false);
     }
 
     public OrcRecordReader createRecordReader(
@@ -261,9 +268,11 @@ public class OrcReader
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform,
             Optional<List<IndexMetadata>> indexes,
+            SplitMetadata splitMetadata,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
-            OrcCacheProperties orcCacheProperties)
+            OrcCacheProperties orcCacheProperties,
+            boolean pageMetadataEnabled)
             throws OrcCorruptionException
     {
         return new OrcRecordReader(
@@ -292,9 +301,11 @@ public class OrcReader
                 initialBatchSize,
                 exceptionTransform,
                 indexes,
+                splitMetadata,
                 domains,
                 orcCacheStore,
-                orcCacheProperties);
+                orcCacheProperties,
+                pageMetadataEnabled);
     }
 
     public OrcSelectiveRecordReader createSelectiveRecordReader(

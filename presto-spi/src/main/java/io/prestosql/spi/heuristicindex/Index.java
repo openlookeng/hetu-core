@@ -19,16 +19,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 /**
  * Interface implemented by all types of indexes (ie, Bloom, minmax etc)
  *
- * @param <T> Type to be indexed on
  * @since 2019-08-18
  */
-public interface Index<T>
+public interface Index
 {
     /**
      * Gets the id of the IndexStore.
@@ -46,7 +46,7 @@ public interface Index<T>
      * @param values a map of columnName-columnValues
      * @return whether the values are successfully added
      */
-    boolean addValues(Map<String, Object[]> values);
+    boolean addValues(Map<String, List<Object>> values);
 
     /**
      * The Index will apply the provided Expression but only return a

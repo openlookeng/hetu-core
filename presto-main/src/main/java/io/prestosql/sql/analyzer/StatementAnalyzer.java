@@ -25,7 +25,9 @@ import io.prestosql.SystemSessionProperties;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableHandle;
@@ -40,6 +42,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.security.AccessDeniedException;
@@ -65,6 +68,7 @@ import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
@@ -76,6 +80,7 @@ import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
 import io.prestosql.sql.tree.DropView;
@@ -147,12 +152,17 @@ import io.prestosql.sql.tree.With;
 import io.prestosql.sql.tree.WithQuery;
 import io.prestosql.sql.util.AstUtils;
 import io.prestosql.type.TypeCoercion;
+import io.prestosql.utils.HeuristicIndexUtils;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -194,6 +204,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.COLUMN_TYPE_UNKNOWN;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_COLUMN_NAME;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_PROPERTY;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_RELATION;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.INDEX_ALREADY_EXISTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_FETCH_FIRST_ROW_COUNT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_LIMIT_ROW_COUNT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_OFFSET_ROW_COUNT;
@@ -248,6 +259,7 @@ class StatementAnalyzer
     private final SqlParser sqlParser;
     private final AccessControl accessControl;
     private final WarningCollector warningCollector;
+    private HeuristicIndexerManager heuristicIndexerManager;
 
     public StatementAnalyzer(
             Analysis analysis,
@@ -264,6 +276,19 @@ class StatementAnalyzer
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.session = requireNonNull(session, "session is null");
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+    }
+
+    public StatementAnalyzer(
+            Analysis analysis,
+            Metadata metadata,
+            SqlParser sqlParser,
+            AccessControl accessControl,
+            Session session,
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
+    {
+        this(analysis, metadata, sqlParser, accessControl, session, warningCollector);
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
     public Scope analyze(Node node, Scope outerQueryScope)
@@ -770,6 +795,12 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitDropIndex(DropIndex node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
         protected Scope visitComment(Comment node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
@@ -995,6 +1026,47 @@ class StatementAnalyzer
         @Override
         protected Scope visitTable(Table table, Optional<Scope> scope)
         {
+            if (analysis.getOriginalStatement() instanceof CreateIndex) {
+                // check index parameters validate
+                CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
+                QualifiedObjectName tableFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getTableName());
+                String tableName = tableFullName.toString();
+                // check catalog validate
+                if (!heuristicIndexerManager.getSupportedCatalog().contains(tableFullName.getCatalogName())) {
+                    throw new SemanticException(NOT_SUPPORTED, createIndex,
+                            "CREATE INDEX is not supported in '%s' connector",
+                            tableFullName.getCatalogName());
+                }
+                List<String> partitions = new ArrayList<>();
+                if (createIndex.getExpression().isPresent()) {
+                    partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
+                    // check partitions validate
+                }
+                List<Map.Entry<String, Type>> indexColumns = new LinkedList<>();
+                for (Identifier i : createIndex.getColumnAliases()) {
+                    indexColumns.add(new AbstractMap.SimpleEntry<>(i.toString(), BIGINT));
+                }
+                try {
+                    boolean indexExist = heuristicIndexerManager.getIndexClient().indexRecordExists(new CreateIndexMetadata(
+                            createIndex.getIndexName().toString(),
+                            tableName,
+                            createIndex.getIndexType(),
+                            indexColumns,
+                            partitions,
+                            null,
+                            session.getUser(),
+                            null));
+                    if (indexExist) {
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                "Index '%s' already exist, or Index with same (table,column,indexType) already exists, or partitions contain conflicts",
+                                createIndex.getIndexName().toString());
+                    }
+                }
+                catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
             if (!table.getName().getPrefix().isPresent()) {
                 // is this a reference to a WITH query?
                 String name = table.getName().getSuffix();

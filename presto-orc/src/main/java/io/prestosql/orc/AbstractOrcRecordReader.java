@@ -98,6 +98,9 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     protected int currentBatchSize;
     protected int nextBatchSize;
     protected int maxBatchSize = MAX_BATCH_SIZE;
+    protected boolean currentStripeFinished;
+
+    protected boolean pageMetadataEnabled;
 
     protected final List<StripeInformation> stripes;
     private final StripeReader stripeReader;
@@ -156,7 +159,8 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
-            Map<String, List<Domain>> orDomains)
+            Map<String, List<Domain>> orDomains,
+            boolean pageMetadataEnabled)
             throws OrcCorruptionException
     {
         requireNonNull(readColumns, "readColumns is null");
@@ -183,6 +187,8 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         this.blockFactory = new OrcBlockFactory(exceptionTransform, true);
 
         this.maxBlockBytes = requireNonNull(maxBlockSize, "maxBlockSize is null").toBytes();
+
+        this.pageMetadataEnabled = pageMetadataEnabled;
 
         // it is possible that old versions of orc use 0 to mean there are no row groups
         checkArgument(rowsInRowGroup > 0, "rowsInRowGroup must be greater than zero");
@@ -559,6 +565,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     protected int prepareNextBatch()
             throws IOException
     {
+        currentStripeFinished = false;
         // update position for current row group (advancing resets them)
         filePosition += currentBatchSize;
         currentPosition += currentBatchSize;
@@ -585,7 +592,18 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         currentBatchSize = toIntExact(min(nextBatchSize, maxBatchSize));
         nextBatchSize = min(currentBatchSize * BATCH_SIZE_GROWTH_FACTOR, MAX_BATCH_SIZE);
         currentBatchSize = toIntExact(min(currentBatchSize, currentGroupRowCount - nextRowInGroup));
+
+        // row groups read finished, so going to next stripe
+        if (!rowGroups.hasNext()) {
+            currentStripeFinished = true;
+        }
+
         return currentBatchSize;
+    }
+
+    protected Boolean isCurrentStripeFinished()
+    {
+        return currentStripeFinished;
     }
 
     private void advanceToNextStripe()

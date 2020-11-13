@@ -15,6 +15,8 @@ package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
@@ -112,6 +114,7 @@ public class TestSetPathTask
                 metadata,
                 accessControl,
                 stateMachine,
-                emptyList()));
+                emptyList(),
+                new HeuristicIndexerManager(new FileSystemClientManager())));
     }
 }

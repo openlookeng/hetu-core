@@ -79,4 +79,25 @@ public interface ConnectorSession
     {
         return true;
     }
+
+    /**
+     * If enabled and supported by the connector, Pages read by the connector will include metadata about the Page.
+     * For example, the Hive connector could include info such as the ORC filepath which the Page
+     * was read from.
+     * @return
+     */
+    default boolean isPageMetadataEnabled()
+    {
+        return false;
+    }
+
+    /**
+     * If enabled and supported by the connector, Pages read by the connector will include metadata about the Page.
+     * For example, the Hive connector could include info such as the ORC filepath which the Page
+     * was read from.
+     * @return
+     */
+    default void setPageMetadataEnabled(boolean enabled)
+    {
+    }
 }

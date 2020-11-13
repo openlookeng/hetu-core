@@ -21,11 +21,16 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockEncodingSerde;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Iterator;
+import java.util.Properties;
 
 import static io.hetu.core.transport.block.BlockSerdeUtil.readBlock;
 import static io.hetu.core.transport.block.BlockSerdeUtil.writeBlock;
 import static java.lang.Math.toIntExact;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
@@ -54,6 +59,17 @@ public class PagesSerdeUtil
         return new Page(positionCount, blocks);
     }
 
+    static Page readRawPage(int positionCount, Properties pageMetadata, SliceInput input, BlockEncodingSerde blockEncodingSerde)
+    {
+        int numberOfBlocks = input.readInt();
+        Block[] blocks = new Block[numberOfBlocks];
+        for (int i = 0; i < blocks.length; i++) {
+            blocks[i] = readBlock(blockEncodingSerde, input);
+        }
+
+        return new Page(positionCount, pageMetadata, blocks);
+    }
+
     public static void writeSerializedPage(SliceOutput output, SerializedPage page)
     {
         output.writeInt(page.getPositionCount());
@@ -61,6 +77,19 @@ public class PagesSerdeUtil
         output.writeInt(page.getUncompressedSizeInBytes());
         output.writeInt(page.getSizeInBytes());
         output.writeBytes(page.getSlice());
+
+        if (page.getPageMetadata().size() != 0) {
+            String pageProperties = page.getPageMetadata().toString();
+            byte[] propertiesByte = pageProperties
+                    .replaceAll(",", System.lineSeparator())
+                    .substring(1, pageProperties.length() - 1)
+                    .getBytes(UTF_8);
+            output.writeInt(propertiesByte.length);
+            output.writeBytes(propertiesByte);
+        }
+        else {
+            output.writeInt(0);
+        }
     }
 
     private static SerializedPage readSerializedPage(SliceInput sliceInput)
@@ -70,6 +99,21 @@ public class PagesSerdeUtil
         int uncompressedSizeInBytes = sliceInput.readInt();
         int sizeInBytes = sliceInput.readInt();
         Slice slice = sliceInput.readSlice(toIntExact((sizeInBytes)));
+
+        int propertiesLength = sliceInput.readInt();
+        if (propertiesLength != 0) {
+            byte[] pageMetadataBytes = new byte[propertiesLength];
+            sliceInput.readBytes(pageMetadataBytes);
+            Properties pros = new Properties();
+            try {
+                pros.load(new ByteArrayInputStream(pageMetadataBytes));
+                return new SerializedPage(slice, markers, positionCount, uncompressedSizeInBytes, pros);
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
         return new SerializedPage(slice, markers, positionCount, uncompressedSizeInBytes);
     }
 

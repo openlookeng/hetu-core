@@ -36,6 +36,7 @@ import static java.util.Objects.requireNonNull;
         @JsonSubTypes.Type(value = TableScanNode.class, name = "tablescan"),
         @JsonSubTypes.Type(value = ValuesNode.class, name = "values"),
         @JsonSubTypes.Type(value = AggregationNode.class, name = "aggregation"),
+        @JsonSubTypes.Type(value = CreateIndexNode.class, name = "createindex"),
         @JsonSubTypes.Type(value = MarkDistinctNode.class, name = "markDistinct"),
         @JsonSubTypes.Type(value = FilterNode.class, name = "filter"),
         @JsonSubTypes.Type(value = WindowNode.class, name = "window"),

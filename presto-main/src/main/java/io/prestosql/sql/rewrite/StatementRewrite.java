@@ -16,6 +16,7 @@ package io.prestosql.sql.rewrite;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.sql.analyzer.QueryExplainer;
@@ -49,10 +50,12 @@ public final class StatementRewrite
             Statement node,
             List<Expression> parameters,
             AccessControl accessControl,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         for (Rewrite rewrite : REWRITES) {
-            node = requireNonNull(rewrite.rewrite(session, metadata, parser, queryExplainer, node, parameters, accessControl, warningCollector), "Statement rewrite returned null");
+            node = requireNonNull(rewrite.rewrite(session, metadata, parser, queryExplainer, node, parameters, accessControl, warningCollector, heuristicIndexerManager),
+                    "Statement rewrite returned null");
         }
         return node;
     }
@@ -67,6 +70,7 @@ public final class StatementRewrite
                 Statement node,
                 List<Expression> parameters,
                 AccessControl accessControl,
-                WarningCollector warningCollector);
+                WarningCollector warningCollector,
+                HeuristicIndexerManager heuristicIndexerManager);
     }
 }

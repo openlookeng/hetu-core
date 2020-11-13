@@ -37,6 +37,7 @@ import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.buffer.OutputBuffer;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
@@ -149,6 +150,7 @@ import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.AggregationNode.Step;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -244,6 +246,7 @@ import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
 import static io.prestosql.SystemSessionProperties.isSpillWindowOperator;
+import static io.prestosql.operator.CreateIndexOperator.CreateIndexOperatorFactory;
 import static io.prestosql.operator.DistinctLimitOperator.DistinctLimitOperatorFactory;
 import static io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFactory;
 import static io.prestosql.operator.NestedLoopJoinOperator.NestedLoopJoinOperatorFactory;
@@ -323,6 +326,7 @@ public class LocalExecutionPlanner
     private final OrderingCompiler orderingCompiler;
     private final StateStoreProvider stateStoreProvider;
     private final NodeInfo nodeInfo;
+    private final HeuristicIndexerManager heuristicIndexerManager;
 
     @Inject
     public LocalExecutionPlanner(
@@ -347,7 +351,8 @@ public class LocalExecutionPlanner
             LookupJoinOperators lookupJoinOperators,
             OrderingCompiler orderingCompiler,
             NodeInfo nodeInfo,
-            StateStoreProvider stateStoreProvider)
+            StateStoreProvider stateStoreProvider,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -374,6 +379,7 @@ public class LocalExecutionPlanner
         this.orderingCompiler = requireNonNull(orderingCompiler, "orderingCompiler is null");
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStore is null");
         this.nodeInfo = nodeInfo;
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
     public LocalExecutionPlan plan(
@@ -1156,6 +1162,20 @@ public class LocalExecutionPlanner
             DataSize unspillMemoryLimit = getAggregationOperatorUnspillMemoryLimit(context.getSession());
 
             return planGroupByAggregation(node, source, spillEnabled, unspillMemoryLimit, context);
+        }
+
+        @Override
+        public PhysicalOperation visitCreateIndex(CreateIndexNode node, LocalExecutionPlanContext context)
+        {
+            PhysicalOperation source = node.getSource().accept(this, context);
+
+            OperatorFactory operatorFactory = new CreateIndexOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    node.getCreateIndexMetadata(),
+                    heuristicIndexerManager);
+
+            return new PhysicalOperation(operatorFactory, source.getLayout(), context, source);
         }
 
         @Override

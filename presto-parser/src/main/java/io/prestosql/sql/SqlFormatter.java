@@ -78,6 +78,7 @@ import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.RenameColumn;
+import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
 import io.prestosql.sql.tree.RenameTable;
 import io.prestosql.sql.tree.ResetSession;
@@ -876,6 +877,20 @@ public final class SqlFormatter
         protected Void visitShowIndex(ShowIndex node, Integer context)
         {
             append(context, "SHOW INDEX ");
+            return null;
+        }
+
+        @Override
+        protected Void visitRenameIndex(RenameIndex node, Integer context)
+        {
+            builder.append("ALTER INDEX ");
+            if (node.isExists()) {
+                builder.append("IF EXISTS ");
+            }
+            builder.append(node.getSource())
+                    .append(" RENAME TO ")
+                    .append(node.getTarget());
+
             return null;
         }
 

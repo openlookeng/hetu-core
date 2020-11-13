@@ -19,6 +19,8 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.util.Properties;
+
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.COMPRESSED;
@@ -34,13 +36,25 @@ public class SerializedPage
     private final int positionCount;
     private final int uncompressedSizeInBytes;
     private final byte pageCodecMarkers;
+    private Properties pageMetadata = new Properties();
 
     @JsonCreator
     public SerializedPage(
             @JsonProperty("sliceArray") byte[] sliceArray,
             @JsonProperty("pageCodecMarkers") byte pageCodecMarkers,
             @JsonProperty("positionCount") int positionCount,
-            @JsonProperty("uncompressedSizeInBytes") int uncompressedSizeInBytes)
+            @JsonProperty("uncompressedSizeInBytes") int uncompressedSizeInBytes,
+            @JsonProperty("pageMetadata") Properties pageMetadata)
+    {
+        this(
+                Slices.wrappedBuffer(sliceArray),
+                fromByteValue(pageCodecMarkers),
+                positionCount,
+                uncompressedSizeInBytes,
+                pageMetadata);
+    }
+
+    public SerializedPage(byte[] sliceArray, byte pageCodecMarkers, int positionCount, int uncompressedSizeInBytes)
     {
         this(
                 Slices.wrappedBuffer(sliceArray),
@@ -49,13 +63,14 @@ public class SerializedPage
                 uncompressedSizeInBytes);
     }
 
-    public SerializedPage(Slice slice, PageCodecMarker.MarkerSet markers, int positionCount, int uncompressedSizeInBytes)
+    public SerializedPage(Slice slice, PageCodecMarker.MarkerSet markers, int positionCount, int uncompressedSizeInBytes, Properties pageMetadata)
     {
         this.slice = requireNonNull(slice, "slice is null");
         this.positionCount = positionCount;
         checkArgument(uncompressedSizeInBytes >= 0, "uncompressedSizeInBytes is negative");
         this.uncompressedSizeInBytes = uncompressedSizeInBytes;
         this.pageCodecMarkers = requireNonNull(markers, "markers is null").byteValue();
+        this.pageMetadata = pageMetadata == null ? new Properties() : pageMetadata;
         //  Encrypted pages may include arbitrary overhead from ciphers, sanity checks skipped
         if (!markers.contains(ENCRYPTED)) {
             if (markers.contains(COMPRESSED)) {
@@ -65,6 +80,11 @@ public class SerializedPage
                 checkArgument(uncompressedSizeInBytes == slice.length(), "uncompressed size must be equal to slice length when uncompressed");
             }
         }
+    }
+
+    public SerializedPage(Slice slice, PageCodecMarker.MarkerSet markers, int positionCount, int uncompressedSizeInBytes)
+    {
+        this(slice, markers, positionCount, uncompressedSizeInBytes, null);
     }
 
     public int getSizeInBytes()
@@ -116,6 +136,12 @@ public class SerializedPage
         return ENCRYPTED.isSet(pageCodecMarkers);
     }
 
+    @JsonProperty
+    public Properties getPageMetadata()
+    {
+        return pageMetadata;
+    }
+
     @Override
     public String toString()
     {
@@ -124,6 +150,7 @@ public class SerializedPage
                 .add("pageCodecMarkers", PageCodecMarker.toSummaryString(pageCodecMarkers))
                 .add("sizeInBytes", slice.length())
                 .add("uncompressedSizeInBytes", uncompressedSizeInBytes)
+                .add("pageMetadata", pageMetadata)
                 .toString();
     }
 }

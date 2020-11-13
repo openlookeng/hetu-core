@@ -16,6 +16,8 @@ package io.prestosql.execution;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
@@ -185,7 +187,7 @@ public class TestSetSessionTask
                 executor,
                 metadata,
                 WarningCollector.NOOP);
-        getFutureValue(new SetSessionTask().execute(new SetSession(qualifiedPropName, expression), transactionManager, metadata, accessControl, stateMachine, parameters));
+        getFutureValue(new SetSessionTask().execute(new SetSession(qualifiedPropName, expression), transactionManager, metadata, accessControl, stateMachine, parameters, new HeuristicIndexerManager(new FileSystemClientManager())));
 
         Map<String, String> sessionProperties = stateMachine.getSetSessionProperties();
         assertEquals(sessionProperties, ImmutableMap.of(qualifiedPropName.toString(), expectedValue));

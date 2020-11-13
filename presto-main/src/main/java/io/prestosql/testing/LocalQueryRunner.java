@@ -60,6 +60,7 @@ import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.QueryPreparer;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.RenameColumnTask;
+import io.prestosql.execution.RenameIndexTask;
 import io.prestosql.execution.RenameTableTask;
 import io.prestosql.execution.ResetSessionTask;
 import io.prestosql.execution.RollbackTask;
@@ -162,6 +163,7 @@ import io.prestosql.sql.tree.DropTable;
 import io.prestosql.sql.tree.DropView;
 import io.prestosql.sql.tree.Prepare;
 import io.prestosql.sql.tree.RenameColumn;
+import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameTable;
 import io.prestosql.sql.tree.ResetSession;
 import io.prestosql.sql.tree.Rollback;
@@ -263,6 +265,7 @@ public class LocalQueryRunner
     //Hetu: DataCenterConnectorStore class is used to store DC connectors for dynamically
     //loading the DC sub catalogs
     private final CatalogConnectorStore catalogConnectorStore = new CatalogConnectorStore();
+    private final HeuristicIndexerManager heuristicIndexerManager;
     private boolean printPlan;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
@@ -343,7 +346,7 @@ public class LocalQueryRunner
         NodeInfo nodeInfo = new NodeInfo("test");
         FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
-        HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager);
+        heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager);
         this.connectorManager = new ConnectorManager(
                 hetuMetaStoreManager,
                 metadata,
@@ -433,7 +436,8 @@ public class LocalQueryRunner
                 defaultSession.getConnectorProperties(),
                 defaultSession.getUnprocessedCatalogProperties(),
                 metadata.getSessionPropertyManager(),
-                defaultSession.getPreparedStatements());
+                defaultSession.getPreparedStatements(),
+                defaultSession.isPageMetadataEnabled());
 
         dataDefinitionTask = ImmutableMap.<Class<? extends Statement>, DataDefinitionTask<?>>builder()
                 .put(CreateTable.class, new CreateTableTask())
@@ -442,6 +446,7 @@ public class LocalQueryRunner
                 .put(DropView.class, new DropViewTask())
                 .put(RenameColumn.class, new RenameColumnTask())
                 .put(RenameTable.class, new RenameTableTask())
+                .put(RenameIndex.class, new RenameIndexTask())
                 .put(Comment.class, new CommentTask())
                 .put(ResetSession.class, new ResetSessionTask())
                 .put(SetSession.class, new SetSessionTask())
@@ -755,7 +760,8 @@ public class LocalQueryRunner
                 new LookupJoinOperators(),
                 new OrderingCompiler(),
                 nodeInfo,
-                new LocalStateStoreProvider(seedStoreManager));
+                new LocalStateStoreProvider(seedStoreManager),
+                heuristicIndexerManager);
 
         // plan query
         StageExecutionDescriptor stageExecutionDescriptor = subplan.getFragment().getStageExecutionDescriptor();
@@ -887,8 +893,9 @@ public class LocalQueryRunner
                 sqlParser,
                 statsCalculator,
                 costCalculator,
-                dataDefinitionTask);
-        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector);
+                dataDefinitionTask,
+                heuristicIndexerManager);
+        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector, heuristicIndexerManager);
 
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
 

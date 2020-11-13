@@ -16,6 +16,8 @@ package io.prestosql.execution;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllAccessControl;
@@ -110,7 +112,7 @@ public class TestPrepareTask
                 metadata,
                 WarningCollector.NOOP);
         Prepare prepare = new Prepare(identifier(statementName), statement);
-        new PrepareTask(new SqlParser()).execute(prepare, transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList());
+        new PrepareTask(new SqlParser()).execute(prepare, transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()));
         return stateMachine.getAddedPreparedStatements();
     }
 }

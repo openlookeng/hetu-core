@@ -34,6 +34,7 @@ import io.prestosql.orc.reader.ColumnReaders;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
+import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
 import org.joda.time.DateTimeZone;
@@ -45,10 +46,17 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static io.prestosql.orc.reader.ColumnReaders.createColumnReader;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_FILE_MODIFICATION;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_FILE_PATH;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_INDEX_LEVEL;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_INDEX_UNIT_FINISHED;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_NUMBER;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_OFFSET;
 import static java.lang.Math.toIntExact;
 
 public class OrcRecordReader
@@ -56,6 +64,8 @@ public class OrcRecordReader
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(OrcRecordReader.class).instanceSize();
     private static final Logger log = Logger.get(OrcRecordReader.class);
+
+    private SplitMetadata splitMetadata;
 
     public OrcRecordReader(
             List<OrcColumn> readColumns,
@@ -83,9 +93,11 @@ public class OrcRecordReader
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform,
             Optional<List<IndexMetadata>> indexes,
+            SplitMetadata splitMetadata,
             Map<String, Domain> domains,
             OrcCacheStore orcCacheStore,
-            OrcCacheProperties orcCacheProperties)
+            OrcCacheProperties orcCacheProperties,
+            boolean pageMetadataEnabled)
             throws OrcCorruptionException
     {
         super(readColumns,
@@ -116,7 +128,9 @@ public class OrcRecordReader
                 domains,
                 orcCacheStore,
                 orcCacheProperties,
-                ImmutableMap.of());
+                ImmutableMap.of(),
+                pageMetadataEnabled);
+        this.splitMetadata = splitMetadata;
 
         setColumnReadersParam(createColumnReaders(readColumns, readTypes,
                 systemMemoryUsage.newAggregatedMemoryContext(),
@@ -155,7 +169,24 @@ public class OrcRecordReader
                     () -> filterRows(columnsReader[columnIndex].readBlock()),
                     block -> blockLoaded(columnIndex, block));
         }
-        return new Page(batchSize, blocks);
+
+        // only include page metadata if enabled
+        if (pageMetadataEnabled) {
+            Properties pageMetadata = new Properties();
+            pageMetadata.setProperty(DATASOURCE_INDEX_UNIT_FINISHED, isCurrentStripeFinished().toString());
+            pageMetadata.setProperty(DATASOURCE_STRIPE_NUMBER, String.valueOf(currentStripe));
+            pageMetadata.setProperty(DATASOURCE_STRIPE_OFFSET, Long.valueOf(stripes.get(currentStripe).getOffset()).toString());
+            if (splitMetadata != null) {
+                // Skip setting for testing (splitMetadata set as null)
+                pageMetadata.setProperty(DATASOURCE_FILE_PATH, splitMetadata.getSplitIdentity());
+                pageMetadata.setProperty(DATASOURCE_FILE_MODIFICATION, String.valueOf(splitMetadata.getLastModifiedTime()));
+            }
+            pageMetadata.setProperty(DATASOURCE_INDEX_LEVEL, "STRIPE");
+            return new Page(batchSize, pageMetadata, blocks);
+        }
+        else {
+            return new Page(batchSize, blocks);
+        }
     }
 
     private Block filterRows(Block block)
