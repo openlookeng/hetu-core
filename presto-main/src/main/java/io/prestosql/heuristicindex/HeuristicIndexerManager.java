@@ -76,7 +76,6 @@ public class HeuristicIndexerManager
             if (factory != null) {
                 indexClient = factory.getIndexClient(fs, root);
             }
-            LOG.info("Heuristic Indexer Client created on %s at %s", fsProfile, indexStoreRoot);
         }
     }
 
@@ -89,7 +88,6 @@ public class HeuristicIndexerManager
     {
         if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
             if (factory != null) {
-                LOG.info("Heuristic Indexer Writer created on %s at %s", createIndexMetadata.getTableName(), root.toString());
                 return factory.getIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
             }
         }

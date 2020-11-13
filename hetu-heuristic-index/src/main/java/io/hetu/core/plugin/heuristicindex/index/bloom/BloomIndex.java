@@ -53,7 +53,7 @@ public class BloomIndex
     }
 
     @Override
-    public boolean addValues(Map<String, List<Object>> values)
+    public synchronized boolean addValues(Map<String, List<Object>> values)
     {
         // Currently expecting only one column
         List<Object> columnIdxValue = values.values().iterator().next();

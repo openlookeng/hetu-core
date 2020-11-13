@@ -594,7 +594,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         currentBatchSize = toIntExact(min(currentBatchSize, currentGroupRowCount - nextRowInGroup));
 
         // row groups read finished, so going to next stripe
-        if (!rowGroups.hasNext()) {
+        if (!rowGroups.hasNext() && (nextRowInGroup + currentBatchSize >= currentGroupRowCount)) {
             currentStripeFinished = true;
         }
 
