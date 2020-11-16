@@ -65,7 +65,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.ValuesNode;
@@ -618,7 +618,7 @@ public class PruneUnreferencedOutputs
         }
 
         @Override
-        public PlanNode visitTopNRowNumber(TopNRowNumberNode node, RewriteContext<Set<Symbol>> context)
+        public PlanNode visitTopNRankingFunction(TopNRankingNumberNode node, RewriteContext<Set<Symbol>> context)
         {
             ImmutableSet.Builder<Symbol> expectedInputs = ImmutableSet.<Symbol>builder()
                     .addAll(context.get())
@@ -630,13 +630,14 @@ public class PruneUnreferencedOutputs
             }
             PlanNode source = context.rewrite(node.getSource(), expectedInputs.build());
 
-            return new TopNRowNumberNode(node.getId(),
+            return new TopNRankingNumberNode(node.getId(),
                     source,
                     node.getSpecification(),
                     node.getRowNumberSymbol(),
                     node.getMaxRowCountPerPartition(),
                     node.isPartial(),
-                    node.getHashSymbol());
+                    node.getHashSymbol(),
+                    node.getRankingFunction());
         }
 
         @Override

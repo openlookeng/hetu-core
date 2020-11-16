@@ -116,6 +116,8 @@ public class FeaturesConfig
     private boolean spillEnabled;
     private boolean spillOrderBy = true;
     private boolean spillWindowOperator = true;
+    private boolean parallelSortWindowOperator;
+    private int parallelSortTaskCount = 2;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, DataSize.Unit.MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
     private int spillerThreads = 4;
@@ -131,7 +133,7 @@ public class FeaturesConfig
     private boolean parseDecimalLiteralsAsDouble;
     private boolean useMarkDistinct = true;
     private boolean preferPartialAggregation = true;
-    private boolean optimizeTopNRowNumber = true;
+    private boolean optimizeTopNRankingFunction = true;
     private boolean workProcessorPipelines;
     private boolean skipRedundantSort = true;
     private boolean predicatePushdownUseTableProperties = true;
@@ -468,15 +470,15 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isOptimizeTopNRowNumber()
+    public boolean isOptimizeTopNRankingFunction()
     {
-        return optimizeTopNRowNumber;
+        return optimizeTopNRankingFunction;
     }
 
-    @Config("optimizer.optimize-top-n-row-number")
-    public FeaturesConfig setOptimizeTopNRowNumber(boolean optimizeTopNRowNumber)
+    @Config("optimizer.optimize-top-n-ranking-function")
+    public FeaturesConfig setOptimizeTopNRankingFunction(boolean optimizeTopNRankingFunction)
     {
-        this.optimizeTopNRowNumber = optimizeTopNRowNumber;
+        this.optimizeTopNRankingFunction = optimizeTopNRankingFunction;
         return this;
     }
 
@@ -647,6 +649,30 @@ public class FeaturesConfig
     public FeaturesConfig setSpillOrderBy(boolean spillOrderBy)
     {
         this.spillOrderBy = spillOrderBy;
+        return this;
+    }
+
+    public boolean isParallelSortWindowOperator()
+    {
+        return parallelSortWindowOperator;
+    }
+
+    @Config("experimental.parallel-sort-window-operator")
+    public FeaturesConfig setParallelSortWindowOperator(boolean parallelSortWindowOperator)
+    {
+        this.parallelSortWindowOperator = parallelSortWindowOperator;
+        return this;
+    }
+
+    public int getParallelSortTaskCount()
+    {
+        return parallelSortTaskCount;
+    }
+
+    @Config("experimental.parallel-sort-task-count")
+    public FeaturesConfig setParallelSortTaskCount(int parallelSortTaskCount)
+    {
+        this.parallelSortTaskCount = parallelSortTaskCount;
         return this;
     }
 

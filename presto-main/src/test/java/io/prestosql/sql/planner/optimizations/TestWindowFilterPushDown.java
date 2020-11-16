@@ -16,12 +16,12 @@ package io.prestosql.sql.planner.optimizations;
 import io.prestosql.Session;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
-import static io.prestosql.SystemSessionProperties.OPTIMIZE_TOP_N_ROW_NUMBER;
+import static io.prestosql.SystemSessionProperties.OPTIMIZE_TOP_N_RANKING_NUMBER;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyNot;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.limit;
@@ -39,17 +39,17 @@ public class TestWindowFilterPushDown
 
         assertPlanWithSession(
                 sql,
-                optimizeTopNRowNumber(true),
+                optimizeTopNRankingNumber(true),
                 true,
                 anyTree(
                         limit(10, anyTree(
-                                node(TopNRowNumberNode.class,
+                                node(TopNRankingNumberNode.class,
                                         anyTree(
                                                 tableScan("lineitem")))))));
 
         assertPlanWithSession(
                 sql,
-                optimizeTopNRowNumber(false),
+                optimizeTopNRankingNumber(false),
                 true,
                 anyTree(
                         limit(10, anyTree(
@@ -67,17 +67,17 @@ public class TestWindowFilterPushDown
 
         assertPlanWithSession(
                 sql,
-                optimizeTopNRowNumber(true),
+                optimizeTopNRankingNumber(true),
                 true,
                 anyTree(
                         anyNot(FilterNode.class,
-                                node(TopNRowNumberNode.class,
+                                node(TopNRankingNumberNode.class,
                                         anyTree(
                                                 tableScan("lineitem"))))));
 
         assertPlanWithSession(
                 sql,
-                optimizeTopNRowNumber(false),
+                optimizeTopNRankingNumber(false),
                 true,
                 anyTree(
                         node(FilterNode.class,
@@ -87,10 +87,10 @@ public class TestWindowFilterPushDown
                                                         tableScan("lineitem")))))));
     }
 
-    private Session optimizeTopNRowNumber(boolean enabled)
+    private Session optimizeTopNRankingNumber(boolean enabled)
     {
         return Session.builder(this.getQueryRunner().getDefaultSession())
-                .setSystemProperty(OPTIMIZE_TOP_N_ROW_NUMBER, Boolean.toString(enabled))
+                .setSystemProperty(OPTIMIZE_TOP_N_RANKING_NUMBER, Boolean.toString(enabled))
                 .build();
     }
 }

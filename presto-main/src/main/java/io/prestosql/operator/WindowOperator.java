@@ -21,6 +21,8 @@ import com.google.common.collect.PeekingIterator;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.operator.WorkProcessor.Transformation;
@@ -37,11 +39,15 @@ import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.OrderingCompiler;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -80,6 +86,8 @@ public class WindowOperator
         private final boolean spillEnabled;
         private final SpillerFactory spillerFactory;
         private final OrderingCompiler orderingCompiler;
+        private final boolean isParallelSort;
+        private int parallelSortTaskCount;
 
         public WindowOperatorFactory(
                 int operatorId,
@@ -96,7 +104,9 @@ public class WindowOperator
                 PagesIndex.Factory pagesIndexFactory,
                 boolean spillEnabled,
                 SpillerFactory spillerFactory,
-                OrderingCompiler orderingCompiler)
+                OrderingCompiler orderingCompiler,
+                boolean isParallelSort,
+                int parallelSortTaskCount)
         {
             requireNonNull(sourceTypes, "sourceTypes is null");
             requireNonNull(planNodeId, "planNodeId is null");
@@ -129,6 +139,12 @@ public class WindowOperator
             this.spillEnabled = spillEnabled;
             this.spillerFactory = spillerFactory;
             this.orderingCompiler = orderingCompiler;
+
+            this.isParallelSort = isParallelSort;
+            if (isParallelSort) {
+                checkArgument(parallelSortTaskCount > 0, "Parallel sort task count must > 0");
+                this.parallelSortTaskCount = parallelSortTaskCount;
+            }
         }
 
         @Override
@@ -151,7 +167,9 @@ public class WindowOperator
                     pagesIndexFactory,
                     spillEnabled,
                     spillerFactory,
-                    orderingCompiler);
+                    orderingCompiler,
+                    isParallelSort,
+                    parallelSortTaskCount);
         }
 
         @Override
@@ -178,7 +196,9 @@ public class WindowOperator
                     pagesIndexFactory,
                     spillEnabled,
                     spillerFactory,
-                    orderingCompiler);
+                    orderingCompiler,
+                    isParallelSort,
+                    parallelSortTaskCount);
         }
     }
 
@@ -194,6 +214,8 @@ public class WindowOperator
     private final WorkProcessor<Page> outputPages;
     private final PageBuffer pageBuffer = new PageBuffer();
 
+    private final ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
+
     public WindowOperator(
             OperatorContext operatorContext,
             List<Type> sourceTypes,
@@ -208,7 +230,9 @@ public class WindowOperator
             PagesIndex.Factory pagesIndexFactory,
             boolean spillEnabled,
             SpillerFactory spillerFactory,
-            OrderingCompiler orderingCompiler)
+            OrderingCompiler orderingCompiler,
+            boolean isParallelSort,
+            int parallelSortTaskCount)
     {
         requireNonNull(operatorContext, "operatorContext is null");
         requireNonNull(outputChannels, "outputChannels is null");
@@ -297,10 +321,44 @@ public class WindowOperator
         }
         else {
             this.spillablePagesToPagesIndexes = Optional.empty();
-            this.outputPages = pageBuffer.pages()
-                    .transform(new PagesToPagesIndexes(inMemoryPagesIndexWithHashStrategies, orderChannels, ordering))
-                    .flatMap(this::pagesIndexToWindowPartitions)
-                    .transform(new WindowPartitionsToOutputPages());
+            if (isParallelSort) {
+                PagesIndexWithHashStrategies mergedPagesIndexWithHashStrategies = new PagesIndexWithHashStrategies(
+                        pagesIndexFactory,
+                        sourceTypes,
+                        expectedPositions,
+                        partitionChannels,
+                        ImmutableList.of(),
+                        sortChannels,
+                        sortChannels);
+                ImmutableList.Builder<PagesIndexWithHashStrategies> partialSortPagesIndexWithHashStrategies = new ImmutableList.Builder<>();
+                for (int idx = 0; idx < parallelSortTaskCount; idx++) {
+                    partialSortPagesIndexWithHashStrategies.add(new PagesIndexWithHashStrategies(
+                            pagesIndexFactory,
+                            sourceTypes,
+                            expectedPositions,
+                            preGroupedChannels,
+                            unGroupedPartitionChannels,
+                            preSortedChannels,
+                            sortChannels));
+                }
+                ParallelPagesToPagesIndexes parallelPagesToPagesIndexes = new ParallelPagesToPagesIndexes(
+                        partialSortPagesIndexWithHashStrategies.build(),
+                        mergedPagesIndexWithHashStrategies,
+                        orderChannels,
+                        ordering,
+                        sourceTypes,
+                        orderingCompiler.compilePageWithPositionComparator(sourceTypes, unGroupedOrderChannels, unGroupedOrdering));
+                this.outputPages = pageBuffer.pages()
+                        .flatTransform(parallelPagesToPagesIndexes)
+                        .flatMap(this::pagesIndexToWindowPartitions)
+                        .transform(new WindowPartitionsToOutputPages());
+            }
+            else {
+                this.outputPages = pageBuffer.pages()
+                        .transform(new PagesToPagesIndexes(inMemoryPagesIndexWithHashStrategies, orderChannels, ordering))
+                        .flatMap(this::pagesIndexToWindowPartitions)
+                        .transform(new WindowPartitionsToOutputPages());
+            }
         }
 
         windowInfo = new WindowInfo.DriverWindowInfoBuilder();
@@ -843,5 +901,111 @@ public class WindowOperator
     {
         driverWindowInfo.set(Optional.of(windowInfo.build()));
         spillablePagesToPagesIndexes.ifPresent(SpillablePagesToPagesIndexes::closeSpiller);
+    }
+
+    private class ParallelPagesToPagesIndexes
+            implements Transformation<Page, WorkProcessor<PagesIndexWithHashStrategies>>
+    {
+        final List<PagesIndexWithHashStrategies> partialsPagesIndexWithHashStrategies;
+        final PagesIndexWithHashStrategies mergedPagesIndexWithHashStrategies;
+        final List<Integer> orderChannels;
+        final List<SortOrder> ordering;
+        final LocalMemoryContext memoryContext;
+        final List<Type> sourceType;
+        final PageWithPositionComparator pageWithPositionComparator;
+
+        int pendingInputPosition;
+        boolean resetPagesIndex;
+        int receivedPageCount;
+        Optional<ListenableFuture<?>> sortedInProgress = Optional.empty();
+
+        boolean isFinished;
+
+        public ParallelPagesToPagesIndexes(
+                List<PagesIndexWithHashStrategies> partialsPagesIndexWithHashStrategies,
+                PagesIndexWithHashStrategies mergedPagesIndexWithHashStrategies,
+                List<Integer> orderChannels,
+                List<SortOrder> ordering,
+                List<Type> sourceType,
+                PageWithPositionComparator pageWithPositionComparator)
+        {
+            this.partialsPagesIndexWithHashStrategies = partialsPagesIndexWithHashStrategies;
+            this.mergedPagesIndexWithHashStrategies = mergedPagesIndexWithHashStrategies;
+            this.orderChannels = orderChannels;
+            this.ordering = ordering;
+
+            this.memoryContext = operatorContext.aggregateUserMemoryContext().newLocalMemoryContext(ParallelPagesToPagesIndexes.class.getSimpleName());
+            this.sourceType = sourceType;
+            this.pageWithPositionComparator = pageWithPositionComparator;
+            this.isFinished = false;
+        }
+
+        @Override
+        public TransformationState<WorkProcessor<PagesIndexWithHashStrategies>> process(@Nullable Page pendingInput)
+        {
+            if (resetPagesIndex) {
+                partialsPagesIndexWithHashStrategies.forEach(buffer -> buffer.pagesIndex.clear());
+                mergedPagesIndexWithHashStrategies.pagesIndex.clear();
+                updateMemoryUsage();
+                resetPagesIndex = false;
+            }
+            boolean finishing = pendingInput == null;
+            if (isFinished) {
+                memoryContext.close();
+                return TransformationState.finished();
+            }
+
+            if (!finishing) {
+                receivedPageCount++;
+                int index = receivedPageCount % partialsPagesIndexWithHashStrategies.size();
+                pendingInputPosition = updatePagesIndex(partialsPagesIndexWithHashStrategies.get(index), pendingInput, pendingInputPosition, Optional.empty());
+                updateMemoryUsage();
+            }
+
+            if (finishing || pendingInputPosition < pendingInput.getPositionCount()) {
+                if (!sortedInProgress.isPresent()) {
+                    //step1: async concurrency partial sort
+                    sortedInProgress = Optional.of(Futures.allAsList(partialsPagesIndexWithHashStrategies.stream()
+                            .map(partialSortTask -> executorService.submit(() -> {
+                                sortPagesIndexIfNecessary(partialSortTask, orderChannels, ordering);
+                            })).collect(Collectors.toList())));
+                    return TransformationState.blocked(sortedInProgress.get());
+                }
+                else {
+                    if (sortedInProgress.get().isDone()) {
+                        //step2: finished sorted merge
+                        List<WorkProcessor<Page>> sortedStreams = ImmutableList.<WorkProcessor<Page>>builder()
+                                .addAll(partialsPagesIndexWithHashStrategies.stream()
+                                        .map(partialSortResult -> partialSortResult.pagesIndex.getSortedPages())
+                                        .map(WorkProcessor::fromIterator)
+                                        .collect(toImmutableList()))
+                                .build();
+                        WorkProcessor<Page> finalMergedPages = mergeSortedPages(
+                                sortedStreams,
+                                pageWithPositionComparator,
+                                sourceType,
+                                operatorContext.aggregateUserMemoryContext(),
+                                operatorContext.getDriverContext().getYieldSignal());
+                        WorkProcessor<PagesIndexWithHashStrategies> result = finalMergedPages
+                                .transform(new PagesToPagesIndexes(mergedPagesIndexWithHashStrategies, ImmutableList.of(), ImmutableList.of()));
+                        resetPagesIndex = true;
+                        isFinished = true;
+                        return TransformationState.ofResult(result, false);
+                    }
+                    else {
+                        return TransformationState.blocked(sortedInProgress.get());
+                    }
+                }
+            }
+            pendingInputPosition = 0;
+            return TransformationState.needsMoreData();
+        }
+
+        void updateMemoryUsage()
+        {
+            memoryContext.setBytes(partialsPagesIndexWithHashStrategies.stream()
+                    .map(buffer -> buffer.pagesIndex.getEstimatedSize().toBytes())
+                    .reduce(0L, Long::sum));
+        }
     }
 }

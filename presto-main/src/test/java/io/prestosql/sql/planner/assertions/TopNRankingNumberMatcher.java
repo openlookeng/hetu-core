@@ -16,10 +16,11 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 
 import java.util.List;
@@ -33,7 +34,7 @@ import static io.prestosql.sql.planner.assertions.MatchResult.match;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
 import static java.util.Objects.requireNonNull;
 
-public class TopNRowNumberMatcher
+public class TopNRankingNumberMatcher
         implements Matcher
 {
     private final Optional<ExpectedValueProvider<WindowNode.Specification>> specification;
@@ -41,25 +42,28 @@ public class TopNRowNumberMatcher
     private final Optional<Integer> maxRowCountPerPartition;
     private final Optional<Boolean> partial;
     private final Optional<Optional<SymbolAlias>> hashSymbol;
+    private final Optional<Optional<RankingFunction>> rankingFunction;
 
-    private TopNRowNumberMatcher(
+    private TopNRankingNumberMatcher(
             Optional<ExpectedValueProvider<WindowNode.Specification>> specification,
             Optional<SymbolAlias> rowNumberSymbol,
             Optional<Integer> maxRowCountPerPartition,
             Optional<Boolean> partial,
-            Optional<Optional<SymbolAlias>> hashSymbol)
+            Optional<Optional<SymbolAlias>> hashSymbol,
+            Optional<Optional<RankingFunction>> rankingFunction)
     {
         this.specification = requireNonNull(specification, "specification is null");
         this.rowNumberSymbol = requireNonNull(rowNumberSymbol, "rowNumberSymbol is null");
         this.maxRowCountPerPartition = requireNonNull(maxRowCountPerPartition, "maxRowCountPerPartition is null");
         this.partial = requireNonNull(partial, "partial is null");
         this.hashSymbol = requireNonNull(hashSymbol, "hashSymbol is null");
+        this.rankingFunction = requireNonNull(rankingFunction, "rankingFunction is null");
     }
 
     @Override
     public boolean shapeMatches(PlanNode node)
     {
-        return node instanceof TopNRowNumberNode;
+        return node instanceof TopNRankingNumberNode;
     }
 
     @Override
@@ -67,37 +71,37 @@ public class TopNRowNumberMatcher
     {
         checkState(shapeMatches(node), "Plan testing framework error: shapeMatches returned false in detailMatches in %s", this.getClass().getName());
 
-        TopNRowNumberNode topNRowNumberNode = (TopNRowNumberNode) node;
+        TopNRankingNumberNode topNRankingNumberNode = (TopNRankingNumberNode) node;
 
         if (specification.isPresent()) {
             WindowNode.Specification expected = specification.get().getExpectedValue(symbolAliases);
-            if (!expected.equals(topNRowNumberNode.getSpecification())) {
+            if (!expected.equals(topNRankingNumberNode.getSpecification())) {
                 return NO_MATCH;
             }
         }
 
         if (rowNumberSymbol.isPresent()) {
             Symbol expected = rowNumberSymbol.get().toSymbol(symbolAliases);
-            if (!expected.equals(topNRowNumberNode.getRowNumberSymbol())) {
+            if (!expected.equals(topNRankingNumberNode.getRowNumberSymbol())) {
                 return NO_MATCH;
             }
         }
 
         if (maxRowCountPerPartition.isPresent()) {
-            if (!maxRowCountPerPartition.get().equals(topNRowNumberNode.getMaxRowCountPerPartition())) {
+            if (!maxRowCountPerPartition.get().equals(topNRankingNumberNode.getMaxRowCountPerPartition())) {
                 return NO_MATCH;
             }
         }
 
         if (partial.isPresent()) {
-            if (!partial.get().equals(topNRowNumberNode.isPartial())) {
+            if (!partial.get().equals(topNRankingNumberNode.isPartial())) {
                 return NO_MATCH;
             }
         }
 
         if (hashSymbol.isPresent()) {
             Optional<Symbol> expected = hashSymbol.get().map(alias -> alias.toSymbol(symbolAliases));
-            if (!expected.equals(topNRowNumberNode.getHashSymbol())) {
+            if (!expected.equals(topNRankingNumberNode.getHashSymbol())) {
                 return NO_MATCH;
             }
         }
@@ -125,6 +129,7 @@ public class TopNRowNumberMatcher
         private Optional<Integer> maxRowCountPerPartition = Optional.empty();
         private Optional<Boolean> partial = Optional.empty();
         private Optional<Optional<SymbolAlias>> hashSymbol = Optional.empty();
+        private Optional<Optional<RankingFunction>> rankingFunction = Optional.empty();
 
         Builder(PlanMatchPattern source)
         {
@@ -161,15 +166,22 @@ public class TopNRowNumberMatcher
             return this;
         }
 
+        public Builder rankingFunction(Optional<RankingFunction> rankingFunction)
+        {
+            this.rankingFunction = Optional.of(requireNonNull(rankingFunction, "rankingFunction is null"));
+            return this;
+        }
+
         PlanMatchPattern build()
         {
-            return node(TopNRowNumberNode.class, source).with(
-                    new TopNRowNumberMatcher(
+            return node(TopNRankingNumberNode.class, source).with(
+                    new TopNRankingNumberMatcher(
                             specification,
                             rowNumberSymbol,
                             maxRowCountPerPartition,
                             partial,
-                            hashSymbol));
+                            hashSymbol,
+                            rankingFunction));
         }
     }
 }
