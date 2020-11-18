@@ -37,6 +37,7 @@ import io.prestosql.sql.planner.plan.PlanFragmentId;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
+import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -186,7 +187,10 @@ public final class SqlStageExecution
                 JoinNode joinNode = (JoinNode) node;
                 dynamicFilterService.registerTasks(joinNode, allTasks, getScheduledNodes(), stateMachine);
             }
-
+            else if (node instanceof SemiJoinNode) {
+                SemiJoinNode semiJoinNode = (SemiJoinNode) node;
+                dynamicFilterService.registerTasks(semiJoinNode, allTasks, getScheduledNodes(), stateMachine);
+            }
             traverseNodesForDynamicFiltering(node.getSources());
         }
     }

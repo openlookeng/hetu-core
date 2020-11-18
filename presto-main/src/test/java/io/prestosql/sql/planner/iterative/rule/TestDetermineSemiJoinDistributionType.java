@@ -89,7 +89,8 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("output"),
                                 Optional.empty(),
                                 Optional.empty(),
-                                Optional.of(REPLICATED)))
+                                Optional.of(REPLICATED),
+                                Optional.empty()))
                 .doesNotFire();
     }
 
@@ -118,6 +119,7 @@ public class TestDetermineSemiJoinDistributionType
                             a1,
                             b1,
                             p.symbol("output"),
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty());
@@ -156,6 +158,7 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("output"),
                                 Optional.empty(),
                                 Optional.empty(),
+                                Optional.empty(),
                                 Optional.empty()))
                 .matches(semiJoin(
                         "A1",
@@ -190,6 +193,7 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("output"),
                                 Optional.empty(),
                                 Optional.empty(),
+                                Optional.empty(),
                                 Optional.empty()))
                 .matches(semiJoin(
                         "A1",
@@ -222,6 +226,7 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("A1"),
                                 p.symbol("B1"),
                                 p.symbol("output"),
+                                Optional.empty(),
                                 Optional.empty(),
                                 Optional.empty(),
                                 Optional.empty()))
@@ -267,6 +272,7 @@ public class TestDetermineSemiJoinDistributionType
                             p.symbol("output"),
                             Optional.empty(),
                             Optional.empty(),
+                            Optional.empty(),
                             Optional.empty());
                 })
                 .matches(semiJoin(
@@ -301,6 +307,7 @@ public class TestDetermineSemiJoinDistributionType
                             a1,
                             b1,
                             p.symbol("output"),
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty());

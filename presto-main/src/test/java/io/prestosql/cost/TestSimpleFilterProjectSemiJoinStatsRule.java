@@ -90,6 +90,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
                             semiJoinOutput,
                             Optional.empty(),
                             Optional.empty(),
+                            Optional.empty(),
                             Optional.empty()));
         })
                 .withSourceStats(LEFT_SOURCE_ID, PlanNodeStatsEstimate.builder()
@@ -127,6 +128,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
                                     a,
                                     c,
                                     semiJoinOutput,
+                                    Optional.empty(),
                                     Optional.empty(),
                                     Optional.empty(),
                                     Optional.empty())));
@@ -167,6 +169,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
                             semiJoinOutput,
                             Optional.empty(),
                             Optional.empty(),
+                            Optional.empty(),
                             Optional.empty()));
         })
                 .withSourceStats(LEFT_SOURCE_ID, PlanNodeStatsEstimate.builder()
@@ -203,6 +206,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
                             a,
                             c,
                             semiJoinOutput,
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty()));

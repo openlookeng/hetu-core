@@ -117,7 +117,7 @@ public class TestPredicatePushdown
         assertPlan("SELECT quantity FROM (SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders)) " +
                         "WHERE linenumber = 2",
                 anyTree(
-                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT",
+                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT", true,
                                 anyTree(
                                         filter("LINE_NUMBER = 2",
                                                 tableScan("lineitem", ImmutableMap.of(
@@ -158,9 +158,8 @@ public class TestPredicatePushdown
     {
         assertPlan("SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderkey = random(5))",
                 anyTree(
-                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT",
-                                // NO filter here
-                                project(
+                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT", true,
+                                anyTree(
                                         tableScan("lineitem", ImmutableMap.of(
                                                 "LINE_ORDER_KEY", "orderkey"))),
                                 node(ExchangeNode.class,
@@ -174,7 +173,7 @@ public class TestPredicatePushdown
     {
         assertPlan("SELECT quantity FROM (SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderkey > 2))",
                 anyTree(
-                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT",
+                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT", true,
                                 anyTree(
                                         filter("LINE_ORDER_KEY > BIGINT '2'",
                                                 tableScan("lineitem", ImmutableMap.of(
@@ -223,7 +222,7 @@ public class TestPredicatePushdown
     {
         assertPlan("SELECT quantity FROM (SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders) AND orderkey > 2)",
                 anyTree(
-                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT",
+                        semiJoin("LINE_ORDER_KEY", "ORDERS_ORDER_KEY", "SEMI_JOIN_RESULT", true,
                                 anyTree(
                                         filter("LINE_ORDER_KEY > BIGINT '2'",
                                                 tableScan("lineitem", ImmutableMap.of(
