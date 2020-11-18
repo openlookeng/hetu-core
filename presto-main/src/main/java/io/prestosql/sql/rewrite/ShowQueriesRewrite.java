@@ -668,7 +668,7 @@ final class ShowQueriesRewrite
                         new StringLiteral(String.join(",", v.columns)),
                         new StringLiteral(v.indexType),
                         new StringLiteral(partitionsStrToDisplay.toString()),
-                        new StringLiteral(""),
+                        new StringLiteral(String.join(",", v.properties)),
                         TRUE_LITERAL));
             }
 

@@ -617,13 +617,13 @@ class QueryPlanner
 
         Properties indexProperties = new Properties();
         CreateIndexMetadata.Level indexCreationLevel = LEVEL_DEFAULT;
+        indexProperties.setProperty(LEVEL_PROP_KEY, String.valueOf(LEVEL_DEFAULT));
 
         for (Property property : createIndex.getProperties()) {
             String key = property.getName().toString().replaceAll("\"", "");
             String val = property.getValue().toString().replaceAll("\"", "").toUpperCase(Locale.ENGLISH);
             if (key.equals(LEVEL_PROP_KEY)) {
                 indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
-                continue;
             }
             indexProperties.setProperty(key, val);
         }

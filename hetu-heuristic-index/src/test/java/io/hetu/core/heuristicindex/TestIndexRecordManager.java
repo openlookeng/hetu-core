@@ -51,14 +51,14 @@ public class TestIndexRecordManager
             IndexRecordManager indexRecordManager1 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
             IndexRecordManager indexRecordManager2 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
 
-            indexRecordManager1.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
+            indexRecordManager1.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
             List<IndexRecord> original1 = indexRecordManager1.getIndexRecords();
             List<IndexRecord> original2 = indexRecordManager2.getIndexRecords();
             assertEquals(original2.size(), 1);
             assertEquals(original1, original2);
 
             List<IndexRecord> beforeadd1 = indexRecordManager1.getIndexRecords();
-            indexRecordManager2.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Arrays.asList("cp=1"));
+            indexRecordManager2.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList(), Arrays.asList("cp=1"));
             List<IndexRecord> added2 = indexRecordManager2.getIndexRecords();
             assertEquals(added2.size(), 2);
 
@@ -89,7 +89,7 @@ public class TestIndexRecordManager
                 threads[i] = new Thread(() -> {
                     try {
                         new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath())
-                                .addIndexRecord(names[finalI], "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
+                                .addIndexRecord(names[finalI], "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
                     }
                     catch (IOException e) {
                         throw new RuntimeException(e);
@@ -147,7 +147,7 @@ public class TestIndexRecordManager
                 int finalI = i;
                 threads[i] = new Thread(() -> {
                     try {
-                        indexRecordManager.addIndexRecord(names[finalI], "u", "t", new String[] {"c"}, "minmax", Arrays.asList("cp=1"));
+                        indexRecordManager.addIndexRecord(names[finalI], "u", "t", new String[] {"c"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
                     }
                     catch (IOException e) {
                         throw new RuntimeException(e);
@@ -193,8 +193,8 @@ public class TestIndexRecordManager
         try (TempFolder folder = new TempFolder()) {
             folder.create();
             IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-            indexRecordManager.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
-            indexRecordManager.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
+            indexRecordManager.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
+            indexRecordManager.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
             assertNotNull(indexRecordManager.lookUpIndexRecord("1"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 2);
 
@@ -221,21 +221,21 @@ public class TestIndexRecordManager
     public void testAddAndLookUp()
             throws IOException, IllegalAccessException
     {
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", ImmutableList.of("12"));
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", ImmutableList.of("12", "123"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("12"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("12", "123"));
     }
 
     @Test
     public void testRecordEqualAndHash()
     {
-        IndexRecord r1 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList());
+        IndexRecord r1 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Collections.emptyList());
         IndexRecord r2 = new IndexRecord("testName", "testUser", "testTable", new String[] {
-                "testColumn"}, "minmax", ImmutableList.of("note"));
-        IndexRecord r3 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList());
+                "testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("note"));
+        IndexRecord r3 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList(), Collections.emptyList());
         IndexRecord r4 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn",
-                "testColumn2"}, "minmax", Collections.emptyList());
+                "testColumn2"}, "minmax", Collections.emptyList(), Collections.emptyList());
         assertEquals(r1, r1);
         assertEquals(r1, r2);
         assertNotEquals(r1, r3);
@@ -253,28 +253,28 @@ public class TestIndexRecordManager
     }
 
     @Test(expectedExceptions = AssertionError.class)
-    public void testAddAndLookUpDifferentNotes()
+    public void testAddAndLookUpDifferentPartitions()
             throws IOException, IllegalAccessException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
             IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
             IndexRecord expected = new IndexRecord("testName", "testUser", "testTable", new String[] {
-                    "testColumn"}, "minmax", ImmutableList.of(""));
-            indexRecordManager.addIndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Arrays.asList("cp=1"));
+                    "testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of(""));
+            indexRecordManager.addIndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
             IndexRecord actual = indexRecordManager.lookUpIndexRecord("testName");
             assertIndexRecordFullyEqual(actual, expected);
         }
     }
 
-    private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, List<String> note)
+    private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
             throws IOException, IllegalAccessException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
             IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-            IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, note);
-            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, note);
+            IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
+            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
 
             IndexRecord actual1 = indexRecordManager.lookUpIndexRecord(name);
             assertNotNull(actual1);
