@@ -5068,6 +5068,15 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate(session1, "INSERT Into multiin values(1,2,'abc'), (11,22,'xyz'), (111,222,'abcd'), (1111,2222,'zxy')", 4);
             assertQuery(session1, "select * from multiin where id3 in ('abc', 'xyz', 'abcd', 'zxy') order by id1", "SELECT * from (values(1,2,'abc'), (11,22,'xyz'), (111,222,'abcd'), (1111,2222,'zxy'))");
             assertQuery(session1, "select * from multiin where id3 in ('abc', 'yzx', 'adbc', 'abcde')", "SELECT 1,2,'abc'");
+            assertUpdate(session1, "create table inperftest(id1 float, id2 double, id3 decimal(19,2), id4 int) with (format='orc')");
+            assertUpdate(session1, "insert into inperftest values(1.2,2.2,3.2,4), (11.22, 22.22, 33.22, 44),(111.33,222.33, 333.33, 444)", 3);
+            assertQuery(session1, "select * from inperftest where id1 in (1.2,5.3,11.22, 111.33)", "select * from (values(1.2, 2.2 , 3.20, 4), (11.22, 22.22, 33.22, 44), (111.33,222.33, 333.33, 444))");
+            assertQuery(session1, "select * from inperftest where id1 in (1.2,5.3)", "select * from (values(1.2, 2.2 , 3.20, 4))");
+            assertQuery(session1, "select * from inperftest where id2 in (2.2,5.3,22.22, 222.33)", "select * from (values(1.2, 2.2 , 3.20, 4), (11.22, 22.22, 33.22, 44), (111.33,222.33, 333.33, 444))");
+            assertQuery(session1, "select * from inperftest where id2 in (2.2,5.3)", "select * from (values(1.2, 2.2 , 3.20, 4))");
+            assertQuery(session1, "select * from inperftest where id3 in (3.2,5.3,33.22, 333.331, 333.33)", "select * from (values(1.2, 2.2 , 3.20, 4), (11.22, 22.22, 33.22, 44), (111.33,222.33, 333.33, 444))");
+            assertQuery(session1, "select * from inperftest where id3 in (3.2,5.3, 33.21)", "select * from (values(1.2, 2.2 , 3.20, 4))");
+            assertQuery(session1, "select * from inperftest where id3 in (3.2,5.3, 33.221)", "select * from (values(1.2, 2.2 , 3.20, 4))");
         }
         finally {
             assertUpdate("DROP TABLE IF EXISTS test_unsupport");
@@ -5076,6 +5085,7 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate("DROP TABLE IF EXISTS map_test");
             assertUpdate("DROP TABLE IF EXISTS array_test");
             assertUpdate("DROP TABLE IF EXISTS multiin");
+            assertUpdate("DROP TABLE IF EXISTS inperftest");
         }
     }
 }

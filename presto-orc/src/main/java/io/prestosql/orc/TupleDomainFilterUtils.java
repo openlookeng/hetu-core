@@ -26,6 +26,7 @@ import io.prestosql.spi.type.Type;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.not;
@@ -109,19 +110,36 @@ public class TupleDomainFilterUtils
             return TupleDomainFilter.BigintMultiRange.of(bigintRanges, nullAllowed);
         }
 
-        if (rangeFilters.get(0) instanceof TupleDomainFilter.BytesRange) {
-            List<TupleDomainFilter.BytesRange> bytesRanges = rangeFilters.stream()
-                    .map(TupleDomainFilter.BytesRange.class::cast)
-                    .collect(toImmutableList());
+        return getMultiValuesTDF(rangeFilters, nullAllowed);
+    }
 
-            Set byteValues = new HashSet<>();
-            if (bytesRanges.stream().allMatch(TupleDomainFilter.BytesRange::isSingleValue)) {
-                for (TupleDomainFilter.BytesRange bytesRange : bytesRanges) {
-                    byteValues.add(new TupleDomainFilter.ExtendedByte(bytesRange.getLower()));
-                }
-
-                return TupleDomainFilter.MultiValues.of(byteValues, nullAllowed);
+    private static TupleDomainFilter getMultiValuesTDF(List<TupleDomainFilter> rangeFilters, boolean nullAllowed)
+    {
+        Set values = new HashSet<>();
+        if (rangeFilters.stream().allMatch(TupleDomainFilter::isSingleValue)) {
+            if (rangeFilters.get(0) instanceof TupleDomainFilter.BytesRange) {
+                values = rangeFilters.stream()
+                        .map(x -> new TupleDomainFilter.ExtendedByte(((TupleDomainFilter.BytesRange) x).getLower()))
+                        .collect(Collectors.toSet());
             }
+            else if (rangeFilters.get(0) instanceof TupleDomainFilter.FloatRange) {
+                values = rangeFilters.stream()
+                        .map(x -> ((TupleDomainFilter.FloatRange) x).getLower())
+                        .collect(Collectors.toSet());
+            }
+            else if (rangeFilters.get(0) instanceof TupleDomainFilter.DoubleRange) {
+                values = rangeFilters.stream()
+                        .map(x -> ((TupleDomainFilter.DoubleRange) x).getLower())
+                        .collect(Collectors.toSet());
+            }
+            else if (rangeFilters.get(0) instanceof TupleDomainFilter.LongDecimalRange) {
+                values = rangeFilters.stream()
+                        .map(x -> new TupleDomainFilter.LongDecimalValue(((TupleDomainFilter.LongDecimalRange) x).getLowerLow(),
+                        ((TupleDomainFilter.LongDecimalRange) x).getLowerHigh()))
+                        .collect(Collectors.toSet());
+            }
+
+            return TupleDomainFilter.MultiValues.of(values, nullAllowed);
         }
 
         return TupleDomainFilter.MultiRange.of(rangeFilters, nullAllowed);
