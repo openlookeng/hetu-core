@@ -104,7 +104,8 @@ public class CarbondataMetadataFactory
                 partitionUpdateCodec, segmentInfoCodec, executorService,
                 vacuumExecutorService, heartbeatService, typeTranslator, nodeVersion.toString(),
                 accessControlMetadataFactory, carbondataTableReader, carbondataConfig.getStoreLocation(),
-                carbondataConfig.getMajorVacuumSegSize(), carbondataConfig.getMinorVacuumSegCount());
+                carbondataConfig.getMajorVacuumSegSize(), carbondataConfig.getMinorVacuumSegCount(),
+                carbondataConfig.getAutoVacuumEnable());
     }
 
     public CarbondataMetadataFactory(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment,
@@ -122,7 +123,8 @@ public class CarbondataMetadataFactory
                                      ExecutorService executorService, ScheduledExecutorService vacuumExecutorService, ScheduledExecutorService heartbeatService,
                                      TypeTranslator typeTranslator, String hetuVersion,
                                      AccessControlMetadataFactory accessControlMetadataFactory,
-                                     CarbondataTableReader carbondataTableReader, String storeLocation, long majorVacuumSegSize, long minorVacuumSegCount)
+                                     CarbondataTableReader carbondataTableReader, String storeLocation, long majorVacuumSegSize, long minorVacuumSegCount,
+                                     boolean autoVacuumEnable)
     {
         super(metastore,
                 hdfsEnvironment,
@@ -186,6 +188,11 @@ public class CarbondataMetadataFactory
         this.carbondataTableStore = storeLocation;
         this.carbondataMinorVacuumSegmentCount = minorVacuumSegCount;
         this.carbondataMajorVacuumSegmentSize = majorVacuumSegSize;
+
+        if (autoVacuumEnable) {
+            CarbondataAutoVacuumThread.setAutoVacuumInfo(this.carbondataTableReader, this.hdfsEnvironment,
+                    majorVacuumSegSize, minorVacuumSegCount, vacuumExecutorService);
+        }
     }
 
     @Override
