@@ -32,6 +32,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
@@ -200,6 +201,7 @@ import io.prestosql.sql.tree.LambdaExpression;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.type.FunctionType;
 
 import javax.inject.Inject;
@@ -246,6 +248,7 @@ import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
 import static io.prestosql.SystemSessionProperties.isSpillWindowOperator;
+import static io.prestosql.dynamicfilter.DynamicFilterCacheManager.createCacheKey;
 import static io.prestosql.operator.CreateIndexOperator.CreateIndexOperatorFactory;
 import static io.prestosql.operator.DistinctLimitOperator.DistinctLimitOperatorFactory;
 import static io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFactory;
@@ -326,6 +329,8 @@ public class LocalExecutionPlanner
     private final OrderingCompiler orderingCompiler;
     private final StateStoreProvider stateStoreProvider;
     private final NodeInfo nodeInfo;
+    private final StateStoreListenerManager stateStoreListenerManager;
+    private final DynamicFilterCacheManager dynamicFilterCacheManager;
     private final HeuristicIndexerManager heuristicIndexerManager;
 
     @Inject
@@ -352,6 +357,8 @@ public class LocalExecutionPlanner
             OrderingCompiler orderingCompiler,
             NodeInfo nodeInfo,
             StateStoreProvider stateStoreProvider,
+            StateStoreListenerManager stateStoreListenerManager,
+            DynamicFilterCacheManager dynamicFilterCacheManager,
             HeuristicIndexerManager heuristicIndexerManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
@@ -379,6 +386,8 @@ public class LocalExecutionPlanner
         this.orderingCompiler = requireNonNull(orderingCompiler, "orderingCompiler is null");
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStore is null");
         this.nodeInfo = nodeInfo;
+        this.stateStoreListenerManager = requireNonNull(stateStoreListenerManager, "stateStoreListenerManager is null");
+        this.dynamicFilterCacheManager = requireNonNull(dynamicFilterCacheManager, "dynamicFilterCacheManager is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
@@ -474,7 +483,7 @@ public class LocalExecutionPlanner
             OutputFactory outputOperatorFactory)
     {
         Session session = taskContext.getSession();
-        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, stateStoreProvider);
+        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, dynamicFilterCacheManager);
 
         Optional<List<String>> columns = Optional.empty();
         if (plan instanceof OutputNode) {
@@ -565,9 +574,9 @@ public class LocalExecutionPlanner
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
 
-        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, StateStoreProvider stateStoreProvider)
+        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, DynamicFilterCacheManager dynamicFilterCacheManager)
         {
-            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, stateStoreProvider), new AtomicInteger(0));
+            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, dynamicFilterCacheManager), new AtomicInteger(0));
         }
 
         private LocalExecutionPlanContext(
@@ -1359,7 +1368,8 @@ public class LocalExecutionPlanner
                 if (sourceNode instanceof TableScanNode) {
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-                    collector.initContext(tableScanNode.getAssignments(), dynamicFilters.get());
+                    collector.initContext(dynamicFilters.get());
+                    dynamicFilters.get().forEach(dynamicFilter -> dynamicFilterCacheManager.registerTask(createCacheKey(dynamicFilter.getId(), session.getQueryId().getId()), context.getTaskId()));
                     return () -> collector.getDynamicFilters(tableScanNode);
                 }
             }

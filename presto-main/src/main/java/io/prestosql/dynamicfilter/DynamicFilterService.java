@@ -152,7 +152,7 @@ public class DynamicFilterService
                 cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
             }
             Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId);
-            StateMap mergedDynamicFilters = (StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP);
+            StateMap mergedDynamicFilters = (StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
 
             for (Map.Entry<String, DynamicFilterRegistryInfo> columnToDynamicFilterEntry : queryToDynamicFiltersEntry.getValue().entrySet()) {
                 if (columnToDynamicFilterEntry.getValue().isMerged()) {
@@ -218,7 +218,7 @@ public class DynamicFilterService
     private void removeFinishedQuery()
     {
         List<String> handledQuery = new ArrayList<>();
-        StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP);
+        StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
         // Clear registered dynamic filter tasks
         for (String queryId : finishedQuery) {
             Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);

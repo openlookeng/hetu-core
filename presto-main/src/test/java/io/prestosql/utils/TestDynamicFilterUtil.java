@@ -105,9 +105,9 @@ public class TestDynamicFilterUtil
         when(mockPartialSet.size()).thenAnswer(i -> partial.size());
         when(mockTasksSet.size()).thenAnswer(i -> tasks.size());
 
-        when(stateStore.getStateCollection(DynamicFilterUtils.MERGEMAP)).thenReturn(mockMergeMap);
-        when(stateStore.createStateCollection(DynamicFilterUtils.MERGEMAP, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
-        when(stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
+        when(stateStore.getStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS)).thenReturn(mockMergeMap);
+        when(stateStore.createStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
+        when(stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
 
         when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId))).thenReturn(mockTasksSet);
         when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockTasksSet);

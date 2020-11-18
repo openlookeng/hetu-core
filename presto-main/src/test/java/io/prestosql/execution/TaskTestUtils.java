@@ -19,6 +19,7 @@ import io.airlift.json.ObjectMapperProvider;
 import io.airlift.node.NodeInfo;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.TestSqlTaskManager.MockExchangeClientSupplier;
@@ -56,6 +57,8 @@ import io.prestosql.sql.planner.plan.PlanFragmentId;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.statestore.LocalStateStoreProvider;
+import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.testing.TestingMetadata.TestingColumnHandle;
 import io.prestosql.testing.TestingSplit;
 import io.prestosql.util.FinalizerService;
@@ -126,6 +129,7 @@ public final class TaskTestUtils
         NodeInfo nodeInfo = new NodeInfo("test");
 
         SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
+        StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
 
         return new LocalExecutionPlanner(
@@ -156,7 +160,9 @@ public final class TaskTestUtils
                 new LookupJoinOperators(),
                 new OrderingCompiler(),
                 nodeInfo,
-                new LocalStateStoreProvider(seedStoreManager),
+                stateStoreProvider,
+                new StateStoreListenerManager(stateStoreProvider),
+                new DynamicFilterCacheManager(),
                 heuristicIndexerManager);
     }
 
