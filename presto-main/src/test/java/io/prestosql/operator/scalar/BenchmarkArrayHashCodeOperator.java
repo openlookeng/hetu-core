@@ -15,6 +15,7 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slices;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.FunctionListBuilder;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.DriverYieldSignal;
@@ -23,10 +24,9 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.Description;
-import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorDependency;
 import io.prestosql.spi.function.ScalarFunction;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.function.TypeParameter;
 import io.prestosql.spi.relation.CallExpression;
@@ -70,6 +70,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.relational.Expressions.field;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static io.prestosql.type.TypeUtils.checkElementNotNull;
@@ -117,8 +118,9 @@ public class BenchmarkArrayHashCodeOperator
         public void setup()
         {
             Metadata metadata = createTestMetadataManager();
-            metadata.addFunctions(new FunctionListBuilder().scalar(BenchmarkOldArrayHash.class).getFunctions());
-            metadata.addFunctions(new FunctionListBuilder().scalar(BenchmarkAnotherArrayHash.class).getFunctions());
+            FunctionAndTypeManager functionAndTypeManager = metadata.getFunctionAndTypeManager();
+            metadata.getFunctionAndTypeManager().registerBuiltInFunctions(new FunctionListBuilder().scalar(BenchmarkOldArrayHash.class).getFunctions());
+            metadata.getFunctionAndTypeManager().registerBuiltInFunctions(new FunctionListBuilder().scalar(BenchmarkAnotherArrayHash.class).getFunctions());
             ExpressionCompiler compiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
             ImmutableList.Builder<RowExpression> projectionsBuilder = ImmutableList.builder();
             Block[] blocks = new Block[1];
@@ -140,8 +142,8 @@ public class BenchmarkArrayHashCodeOperator
                     throw new UnsupportedOperationException();
             }
             ArrayType arrayType = new ArrayType(elementType);
-            Signature signature = new Signature(name, FunctionKind.SCALAR, BIGINT.getTypeSignature(), arrayType.getTypeSignature());
-            projectionsBuilder.add(new CallExpression(signature, BIGINT, ImmutableList.of(field(0, arrayType)), Optional.empty()));
+            FunctionHandle functionHandle = functionAndTypeManager.lookupFunction(name, fromTypes(arrayType));
+            projectionsBuilder.add(new CallExpression(name, functionHandle, BIGINT, ImmutableList.of(field(0, arrayType))));
             blocks[0] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);
 
             ImmutableList<RowExpression> projections = projectionsBuilder.build();

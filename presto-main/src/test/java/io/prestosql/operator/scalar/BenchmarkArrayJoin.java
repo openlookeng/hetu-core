@@ -21,6 +21,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
@@ -89,10 +91,10 @@ public class BenchmarkArrayJoin
         @Setup
         public void setup()
         {
-            Signature signature = new Signature("array_join", FunctionKind.SCALAR, VARCHAR.getTypeSignature(), new ArrayType(BIGINT).getTypeSignature(), VARCHAR.getTypeSignature());
+            Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction("array_join"), FunctionKind.SCALAR, VARCHAR.getTypeSignature(), new ArrayType(BIGINT).getTypeSignature(), VARCHAR.getTypeSignature());
 
             List<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, VARCHAR, ImmutableList.of(
+                    new CallExpression(signature.getName().getObjectName(), new BuiltInFunctionHandle(signature), VARCHAR, ImmutableList.of(
                             field(0, new ArrayType(BIGINT)),
                             constant(Slices.wrappedBuffer(",".getBytes(UTF_8)), VARCHAR)),
                             Optional.empty()));

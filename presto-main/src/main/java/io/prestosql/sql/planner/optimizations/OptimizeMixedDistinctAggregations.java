@@ -20,8 +20,8 @@ import com.google.common.collect.Iterables;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.Assignments;
@@ -31,6 +31,7 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
@@ -38,12 +39,12 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.IfExpression;
 import io.prestosql.sql.tree.NullLiteral;
-import io.prestosql.sql.tree.QualifiedName;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -55,6 +56,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.SystemSessionProperties.isOptimizeDistinctAggregationEnabled;
+import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.relation.SpecialForm.Form.COALESCE;
@@ -84,11 +86,18 @@ import static java.util.Objects.requireNonNull;
 public class OptimizeMixedDistinctAggregations
         implements PlanOptimizer
 {
+    private static final Set<QualifiedObjectName> ALLOWED_FUNCTIONS = ImmutableSet.of(
+            QualifiedObjectName.valueOfDefaultFunction("count"),
+            QualifiedObjectName.valueOfDefaultFunction("count_if"),
+            QualifiedObjectName.valueOfDefaultFunction("approx_distinct"));
+
     private final Metadata metadata;
+    private final StandardFunctionResolution functionResolution;
 
     public OptimizeMixedDistinctAggregations(Metadata metadata)
     {
         this.metadata = metadata;
+        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
     }
 
     @Override
@@ -107,12 +116,14 @@ public class OptimizeMixedDistinctAggregations
         private final PlanNodeIdAllocator idAllocator;
         private final PlanSymbolAllocator planSymbolAllocator;
         private final Metadata metadata;
+        private final StandardFunctionResolution functionResolution;
 
         private Optimizer(PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator, Metadata metadata)
         {
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
+            this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
         }
 
         @Override
@@ -168,7 +179,11 @@ public class OptimizeMixedDistinctAggregations
                 if (aggregation.getMask().isPresent()) {
                     Symbol newSymbol = aggregateInfo.getNewDistinctAggregateSymbol();
                     aggregations.put(entry.getKey(), new Aggregation(
-                            aggregation.getSignature(),
+                            new CallExpression(
+                                    entry.getValue().getFunctionCall().getDisplayName(),
+                                    entry.getValue().getFunctionCall().getFunctionHandle(),
+                                    entry.getValue().getFunctionCall().getType(),
+                                    ImmutableList.of(new VariableReferenceExpression(newSymbol.getName(), planSymbolAllocator.getSymbols().get(newSymbol)))),
                             ImmutableList.of(new VariableReferenceExpression(newSymbol.getName(), planSymbolAllocator.getSymbols().get(newSymbol))),
                             false,
                             Optional.empty(),
@@ -178,16 +193,19 @@ public class OptimizeMixedDistinctAggregations
                 else {
                     // Aggregations on non-distinct are already done by new node, just extract the non-null value
                     Symbol argument = aggregateInfo.getNewNonDistinctAggregateSymbols().get(entry.getKey());
-                    QualifiedName functionName = QualifiedName.of("arbitrary");
-                    String signatureName = aggregation.getSignature().getName();
                     Aggregation newAggregation = new Aggregation(
-                            getFunctionSignature(functionName, argument),
+                            new CallExpression(
+                                    "arbitrary",
+                                    metadata.getFunctionAndTypeManager().lookupFunction("arbitrary", fromTypes(ImmutableList.of(planSymbolAllocator.getSymbols().get(argument)))),
+                                    planSymbolAllocator.getTypes().get(entry.getKey()),
+                                    aggregation.getArguments()),
                             ImmutableList.of(new VariableReferenceExpression(argument.getName(), planSymbolAllocator.getSymbols().get(argument))),
                             false,
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty());
-                    if (signatureName.equals("count") || signatureName.equals("count_if") || signatureName.equals("approx_distinct")) {
+                    QualifiedObjectName functionName = metadata.getFunctionAndTypeManager().getFunctionMetadata(entry.getValue().getFunctionHandle()).getName();
+                    if (ALLOWED_FUNCTIONS.contains(functionName)) {
                         Symbol newSymbol = planSymbolAllocator.newSymbol("expr", planSymbolAllocator.getTypes().get(entry.getKey()));
                         aggregations.put(newSymbol, newAggregation);
                         coalesceSymbolsBuilder.put(newSymbol, entry.getKey());
@@ -348,7 +366,8 @@ public class OptimizeMixedDistinctAggregations
                             planSymbolAllocator.getTypes().get(symbol),
                             ImmutableList.of(
                                     call(
-                                            Signature.internalOperator(OperatorType.EQUAL, BOOLEAN, ImmutableList.of(BIGINT, BIGINT)),
+                                            EQUAL.name(),
+                                            functionResolution.comparisonFunction(EQUAL, BIGINT, BIGINT),
                                             BOOLEAN,
                                             ImmutableList.of(new VariableReferenceExpression(groupSymbol.getName(), planSymbolAllocator.getTypes().get(groupSymbol)),
                                                     constant(1L, BIGINT))),
@@ -365,7 +384,8 @@ public class OptimizeMixedDistinctAggregations
                             planSymbolAllocator.getTypes().get(symbol),
                             ImmutableList.of(
                                     call(
-                                            Signature.internalOperator(OperatorType.EQUAL, BOOLEAN, ImmutableList.of(BIGINT, BIGINT)),
+                                            EQUAL.name(),
+                                            functionResolution.comparisonFunction(EQUAL, BIGINT, BIGINT),
                                             BOOLEAN,
                                             ImmutableList.of(new VariableReferenceExpression(groupSymbol.getName(), planSymbolAllocator.getTypes().get(groupSymbol)),
                                                     constant(0L, BIGINT))),
@@ -465,7 +485,7 @@ public class OptimizeMixedDistinctAggregations
                                 }
                             }
                             aggregation = new Aggregation(
-                                    aggregation.getSignature(),
+                                    aggregation.getFunctionCall(),
                                     arguments.build(),
                                     false,
                                     Optional.empty(),
@@ -485,11 +505,6 @@ public class OptimizeMixedDistinctAggregations
                     SINGLE,
                     originalNode.getHashSymbol(),
                     Optional.empty());
-        }
-
-        private Signature getFunctionSignature(QualifiedName functionName, Symbol argument)
-        {
-            return metadata.resolveFunction(functionName, fromTypes(planSymbolAllocator.getTypes().get(argument)));
         }
 
         // creates if clause specific to use case here, default value always null

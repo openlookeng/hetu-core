@@ -30,6 +30,7 @@ import io.prestosql.plugin.jdbc.JdbcSplit;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.StatsCollecting;
+import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
 import io.prestosql.spi.PrestoException;
@@ -38,6 +39,9 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.sql.QueryGenerator;
 import io.prestosql.spi.type.DecimalType;
@@ -88,6 +92,8 @@ public class HanaClient
 
     private HanaConfig hanaConfig;
 
+    private BaseJdbcConfig baseJdbcConfig;
+
     /**
      * If disabled, do not accept sub-query push down.
      */
@@ -107,6 +113,7 @@ public class HanaClient
         tableTypes = hanaConfig.getTableTypes().split(",");
         schemaPattern = hanaConfig.getSchemaPattern();
         this.pushDownModule = config.getPushDownModule();
+        this.baseJdbcConfig = config;
         this.hanaConfig = hanaConfig;
     }
 
@@ -244,10 +251,10 @@ public class HanaClient
     }
 
     @Override
-    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
+    public Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> getQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution)
     {
-        HanaPushDownParameter pushDownParameter = new HanaPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, pushDownModule, hanaConfig);
-        return Optional.of(new HanaQueryGenerator(rowExpressionService, pushDownParameter));
+        HanaPushDownParameter pushDownParameter = new HanaPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, pushDownModule, hanaConfig, functionResolution);
+        return Optional.of(new HanaQueryGenerator(determinismEvaluator, rowExpressionService, functionManager, functionResolution, pushDownParameter));
     }
 
     @SuppressFBWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")

@@ -15,6 +15,7 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.Assignments;
@@ -91,7 +92,7 @@ public class TestSingleDistinctAggregationToGroupBy
     public void testDistinctWithFilter()
     {
         Signature moreThan = internalOperator(OperatorType.GREATER_THAN, BOOLEAN, ImmutableList.of(BIGINT, BIGINT));
-        CallExpression filterExpression = new CallExpression(moreThan, BOOLEAN, ImmutableList.of(new VariableReferenceExpression("input2", BIGINT), constant(10L, BIGINT)), Optional.empty());
+        CallExpression filterExpression = new CallExpression(OperatorType.GREATER_THAN.name(), new BuiltInFunctionHandle(moreThan), BOOLEAN, ImmutableList.of(new VariableReferenceExpression("input2", BIGINT), constant(10L, BIGINT)), Optional.empty());
         tester().assertThat(new SingleDistinctAggregationToGroupBy())
                 .on(p -> p.aggregation(builder -> builder
                         .globalGrouping()

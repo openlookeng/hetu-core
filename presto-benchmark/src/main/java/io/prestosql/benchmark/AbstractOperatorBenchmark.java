@@ -27,7 +27,6 @@ import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.MemoryPool;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.Driver;
 import io.prestosql.operator.DriverContext;
@@ -45,6 +44,7 @@ import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -237,7 +237,7 @@ public abstract class AbstractOperatorBenchmark
         Map<NodeRef<Expression>, Type> expressionTypes = new TypeAnalyzer(localQueryRunner.getSqlParser(), localQueryRunner.getMetadata())
                 .getTypes(session, TypeProvider.copyOf(symbolTypes), hashExpression.get());
 
-        RowExpression translated = translate(hashExpression.get(), SCALAR, expressionTypes, symbolToInputMapping.build(), localQueryRunner.getMetadata(), session, false);
+        RowExpression translated = translate(hashExpression.get(), SCALAR, expressionTypes, symbolToInputMapping.build(), localQueryRunner.getMetadata().getFunctionAndTypeManager(), session, false);
 
         PageFunctionCompiler functionCompiler = new PageFunctionCompiler(localQueryRunner.getMetadata(), 0);
         projections.add(functionCompiler.compileProjection(translated, Optional.empty()).get());

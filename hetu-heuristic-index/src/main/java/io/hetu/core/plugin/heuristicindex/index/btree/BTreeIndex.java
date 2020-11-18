@@ -19,6 +19,7 @@ import com.google.common.io.Files;
 import io.hetu.core.heuristicindex.PartitionIndexWriter;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
@@ -213,7 +214,14 @@ public class BTreeIndex
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
             Object key = extractValueFromRowExpression(callExp.getArguments().get(1));
-            Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
+            BuiltInFunctionHandle builtInFunctionHandle;
+            if (callExp.getFunctionHandle() instanceof BuiltInFunctionHandle) {
+                builtInFunctionHandle = (BuiltInFunctionHandle) callExp.getFunctionHandle();
+            }
+            else {
+                throw new UnsupportedOperationException("Unsupported function: " + callExp.getDisplayName());
+            }
+            Optional<OperatorType> operatorOptional = Signature.getOperatorType(builtInFunctionHandle.getSignature().getNameSuffix());
             if (operatorOptional.isPresent()) {
                 OperatorType operator = operatorOptional.get();
                 switch (operator) {

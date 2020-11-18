@@ -14,7 +14,7 @@
 package io.prestosql.sql.gen;
 
 import io.airlift.bytecode.BytecodeNode;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 
@@ -22,5 +22,5 @@ import java.util.List;
 
 public interface BytecodeGenerator
 {
-    BytecodeNode generateExpression(Signature signature, BytecodeGeneratorContext context, Type returnType, List<RowExpression> arguments);
+    BytecodeNode generateExpression(FunctionHandle functionHandle, BytecodeGeneratorContext context, Type returnType, List<RowExpression> arguments);
 }

@@ -298,7 +298,7 @@ public class TestStructColumnReader
                     new NamedTypeSignature(Optional.of(new RowFieldName(fieldName, false)),
                             TEST_DATA_TYPE.getTypeSignature())));
         }
-        return METADATA.getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
+        return METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
     }
 
     private Type getTypeNullName(int numFields)
@@ -309,6 +309,6 @@ public class TestStructColumnReader
             typeSignatureParameters.add(TypeSignatureParameter.of(
                     new NamedTypeSignature(Optional.empty(), TEST_DATA_TYPE.getTypeSignature())));
         }
-        return METADATA.getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
+        return METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
     }
 }

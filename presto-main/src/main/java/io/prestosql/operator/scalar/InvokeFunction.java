@@ -16,10 +16,11 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.lambda.LambdaFunctionInterface;
@@ -27,7 +28,8 @@ import io.prestosql.sql.gen.lambda.LambdaFunctionInterface;
 import java.lang.invoke.MethodHandle;
 
 import static com.google.common.primitives.Primitives.wrap;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.functionTypeArgumentProperty;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.functionTypeArgumentProperty;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -45,7 +47,7 @@ public final class InvokeFunction
     private InvokeFunction()
     {
         super(new Signature(
-                "invoke",
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "invoke"),
                 FunctionKind.SCALAR,
                 ImmutableList.of(typeVariable("T")),
                 ImmutableList.of(),
@@ -73,16 +75,15 @@ public final class InvokeFunction
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type returnType = boundVariables.getTypeVariable("T");
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 true,
                 ImmutableList.of(functionTypeArgumentProperty(InvokeLambda.class)),
                 METHOD_HANDLE.asType(
                         METHOD_HANDLE.type()
-                                .changeReturnType(wrap(returnType.getJavaType()))),
-                isDeterministic());
+                                .changeReturnType(wrap(returnType.getJavaType()))));
     }
 
     public static Object invoke(InvokeLambda function)

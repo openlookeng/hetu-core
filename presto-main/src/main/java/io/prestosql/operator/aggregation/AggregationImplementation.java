@@ -15,13 +15,14 @@ package io.prestosql.operator.aggregation;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.operator.ParametricImplementation;
 import io.prestosql.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType;
 import io.prestosql.operator.annotations.FunctionsParserHelper;
 import io.prestosql.operator.annotations.ImplementationDependency;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.AggregationState;
 import io.prestosql.spi.function.BlockIndex;
 import io.prestosql.spi.function.BlockPosition;
@@ -58,6 +59,7 @@ import static io.prestosql.operator.annotations.ImplementationDependency.Factory
 import static io.prestosql.operator.annotations.ImplementationDependency.getImplementationDependencyAnnotation;
 import static io.prestosql.operator.annotations.ImplementationDependency.isImplementationDependencyAnnotation;
 import static io.prestosql.operator.annotations.ImplementationDependency.validateImplementationDependencyAnnotation;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
 import static java.util.Objects.requireNonNull;
@@ -199,13 +201,13 @@ public class AggregationImplementation
         return inputParameterMetadataTypes;
     }
 
-    public boolean areTypesAssignable(Signature boundSignature, BoundVariables variables, Metadata metadata)
+    public boolean areTypesAssignable(Signature boundSignature, BoundVariables variables, FunctionAndTypeManager functionAndTypeManager)
     {
         checkState(argumentNativeContainerTypes.size() == boundSignature.getArgumentTypes().size(), "Number of argument assigned to AggregationImplementation is different than number parsed from annotations.");
 
         // TODO specialized functions variants support is missing here
         for (int i = 0; i < boundSignature.getArgumentTypes().size(); i++) {
-            Class<?> argumentType = metadata.getType(boundSignature.getArgumentTypes().get(i)).getJavaType();
+            Class<?> argumentType = functionAndTypeManager.getType(boundSignature.getArgumentTypes().get(i)).getJavaType();
             Class<?> methodDeclaredType = argumentNativeContainerTypes.get(i).getJavaType();
             boolean isCurrentBlockPosition = argumentNativeContainerTypes.get(i).isBlockPosition();
 
@@ -304,7 +306,7 @@ public class AggregationImplementation
         private AggregationImplementation get()
         {
             Signature signature = new Signature(
-                    header.getName(),
+                    QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, header.getName()),
                     FunctionKind.AGGREGATE,
                     typeVariableConstraints,
                     longVariableConstraints,

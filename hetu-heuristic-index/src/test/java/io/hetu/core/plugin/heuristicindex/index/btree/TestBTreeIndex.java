@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
-import static io.prestosql.spi.sql.RowExpressionUtils.simplePredicate;
+import static io.hetu.core.HeuristicIndexTestUtils.simplePredicate;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;

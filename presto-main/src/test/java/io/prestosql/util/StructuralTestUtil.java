@@ -62,7 +62,7 @@ public final class StructuralTestUtil
 
     public static MapType mapType(Type keyType, Type valueType)
     {
-        return (MapType) METADATA.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
+        return (MapType) METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.MAP, ImmutableList.of(
                 TypeSignatureParameter.of(keyType.getTypeSignature()),
                 TypeSignatureParameter.of(valueType.getTypeSignature())));
     }

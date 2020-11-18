@@ -21,11 +21,11 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 import io.prestosql.execution.Output;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.type.Type;
@@ -124,7 +124,7 @@ public class Analysis
     private final Map<NodeRef<Expression>, Type> coercions = new LinkedHashMap<>();
     private final Set<NodeRef<Expression>> typeOnlyCoercions = new LinkedHashSet<>();
     private final Map<NodeRef<Relation>, List<Type>> relationCoercions = new LinkedHashMap<>();
-    private final Map<NodeRef<FunctionCall>, Signature> functionSignature = new LinkedHashMap<>();
+    private final Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles = new LinkedHashMap<>();
     private final Map<NodeRef<Identifier>, LambdaArgumentDeclaration> lambdaArgumentReferences = new LinkedHashMap<>();
 
     private final Map<Field, ColumnHandle> columns = new LinkedHashMap<>();
@@ -543,14 +543,19 @@ public class Analysis
         tables.put(NodeRef.of(table), handle);
     }
 
-    public Signature getFunctionSignature(FunctionCall function)
+    public FunctionHandle getFunctionHandle(FunctionCall function)
     {
-        return functionSignature.get(NodeRef.of(function));
+        return functionHandles.get(NodeRef.of(function));
     }
 
-    public void addFunctionSignatures(Map<NodeRef<FunctionCall>, Signature> infos)
+    public void addFunctionHandles(Map<NodeRef<FunctionCall>, FunctionHandle> infos)
     {
-        functionSignature.putAll(infos);
+        functionHandles.putAll(infos);
+    }
+
+    public Map<NodeRef<FunctionCall>, FunctionHandle> getFunctionHandles()
+    {
+        return ImmutableMap.copyOf(functionHandles);
     }
 
     public Set<NodeRef<Expression>> getColumnReferences()
@@ -1087,7 +1092,7 @@ public class Analysis
             }
             RowFilterScopeEntry that = (RowFilterScopeEntry) o;
             return table.equals(that.table) &&
-                           identity.equals(that.identity);
+                    identity.equals(that.identity);
         }
 
         @Override

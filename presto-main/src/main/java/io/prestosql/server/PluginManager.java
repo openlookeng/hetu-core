@@ -38,6 +38,7 @@ import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.cube.CubeProvider;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
+import io.prestosql.spi.function.FunctionNamespaceManagerFactory;
 import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
@@ -239,11 +240,12 @@ public class PluginManager
     {
         for (Class<?> functionClass : plugin.getFunctions()) {
             log.info("Registering functions from %s", functionClass.getName());
-            metadataManager.addFunctions(extractFunctions(functionClass));
+            metadataManager.getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(functionClass));
         }
+
         for (Object dynamicHiveFunction : plugin.getDynamicHiveFunctions()) {
             log.info("Registering function %s", ((SqlFunction) dynamicHiveFunction).getSignature());
-            metadataManager.addFunctions(ImmutableList.of((SqlFunction) dynamicHiveFunction));
+            metadataManager.getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of((SqlFunction) dynamicHiveFunction));
         }
     }
 
@@ -251,17 +253,17 @@ public class PluginManager
     {
         for (BlockEncoding blockEncoding : plugin.getBlockEncodings()) {
             log.info("Registering block encoding %s", blockEncoding.getName());
-            metadataManager.addBlockEncoding(blockEncoding);
+            metadataManager.getFunctionAndTypeManager().addBlockEncoding(blockEncoding);
         }
 
         for (Type type : plugin.getTypes()) {
             log.info("Registering type %s", type.getTypeSignature());
-            metadataManager.addType(type);
+            metadataManager.getFunctionAndTypeManager().addType(type);
         }
 
         for (ParametricType parametricType : plugin.getParametricTypes()) {
             log.info("Registering parametric type %s", parametricType.getName());
-            metadataManager.addParametricType(parametricType);
+            metadataManager.getFunctionAndTypeManager().addParametricType(parametricType);
         }
 
         for (ConnectorFactory connectorFactory : plugin.getConnectorFactories()) {
@@ -273,6 +275,11 @@ public class PluginManager
         for (SessionPropertyConfigurationManagerFactory sessionConfigFactory : plugin.getSessionPropertyConfigurationManagerFactories()) {
             log.info("Registering session property configuration manager %s", sessionConfigFactory.getName());
             sessionPropertyDefaults.addConfigurationManagerFactory(sessionConfigFactory);
+        }
+
+        for (FunctionNamespaceManagerFactory functionNamespaceManagerFactory : plugin.getFunctionNamespaceManagerFactories()) {
+            log.info("Registering function namespace manager %s", functionNamespaceManagerFactory.getName());
+            metadataManager.getFunctionAndTypeManager().addFunctionNamespaceFactory(functionNamespaceManagerFactory);
         }
 
         for (ResourceGroupConfigurationManagerFactory configurationManagerFactory : plugin.getResourceGroupConfigurationManagerFactories()) {

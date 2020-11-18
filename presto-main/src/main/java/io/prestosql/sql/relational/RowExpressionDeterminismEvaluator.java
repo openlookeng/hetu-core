@@ -13,9 +13,10 @@
  */
 package io.prestosql.sql.relational;
 
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.DeterminismEvaluator;
@@ -28,6 +29,7 @@ import io.prestosql.spi.relation.VariableReferenceExpression;
 
 import javax.inject.Inject;
 
+import static io.prestosql.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_MISSING;
 import static java.util.Objects.requireNonNull;
 
 public class RowExpressionDeterminismEvaluator
@@ -43,17 +45,17 @@ public class RowExpressionDeterminismEvaluator
 
     public boolean isDeterministic(RowExpression expression)
     {
-        return expression.accept(new Visitor(metadata), null);
+        return expression.accept(new Visitor(metadata.getFunctionAndTypeManager()), null);
     }
 
     private static class Visitor
             implements RowExpressionVisitor<Boolean, Void>
     {
-        private final Metadata metadata;
+        private final FunctionAndTypeManager functionAndTypeManager;
 
-        public Visitor(Metadata metadata)
+        public Visitor(FunctionAndTypeManager functionAndTypeManager)
         {
-            this.metadata = metadata;
+            this.functionAndTypeManager = functionAndTypeManager;
         }
 
         @Override
@@ -71,24 +73,20 @@ public class RowExpressionDeterminismEvaluator
         @Override
         public Boolean visitCall(CallExpression call, Void context)
         {
-            Signature signature = call.getSignature();
-            if (!isDeterministic(signature)) {
-                return false;
+            FunctionHandle functionHandle = call.getFunctionHandle();
+            try {
+                if (!functionAndTypeManager.getFunctionMetadata(functionHandle).isDeterministic()) {
+                    return false;
+                }
+            }
+            catch (PrestoException e) {
+                if (e.getErrorCode().getCode() != FUNCTION_IMPLEMENTATION_MISSING.toErrorCode().getCode()) {
+                    throw e;
+                }
             }
 
             return call.getArguments().stream()
                     .allMatch(expression -> expression.accept(this, context));
-        }
-
-        private boolean isDeterministic(Signature signature)
-        {
-            try {
-                return metadata.getScalarFunctionImplementation(signature).isDeterministic();
-            }
-            catch (PrestoException ignored) {
-                // unknown functions are typically special forms and are deterministic
-                return true;
-            }
         }
 
         @Override

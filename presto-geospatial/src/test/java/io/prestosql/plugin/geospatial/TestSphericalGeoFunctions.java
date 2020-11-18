@@ -47,7 +47,7 @@ public class TestSphericalGeoFunctions
         for (Type type : plugin.getTypes()) {
             functionAssertions.addType(type);
         }
-        functionAssertions.getMetadata().addFunctions(extractFunctions(plugin.getFunctions()));
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(plugin.getFunctions()));
     }
 
     @Test

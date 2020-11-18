@@ -16,6 +16,7 @@ package io.prestosql.sql.parser;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.PathSpecification;
+import io.prestosql.sql.tree.Return;
 import io.prestosql.sql.tree.Statement;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStreams;
@@ -114,6 +115,11 @@ public class SqlParser
     public PathSpecification createPathSpecification(String expression)
     {
         return (PathSpecification) invokeParser("path specification", expression, SqlBaseParser::standalonePathSpecification, new ParsingOptions());
+    }
+
+    public Return createReturn(String routineBody, ParsingOptions parsingOptions)
+    {
+        return (Return) invokeParser("return", routineBody, SqlBaseParser::standaloneRoutineBody, parsingOptions);
     }
 
     private Node invokeParser(String name, String sql, Function<SqlBaseParser, ParserRuleContext> parseFunction, ParsingOptions parsingOptions)

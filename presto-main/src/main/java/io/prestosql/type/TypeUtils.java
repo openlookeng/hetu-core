@@ -21,14 +21,19 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.FixedWidthType;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 
@@ -95,6 +100,34 @@ public final class TypeUtils
             return leftIsNull && rightIsNull;
         }
         return type.equalTo(leftBlock, leftPosition, rightBlock, rightPosition);
+    }
+
+    public static Type resolveType(TypeSignature typeName, TypeManager typeManager)
+    {
+        return typeManager.getType(typeName);
+    }
+
+    public static boolean isIntegralType(TypeSignature typeName, TypeManager typeManager)
+    {
+        switch (typeName.getBase()) {
+            case StandardTypes.BIGINT:
+            case StandardTypes.INTEGER:
+            case StandardTypes.SMALLINT:
+            case StandardTypes.TINYINT:
+                return true;
+            case StandardTypes.DECIMAL:
+                DecimalType decimalType = (DecimalType) resolveType(typeName, typeManager);
+                return decimalType.getScale() == 0;
+            default:
+                return false;
+        }
+    }
+
+    public static List<Type> resolveTypes(List<TypeSignature> typeNames, TypeManager typeManager)
+    {
+        return typeNames.stream()
+                .map((TypeSignature type) -> resolveType(type, typeManager))
+                .collect(toImmutableList());
     }
 
     public static long getHashPosition(List<? extends Type> hashTypes, Block[] hashBlocks, int position)

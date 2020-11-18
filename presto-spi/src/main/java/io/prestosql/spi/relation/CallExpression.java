@@ -17,11 +17,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
-
-import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 import java.util.Objects;
@@ -29,37 +28,51 @@ import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
-@Immutable
 public final class CallExpression
         extends RowExpression
 {
-    private final Signature signature;
+    private final String displayName;
+    private final FunctionHandle functionHandle;
     private final Type returnType;
     private final List<RowExpression> arguments;
     private final Optional<RowExpression> filter;
 
+    public CallExpression(String displayName, FunctionHandle functionHandle, Type returnType, List<RowExpression> arguments)
+    {
+        this(displayName, functionHandle, returnType, arguments, Optional.empty());
+    }
+
     @JsonCreator
     public CallExpression(
-            @JsonProperty("signature") Signature signature,
+            @JsonProperty("displayName") String displayName,
+            @JsonProperty("functionHandle") FunctionHandle functionHandle,
             @JsonProperty("returnType") Type returnType,
             @JsonProperty("arguments") List<RowExpression> arguments,
             @JsonProperty("filter") Optional<RowExpression> filter)
     {
-        requireNonNull(signature, "signature is null");
+        requireNonNull(displayName, "displayName is null");
+        requireNonNull(functionHandle, "functionHandle is null");
         requireNonNull(arguments, "arguments is null");
         requireNonNull(returnType, "returnType is null");
         requireNonNull(filter, "filter object is null");
 
-        this.signature = signature;
+        this.displayName = displayName;
+        this.functionHandle = functionHandle;
         this.returnType = returnType;
         this.arguments = ImmutableList.copyOf(arguments);
         this.filter = filter;
     }
 
     @JsonProperty
-    public Signature getSignature()
+    public String getDisplayName()
     {
-        return signature;
+        return displayName;
+    }
+
+    @JsonProperty
+    public FunctionHandle getFunctionHandle()
+    {
+        return functionHandle;
     }
 
     @Override
@@ -84,7 +97,7 @@ public final class CallExpression
     @Override
     public String toString()
     {
-        return signature.getName() + "(" + Joiner.on(", ").join(arguments) + ")";
+        return displayName + "(" + Joiner.on(", ").join(arguments) + ")";
     }
 
     @Override
@@ -96,16 +109,14 @@ public final class CallExpression
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        CallExpression that = (CallExpression) o;
-        return Objects.equals(signature, that.signature) &&
-                Objects.equals(returnType, that.returnType) &&
-                Objects.equals(arguments, that.arguments);
+        CallExpression other = (CallExpression) o;
+        return Objects.equals(this.functionHandle, other.functionHandle) && Objects.equals(this.arguments, other.arguments);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(signature, returnType, arguments);
+        return Objects.hash(functionHandle, arguments);
     }
 
     @Override
@@ -149,8 +160,8 @@ public final class CallExpression
 
         try {
             CallExpression that = (CallExpression) o;
-            OperatorType operator = this.getSignature().unmangleOperator(that.getSignature().getName());
-            OperatorType operatorThat = that.getSignature().unmangleOperator(that.getSignature().getName());
+            OperatorType operator = Signature.unmangleOperator(this.displayName);
+            OperatorType operatorThat = Signature.unmangleOperator(that.displayName);
             if (!operator.isComparisonOperator() || !operatorThat.isComparisonOperator() ||
                     this.getArguments().size() != 2 || that.getArguments().size() != 2) {
                 return false;

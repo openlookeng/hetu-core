@@ -15,13 +15,15 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 
 import static io.prestosql.operator.scalar.JsonToMapCast.JSON_TO_MAP;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.comparableTypeParameter;
 import static io.prestosql.spi.function.Signature.typeVariable;
@@ -36,7 +38,7 @@ public final class JsonStringToMapCast
     private JsonStringToMapCast()
     {
         super(new Signature(
-                JSON_STRING_TO_MAP_NAME,
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, JSON_STRING_TO_MAP_NAME),
                 SCALAR,
                 ImmutableList.of(comparableTypeParameter("K"), typeVariable("V")),
                 ImmutableList.of(),
@@ -65,8 +67,8 @@ public final class JsonStringToMapCast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
-        return JSON_TO_MAP.specialize(boundVariables, arity, metadata);
+        return JSON_TO_MAP.specialize(boundVariables, arity, functionAndTypeManager);
     }
 }

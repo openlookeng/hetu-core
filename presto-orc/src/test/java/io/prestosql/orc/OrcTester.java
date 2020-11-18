@@ -1387,12 +1387,12 @@ public class OrcTester
 
     private static Type arrayType(Type elementType)
     {
-        return METADATA.getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(elementType.getTypeSignature())));
+        return METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(elementType.getTypeSignature())));
     }
 
     public static Type mapType(Type keyType, Type valueType)
     {
-        return METADATA.getParameterizedType(StandardTypes.MAP, ImmutableList.of(TypeSignatureParameter.of(keyType.getTypeSignature()), TypeSignatureParameter.of(valueType.getTypeSignature())));
+        return METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.MAP, ImmutableList.of(TypeSignatureParameter.of(keyType.getTypeSignature()), TypeSignatureParameter.of(valueType.getTypeSignature())));
     }
 
     private static Type rowType(Type... fieldTypes)
@@ -1403,6 +1403,6 @@ public class OrcTester
             Type fieldType = fieldTypes[i];
             typeSignatureParameters.add(TypeSignatureParameter.of(new NamedTypeSignature(Optional.of(new RowFieldName(filedName, false)), fieldType.getTypeSignature())));
         }
-        return METADATA.getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
+        return METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.ROW, typeSignatureParameters.build());
     }
 }

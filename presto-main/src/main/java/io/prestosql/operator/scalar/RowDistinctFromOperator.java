@@ -15,27 +15,28 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.FunctionInvoker;
-import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ScalarImplementationChoice;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.InvocationConvention;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.ScalarFunctionImplementation.ScalarImplementationChoice;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Defaults.defaultValue;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.InvocationConvention.InvocationArgumentConvention.NULL_FLAG;
 import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.Signature.comparableWithVariadicBound;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.TypeUtils.readNativeValue;
@@ -59,33 +60,34 @@ public class RowDistinctFromOperator
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         ImmutableList.Builder<MethodHandle> argumentMethods = ImmutableList.builder();
         Type type = boundVariables.getTypeVariable("T");
         for (Type parameterType : type.getTypeParameters()) {
-            Signature signature = metadata.resolveOperator(IS_DISTINCT_FROM, ImmutableList.of(parameterType, parameterType));
-            FunctionInvoker functionInvoker = metadata.getFunctionInvokerProvider().createFunctionInvoker(
-                    signature,
+            FunctionHandle operatorHandle = functionAndTypeManager.resolveOperatorFunctionHandle(IS_DISTINCT_FROM, TypeSignatureProvider.fromTypes(parameterType, parameterType));
+            FunctionInvoker functionInvoker = functionAndTypeManager.getFunctionInvokerProvider().createFunctionInvoker(
+                    operatorHandle,
                     Optional.of(new InvocationConvention(
                             ImmutableList.of(NULL_FLAG, NULL_FLAG),
                             InvocationConvention.InvocationReturnConvention.FAIL_ON_NULL,
                             false)));
             argumentMethods.add(functionInvoker.methodHandle());
         }
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 ImmutableList.of(
                         new ScalarImplementationChoice(
                                 false,
                                 ImmutableList.of(valueTypeArgumentProperty(USE_NULL_FLAG), valueTypeArgumentProperty(USE_NULL_FLAG)),
+                                BuiltInScalarFunctionImplementation.ReturnPlaceConvention.STACK,
                                 METHOD_HANDLE_NULL_FLAG.bindTo(type).bindTo(argumentMethods.build()),
                                 Optional.empty()),
                         new ScalarImplementationChoice(
                                 false,
                                 ImmutableList.of(valueTypeArgumentProperty(BLOCK_AND_POSITION), valueTypeArgumentProperty(BLOCK_AND_POSITION)),
+                                BuiltInScalarFunctionImplementation.ReturnPlaceConvention.STACK,
                                 METHOD_HANDLE_BLOCK_POSITION.bindTo(type).bindTo(argumentMethods.build()),
-                                Optional.empty())),
-                isDeterministic());
+                                Optional.empty())));
     }
 
     public static boolean isDistinctFrom(Type rowType, List<MethodHandle> argumentMethods, Block leftRow, boolean leftNull, Block rightRow, boolean rightNull)

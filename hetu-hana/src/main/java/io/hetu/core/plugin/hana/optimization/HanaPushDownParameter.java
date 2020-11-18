@@ -17,6 +17,7 @@ package io.hetu.core.plugin.hana.optimization;
 import io.hetu.core.plugin.hana.HanaConfig;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
+import io.prestosql.spi.function.StandardFunctionResolution;
 
 /**
  * Push Down parameter module
@@ -26,9 +27,9 @@ public class HanaPushDownParameter
 {
     private final HanaConfig hanaConfig;
 
-    public HanaPushDownParameter(String identifierQuote, boolean nameCaseInsensitive, JdbcPushDownModule pushDownModule, HanaConfig hanaConfig)
+    public HanaPushDownParameter(String identifierQuote, boolean nameCaseInsensitive, JdbcPushDownModule pushDownModule, HanaConfig hanaConfig, StandardFunctionResolution functionResolution)
     {
-        super(identifierQuote, nameCaseInsensitive, pushDownModule);
+        super(identifierQuote, nameCaseInsensitive, pushDownModule, functionResolution);
         this.hanaConfig = hanaConfig;
     }
 

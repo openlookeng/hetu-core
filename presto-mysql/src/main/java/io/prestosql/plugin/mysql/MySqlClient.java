@@ -33,6 +33,7 @@ import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.StatsCollecting;
 import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
@@ -42,6 +43,9 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.sql.QueryGenerator;
 import io.prestosql.spi.type.AbstractType;
@@ -107,6 +111,7 @@ public class MySqlClient
 {
     private final Type jsonType;
     private final JdbcPushDownModule pushDownModule;
+    private final BaseJdbcConfig config;
 
     @Inject
     public MySqlClient(BaseJdbcConfig config, @StatsCollecting ConnectionFactory connectionFactory, TypeManager typeManager)
@@ -114,6 +119,7 @@ public class MySqlClient
         super(config, "`", connectionFactory);
         this.pushDownModule = config.getPushDownModule();
         this.jsonType = typeManager.getType(new TypeSignature(StandardTypes.JSON));
+        this.config = config;
     }
 
     @Override
@@ -291,12 +297,12 @@ public class MySqlClient
     }
 
     @Override
-    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
+    public Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> getQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution)
     {
         // In most cases, the running efficiency of MySql is not satisfactory, so just base push down by default.
         JdbcPushDownModule mysqlPushDownModule = pushDownModule == DEFAULT ? BASE_PUSHDOWN : pushDownModule;
-        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, mysqlPushDownModule);
-        return Optional.of(new MySqlQueryGenerator(rowExpressionService, pushDownParameter));
+        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, mysqlPushDownModule, functionResolution);
+        return Optional.of(new MySqlQueryGenerator(determinismEvaluator, rowExpressionService, functionManager, functionResolution, pushDownParameter, config));
     }
 
     @SuppressWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")

@@ -143,7 +143,11 @@ public class TestFeaturesConfig
                 .setEnableStarTreeIndex(false)
                 .setCubeMetadataCacheSize(5)
                 .setCubeMetadataCacheTtl(new Duration(1, HOURS))
-                .setImplicitConversionEnabled(false));
+                .setImplicitConversionEnabled(false)
+                .setLegacyCharToVarcharCoercion(false)
+                .setLegacyDateTimestampToVarcharCoercion(false)
+                .setLegacyMapSubscript(false)
+                .setListBuiltInFunctionsOnly(true));
     }
 
     @Test
@@ -239,6 +243,10 @@ public class TestFeaturesConfig
                 .put("cube.metadata-cache-size", "10")
                 .put("cube.metadata-cache-ttl", "10m")
                 .put("optimizer.enable-star-tree-index", "true")
+                .put("deprecated.legacy-char-to-varchar-coercion", "true")
+                .put("deprecated.legacy-date-timestamp-to-varchar-coercion", "true")
+                .put("deprecated.legacy-map-subscript", "true")
+                .put("list-built-in-functions-only", "false")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -331,7 +339,12 @@ public class TestFeaturesConfig
                 .setSpillOperatorThresholdReuseExchange(100)
                 .setEnableStarTreeIndex(true)
                 .setCubeMetadataCacheSize(10)
-                .setCubeMetadataCacheTtl(new Duration(10, MINUTES));
+                .setCubeMetadataCacheTtl(new Duration(10, MINUTES))
+                .setLegacyCharToVarcharCoercion(true)
+                .setLegacyDateTimestampToVarcharCoercion(true)
+                .setLegacyMapSubscript(true)
+                .setListBuiltInFunctionsOnly(false);
+
         assertFullMapping(properties, expected);
     }
 

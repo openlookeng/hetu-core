@@ -52,30 +52,30 @@ public class TestLearnAggregations
     private static final MetadataManager METADATA = createTestMetadataManager();
 
     static {
-        METADATA.addParametricType(new ClassifierParametricType());
-        METADATA.addType(ModelType.MODEL);
-        METADATA.addType(RegressorType.REGRESSOR);
+        METADATA.getFunctionAndTypeManager().addParametricType(new ClassifierParametricType());
+        METADATA.getFunctionAndTypeManager().addType(ModelType.MODEL);
+        METADATA.getFunctionAndTypeManager().addType(RegressorType.REGRESSOR);
     }
 
     @Test
     public void testLearn()
     {
-        Type mapType = METADATA.getParameterizedType("map", ImmutableList.of(TypeSignatureParameter.of(parseTypeSignature(StandardTypes.BIGINT)), TypeSignatureParameter.of(parseTypeSignature(StandardTypes.DOUBLE))));
+        Type mapType = METADATA.getFunctionAndTypeManager().getParameterizedType("map", ImmutableList.of(TypeSignatureParameter.of(parseTypeSignature(StandardTypes.BIGINT)), TypeSignatureParameter.of(parseTypeSignature(StandardTypes.DOUBLE))));
         List<TypeSignature> inputTypes = ImmutableList.of(BIGINT.getTypeSignature(), mapType.getTypeSignature());
         InternalAggregationFunction aggregation = parseFunctionDefinitionWithTypesConstraint(LearnClassifierAggregation.class, BIGINT_CLASSIFIER.getTypeSignature(), inputTypes)
-                .specialize(BoundVariables.builder().build(), inputTypes.size(), METADATA);
+                .specialize(BoundVariables.builder().build(), inputTypes.size(), METADATA.getFunctionAndTypeManager());
         assertLearnClassifer(aggregation.bind(ImmutableList.of(0, 1), Optional.empty()).createAccumulator());
     }
 
     @Test
     public void testLearnLibSvm()
     {
-        Type mapType = METADATA.getParameterizedType("map", ImmutableList.of(TypeSignatureParameter.of(parseTypeSignature(StandardTypes.BIGINT)), TypeSignatureParameter.of(parseTypeSignature(StandardTypes.DOUBLE))));
+        Type mapType = METADATA.getFunctionAndTypeManager().getParameterizedType("map", ImmutableList.of(TypeSignatureParameter.of(parseTypeSignature(StandardTypes.BIGINT)), TypeSignatureParameter.of(parseTypeSignature(StandardTypes.DOUBLE))));
         InternalAggregationFunction aggregation = parseFunctionDefinitionWithTypesConstraint(
                 LearnLibSvmClassifierAggregation.class,
                 BIGINT_CLASSIFIER.getTypeSignature(),
                 ImmutableList.of(BIGINT.getTypeSignature(), mapType.getTypeSignature(), VarcharType.getParametrizedVarcharSignature("x")))
-                .specialize(BoundVariables.builder().setLongVariable("x", (long) Integer.MAX_VALUE).build(), 3, METADATA);
+                .specialize(BoundVariables.builder().setLongVariable("x", (long) Integer.MAX_VALUE).build(), 3, METADATA.getFunctionAndTypeManager());
         assertLearnClassifer(aggregation.bind(ImmutableList.of(0, 1, 2), Optional.empty()).createAccumulator());
     }
 
@@ -93,7 +93,7 @@ public class TestLearnAggregations
 
     private static Page getPage()
     {
-        Type mapType = METADATA.getParameterizedType("map", ImmutableList.of(TypeSignatureParameter.of(parseTypeSignature(StandardTypes.BIGINT)), TypeSignatureParameter.of(parseTypeSignature(StandardTypes.DOUBLE))));
+        Type mapType = METADATA.getFunctionAndTypeManager().getParameterizedType("map", ImmutableList.of(TypeSignatureParameter.of(parseTypeSignature(StandardTypes.BIGINT)), TypeSignatureParameter.of(parseTypeSignature(StandardTypes.DOUBLE))));
         int datapoints = 100;
         RowPageBuilder builder = RowPageBuilder.rowPageBuilder(BIGINT, mapType, VarcharType.VARCHAR);
         Random rand = new Random(0);

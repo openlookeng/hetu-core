@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.BASE_PUSHDOWN;
 import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.DEFAULT;
+import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.REMOTE_FUNCTION_CATALOG_SCHEMA;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -31,6 +32,8 @@ public class TestBaseJdbcConfig
     public void testDefaults()
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(BaseJdbcConfig.class)
+                .setPushDownExternalFunctionNamespace(null)
+                .setConnectorRegistryFunctionNamespace(null)
                 .setConnectionUrl(null)
                 .setConnectionUser(null)
                 .setConnectionPassword(null)
@@ -64,6 +67,8 @@ public class TestBaseJdbcConfig
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
+                .put(REMOTE_FUNCTION_CATALOG_SCHEMA, "mem.testing|fs.testing")
+                .put("connector.externalfunction.namespace", "jdbc.v1")
                 .put("connection-url", "jdbc:h2:mem:config")
                 .put("connection-user", "user")
                 .put("connection-password", "password")
@@ -93,6 +98,8 @@ public class TestBaseJdbcConfig
                 .build();
 
         BaseJdbcConfig expected = new BaseJdbcConfig()
+                .setPushDownExternalFunctionNamespace("mem.testing|fs.testing")
+                .setConnectorRegistryFunctionNamespace("jdbc.v1")
                 .setConnectionUrl("jdbc:h2:mem:config")
                 .setConnectionUser("user")
                 .setConnectionPassword("password")

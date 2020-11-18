@@ -18,6 +18,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.AggregationOperator.AggregationOperatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -59,16 +60,16 @@ public class TestAggregationOperator
 {
     private static final Metadata metadata = createTestMetadataManager();
 
-    private static final InternalAggregationFunction LONG_AVERAGE = metadata.getAggregateFunctionImplementation(
-            new Signature("avg", AGGREGATE, DOUBLE.getTypeSignature(), BIGINT.getTypeSignature()));
-    private static final InternalAggregationFunction DOUBLE_SUM = metadata.getAggregateFunctionImplementation(
-            new Signature("sum", AGGREGATE, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()));
-    private static final InternalAggregationFunction LONG_SUM = metadata.getAggregateFunctionImplementation(
-            new Signature("sum", AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
-    private static final InternalAggregationFunction REAL_SUM = metadata.getAggregateFunctionImplementation(
-            new Signature("sum", AGGREGATE, REAL.getTypeSignature(), REAL.getTypeSignature()));
-    private static final InternalAggregationFunction COUNT = metadata.getAggregateFunctionImplementation(
-            new Signature("count", AGGREGATE, BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction LONG_AVERAGE = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("avg"), AGGREGATE, DOUBLE.getTypeSignature(), BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction DOUBLE_SUM = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("sum"), AGGREGATE, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()));
+    private static final InternalAggregationFunction LONG_SUM = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("sum"), AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction REAL_SUM = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("sum"), AGGREGATE, REAL.getTypeSignature(), REAL.getTypeSignature()));
+    private static final InternalAggregationFunction COUNT = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, BIGINT.getTypeSignature()));
 
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
@@ -90,10 +91,10 @@ public class TestAggregationOperator
     @Test
     public void testAggregation()
     {
-        InternalAggregationFunction countVarcharColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
-        InternalAggregationFunction maxVarcharColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("max", AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
         List<Page> input = rowPagesBuilder(VARCHAR, BIGINT, VARCHAR, BIGINT, REAL, DOUBLE, VARCHAR)
                 .addSequencePage(100, 0, 0, 300, 500, 400, 500, 500)
                 .build();

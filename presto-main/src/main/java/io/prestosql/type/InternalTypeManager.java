@@ -14,9 +14,9 @@
 package io.prestosql.type;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
@@ -30,16 +30,17 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static java.util.Objects.requireNonNull;
 
 public final class InternalTypeManager
         implements TypeManager
 {
-    private final Metadata metadata;
+    private final FunctionAndTypeManager metadata;
     private final TypeCoercion typeCoercion;
 
     @Inject
-    public InternalTypeManager(Metadata metadata)
+    public InternalTypeManager(FunctionAndTypeManager metadata)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.typeCoercion = new TypeCoercion(this::getType);
@@ -60,8 +61,8 @@ public final class InternalTypeManager
     @Override
     public MethodHandle resolveOperator(OperatorType operatorType, List<? extends Type> argumentTypes)
     {
-        Signature signature = metadata.resolveOperator(operatorType, argumentTypes);
-        return metadata.getScalarFunctionImplementation(signature).getMethodHandle();
+        FunctionHandle operatorHandle = metadata.resolveOperatorFunctionHandle(operatorType, fromTypes(argumentTypes));
+        return metadata.getBuiltInScalarFunctionImplementation(operatorHandle).getMethodHandle();
     }
 
     @Override

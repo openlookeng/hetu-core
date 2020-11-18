@@ -33,7 +33,6 @@ import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
@@ -56,9 +55,9 @@ import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.PageAssertions.assertPageEquals;
-import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -74,8 +73,8 @@ import static org.testng.Assert.assertTrue;
 public class TestTableWriterOperator
 {
     private static final CatalogName CONNECTOR_ID = new CatalogName("testConnectorId");
-    private static final InternalAggregationFunction LONG_MAX = createTestMetadataManager().getAggregateFunctionImplementation(
-            new Signature("max", AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction LONG_MAX = createTestMetadataManager().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            createTestMetadataManager().getFunctionAndTypeManager().lookupFunction("max", fromTypes(BIGINT)));
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
 

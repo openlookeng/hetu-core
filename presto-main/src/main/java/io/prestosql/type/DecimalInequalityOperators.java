@@ -32,6 +32,9 @@ import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.prestosql.metadata.PolymorphicScalarFunctionBuilder.constant;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.OperatorType.BETWEEN;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
@@ -41,9 +44,6 @@ import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.function.OperatorType.NOT_EQUAL;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.compare;
@@ -116,7 +116,7 @@ public class DecimalInequalityOperators
                 .argumentTypes(DECIMAL_SIGNATURE, DECIMAL_SIGNATURE)
                 .returnType(parseTypeSignature(BOOLEAN))
                 .build();
-        return SqlScalarFunction.builder(DecimalInequalityOperators.class)
+        return SqlScalarFunction.builder(DecimalInequalityOperators.class, operatorType)
                 .signature(signature)
                 .deterministic(true);
     }
@@ -265,7 +265,7 @@ public class DecimalInequalityOperators
                 .argumentTypes(DECIMAL_SIGNATURE, DECIMAL_SIGNATURE, DECIMAL_SIGNATURE)
                 .returnType(parseTypeSignature(BOOLEAN))
                 .build();
-        return SqlScalarFunction.builder(DecimalInequalityOperators.class)
+        return SqlScalarFunction.builder(DecimalInequalityOperators.class, BETWEEN)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice

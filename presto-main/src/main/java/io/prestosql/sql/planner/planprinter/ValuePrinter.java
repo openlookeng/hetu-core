@@ -17,10 +17,11 @@ import io.airlift.slice.Slice;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.OperatorNotFoundException;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.InterpretedFunctionInvoker;
 
+import static io.prestosql.metadata.CastType.CAST;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.util.Objects.requireNonNull;
 
@@ -52,8 +53,9 @@ public final class ValuePrinter
             return "NULL";
         }
 
-        Signature coercion = metadata.getCoercion(type.getTypeSignature(), VARCHAR.getTypeSignature());
-        Slice coerced = (Slice) new InterpretedFunctionInvoker(metadata).invoke(coercion, session.toConnectorSession(), value);
+        FunctionHandle coercion = metadata.getFunctionAndTypeManager().lookupCast(CAST, type.getTypeSignature(), VARCHAR.getTypeSignature());
+        Slice coerced = (Slice) new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager()).invoke(coercion, session.toConnectorSession(), value);
+
         return coerced.toStringUtf8();
     }
 }

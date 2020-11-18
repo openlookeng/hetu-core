@@ -14,7 +14,7 @@
 package io.prestosql.operator.annotations;
 
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 
 import static java.util.Objects.requireNonNull;
 
@@ -29,7 +29,7 @@ public final class LiteralImplementationDependency
     }
 
     @Override
-    public Long resolve(BoundVariables boundVariables, Metadata metadata)
+    public Long resolve(BoundVariables boundVariables, FunctionAndTypeManager functionAndTypeManager)
     {
         return boundVariables.getLongVariable(literalName);
     }

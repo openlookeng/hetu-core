@@ -19,6 +19,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.StandardTypes;
@@ -46,8 +47,8 @@ public class TestRealHistogramAggregation
 
     public TestRealHistogramAggregation()
     {
-        InternalAggregationFunction function = createTestMetadataManager().getAggregateFunctionImplementation(
-                new Signature("numeric_histogram",
+        InternalAggregationFunction function = createTestMetadataManager().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("numeric_histogram"),
                         AGGREGATE,
                         parseTypeSignature("map(real, real)"),
                         parseTypeSignature(StandardTypes.BIGINT),

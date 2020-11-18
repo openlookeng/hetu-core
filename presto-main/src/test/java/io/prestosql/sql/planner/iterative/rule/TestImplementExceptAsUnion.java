@@ -34,7 +34,7 @@ public class TestImplementExceptAsUnion
     @Test
     public void test()
     {
-        tester().assertThat(new ImplementExceptAsUnion())
+        tester().assertThat(new ImplementExceptAsUnion(getMetadata()))
                 .on(p -> {
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");

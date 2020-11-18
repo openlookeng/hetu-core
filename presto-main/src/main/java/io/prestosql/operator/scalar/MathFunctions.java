@@ -40,6 +40,7 @@ import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
+import static io.prestosql.spi.function.OperatorType.MODULUS;
 import static io.prestosql.spi.type.Decimals.longTenToNth;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.add;
@@ -523,7 +524,7 @@ public final class MathFunctions
                 .kind(SCALAR)
                 .name("mod")
                 .build();
-        return modulusScalarFunction(signature);
+        return modulusScalarFunction(signature, MODULUS);
     }
 
     @Description("remainder of given quotient")

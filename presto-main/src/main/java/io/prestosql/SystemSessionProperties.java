@@ -155,6 +155,7 @@ public final class SystemSessionProperties
     public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
     public static final String CTE_MAX_PREFETCH_QUEUE_SIZE = "cte_max_prefetch_queue_size";
     public static final String DELETE_TRANSACTIONAL_TABLE_DIRECT = "delete_transactional_table_direct";
+    public static final String LIST_BUILT_IN_FUNCTIONS_ONLY = "list_built_in_functions_only";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -715,6 +716,11 @@ public final class SystemSessionProperties
                         ENABLE_STAR_TREE_INDEX,
                         "Enable star-tree index",
                         featuresConfig.isEnableStarTreeIndex(),
+                        false),
+                booleanProperty(
+                        LIST_BUILT_IN_FUNCTIONS_ONLY,
+                        "Only List built-in functions in SHOW FUNCTIONS",
+                        featuresConfig.isListBuiltInFunctionsOnly(),
                         false));
     }
 
@@ -1257,5 +1263,10 @@ public final class SystemSessionProperties
     public static boolean isEnableStarTreeIndex(Session session)
     {
         return session.getSystemProperty(ENABLE_STAR_TREE_INDEX, Boolean.class);
+    }
+
+    public static boolean isListBuiltInFunctionsOnly(Session session)
+    {
+        return session.getSystemProperty(LIST_BUILT_IN_FUNCTIONS_ONLY, Boolean.class);
     }
 }

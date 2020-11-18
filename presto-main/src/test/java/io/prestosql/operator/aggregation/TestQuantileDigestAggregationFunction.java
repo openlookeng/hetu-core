@@ -20,6 +20,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.scalar.AbstractTestFunctions;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.SqlVarbinary;
 import io.prestosql.spi.type.StandardTypes;
@@ -164,8 +165,8 @@ public class TestQuantileDigestAggregationFunction
     private InternalAggregationFunction getAggregationFunction(String... type)
     {
         TypeSignature[] typeSignatures = Arrays.stream(type).map(TypeSignature::parseTypeSignature).toArray(TypeSignature[]::new);
-        return METADATA.getAggregateFunctionImplementation(
-                new Signature("qdigest_agg",
+        return METADATA.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("qdigest_agg"),
                         AGGREGATE,
                         parseTypeSignature(format("qdigest(%s)", type[0])),
                         typeSignatures));

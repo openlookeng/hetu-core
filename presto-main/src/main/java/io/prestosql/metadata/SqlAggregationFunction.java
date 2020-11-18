@@ -16,10 +16,10 @@ package io.prestosql.metadata;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.operator.aggregation.AggregationFromAnnotationsParser;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.LongVariableConstraint;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.function.TypeVariableConstraint;
 import io.prestosql.spi.type.TypeSignature;
 
@@ -27,11 +27,12 @@ import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static java.util.Objects.requireNonNull;
 
 public abstract class SqlAggregationFunction
-        implements SqlFunction
+        extends BuiltInFunction
 {
     private final Signature signature;
     private final boolean hidden;
@@ -91,7 +92,7 @@ public abstract class SqlAggregationFunction
         requireNonNull(argumentTypes, "argumentTypes is null");
         checkArgument(kind == AGGREGATE, "kind must be an aggregate");
         return new Signature(
-                name,
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, name),
                 kind,
                 ImmutableList.copyOf(typeVariableConstraints),
                 ImmutableList.copyOf(longVariableConstraints),
@@ -118,5 +119,5 @@ public abstract class SqlAggregationFunction
         return true;
     }
 
-    public abstract InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, Metadata metadata);
+    public abstract InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager);
 }

@@ -63,6 +63,7 @@ import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowCubes;
+import io.prestosql.sql.tree.ShowExternalFunction;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -108,6 +109,7 @@ public final class StatementUtils
         builder.put(ShowCatalogs.class, QueryType.DESCRIBE);
         builder.put(ShowCreate.class, QueryType.DESCRIBE);
         builder.put(ShowCubes.class, QueryType.DESCRIBE);
+        builder.put(ShowExternalFunction.class, QueryType.DESCRIBE);
         builder.put(ShowFunctions.class, QueryType.DESCRIBE);
         builder.put(ShowGrants.class, QueryType.DESCRIBE);
         builder.put(ShowRoles.class, QueryType.DESCRIBE);

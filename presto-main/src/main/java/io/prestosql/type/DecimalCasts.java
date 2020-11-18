@@ -103,7 +103,7 @@ public final class DecimalCasts
                 .argumentTypes(parseTypeSignature("decimal(precision,scale)", ImmutableSet.of("precision", "scale")))
                 .returnType(to)
                 .build();
-        return SqlScalarFunction.builder(DecimalCasts.class)
+        return SqlScalarFunction.builder(DecimalCasts.class, CAST)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice
@@ -137,7 +137,7 @@ public final class DecimalCasts
                 .argumentTypes(from)
                 .returnType(parseTypeSignature("decimal(precision,scale)", ImmutableSet.of("precision", "scale")))
                 .build();
-        return SqlScalarFunction.builder(DecimalCasts.class)
+        return SqlScalarFunction.builder(DecimalCasts.class, CAST)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice

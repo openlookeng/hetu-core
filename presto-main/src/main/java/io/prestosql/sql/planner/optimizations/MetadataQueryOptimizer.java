@@ -25,6 +25,7 @@ import io.prestosql.metadata.TableProperties;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.DiscretePredicates;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.FilterNode;
@@ -65,7 +66,10 @@ import static java.util.stream.Collectors.toList;
 public class MetadataQueryOptimizer
         implements PlanOptimizer
 {
-    private static final Set<String> ALLOWED_FUNCTIONS = ImmutableSet.of("max", "min", "approx_distinct");
+    private static final Set<QualifiedObjectName> ALLOWED_FUNCTIONS = ImmutableSet.of(
+            QualifiedObjectName.valueOfDefaultFunction("max"),
+            QualifiedObjectName.valueOfDefaultFunction("min"),
+            QualifiedObjectName.valueOfDefaultFunction("approx_distinct"));
 
     private final Metadata metadata;
     private final LiteralEncoder literalEncoder;
@@ -108,7 +112,8 @@ public class MetadataQueryOptimizer
         {
             // supported functions are only MIN/MAX/APPROX_DISTINCT or distinct aggregates
             for (Aggregation aggregation : node.getAggregations().values()) {
-                if (!ALLOWED_FUNCTIONS.contains(aggregation.getSignature().getName()) && !aggregation.isDistinct()) {
+                QualifiedObjectName functionName = metadata.getFunctionAndTypeManager().getFunctionMetadata(aggregation.getFunctionHandle()).getName();
+                if (!ALLOWED_FUNCTIONS.contains(functionName) && !aggregation.isDistinct()) {
                     return context.defaultRewrite(node);
                 }
             }

@@ -15,10 +15,10 @@ package io.prestosql.testing;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllSystemAccessControl;
 import io.prestosql.spi.connector.CatalogSchemaName;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.ViewExpression;
 import io.prestosql.spi.type.Type;

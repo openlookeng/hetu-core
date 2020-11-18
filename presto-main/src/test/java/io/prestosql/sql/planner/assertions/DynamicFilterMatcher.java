@@ -24,8 +24,8 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.sql.DynamicFilters;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.Expression;
 
@@ -78,10 +78,11 @@ public class DynamicFilterMatcher
         this.filterNode = filterNode;
         this.symbolAliases = symbolAliases;
 
-        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata));
+        FunctionResolution functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), functionResolution, metadata.getFunctionAndTypeManager());
         boolean staticFilterMatches = expectedStaticFilter.map(filter -> {
             RowExpressionVerifier verifier = new RowExpressionVerifier(symbolAliases, metadata, session, filterNode.getOutputSymbols());
-            RowExpression staticFilter = RowExpressionUtils.combineConjuncts(extractDynamicFilters(filterNode.getPredicate()).getStaticConjuncts());
+            RowExpression staticFilter = logicalRowExpressions.combineConjuncts(extractDynamicFilters(filterNode.getPredicate()).getStaticConjuncts());
             return verifier.process(filter, staticFilter);
         }).orElse(true);
 

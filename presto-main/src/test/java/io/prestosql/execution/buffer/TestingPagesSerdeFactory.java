@@ -34,13 +34,13 @@ public class TestingPagesSerdeFactory
     public TestingPagesSerdeFactory()
     {
         // compression should be enabled in as many tests as possible
-        super(createTestMetadataManager().getBlockEncodingSerde(), true);
+        super(createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(), true);
     }
 
     public static PagesSerde testingPagesSerde()
     {
         return new SynchronizedPagesSerde(
-                createTestMetadataManager().getBlockEncodingSerde(),
+                createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 Optional.of(new ZstdCompressor()),
                 Optional.of(new ZstdDecompressor()),
                 Optional.empty());

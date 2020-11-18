@@ -22,6 +22,7 @@ import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 import org.testng.annotations.Test;
@@ -44,9 +45,9 @@ public class TestEvaluateClassifierPredictions
     @Test
     public void testEvaluateClassifierPredictions()
     {
-        metadata.addFunctions(extractFunctions(new MLPlugin().getFunctions()));
-        InternalAggregationFunction aggregation = metadata.getAggregateFunctionImplementation(
-                new Signature("evaluate_classifier_predictions",
+        metadata.getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(new MLPlugin().getFunctions()));
+        InternalAggregationFunction aggregation = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("evaluate_classifier_predictions"),
                         AGGREGATE,
                         parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BIGINT)));
         Accumulator accumulator = aggregation.bind(ImmutableList.of(0, 1), Optional.empty()).createAccumulator();

@@ -15,6 +15,7 @@ package io.prestosql.operator.aggregation;
 
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.BigintType;
@@ -54,8 +55,8 @@ public class TestChecksumAggregation
     @Test
     public void testEmpty()
     {
-        InternalAggregationFunction booleanAgg = metadata.getAggregateFunctionImplementation(
-                new Signature("checksum",
+        InternalAggregationFunction booleanAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"),
                         AGGREGATE,
                         parseTypeSignature(VARBINARY),
                         parseTypeSignature(BOOLEAN)));
@@ -65,8 +66,8 @@ public class TestChecksumAggregation
     @Test
     public void testBoolean()
     {
-        InternalAggregationFunction booleanAgg = metadata.getAggregateFunctionImplementation(
-                new Signature("checksum",
+        InternalAggregationFunction booleanAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"),
                         AGGREGATE,
                         parseTypeSignature(VARBINARY),
                         parseTypeSignature(BOOLEAN)));
@@ -77,8 +78,8 @@ public class TestChecksumAggregation
     @Test
     public void testLong()
     {
-        InternalAggregationFunction longAgg = metadata.getAggregateFunctionImplementation(
-                new Signature("checksum",
+        InternalAggregationFunction longAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"),
                         AGGREGATE,
                         parseTypeSignature(VARBINARY),
                         parseTypeSignature(BIGINT)));
@@ -89,8 +90,8 @@ public class TestChecksumAggregation
     @Test
     public void testDouble()
     {
-        InternalAggregationFunction doubleAgg = metadata.getAggregateFunctionImplementation(
-                new Signature("checksum",
+        InternalAggregationFunction doubleAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"),
                         AGGREGATE,
                         parseTypeSignature(VARBINARY),
                         parseTypeSignature(DOUBLE)));
@@ -101,8 +102,8 @@ public class TestChecksumAggregation
     @Test
     public void testString()
     {
-        InternalAggregationFunction stringAgg = metadata.getAggregateFunctionImplementation(
-                new Signature("checksum",
+        InternalAggregationFunction stringAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"),
                         AGGREGATE,
                         parseTypeSignature(VARBINARY),
                         parseTypeSignature(VARCHAR)));
@@ -113,7 +114,7 @@ public class TestChecksumAggregation
     @Test
     public void testShortDecimal()
     {
-        InternalAggregationFunction decimalAgg = metadata.getAggregateFunctionImplementation(new Signature("checksum", AGGREGATE, parseTypeSignature(VARBINARY), parseTypeSignature("decimal(10,2)")));
+        InternalAggregationFunction decimalAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"), AGGREGATE, parseTypeSignature(VARBINARY), parseTypeSignature("decimal(10,2)")));
         Block block = createShortDecimalsBlock("11.11", "22.22", null, "33.33", "44.44");
         DecimalType shortDecimalType = DecimalType.createDecimalType(1);
         assertAggregation(decimalAgg, expectedChecksum(shortDecimalType, block), block);
@@ -122,7 +123,7 @@ public class TestChecksumAggregation
     @Test
     public void testLongDecimal()
     {
-        InternalAggregationFunction decimalAgg = metadata.getAggregateFunctionImplementation(new Signature("checksum", AGGREGATE, parseTypeSignature(VARBINARY), parseTypeSignature("decimal(19,2)")));
+        InternalAggregationFunction decimalAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"), AGGREGATE, parseTypeSignature(VARBINARY), parseTypeSignature("decimal(19,2)")));
         Block block = createLongDecimalsBlock("11.11", "22.22", null, "33.33", "44.44");
         DecimalType longDecimalType = DecimalType.createDecimalType(19);
         assertAggregation(decimalAgg, expectedChecksum(longDecimalType, block), block);
@@ -132,7 +133,7 @@ public class TestChecksumAggregation
     public void testArray()
     {
         ArrayType arrayType = new ArrayType(BigintType.BIGINT);
-        InternalAggregationFunction stringAgg = metadata.getAggregateFunctionImplementation(new Signature("checksum", AGGREGATE, VarbinaryType.VARBINARY.getTypeSignature(), arrayType.getTypeSignature()));
+        InternalAggregationFunction stringAgg = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(new Signature(QualifiedObjectName.valueOfDefaultFunction("checksum"), AGGREGATE, VarbinaryType.VARBINARY.getTypeSignature(), arrayType.getTypeSignature()));
         Block block = createArrayBigintBlock(asList(null, asList(1L, 2L), asList(3L, 4L), asList(5L, 6L)));
         assertAggregation(stringAgg, expectedChecksum(arrayType, block), block);
     }

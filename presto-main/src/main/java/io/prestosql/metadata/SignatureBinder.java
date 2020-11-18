@@ -23,6 +23,7 @@ import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.NamedTypeSignature;
 import io.prestosql.spi.type.ParameterKind;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
@@ -73,17 +74,17 @@ public class SignatureBinder
     // 4 is chosen arbitrarily here. This limit is set to avoid having infinite loops in iterative solving.
     private static final int SOLVE_ITERATION_LIMIT = 4;
 
-    private final Metadata metadata;
+    private final FunctionAndTypeManager functionAndTypeManager;
     private final TypeCoercion typeCoercion;
     private final Signature declaredSignature;
     private final boolean allowCoercion;
     private final Map<String, TypeVariableConstraint> typeVariableConstraints;
 
-    SignatureBinder(Metadata metadata, Signature declaredSignature, boolean allowCoercion)
+    SignatureBinder(FunctionAndTypeManager functionAndTypeManager, Signature declaredSignature, boolean allowCoercion)
     {
         checkNoLiteralVariableUsageAcrossTypes(declaredSignature);
-        this.metadata = requireNonNull(metadata, "metadata is null");
-        this.typeCoercion = new TypeCoercion(metadata::getType);
+        this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "metadata is null");
+        this.typeCoercion = new TypeCoercion(functionAndTypeManager::getType);
         this.declaredSignature = requireNonNull(declaredSignature, "parametrizedSignature is null");
         this.allowCoercion = allowCoercion;
         this.typeVariableConstraints = declaredSignature.getTypeVariableConstraints().stream()
@@ -176,6 +177,30 @@ public class SignatureBinder
                 .collect(toList());
 
         return new TypeSignature(baseType, parameters);
+    }
+
+    public static List<Type> applyBoundVariables(TypeManager typeManager, List<TypeSignature> typeSignatures, BoundVariables boundVariables)
+    {
+        ImmutableList.Builder<Type> builder = ImmutableList.builder();
+        for (TypeSignature typeSignature : typeSignatures) {
+            builder.add(applyBoundVariables(typeManager, typeSignature, boundVariables));
+        }
+        return builder.build();
+    }
+
+    public static Type applyBoundVariables(TypeManager typeManager, TypeSignature typeSignature, BoundVariables boundVariables)
+    {
+        String baseType = typeSignature.getBase();
+        if (boundVariables.containsTypeVariable(baseType)) {
+            checkState(typeSignature.getParameters().isEmpty(), "Type parameters cannot have parameters");
+            return boundVariables.getTypeVariable(baseType);
+        }
+
+        List<TypeSignatureParameter> parameters = typeSignature.getParameters().stream()
+                .map(typeSignatureParameter -> applyBoundVariables(typeSignatureParameter, boundVariables))
+                .collect(toList());
+
+        return typeManager.getParameterizedType(baseType, parameters);
     }
 
     /**
@@ -294,7 +319,7 @@ public class SignatureBinder
             if (typeVariableConstraint == null) {
                 return true;
             }
-            Type actualType = metadata.getType(actualTypeSignatureProvider.getTypeSignature());
+            Type actualType = functionAndTypeManager.getType(actualTypeSignatureProvider.getTypeSignature());
             resultBuilder.add(new TypeParameterSolver(
                     formalTypeSignature.getBase(),
                     actualType,
@@ -304,7 +329,7 @@ public class SignatureBinder
             return true;
         }
 
-        Type actualType = metadata.getType(actualTypeSignatureProvider.getTypeSignature());
+        Type actualType = functionAndTypeManager.getType(actualTypeSignatureProvider.getTypeSignature());
         if (isTypeWithLiteralParameters(formalTypeSignature)) {
             resultBuilder.add(new TypeWithLiteralParametersSolver(formalTypeSignature, actualType));
             return true;
@@ -502,7 +527,7 @@ public class SignatureBinder
     private boolean satisfiesCoercion(boolean allowCoercion, Type fromType, TypeSignature toTypeSignature)
     {
         if (allowCoercion) {
-            return typeCoercion.canCoerce(fromType, metadata.getType(toTypeSignature));
+            return typeCoercion.canCoerce(fromType, functionAndTypeManager.getType(toTypeSignature));
         }
         else {
             return fromType.getTypeSignature().equals(toTypeSignature);
@@ -663,7 +688,7 @@ public class SignatureBinder
                     originalTypeTypeParametersBuilder.add(typeSignatureParameter);
                 }
             }
-            Type originalType = metadata.getType(new TypeSignature(formalTypeSignature.getBase(), originalTypeTypeParametersBuilder.build()));
+            Type originalType = functionAndTypeManager.getType(new TypeSignature(formalTypeSignature.getBase(), originalTypeTypeParametersBuilder.build()));
             Optional<Type> commonSuperType = typeCoercion.getCommonSuperType(originalType, actualType);
             if (!commonSuperType.isPresent()) {
                 return SolverReturnStatus.UNSOLVABLE;
@@ -733,7 +758,7 @@ public class SignatureBinder
                 verify(getLambdaArgumentTypeSignatures(actualLambdaTypeSignature).equals(toTypeSignatures(lambdaArgumentTypes.get())));
             }
 
-            Type actualLambdaType = metadata.getType(actualLambdaTypeSignature);
+            Type actualLambdaType = functionAndTypeManager.getType(actualLambdaTypeSignature);
             Type actualReturnType = ((FunctionType) actualLambdaType).getReturnType();
 
             ImmutableList.Builder<TypeConstraintSolver> constraintsBuilder = ImmutableList.builder();
@@ -768,7 +793,7 @@ public class SignatureBinder
                     lambdaArgumentTypesBuilder.add(typeVariable);
                 }
                 else {
-                    lambdaArgumentTypesBuilder.add(metadata.getType(lambdaArgument));
+                    lambdaArgumentTypesBuilder.add(functionAndTypeManager.getType(lambdaArgument));
                 }
             }
             return Optional.of(lambdaArgumentTypesBuilder.build());
@@ -799,7 +824,7 @@ public class SignatureBinder
                 formalTypeSignature,
                 typeVariables,
                 longVariables,
-                metadata.getType(actualTypeSignatureProvider.getTypeSignature()),
+                functionAndTypeManager.getType(actualTypeSignatureProvider.getTypeSignature()),
                 allowCoercion));
         return true;
     }

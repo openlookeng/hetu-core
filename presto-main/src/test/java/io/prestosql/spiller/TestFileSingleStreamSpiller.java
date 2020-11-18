@@ -98,7 +98,7 @@ public class TestFileSingleStreamSpiller
     {
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executor, // executor won't be closed, because we don't call destroy() on the spiller factory
-                createTestMetadataManager().getBlockEncodingSerde(),
+                createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath.toPath()),
                 1.0,

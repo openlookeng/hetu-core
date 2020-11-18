@@ -56,7 +56,7 @@ public final class VariableToChannelTranslator
         {
             ImmutableList.Builder<RowExpression> arguments = ImmutableList.builder();
             call.getArguments().forEach(argument -> arguments.add(argument.accept(this, layout)));
-            return call(call.getSignature(), call.getType(), arguments.build(), call.getFilter());
+            return call(call.getDisplayName(), call.getFunctionHandle(), call.getType(), arguments.build(), call.getFilter());
         }
 
         @Override

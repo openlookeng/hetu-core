@@ -19,6 +19,7 @@ import io.airlift.units.DataSize;
 import io.prestosql.operator.HashAggregationOperator.HashAggregationOperatorFactory;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -42,8 +43,8 @@ public class HashAggregationBenchmark
     {
         super(localQueryRunner, "hash_agg", 5, 25);
 
-        doubleSum = localQueryRunner.getMetadata().getAggregateFunctionImplementation(
-                new Signature("sum", AGGREGATE, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()));
+        doubleSum = localQueryRunner.getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("sum"), AGGREGATE, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()));
     }
 
     @Override

@@ -14,14 +14,15 @@ package io.prestosql.operator.scalar;
  */
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
@@ -44,12 +45,12 @@ public abstract class RowComparisonOperator
                 ImmutableList.of(parseTypeSignature("T"), parseTypeSignature("T")));
     }
 
-    protected List<MethodHandle> getMethodHandles(RowType type, Metadata metadata, OperatorType operatorType)
+    protected List<MethodHandle> getMethodHandles(RowType type, FunctionAndTypeManager functionAndTypeManager, OperatorType operatorType)
     {
         ImmutableList.Builder<MethodHandle> argumentMethods = ImmutableList.builder();
         for (Type parameterType : type.getTypeParameters()) {
-            Signature signature = metadata.resolveOperator(operatorType, ImmutableList.of(parameterType, parameterType));
-            argumentMethods.add(metadata.getScalarFunctionImplementation(signature).getMethodHandle());
+            FunctionHandle operatorHandle = functionAndTypeManager.resolveOperatorFunctionHandle(operatorType, TypeSignatureProvider.fromTypes(parameterType, parameterType));
+            argumentMethods.add(functionAndTypeManager.getBuiltInScalarFunctionImplementation(operatorHandle).getMethodHandle());
         }
         return argumentMethods.build();
     }

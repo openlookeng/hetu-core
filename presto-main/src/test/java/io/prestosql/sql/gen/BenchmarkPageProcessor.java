@@ -23,6 +23,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.RowExpression;
@@ -184,37 +186,38 @@ public class BenchmarkPageProcessor
     //    and discount >= 0.05
     //    and discount <= 0.07
     //    and quantity < 24;
-    private static final RowExpression FILTER = call(new Signature("AND", SCALAR, parseTypeSignature(StandardTypes.BOOLEAN)),
+    private static final RowExpression FILTER = call(QualifiedObjectName.valueOfDefaultFunction("AND").toString(), new BuiltInFunctionHandle(new Signature(QualifiedObjectName.valueOfDefaultFunction("AND"), SCALAR, parseTypeSignature(StandardTypes.BOOLEAN))),
             BOOLEAN,
-            call(internalOperator(OperatorType.GREATER_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature()),
+            call(OperatorType.GREATER_THAN_OR_EQUAL.getFunctionName().toString(),
+                    new BuiltInFunctionHandle(internalOperator(OperatorType.GREATER_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature())),
                     BOOLEAN,
                     field(SHIP_DATE, VARCHAR),
                     constant(MIN_SHIP_DATE, VARCHAR)),
-            call(new Signature("AND", SCALAR, parseTypeSignature(StandardTypes.BOOLEAN)),
+            call(QualifiedObjectName.valueOfDefaultFunction("AND").toString(), new BuiltInFunctionHandle(new Signature(QualifiedObjectName.valueOfDefaultFunction("AND"), SCALAR, parseTypeSignature(StandardTypes.BOOLEAN))),
                     BOOLEAN,
-                    call(internalOperator(OperatorType.LESS_THAN, BOOLEAN.getTypeSignature(), VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature()),
+                    call(OperatorType.LESS_THAN.getFunctionName().toString(), new BuiltInFunctionHandle(internalOperator(OperatorType.LESS_THAN, BOOLEAN.getTypeSignature(), VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature())),
                             BOOLEAN,
                             field(SHIP_DATE, VARCHAR),
                             constant(MAX_SHIP_DATE, VARCHAR)),
-                    call(new Signature("AND", SCALAR, parseTypeSignature(StandardTypes.BOOLEAN)),
+                    call(QualifiedObjectName.valueOfDefaultFunction("AND").toString(), new BuiltInFunctionHandle(new Signature(QualifiedObjectName.valueOfDefaultFunction("AND"), SCALAR, parseTypeSignature(StandardTypes.BOOLEAN))),
                             BOOLEAN,
-                            call(internalOperator(OperatorType.GREATER_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()),
+                            call(OperatorType.GREATER_THAN_OR_EQUAL.getFunctionName().toString(), new BuiltInFunctionHandle(internalOperator(OperatorType.GREATER_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature())),
                                     BOOLEAN,
                                     field(DISCOUNT, DOUBLE),
                                     constant(0.05, DOUBLE)),
-                            call(new Signature("AND", SCALAR, parseTypeSignature(StandardTypes.BOOLEAN)),
+                            call(QualifiedObjectName.valueOfDefaultFunction("AND").toString(), new BuiltInFunctionHandle(new Signature(QualifiedObjectName.valueOfDefaultFunction("AND"), SCALAR, parseTypeSignature(StandardTypes.BOOLEAN))),
                                     BOOLEAN,
-                                    call(internalOperator(OperatorType.LESS_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()),
+                                    call(OperatorType.LESS_THAN_OR_EQUAL.getFunctionName().toString(), new BuiltInFunctionHandle(internalOperator(OperatorType.LESS_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature())),
                                             BOOLEAN,
                                             field(DISCOUNT, DOUBLE),
                                             constant(0.07, DOUBLE)),
-                                    call(internalOperator(OperatorType.LESS_THAN, BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()),
+                                    call(OperatorType.LESS_THAN.getFunctionName().toString(), new BuiltInFunctionHandle(internalOperator(OperatorType.LESS_THAN, BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature())),
                                             BOOLEAN,
                                             field(QUANTITY, DOUBLE),
                                             constant(24.0, DOUBLE))))));
 
-    private static final RowExpression PROJECT = call(
-            internalOperator(OperatorType.MULTIPLY, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()),
+    private static final RowExpression PROJECT = call(OperatorType.MULTIPLY.getFunctionName().toString(),
+            new BuiltInFunctionHandle(internalOperator(OperatorType.MULTIPLY, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature())),
             DOUBLE,
             field(EXTENDED_PRICE, DOUBLE),
             field(DISCOUNT, DOUBLE));

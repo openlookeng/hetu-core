@@ -21,6 +21,7 @@ import io.prestosql.operator.project.SelectedPositions;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
 import org.testng.annotations.Test;
@@ -44,8 +45,8 @@ import static org.testng.Assert.assertTrue;
 
 public class TestPageFunctionCompiler
 {
-    private static final CallExpression ADD_10_EXPRESSION = call(
-            Signature.internalOperator(ADD, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+    private static final CallExpression ADD_10_EXPRESSION = call(ADD.getFunctionName().toString(),
+            new BuiltInFunctionHandle(Signature.internalOperator(ADD, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
             BIGINT,
             field(0, BIGINT),
             constant(10L, BIGINT));

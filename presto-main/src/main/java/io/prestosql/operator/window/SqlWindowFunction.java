@@ -14,14 +14,14 @@
 package io.prestosql.operator.window;
 
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.BuiltInFunction;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.function.SqlFunction;
 
 import static java.util.Objects.requireNonNull;
 
 public class SqlWindowFunction
-        implements SqlFunction
+        extends BuiltInFunction
 {
     private final WindowFunctionSupplier supplier;
 
@@ -54,7 +54,7 @@ public class SqlWindowFunction
         return supplier.getDescription();
     }
 
-    public WindowFunctionSupplier specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public WindowFunctionSupplier specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         return supplier;
     }

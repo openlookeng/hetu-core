@@ -35,6 +35,7 @@ import io.prestosql.plugin.jdbc.LongWriteFunction;
 import io.prestosql.plugin.jdbc.SliceWriteFunction;
 import io.prestosql.plugin.jdbc.StatsCollecting;
 import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
@@ -43,6 +44,9 @@ import io.prestosql.spi.SuppressFBWarnings;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.sql.QueryGenerator;
 import io.prestosql.spi.type.AbstractType;
@@ -691,10 +695,10 @@ public class OracleClient
     }
 
     @Override
-    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
+    public Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> getQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution)
     {
-        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, pushDownModule);
-        return Optional.of(new OracleQueryGenerator(rowExpressionService, pushDownParameter));
+        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, pushDownModule, functionResolution);
+        return Optional.of(new OracleQueryGenerator(determinismEvaluator, rowExpressionService, functionManager, functionResolution, pushDownParameter));
     }
 
     private ColumnMapping decimalColumnMapping(DecimalType decimalType)

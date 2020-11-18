@@ -15,13 +15,15 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 
 import static io.prestosql.operator.scalar.JsonToRowCast.JSON_TO_ROW;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.withVariadicBound;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -35,7 +37,7 @@ public final class JsonStringToRowCast
     private JsonStringToRowCast()
     {
         super(new Signature(
-                JSON_STRING_TO_ROW_NAME,
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, JSON_STRING_TO_ROW_NAME),
                 SCALAR,
                 ImmutableList.of(withVariadicBound("T", "row")),
                 ImmutableList.of(),
@@ -64,8 +66,8 @@ public final class JsonStringToRowCast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
-        return JSON_TO_ROW.specialize(boundVariables, arity, metadata);
+        return JSON_TO_ROW.specialize(boundVariables, arity, functionAndTypeManager);
     }
 }

@@ -22,7 +22,6 @@ import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.OrderingSchemeUtils;
 import io.prestosql.sql.tree.FunctionCall;
-import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.Map;
@@ -71,7 +70,7 @@ public class AggregationFunctionMatcher
         if (expectedCall.getWindow().isPresent()) {
             return false;
         }
-        if (!Objects.equals(expectedCall.getName(), QualifiedName.of(aggregation.getSignature().getName())) ||
+        if (!Objects.equals(expectedCall.getName().getSuffix(), aggregation.getFunctionCall().getDisplayName()) ||
                 !Objects.equals(expectedCall.getFilter(), aggregation.getFilter()) ||
                 !Objects.equals(expectedCall.getOrderBy().map(OrderingSchemeUtils::fromOrderBy), aggregation.getOrderingScheme()) ||
                 !Objects.equals(expectedCall.isDistinct(), aggregation.isDistinct()) ||

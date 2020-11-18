@@ -27,13 +27,13 @@ import io.prestosql.metadata.HandleJsonModule;
 import io.prestosql.server.SliceDeserializer;
 import io.prestosql.server.SliceSerializer;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.spi.type.TestingTypeDeserializer;
@@ -58,7 +58,10 @@ import static com.google.inject.multibindings.Multibinder.newSetBinder;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.json.JsonBinder.jsonBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static io.prestosql.sql.relational.Expressions.call;
 import static org.testng.Assert.assertEquals;
 
 public class TestWindowNode
@@ -96,14 +99,8 @@ public class TestWindowNode
             throws Exception
     {
         Symbol windowSymbol = planSymbolAllocator.newSymbol("sum", BIGINT);
-        Signature signature = new Signature(
-                "sum",
-                FunctionKind.WINDOW,
-                ImmutableList.of(),
-                ImmutableList.of(),
-                BIGINT.getTypeSignature(),
-                ImmutableList.of(BIGINT.getTypeSignature()),
-                false);
+        FunctionHandle functionHandle = createTestMetadataManager().getFunctionAndTypeManager().lookupFunction("sum", fromTypes(BIGINT));
+
         WindowNode.Frame frame = new WindowNode.Frame(
                 Types.WindowFrameType.RANGE,
                 Types.FrameBoundType.UNBOUNDED_PRECEDING,
@@ -119,7 +116,8 @@ public class TestWindowNode
                 Optional.of(new OrderingScheme(
                         ImmutableList.of(columnB),
                         ImmutableMap.of(columnB, SortOrder.ASC_NULLS_FIRST))));
-        Map<Symbol, WindowNode.Function> functions = ImmutableMap.of(windowSymbol, new WindowNode.Function(signature, ImmutableList.of(new VariableReferenceExpression(columnC.getName(), BIGINT)), frame));
+        CallExpression call = call("sum", functionHandle, BIGINT, ImmutableList.of(new VariableReferenceExpression(columnC.getName(), BIGINT)));
+        Map<Symbol, WindowNode.Function> functions = ImmutableMap.of(windowSymbol, new WindowNode.Function(call, ImmutableList.of(new VariableReferenceExpression(columnC.getName(), BIGINT)), frame));
         Optional<Symbol> hashSymbol = Optional.of(columnB);
         Set<Symbol> prePartitionedInputs = ImmutableSet.of(columnA);
         WindowNode windowNode = new WindowNode(

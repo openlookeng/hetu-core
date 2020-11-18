@@ -22,7 +22,6 @@ import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.SymbolAllocator;
@@ -30,8 +29,9 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ColumnNotFoundException;
 import io.prestosql.spi.connector.CubeNotFoundException;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
@@ -42,8 +42,10 @@ import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
@@ -67,7 +69,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static io.prestosql.spi.StandardErrorCode.CUBE_ERROR;
-import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
@@ -123,16 +124,21 @@ public class AggregationRewriteWithCube
         // Rewrite AggregationNode using Cube table
         ImmutableMap.Builder<Symbol, AggregationNode.Aggregation> aggregationsBuilder = ImmutableMap.builder();
         for (CubeRewriteResult.AggregatorSource aggregatorSource : cubeRewriteResult.getAggregationColumns()) {
-            TypeSignature typeSignature = cubeRewriteResult.getSymbolMetadataMap().get(aggregatorSource.getOriginalAggSymbol()).getType().getTypeSignature();
+            Type type = cubeRewriteResult.getSymbolMetadataMap().get(aggregatorSource.getOriginalAggSymbol()).getType();
+            TypeSignature typeSignature = type.getTypeSignature();
             ColumnHandle cubeColHandle = cubeRewriteResult.getTableScanNode().getAssignments().get(aggregatorSource.getScanSymbol());
             ColumnMetadata cubeColumnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
             AggregationSignature aggregationSignature = cubeMetadata.getAggregationSignature(cubeColumnMetadata.getName())
                     .orElseThrow(() -> new ColumnNotFoundException(new SchemaTableName(starTreeTableName.getSchemaName(), starTreeTableName.getObjectName()), cubeColHandle.getColumnName()));
             String aggFunction = AggregationSignature.COUNT_FUNCTION_NAME.equals(aggregationSignature.getFunction()) ? "sum" : aggregationSignature.getFunction();
-            Signature signature = new Signature(aggFunction, AGGREGATE, typeSignature, typeSignature);
             SymbolReference argument = toSymbolReference(aggregatorSource.getScanSymbol());
+            FunctionHandle functionHandle = metadata.getFunctionAndTypeManager().lookupFunction(aggFunction, TypeSignatureProvider.fromTypeSignatures(typeSignature));
             aggregationsBuilder.put(aggregatorSource.getOriginalAggSymbol(), new AggregationNode.Aggregation(
-                    signature,
+                    new CallExpression(
+                            aggFunction,
+                            functionHandle,
+                            type,
+                            ImmutableList.of(OriginalExpressionUtils.castToRowExpression(argument))),
                     ImmutableList.of(OriginalExpressionUtils.castToRowExpression(argument)),
                     false,
                     Optional.empty(),
@@ -267,7 +273,7 @@ public class AggregationRewriteWithCube
             else if (originalAggregationNode.getAggregations().containsKey(originalAggOutputSymbol)) {
                 //output symbol is mapped to an aggregation
                 AggregationNode.Aggregation aggregation = originalAggregationNode.getAggregations().get(originalAggOutputSymbol);
-                String aggFunction = aggregation.getSignature().getName();
+                String aggFunction = aggregation.getFunctionCall().getDisplayName();
                 List<Expression> arguments = aggregation.getArguments() == null ? null : aggregation.getArguments()
                         .stream()
                         .map(OriginalExpressionUtils::castToExpression).collect(Collectors.toList());

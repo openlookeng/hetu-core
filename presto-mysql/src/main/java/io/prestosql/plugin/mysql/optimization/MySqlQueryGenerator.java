@@ -14,11 +14,15 @@
  */
 package io.prestosql.plugin.mysql.optimization;
 
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcQueryGenerator;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorContext;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.PlanVisitor;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 
@@ -27,9 +31,9 @@ import java.util.Optional;
 public class MySqlQueryGenerator
         extends BaseJdbcQueryGenerator
 {
-    public MySqlQueryGenerator(RowExpressionService rowExpressionService, JdbcPushDownParameter pushDownParameter)
+    public MySqlQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, JdbcPushDownParameter pushDownParameter, BaseJdbcConfig baseConfig)
     {
-        super(pushDownParameter, new MySqlRowExpressionConverter(rowExpressionService), new MySqlSqlStatementWriter(pushDownParameter));
+        super(pushDownParameter, new MySqlRowExpressionConverter(determinismEvaluator, rowExpressionService, functionManager, functionResolution, baseConfig), new MySqlSqlStatementWriter(pushDownParameter));
     }
 
     @Override

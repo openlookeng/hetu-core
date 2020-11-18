@@ -19,7 +19,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 
 import javax.annotation.concurrent.Immutable;
@@ -329,7 +330,7 @@ public class AggregationNode
 
     public static class Aggregation
     {
-        private final Signature signature;
+        private final CallExpression functionCall;
         private final List<RowExpression> arguments;
         private final boolean distinct;
         private final Optional<Symbol> filter;
@@ -338,14 +339,14 @@ public class AggregationNode
 
         @JsonCreator
         public Aggregation(
-                @JsonProperty("signature") Signature signature,
+                @JsonProperty("call") CallExpression functionCall,
                 @JsonProperty("arguments") List<RowExpression> arguments,
                 @JsonProperty("distinct") boolean distinct,
                 @JsonProperty("filter") Optional<Symbol> filter,
                 @JsonProperty("orderingScheme") Optional<OrderingScheme> orderingScheme,
                 @JsonProperty("mask") Optional<Symbol> mask)
         {
-            this.signature = requireNonNull(signature, "signature is null");
+            this.functionCall = requireNonNull(functionCall, "functionCall is null");
             this.arguments = ImmutableList.copyOf(requireNonNull(arguments, "arguments is null"));
 //            for (RowExpression argument : arguments) {
 //                checkArgument(isExpression(argument) && (castToExpression(argument) instanceof SymbolReference || castToExpression(argument) instanceof LambdaExpression),
@@ -358,9 +359,15 @@ public class AggregationNode
         }
 
         @JsonProperty
-        public Signature getSignature()
+        public CallExpression getFunctionCall()
         {
-            return signature;
+            return functionCall;
+        }
+
+        @JsonProperty
+        public FunctionHandle getFunctionHandle()
+        {
+            return functionCall.getFunctionHandle();
         }
 
         @JsonProperty
@@ -404,7 +411,7 @@ public class AggregationNode
             }
             Aggregation that = (Aggregation) o;
             return distinct == that.distinct &&
-                    Objects.equals(signature, that.signature) &&
+                    Objects.equals(functionCall, that.functionCall) &&
                     Objects.equals(arguments, that.arguments) &&
                     Objects.equals(filter, that.filter) &&
                     Objects.equals(orderingScheme, that.orderingScheme) &&
@@ -414,7 +421,7 @@ public class AggregationNode
         @Override
         public int hashCode()
         {
-            return Objects.hash(signature, arguments, distinct, filter, orderingScheme, mask);
+            return Objects.hash(functionCall, arguments, distinct, filter, orderingScheme, mask);
         }
     }
 }

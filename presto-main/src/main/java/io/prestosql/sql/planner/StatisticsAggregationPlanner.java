@@ -15,20 +15,26 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.aggregation.MaxDataSizeForStats;
 import io.prestosql.operator.aggregation.SumDataSizeForStats;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.statistics.TableStatisticType;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
@@ -73,12 +79,18 @@ public class StatisticsAggregationPlanner
         }
 
         ImmutableMap.Builder<Symbol, AggregationNode.Aggregation> aggregations = ImmutableMap.builder();
+        StandardFunctionResolution functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
         for (TableStatisticType type : statisticsMetadata.getTableStatistics()) {
             if (type != ROW_COUNT) {
                 throw new PrestoException(NOT_SUPPORTED, "Table-wide statistic type not supported: " + type);
             }
             AggregationNode.Aggregation aggregation = new AggregationNode.Aggregation(
-                    metadata.resolveFunction(QualifiedName.of("count"), ImmutableList.of()),
+                    new CallExpression(
+                            "count",
+                            functionResolution.countFunction(),
+                            BIGINT,
+                            ImmutableList.of(),
+                            Optional.empty()),
                     ImmutableList.of(),
                     false,
                     Optional.empty(),
@@ -130,12 +142,19 @@ public class StatisticsAggregationPlanner
 
     private ColumnStatisticsAggregation createAggregation(QualifiedName functionName, SymbolReference input, Type inputType, Type outputType)
     {
-        Signature signature = metadata.resolveFunction(functionName, fromTypes(inputType));
+        Signature signature = metadata.getFunctionAndTypeManager().resolveBuiltInFunction(functionName, fromTypes(inputType));
+        FunctionAndTypeManager functionAndTypeManager = metadata.getFunctionAndTypeManager();
+        FunctionHandle functionHandle = functionAndTypeManager.lookupFunction(functionName.getSuffix(), TypeSignatureProvider.fromTypes(ImmutableList.of(inputType)));
         Type resolvedType = metadata.getType(getOnlyElement(signature.getArgumentTypes()));
         verify(resolvedType.equals(inputType), "resolved function input type does not match the input type: %s != %s", resolvedType, inputType);
         return new ColumnStatisticsAggregation(
                 new AggregationNode.Aggregation(
-                        signature,
+                        new CallExpression(
+                                functionName.getSuffix(),
+                                functionHandle,
+                                outputType,
+                                ImmutableList.of(castToRowExpression(input)),
+                                Optional.empty()),
                         ImmutableList.of(castToRowExpression(input)),
                         false,
                         Optional.empty(),

@@ -72,7 +72,7 @@ import static org.testng.Assert.assertEquals;
 public class TestOrcAcidPageSource
 {
     private static final Metadata METADATA = createTestMetadataManager();
-    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
+    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA.getFunctionAndTypeManager());
 
     private static final HivePageSourceFactory PAGE_SOURCE_FACTORY = new OrcPageSourceFactory(
             TYPE_MANAGER,

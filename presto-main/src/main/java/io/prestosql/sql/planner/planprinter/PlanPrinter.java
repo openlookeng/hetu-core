@@ -29,6 +29,7 @@ import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.StageStats;
 import io.prestosql.execution.TableInfo;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -62,7 +63,6 @@ import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.TableStatisticType;
 import io.prestosql.spi.type.Type;
@@ -108,6 +108,8 @@ import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.planprinter.NodeRepresentation.TypedSymbol;
+import io.prestosql.sql.relational.FunctionResolution;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.util.GraphvizPrinter;
@@ -187,7 +189,7 @@ public class PlanPrinter
 
         this.representation = new PlanRepresentation(planRoot, types, totalCpuTime, totalScheduledTime);
 
-        RowExpressionFormatter rowExpressionFormatter = new RowExpressionFormatter();
+        RowExpressionFormatter rowExpressionFormatter = new RowExpressionFormatter(metadata);
         this.formatter = rowExpressionFormatter::formatRowExpression;
 
         Visitor visitor = new Visitor(stageExecutionStrategy, types, estimatedStatsAndCosts, stats, metadata);
@@ -394,6 +396,7 @@ public class PlanPrinter
         private final StatsAndCosts estimatedStatsAndCosts;
         private final Optional<Map<PlanNodeId, PlanNodeStats>> stats;
         private final Metadata metadata;
+        private final LogicalRowExpressions logicalRowExpressions;
 
         public Visitor(Optional<StageExecutionDescriptor> stageExecutionStrategy, TypeProvider types, StatsAndCosts estimatedStatsAndCosts, Optional<Map<PlanNodeId, PlanNodeStats>> stats, Metadata metadata)
         {
@@ -402,6 +405,7 @@ public class PlanPrinter
             this.estimatedStatsAndCosts = requireNonNull(estimatedStatsAndCosts, "estimatedStatsAndCosts is null");
             this.stats = requireNonNull(stats, "stats is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
+            this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
         }
 
         @Override
@@ -638,7 +642,7 @@ public class PlanPrinter
                 nodeOutput.appendDetailsLine(
                         "%s := %s(%s) %s",
                         entry.getKey(),
-                        function.getSignature().getName(),
+                        function.getFunctionCall().getDisplayName(),
                         Joiner.on(", ").join(function.getArguments()),
                         frameInfo);
             }
@@ -847,7 +851,7 @@ public class PlanPrinter
                 formatString += "filterPredicate = %s, ";
                 RowExpression predicate = filterNode.get().getPredicate();
                 DynamicFilters.ExtractResult extractResult = extractDynamicFilters(predicate);
-                arguments.add(formatter.apply(RowExpressionUtils.combineConjuncts(extractResult.getStaticConjuncts())));
+                arguments.add(formatter.apply(logicalRowExpressions.combineConjuncts(extractResult.getStaticConjuncts())));
                 if (!extractResult.getDynamicConjuncts().isEmpty()) {
                     formatString += "dynamicFilter = %s, ";
                     arguments.add(printDynamicFilters(extractResult.getDynamicConjuncts()));
@@ -1437,14 +1441,14 @@ public class PlanPrinter
         StringBuilder builder = new StringBuilder();
 
         String arguments = Joiner.on(", ").join(aggregation.getArguments());
-        if (aggregation.getArguments().isEmpty() && "count".equalsIgnoreCase(aggregation.getSignature().getName())) {
+        if (aggregation.getArguments().isEmpty() && "count".equalsIgnoreCase(aggregation.getFunctionCall().getDisplayName())) {
             arguments = "*";
         }
         if (aggregation.isDistinct()) {
             arguments = "DISTINCT " + arguments;
         }
 
-        builder.append(aggregation.getSignature().getName())
+        builder.append(aggregation.getFunctionCall().getDisplayName())
                 .append('(').append(arguments);
 
         aggregation.getOrderingScheme().ifPresent(orderingScheme -> builder.append(' ').append(orderingScheme.getOrderBy().stream()

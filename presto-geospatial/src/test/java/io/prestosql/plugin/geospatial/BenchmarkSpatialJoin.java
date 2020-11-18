@@ -15,8 +15,8 @@ package io.prestosql.plugin.geospatial;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.plugin.memory.MemoryConnectorFactory;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.testing.LocalQueryRunner;
 import io.prestosql.testing.MaterializedResult;

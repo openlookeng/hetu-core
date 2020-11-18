@@ -27,13 +27,13 @@ import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.NewTableLayout;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
@@ -114,6 +114,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
+import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
@@ -500,8 +501,8 @@ public class LogicalPlanner
                 targetLength = ((CharType) toType).getLength();
             }
 
-            Signature spaceTrimmedLength = metadata.resolveFunction(QualifiedName.of("$space_trimmed_length"), fromTypes(VARCHAR));
-            Signature fail = metadata.resolveFunction(QualifiedName.of("fail"), fromTypes(VARCHAR));
+            Signature spaceTrimmedLength = metadata.getFunctionAndTypeManager().resolveBuiltInFunction(QualifiedName.of("$space_trimmed_length"), fromTypes(VARCHAR));
+            Signature fail = metadata.getFunctionAndTypeManager().resolveBuiltInFunction(QualifiedName.of("fail"), fromTypes(VARCHAR));
 
             return new IfExpression(
                     // check if the trimmed value fits in the target type
@@ -509,12 +510,12 @@ public class LogicalPlanner
                             GREATER_THAN_OR_EQUAL,
                             new GenericLiteral("BIGINT", Integer.toString(targetLength)),
                             new FunctionCall(
-                                    QualifiedName.of(spaceTrimmedLength.getName()),
+                                    QualifiedName.of("$space_trimmed_length"),
                                     ImmutableList.of(new Cast(expression, VARCHAR.getTypeSignature().toString())))),
                     new Cast(expression, toType.getTypeSignature().toString()),
                     new Cast(
                             new FunctionCall(
-                                    QualifiedName.of(fail.getName()),
+                                    QualifiedName.of("fail"),
                                     ImmutableList.of(new Cast(new StringLiteral(format("Out of range for insert query type: Table: %s, Query: %s", toType.toString(), fromType.toString())),
                                             VARCHAR.getTypeSignature().toString()))),
                             toType.getTypeSignature().toString()));
@@ -627,7 +628,7 @@ public class LogicalPlanner
         TableHandle handle = analysis.getTableHandle(node.getTable());
         if (handle.getConnectorHandle().isDeleteAsInsertSupported()) {
             QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
-                        .planDeleteRowAsInsert(node);
+                    .planDeleteRowAsInsert(node);
 
             RelationPlan plan = deletePlan.getPlan();
 
@@ -808,7 +809,7 @@ public class LogicalPlanner
                 metadata,
                 parameters);
 
-        return new ConnectorTableMetadata(table.asSchemaTableName(), columns, properties, comment);
+        return new ConnectorTableMetadata(toSchemaTableName(table), columns, properties, comment);
     }
 
     private static List<ColumnMetadata> getOutputTableColumns(RelationPlan plan, Optional<List<Identifier>> columnAliases)

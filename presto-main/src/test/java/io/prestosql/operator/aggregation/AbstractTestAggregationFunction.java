@@ -17,21 +17,24 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
-import io.prestosql.sql.tree.QualifiedName;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.aggregation.AggregationTestUtils.assertAggregation;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.testing.assertions.PrestoExceptionAssert.assertPrestoExceptionThrownBy;
 
 public abstract class AbstractTestAggregationFunction
@@ -54,11 +57,12 @@ public abstract class AbstractTestAggregationFunction
 
     protected final InternalAggregationFunction getFunction()
     {
-        Signature signature = metadata.resolveFunction(QualifiedName.of(getFunctionName()), getFunctionParameterTypes().stream()
-                        .map(TypeSignature::parseTypeSignature)
-                        .map(TypeSignatureProvider::new)
-                        .collect(toImmutableList()));
-        return metadata.getAggregateFunctionImplementation(signature);
+        Signature signature = ((BuiltInFunctionHandle) metadata.getFunctionAndTypeManager().resolveFunction(Optional.empty(), QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, getFunctionName()),
+                getFunctionParameterTypes().stream()
+                .map(TypeSignature::parseTypeSignature)
+                .map(TypeSignatureProvider::new)
+                .collect(toImmutableList()))).getSignature();
+        return metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(signature);
     }
 
     protected abstract String getFunctionName();

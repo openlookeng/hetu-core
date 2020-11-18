@@ -83,10 +83,10 @@ public class TypesJdbcTable
     public RecordCursor cursor(ConnectorTransactionHandle transactionHandle, ConnectorSession connectorSession, TupleDomain<Integer> constraint)
     {
         Builder table = InMemoryRecordSet.builder(METADATA);
-        for (Type type : metadata.getTypes()) {
+        for (Type type : metadata.getFunctionAndTypeManager().getTypes()) {
             addTypeRow(table, type);
         }
-        for (ParametricType type : metadata.getParametricTypes()) {
+        for (ParametricType type : metadata.getFunctionAndTypeManager().getParametricTypes()) {
             addTypeRow(table, type);
         }
         return table.build().cursor();

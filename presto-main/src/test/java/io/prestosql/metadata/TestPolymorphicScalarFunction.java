@@ -20,7 +20,7 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.TypeSignature;
@@ -32,12 +32,12 @@ import java.util.Optional;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.metadata.TestPolymorphicScalarFunction.TestMethods.VARCHAR_TO_BIGINT_RETURN_VALUE;
 import static io.prestosql.metadata.TestPolymorphicScalarFunction.TestMethods.VARCHAR_TO_VARCHAR_RETURN_VALUE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.OperatorType.ADD;
 import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.Signature.comparableWithVariadicBound;
 import static io.prestosql.spi.type.Decimals.MAX_SHORT_PRECISION;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
@@ -58,6 +58,7 @@ public class TestPolymorphicScalarFunction
             .returnType(parseTypeSignature(StandardTypes.BIGINT))
             .argumentTypes(parseTypeSignature("varchar(x)", ImmutableSet.of("x")))
             .build();
+    private static final boolean FOO_IS_CALL_ON_NUL_INPUT = false;
     private static final long INPUT_VARCHAR_LENGTH = 10;
     private static final String INPUT_VARCHAR_SIGNATURE = "varchar(" + INPUT_VARCHAR_LENGTH + ")";
     private static final TypeSignature INPUT_VARCHAR_TYPE = parseTypeSignature(INPUT_VARCHAR_SIGNATURE);
@@ -88,6 +89,7 @@ public class TestPolymorphicScalarFunction
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(signature)
                 .deterministic(true)
+                .calledOnNullInput(IS_DISTINCT_FROM.isCalledOnNullInput())
                 .choice(choice -> choice
                         .argumentProperties(
                                 valueTypeArgumentProperty(USE_NULL_FLAG),
@@ -105,7 +107,7 @@ public class TestPolymorphicScalarFunction
                                         asList(Optional.of(long.class), Optional.of(long.class)))))
                 .build();
 
-        ScalarFunctionImplementation functionImplementation = function.specialize(SHORT_DECIMAL_BOUND_VARIABLES, 2, METADATA);
+        BuiltInScalarFunctionImplementation functionImplementation = function.specialize(SHORT_DECIMAL_BOUND_VARIABLES, 2, METADATA.getFunctionAndTypeManager());
 
         assertEquals(functionImplementation.getAllChoices().size(), 2);
         assertEquals(functionImplementation.getAllChoices().get(0).getArgumentProperties(), Collections.nCopies(2, valueTypeArgumentProperty(USE_NULL_FLAG)));
@@ -113,7 +115,7 @@ public class TestPolymorphicScalarFunction
         Block block1 = new LongArrayBlock(0, Optional.empty(), new long[0]);
         Block block2 = new LongArrayBlock(0, Optional.empty(), new long[0]);
         assertFalse((boolean) functionImplementation.getAllChoices().get(1).getMethodHandle().invoke(block1, 0, block2, 0));
-        functionImplementation = function.specialize(LONG_DECIMAL_BOUND_VARIABLES, 2, METADATA);
+        functionImplementation = function.specialize(LONG_DECIMAL_BOUND_VARIABLES, 2, METADATA.getFunctionAndTypeManager());
         assertTrue((boolean) functionImplementation.getAllChoices().get(1).getMethodHandle().invoke(block1, 0, block2, 0));
     }
 
@@ -124,6 +126,7 @@ public class TestPolymorphicScalarFunction
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(SIGNATURE)
                 .deterministic(true)
+                .calledOnNullInput(FOO_IS_CALL_ON_NUL_INPUT)
                 .choice(choice -> choice
                         .implementation(methodsGroup -> methodsGroup.methods("bigintToBigintReturnExtraParameter"))
                         .implementation(methodsGroup -> methodsGroup
@@ -131,7 +134,7 @@ public class TestPolymorphicScalarFunction
                                 .withExtraParameters(context -> ImmutableList.of(context.getLiteral("x")))))
                 .build();
 
-        ScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA);
+        BuiltInScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA.getFunctionAndTypeManager());
         assertEquals(functionImplementation.getMethodHandle().invoke(INPUT_SLICE), INPUT_VARCHAR_LENGTH);
     }
 
@@ -142,6 +145,7 @@ public class TestPolymorphicScalarFunction
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(SIGNATURE)
                 .deterministic(true)
+                .calledOnNullInput(FOO_IS_CALL_ON_NUL_INPUT)
                 .choice(choice -> choice
                         .implementation(methodsGroup -> methodsGroup.methods("varcharToVarcharCreateSliceWithExtraParameterLength"))
                         .implementation(methodsGroup -> methodsGroup
@@ -149,7 +153,7 @@ public class TestPolymorphicScalarFunction
                                 .withExtraParameters(context -> ImmutableList.of(42))))
                 .build();
 
-        ScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA);
+        BuiltInScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA.getFunctionAndTypeManager());
 
         assertEquals(functionImplementation.getMethodHandle().invoke(INPUT_SLICE), VARCHAR_TO_BIGINT_RETURN_VALUE);
     }
@@ -168,11 +172,12 @@ public class TestPolymorphicScalarFunction
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(signature)
                 .deterministic(true)
+                .calledOnNullInput(FOO_IS_CALL_ON_NUL_INPUT)
                 .choice(choice -> choice
                         .implementation(methodsGroup -> methodsGroup.methods("varcharToVarchar")))
                 .build();
 
-        ScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA);
+        BuiltInScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA.getFunctionAndTypeManager());
         Slice slice = (Slice) functionImplementation.getMethodHandle().invoke(INPUT_SLICE);
         assertEquals(slice, VARCHAR_TO_VARCHAR_RETURN_VALUE);
     }
@@ -192,11 +197,12 @@ public class TestPolymorphicScalarFunction
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(signature)
                 .deterministic(true)
+                .calledOnNullInput(FOO_IS_CALL_ON_NUL_INPUT)
                 .choice(choice -> choice
                         .implementation(methodsGroup -> methodsGroup.methods("varcharToVarchar")))
                 .build();
 
-        ScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA);
+        BuiltInScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA.getFunctionAndTypeManager());
         Slice slice = (Slice) functionImplementation.getMethodHandle().invoke(INPUT_SLICE);
         assertEquals(slice, VARCHAR_TO_VARCHAR_RETURN_VALUE);
     }
@@ -213,12 +219,13 @@ public class TestPolymorphicScalarFunction
 
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(signature)
+                .calledOnNullInput(ADD.isCalledOnNullInput())
                 .deterministic(true)
                 .choice(choice -> choice
                         .implementation(methodsGroup -> methodsGroup.methods("varcharToVarchar")))
                 .build();
 
-        ScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA);
+        BuiltInScalarFunctionImplementation functionImplementation = function.specialize(BOUND_VARIABLES, 1, METADATA.getFunctionAndTypeManager());
     }
 
     @Test(expectedExceptions = {IllegalStateException.class},
@@ -254,12 +261,13 @@ public class TestPolymorphicScalarFunction
         SqlScalarFunction function = SqlScalarFunction.builder(TestMethods.class)
                 .signature(SIGNATURE)
                 .deterministic(true)
+                .calledOnNullInput(FOO_IS_CALL_ON_NUL_INPUT)
                 .choice(choice -> choice
                         .implementation(methodsGroup -> methodsGroup.methods("varcharToBigintReturnFirstExtraParameter"))
                         .implementation(methodsGroup -> methodsGroup.methods("varcharToBigintReturnExtraParameter")))
                 .build();
 
-        function.specialize(BOUND_VARIABLES, 1, METADATA);
+        function.specialize(BOUND_VARIABLES, 1, METADATA.getFunctionAndTypeManager());
     }
 
     public static class TestMethods

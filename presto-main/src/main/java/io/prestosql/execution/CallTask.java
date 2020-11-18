@@ -17,12 +17,12 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.procedure.Procedure;
 import io.prestosql.spi.procedure.Procedure.Argument;
 import io.prestosql.spi.type.Type;
@@ -48,6 +48,7 @@ import java.util.function.Predicate;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
+import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.INVALID_PROCEDURE_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.INVALID_PROCEDURE_DEFINITION;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -78,7 +79,7 @@ public class CallTask
         QualifiedObjectName procedureName = createQualifiedObjectName(session, call, call.getName());
         CatalogName catalogName = metadata.getCatalogHandle(stateMachine.getSession(), procedureName.getCatalogName())
                 .orElseThrow(() -> new SemanticException(MISSING_CATALOG, call, "Catalog %s does not exist", procedureName.getCatalogName()));
-        Procedure procedure = metadata.getProcedureRegistry().resolve(catalogName, procedureName.asSchemaTableName());
+        Procedure procedure = metadata.getProcedureRegistry().resolve(catalogName, toSchemaTableName(procedureName));
 
         // map declared argument names to positions
         Map<String, Integer> positions = new HashMap<>();

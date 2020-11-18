@@ -16,7 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.execution.QueryStats;
-import io.prestosql.metadata.QualifiedObjectName;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;

@@ -15,13 +15,15 @@ package io.prestosql.sql.planner.assertions;
 
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.sql.DynamicFilters;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
@@ -58,6 +60,8 @@ final class FilterMatcher
     public MatchResult detailMatches(PlanNode node, StatsProvider stats, Session session, Metadata metadata, SymbolAliases symbolAliases)
     {
         checkState(shapeMatches(node), "Plan testing framework error: shapeMatches returned false in detailMatches in %s", this.getClass().getName());
+        FunctionResolution functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), functionResolution, metadata.getFunctionAndTypeManager());
 
         FilterNode filterNode = (FilterNode) node;
         if (isExpression(filterNode.getPredicate())) {
@@ -77,7 +81,7 @@ final class FilterMatcher
             return new MatchResult(verifier.process(combineConjuncts(castToExpression(predicate), castToExpression(dynamicFilter.get())), filterNode.getPredicate()));
         }
         DynamicFilters.ExtractResult extractResult = extractDynamicFilters(filterNode.getPredicate());
-        return new MatchResult(verifier.process(castToExpression(predicate), RowExpressionUtils.combineConjuncts(extractResult.getStaticConjuncts())));
+        return new MatchResult(verifier.process(castToExpression(predicate), logicalRowExpressions.combineConjuncts(extractResult.getStaticConjuncts())));
     }
 
     @Override

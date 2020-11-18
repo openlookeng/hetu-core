@@ -30,13 +30,13 @@ import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
 import io.prestosql.sql.parser.SqlParserOptions;
@@ -168,7 +168,7 @@ public class DistributedQueryRunner
 
         start = System.nanoTime();
         for (TestingPrestoServer server : servers) {
-            server.getMetadata().addFunctions(AbstractTestQueries.CUSTOM_FUNCTIONS);
+            server.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(AbstractTestQueries.CUSTOM_FUNCTIONS);
         }
         log.info("Added functions in %s", nanosSince(start).convertToMostSuccinctTimeUnit());
 

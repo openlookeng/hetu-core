@@ -14,6 +14,8 @@
 package io.prestosql.sql.planner.iterative.rule.test;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.Plugin;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -48,5 +50,15 @@ public abstract class BaseRuleTest
     protected RuleTester tester()
     {
         return tester;
+    }
+
+    protected Metadata getMetadata()
+    {
+        return tester.getMetadata();
+    }
+
+    protected FunctionAndTypeManager getFunctionManager()
+    {
+        return tester.getMetadata().getFunctionAndTypeManager();
     }
 }

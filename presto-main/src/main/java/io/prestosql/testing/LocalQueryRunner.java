@@ -83,12 +83,12 @@ import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.metadata.AnalyzePropertyManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.ColumnPropertyManager;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.HandleResolver;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metadata.MetadataUtil;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.QualifiedTablePrefix;
 import io.prestosql.metadata.SchemaPropertyManager;
 import io.prestosql.metadata.SessionPropertyManager;
@@ -117,6 +117,7 @@ import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
@@ -330,6 +331,7 @@ public class LocalQueryRunner
         this.planOptimizerManager = new ConnectorPlanOptimizerManager();
 
         this.metadata = new MetadataManager(
+                new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of()),
                 featuresConfig,
                 // new HetuConfig object passed, if split filtering is needed in the runner, a modified HetuConfig object with filter settings manually set must be used.
                 new SessionPropertyManager(new SystemSessionProperties(new QueryManagerConfig(), taskManagerConfig, new MemoryManagerConfig(), featuresConfig, new HetuConfig())),
@@ -509,7 +511,7 @@ public class LocalQueryRunner
 
     public void addType(Type type)
     {
-        metadata.addType(type);
+        metadata.getFunctionAndTypeManager().addType(type);
     }
 
     @Override

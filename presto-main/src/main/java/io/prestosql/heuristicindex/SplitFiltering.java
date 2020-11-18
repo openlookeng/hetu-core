@@ -22,7 +22,10 @@ import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFilter;
@@ -481,21 +484,24 @@ public class SplitFiltering
         }
         if (predicate instanceof CallExpression) {
             CallExpression call = (CallExpression) predicate;
-            if (call.getSignature().getName().equals("not")) {
-                return true;
-            }
-            try {
-                OperatorType operatorType = call.getSignature().unmangleOperator(call.getSignature().getName());
-                if (operatorType.isComparisonOperator() && operatorType != IS_DISTINCT_FROM) {
+            FunctionHandle builtInFunctionHandle = call.getFunctionHandle();
+            if (builtInFunctionHandle instanceof BuiltInFunctionHandle) {
+                Signature signature = ((BuiltInFunctionHandle) builtInFunctionHandle).getSignature();
+                if (signature.getName().getObjectName().equals("not")) {
                     return true;
                 }
-                return false;
-            }
-            catch (IllegalArgumentException e) {
-                return false;
+                try {
+                    OperatorType operatorType = Signature.unmangleOperator(signature.getName().getObjectName());
+                    if (operatorType.isComparisonOperator() && operatorType != IS_DISTINCT_FROM) {
+                        return true;
+                    }
+                    return false;
+                }
+                catch (IllegalArgumentException e) {
+                    return false;
+                }
             }
         }
-
         return false;
     }
 
@@ -594,7 +600,15 @@ public class SplitFiltering
         if (expression instanceof CallExpression) {
             CallExpression call = (CallExpression) expression;
             try {
-                OperatorType operatorType = call.getSignature().unmangleOperator(call.getSignature().getName());
+                FunctionHandle builtInFunctionHandle = call.getFunctionHandle();
+                Signature signature;
+                if (builtInFunctionHandle instanceof BuiltInFunctionHandle) {
+                    signature = ((BuiltInFunctionHandle) builtInFunctionHandle).getSignature();
+                }
+                else {
+                    return;
+                }
+                OperatorType operatorType = Signature.unmangleOperator(signature.getName().getObjectName());
                 if (!operatorType.isComparisonOperator()) {
                     return;
                 }
@@ -620,13 +634,18 @@ public class SplitFiltering
 
     private static RowExpression extractExpression(RowExpression expression)
     {
-        if (expression instanceof CallExpression && ((CallExpression) expression).getSignature().getName().contains("CAST")) {
-            // extract the inner expression for CAST expressions
-            return extractExpression(((CallExpression) expression).getArguments().get(0));
+        if (expression instanceof CallExpression) {
+            FunctionHandle builtInFunctionHandle = ((CallExpression) expression).getFunctionHandle();
+            Signature signature;
+            if (builtInFunctionHandle instanceof BuiltInFunctionHandle) {
+                signature = ((BuiltInFunctionHandle) builtInFunctionHandle).getSignature();
+                if (signature.getName().getObjectName().contains("CAST")) {
+                    // extract the inner expression for CAST expressions
+                    return extractExpression(((CallExpression) expression).getArguments().get(0));
+                }
+            }
         }
-        else {
-            return expression;
-        }
+        return expression;
     }
 
     /**

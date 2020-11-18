@@ -22,6 +22,7 @@ import io.prestosql.operator.scalar.AbstractTestFunctions;
 import io.prestosql.plugin.geospatial.GeoPlugin;
 import io.prestosql.plugin.geospatial.GeometryType;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
@@ -49,9 +50,9 @@ public abstract class AbstractTestGeoAggregationFunctions
         for (Type type : plugin.getTypes()) {
             functionAssertions.addType(type);
         }
-        functionAssertions.getMetadata().addFunctions(extractFunctions(plugin.getFunctions()));
-        function = functionAssertions.getMetadata().getAggregateFunctionImplementation(new Signature(
-                getFunctionName(),
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(plugin.getFunctions()));
+        function = functionAssertions.getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(new Signature(
+                QualifiedObjectName.valueOfDefaultFunction(getFunctionName()),
                 FunctionKind.AGGREGATE,
                 parseTypeSignature(GeometryType.GEOMETRY_TYPE_NAME),
                 parseTypeSignature(GeometryType.GEOMETRY_TYPE_NAME)));

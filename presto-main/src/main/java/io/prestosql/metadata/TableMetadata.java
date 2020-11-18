@@ -16,6 +16,7 @@ package io.prestosql.metadata;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 
 import java.util.List;

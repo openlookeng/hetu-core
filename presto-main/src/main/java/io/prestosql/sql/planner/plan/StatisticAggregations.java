@@ -19,9 +19,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 
 import java.util.List;
@@ -65,12 +66,17 @@ public class StatisticAggregations
         ImmutableMap.Builder<Symbol, Symbol> mappings = ImmutableMap.builder();
         for (Map.Entry<Symbol, Aggregation> entry : aggregations.entrySet()) {
             Aggregation originalAggregation = entry.getValue();
-            Signature signature = originalAggregation.getSignature();
-            InternalAggregationFunction function = metadata.getAggregateFunctionImplementation(signature);
-            Symbol partialSymbol = planSymbolAllocator.newSymbol(signature.getName(), function.getIntermediateType());
+            FunctionHandle functionHandle = originalAggregation.getFunctionHandle();
+            InternalAggregationFunction function = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(functionHandle);
+            Symbol partialSymbol = planSymbolAllocator.newSymbol(originalAggregation.getFunctionCall().getDisplayName(), function.getIntermediateType());
             mappings.put(entry.getKey(), partialSymbol);
             partialAggregation.put(partialSymbol, new Aggregation(
-                    signature,
+                    new CallExpression(
+                            originalAggregation.getFunctionCall().getDisplayName(),
+                            functionHandle,
+                            function.getIntermediateType(),
+                            originalAggregation.getArguments(),
+                            Optional.empty()),
                     originalAggregation.getArguments(),
                     originalAggregation.isDistinct(),
                     originalAggregation.getFilter(),
@@ -78,7 +84,12 @@ public class StatisticAggregations
                     originalAggregation.getMask()));
             finalAggregation.put(entry.getKey(),
                     new Aggregation(
-                            signature,
+                            new CallExpression(
+                                    originalAggregation.getFunctionCall().getDisplayName(),
+                                    functionHandle,
+                                    function.getFinalType(),
+                                    ImmutableList.of(castToRowExpression(toSymbolReference(partialSymbol))),
+                                    Optional.empty()),
                             ImmutableList.of(castToRowExpression(toSymbolReference(partialSymbol))),
                             false,
                             Optional.empty(),

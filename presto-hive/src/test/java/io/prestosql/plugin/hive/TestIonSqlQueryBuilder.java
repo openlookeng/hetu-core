@@ -50,7 +50,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestIonSqlQueryBuilder
 {
-    private final TypeManager typeManager = new InternalTypeManager(createTestMetadataManager());
+    private final TypeManager typeManager = new InternalTypeManager(createTestMetadataManager().getFunctionAndTypeManager());
 
     @Test
     public void testBuildSQL()

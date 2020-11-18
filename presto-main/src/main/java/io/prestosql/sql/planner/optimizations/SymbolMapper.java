@@ -27,6 +27,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.PartitioningScheme;
@@ -163,7 +164,13 @@ public class SymbolMapper
     private Aggregation map(Aggregation aggregation)
     {
         return new Aggregation(
-                aggregation.getSignature(),
+                new CallExpression(
+                        aggregation.getFunctionCall().getDisplayName(),
+                        aggregation.getFunctionCall().getFunctionHandle(),
+                        aggregation.getFunctionCall().getType(),
+                        aggregation.getArguments().stream()
+                                .map(this::map)
+                                .collect(toImmutableList())),
                 aggregation.getArguments().stream()
                         .map(this::map)
                         .collect(toImmutableList()),

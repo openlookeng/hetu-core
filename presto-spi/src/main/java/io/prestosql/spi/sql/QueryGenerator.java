@@ -19,9 +19,9 @@ import io.prestosql.spi.type.TypeManager;
 
 import java.util.Optional;
 
-public interface QueryGenerator<R>
+public interface QueryGenerator<R, C>
 {
-    RowExpressionConverter getConverter();
+    RowExpressionConverter<C> getConverter();
 
     Optional<R> generate(PlanNode node, TypeManager typeManager);
 }

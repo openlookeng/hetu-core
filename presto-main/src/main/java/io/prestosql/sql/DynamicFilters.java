@@ -15,8 +15,12 @@ package io.prestosql.sql;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
+import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.ScalarFunction;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlType;
@@ -43,8 +47,7 @@ import java.util.function.Predicate;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
-import static io.prestosql.spi.function.Signature.unmangleOperator;
-import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
+import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
@@ -70,12 +73,12 @@ public final class DynamicFilters
                 .build();
     }
 
-    public static RowExpression createDynamicFilterRowExpression(Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input, Optional<RowExpression> filter)
+    public static RowExpression createDynamicFilterRowExpression(Session session, Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input, Optional<RowExpression> filter)
     {
         ConstantExpression string = new ConstantExpression(utf8Slice(id), VarcharType.VARCHAR);
         VariableReferenceExpression expression = new VariableReferenceExpression(input.getName(), inputType);
-        Signature signature = metadata.resolveFunction(QualifiedName.of(Function.NAME), fromTypes(VarcharType.VARCHAR, inputType));
-        return call(signature, typeManager.getType(signature.getReturnType()), Arrays.asList(string, expression), filter);
+        FunctionHandle handle = metadata.getFunctionAndTypeManager().resolveFunction(session.getTransactionId(), QualifiedObjectName.valueOfDefaultFunction(Function.NAME), fromTypes(VarcharType.VARCHAR, inputType));
+        return call(Function.NAME, handle, string.getType(), Arrays.asList(string, expression), filter);
     }
 
     public static ExtractResult extractDynamicFilters(RowExpression expression)
@@ -111,7 +114,7 @@ public final class DynamicFilters
 
         CallExpression callExpression = (CallExpression) expression;
 
-        if (!callExpression.getSignature().getName().contains(Function.NAME)) {
+        if (!callExpression.getDisplayName().equals(Function.NAME)) {
             return Optional.empty();
         }
 
@@ -130,11 +133,12 @@ public final class DynamicFilters
         if (filter.isPresent()) {
             if (filter.get() instanceof CallExpression) {
                 CallExpression call = (CallExpression) filter.get();
-                String name = call.getSignature().getName();
-                if (name.contains("$operator$") && unmangleOperator(name).isComparisonOperator()) {
+                BuiltInFunctionHandle builtInFunctionHandle = (BuiltInFunctionHandle) call.getFunctionHandle();
+                String name = builtInFunctionHandle.getSignature().getNameSuffix();
+                if (name.contains("$operator$") && Signature.unmangleOperator(name).isComparisonOperator()) {
                     if (call.getArguments().get(1) instanceof VariableReferenceExpression &&
                             call.getArguments().get(0) instanceof VariableReferenceExpression) {
-                        switch (unmangleOperator(name)) {
+                        switch (Signature.unmangleOperator(name)) {
                             case LESS_THAN:
                                 return Optional.of((values) -> {
                                     Object probeValue = values.get(0);

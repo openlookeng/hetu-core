@@ -27,11 +27,10 @@ import io.airlift.bytecode.instruction.LabelNode;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty;
-import io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention;
-import io.prestosql.spi.function.ScalarFunctionImplementation.ScalarImplementationChoice;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ScalarImplementationChoice;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.InputReferenceCompiler.InputReferenceNode;
 
@@ -47,7 +46,7 @@ import static io.airlift.bytecode.OpCode.NOP;
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantFalse;
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantTrue;
 import static io.airlift.bytecode.expression.BytecodeExpressions.invokeDynamic;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentType.VALUE_TYPE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentType.VALUE_TYPE;
 import static io.prestosql.sql.gen.Bootstrap.BOOTSTRAP_METHOD;
 import static java.lang.String.format;
 
@@ -160,7 +159,7 @@ public final class BytecodeUtils
                 binding.getType().returnType());
     }
 
-    public static BytecodeNode generateInvocation(Scope scope, String name, ScalarFunctionImplementation function, Optional<BytecodeNode> instance, List<BytecodeNode> arguments, CallSiteBinder binder)
+    public static BytecodeNode generateInvocation(Scope scope, String name, BuiltInScalarFunctionImplementation function, Optional<BytecodeNode> instance, List<BytecodeNode> arguments, CallSiteBinder binder)
     {
         LabelNode end = new LabelNode("end");
         BytecodeBlock block = new BytecodeBlock()
@@ -337,11 +336,6 @@ public final class BytecodeUtils
     public static BytecodeExpression invoke(Binding binding, String name)
     {
         return invokeDynamic(BOOTSTRAP_METHOD, ImmutableList.of(binding.getBindingId()), name, binding.getType());
-    }
-
-    public static BytecodeExpression invoke(Binding binding, Signature signature)
-    {
-        return invoke(binding, signature.getName());
     }
 
     public static BytecodeNode generateWrite(CallSiteBinder callSiteBinder, Scope scope, Variable wasNullVariable, Type type)

@@ -22,6 +22,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
@@ -96,7 +98,7 @@ public class BenchmarkJsonToMapCast
         @Setup
         public void setup()
         {
-            Signature signature = new Signature("$operator$CAST", FunctionKind.SCALAR, mapType(VARCHAR, BIGINT).getTypeSignature(), JSON.getTypeSignature());
+            Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction("$operator$CAST"), FunctionKind.SCALAR, mapType(VARCHAR, BIGINT).getTypeSignature(), JSON.getTypeSignature());
 
             Type valueType;
             switch (valueTypeName) {
@@ -114,7 +116,7 @@ public class BenchmarkJsonToMapCast
             }
 
             List<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, mapType(VARCHAR, valueType), ImmutableList.of(field(0, JSON)), Optional.empty()));
+                    new CallExpression(signature.getName().getObjectName(), new BuiltInFunctionHandle(signature), mapType(VARCHAR, valueType), ImmutableList.of(field(0, JSON)), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             pageProcessor = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0))

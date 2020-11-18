@@ -15,7 +15,7 @@ package io.prestosql.sql.planner.assertions;
 
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.WindowNode;
@@ -39,21 +39,21 @@ public class WindowFunctionMatcher
         implements RvalueMatcher
 {
     private final ExpectedValueProvider<FunctionCall> callMaker;
-    private final Optional<Signature> signature;
+    private final Optional<FunctionHandle> functionHandle;
     private final Optional<ExpectedValueProvider<WindowNode.Frame>> frameMaker;
 
     /**
      * @param callMaker Always validates the function call
-     * @param signature Optionally validates the signature
+     * @param functionHandle Optionally validates the signature
      * @param frameMaker Optionally validates the frame
      */
     public WindowFunctionMatcher(
             ExpectedValueProvider<FunctionCall> callMaker,
-            Optional<Signature> signature,
+            Optional<FunctionHandle> functionHandle,
             Optional<ExpectedValueProvider<WindowNode.Frame>> frameMaker)
     {
         this.callMaker = requireNonNull(callMaker, "functionCall is null");
-        this.signature = requireNonNull(signature, "signature is null");
+        this.functionHandle = requireNonNull(functionHandle, "functionHandle is null");
         this.frameMaker = requireNonNull(frameMaker, "frameMaker is null");
     }
 
@@ -72,8 +72,8 @@ public class WindowFunctionMatcher
 
         for (Map.Entry<Symbol, Function> assignment : windowNode.getWindowFunctions().entrySet()) {
             Function function = assignment.getValue();
-            boolean signatureMatches = signature.map(assignment.getValue().getSignature()::equals).orElse(true);
-            if (signatureMatches && windowFunctionMatches(function, expectedCall, expectedFrame)) {
+            boolean signatureMatches = functionHandle.map(assignment.getValue().getFunctionHandle()::equals).orElse(true);
+            if (signatureMatches && windowFunctionMatches(function, expectedCall, expectedFrame, metadata)) {
                 checkState(!result.isPresent(), "Ambiguous function calls in %s", windowNode);
                 result = Optional.of(assignment.getKey());
             }
@@ -82,14 +82,14 @@ public class WindowFunctionMatcher
         return result;
     }
 
-    private boolean windowFunctionMatches(Function windowFunction, FunctionCall expectedCall, Optional<WindowNode.Frame> expectedFrame)
+    private boolean windowFunctionMatches(Function windowFunction, FunctionCall expectedCall, Optional<WindowNode.Frame> expectedFrame, Metadata metadata)
     {
         if (expectedCall.getWindow().isPresent()) {
             return false;
         }
-        if (!signature.map(windowFunction.getSignature()::equals).orElse(true) ||
+        if (!functionHandle.map(windowFunction.getFunctionHandle()::equals).orElse(true) ||
                 !expectedFrame.map(windowFunction.getFrame()::equals).orElse(true) ||
-                !Objects.equals(expectedCall.getName(), QualifiedName.of(windowFunction.getSignature().getName())) ||
+                !Objects.equals(expectedCall.getName(), QualifiedName.of(metadata.getFunctionAndTypeManager().getFunctionMetadata(windowFunction.getFunctionHandle()).getName().getObjectName())) ||
                 expectedCall.getArguments().size() != windowFunction.getArguments().size()) {
             return false;
         }
@@ -120,7 +120,7 @@ public class WindowFunctionMatcher
         return toStringHelper(this)
                 .omitNullValues()
                 .add("callMaker", callMaker)
-                .add("signature", signature.orElse(null))
+                .add("functionHandle", functionHandle.orElse(null))
                 .add("frameMaker", frameMaker.orElse(null))
                 .toString();
     }

@@ -17,8 +17,8 @@ import io.airlift.bytecode.BytecodeNode;
 import io.airlift.bytecode.FieldDefinition;
 import io.airlift.bytecode.Scope;
 import io.airlift.bytecode.Variable;
-import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.relation.RowExpression;
 
 import java.util.List;
@@ -33,7 +33,7 @@ public class BytecodeGeneratorContext
     private final Scope scope;
     private final CallSiteBinder callSiteBinder;
     private final CachedInstanceBinder cachedInstanceBinder;
-    private final Metadata metadata;
+    private final FunctionAndTypeManager manager;
     private final Variable wasNull;
 
     public BytecodeGeneratorContext(
@@ -41,19 +41,19 @@ public class BytecodeGeneratorContext
             Scope scope,
             CallSiteBinder callSiteBinder,
             CachedInstanceBinder cachedInstanceBinder,
-            Metadata metadata)
+            FunctionAndTypeManager manager)
     {
         requireNonNull(rowExpressionCompiler, "bytecodeGenerator is null");
         requireNonNull(cachedInstanceBinder, "cachedInstanceBinder is null");
         requireNonNull(scope, "scope is null");
         requireNonNull(callSiteBinder, "callSiteBinder is null");
-        requireNonNull(metadata, "metadata is null");
+        requireNonNull(manager, "manager is null");
 
         this.rowExpressionCompiler = rowExpressionCompiler;
         this.scope = scope;
         this.callSiteBinder = callSiteBinder;
         this.cachedInstanceBinder = cachedInstanceBinder;
-        this.metadata = metadata;
+        this.manager = manager;
         this.wasNull = scope.getVariable("wasNull");
     }
 
@@ -77,15 +77,15 @@ public class BytecodeGeneratorContext
         return rowExpressionCompiler.compile(expression, scope, lambdaInterface);
     }
 
-    public Metadata getMetadata()
+    public FunctionAndTypeManager getFunctionManager()
     {
-        return metadata;
+        return manager;
     }
 
     /**
      * Generates a function call with null handling, automatic binding of session parameter, etc.
      */
-    public BytecodeNode generateCall(String name, ScalarFunctionImplementation function, List<BytecodeNode> arguments)
+    public BytecodeNode generateCall(String name, BuiltInScalarFunctionImplementation function, List<BytecodeNode> arguments)
     {
         Optional<BytecodeNode> instance = Optional.empty();
         if (function.getInstanceFactory().isPresent()) {

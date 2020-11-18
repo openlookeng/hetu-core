@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Stream.concat;
@@ -37,7 +39,7 @@ public final class Signature
 {
     private static final String OPERATOR_PREFIX = "$operator$";
 
-    private final String name;
+    private final QualifiedObjectName name;
     private final FunctionKind kind;
     private final List<TypeVariableConstraint> typeVariableConstraints;
     private final List<LongVariableConstraint> longVariableConstraints;
@@ -47,7 +49,7 @@ public final class Signature
 
     @JsonCreator
     public Signature(
-            @JsonProperty("name") String name,
+            @JsonProperty("name") QualifiedObjectName name,
             @JsonProperty("kind") FunctionKind kind,
             @JsonProperty("typeVariableConstraints") List<TypeVariableConstraint> typeVariableConstraints,
             @JsonProperty("longVariableConstraints") List<LongVariableConstraint> longVariableConstraints,
@@ -68,19 +70,19 @@ public final class Signature
         this.variableArity = variableArity;
     }
 
-    public Signature(String name, FunctionKind kind, TypeSignature returnType, TypeSignature... argumentTypes)
+    public Signature(QualifiedObjectName name, FunctionKind kind, TypeSignature returnType, TypeSignature... argumentTypes)
     {
         this(name, kind, returnType, ImmutableList.copyOf(argumentTypes));
     }
 
-    public Signature(String name, FunctionKind kind, TypeSignature returnType, List<TypeSignature> argumentTypes)
+    public Signature(QualifiedObjectName name, FunctionKind kind, TypeSignature returnType, List<TypeSignature> argumentTypes)
     {
         this(name, kind, ImmutableList.of(), ImmutableList.of(), returnType, argumentTypes, false);
     }
 
     public static Signature internalOperator(OperatorType operator, Type returnType, List<? extends Type> argumentTypes)
     {
-        return internalScalarFunction(mangleOperatorName(operator), returnType.getTypeSignature(), argumentTypes.stream().map(Type::getTypeSignature).collect(toImmutableList()));
+        return internalScalarFunction(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, mangleOperatorName(operator)), returnType.getTypeSignature(), argumentTypes.stream().map(Type::getTypeSignature).collect(toImmutableList()));
     }
 
     public static Signature internalOperator(OperatorType operator, TypeSignature returnType, TypeSignature... argumentTypes)
@@ -90,15 +92,15 @@ public final class Signature
 
     public static Signature internalOperator(OperatorType operator, TypeSignature returnType, List<TypeSignature> argumentTypes)
     {
-        return internalScalarFunction(mangleOperatorName(operator), returnType, argumentTypes);
+        return internalScalarFunction(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, mangleOperatorName(operator)), returnType, argumentTypes);
     }
 
-    public static Signature internalScalarFunction(String name, TypeSignature returnType, TypeSignature... argumentTypes)
+    public static Signature internalScalarFunction(QualifiedObjectName name, TypeSignature returnType, TypeSignature... argumentTypes)
     {
         return internalScalarFunction(name, returnType, ImmutableList.copyOf(argumentTypes));
     }
 
-    public static Signature internalScalarFunction(String name, TypeSignature returnType, List<TypeSignature> argumentTypes)
+    public static Signature internalScalarFunction(QualifiedObjectName name, TypeSignature returnType, List<TypeSignature> argumentTypes)
     {
         return new Signature(name, SCALAR, ImmutableList.of(), ImmutableList.of(), returnType, argumentTypes, false);
     }
@@ -117,6 +119,11 @@ public final class Signature
         return Optional.empty();
     }
 
+    public static String operatorNameWithDefaultFunctionPrefix(OperatorType operatorType)
+    {
+        return QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, OPERATOR_PREFIX + operatorType.name()).toString();
+    }
+
     @VisibleForTesting
     public static OperatorType unmangleOperator(String mangledName)
     {
@@ -129,15 +136,20 @@ public final class Signature
         return mangledName.startsWith(OPERATOR_PREFIX);
     }
 
-    public Signature withAlias(String name)
+    public Signature withAlias(QualifiedObjectName name)
     {
         return new Signature(name, kind, typeVariableConstraints, longVariableConstraints, getReturnType(), getArgumentTypes(), variableArity);
     }
 
     @JsonProperty
-    public String getName()
+    public QualifiedObjectName getName()
     {
         return name;
+    }
+
+    public String getNameSuffix()
+    {
+        return name.getObjectName();
     }
 
     @JsonProperty

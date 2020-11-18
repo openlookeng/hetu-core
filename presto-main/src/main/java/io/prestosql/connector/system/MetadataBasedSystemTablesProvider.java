@@ -17,9 +17,9 @@ package io.prestosql.connector.system;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.FullConnectorSession;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SystemTable;
 

@@ -18,7 +18,8 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.Assignments;
@@ -31,6 +32,7 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.SetOperationNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.ExpressionUtils;
@@ -38,6 +40,7 @@ import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -51,12 +54,10 @@ import java.util.Optional;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.concat;
-import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.plan.AggregationNode.Step;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.sourceSymbolMap;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
@@ -124,6 +125,13 @@ import static java.util.stream.Collectors.toList;
 public class ImplementIntersectAndExceptAsUnion
         implements PlanOptimizer
 {
+    private final FunctionAndTypeManager functionAndTypeManager;
+
+    public ImplementIntersectAndExceptAsUnion(FunctionAndTypeManager functionAndTypeManager)
+    {
+        this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "functionManager is null");
+    }
+
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
@@ -133,21 +141,23 @@ public class ImplementIntersectAndExceptAsUnion
         requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
-        return SimplePlanRewriter.rewriteWith(new Rewriter(idAllocator, planSymbolAllocator), plan);
+        return SimplePlanRewriter.rewriteWith(new Rewriter(functionAndTypeManager, idAllocator, planSymbolAllocator), plan);
     }
 
     private static class Rewriter
             extends SimplePlanRewriter<Void>
     {
         private static final String MARKER = "marker";
-        private static final Signature COUNT_AGGREGATION = new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN));
+        private final StandardFunctionResolution functionResolution;
         private final PlanNodeIdAllocator idAllocator;
         private final PlanSymbolAllocator planSymbolAllocator;
 
-        private Rewriter(PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator)
+        private Rewriter(FunctionAndTypeManager functionAndTypeManager, PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator)
         {
+            requireNonNull(functionAndTypeManager, "functionManager is null");
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
+            this.functionResolution = new FunctionResolution(functionAndTypeManager);
         }
 
         @Override
@@ -255,7 +265,11 @@ public class ImplementIntersectAndExceptAsUnion
             for (int i = 0; i < markers.size(); i++) {
                 Symbol output = aggregationOutputs.get(i);
                 aggregations.put(output, new Aggregation(
-                        COUNT_AGGREGATION,
+                        new CallExpression(
+                                "count",
+                                functionResolution.countFunction(planSymbolAllocator.getTypes().get(markers.get(i))),
+                                BIGINT,
+                                ImmutableList.of(castToRowExpression(toSymbolReference(markers.get(i))))),
                         ImmutableList.of(castToRowExpression(toSymbolReference(markers.get(i)))),
                         false,
                         Optional.empty(),

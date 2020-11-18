@@ -17,6 +17,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Module;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ExternalFunctionHub;
+
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -27,17 +30,28 @@ public class JdbcPlugin
 {
     private final String name;
     private final Module module;
+    private final Optional<ExternalFunctionHub> externalFunctionHub;
 
     public JdbcPlugin(String name, Module module)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or empty");
         this.name = name;
         this.module = requireNonNull(module, "module is null");
+        externalFunctionHub = Optional.empty();
+    }
+
+    public JdbcPlugin(String name, Module module, JdbcExternalFunctionHub jdbcExternalFunctionHub)
+    {
+        checkArgument(!isNullOrEmpty(name), "name is null or empty");
+        this.name = name;
+        this.module = requireNonNull(module, "module is null");
+        requireNonNull(jdbcExternalFunctionHub, "jdbcExternalFunctionHub is null");
+        this.externalFunctionHub = Optional.of(jdbcExternalFunctionHub);
     }
 
     @Override
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
-        return ImmutableList.of(new JdbcConnectorFactory(name, module, JdbcPlugin.class.getClassLoader()));
+        return ImmutableList.of(new JdbcConnectorFactory(name, module, JdbcPlugin.class.getClassLoader(), this.externalFunctionHub));
     }
 }

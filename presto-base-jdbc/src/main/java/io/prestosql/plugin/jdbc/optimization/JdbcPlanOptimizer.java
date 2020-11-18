@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcClient;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
@@ -28,8 +29,8 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.SymbolAllocator;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.Assignments;
@@ -44,11 +45,11 @@ import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.QueryGenerator;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.UnknownType;
@@ -69,6 +70,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizerUtils.getGroupingSetColumn;
 import static io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizerUtils.replaceGroupingSetColumns;
+import static io.prestosql.spi.function.OperatorType.CAST;
 
 public class JdbcPlanOptimizer
         implements ConnectorPlanOptimizer
@@ -79,19 +81,29 @@ public class JdbcPlanOptimizer
     private final JdbcClient client;
     private final BaseJdbcConfig config;
     private final TypeManager typeManager;
-    private final Optional<QueryGenerator<JdbcQueryGeneratorResult>> queryGenerator;
+    private final Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> queryGenerator;
+    private final StandardFunctionResolution functionResolution;
+    private final LogicalRowExpressions logicalRowExpressions;
 
     @Inject
     public JdbcPlanOptimizer(
             JdbcClient client,
             TypeManager typeManager,
             BaseJdbcConfig config,
-            RowExpressionService rowExpressionService)
+            RowExpressionService rowExpressionService,
+            DeterminismEvaluator determinismEvaluator,
+            FunctionMetadataManager functionManager,
+            StandardFunctionResolution functionResolution)
     {
         this.client = client;
         this.config = config;
         this.typeManager = typeManager;
-        this.queryGenerator = client.getQueryGenerator(rowExpressionService);
+        this.functionResolution = functionResolution;
+        this.queryGenerator = client.getQueryGenerator(determinismEvaluator, rowExpressionService, functionManager, functionResolution);
+        this.logicalRowExpressions = new LogicalRowExpressions(
+                determinismEvaluator,
+                functionResolution,
+                functionManager);
     }
 
     @Override
@@ -162,9 +174,10 @@ public class JdbcPlanOptimizer
             List<RowExpression> pushable = new ArrayList<>();
             List<RowExpression> nonPushable = new ArrayList<>();
 
-            for (RowExpression conjunct : RowExpressionUtils.extractConjuncts(node.getPredicate())) {
+            for (RowExpression conjunct : logicalRowExpressions.extractConjuncts(node.getPredicate())) {
                 try {
-                    conjunct.accept(queryGenerator.get().getConverter(), null);
+                    JdbcConverterContext jdbcConverterContext = new JdbcConverterContext();
+                    conjunct.accept(queryGenerator.get().getConverter(), jdbcConverterContext);
                     pushable.add(conjunct);
                 }
                 catch (PrestoException pe) {
@@ -172,8 +185,8 @@ public class JdbcPlanOptimizer
                 }
             }
             if (!pushable.isEmpty()) {
-                FilterNode pushableFilter = new FilterNode(idAllocator.getNextId(), node.getSource(), RowExpressionUtils.combineConjuncts(pushable));
-                Optional<FilterNode> nonPushableFilter = nonPushable.isEmpty() ? Optional.empty() : Optional.of(new FilterNode(idAllocator.getNextId(), pushableFilter, RowExpressionUtils.combineConjuncts(nonPushable)));
+                FilterNode pushableFilter = new FilterNode(idAllocator.getNextId(), node.getSource(), logicalRowExpressions.combineConjuncts(pushable));
+                Optional<FilterNode> nonPushableFilter = nonPushable.isEmpty() ? Optional.empty() : Optional.of(new FilterNode(idAllocator.getNextId(), pushableFilter, logicalRowExpressions.combineConjuncts(nonPushable)));
 
                 filtersSplitUp.put(pushableFilter, null);
                 if (nonPushableFilter.isPresent()) {
@@ -252,7 +265,8 @@ public class JdbcPlanOptimizer
                     scanOutputs.add(scanSymbol);
                     columnHandles.put(scanSymbol, columns.get(aliasName));
                     assignments.put(symbol, new CallExpression(
-                            Signature.internalOperator(OperatorType.CAST, prestoType.getTypeSignature(), ImmutableList.of(jdbcType.getTypeSignature())),
+                            CAST.name(),
+                            functionResolution.castFunction(jdbcType.getTypeSignature(), prestoType.getTypeSignature()),
                             prestoType,
                             ImmutableList.of(new VariableReferenceExpression(scanSymbol.getName(), jdbcType)),
                             Optional.empty()));

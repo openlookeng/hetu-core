@@ -35,5 +35,5 @@ public abstract class DynamicSqlScalarFunction
         return signature;
     }
 
-    public abstract ScalarFunctionImplementation specialize();
+    public abstract BuiltInScalarFunctionImplementation specialize();
 }

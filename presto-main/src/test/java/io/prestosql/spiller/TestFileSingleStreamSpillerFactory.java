@@ -47,7 +47,7 @@ import static org.testng.Assert.assertEquals;
 @Test(singleThreaded = true)
 public class TestFileSingleStreamSpillerFactory
 {
-    private final BlockEncodingSerde blockEncodingSerde = createTestMetadataManager().getBlockEncodingSerde();
+    private final BlockEncodingSerde blockEncodingSerde = createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde();
     private Closer closer;
     private ListeningExecutorService executor;
     private File spillPath1;

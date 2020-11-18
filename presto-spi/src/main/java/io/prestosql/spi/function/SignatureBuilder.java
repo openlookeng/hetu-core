@@ -14,19 +14,20 @@
 package io.prestosql.spi.function;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.type.TypeSignature;
 
 import java.util.List;
 
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
-import static io.prestosql.spi.function.Signature.mangleOperatorName;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public final class SignatureBuilder
 {
-    private String name;
+    private QualifiedObjectName name;
     private FunctionKind kind;
     private List<TypeVariableConstraint> typeVariableConstraints = emptyList();
     private List<LongVariableConstraint> longVariableConstraints = emptyList();
@@ -38,7 +39,7 @@ public final class SignatureBuilder
 
     public SignatureBuilder name(String name)
     {
-        this.name = requireNonNull(name, "name is null");
+        this.name = QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, requireNonNull(name, "name is null"));
         return this;
     }
 
@@ -50,7 +51,7 @@ public final class SignatureBuilder
 
     public SignatureBuilder operatorType(OperatorType operatorType)
     {
-        this.name = mangleOperatorName(requireNonNull(operatorType, "operatorType is null"));
+        this.name = operatorType.getFunctionName();
         this.kind = SCALAR;
         return this;
     }

@@ -2227,6 +2227,7 @@ public class HiveAstBuilder
                 filter,
                 orderBy,
                 distinct,
+                false,
                 visit(context.expression(), Expression.class));
     }
 

@@ -17,9 +17,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.connector.MockConnectorFactory;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.ViewExpression;
@@ -70,8 +70,8 @@ public class TestRowFilter
 
         MockConnectorFactory mock = MockConnectorFactory.builder()
                 .withGetViews((s, prefix) -> ImmutableMap.<SchemaTableName, ConnectorViewDefinition>builder()
-                    .put(new SchemaTableName("default", "nation_view"), view)
-                    .build())
+                        .put(new SchemaTableName("default", "nation_view"), view)
+                        .build())
                 .build();
 
         runner.createCatalog(MOCK_CATALOG, mock, ImmutableMap.of());

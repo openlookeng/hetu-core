@@ -15,6 +15,7 @@ package io.prestosql.sql;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import io.prestosql.sql.tree.AddColumn;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
@@ -28,6 +29,7 @@ import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.CreateCube;
+import io.prestosql.sql.tree.CreateFunction;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
@@ -53,7 +55,9 @@ import io.prestosql.sql.tree.ExplainFormat;
 import io.prestosql.sql.tree.ExplainOption;
 import io.prestosql.sql.tree.ExplainType;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.ExternalBodyReference;
 import io.prestosql.sql.tree.FetchFirst;
+import io.prestosql.sql.tree.FunctionProperty;
 import io.prestosql.sql.tree.Grant;
 import io.prestosql.sql.tree.GrantRoles;
 import io.prestosql.sql.tree.GrantorSpecification;
@@ -84,9 +88,11 @@ import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
 import io.prestosql.sql.tree.RenameTable;
 import io.prestosql.sql.tree.ResetSession;
+import io.prestosql.sql.tree.Return;
 import io.prestosql.sql.tree.Revoke;
 import io.prestosql.sql.tree.RevokeRoles;
 import io.prestosql.sql.tree.Rollback;
+import io.prestosql.sql.tree.RoutineCharacteristics;
 import io.prestosql.sql.tree.Row;
 import io.prestosql.sql.tree.SampledRelation;
 import io.prestosql.sql.tree.Select;
@@ -99,6 +105,7 @@ import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowCubes;
+import io.prestosql.sql.tree.ShowExternalFunction;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -109,6 +116,7 @@ import io.prestosql.sql.tree.ShowSession;
 import io.prestosql.sql.tree.ShowStats;
 import io.prestosql.sql.tree.ShowTables;
 import io.prestosql.sql.tree.SingleColumn;
+import io.prestosql.sql.tree.SqlParameterDeclaration;
 import io.prestosql.sql.tree.StartTransaction;
 import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.TableSubquery;
@@ -656,6 +664,62 @@ public final class SqlFormatter
         }
 
         @Override
+        protected Void visitCreateFunction(CreateFunction node, Integer indent)
+        {
+            builder.append("External FUNCTION ")
+                    .append(formatName(node.getFunctionName()))
+                    .append(" ")
+                    .append(formatSqlParameterDeclarations(node.getParameters()))
+                    .append("\nRETURNS ")
+                    .append(node.getReturnType())
+                    .append("\n");
+            if (node.getComment().isPresent()) {
+                builder.append("\nCOMMENT ")
+                        .append(formatStringLiteral(node.getComment().get()))
+                        .append("\n");
+            }
+            builder.append(formatRoutineCharacteristics(node.getCharacteristics()))
+                    .append("\n");
+
+            process(node.getBody(), 0);
+
+            builder.append(formatFunctionPropertiesMultiLine(node.getFunctionProperties()));
+
+            return null;
+        }
+
+        @Override
+        protected Void visitShowExternalFunction(ShowExternalFunction node, Integer context)
+        {
+            builder.append("SHOW EXTERNAL FUNCTION ")
+                    .append(formatName(node.getName()));
+            node.getParameterTypes().map(Formatter::formatTypeList).ifPresent(builder::append);
+
+            return null;
+        }
+
+        @Override
+        protected Void visitReturn(Return node, Integer indent)
+        {
+            append(indent, "RETURN ");
+            builder.append(formatExpression(node.getExpression(), parameters));
+
+            return null;
+        }
+
+        @Override
+        protected Void visitExternalBodyReference(ExternalBodyReference node, Integer indent)
+        {
+            append(indent, "EXTERNAL");
+            if (node.getIdentifier().isPresent()) {
+                builder.append(" NAME ");
+                builder.append(node.getIdentifier().get().toString());
+            }
+
+            return null;
+        }
+
+        @Override
         protected Void visitExplain(Explain node, Integer indent)
         {
             builder.append("EXPLAIN ");
@@ -1026,6 +1090,21 @@ public final class SqlFormatter
             builder.append(formatPropertiesMultiLine(node.getProperties()));
 
             return null;
+        }
+
+        private String formatFunctionPropertiesMultiLine(List<FunctionProperty> properties)
+        {
+            if (properties.isEmpty()) {
+                return "";
+            }
+
+            String propertyList = properties.stream()
+                    .map(element -> INDENT +
+                            formatExpression(element.getName(), parameters) + " = " +
+                            formatStringLiteral(element.getValue().getValue()))
+                    .collect(joining(",\n"));
+
+            return "\nFUNCPROPERTIES (\n" + propertyList + "\n)";
         }
 
         private String formatPropertiesMultiLine(List<Property> properties)
@@ -1570,6 +1649,11 @@ public final class SqlFormatter
             return null;
         }
 
+        public static String formatTypeList(List<String> types)
+        {
+            return format("(%s)", Joiner.on(", ").join(types));
+        }
+
         private void processRelation(Relation relation, Integer indent)
         {
             // TODO: handle this properly
@@ -1592,6 +1676,32 @@ public final class SqlFormatter
         private static String indentString(int indent)
         {
             return Strings.repeat(INDENT, indent);
+        }
+
+        private String formatSqlParameterDeclarations(List<SqlParameterDeclaration> parameters)
+        {
+            if (parameters.isEmpty()) {
+                return "()";
+            }
+            return parameters.stream()
+                    .map(parameter -> format(
+                            "%s%s %s",
+                            INDENT,
+                            formatExpression(parameter.getName(), this.parameters),
+                            parameter.getType()))
+                    .collect(joining(",\n", "(\n", "\n)"));
+        }
+
+        private String formatRoutineCharacteristics(RoutineCharacteristics characteristics)
+        {
+            return Joiner.on("\n").join(ImmutableList.of(
+                    formatRoutineCharacteristicName(characteristics.getDeterminism()),
+                    formatRoutineCharacteristicName(characteristics.getNullCallClause())));
+        }
+
+        private String formatRoutineCharacteristicName(Enum characteristic)
+        {
+            return characteristic.name().replace("_", " ");
         }
     }
 

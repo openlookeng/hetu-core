@@ -21,6 +21,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
@@ -120,9 +122,9 @@ public class BenchmarkArrayIntersect
             }
 
             ArrayType arrayType = new ArrayType(elementType);
-            Signature signature = new Signature(name, FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature(), arrayType.getTypeSignature());
+            Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction(name), FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature(), arrayType.getTypeSignature());
             ImmutableList<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, arrayType, ImmutableList.of(field(0, arrayType), field(1, arrayType)), Optional.empty()));
+                    new CallExpression(signature.getName().getObjectName(), new BuiltInFunctionHandle(signature), arrayType, ImmutableList.of(field(0, arrayType), field(1, arrayType)), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             ExpressionCompiler compiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));

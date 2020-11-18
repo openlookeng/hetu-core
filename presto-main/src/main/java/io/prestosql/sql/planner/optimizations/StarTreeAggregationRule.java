@@ -251,6 +251,7 @@ public class StarTreeAggregationRule
         TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle);
         String tableName = tableMetadata.getQualifiedName().toString();
         CubeStatement statement = CubeStatementGenerator.generate(
+                metadata,
                 tableName,
                 aggregationNode,
                 filterNode.map(FilterNode.class::cast).orElse(null),
@@ -419,9 +420,9 @@ public class StarTreeAggregationRule
 
     static boolean isSupported(AggregationNode.Aggregation aggregation)
     {
-        return SUPPORTED_FUNCTIONS.contains(aggregation.getSignature().getName()) &&
-                aggregation.getSignature().getArgumentTypes().size() <= 1 &&
-                (!aggregation.isDistinct() || aggregation.getSignature().getName().equals(COUNT));
+        return SUPPORTED_FUNCTIONS.contains(aggregation.getFunctionCall().getDisplayName()) &&
+                aggregation.getFunctionCall().getArguments().size() <= 1 &&
+                (!aggregation.isDistinct() || aggregation.getFunctionCall().getDisplayName().equals(COUNT));
     }
 
     /**

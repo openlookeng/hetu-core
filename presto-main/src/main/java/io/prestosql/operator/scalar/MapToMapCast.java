@@ -16,7 +16,8 @@ package io.prestosql.operator.scalar;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.CastType;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.operator.aggregation.TypedSet;
 import io.prestosql.spi.PrestoException;
@@ -24,8 +25,7 @@ import io.prestosql.spi.annotation.UsedByGeneratedCode;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignatureParameter;
 
@@ -39,9 +39,9 @@ import static io.prestosql.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static io.prestosql.spi.block.MethodHandleUtil.compose;
 import static io.prestosql.spi.block.MethodHandleUtil.nativeValueGetter;
 import static io.prestosql.spi.block.MethodHandleUtil.nativeValueWriter;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.OperatorType.CAST;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -79,36 +79,35 @@ public final class MapToMapCast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         checkArgument(arity == 1, "Expected arity to be 1");
         Type fromKeyType = boundVariables.getTypeVariable("FK");
         Type fromValueType = boundVariables.getTypeVariable("FV");
         Type toKeyType = boundVariables.getTypeVariable("TK");
         Type toValueType = boundVariables.getTypeVariable("TV");
-        Type toMapType = metadata.getParameterizedType(
+        Type toMapType = functionAndTypeManager.getParameterizedType(
                 "map",
                 ImmutableList.of(
                         TypeSignatureParameter.of(toKeyType.getTypeSignature()),
                         TypeSignatureParameter.of(toValueType.getTypeSignature())));
 
-        MethodHandle keyProcessor = buildProcessor(metadata, fromKeyType, toKeyType, true);
-        MethodHandle valueProcessor = buildProcessor(metadata, fromValueType, toValueType, false);
+        MethodHandle keyProcessor = buildProcessor(functionAndTypeManager, fromKeyType, toKeyType, true);
+        MethodHandle valueProcessor = buildProcessor(functionAndTypeManager, fromValueType, toValueType, false);
         MethodHandle target = MethodHandles.insertArguments(METHOD_HANDLE, 0, keyProcessor, valueProcessor, toMapType);
-        return new ScalarFunctionImplementation(true, ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)), target, true);
+        return new BuiltInScalarFunctionImplementation(true, ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)), target);
     }
 
     /**
      * The signature of the returned MethodHandle is (Block fromMap, int position, ConnectorSession session, BlockBuilder mapBlockBuilder)void.
      * The processor will get the value from fromMap, cast it and write to toBlock.
      */
-    private MethodHandle buildProcessor(Metadata metadata, Type fromType, Type toType, boolean isKey)
+    private MethodHandle buildProcessor(FunctionAndTypeManager functionAndTypeManager, Type fromType, Type toType, boolean isKey)
     {
         MethodHandle getter = nativeValueGetter(fromType);
 
         // Adapt cast that takes ([ConnectorSession,] ?) to one that takes (?, ConnectorSession), where ? is the return type of getter.
-        Signature signature = metadata.getCoercion(fromType.getTypeSignature(), toType.getTypeSignature());
-        ScalarFunctionImplementation castImplementation = metadata.getScalarFunctionImplementation(signature);
+        BuiltInScalarFunctionImplementation castImplementation = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.lookupCast(CastType.CAST, fromType.getTypeSignature(), toType.getTypeSignature()));
         MethodHandle cast = castImplementation.getMethodHandle();
         if (cast.type().parameterArray()[0] != ConnectorSession.class) {
             cast = MethodHandles.dropArguments(cast, 0, ConnectorSession.class);

@@ -24,10 +24,10 @@ import io.airlift.bytecode.control.IfStatement;
 import io.airlift.bytecode.expression.BytecodeExpression;
 import io.airlift.bytecode.instruction.LabelNode;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.CachedInstanceBinder;
 import io.prestosql.sql.gen.CallSiteBinder;
@@ -44,14 +44,15 @@ import static io.airlift.bytecode.Parameter.arg;
 import static io.airlift.bytecode.ParameterizedType.type;
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantFalse;
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantInt;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.OperatorType.INDETERMINATE;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static io.prestosql.spi.function.Signature.withVariadicBound;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.spi.util.Reflection.methodHandle;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.gen.InvokeFunctionBytecodeExpression.invokeFunction;
 import static io.prestosql.sql.gen.SqlTypeBytecodeExpression.constantType;
 import static io.prestosql.util.CompilerUtils.defineClass;
@@ -68,20 +69,19 @@ public class RowIndeterminateOperator
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         checkArgument(arity == 1, "Expected arity to be 1");
         Type type = boundVariables.getTypeVariable("T");
-        Class<?> indeterminateOperatorClass = generateIndeterminate(type, metadata);
+        Class<?> indeterminateOperatorClass = generateIndeterminate(type, functionAndTypeManager);
         MethodHandle indeterminateMethod = methodHandle(indeterminateOperatorClass, "indeterminate", type.getJavaType(), boolean.class);
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(valueTypeArgumentProperty(USE_NULL_FLAG)),
-                indeterminateMethod,
-                isDeterministic());
+                indeterminateMethod);
     }
 
-    private static Class<?> generateIndeterminate(Type type, Metadata metadata)
+    private static Class<?> generateIndeterminate(Type type, FunctionAndTypeManager functionAndTypeManager)
     {
         CallSiteBinder binder = new CallSiteBinder();
 
@@ -131,15 +131,13 @@ public class RowIndeterminateOperator
                                 .push(true)
                                 .gotoLabel(end));
 
-                Signature signature = Signature.internalOperator(
-                        INDETERMINATE,
-                        BOOLEAN.getTypeSignature(),
-                        ImmutableList.of(fieldTypes.get(i).getTypeSignature()));
-                ScalarFunctionImplementation function = metadata.getScalarFunctionImplementation(signature);
+                FunctionHandle functionHandle = functionAndTypeManager.resolveOperatorFunctionHandle(INDETERMINATE, fromTypes(fieldTypes.get(i)));
+
+                BuiltInScalarFunctionImplementation function = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionHandle);
                 BytecodeExpression element = constantType(binder, fieldTypes.get(i)).getValue(value, constantInt(i));
 
                 ifNullField.ifFalse(new IfStatement("if the field is not null but indeterminate...")
-                        .condition(invokeFunction(scope, cachedInstanceBinder, signature.getName(), function, element))
+                        .condition(invokeFunction(scope, cachedInstanceBinder, functionAndTypeManager.getFunctionMetadata(functionHandle).getName().getObjectName(), function, element))
                         .ifTrue(new BytecodeBlock()
                                 .push(true)
                                 .gotoLabel(end)));

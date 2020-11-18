@@ -37,7 +37,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.ArrayType;
@@ -70,6 +70,7 @@ import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
 import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
 import static io.prestosql.spi.type.Decimals.encodeScaledValue;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static java.util.stream.Collectors.toList;
 
 public final class HiveTestUtils
@@ -82,7 +83,7 @@ public final class HiveTestUtils
             new HiveSessionProperties(new HiveConfig().setOrcLazyReadSmallRanges(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
 
     private static final Metadata METADATA = createTestMetadataManager();
-    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
+    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA.getFunctionAndTypeManager());
 
     public static final HdfsEnvironment HDFS_ENVIRONMENT = createTestHdfsEnvironment(new HiveConfig());
 
@@ -188,21 +189,21 @@ public final class HiveTestUtils
 
     public static MapType mapType(Type keyType, Type valueType)
     {
-        return (MapType) METADATA.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
+        return (MapType) METADATA.getFunctionAndTypeManager().getParameterizedType(StandardTypes.MAP, ImmutableList.of(
                 TypeSignatureParameter.of(keyType.getTypeSignature()),
                 TypeSignatureParameter.of(valueType.getTypeSignature())));
     }
 
     public static ArrayType arrayType(Type elementType)
     {
-        return (ArrayType) METADATA.getParameterizedType(
+        return (ArrayType) METADATA.getFunctionAndTypeManager().getParameterizedType(
                 StandardTypes.ARRAY,
                 ImmutableList.of(TypeSignatureParameter.of(elementType.getTypeSignature())));
     }
 
     public static RowType rowType(List<NamedTypeSignature> elementTypeSignatures)
     {
-        return (RowType) METADATA.getParameterizedType(
+        return (RowType) METADATA.getFunctionAndTypeManager().getParameterizedType(
                 StandardTypes.ROW,
                 ImmutableList.copyOf(elementTypeSignatures.stream()
                         .map(TypeSignatureParameter::of)
@@ -221,8 +222,8 @@ public final class HiveTestUtils
 
     public static MethodHandle distinctFromOperator(Type type)
     {
-        Signature signature = METADATA.resolveOperator(IS_DISTINCT_FROM, ImmutableList.of(type, type));
-        return METADATA.getScalarFunctionImplementation(signature).getMethodHandle();
+        FunctionHandle operatorHandle = METADATA.getFunctionAndTypeManager().resolveOperatorFunctionHandle(IS_DISTINCT_FROM, fromTypes(type, type));
+        return METADATA.getFunctionAndTypeManager().getBuiltInScalarFunctionImplementation(operatorHandle).getMethodHandle();
     }
 
     public static boolean isDistinctFrom(MethodHandle handle, Block left, Block right)

@@ -14,25 +14,23 @@
  */
 package io.prestosql.operator.window;
 
-import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.type.StandardTypes;
-
-import static io.prestosql.spi.function.FunctionKind.WINDOW;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import io.prestosql.spi.connector.QualifiedObjectName;
 
 public enum RankingFunction
 {
-    ROW_NUMBER(new Signature("row_number", WINDOW, parseTypeSignature(StandardTypes.BIGINT), ImmutableList.of())), RANK(new Signature("rank", WINDOW, parseTypeSignature(StandardTypes.BIGINT), ImmutableList.of())), DENSE_RANK(new Signature("dense_rank", WINDOW, parseTypeSignature(StandardTypes.BIGINT), ImmutableList.of()));
-    private Signature value;
+    ROW_NUMBER(QualifiedObjectName.valueOfDefaultFunction("row_number")),
+    RANK(QualifiedObjectName.valueOfDefaultFunction("rank")),
+    DENSE_RANK(QualifiedObjectName.valueOfDefaultFunction("dense_rank"));
 
-    private RankingFunction(Signature value)
+    private QualifiedObjectName name;
+
+    private RankingFunction(QualifiedObjectName name)
     {
-        this.value = value;
+        this.name = name;
     }
 
-    public Signature getValue()
+    public QualifiedObjectName getName()
     {
-        return this.value;
+        return this.name;
     }
 }

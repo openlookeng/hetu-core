@@ -28,6 +28,7 @@ import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolUtils;
@@ -309,7 +310,16 @@ public class PushAggregationThroughOuterJoin
             }
 
             Aggregation overNullAggregation = new Aggregation(
-                    aggregation.getSignature(),
+                    new CallExpression(
+                            aggregation.getFunctionCall().getDisplayName(),
+                            aggregation.getFunctionCall().getFunctionHandle(),
+                            aggregation.getFunctionCall().getType(),
+                            aggregation.getArguments().stream()
+                                    .map(OriginalExpressionUtils::castToExpression)
+                                    .map(argument -> inlineSymbols(sourcesSymbolMapping, argument))
+                                    .map(OriginalExpressionUtils::castToRowExpression)
+                                    .collect(toImmutableList()),
+                            Optional.empty()),
                     aggregation.getArguments().stream()
                             .map(OriginalExpressionUtils::castToExpression)
                             .map(argument -> inlineSymbols(sourcesSymbolMapping, argument))
@@ -319,7 +329,9 @@ public class PushAggregationThroughOuterJoin
                     aggregation.getFilter(),
                     aggregation.getOrderingScheme(),
                     aggregation.getMask());
-            Symbol overNullSymbol = planSymbolAllocator.newSymbol(overNullAggregation.getSignature().getName(), planSymbolAllocator.getTypes().get(aggregationSymbol));
+
+            Symbol overNullSymbol = planSymbolAllocator.newSymbol(overNullAggregation.getFunctionCall().getDisplayName(), planSymbolAllocator.getTypes().get(aggregationSymbol));
+
             aggregationsOverNullBuilder.put(overNullSymbol, overNullAggregation);
             aggregationsSymbolMappingBuilder.put(aggregationSymbol, overNullSymbol);
         }

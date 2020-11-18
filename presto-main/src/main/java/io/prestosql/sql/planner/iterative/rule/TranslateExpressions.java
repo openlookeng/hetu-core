@@ -71,7 +71,8 @@ public class TranslateExpressions
             {
                 Map<NodeRef<Expression>, Type> types = analyzeCallExpressionTypes(callExpression, session, planSymbolAllocator.getTypes());
                 return new CallExpression(
-                        callExpression.getSignature(),
+                        callExpression.getDisplayName(),
+                        callExpression.getFunctionHandle(),
                         callExpression.getType(),
                         callExpression.getArguments().stream()
                                 .map(expression -> removeOriginalExpression(expression, session, types, context))
@@ -90,12 +91,13 @@ public class TranslateExpressions
                 ImmutableMap.Builder<NodeRef<Expression>, Type> builder = ImmutableMap.<NodeRef<Expression>, Type>builder();
                 TypeAnalyzer typeAnalyzer = new TypeAnalyzer(sqlParser, metadata);
                 if (!lambdaExpressions.isEmpty()) {
-                    List<FunctionType> functionTypes = callExpression.getSignature().getArgumentTypes().stream()
+                    List<FunctionType> functionTypes = metadata.getFunctionAndTypeManager().getFunctionMetadata(callExpression.getFunctionHandle()).getArgumentTypes()
+                            .stream()
                             .filter(typeSignature -> typeSignature.getBase().equals(FunctionType.NAME))
                             .map(metadata::getType)
                             .map(FunctionType.class::cast)
                             .collect(toImmutableList());
-                    InternalAggregationFunction internalAggregationFunction = metadata.getAggregateFunctionImplementation(callExpression.getSignature());
+                    InternalAggregationFunction internalAggregationFunction = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(callExpression.getFunctionHandle());
                     List<Class<?>> lambdaInterfaces = internalAggregationFunction.getLambdaInterfaces();
                     verify(lambdaExpressions.size() == functionTypes.size());
                     verify(lambdaExpressions.size() == lambdaInterfaces.size());
@@ -145,7 +147,7 @@ public class TranslateExpressions
 
             private RowExpression toRowExpression(Expression expression, Map<NodeRef<Expression>, Type> types, Map<Symbol, Integer> layout, Session session)
             {
-                return SqlToRowExpressionTranslator.translate(expression, FunctionKind.SCALAR, types, layout, metadata, session, false);
+                return SqlToRowExpressionTranslator.translate(expression, FunctionKind.SCALAR, types, layout, metadata.getFunctionAndTypeManager(), session, false);
             }
 
             private RowExpression removeOriginalExpression(RowExpression expression, Rule.Context context, Map<Symbol, Integer> layout)

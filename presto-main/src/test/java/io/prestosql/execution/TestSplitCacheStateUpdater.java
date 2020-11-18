@@ -112,7 +112,7 @@ public class TestSplitCacheStateUpdater
     {
         Metadata metadata = MetadataManager.createTestMetadataManager();
         PropertyService.setProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED, true);
-        BlockEncodingSerde blockEncodingSerde = metadata.getBlockEncodingSerde();
+        BlockEncodingSerde blockEncodingSerde = metadata.getFunctionAndTypeManager().getBlockEncodingSerde();
         objectMapper = new ObjectMapperProvider().get().registerModule(new SimpleModule()
                 .addDeserializer(Type.class, new TypeDeserializer(metadata))
                 .addSerializer(Block.class, new BlockJsonSerde.Serializer(blockEncodingSerde))

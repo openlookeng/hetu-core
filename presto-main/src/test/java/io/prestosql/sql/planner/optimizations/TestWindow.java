@@ -92,7 +92,7 @@ public class TestWindow
 
         //Window to TopN RankingFunction
         for (RankingFunction rankingFunction : RankingFunction.values()) {
-            assertDistributedPlan(format("SELECT orderkey FROM (SELECT orderkey, %s() OVER (PARTITION BY orderkey ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getValue().getName()),
+            assertDistributedPlan(format("SELECT orderkey FROM (SELECT orderkey, %s() OVER (PARTITION BY orderkey ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getName().getObjectName()),
                     anyTree(
                             topNRankingNumber(pattern -> pattern
                                             .specification(
@@ -101,7 +101,7 @@ public class TestWindow
                                                     ImmutableMap.of("custkey", ASC_NULLS_LAST)),
                                     project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey", "custkey", "custkey"))))));
 
-            assertDistributedPlan(format("SELECT orderstatus FROM (SELECT orderstatus, %s() OVER (PARTITION BY orderstatus ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getValue().getName()),
+            assertDistributedPlan(format("SELECT orderstatus FROM (SELECT orderstatus, %s() OVER (PARTITION BY orderstatus ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getName().getObjectName()),
                     anyTree(
                             topNRankingNumber(pattern -> pattern
                                             .specification(

@@ -19,8 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
@@ -41,27 +40,24 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
 import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.windowFrame;
+import static io.prestosql.sql.relational.Expressions.call;
 
 public class TestPruneWindowColumns
         extends BaseRuleTest
 {
-    private static final Signature signature = new Signature(
-            "min",
-            FunctionKind.WINDOW,
-            ImmutableList.of(),
-            ImmutableList.of(),
-            BIGINT.getTypeSignature(),
-            ImmutableList.of(BIGINT.getTypeSignature()),
-            false);
+    private static final String FUNCTION_NAME = "min";
+    private static final FunctionHandle FUNCTION_HANDLE = createTestMetadataManager().getFunctionAndTypeManager().lookupFunction(FUNCTION_NAME, fromTypes(BIGINT));
 
     private static final List<String> inputSymbolNameList =
             ImmutableList.of("orderKey", "partitionKey", "hash", "startValue1", "startValue2", "endValue1", "endValue2", "input1", "input2", "unused");
@@ -114,7 +110,7 @@ public class TestPruneWindowColumns
                                                 .addFunction(
                                                         "output2",
                                                         functionCall("min", ImmutableList.of("input2")),
-                                                        signature,
+                                                        FUNCTION_HANDLE,
                                                         frameProvider2)
                                                 .hashSymbol("hash"),
                                         strictProject(
@@ -170,12 +166,12 @@ public class TestPruneWindowColumns
                                                 .addFunction(
                                                         "output1",
                                                         functionCall("min", ImmutableList.of("input1")),
-                                                        signature,
+                                                        FUNCTION_HANDLE,
                                                         frameProvider1)
                                                 .addFunction(
                                                         "output2",
                                                         functionCall("min", ImmutableList.of("input2")),
-                                                        signature,
+                                                        FUNCTION_HANDLE,
                                                         frameProvider2)
                                                 .hashSymbol("hash"),
                                         strictProject(
@@ -219,7 +215,7 @@ public class TestPruneWindowColumns
                         ImmutableMap.of(
                                 output1,
                                 new WindowNode.Function(
-                                        signature,
+                                        call(FUNCTION_NAME, FUNCTION_HANDLE, BIGINT, ImmutableList.of(p.variable(input1.getName()))),
                                         ImmutableList.of(p.variable(input1.getName())),
                                         new WindowNode.Frame(
                                                 WindowFrameType.RANGE,
@@ -231,7 +227,7 @@ public class TestPruneWindowColumns
                                                 Optional.of(endValue2.getName()))),
                                 output2,
                                 new WindowNode.Function(
-                                        signature,
+                                        call(FUNCTION_NAME, FUNCTION_HANDLE, BIGINT, ImmutableList.of(p.variable(input2.getName()))),
                                         ImmutableList.of(p.variable(input2.getName())),
                                         new WindowNode.Frame(
                                                 WindowFrameType.RANGE,

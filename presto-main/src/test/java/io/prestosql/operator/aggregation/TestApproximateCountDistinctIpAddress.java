@@ -14,6 +14,7 @@
 package io.prestosql.operator.aggregation;
 
 import io.airlift.slice.Slices;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 
@@ -30,8 +31,8 @@ public class TestApproximateCountDistinctIpAddress
     @Override
     protected InternalAggregationFunction getAggregationFunction()
     {
-        return metadata.getAggregateFunctionImplementation(
-                new Signature("approx_distinct", AGGREGATE, BIGINT.getTypeSignature(), IPADDRESS.getTypeSignature(), DOUBLE.getTypeSignature()));
+        return metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("approx_distinct"), AGGREGATE, BIGINT.getTypeSignature(), IPADDRESS.getTypeSignature(), DOUBLE.getTypeSignature()));
     }
 
     @Override
