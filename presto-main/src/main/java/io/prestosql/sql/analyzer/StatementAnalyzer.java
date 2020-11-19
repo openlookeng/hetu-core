@@ -1031,17 +1031,35 @@ class StatementAnalyzer
                 CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
                 QualifiedObjectName tableFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getTableName());
                 String tableName = tableFullName.toString();
-                // check catalog validate
-                if (!heuristicIndexerManager.getSupportedCatalog().contains(tableFullName.getCatalogName())) {
+                // check whether catalog support create index
+                if (!metadata.isHeuristicIndexSupported(session, tableFullName)) {
                     throw new SemanticException(NOT_SUPPORTED, createIndex,
-                            "CREATE INDEX is not supported in '%s' connector",
+                            "CREATE INDEX is not supported in catalog '%s'",
                             tableFullName.getCatalogName());
                 }
+
                 List<String> partitions = new ArrayList<>();
+                String partitionColumn = null;
                 if (createIndex.getExpression().isPresent()) {
                     partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
-                    // check partitions validate
+                    // check partition name validate, create index …… where pt_d = xxx;
+                    // pt_d must be partition column
+                    List<String> partitionColumns = partitions.stream().map(k -> k.substring(0, k.indexOf("="))).collect(Collectors.toList());
+                    if (partitionColumns.size() > 1) {
+                        throw new IllegalArgumentException("Heuristic index only supports predicates on one column");
+                    }
+                    partitionColumn = partitionColumns.get(0);
                 }
+
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
+                if (tableHandle.isPresent() && !tableHandle.get().getConnectorHandle().isHeuristicIndexSupported()) {
+                    throw new SemanticException(NOT_SUPPORTED, table, "Catalog supported, but table storage format is not supported by heuristic index");
+                }
+                if (tableHandle.isPresent() && partitionColumn != null
+                        && !tableHandle.get().getConnectorHandle().isPartitionColumn(partitionColumn)) {
+                    throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
+                }
+
                 List<Map.Entry<String, Type>> indexColumns = new LinkedList<>();
                 for (Identifier i : createIndex.getColumnAliases()) {
                     indexColumns.add(new AbstractMap.SimpleEntry<>(i.toString(), BIGINT));

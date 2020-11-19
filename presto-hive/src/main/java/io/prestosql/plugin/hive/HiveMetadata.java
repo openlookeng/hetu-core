@@ -587,6 +587,12 @@ public class HiveMetadata
     }
 
     @Override
+    public boolean isHeuristicIndexSupported()
+    {
+        return true;
+    }
+
+    @Override
     public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> optionalSchemaName)
     {
         ImmutableList.Builder<SchemaTableName> tableNames = ImmutableList.builder();

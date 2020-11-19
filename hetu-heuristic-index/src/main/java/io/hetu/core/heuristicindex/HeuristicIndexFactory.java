@@ -15,7 +15,6 @@
 
 package io.hetu.core.heuristicindex;
 
-import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.hetu.core.heuristicindex.filter.HeuristicIndexFilter;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
@@ -35,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -49,7 +47,6 @@ public class HeuristicIndexFactory
         implements IndexFactory
 {
     private static final Logger LOG = Logger.get(HeuristicIndexFactory.class);
-    private final Set<String> supportedConnector = ImmutableSet.of("hive");
 
     public HeuristicIndexFactory()
     {
@@ -100,11 +97,5 @@ public class HeuristicIndexFactory
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         return new HeuristicIndexFilter(indices);
-    }
-
-    @Override
-    public Set<String> getSupportedConnector()
-    {
-        return supportedConnector;
     }
 }

@@ -35,7 +35,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 public class HeuristicIndexerManager
 {
@@ -100,10 +99,5 @@ public class HeuristicIndexerManager
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         return factory.getIndexFilter(indices);
-    }
-
-    public Set<String> getSupportedCatalog()
-    {
-        return factory.getSupportedConnector();
     }
 }

@@ -57,7 +57,7 @@ public class TestIndexCache
     private HiveColumnHandle partitionColumnHandle;
     private HiveSplit testHiveSplit;
     private List<HiveColumnHandle> testPartitions = Collections.emptyList();
-    private final long loadDelay = 0;
+    private final long loadDelay = 1000;
 
     @BeforeClass
     public void setupBeforeClass()
