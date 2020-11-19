@@ -38,6 +38,37 @@ hbase.metastore.type=hetuMetastore
 hbase.metastore.type=hetuMetastore
 ```
 
+**Kerberos配置：**
+
+如果HBase/Zookeeper是安全集群，则需要配置kerberos相关信息
+
+```properties
+hbase.jaas.conf.path=/xxx/jaas.conf
+
+hbase.hbase.site.path=/xxx/hbase-site.xml
+
+hbase.krb5.conf.path=/xxx/krb5.conf
+
+hbase.kerberos.keytab=/xxx/user.keytab
+
+hbase.kerberos.principal=lk_username
+
+hbase.authentication.type=KERBEROS
+```
+
+编辑 jaas.conf
+```properties
+Client {
+com.sun.security.auth.module.Krb5LoginModule required
+useKeyTab=true
+keyTab="/xxx/user.keytab"
+principal="lk_username@HADOOP.COM"
+useTicketCache=false
+storeKey=true
+debug=true;
+};
+```
+
 ## 配置属性
 
 | 属性名称| 默认值| 是否必填| 说明|
@@ -49,6 +80,12 @@ hbase.metastore.type=hetuMetastore
 | hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值。|
 | hbase.default.value| NULL| 否| 表中数据的默认值|
 | hbase.metastore.type| hetuMetastore| 否| HBase元数据的存储，`hetuMetastore`|
+| hbase.authentication.type| （无）| 否| HDFS/HBase组件访问安全身份验证方式|
+| hbase.kerberos.principal| （无）| 否| 安全身份验证的用户名|
+| hbase.kerberos.keytab| （无）| 否| 安全身份验证的密钥|
+| hbase.hbase.site.path| （无）| 否| 连接安全HBase集群的配置|
+| hbase.jaas.conf.path| （无）| 否| 安全身份验证的JAAS|
+| hbase.krb5.conf.path| （无）| 否| 安全身份验证的krb5|
 
 
 ## 表属性

@@ -38,6 +38,36 @@ You have to create `etc/hetu-metastore.properties` to connect database. For the 
 hbase.metastore.type=hetuMetastore
 ```
 
+**Kerberos Configuration:**
+
+If HBase/Zookeeper is a security cluster，so we should add the configuration about kerberos.
+
+```properties
+hbase.jaas.conf.path=/xxx/jaas.conf
+
+hbase.hbase.site.path=/xxx/hbase-site.xml
+
+hbase.krb5.conf.path=/xxx/krb5.conf
+
+hbase.kerberos.keytab=/xxx/user.keytab
+
+hbase.kerberos.principal=lk_username
+
+hbase.authentication.type=KERBEROS
+```
+
+vi jaas.conf
+```properties
+Client {
+com.sun.security.auth.module.Krb5LoginModule required
+useKeyTab=true
+keyTab="/xxx/user.keytab"
+principal="lk_username@HADOOP.COM"
+useTicketCache=false
+storeKey=true
+debug=true;
+};
+```
 ## Configuration Properties
 
 | Property Name                       | Default Value | Required | Description                                                  |
@@ -49,6 +79,12 @@ hbase.metastore.type=hetuMetastore
 | hbase.rpc.protection.enable         | false         | No       | Communication privacy protection. You can get this from `hbase-site.xml`. |
 | hbase.default.value                 | NULL          | No       | The default value of data in table                           |
 | hbase.metastore.type                | hetuMetastore | No       | The storage of hbase metadata, you can choose `hetuMetastore` |
+| hbase.authentication.type           | (none)        | No       | Access security authentication mode of hbase component  |
+| hbase.kerberos.principal            | (none)        | No       | User name for security authentication                        |
+| hbase.kerberos.keytab               | (none)        | No       | Key for security authentication                              |
+| hbase.hbase.site.path               | (none)        | No       | Configuration used to connect to a secure hbase cluster      |
+| hbase.jaas.conf.path                | (none)        | No       | Jaas for security authentication                             |
+| hbase.krb5.conf.path                | (none)        | No       | Krb5 for security authentication                             |
 
 
 ## Table Properties
