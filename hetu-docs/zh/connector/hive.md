@@ -254,20 +254,20 @@ Hive连接器缓存ORC文件数据，以提供更好的性能并减少查询时�
 | 属性名称| 说明| 默认值|
 |:----------|:----------|:----------|
 | `hive.orc.file-tail.cache.enabled`| 启用ORC文件尾缓存| `false`|
-| `hive.orc.file-tail.cache.ttl`| ORC文件尾缓存TTL| `30 mins`|
-| `hive.orc.file-tail.cache.limit`| ORC文件尾缓存最大条目数| `10,000`|
+| `hive.orc.file-tail.cache.ttl`| ORC文件尾缓存TTL| `4 hours`|
+| `hive.orc.file-tail.cache.limit`| ORC文件尾缓存最大条目数| `50,000`|
 | `hive.orc.stripe-footer.cache.enabled`| 启用ORC分条页脚缓存| `false`|
-| `hive.orc.stripe-footer.cache.ttl`| ORC分条页脚缓存的TTL| `30 mins`|
-| `hive.orc.stripe-footer.cache.limit`| ORC分条页脚缓存最大条目数| `25,000`|
+| `hive.orc.stripe-footer.cache.ttl`| ORC分条页脚缓存的TTL| `4 hours`|
+| `hive.orc.stripe-footer.cache.limit`| ORC分条页脚缓存最大条目数| `250,000`|
 | `hive.orc.row-index.cache.enabled`| 启用ORC行索引缓存| `false`|
-| `hive.orc.row-index.cache.ttl`| ORC行索引缓存TTL| `30 mins`|
-| `hive.orc.row-index.cache.limit`| ORC行索引缓存最大条目数| `50,000`|
+| `hive.orc.row-index.cache.ttl`| ORC行索引缓存TTL| `4 hours`|
+| `hive.orc.row-index.cache.limit`| ORC行索引缓存最大条目数| `250,000`|
 | `hive.orc.bloom-filters.cache.enabled`| 启用ORC布隆过滤器缓存| `false`|
-| `hive.orc.bloom-filters.cache.ttl`| ORC布隆过滤器缓存TTL| `30 mins`|
-| `hive.orc.bloom-filters.cache.limit`| ORC布隆过滤器缓存最大条目数| `50,000`|
+| `hive.orc.bloom-filters.cache.ttl`| ORC布隆过滤器缓存TTL| `4 hours`|
+| `hive.orc.bloom-filters.cache.limit`| ORC布隆过滤器缓存最大条目数| `250,000`|
 | `hive.orc.row-data.block.cache.enabled`| 启用ORC行组块缓存| `false`|
-| `hive.orc.row-data.block.cache.ttl`| ORC行组缓存TTL| `30 mins`|
-| `hive.orc.row-data.block.cache.max.weight`| ORC行组缓存最大权重。| `500 MB`|
+| `hive.orc.row-data.block.cache.ttl`| ORC行组缓存TTL| `4 hours`|
+| `hive.orc.row-data.block.cache.max.weight`| ORC行组缓存最大权重。| `20 GB`|
 
 TTL: 是指自最后一次读写cache到现在的时间间隔。如后文所讲, 在写cache阶段会周期性执行时间过期验证,在读cache的时也会触发过期验证。
 

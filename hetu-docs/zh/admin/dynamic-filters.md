@@ -22,7 +22,7 @@ dynamic-filtering-bloom-filter-fpp=0.1
 上述属性说明如下：
 
 - `enable-dynamic-filtering`：是否开启动态过滤特性。
-- `dynamic-filtering-wait-time`：等待动态过滤条件生成的最长等待时间，默认值是0ms。（该配置要求集群不同节点之间的时间高度同步）
+- `dynamic-filtering-wait-time`：等待动态过滤条件生成的最长等待时间，默认值是1s。（该配置要求集群不同节点之间的时间高度同步）
 - `dynamic-filtering-data-type`：设置动态过滤类型，可选包含`BLOOM_FILTER`以及`HASHSET`，默认类型为`BLOOM_FILTER`。
 - `dynamic-filtering-max-size`: 每个dynamic filter的大小上限，如果预估大小超过设定值，代价优化器不会生成对应的dynamic filter，默认值是1000000。
 - `dynamic-filtering-max-per-driver-size`：每个driver可以收集的数据大小上限，默认值是1MB。

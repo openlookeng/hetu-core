@@ -491,14 +491,14 @@ Heuristic index is external index module that which can be used to filter to out
 ### `hetu.heuristicindex.filter.cache.max-memory`
  
 > -   **Type:** `data size`
-> -   **Default value:** `1GB`
+> -   **Default value:** `10GB`
 >
 > Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from indexstore. This property controls the maximum memory used by the index cache. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
 
 ### `hetu.heuristicindex.filter.cache.soft-reference`
  
 > -   **Type:** `boolean`
-> -   **Default value:** `false`
+> -   **Default value:** `true`
 >
 > Caching the index files provides better performance, however it utilizes memory. Enabling this property allows the Garbage Collector to remove entries from the cache if memory is running low.
 >
@@ -507,14 +507,14 @@ Heuristic index is external index module that which can be used to filter to out
 ### `hetu.heuristicindex.filter.cache.ttl`
  
 > -   **Type:** `Duration`
-> -   **Default value:** `1h`
+> -   **Default value:** `24h`
 >
 > The time period after which index cache expires.
 
 ### `hetu.heuristicindex.filter.cache.loading-threads`
  
 > -   **Type:** `integer`
-> -   **Default value:** `2`
+> -   **Default value:** `10`
 >
 > The number of threads used to load indices in parallel.
 
@@ -553,14 +553,14 @@ of constructing another execution plan, thus reducing the amount of query pre-pr
 ### `hetu.executionplan.cache.limit`
 > 
 > -  **Type:** `integer`
-> - **Default value:** `1000`
+> - **Default value:** `10000`
 >
 > Maximum number of execution plans to keep in the cache
  
 ### `hetu.executionplan.cache.timeout`
 > 
 > - **Type:** `integer`
-> - **Default value:** `60000 ms`
+> - **Default value:** `86400000 ms`
 > 
 > Time in milliseconds to expire cached execution plans after the last access
  

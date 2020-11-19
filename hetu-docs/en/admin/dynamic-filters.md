@@ -21,7 +21,7 @@ dynamic-filtering-bloom-filter-fpp=0.1
 The above attributes are described below:
 
 - `enable-dynamic-filtering`: Enable dynamic filtering feature.
-- `dynamic-filtering-wait-time`: Maximum waiting time for the dynamic filter to be ready, default to 0ms. (This feature requires the time of nodes in cluster to be highly sync-up)
+- `dynamic-filtering-wait-time`: Maximum waiting time for the dynamic filter to be ready, default to 1s. (This feature requires the time of nodes in cluster to be highly sync-up)
 - `dynamic-filtering-data-type`: Set dynamic filtering data type, default to BLOOM_FILTER.
 - `dynamic-filtering-max-size`: Max dynamic filter size, cost based optimizer won't create dynamic filter that has estimate size exceeding this value based on statistics, default to 1000000.
 - `dynamic-filtering-max-per-driver-size`: Max data size collected for dynamic filter per driver, default to 1MB.

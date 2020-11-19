@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.plugin.hive.TestHiveUtil.nonDefaultTimeZone;
 
@@ -91,13 +92,13 @@ public class TestHiveConfig
                 .setOrcMaxMergeDistance(new DataSize(1, Unit.MEGABYTE))
                 .setOrcMaxBufferSize(new DataSize(8, Unit.MEGABYTE))
                 .setOrcStreamBufferSize(new DataSize(8, Unit.MEGABYTE))
-                .setOrcTinyStripeThreshold(new DataSize(8, Unit.MEGABYTE))
+                .setOrcTinyStripeThreshold(new DataSize(1, Unit.BYTE))
                 .setOrcMaxReadBlockSize(new DataSize(16, Unit.MEGABYTE))
-                .setOrcFileTailCacheEnabled(false).setOrcFileTailCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcFileTailCacheLimit(10_000)
-                .setOrcStripeFooterCacheEnabled(false).setOrcStripeFooterCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcStripeFooterCacheLimit(25_000)
-                .setOrcRowIndexCacheEnabled(false).setOrcRowIndexCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcRowIndexCacheLimit(50_000)
-                .setOrcBloomFiltersCacheEnabled(false).setOrcBloomFiltersCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcBloomFiltersCacheLimit(50_000)
-                .setOrcRowDataCacheEnabled(false).setOrcRowDataCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcRowDataCacheMaximumWeight(new DataSize(500, MEGABYTE))
+                .setOrcFileTailCacheEnabled(false).setOrcFileTailCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcFileTailCacheLimit(50_000)
+                .setOrcStripeFooterCacheEnabled(false).setOrcStripeFooterCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcStripeFooterCacheLimit(250_000)
+                .setOrcRowIndexCacheEnabled(false).setOrcRowIndexCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcRowIndexCacheLimit(250_000)
+                .setOrcBloomFiltersCacheEnabled(false).setOrcBloomFiltersCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcBloomFiltersCacheLimit(250_000)
+                .setOrcRowDataCacheEnabled(false).setOrcRowDataCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcRowDataCacheMaximumWeight(new DataSize(20, GIGABYTE))
                 .setOrcLazyReadSmallRanges(true)
                 .setRcfileWriterValidate(false)
                 .setOrcWriteLegacyVersion(false)
@@ -125,7 +126,7 @@ public class TestHiveConfig
                 .setS3SelectPushdownMaxConnections(500)
                 .setTemporaryStagingDirectoryEnabled(true)
                 .setTemporaryStagingDirectoryPath("/tmp/presto-${USER}")
-                .setFileStatusCacheExpireAfterWrite(new Duration(1, TimeUnit.MINUTES))
+                .setFileStatusCacheExpireAfterWrite(new Duration(24, TimeUnit.HOURS))
                 .setFileStatusCacheMaxSize(1000 * 1000)
                 .setFileStatusCacheTables("")
                 .setHiveTransactionHeartbeatInterval(null)
