@@ -31,6 +31,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -110,9 +111,12 @@ public class CreateIndexOperator
 
         // persist index to disk if this operator is responsible for persisting a writer
         try {
-            for (IndexWriter writer : levelWriter.values()) {
-                if (persistBy.get(writer) == this) {
-                    writer.persist();
+            Iterator<Map.Entry<String, IndexWriter>> iterator = levelWriter.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, IndexWriter> entry = iterator.next();
+                if (persistBy.get(entry.getValue()) == this) {
+                    entry.getValue().persist();
+                    iterator.remove(); // remove reference to writer once persisted so it can be GCed
                 }
             }
         }
@@ -165,8 +169,7 @@ public class CreateIndexOperator
             Type type = entry.getValue();
 
             for (int position = 0; position < block.getPositionCount(); ++position) {
-                values.computeIfAbsent(indexColumn, k -> new ArrayList<>());
-                values.get(indexColumn).add(getNativeValue(type, block, position));
+                values.computeIfAbsent(indexColumn, k -> new ArrayList<>()).add(getNativeValue(type, block, position));
             }
         }
 
@@ -177,18 +180,19 @@ public class CreateIndexOperator
             switch (createIndexMetadata.getCreateLevel()) {
                 case STRIPE: {
                     String filePath = page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH);
-                    levelWriter.putIfAbsent(filePath, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
-                    IndexWriter indexWriter = levelWriter.get(filePath);
-                    persistBy.putIfAbsent(indexWriter, this);
-                    indexWriter.addData(
-                            values,
-                            connectorMetadata);
+                    IndexWriter indexWriter = levelWriter.computeIfAbsent(filePath,
+                            k -> {
+                                IndexWriter writer = heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata);
+                                persistBy.putIfAbsent(writer, this);
+                                return writer;
+                            });
+                    indexWriter.addData(values, connectorMetadata);
                     break;
                 }
                 case PARTITION: {
                     String partition = getPartitionName(page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH),
                             createIndexMetadata.getTableName());
-                    levelWriter.putIfAbsent(partition, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    levelWriter.computeIfAbsent(partition, k -> heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
                     IndexWriter indexWriter = levelWriter.get(partition);
                     // TODO: use partitioned index writer here
                     break;
