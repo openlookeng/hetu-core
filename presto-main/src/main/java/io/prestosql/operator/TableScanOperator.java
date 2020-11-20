@@ -292,7 +292,7 @@ public class TableScanOperator
             return null;
         }
         if (source == null) {
-            source = pageSourceProvider.createPageSource(operatorContext.getSession(), split, table, columns, null);
+            source = pageSourceProvider.createPageSource(operatorContext.getSession(), split, table, columns, Optional.empty());
         }
 
         Page page = source.getNextPage();
