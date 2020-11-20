@@ -35,6 +35,7 @@ import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
 
@@ -48,6 +49,7 @@ import java.util.stream.Collectors;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxSize;
+import static io.prestosql.SystemSessionProperties.isOptimizeDynamicFilterGeneration;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.DynamicFilters.getDescriptor;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
@@ -65,12 +67,13 @@ import static java.util.stream.Collectors.toList;
 public class RemoveUnsupportedDynamicFilters
         implements PlanOptimizer
 {
-    private static final double DEFAULT_SELECTIVITY_THRESHOLD = 0.5D;
+    private static final double DEFAULT_GENERATE_SELECTIVITY_THRESHOLD = 0.5D;
+    private static final double DEFAULT_REMOVE_SELECTIVITY_THRESHOLD = 0.01D;
 
     private final Metadata metadata;
     private final StatsCalculator statsCalculator;
-    private Session session;
     private StatsProvider statsProvider;
+    private final Set<String> removedDynamicFilterIds = new HashSet<>();
 
     public RemoveUnsupportedDynamicFilters(Metadata metadata, StatsCalculator statsCalculator)
     {
@@ -81,15 +84,25 @@ public class RemoveUnsupportedDynamicFilters
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        this.session = session;
         this.statsProvider = new CachingStatsProvider(statsCalculator, session, symbolAllocator.getTypes());
-        PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(), ImmutableSet.of());
-        return result.getNode();
+        PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(session, metadata, removedDynamicFilterIds), ImmutableSet.of());
+        return SimplePlanRewriter.rewriteWith(new RemoveFilterVisitor(removedDynamicFilterIds), result.getNode(), null);
     }
 
     private class Rewriter
             extends PlanVisitor<PlanWithConsumedDynamicFilters, Set<String>>
     {
+        private final Metadata metadata;
+        private final Session session;
+        private final Set<String> removedDynamicFilterIds;
+
+        public Rewriter(Session session, Metadata metadata, Set<String> removedDynamicFilterIds)
+        {
+            this.session = session;
+            this.metadata = metadata;
+            this.removedDynamicFilterIds = removedDynamicFilterIds;
+        }
+
         @Override
         protected PlanWithConsumedDynamicFilters visitPlan(PlanNode node, Set<String> allowedDynamicFilterIds)
         {
@@ -115,7 +128,7 @@ public class RemoveUnsupportedDynamicFilters
         public PlanWithConsumedDynamicFilters visitJoin(JoinNode node, Set<String> allowedDynamicFilterIds)
         {
             ImmutableSet.Builder<String> builder = ImmutableSet.<String>builder().addAll(allowedDynamicFilterIds);
-            if (!hasHighSelectivity(node.getRight())) {
+            if (!isOptimizeDynamicFilterGeneration(session) || (isOptimizeDynamicFilterGeneration(session) && !hasHighSelectivity(node.getRight()))) {
                 builder.addAll(node.getDynamicFilters().keySet());
             }
             ImmutableSet<String> allowedDynamicFilterIdsProbeSide = builder.build();
@@ -164,8 +177,16 @@ public class RemoveUnsupportedDynamicFilters
             PlanNode source = result.getNode();
             Expression modified;
             if (source instanceof TableScanNode) {
+                // Keep only small table
+                DynamicFilters.ExtractResult extractResult = extractDynamicFilters(original);
+                if (isOptimizeDynamicFilterGeneration(session) && !highSelectivity(node)) {
+                    modified = removeDynamicFilters(original, ImmutableSet.of(), consumedDynamicFilterIds);
+                    extractResult.getDynamicConjuncts().forEach(descriptor -> removedDynamicFilterIds.add(descriptor.getId()));
+                }
                 // Keep only allowed dynamic filters
-                modified = removeDynamicFilters(original, allowedDynamicFilterIds, consumedDynamicFilterIds);
+                else {
+                    modified = removeDynamicFilters(original, allowedDynamicFilterIds, consumedDynamicFilterIds);
+                }
             }
             else {
                 modified = removeAllDynamicFilters(original);
@@ -197,19 +218,21 @@ public class RemoveUnsupportedDynamicFilters
             // Only handle the case that build side of JoinNode is0
             // TableScanNode or FilterNode above TableScanNode
             // as the estimates will be more accurate
+            Optional<Expression> predicates = Optional.empty();
             if (node instanceof TableScanNode) {
                 buildSideTableScanNode = Optional.of(node);
+                predicates = ((TableScanNode) buildSideTableScanNode.get()).getPredicate();
             }
 
             if (node instanceof FilterNode) {
                 PlanNode sourceNode = ((FilterNode) node).getSource();
                 if (sourceNode instanceof TableScanNode) {
                     buildSideTableScanNode = Optional.of(sourceNode);
+                    predicates = Optional.of(((FilterNode) node).getPredicate());
                 }
             }
 
             if (buildSideTableScanNode.isPresent()) {
-                Optional<Expression> predicates = ((TableScanNode) buildSideTableScanNode.get()).getPredicate();
                 // If there is dynamic filters applied on the build side,
                 // the selectivity cannot be easily calculated,
                 // thus we assume it's not high selectivity
@@ -236,11 +259,31 @@ public class RemoveUnsupportedDynamicFilters
 
                     // If selectivity too low, no need to create Dynamic Filter
                     double selectivity = filteredStats.getOutputRowCount() / totalRowCount.getValue();
-                    return selectivity > DEFAULT_SELECTIVITY_THRESHOLD;
+                    return selectivity > DEFAULT_GENERATE_SELECTIVITY_THRESHOLD;
                 }
             }
 
             return false;
+        }
+
+        private boolean highSelectivity(FilterNode node)
+        {
+            Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) node.getSource()).getTable(), Constraint.alwaysTrue()).getRowCount();
+            PlanNodeStatsEstimate filteredStats = statsProvider.getStats(node);
+
+            if (!filteredStats.isOutputRowCountUnknown() && !totalRowCount.isUnknown()) {
+                // If filtered row count is too big, no need to create Dynamic Filter
+                if (filteredStats.getOutputRowCount() > getDynamicFilteringMaxSize(session)) {
+                    return true;
+                }
+
+                // If selectivity too low, no need to create Dynamic Filter
+                double selectivity = filteredStats.getOutputRowCount() / totalRowCount.getValue();
+                return selectivity > DEFAULT_REMOVE_SELECTIVITY_THRESHOLD;
+            }
+            else {
+                return true;
+            }
         }
 
         private Expression removeDynamicFilters(Expression expression, Set<String> allowedDynamicFilterIds, ImmutableSet.Builder<String> consumedDynamicFilterIds)
@@ -288,6 +331,65 @@ public class RemoveUnsupportedDynamicFilters
         Set<String> getConsumedDynamicFilterIds()
         {
             return consumedDynamicFilterIds;
+        }
+    }
+
+    private static class RemoveFilterVisitor
+            extends SimplePlanRewriter<Void>
+    {
+        private final Set<String> removedDynamicFilterIds;
+
+        public RemoveFilterVisitor(Set<String> removedDynamicFilterIds)
+        {
+            this.removedDynamicFilterIds = removedDynamicFilterIds;
+        }
+
+        @Override
+        public PlanNode visitFilter(FilterNode node, RewriteContext<Void> context)
+        {
+            PlanNode source = context.rewrite(node.getSource());
+            Expression original = node.getPredicate();
+            Expression modified;
+            if (source instanceof TableScanNode) {
+                modified = combineConjuncts(extractConjuncts(original)
+                        .stream()
+                        .filter(conjunct ->
+                                getDescriptor(conjunct)
+                                        .map(descriptor -> !removedDynamicFilterIds.contains(descriptor.getId())).orElse(true))
+                        .collect(toImmutableList()));
+            }
+            else {
+                modified = original;
+            }
+            return new FilterNode(node.getId(), source, modified);
+        }
+
+        @Override
+        public PlanNode visitJoin(JoinNode node, RewriteContext<Void> context)
+        {
+            PlanNode leftSource = context.rewrite(node.getLeft());
+            PlanNode rightSource = context.rewrite(node.getRight());
+            Map<String, Symbol> dynamicFilters = node.getDynamicFilters().entrySet().stream()
+                    .filter(entry -> !removedDynamicFilterIds.contains(entry.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            if (leftSource != node.getLeft() ||
+                    rightSource != node.getRight() ||
+                    !dynamicFilters.equals(node.getDynamicFilters())) {
+                return new JoinNode(
+                        node.getId(),
+                        node.getType(),
+                        leftSource,
+                        rightSource,
+                        node.getCriteria(),
+                        node.getOutputSymbols(),
+                        node.getFilter(),
+                        node.getLeftHashSymbol(),
+                        node.getRightHashSymbol(),
+                        node.getDistributionType(),
+                        node.isSpillable(),
+                        dynamicFilters);
+            }
+            return node;
         }
     }
 }

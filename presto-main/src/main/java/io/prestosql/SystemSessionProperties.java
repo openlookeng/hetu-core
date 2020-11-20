@@ -144,6 +144,7 @@ public final class SystemSessionProperties
     public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
     public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
     public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
+    public static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -639,6 +640,11 @@ public final class SystemSessionProperties
                         DYNAMIC_FILTERING_BLOOM_FILTER_FPP,
                         "Expected FPP for BloomFilter which is used in dynamic filtering",
                         featuresConfig.getDynamicFilteringBloomFilterFpp(),
+                        false),
+                booleanProperty(
+                        OPTIMIZE_DYNAMIC_FILTER_GENERATION,
+                        "Generate dynamic filters based on the selectivity",
+                        true,
                         false),
                 booleanProperty(
                         ENABLE_EXECUTION_PLAN_CACHE,
@@ -1141,6 +1147,11 @@ public final class SystemSessionProperties
     public static double getDynamicFilteringBloomFilterFpp(Session session)
     {
         return session.getSystemProperty(DYNAMIC_FILTERING_BLOOM_FILTER_FPP, Double.class);
+    }
+
+    public static boolean isOptimizeDynamicFilterGeneration(Session session)
+    {
+        return session.getSystemProperty(OPTIMIZE_DYNAMIC_FILTER_GENERATION, Boolean.class);
     }
 
     public static boolean isExecutionPlanCacheEnabled(Session session)
