@@ -34,7 +34,7 @@ import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.connector.UpdatablePageSource;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.EmptySplitPageSource;
@@ -44,7 +44,6 @@ import io.prestosql.sql.planner.plan.PlanNodeId;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -83,7 +82,7 @@ public class ScanFilterAndProjectOperator
             PageProcessor pageProcessor,
             TableHandle table,
             Iterable<ColumnHandle> columns,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter,
+            Optional<DynamicFilterSupplier> dynamicFilter,
             Iterable<Type> types,
             DataSize minOutputPageSize,
             int minOutputPageRowCount)
@@ -177,7 +176,7 @@ public class ScanFilterAndProjectOperator
         final PageProcessor pageProcessor;
         final TableHandle table;
         final List<ColumnHandle> columns;
-        final Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter;
+        final Optional<DynamicFilterSupplier> dynamicFilter;
         final List<Type> types;
         final LocalMemoryContext memoryContext;
         final AggregatedMemoryContext localAggregatedMemoryContext;
@@ -194,7 +193,7 @@ public class ScanFilterAndProjectOperator
                 PageProcessor pageProcessor,
                 TableHandle table,
                 Iterable<ColumnHandle> columns,
-                Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter,
+                Optional<DynamicFilterSupplier> dynamicFilter,
                 Iterable<Type> types,
                 AggregatedMemoryContext aggregatedMemoryContext,
                 DataSize minOutputPageSize,
@@ -387,7 +386,7 @@ public class ScanFilterAndProjectOperator
         private final PageSourceProvider pageSourceProvider;
         private final TableHandle table;
         private final List<ColumnHandle> columns;
-        private final Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter;
+        private final Optional<DynamicFilterSupplier> dynamicFilter;
         private final List<Type> types;
         private final DataSize minOutputPageSize;
         private final int minOutputPageRowCount;
@@ -402,7 +401,7 @@ public class ScanFilterAndProjectOperator
                 Supplier<PageProcessor> pageProcessor,
                 TableHandle table,
                 Iterable<ColumnHandle> columns,
-                Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter,
+                Optional<DynamicFilterSupplier> dynamicFilter,
                 List<Type> types,
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount)

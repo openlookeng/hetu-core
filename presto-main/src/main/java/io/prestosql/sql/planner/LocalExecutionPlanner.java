@@ -128,6 +128,7 @@ import io.prestosql.spi.connector.ConnectorIndex;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.type.Type;
@@ -238,6 +239,7 @@ import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.SystemSessionProperties.getAggregationOperatorUnspillMemoryLimit;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
+import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageRowCount;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageSize;
 import static io.prestosql.SystemSessionProperties.getParallelSortTaskCount;
@@ -1309,6 +1311,10 @@ public class LocalExecutionPlanner
 
             // TODO: Execution must be plugged in here
             Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier = getDynamicFilterSupplier(extractDynamicFilterResult, sourceNode, context);
+            Optional<DynamicFilterSupplier> dynamicFilter = Optional.empty();
+            if (dynamicFilterSupplier != null) {
+                dynamicFilter = Optional.of(new DynamicFilterSupplier(dynamicFilterSupplier, System.currentTimeMillis(), getDynamicFilteringWaitTime(session).toMillis()));
+            }
 
             List<Expression> projections = new ArrayList<>();
             for (Symbol symbol : outputSymbols) {
@@ -1339,7 +1345,7 @@ public class LocalExecutionPlanner
                             pageProcessor,
                             table,
                             columns,
-                            dynamicFilterSupplier,
+                            dynamicFilter,
                             getTypes(projections, expressionTypes),
                             getFilterAndProjectMinOutputPageSize(session),
                             getFilterAndProjectMinOutputPageRowCount(session));

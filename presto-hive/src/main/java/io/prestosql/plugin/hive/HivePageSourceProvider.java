@@ -31,6 +31,7 @@ import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -50,7 +51,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -105,17 +105,17 @@ public class HivePageSourceProvider
     public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorSplit split, ConnectorTableHandle table,
             List<ColumnHandle> columns)
     {
-        return createPageSource(transaction, session, split, table, columns, null);
+        return createPageSource(transaction, session, split, table, columns, Optional.empty());
     }
 
     @Override
     public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session,
             ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier)
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier)
     {
         Map<ColumnHandle, DynamicFilter> dynamicFilters = null;
-        if (dynamicFilterSupplier != null) {
-            dynamicFilters = dynamicFilterSupplier.get();
+        if (dynamicFilterSupplier.isPresent()) {
+            dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
         }
 
         HiveTableHandle hiveTable = (HiveTableHandle) table;
@@ -251,7 +251,7 @@ public class HivePageSourceProvider
             List<HiveColumnHandle> columns,
             DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -356,7 +356,7 @@ public class HivePageSourceProvider
             Map<Integer, HiveType> columnCoercions,
             Optional<HiveSplit.BucketConversion> bucketConversion,
             boolean s3SelectPushdownEnabled,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

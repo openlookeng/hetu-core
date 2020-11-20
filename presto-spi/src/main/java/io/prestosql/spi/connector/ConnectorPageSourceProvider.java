@@ -13,11 +13,10 @@
  */
 package io.prestosql.spi.connector;
 
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 
 import java.util.List;
-import java.util.Map;
-import java.util.function.Supplier;
+import java.util.Optional;
 
 public interface ConnectorPageSourceProvider
 {
@@ -57,7 +56,7 @@ public interface ConnectorPageSourceProvider
             ConnectorSplit split,
             ConnectorTableHandle table,
             List<ColumnHandle> columns,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier)
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier)
     {
         // By default, ignore dynamic filter (as it is an optimization and doesn't affect correctness).
         return createPageSource(transaction, session, split, table, columns);
