@@ -181,7 +181,7 @@ public class TableScanWorkProcessorOperator
                 source = new EmptySplitPageSource();
             }
             else {
-                source = pageSourceProvider.createPageSource(session, split, table, columns, null);
+                source = pageSourceProvider.createPageSource(session, split, table, columns, Optional.empty());
             }
             if (source.needMergingForPages()) {
                 return TransformationState.ofResult(

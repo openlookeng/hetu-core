@@ -138,6 +138,7 @@ public class FeaturesConfig
     private boolean skipRedundantSort = true;
     private boolean predicatePushdownUseTableProperties = true;
     private boolean pushTableThroughSubquery;
+    private boolean rewriteFilteringSemiJoinToInnerJoin;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering;
@@ -380,6 +381,18 @@ public class FeaturesConfig
     public FeaturesConfig setMaxReorderedJoins(int maxReorderedJoins)
     {
         this.maxReorderedJoins = maxReorderedJoins;
+        return this;
+    }
+
+    public boolean isRewriteFilteringSemiJoinToInnerJoin()
+    {
+        return rewriteFilteringSemiJoinToInnerJoin;
+    }
+
+    @Config("optimizer.rewrite-filtering-semi-join-to-inner-join")
+    public FeaturesConfig setRewriteFilteringSemiJoinToInnerJoin(boolean rewriteFilteringSemiJoinToInnerJoin)
+    {
+        this.rewriteFilteringSemiJoinToInnerJoin = rewriteFilteringSemiJoinToInnerJoin;
         return this;
     }
 

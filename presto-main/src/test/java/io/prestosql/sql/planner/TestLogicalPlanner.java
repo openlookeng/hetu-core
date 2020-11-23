@@ -67,6 +67,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.SystemSessionProperties.DISTRIBUTED_SORT;
+import static io.prestosql.SystemSessionProperties.FILTERING_SEMI_JOIN_TO_INNER;
 import static io.prestosql.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
@@ -737,9 +738,9 @@ public class TestLogicalPlanner
                 "SELECT orderkey FROM orders WHERE orderstatus='F'",
                 output(
                         constrainedTableScanWithTableLayout(
-                            "orders",
-                            ImmutableMap.of("orderstatus", singleValue(createVarcharType(1), utf8Slice("F"))),
-                            ImmutableMap.of("orderkey", "orderkey"))));
+                                "orders",
+                                ImmutableMap.of("orderstatus", singleValue(createVarcharType(1), utf8Slice("F"))),
+                                ImmutableMap.of("orderkey", "orderkey"))));
     }
 
     @Test
@@ -887,6 +888,31 @@ public class TestLogicalPlanner
         assertPlanDoesNotContain(
                 "SELECT custkey FROM orders WHERE custkey IN (SELECT distinct custkey FROM customer)",
                 AggregationNode.class);
+    }
+
+    @Test
+    public void testFilteringSemiJoinRewriteToInnerJoin()
+    {
+        assertDistributedPlan(
+                "SELECT custkey FROM orders WHERE custkey IN (SELECT custkey FROM customer)",
+                Session.builder(getQueryRunner().getDefaultSession())
+                        .setSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, "true")
+                        .build(),
+                anyTree(
+                        join(
+                                INNER,
+                                ImmutableList.of(equiJoinClause("ORDER_CUSTKEY", "CUSTOMER_CUSTKEY")),
+                                anyTree(
+                                        tableScan("orders", ImmutableMap.of("ORDER_CUSTKEY", "custkey"))),
+                                project(
+                                        aggregation(
+                                                singleGroupingSet("CUSTOMER_CUSTKEY"),
+                                                ImmutableMap.of(),
+                                                ImmutableMap.of(),
+                                                Optional.empty(),
+                                                FINAL,
+                                                anyTree(
+                                                        tableScan("customer", ImmutableMap.of("CUSTOMER_CUSTKEY", "custkey"))))))));
     }
 
     @Test
