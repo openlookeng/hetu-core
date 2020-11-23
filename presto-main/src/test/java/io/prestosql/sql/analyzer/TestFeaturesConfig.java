@@ -128,7 +128,8 @@ public class TestFeaturesConfig
                 .setPushLimitThroughUnion(true)
                 .setEnableExecutionPlanCache(true)
                 .setImplicitConversionEnabled(false)
-                .setPushTableThroughSubquery(false));
+                .setPushTableThroughSubquery(false)
+                .setRewriteFilteringSemiJoinToInnerJoin(false));
     }
 
     @Test
@@ -213,6 +214,7 @@ public class TestFeaturesConfig
                 .put("dynamic-filtering-bloom-filter-fpp", "0.001")
                 .put("implicit-conversion", "true")
                 .put("optimizer.push-table-through-subquery", "true")
+                .put("optimizer.rewrite-filtering-semi-join-to-inner-join", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -287,6 +289,7 @@ public class TestFeaturesConfig
                 .setPushLimitThroughUnion(false)
                 .setPushLimitThroughSemiJoin(false)
                 .setPushLimitThroughOuterJoin(false)
+                .setRewriteFilteringSemiJoinToInnerJoin(true)
                 .setEnableExecutionPlanCache(false)
                 .setDynamicFilteringMaxPerDriverRowCount(256)
                 .setDynamicFilteringDataType(HASHSET)

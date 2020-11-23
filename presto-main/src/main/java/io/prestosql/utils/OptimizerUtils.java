@@ -26,8 +26,6 @@ import io.prestosql.sql.planner.iterative.rule.PushLimitThroughOuterJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughUnion;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
-import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToJoin;
-import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToSemiJoin;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.JoinNode;
@@ -67,12 +65,6 @@ public class OptimizerUtils
         }
         if (rule instanceof PushLimitThroughSemiJoin) {
             return SystemSessionProperties.isPushLimitThroughSemiJoin(session);
-        }
-        if (rule instanceof TransformUncorrelatedInPredicateSubqueryToJoin) {
-            return SystemSessionProperties.isTransformUncorrelatedInToJoin(session);
-        }
-        if (rule instanceof TransformUncorrelatedInPredicateSubqueryToSemiJoin) {
-            return !SystemSessionProperties.isTransformUncorrelatedInToJoin(session);
         }
         if (rule instanceof PushLimitThroughOuterJoin) {
             return SystemSessionProperties.isPushLimitThroughOuterJoin(session);

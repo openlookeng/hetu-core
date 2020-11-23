@@ -128,7 +128,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedScalarAggregat
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedScalarSubquery;
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedSingleRowSubqueryToProject;
 import io.prestosql.sql.planner.iterative.rule.TransformExistsApplyToLateralNode;
-import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToJoin;
+import io.prestosql.sql.planner.iterative.rule.TransformFilteringSemiJoinToInnerJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoin;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
@@ -386,7 +386,6 @@ public class PlanOptimizers
                                 new RemoveUnreferencedScalarLateralNodes(),
                                 new TransformUncorrelatedLateralToJoin(),
                                 new TransformUncorrelatedInPredicateSubqueryToSemiJoin(),
-                                new TransformUncorrelatedInPredicateSubqueryToJoin(),
                                 new TransformCorrelatedScalarAggregationToJoin(metadata),
                                 new TransformCorrelatedLateralJoinToJoin())),
                 new IterativeOptimizer(
@@ -412,6 +411,11 @@ public class PlanOptimizers
                 new StatsRecordingPlanOptimizer(
                         optimizerStats,
                         new PredicatePushDown(metadata, typeAnalyzer, false, false)),
+                new IterativeOptimizer(
+                        ruleStats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new TransformFilteringSemiJoinToInnerJoin())), // must run after PredicatePushDown
                 new PruneUnreferencedOutputs(), // Prune unreferenced outputs to make the sub-query simple
                 inlineProjections,              // Remove redundant projects to make the sub-query simple
                 new SubQueryPushDown(metadata), // SubQueryPushDown is introduced in Hetu. It must run before AddExchanges
