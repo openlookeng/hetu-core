@@ -16,6 +16,7 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.FilterNode;
@@ -26,6 +27,8 @@ import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_MAX_SIZE;
 import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
+import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyNot;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
@@ -45,7 +48,10 @@ public class TestDynamicFilter
     TestDynamicFilter()
     {
         // in order to test testUncorrelatedSubqueries with Dynamic Filtering, enable it
-        super(ImmutableMap.of(ENABLE_DYNAMIC_FILTERING, "true"));
+        super(ImmutableMap.of(
+                ENABLE_DYNAMIC_FILTERING, "true",
+                JOIN_REORDERING_STRATEGY, FeaturesConfig.JoinReorderingStrategy.NONE.name(),
+                JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name()));
     }
 
     @Test
@@ -258,8 +264,8 @@ public class TestDynamicFilter
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("LINEITEM_OK", "PART_PK")),
                                 join(INNER, ImmutableList.of(equiJoinClause("LINEITEM_OK", "ORDERS_OK")),
-                                        project(
-                                                tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey"))),
+                                        project(node(FilterNode.class,
+                                                tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey")))),
                                         exchange(project(
                                                 tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))),
                                 exchange(
