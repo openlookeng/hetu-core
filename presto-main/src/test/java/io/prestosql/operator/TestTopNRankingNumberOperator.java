@@ -16,6 +16,7 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.RowPagesBuilder;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.type.Type;
@@ -40,7 +41,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.GroupByHashYieldAssertion.createPagesWithDistinctHashKeys;
 import static io.prestosql.operator.GroupByHashYieldAssertion.finishOperatorWithYieldingGroupByHash;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
-import static io.prestosql.operator.TopNRowNumberOperator.TopNRowNumberOperatorFactory;
+import static io.prestosql.operator.TopNRankingNumberOperator.TopNRankingNumberOperatorFactory;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.testing.MaterializedResult.resultBuilder;
@@ -50,7 +51,7 @@ import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
 
 @Test(singleThreaded = true)
-public class TestTopNRowNumberOperator
+public class TestTopNRankingNumberOperator
 {
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
@@ -107,7 +108,7 @@ public class TestTopNRowNumberOperator
                 .row(2L, 0.9)
                 .build();
 
-        TopNRowNumberOperatorFactory operatorFactory = new TopNRowNumberOperatorFactory(
+        TopNRankingNumberOperatorFactory operatorFactory = new TopNRankingNumberOperatorFactory(
                 0,
                 new PlanNodeId("test"),
                 ImmutableList.of(BIGINT, DOUBLE),
@@ -120,7 +121,8 @@ public class TestTopNRowNumberOperator
                 false,
                 Optional.empty(),
                 10,
-                joinCompiler);
+                joinCompiler,
+                Optional.of(RankingFunction.ROW_NUMBER));
 
         MaterializedResult expected = resultBuilder(driverContext.getSession(), DOUBLE, BIGINT, BIGINT)
                 .row(0.3, 1L, 1L)
@@ -155,7 +157,7 @@ public class TestTopNRowNumberOperator
                 .row(2L, 0.9)
                 .build();
 
-        TopNRowNumberOperatorFactory operatorFactory = new TopNRowNumberOperatorFactory(
+        TopNRankingNumberOperatorFactory operatorFactory = new TopNRankingNumberOperatorFactory(
                 0,
                 new PlanNodeId("test"),
                 ImmutableList.of(BIGINT, DOUBLE),
@@ -168,7 +170,8 @@ public class TestTopNRowNumberOperator
                 partial,
                 Optional.empty(),
                 10,
-                joinCompiler);
+                joinCompiler,
+                Optional.of(RankingFunction.ROW_NUMBER));
 
         MaterializedResult expected;
         if (partial) {
@@ -195,7 +198,7 @@ public class TestTopNRowNumberOperator
         Type type = BIGINT;
         List<Page> input = createPagesWithDistinctHashKeys(type, 6_000, 600);
 
-        OperatorFactory operatorFactory = new TopNRowNumberOperatorFactory(
+        OperatorFactory operatorFactory = new TopNRankingNumberOperatorFactory(
                 0,
                 new PlanNodeId("test"),
                 ImmutableList.of(type),
@@ -208,14 +211,15 @@ public class TestTopNRowNumberOperator
                 false,
                 Optional.empty(),
                 10,
-                joinCompiler);
+                joinCompiler,
+                Optional.of(RankingFunction.ROW_NUMBER));
 
         // get result with yield; pick a relatively small buffer for heaps
         GroupByHashYieldAssertion.GroupByHashYieldResult result = finishOperatorWithYieldingGroupByHash(
                 input,
                 type,
                 operatorFactory,
-                operator -> ((TopNRowNumberOperator) operator).getCapacity(),
+                operator -> ((TopNRankingNumberOperator) operator).getCapacity(),
                 1_000_000);
         assertGreaterThan(result.getYieldCount(), 3);
         assertGreaterThan(result.getMaxReservedBytes(), 5L << 20);

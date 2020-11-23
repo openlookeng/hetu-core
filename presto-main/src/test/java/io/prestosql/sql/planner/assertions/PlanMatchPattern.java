@@ -293,9 +293,9 @@ public final class PlanMatchPattern
         return builder.build();
     }
 
-    public static PlanMatchPattern topNRowNumber(Consumer<TopNRowNumberMatcher.Builder> handler, PlanMatchPattern source)
+    public static PlanMatchPattern topNRankingNumber(Consumer<TopNRankingNumberMatcher.Builder> handler, PlanMatchPattern source)
     {
-        TopNRowNumberMatcher.Builder builder = new TopNRowNumberMatcher.Builder(source);
+        TopNRankingNumberMatcher.Builder builder = new TopNRankingNumberMatcher.Builder(source);
         handler.accept(builder);
         return builder.build();
     }

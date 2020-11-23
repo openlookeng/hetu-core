@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.RowPagesBuilder;
 import io.prestosql.array.ObjectBigArray;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
@@ -76,6 +77,7 @@ public class TestGroupedTopNBuilder
                 },
                 5,
                 false,
+                Optional.empty(),
                 new NoChannelGroupByHash());
         assertFalse(groupedTopNBuilder.buildResult().hasNext());
     }
@@ -110,7 +112,8 @@ public class TestGroupedTopNBuilder
                 types,
                 new SimplePageWithPositionComparator(types, ImmutableList.of(1), ImmutableList.of(ASC_NULLS_LAST)),
                 2,
-                produceRowNumbers,
+                true,
+                Optional.of(RankingFunction.ROW_NUMBER),
                 groupByHash);
         assertBuilderSize(groupByHash, types, ImmutableList.of(), ImmutableList.of(), groupedTopNBuilder.getEstimatedSizeInBytes());
 
@@ -182,7 +185,8 @@ public class TestGroupedTopNBuilder
                 types,
                 new SimplePageWithPositionComparator(types, ImmutableList.of(1), ImmutableList.of(ASC_NULLS_LAST)),
                 5,
-                produceRowNumbers,
+                true,
+                Optional.of(RankingFunction.ROW_NUMBER),
                 new NoChannelGroupByHash());
         assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(), ImmutableList.of(), groupedTopNBuilder.getEstimatedSizeInBytes());
 
@@ -243,6 +247,7 @@ public class TestGroupedTopNBuilder
                 new SimplePageWithPositionComparator(types, ImmutableList.of(1), ImmutableList.of(ASC_NULLS_LAST)),
                 5,
                 false,
+                Optional.empty(),
                 groupByHash);
         assertBuilderSize(groupByHash, types, ImmutableList.of(), ImmutableList.of(), groupedTopNBuilder.getEstimatedSizeInBytes());
 
@@ -293,6 +298,7 @@ public class TestGroupedTopNBuilder
                 new SimplePageWithPositionComparator(types, ImmutableList.of(1), ImmutableList.of(ASC_NULLS_LAST)),
                 1,
                 false,
+                Optional.empty(),
                 createGroupByHash(ImmutableList.of(types.get(0)), ImmutableList.of(0), NOOP));
 
         // page 1:
@@ -387,6 +393,7 @@ public class TestGroupedTopNBuilder
                 new SimplePageWithPositionComparator(types, ImmutableList.of(1), ImmutableList.of(ASC_NULLS_LAST)),
                 pageCount * rowCount,
                 false,
+                Optional.empty(),
                 groupByHash);
 
         // Assert memory usage gradually goes up

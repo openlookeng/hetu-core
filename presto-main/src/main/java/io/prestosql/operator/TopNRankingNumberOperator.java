@@ -17,6 +17,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
@@ -35,10 +36,10 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
-public class TopNRowNumberOperator
+public class TopNRankingNumberOperator
         implements Operator
 {
-    public static class TopNRowNumberOperatorFactory
+    public static class TopNRankingNumberOperatorFactory
             implements OperatorFactory
     {
         private final int operatorId;
@@ -56,11 +57,12 @@ public class TopNRowNumberOperator
         private final Optional<Integer> hashChannel;
         private final int expectedPositions;
 
-        private final boolean generateRowNumber;
+        private final boolean generateRankingNumber;
         private boolean closed;
         private final JoinCompiler joinCompiler;
+        private Optional<RankingFunction> rankingFunction;
 
-        public TopNRowNumberOperatorFactory(
+        public TopNRankingNumberOperatorFactory(
                 int operatorId,
                 PlanNodeId planNodeId,
                 List<? extends Type> sourceTypes,
@@ -73,7 +75,8 @@ public class TopNRowNumberOperator
                 boolean partial,
                 Optional<Integer> hashChannel,
                 int expectedPositions,
-                JoinCompiler joinCompiler)
+                JoinCompiler joinCompiler,
+                Optional<RankingFunction> rankingFunction)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -88,17 +91,19 @@ public class TopNRowNumberOperator
             checkArgument(maxRowCountPerPartition > 0, "maxRowCountPerPartition must be > 0");
             this.maxRowCountPerPartition = maxRowCountPerPartition;
             checkArgument(expectedPositions > 0, "expectedPositions must be > 0");
-            this.generateRowNumber = !partial;
+            this.generateRankingNumber = !partial;
             this.expectedPositions = expectedPositions;
             this.joinCompiler = requireNonNull(joinCompiler, "joinCompiler is null");
+
+            this.rankingFunction = requireNonNull(rankingFunction, "rankingFunction is null");
         }
 
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TopNRowNumberOperator.class.getSimpleName());
-            return new TopNRowNumberOperator(
+            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TopNRankingNumberOperator.class.getSimpleName());
+            return new TopNRankingNumberOperator(
                     operatorContext,
                     sourceTypes,
                     outputChannels,
@@ -107,10 +112,11 @@ public class TopNRowNumberOperator
                     sortChannels,
                     sortOrder,
                     maxRowCountPerPartition,
-                    generateRowNumber,
+                    generateRankingNumber,
                     hashChannel,
                     expectedPositions,
-                    joinCompiler);
+                    joinCompiler,
+                    rankingFunction);
         }
 
         @Override
@@ -120,9 +126,9 @@ public class TopNRowNumberOperator
         }
 
         @Override
-        public OperatorFactory duplicate()
+        public TopNRankingNumberOperatorFactory duplicate()
         {
-            return new TopNRowNumberOperatorFactory(operatorId, planNodeId, sourceTypes, outputChannels, partitionChannels, partitionTypes, sortChannels, sortOrder, maxRowCountPerPartition, partial, hashChannel, expectedPositions, joinCompiler);
+            return new TopNRankingNumberOperatorFactory(operatorId, planNodeId, sourceTypes, outputChannels, partitionChannels, partitionTypes, sortChannels, sortOrder, maxRowCountPerPartition, partial, hashChannel, expectedPositions, joinCompiler, rankingFunction);
         }
     }
 
@@ -137,8 +143,9 @@ public class TopNRowNumberOperator
     private boolean finishing;
     private Work<?> unfinishedWork;
     private Iterator<Page> outputIterator;
+    private Optional<RankingFunction> rankingFunction;
 
-    public TopNRowNumberOperator(
+    public TopNRankingNumberOperator(
             OperatorContext operatorContext,
             List<? extends Type> sourceTypes,
             List<Integer> outputChannels,
@@ -147,10 +154,11 @@ public class TopNRowNumberOperator
             List<Integer> sortChannels,
             List<SortOrder> sortOrders,
             int maxRowCountPerPartition,
-            boolean generateRowNumber,
+            boolean generateRankingNumber,
             Optional<Integer> hashChannel,
             int expectedPositions,
-            JoinCompiler joinCompiler)
+            JoinCompiler joinCompiler,
+            Optional<RankingFunction> rankingFunction)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.localUserMemoryContext = operatorContext.localUserMemoryContext();
@@ -159,7 +167,7 @@ public class TopNRowNumberOperator
         for (int channel : requireNonNull(outputChannels, "outputChannels is null")) {
             outputChannelsBuilder.add(channel);
         }
-        if (generateRowNumber) {
+        if (generateRankingNumber) {
             outputChannelsBuilder.add(outputChannels.size());
         }
         this.outputChannels = outputChannelsBuilder.build();
@@ -181,12 +189,13 @@ public class TopNRowNumberOperator
             groupByHash = new NoChannelGroupByHash();
         }
 
-        List<Type> types = toTypes(sourceTypes, outputChannels, generateRowNumber);
+        List<Type> types = toTypes(sourceTypes, outputChannels, generateRankingNumber);
         this.groupedTopNBuilder = new GroupedTopNBuilder(
                 ImmutableList.copyOf(sourceTypes),
                 new SimplePageWithPositionComparator(types, sortChannels, sortOrders),
                 maxRowCountPerPartition,
-                generateRowNumber,
+                generateRankingNumber,
+                rankingFunction,
                 groupByHash);
     }
 

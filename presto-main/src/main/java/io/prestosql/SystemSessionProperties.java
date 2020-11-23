@@ -97,6 +97,8 @@ public final class SystemSessionProperties
     public static final String SPILL_ENABLED = "spill_enabled";
     public static final String SPILL_ORDER_BY = "spill_order_by";
     public static final String SPILL_WINDOW_OPERATOR = "spill_window_operator";
+    public static final String PARALLEL_SORT_WINDOW_OPERATOR = "parallel_sort_window_operator";
+    public static final String PARALLEL_SORT_TASK_COUNT = "parallel_sort_task_count";
     public static final String AGGREGATION_OPERATOR_UNSPILL_MEMORY_LIMIT = "aggregation_operator_unspill_memory_limit";
     public static final String OPTIMIZE_DISTINCT_AGGREGATIONS = "optimize_mixed_distinct_aggregations";
     public static final String ITERATIVE_OPTIMIZER = "iterative_optimizer_enabled";
@@ -114,7 +116,7 @@ public final class SystemSessionProperties
     public static final String DISTRIBUTED_SORT = "distributed_sort";
     public static final String USE_MARK_DISTINCT = "use_mark_distinct";
     public static final String PREFER_PARTIAL_AGGREGATION = "prefer_partial_aggregation";
-    public static final String OPTIMIZE_TOP_N_ROW_NUMBER = "optimize_top_n_row_number";
+    public static final String OPTIMIZE_TOP_N_RANKING_NUMBER = "optimize_top_n_ranking_number";
     public static final String MAX_GROUPING_SETS = "max_grouping_sets";
     public static final String STATISTICS_CPU_TIMER_ENABLED = "statistics_cpu_timer_enabled";
     public static final String ENABLE_STATS_CALCULATOR = "enable_stats_calculator";
@@ -455,6 +457,15 @@ public final class SystemSessionProperties
                         "Spill in WindowOperator if spill_enabled is also set",
                         featuresConfig.isSpillWindowOperator(),
                         false),
+                booleanProperty(PARALLEL_SORT_WINDOW_OPERATOR,
+                        "Experimental: parallel sort in window operator",
+                        featuresConfig.isParallelSortWindowOperator(),
+                        false),
+                integerProperty(
+                        PARALLEL_SORT_TASK_COUNT,
+                        "Experimental: Default number of parallel sort task count in window operator",
+                        featuresConfig.getParallelSortTaskCount(),
+                        false),
                 dataSizeProperty(
                         AGGREGATION_OPERATOR_UNSPILL_MEMORY_LIMIT,
                         "Experimental: How much memory can should be allocated per aggragation operator in unspilling process",
@@ -541,9 +552,9 @@ public final class SystemSessionProperties
                         featuresConfig.isPreferPartialAggregation(),
                         false),
                 booleanProperty(
-                        OPTIMIZE_TOP_N_ROW_NUMBER,
+                        OPTIMIZE_TOP_N_RANKING_NUMBER,
                         "Use top N row number optimization",
-                        featuresConfig.isOptimizeTopNRowNumber(),
+                        featuresConfig.isOptimizeTopNRankingFunction(),
                         false),
                 integerProperty(
                         MAX_GROUPING_SETS,
@@ -919,6 +930,16 @@ public final class SystemSessionProperties
         return session.getSystemProperty(SPILL_ENABLED, Boolean.class);
     }
 
+    public static int getParallelSortTaskCount(Session session)
+    {
+        return session.getSystemProperty(PARALLEL_SORT_TASK_COUNT, Integer.class);
+    }
+
+    public static boolean isParallelSortWindowOperator(Session session)
+    {
+        return session.getSystemProperty(PARALLEL_SORT_WINDOW_OPERATOR, Boolean.class);
+    }
+
     public static boolean isSpillOrderBy(Session session)
     {
         return session.getSystemProperty(SPILL_ORDER_BY, Boolean.class);
@@ -1011,9 +1032,9 @@ public final class SystemSessionProperties
         return session.getSystemProperty(PREFER_PARTIAL_AGGREGATION, Boolean.class);
     }
 
-    public static boolean isOptimizeTopNRowNumber(Session session)
+    public static boolean isOptimizeTopNRankingNumber(Session session)
     {
-        return session.getSystemProperty(OPTIMIZE_TOP_N_ROW_NUMBER, Boolean.class);
+        return session.getSystemProperty(OPTIMIZE_TOP_N_RANKING_NUMBER, Boolean.class);
     }
 
     public static boolean isDistributedSortEnabled(Session session)

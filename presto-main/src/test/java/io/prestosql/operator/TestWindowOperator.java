@@ -779,7 +779,9 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 spillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(),
+                false,
+                0);
     }
 
     public static WindowOperatorFactory createFactoryUnbounded(
@@ -809,7 +811,9 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 spillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(),
+                false,
+                0);
     }
 
     private DriverContext createDriverContext()

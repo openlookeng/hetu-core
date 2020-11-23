@@ -68,7 +68,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
@@ -359,7 +359,7 @@ public class AddExchanges
         }
 
         @Override
-        public PlanWithProperties visitTopNRowNumber(TopNRowNumberNode node, PreferredProperties preferredProperties)
+        public PlanWithProperties visitTopNRankingFunction(TopNRankingNumberNode node, PreferredProperties preferredProperties)
         {
             PreferredProperties preferredChildProperties;
             Function<PlanNode, PlanNode> addExchange;
@@ -379,14 +379,15 @@ public class AddExchanges
                     && !child.getProperties().isNodePartitionedOn(node.getPartitionBy())) {
                 // add exchange + push function to child
                 child = withDerivedProperties(
-                        new TopNRowNumberNode(
+                        new TopNRankingNumberNode(
                                 idAllocator.getNextId(),
                                 child.getNode(),
                                 node.getSpecification(),
                                 node.getRowNumberSymbol(),
                                 node.getMaxRowCountPerPartition(),
                                 true,
-                                node.getHashSymbol()),
+                                node.getHashSymbol(),
+                                node.getRankingFunction()),
                         child.getProperties());
 
                 child = withDerivedProperties(addExchange.apply(child.getNode()), child.getProperties());

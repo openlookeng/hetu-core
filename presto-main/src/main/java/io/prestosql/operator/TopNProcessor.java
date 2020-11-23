@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
@@ -60,6 +61,7 @@ public class TopNProcessor
                     new SimplePageWithPositionComparator(types, sortChannels, sortOrders),
                     n,
                     false,
+                    Optional.empty(),
                     new NoChannelGroupByHash());
         }
     }
