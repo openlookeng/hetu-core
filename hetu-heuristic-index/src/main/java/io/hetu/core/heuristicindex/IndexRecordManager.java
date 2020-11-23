@@ -87,6 +87,10 @@ public class IndexRecordManager
                         records.add(new IndexRecord(line));
                     }
                 }
+                catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            "Error reading index record. Index record storage has been updated. Please delete old index directory and recreate the indices.");
+                }
                 cache = records;
                 cacheLastModifiedTime = modifiedTime;
             }
@@ -127,7 +131,7 @@ public class IndexRecordManager
      * Add IndexRecord into record file. If the method is called with a name that already exists,
      * it will OVERWRITE the existing entry but combine the note part
      */
-    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> partitions)
+    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
             throws IOException
     {
         // Protect root directory
@@ -143,7 +147,7 @@ public class IndexRecordManager
                     iterator.remove();
                 }
             }
-            records.add(new IndexRecord(name, user, table, columns, indexType, partitions));
+            records.add(new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions));
             writeIndexRecords(records);
         }
         finally {
@@ -179,7 +183,8 @@ public class IndexRecordManager
         boolean writeHead = false;
         try (OutputStream os = fs.newOutputStream(recordFile)) {
             // Use IndexRecord to generate a special "entry" as table head so it's easier to maintain when csv format changes
-            String head = new IndexRecord("Name", "User", "Table", new String[] {"Columns"}, "IndexType", ImmutableList.of("Partitions")).toCsvRecord();
+            String head = new IndexRecord("Name", "User", "Table", new String[] {"Columns"}, "IndexType",
+                    ImmutableList.of("Properties"), ImmutableList.of("Partitions")).toCsvRecord();
             os.write(head.getBytes());
             for (IndexRecord record : records) {
                 os.write(record.toCsvRecord().getBytes());

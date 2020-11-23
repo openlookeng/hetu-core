@@ -533,6 +533,14 @@ public interface Metadata
     boolean isExecutionPlanCacheSupported(Session session, TableHandle handle);
 
     /**
+     * Hetu can only create index for supported connectors.
+     *
+     * @param session Presto session
+     * @param tableName Connector specific tableName
+     */
+    boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName);
+
+    /**
      * Hetu supports pushing sub-query with join down to the connector.
      * This method decides if the sub-query can be pushed down to the connector based on the connector.
      *

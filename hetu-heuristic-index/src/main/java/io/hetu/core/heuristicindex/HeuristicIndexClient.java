@@ -217,12 +217,17 @@ public class HeuristicIndexClient
     public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
+        List<String> properties = new LinkedList<>();
+        for (String propKey : createIndexMetadata.getProperties().stringPropertyNames()) {
+            properties.add(propKey + "=" + createIndexMetadata.getProperties().getProperty(propKey));
+        }
         indexRecordManager.addIndexRecord(
                 createIndexMetadata.getIndexName(),
                 createIndexMetadata.getUser(),
                 createIndexMetadata.getTableName(),
                 createIndexMetadata.getIndexColumns().stream().map(Map.Entry::getKey).toArray(String[]::new),
                 createIndexMetadata.getIndexType(),
+                properties,
                 createIndexMetadata.getPartitions());
     }
 
