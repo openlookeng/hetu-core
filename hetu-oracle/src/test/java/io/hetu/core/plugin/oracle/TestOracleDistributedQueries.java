@@ -1564,6 +1564,14 @@ public class TestOracleDistributedQueries
                 "line .*: UNNEST on other than the right side of CROSS JOIN is not supported");
     }
 
+    @Test
+    public void testSynonyms()
+    {
+        try (TestSynonym synonym = new TestSynonym(oracleServer, oracleServer.getUser() + ".test_synonym", "FOR ORDERS")) {
+            assertQueryFails("SELECT orderkey FROM " + synonym.getName(), "line 1:22: Table oracle.* does not exist");
+        }
+    }
+
     /**
      * testUnionWithJoinOnNonTranslateableSymbols
      */

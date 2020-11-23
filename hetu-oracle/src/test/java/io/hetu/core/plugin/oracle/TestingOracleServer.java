@@ -80,20 +80,35 @@ public class TestingOracleServer
                 ImmutableMap.of(
                         "USER", user,
                         "PASSWORD", passWd),
-                TestingOracleServer::helthCheck, MEMORY_SIZE);
+                this::healthCheck, MEMORY_SIZE);
     }
 
-    private static void helthCheck(DockerContainer.HostPortProvider hostPortProvider)
+    private void healthCheck(DockerContainer.HostPortProvider hostPortProvider)
             throws Exception
     {
         String jdbcUrl = getJdbcUrl(hostPortProvider);
         LOG.info("connection jdbcurl: " + jdbcUrl);
+        execute(SQL_STATEMENT, jdbcUrl);
+    }
+
+    private static String getJdbcUrl(DockerContainer.HostPortProvider hostPortProvider)
+    {
+        return format(connectionUrl, hostPortProvider.getHostPort(port));
+    }
+
+    public void execute(String sql) throws Exception
+    {
+        execute(sql, getJdbcUrl());
+    }
+
+    public void execute(String sql, String jdbcUrl) throws Exception
+    {
         try {
             Class.forName(Constants.ORACLE_JDBC_DRIVER_CLASS_NAME);
             Connection conn = DriverManager.getConnection(jdbcUrl, user, passWd);
             if (conn != null) {
                 Statement stmt = conn.createStatement();
-                stmt.execute(SQL_STATEMENT);
+                stmt.execute(sql);
             }
         }
         catch (ClassNotFoundException e) {
@@ -102,11 +117,6 @@ public class TestingOracleServer
         catch (Exception e) {
             throw new RuntimeException("Failed to execute statement: " + SQL_STATEMENT, e);
         }
-    }
-
-    private static String getJdbcUrl(DockerContainer.HostPortProvider hostPortProvider)
-    {
-        return format(connectionUrl, hostPortProvider.getHostPort(port));
     }
 
     /**
