@@ -111,4 +111,6 @@ public interface QueryManager
     void cancelStage(StageId stageId);
 
     QueryManagerStats getStats();
+
+    default void checkForQueryPruning(QueryId queryId, QueryInfo queryInfo) {}
 }
