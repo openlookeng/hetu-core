@@ -62,7 +62,7 @@ public class TestIndexRecordManager
             List<IndexRecord> added2 = indexRecordManager2.getIndexRecords();
             assertEquals(added2.size(), 2);
 
-            indexRecordManager2.deleteIndexRecord("2");
+            indexRecordManager2.deleteIndexRecord("2", Collections.emptyList());
             List<IndexRecord> deleted1 = indexRecordManager1.getIndexRecords();
             List<IndexRecord> deleted2 = indexRecordManager2.getIndexRecords();
             assertEquals(deleted2.size(), 1);
@@ -106,7 +106,7 @@ public class TestIndexRecordManager
                         while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
                             Thread.sleep(50L);
                         }
-                        indexRecordManager.deleteIndexRecord(names[finalI - 6]);
+                        indexRecordManager.deleteIndexRecord(names[finalI - 6], Collections.emptyList());
                     }
                     catch (IOException | InterruptedException e) {
                         throw new RuntimeException(e);
@@ -163,7 +163,7 @@ public class TestIndexRecordManager
                         while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
                             Thread.sleep(50L);
                         }
-                        indexRecordManager.deleteIndexRecord(names[finalI - 6]);
+                        indexRecordManager.deleteIndexRecord(names[finalI - 6], Collections.emptyList());
                     }
                     catch (IOException | InterruptedException e) {
                         throw new RuntimeException(e);
@@ -199,19 +199,19 @@ public class TestIndexRecordManager
             assertEquals(indexRecordManager.getIndexRecords().size(), 2);
 
             // Delete 1
-            indexRecordManager.deleteIndexRecord("1");
+            indexRecordManager.deleteIndexRecord("1", Collections.emptyList());
             assertNull(indexRecordManager.lookUpIndexRecord("1"));
             assertNotNull(indexRecordManager.lookUpIndexRecord("2"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 1);
 
             // Delete 1 again
-            indexRecordManager.deleteIndexRecord("1");
+            indexRecordManager.deleteIndexRecord("1", Collections.emptyList());
             assertNull(indexRecordManager.lookUpIndexRecord("1"));
             assertNotNull(indexRecordManager.lookUpIndexRecord("2"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 1);
 
             // Delete 2
-            indexRecordManager.deleteIndexRecord("2");
+            indexRecordManager.deleteIndexRecord("2", Collections.emptyList());
             assertNull(indexRecordManager.lookUpIndexRecord("2"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 0);
         }

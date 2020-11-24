@@ -23,9 +23,12 @@ import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.transaction.TransactionManager;
+import io.prestosql.utils.HeuristicIndexUtils;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -51,7 +54,17 @@ public class DropIndexTask
             if (indexClient.getIndexRecord(indexName) == null) {
                 throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exists", indexName);
             }
-            indexClient.deleteIndex(indexName);
+            List<String> partitions = Collections.emptyList();
+            if (statement.getPartitions().isPresent()) {
+                partitions = HeuristicIndexUtils.extractPartitions(statement.getPartitions().get());
+
+                List<String> missingPartitions = new ArrayList<>(partitions);
+                missingPartitions.removeAll(indexClient.getIndexRecord(indexName).partitions);
+                if (!missingPartitions.isEmpty()) {
+                    throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not contain partitions: %s", indexName, missingPartitions);
+                }
+            }
+            indexClient.deleteIndex(indexName, partitions);
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);

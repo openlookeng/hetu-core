@@ -155,7 +155,7 @@ public class IndexRecordManager
         }
     }
 
-    public synchronized void deleteIndexRecord(String name)
+    public synchronized void deleteIndexRecord(String name, List<String> partitionsToRemove)
             throws IOException
     {
         // Protect root directory
@@ -163,7 +163,23 @@ public class IndexRecordManager
         try {
             lock.lock();
             List<IndexRecord> records = getIndexRecords();
-            records.removeIf(record -> record.name.equals(name));
+            if (partitionsToRemove.isEmpty()) {
+                // remove record
+                records.removeIf(record -> record.name.equals(name));
+            }
+            else {
+                // only remove partitions
+                Iterator<IndexRecord> iterator = records.iterator();
+                while (iterator.hasNext()) {
+                    IndexRecord record = iterator.next();
+                    if (record.name.equals(name)) {
+                        record.partitions.removeAll(partitionsToRemove);
+                        if (record.partitions.isEmpty()) {
+                            iterator.remove();
+                        }
+                    }
+                }
+            }
             writeIndexRecords(records);
         }
         finally {

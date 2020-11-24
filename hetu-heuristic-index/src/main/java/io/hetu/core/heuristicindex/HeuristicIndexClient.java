@@ -237,7 +237,7 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public void deleteIndex(String indexName)
+    public void deleteIndex(String indexName, List<String> partitionsToDelete)
             throws IOException
     {
         IndexRecord indexRecord = indexRecordManager.lookUpIndexRecord(indexName);
@@ -260,14 +260,25 @@ public class HeuristicIndexClient
             }));
             lock.lock();
 
-            fs.deleteRecursively(toDelete);
+            if (partitionsToDelete.isEmpty()) {
+                fs.deleteRecursively(toDelete);
+            }
+            else {
+                List<Path> toDeletePartitions = fs.walk(toDelete)
+                        .filter(fs::isDirectory)
+                        .filter(path -> partitionsToDelete.contains(path.getFileName().toString()))
+                        .collect(Collectors.toList());
+
+                for (Path path : toDeletePartitions) {
+                    fs.deleteRecursively(path);
+                }
+            }
         }
         finally {
             lock.unlock();
         }
 
-        indexRecordManager.deleteIndexRecord(indexName);
-        return;
+        indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
     }
 
     private boolean notDirectory(Path path)

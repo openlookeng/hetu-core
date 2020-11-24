@@ -63,7 +63,7 @@ public class NoOpIndexClient
     }
 
     @Override
-    public void deleteIndex(String indexName)
+    public void deleteIndex(String indexName, List<String> partitionsToDelete)
             throws IOException
     {
         throw new UnsupportedOperationException(ERROR_MSG);
