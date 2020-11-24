@@ -37,7 +37,9 @@ import java.util.stream.Collector;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Arrays.asList;
+import static java.util.Map.Entry.comparingByKey;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toMap;
 
 public class Assignments
 {
@@ -205,6 +207,11 @@ public class Assignments
             return putAll(assignments.getMap());
         }
 
+        public Builder putAllSorted(Assignments assignments)
+        {
+            return putAllSorted(assignments.getMap());
+        }
+
         public Builder putAll(Map<Symbol, Expression> assignments)
         {
             for (Entry<Symbol, Expression> assignment : assignments.entrySet()) {
@@ -245,6 +252,19 @@ public class Assignments
         public Builder putIdentity(Symbol symbol)
         {
             put(symbol, symbol.toSymbolReference());
+            return this;
+        }
+
+        public Builder putAllSorted(Map<Symbol, Expression> assignments)
+        {
+            Map<Symbol, Expression> sortedAssigments = assignments
+                    .entrySet()
+                    .stream()
+                    .sorted(comparingByKey())
+                    .collect(
+                        toMap(Map.Entry::getKey, Map.Entry::getValue,
+                                (e1, e2) -> e2, LinkedHashMap::new));
+            putAll(sortedAssigments);
             return this;
         }
 

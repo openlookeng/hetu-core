@@ -24,8 +24,12 @@ import io.prestosql.sql.planner.plan.PlanNodeId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
+import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.operator.WorkProcessor.ProcessState.blocked;
 import static io.prestosql.operator.WorkProcessor.ProcessState.finished;
 import static io.prestosql.operator.WorkProcessor.ProcessState.ofResult;
@@ -51,7 +55,22 @@ public class WorkProcessorSourceOperatorAdapter
     private long previousInputPositions;
     private long previousReadTimeNanos;
 
-    public WorkProcessorSourceOperatorAdapter(OperatorContext operatorContext, WorkProcessorSourceOperatorFactory sourceOperatorFactory)
+    private Integer strategy;
+    private Integer slot;
+    private static ConcurrentMap<String, Integer> indexes;
+    private static ConcurrentMap<Integer, List<Page>> pageCaches;
+
+    // sourceIdString is required, as multiple resue nodes can be there with the same slot. It needs
+    // to differentiate by concatenating SourceId and Slot.
+    private final String sourceIdString;
+
+    public int getStrategy()
+    {
+        return strategy;
+    }
+
+    public WorkProcessorSourceOperatorAdapter(OperatorContext operatorContext, WorkProcessorSourceOperatorFactory sourceOperatorFactory,
+                                                Integer strategy, Integer slot)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sourceId = requireNonNull(sourceOperatorFactory, "sourceOperatorFactory is null").getSourceId();
@@ -69,6 +88,16 @@ public class WorkProcessorSourceOperatorAdapter
                 .map(Page::getLoadedPage)
                 .withProcessStateMonitor(state -> updateOperatorStats())
                 .finishWhen(() -> operatorFinishing);
+        this.strategy = strategy;
+        this.slot = slot;
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            if (pageCaches == null) {
+                pageCaches = new ConcurrentHashMap<>();
+                indexes = new ConcurrentHashMap<>();
+            }
+
+            sourceIdString = sourceId.toString().concat(slot.toString());
+        }
     }
 
     @Override
@@ -130,15 +159,35 @@ public class WorkProcessorSourceOperatorAdapter
     @Override
     public Page getOutput()
     {
+        if (strategy == REUSE_STRATEGY_CONSUMER) {
+            return getPage();
+        }
+
         if (!pages.process()) {
             return null;
         }
 
         if (pages.isFinished()) {
+            //In-case result is empty it will never initialize and reuse will keep on waiting.
+            if (strategy == REUSE_STRATEGY_PRODUCER) {
+                initPageCache();
+            }
             return null;
         }
 
-        return pages.getResult();
+        Page page = pages.getResult();
+        if (strategy == REUSE_STRATEGY_PRODUCER && page != null) {
+            setPage(page);
+        }
+
+        return page;
+    }
+
+    public static synchronized void releaseCache(Integer slot)
+    {
+        if (pageCaches != null) {
+            pageCaches.remove(slot);
+        }
     }
 
     @Override
@@ -151,6 +200,10 @@ public class WorkProcessorSourceOperatorAdapter
     @Override
     public boolean isFinished()
     {
+        if (strategy == REUSE_STRATEGY_CONSUMER) {
+            return checkFinished();
+        }
+
         return pages.isFinished();
     }
 
@@ -204,6 +257,50 @@ public class WorkProcessorSourceOperatorAdapter
 
             previousInputBytes = currentInputBytes;
             previousInputPositions = currentInputPositions;
+        }
+    }
+
+    private Page getPage()
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            initIndex();
+            if (indexes.get(sourceIdString) == null || pageCaches.get(slot) == null || indexes.get(sourceIdString) >= pageCaches.get(slot).size()) {
+                return null;
+            }
+
+            Page newPage = pageCaches.get(slot).get(indexes.get(sourceIdString));
+            indexes.merge(sourceIdString, 1, Integer::sum);
+            return newPage;
+        }
+    }
+
+    private void setPage(Page page)
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            initPageCache(); // Actually it should not be required but somehow TSO Strategy-2 is get scheduled in parallel and clear the cache.
+            pageCaches.get(slot).add(page);
+        }
+    }
+
+    private Boolean checkFinished()
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            return indexes.get(sourceIdString) != null && pageCaches.get(slot) != null
+                    && indexes.get(sourceIdString) >= pageCaches.get(slot).size();
+        }
+    }
+
+    private void initPageCache()
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            pageCaches.putIfAbsent(slot, new ArrayList<>());
+        }
+    }
+
+    private void initIndex()
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            indexes.putIfAbsent(sourceIdString, 0);
         }
     }
 

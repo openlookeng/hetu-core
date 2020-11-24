@@ -258,6 +258,7 @@ import static io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOpera
 import static io.prestosql.operator.NestedLoopJoinOperator.NestedLoopJoinOperatorFactory;
 import static io.prestosql.operator.PipelineExecutionStrategy.GROUPED_EXECUTION;
 import static io.prestosql.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
+import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.operator.TableFinishOperator.TableFinishOperatorFactory;
 import static io.prestosql.operator.TableFinishOperator.TableFinisher;
 import static io.prestosql.operator.TableWriterOperator.FRAGMENT_CHANNEL;
@@ -1251,6 +1252,8 @@ public class LocalExecutionPlanner
             TableHandle table = null;
             List<ColumnHandle> columns = null;
             PhysicalOperation source = null;
+            Integer strategy = REUSE_STRATEGY_DEFAULT;
+            Integer slot = 0;
             if (sourceNode instanceof TableScanNode) {
                 TableScanNode tableScanNode = (TableScanNode) sourceNode;
                 table = tableScanNode.getTable();
@@ -1267,6 +1270,9 @@ public class LocalExecutionPlanner
 
                     channel++;
                 }
+
+                strategy = tableScanNode.getStrategy();
+                slot = tableScanNode.getSlot();
             }
             //TODO: This is a simple hack, it will be replaced when we add ability to push down sampling into connectors.
             // SYSTEM sampling is performed in the coordinator by dropping some random splits so the SamplingNode can be skipped here.
@@ -1342,7 +1348,8 @@ public class LocalExecutionPlanner
                             metadata,
                             dynamicFilterCacheManager,
                             getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session));
+                            getFilterAndProjectMinOutputPageRowCount(session),
+                            strategy, slot);
 
                     return new PhysicalOperation(operatorFactory, outputMappings, context, stageExecutionDescriptor.isScanGroupedExecution(sourceNode.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
                 }
@@ -1420,7 +1427,8 @@ public class LocalExecutionPlanner
                     metadata,
                     dynamicFilterCacheManager,
                     getFilterAndProjectMinOutputPageSize(session),
-                    getFilterAndProjectMinOutputPageRowCount(session));
+                    getFilterAndProjectMinOutputPageRowCount(session),
+                    node.getStrategy(), node.getSlot());
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
         }
 

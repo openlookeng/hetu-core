@@ -14,6 +14,7 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
@@ -83,6 +84,8 @@ public class ScanFilterAndProjectOperator
     private long processedBytes;
     private long physicalBytes;
     private long readTimeNanos;
+
+    private static final Logger log = Logger.get(ScanFilterAndProjectOperator.class);
 
     private ScanFilterAndProjectOperator(
             Session session,
@@ -528,6 +531,8 @@ public class ScanFilterAndProjectOperator
         private Optional<QueryId> queryIdOptional = Optional.empty();
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
+        private Integer strategy;
+        private Integer slot;
 
         public ScanFilterAndProjectOperatorFactory(
                 Session session,
@@ -547,7 +552,7 @@ public class ScanFilterAndProjectOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount)
         {
-            this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount);
+            this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount, 0, 0);
 
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 if (sourceNode instanceof TableScanNode) {
@@ -574,7 +579,9 @@ public class ScanFilterAndProjectOperator
                 Optional<DynamicFilterSupplier> dynamicFilter,
                 List<Type> types,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                Integer strategy,
+                Integer slot)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -588,6 +595,8 @@ public class ScanFilterAndProjectOperator
             this.types = requireNonNull(types, "types is null");
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
+            this.strategy = strategy;
+            this.slot = slot;
         }
 
         @Override
@@ -613,7 +622,7 @@ public class ScanFilterAndProjectOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, getOperatorType());
-            return new WorkProcessorSourceOperatorAdapter(operatorContext, this);
+            return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, slot);
         }
 
         @Override

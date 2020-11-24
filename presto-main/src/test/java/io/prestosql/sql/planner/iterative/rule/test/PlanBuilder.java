@@ -457,7 +457,8 @@ public class PlanBuilder
                 symbols,
                 assignments,
                 enforcedConstraint,
-                Optional.empty());
+                Optional.empty(),
+                0, 0);
     }
 
     public TableFinishNode tableDelete(SchemaTableName schemaTableName, PlanNode deleteSource, Symbol deleteRowId)

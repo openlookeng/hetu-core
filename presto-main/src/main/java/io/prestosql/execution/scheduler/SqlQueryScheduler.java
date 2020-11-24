@@ -557,6 +557,10 @@ public class SqlQueryScheduler
             while (!executionSchedule.isFinished()) {
                 List<ListenableFuture<?>> blockedStages = new ArrayList<>();
                 for (SqlStageExecution stage : executionSchedule.getStagesToSchedule()) {
+                    if (!SqlStageExecution.getSlotStatus(stage.getStateMachine())) {
+                        continue;
+                    }
+
                     stage.beginScheduling();
 
                     // perform some scheduling work

@@ -237,7 +237,9 @@ public class BeginTableWrite
                         scan.getOutputSymbols(),
                         scan.getAssignments(),
                         scan.getEnforcedConstraint(),
-                        scan.getPredicate());
+                        scan.getPredicate(),
+                        scan.getStrategy(),
+                        scan.getSlot());
             }
 
             if (node instanceof FilterNode) {

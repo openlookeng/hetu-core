@@ -137,6 +137,7 @@ public class FeaturesConfig
     private boolean predicatePushdownUseTableProperties = true;
     private boolean pushTableThroughSubquery;
     private boolean rewriteFilteringSemiJoinToInnerJoin;
+    private boolean reuseTableScanEnabled;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering;
@@ -1175,6 +1176,18 @@ public class FeaturesConfig
     public FeaturesConfig setPushTableThroughSubquery(boolean value)
     {
         this.pushTableThroughSubquery = value;
+        return this;
+    }
+
+    public boolean isReuseTableScanEnabled()
+    {
+        return reuseTableScanEnabled;
+    }
+
+    @Config("optimizer.reuse-table-scan")
+    public FeaturesConfig setReuseTableScanEnabled(boolean reuseTableScanEnabled)
+    {
+        this.reuseTableScanEnabled = reuseTableScanEnabled;
         return this;
     }
 }

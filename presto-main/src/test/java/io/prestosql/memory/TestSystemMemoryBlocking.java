@@ -105,7 +105,7 @@ public class TestSystemMemoryBlocking
                         .addSequencePage(10, 1)
                         .build()),
                 TEST_TABLE_HANDLE,
-                ImmutableList.of());
+                ImmutableList.of(), 0, 0);
         PageConsumerOperator sink = createSinkOperator(types);
         Driver driver = Driver.createDriver(driverContext, source, sink);
         assertSame(driver.getDriverContext(), driverContext);

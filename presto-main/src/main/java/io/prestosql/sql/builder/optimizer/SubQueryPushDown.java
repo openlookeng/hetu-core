@@ -317,7 +317,8 @@ public class SubQueryPushDown
                                 symbolsBuilder.build(),
                                 columnHandleBuilder.build(),
                                 TupleDomain.all(),
-                                Optional.empty()),
+                                Optional.empty(),
+                                0, 0),
                         new Assignments(assignmentsBuilder.build()));
 
                 return Optional.of(output);

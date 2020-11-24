@@ -173,4 +173,51 @@ public class ComparisonExpression
             }
         }
     }
+
+    private boolean isInteger(String st)
+    {
+        try {
+            Integer.parseInt(st);
+        }
+        catch (NumberFormatException ex) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private String getActualColName(String var)
+    {
+        int index = var.lastIndexOf("_");
+        if (index == -1 || isInteger(var.substring(index + 1)) == false) {
+            return var;
+        }
+        else {
+            return var.substring(0, index);
+        }
+    }
+
+    @Override
+    public boolean absEquals(Object o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ComparisonExpression that = (ComparisonExpression) o;
+        Expression tempLeft = left;
+        Expression tempThatLeft = that.left;
+        if (tempLeft instanceof SymbolReference && tempThatLeft instanceof SymbolReference) {
+            tempLeft = new SymbolReference(getActualColName(((SymbolReference) tempLeft).getName()));
+            tempThatLeft = new SymbolReference(getActualColName(((SymbolReference) tempThatLeft).getName()));
+        }
+
+        // Need to check for right incase expr is 5=id
+        return (operator == that.operator) &&
+                Objects.equals(tempLeft, tempThatLeft) &&
+                Objects.equals(right, that.right);
+    }
 }

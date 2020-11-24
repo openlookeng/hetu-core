@@ -173,7 +173,7 @@ public class TestDriver
                         .addSequencePage(10, 20, 30, 40)
                         .build()),
                 TEST_TABLE_HANDLE,
-                ImmutableList.of());
+                ImmutableList.of(), 0, 0);
 
         PageConsumerOperator sink = createSinkOperator(types);
         Driver driver = Driver.createDriver(driverContext, source, sink);
@@ -467,7 +467,7 @@ public class TestDriver
                 TableHandle table,
                 Iterable<ColumnHandle> columns)
         {
-            super(operatorContext, planNodeId, pageSourceProvider, table, columns);
+            super(operatorContext, planNodeId, pageSourceProvider, table, columns, 0, 0);
         }
 
         @Override
@@ -492,7 +492,7 @@ public class TestDriver
                 TableHandle table,
                 Iterable<ColumnHandle> columns)
         {
-            super(operatorContext, planNodeId, pageSourceProvider, table, columns);
+            super(operatorContext, planNodeId, pageSourceProvider, table, columns, 0, 0);
         }
 
         @Override

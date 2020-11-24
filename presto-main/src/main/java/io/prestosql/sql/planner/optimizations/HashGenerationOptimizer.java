@@ -53,6 +53,7 @@ import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
@@ -65,7 +66,9 @@ import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -81,6 +84,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.mangleOperatorName;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -133,6 +137,11 @@ public class HashGenerationOptimizer
         private final PlanNodeIdAllocator idAllocator;
         private final SymbolAllocator symbolAllocator;
         private final TypeProvider types;
+        private final Map<Integer, Map<TableScanNode, List>> nodeList;
+//        private final Map<TableScanNode, List> nodeList;
+        private final Set<Integer> removedSlots;
+        private final Map<Integer, List> slotSymbols;
+        private final Map<Integer, List> slotNodes;
 
         private Rewriter(Metadata metadata, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, TypeProvider types)
         {
@@ -140,6 +149,10 @@ public class HashGenerationOptimizer
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
             this.types = requireNonNull(types, "types is null");
+            nodeList = new HashMap<>();
+            removedSlots = new HashSet<>();
+            slotSymbols = new HashMap<>();
+            slotNodes = new HashMap<>();
         }
 
         @Override
@@ -756,8 +769,62 @@ public class HashGenerationOptimizer
                 }
             }
 
+            if (planWithProperties.getNode() instanceof TableScanNode) {
+                readjustScanNode((TableScanNode) planWithProperties.getNode(), requiredHashes);
+            }
+            else if (planWithProperties.getNode() instanceof ProjectNode) {
+                ProjectNode projectNode = (ProjectNode) planWithProperties.getNode();
+                if (projectNode.getSource() instanceof TableScanNode) {
+                    readjustScanNode((TableScanNode) projectNode.getSource(), requiredHashes);
+                }
+            }
+
             ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), planWithProperties.getNode(), assignments.build());
             return new PlanWithProperties(projectNode, outputHashSymbols);
+        }
+
+        private void readjustScanNode(TableScanNode node, HashComputationSet requiredHashes)
+        {
+            if (node.getStrategy() != REUSE_STRATEGY_DEFAULT) {
+                List<Symbol> fields = new ArrayList<>();
+                boolean isDerivedExpr = false;
+                for (HashComputation hashComputation : requiredHashes.getHashes()) {
+                    fields.addAll(hashComputation.getFields());
+                    isDerivedExpr = !fields.stream().filter(field -> node.getAssignments().get(field) == null).findAny().equals(Optional.empty());
+                }
+
+                Integer slot = node.getSlot();
+                if (slotNodes.get(slot) == null) {
+                    slotSymbols.put(slot, fields);
+                    List<TableScanNode> nodes = new ArrayList<>();
+                    nodes.add(node);
+                    slotNodes.put(slot, nodes);
+                }
+                else {
+                    // compare already saved field list.
+                    List<Symbol> nodeFields = slotSymbols.get(slot);
+                    if (removedSlots.contains(slot)) {
+                        node.setStrategy(REUSE_STRATEGY_DEFAULT);
+                        node.setSlot(-1);
+                    }
+                    else if (!node.isSymbolsEqual(nodeFields, fields) || isDerivedExpr) {
+                        // means two symbol fields are not same.
+                        node.setStrategy(REUSE_STRATEGY_DEFAULT);
+                        node.setSlot(-1);
+                        removedSlots.add(slot);
+                        for (int i = 0; i < slotNodes.get(slot).size(); i++) {
+                            TableScanNode tnode = (TableScanNode) slotNodes.get(slot).get(0);
+                            tnode.setStrategy(REUSE_STRATEGY_DEFAULT);
+                            tnode.setSlot(-1);
+                        }
+                    }
+                    else {
+                        List<TableScanNode> nodes = slotNodes.get(slot);
+                        nodes.add(node);
+                        slotNodes.put(slot, nodes);
+                    }
+                }
+            }
         }
 
         private PlanWithProperties plan(PlanNode node, HashComputationSet parentPreference)

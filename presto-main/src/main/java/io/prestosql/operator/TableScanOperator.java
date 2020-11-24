@@ -44,16 +44,21 @@ import io.prestosql.statestore.StateStoreProvider;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
+import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static java.util.Objects.requireNonNull;
 
@@ -77,6 +82,8 @@ public class TableScanOperator
         private Optional<QueryId> queryIdOptional = Optional.empty();
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
+        private Integer strategy;
+        private Integer slot;
 
         public TableScanOperatorFactory(
                 Session session,
@@ -92,7 +99,7 @@ public class TableScanOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount)
         {
-            this(operatorId, sourceNode.getId(), pageSourceProvider, table, columns, types, minOutputPageSize, minOutputPageRowCount);
+            this(operatorId, sourceNode.getId(), pageSourceProvider, table, columns, types, minOutputPageSize, minOutputPageRowCount, 0, 0);
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 if (sourceNode instanceof TableScanNode) {
                     tableScanNodeOptional = Optional.of((TableScanNode) sourceNode);
@@ -114,7 +121,9 @@ public class TableScanOperator
                 Iterable<ColumnHandle> columns,
                 List<Type> types,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                Integer strategy,
+                Integer slot)
         {
             this.operatorId = operatorId;
             this.sourceId = requireNonNull(sourceId, "sourceId is null");
@@ -124,6 +133,18 @@ public class TableScanOperator
             this.types = requireNonNull(types, "types is null");
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
+            this.strategy = strategy;
+            this.slot = slot;
+        }
+
+        public Integer getStrategy()
+        {
+            return strategy;
+        }
+
+        public void setStrategy(Integer strategy)
+        {
+            this.strategy = strategy;
         }
 
         @Override
@@ -150,7 +171,7 @@ public class TableScanOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, getOperatorType());
             if (table.getConnectorHandle().isSuitableForPushdown()) {
-                return new WorkProcessorSourceOperatorAdapter(operatorContext, this);
+                return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, slot);
             }
 
             return new TableScanOperator(
@@ -163,7 +184,9 @@ public class TableScanOperator
                     stateStoreProviderOptional,
                     queryIdOptional,
                     metadataOptional,
-                    dynamicFilterCacheManagerOptional);
+                    dynamicFilterCacheManagerOptional,
+                    strategy,
+                    slot);
         }
 
         @Override
@@ -222,6 +245,12 @@ public class TableScanOperator
     boolean existsCrossFilter;
     boolean isDcTable;
 
+    private Integer strategy;
+    private Integer slot;
+    private static ConcurrentMap<String, Integer> indexes;
+    private static ConcurrentMap<Integer, List<Page>> pageCaches;
+    private final String sourceIdString;
+
     public TableScanOperator(
             OperatorContext operatorContext,
             PlanNodeId planNodeId,
@@ -232,9 +261,11 @@ public class TableScanOperator
             Optional<StateStoreProvider> stateStoreProviderOptional,
             Optional<QueryId> queryIdOptional,
             Optional<Metadata> metadataOptional,
-            Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional)
+            Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
+            Integer strategy,
+            Integer slot)
     {
-        this(operatorContext, planNodeId, pageSourceProvider, table, columns);
+        this(operatorContext, planNodeId, pageSourceProvider, table, columns, strategy, slot);
         this.tableScanNodeOptional = tableScanNodeOptional;
         this.stateStoreProviderOptional = stateStoreProviderOptional;
         this.queryIdOptional = queryIdOptional;
@@ -257,7 +288,9 @@ public class TableScanOperator
             PlanNodeId planNodeId,
             PageSourceProvider pageSourceProvider,
             TableHandle table,
-            Iterable<ColumnHandle> columns)
+            Iterable<ColumnHandle> columns,
+            Integer strategy,
+            Integer slot)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -265,6 +298,60 @@ public class TableScanOperator
         this.table = requireNonNull(table, "table is null");
         this.columns = ImmutableList.copyOf(requireNonNull(columns, "columns is null"));
         this.systemMemoryContext = operatorContext.newLocalSystemMemoryContext(TableScanOperator.class.getSimpleName());
+        this.strategy = strategy;
+        this.slot = slot;
+        synchronized (TableScanOperator.class) {
+            if (pageCaches == null) {
+                pageCaches = new ConcurrentHashMap<>();
+                indexes = new ConcurrentHashMap<>();
+            }
+
+            sourceIdString = planNodeId.toString().concat(slot.toString());
+        }
+    }
+
+    private Page getPage()
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            initIndex();
+            if (indexes.get(sourceIdString) == null || pageCaches.get(slot) == null || indexes.get(sourceIdString) >= pageCaches.get(slot).size()) {
+                return null;
+            }
+
+            Page newPage = pageCaches.get(slot).get(indexes.get(sourceIdString));
+            indexes.merge(sourceIdString, 1, Integer::sum);
+            return newPage;
+        }
+    }
+
+    private void setPage(Page page)
+    {
+        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+            initPageCache(); // Actually it should not be required but somehow TSO Strategy-2 is get scheduled in parallel and clear the cache.
+            pageCaches.get(slot).add(page);
+        }
+    }
+
+    private synchronized Boolean checkFinished()
+    {
+        synchronized (TableScanOperator.class) {
+            return indexes.get(sourceIdString) != null && pageCaches.get(slot) != null
+                    && indexes.get(sourceIdString) >= pageCaches.get(slot).size();
+        }
+    }
+
+    private void initPageCache()
+    {
+        synchronized (TableScanOperator.class) {
+            pageCaches.putIfAbsent(slot, new ArrayList<>());
+        }
+    }
+
+    private void initIndex()
+    {
+        synchronized (TableScanOperator.class) {
+            indexes.putIfAbsent(sourceIdString, 0);
+        }
     }
 
     @Override
@@ -346,9 +433,14 @@ public class TableScanOperator
     public boolean isFinished()
     {
         if (!finished) {
-            finished = (source != null) && source.isFinished();
-            if (source != null) {
-                systemMemoryContext.setBytes(source.getSystemMemoryUsage());
+            if (strategy == REUSE_STRATEGY_CONSUMER) {
+                finished = checkFinished();
+            }
+            else {
+                finished = (source != null) && source.isFinished();
+                if (source != null) {
+                    systemMemoryContext.setBytes(source.getSystemMemoryUsage());
+                }
             }
         }
 
@@ -383,6 +475,9 @@ public class TableScanOperator
     @Override
     public Page getOutput()
     {
+        if (strategy == REUSE_STRATEGY_CONSUMER) {
+            return getPage();
+        }
         if (split == null) {
             return null;
         }
@@ -426,8 +521,13 @@ public class TableScanOperator
         // updating system memory usage should happen after page is loaded.
         systemMemoryContext.setBytes(source.getSystemMemoryUsage());
 
+        if (strategy == REUSE_STRATEGY_PRODUCER && page != null) {
+            setPage(page);
+        }
+
         return page;
     }
+
 
     private Page filter(Page page)
     {
@@ -437,5 +537,12 @@ public class TableScanOperator
             page = BloomFilterUtils.filter(page, bloomFilters);
         }
         return page;
+    }
+
+    public static synchronized void releaseCache(Integer slot)
+    {
+        if (pageCaches != null) {
+            pageCaches.remove(slot);
+        }
     }
 }

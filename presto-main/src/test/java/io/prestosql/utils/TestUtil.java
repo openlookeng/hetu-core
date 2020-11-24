@@ -121,7 +121,7 @@ public class TestUtil
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 TupleDomain.none(),
-                Optional.empty());
+                Optional.empty(), 0, 0);
         PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());
         FilterNode filterNode = planBuilder.filter(expr, tableScanNode);
 

@@ -796,7 +796,9 @@ public class PlanFragmenter
                     node.getOutputSymbols(),
                     node.getAssignments(),
                     node.getEnforcedConstraint(),
-                    node.getPredicate());
+                    node.getPredicate(),
+                    node.getStrategy(),
+                    node.getSlot());
         }
     }
 }

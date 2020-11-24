@@ -25,8 +25,11 @@ import io.prestosql.sql.tree.Expression;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -45,6 +48,10 @@ public class TableScanNode
     private final TupleDomain<ColumnHandle> enforcedConstraint;
     private final Optional<Expression> predicate;
 
+    private Integer strategy;
+    private Integer slot;
+    private Expression filterExpr;
+
     // We need this factory method to disambiguate with the constructor used for deserializing
     // from a json object. The deserializer sets some fields which are never transported
     // to null
@@ -52,9 +59,11 @@ public class TableScanNode
             PlanNodeId id,
             TableHandle table,
             List<Symbol> outputs,
-            Map<Symbol, ColumnHandle> assignments)
+            Map<Symbol, ColumnHandle> assignments,
+            Integer strategy,
+            Integer slot)
     {
-        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty());
+        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, slot);
     }
 
     @JsonCreator
@@ -63,7 +72,9 @@ public class TableScanNode
             @JsonProperty("table") TableHandle table,
             @JsonProperty("outputSymbols") List<Symbol> outputs,
             @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
-            @JsonProperty("predicate") Optional<Expression> predicate)
+            @JsonProperty("predicate") Optional<Expression> predicate,
+            @JsonProperty("strategy") Integer strategy,
+            @JsonProperty("slot") Integer slot)
     {
         // This constructor is for JSON deserialization only. Do not use.
         super(id);
@@ -73,6 +84,9 @@ public class TableScanNode
         checkArgument(assignments.keySet().containsAll(outputs), "assignments does not cover all of outputs");
         this.enforcedConstraint = null;
         this.predicate = predicate;
+        this.strategy = strategy;
+        this.slot = slot;
+        this.filterExpr = null;
     }
 
     public TableScanNode(
@@ -81,7 +95,9 @@ public class TableScanNode
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments,
             TupleDomain<ColumnHandle> enforcedConstraint,
-            Optional<Expression> predicate)
+            Optional<Expression> predicate,
+            Integer strategy,
+            Integer slot)
     {
         super(id);
         this.table = requireNonNull(table, "table is null");
@@ -90,6 +106,29 @@ public class TableScanNode
         checkArgument(assignments.keySet().containsAll(outputs), "assignments does not cover all of outputs");
         this.enforcedConstraint = requireNonNull(enforcedConstraint, "enforcedConstraint is null");
         this.predicate = requireNonNull(predicate, "predicate expression cannot be empty");
+        this.strategy = strategy;
+        this.slot = slot;
+        this.filterExpr = null;
+    }
+
+    public Expression getFilterExpr()
+    {
+        return filterExpr;
+    }
+
+    public void setFilterExpr(Expression filterExpr)
+    {
+        this.filterExpr = filterExpr;
+    }
+
+    public void setStrategy(Integer strategy)
+    {
+        this.strategy = strategy;
+    }
+
+    public void setSlot(Integer slot)
+    {
+        this.slot = slot;
     }
 
     @JsonProperty("table")
@@ -109,6 +148,18 @@ public class TableScanNode
     public Map<Symbol, ColumnHandle> getAssignments()
     {
         return assignments;
+    }
+
+    @JsonProperty("strategy")
+    public Integer getStrategy()
+    {
+        return strategy;
+    }
+
+    @JsonProperty("slot")
+    public Integer getSlot()
+    {
+        return slot;
     }
 
     /**
@@ -152,6 +203,8 @@ public class TableScanNode
                 .add("outputSymbols", outputSymbols)
                 .add("assignments", assignments)
                 .add("enforcedConstraint", enforcedConstraint)
+                .add("strategy", strategy)
+                .add("slot", slot)
                 .toString();
     }
 
@@ -160,5 +213,117 @@ public class TableScanNode
     {
         checkArgument(newChildren.isEmpty(), "newChildren is not empty");
         return this;
+    }
+
+    private boolean isSourcesEqual(List<PlanNode> n1, List<PlanNode> n2)
+    {
+        if (n1.size() != n2.size()) {
+            return false;
+        }
+        int count = 0;
+        for (PlanNode p1 : n1) {
+            for (PlanNode p2 : n2) {
+                if (p1.equals(p2)) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        if (count == n1.size()) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isSymbolsEqual(List<Symbol> s1, List<Symbol> s2)
+    {
+        if (s1 == null && s2 == null) {
+            return true;
+        }
+        if (null == s1 || null == s2 || s1.size() != s2.size()) {
+            return false;
+        }
+        // Convert RegularImmutableList to list
+        ArrayList<Symbol> ar1 = new ArrayList<>(s1);
+        ArrayList<Symbol> ar2 = new ArrayList<>(s2);
+        Collections.sort(ar1);
+        Collections.sort(ar2);
+
+        for (int i = 0; i < ar1.size(); i++) {
+            String st1 = getActualColName(ar1.get(i).getName());
+            String st2 = getActualColName(ar2.get(i).getName());
+            if (!st1.equalsIgnoreCase(st2)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String getActualColName(String var)
+    {
+        // TODO: Instead of stripping off _, we can get corresponding name from assigments column mapping.
+        int index = var.lastIndexOf("_");
+        if (index == -1 || isInteger(var.substring(index + 1)) == false) {
+            return var;
+        }
+        else {
+            return var.substring(0, index);
+        }
+    }
+
+    private boolean isInteger(String st)
+    {
+        try {
+            Integer.parseInt(st);
+        }
+        catch (NumberFormatException ex) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        int hashVal = Objects.hash(table);
+        for (int i = 0; i < outputSymbols.size(); i++) {
+            hashVal += Objects.hash(getActualColName(outputSymbols.get(i).getName()));
+        }
+
+        return hashVal;
+    }
+
+    private boolean isPredicateSame(TableScanNode curr)
+    {
+        if (filterExpr != null) {
+            return filterExpr.absEquals(curr.getFilterExpr());
+        }
+        else if (curr.getFilterExpr() == null) {
+            return true;
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        TableScanNode curr = (TableScanNode) (o);
+        if (curr == this) {
+            return true;
+        }
+        if (!(curr instanceof TableScanNode)) {
+            return false;
+        }
+
+        if (curr.table.getCatalogName().equals(this.table.getCatalogName())
+                && curr.getTable().equals(this.getTable())
+                && isSourcesEqual(curr.getSources(), this.getSources())
+                && isSymbolsEqual(curr.getOutputSymbols(), this.getOutputSymbols())
+                && isPredicateSame(curr)) {
+            return true;
+        }
+        return false;
     }
 }

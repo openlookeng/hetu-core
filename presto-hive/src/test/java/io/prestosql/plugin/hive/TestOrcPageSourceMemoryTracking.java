@@ -530,7 +530,8 @@ public class TestOrcPageSourceMemoryTracking
                     columns.stream().map(columnHandle -> (ColumnHandle) columnHandle).collect(toList()),
                     types,
                     DataSize.valueOf("462304B"),
-                    5);
+                    5,
+                    0, 0);
             SourceOperator operator = sourceOperatorFactory.createOperator(driverContext);
             operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
             return operator;
@@ -557,6 +558,8 @@ public class TestOrcPageSourceMemoryTracking
                     Optional.empty(),
                     types,
                     new DataSize(0, BYTE),
+                    0,
+                    0,
                     0);
             SourceOperator operator = sourceOperatorFactory.createOperator(driverContext);
             operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));

@@ -110,7 +110,7 @@ public class MockRemoteTaskFactory
                         sourceId,
                         TEST_TABLE_HANDLE,
                         ImmutableList.of(symbol),
-                        ImmutableMap.of(symbol, new TestingColumnHandle("column"))),
+                        ImmutableMap.of(symbol, new TestingColumnHandle("column")), 0, 0),
                 ImmutableMap.of(symbol, VARCHAR),
                 SOURCE_DISTRIBUTION,
                 ImmutableList.of(sourceId),

@@ -295,7 +295,7 @@ public class LogicalPlanner
                 idAllocator.getNextId(),
                 new AggregationNode(
                         idAllocator.getNextId(),
-                        TableScanNode.newInstance(idAllocator.getNextId(), targetTable, tableScanOutputs.build(), symbolToColumnHandle.build()),
+                        TableScanNode.newInstance(idAllocator.getNextId(), targetTable, tableScanOutputs.build(), symbolToColumnHandle.build(), 0, 0),
                         statisticAggregations.getAggregations(),
                         singleGroupingSet(groupingSymbols),
                         ImmutableList.of(),

@@ -388,7 +388,7 @@ public class CachedSqlQueryExecution
 
             // Return a new table handle with the ID, output symbols, assignments, and enforced constraints of the cached table handle
             return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(),
-                    node.getEnforcedConstraint(), node.getPredicate());
+                    node.getEnforcedConstraint(), node.getPredicate(), 0, 0);
         }
 
         @Override

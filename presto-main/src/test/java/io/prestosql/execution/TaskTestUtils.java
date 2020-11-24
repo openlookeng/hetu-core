@@ -98,7 +98,7 @@ public final class TaskTestUtils
                     TABLE_SCAN_NODE_ID,
                     TEST_TABLE_HANDLE,
                     ImmutableList.of(SYMBOL),
-                    ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT))),
+                    ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT)), 0, 0),
             ImmutableMap.of(SYMBOL, VARCHAR),
             SOURCE_DISTRIBUTION,
             ImmutableList.of(TABLE_SCAN_NODE_ID),
