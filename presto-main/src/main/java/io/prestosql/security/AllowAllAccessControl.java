@@ -161,6 +161,11 @@ public class AllowAllAccessControl
     }
 
     @Override
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    {
+    }
+
+    @Override
     public void checkCanCreateView(TransactionId transactionId, Identity identity, QualifiedObjectName viewName)
     {
     }

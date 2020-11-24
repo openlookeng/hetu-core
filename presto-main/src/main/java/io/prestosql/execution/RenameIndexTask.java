@@ -15,8 +15,10 @@
 package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.prestosql.Session;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.RenameIndex;
@@ -25,6 +27,7 @@ import io.prestosql.transaction.TransactionManager;
 import java.util.List;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 
 public class RenameIndexTask
         implements DataDefinitionTask<RenameIndex>
@@ -38,6 +41,12 @@ public class RenameIndexTask
     @Override
     public ListenableFuture<?> execute(RenameIndex statement, TransactionManager transactionManager, Metadata metadata, AccessControl accessControl, QueryStateMachine stateMachine, List<Expression> parameters, HeuristicIndexerManager heuristicIndexerManager)
     {
+        Session session = stateMachine.getSession();
+        QualifiedObjectName oldIndexName = createQualifiedObjectName(session, statement, statement.getSource());
+        QualifiedObjectName newIndexName = createQualifiedObjectName(session, statement, statement.getTarget());
+
+        accessControl.checkCanRenameIndex(session.getRequiredTransactionId(), session.getIdentity(), oldIndexName, newIndexName);
+
         return immediateFuture(null);
     }
 }

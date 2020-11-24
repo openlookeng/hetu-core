@@ -236,6 +236,11 @@ public interface AccessControl
     default void checkCanUpdateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName) {}
 
     /**
+     * Check if identity is allowed to show the specified index.
+     */
+    void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName);
+
+    /**
      * Check if identity is allowed to create the specified view.
      *
      * @throws io.prestosql.spi.security.AccessDeniedException if not allowed

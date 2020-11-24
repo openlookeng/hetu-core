@@ -63,6 +63,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denySetSystemSessi
 import static io.prestosql.spi.security.AccessDeniedException.denySetUser;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowCurrentRoles;
+import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowRoleGrants;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowRoles;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowSchemas;
@@ -219,6 +220,12 @@ public class DenyAllAccessControl
     public void checkCanRenameIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName, QualifiedObjectName newIndexName)
     {
         denyRenameIndex(indexName.toString(), newIndexName.toString());
+    }
+
+    @Override
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    {
+        denyShowIndex(indexName.toString());
     }
 
     @Override
