@@ -53,7 +53,7 @@ public class IndexCacheLoader
         }
         catch (Exception e) {
             // no lastModified file found, i.e. index doesn't exist
-            throw new Exception("No index files found for key " + key, e);
+            throw new IndexNotCreatedException();
         }
 
         if (lastModified != key.getLastModifiedTime()) {

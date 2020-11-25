@@ -47,5 +47,6 @@ public class HetuConstant
     public static final String DATASOURCE_INDEX_LEVEL = "datasource_index_level";
     public static final String DATASOURCE_STRIPE_NUMBER = "datasource_stripe_number";
     public static final String DATASOURCE_STRIPE_OFFSET = "datasource_stripe_offset";
-    public static final String DATASOURCE_PAGE_COUNT = "datasource_page_count";
+    public static final String DATASOURCE_TOTAL_PAGES = "datasource_total_pages";
+    public static final String DATASOURCE_PAGE_NUMBER = "datasource_page_number";
 }

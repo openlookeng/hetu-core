@@ -23,15 +23,18 @@ import java.util.Properties;
 public class NoOpIndexWriter
         implements IndexWriter
 {
+    private static final String ERROR_MSG = "Heuristic Index is not enabled or is configured incorrectly.";
+
     @Override
     public void addData(Map<String, List<Object>> values, Properties connectorMetadata)
     {
-        throw new UnsupportedOperationException("This is a no-op index writer, you should set hetu.heuristicindex.filter.enabled=true in config.properties");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public void persist()
             throws IOException
     {
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 }

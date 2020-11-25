@@ -15,6 +15,7 @@
 
 package io.hetu.core.plugin.heuristicindex.index.minmax;
 
+import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -27,6 +28,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static io.hetu.core.heuristicindex.util.IndexConstants.TYPES_WHITELIST;
 import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
@@ -41,7 +43,6 @@ public class MinMaxIndex
 
     private Comparable min;
     private Comparable max;
-    private long memorySize;
 
     /**
      * Default Constructor
@@ -66,6 +67,12 @@ public class MinMaxIndex
     public String getId()
     {
         return ID;
+    }
+
+    @Override
+    public Set<Level> getSupportedIndexLevels()
+    {
+        return ImmutableSet.of(Level.STRIPE);
     }
 
     @Override
@@ -192,18 +199,6 @@ public class MinMaxIndex
     }
 
     @Override
-    public int getExpectedNumOfEntries()
-    {
-        return 0;
-    }
-
-    @Override
-    public void setExpectedNumOfEntries(int expectedNumOfEntries)
-    {
-        // ignore
-    }
-
-    @Override
     public boolean equals(Object o)
     {
         if (this == o) {
@@ -221,23 +216,5 @@ public class MinMaxIndex
     public int hashCode()
     {
         return Objects.hash(min, max);
-    }
-
-    @Override
-    public long getMemorySize()
-    {
-        return this.memorySize;
-    }
-
-    @Override
-    public void setMemorySize(long memorySize)
-    {
-        this.memorySize = memorySize;
-    }
-
-    @Override
-    public boolean supportMultiColumn()
-    {
-        return false;
     }
 }

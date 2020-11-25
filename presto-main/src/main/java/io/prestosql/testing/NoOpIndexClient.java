@@ -24,52 +24,54 @@ import java.util.List;
 public class NoOpIndexClient
         implements IndexClient
 {
+    private static final String ERROR_MSG = "Heuristic Index is not enabled or is configured incorrectly.";
+
     @Override
     public List<IndexMetadata> readSplitIndex(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public long getLastModified(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public void deleteIndex(String indexName)
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public List<IndexRecord> getAllIndexRecords()
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 
     @Override
     public IndexRecord getIndexRecord(String name)
             throws IOException
     {
-        throw new UnsupportedOperationException("This is a no-op index client");
+        throw new UnsupportedOperationException(ERROR_MSG);
     }
 }

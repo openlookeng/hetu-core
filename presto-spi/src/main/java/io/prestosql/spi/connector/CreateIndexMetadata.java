@@ -16,6 +16,7 @@ package io.prestosql.spi.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -29,7 +30,7 @@ import static java.util.Objects.requireNonNull;
 public class CreateIndexMetadata
 {
     public static final String LEVEL_PROP_KEY = "level";
-    public static final Level LEVEL_DEFAULT = Level.STRIPE;
+    public static final Index.Level LEVEL_DEFAULT = Index.Level.STRIPE;
 
     private final String indexName;
     private final String tableName;
@@ -38,7 +39,7 @@ public class CreateIndexMetadata
     private final List<String> partitions;
     private final Properties properties;
     private final String user;
-    private final Level createLevel;
+    private final Index.Level createLevel;
 
     @JsonCreator
     public CreateIndexMetadata(
@@ -49,7 +50,7 @@ public class CreateIndexMetadata
             @JsonProperty("partitions") List<String> partitions,
             @JsonProperty("properties") Properties properties,
             @JsonProperty("user") String user,
-            @JsonProperty("createLevel") Level createLevel)
+            @JsonProperty("createLevel") Index.Level createLevel)
     {
         this.indexName = checkNotEmpty(indexName, "indexName");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -62,7 +63,7 @@ public class CreateIndexMetadata
     }
 
     @JsonProperty
-    public Level getCreateLevel()
+    public Index.Level getCreateLevel()
     {
         return createLevel;
     }
@@ -107,12 +108,6 @@ public class CreateIndexMetadata
     public String getUser()
     {
         return user;
-    }
-
-    public enum Level
-    {
-        STRIPE,
-        PARTITION
     }
 
     @Override

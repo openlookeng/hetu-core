@@ -59,11 +59,9 @@ public class TestHeuristicIndexFilter
         bloomIndex2.addValues(ImmutableMap.of("testColumn", ImmutableList.of("c", "d")));
 
         minMaxIndex1 = new MinMaxIndex();
-        minMaxIndex1.setExpectedNumOfEntries(3);
         minMaxIndex1.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1L, 5L, 10L)));
 
         minMaxIndex2 = new MinMaxIndex();
-        minMaxIndex2.setExpectedNumOfEntries(3);
         minMaxIndex2.addValues(ImmutableMap.of("testColumn", ImmutableList.of(50L, 80L, 100L)));
     }
 

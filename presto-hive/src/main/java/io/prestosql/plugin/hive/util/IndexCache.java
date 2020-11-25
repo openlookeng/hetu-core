@@ -33,6 +33,7 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
 import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -50,7 +51,7 @@ public class IndexCache
 {
     private static final Logger LOG = Logger.get(IndexCache.class);
     private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("Hive-IndexCache-pool-%d").setDaemon(true).build();
-    private static final List<String> INDEX_TYPES = ImmutableList.of("bloom");
+    protected static final List<String> INDEX_TYPES = ImmutableList.of("minmax", "bloom");
 
     private static ScheduledExecutorService executor;
 
@@ -66,6 +67,14 @@ public class IndexCache
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
             executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
             CacheBuilder cacheBuilder = CacheBuilder.newBuilder()
+                    .removalListener(e -> ((List<IndexMetadata>) e.getValue()).stream().forEach(i -> {
+                        try {
+                            i.getIndex().close();
+                        }
+                        catch (IOException ioException) {
+                            LOG.debug(ioException, "Failed to close index " + i);
+                        }
+                    }))
                     .expireAfterWrite(PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_TTL).toMillis(), TimeUnit.MILLISECONDS)
                     .maximumWeight(PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY))
                     .weigher((Weigher<IndexCacheKey, List<IndexMetadata>>) (indexCacheKey, indices) -> {
@@ -73,13 +82,14 @@ public class IndexCache
                         for (IndexMetadata indexMetadata : indices) {
                             // HetuConstant.FILTER_CACHE_MAX_MEMORY is set in KBs
                             // convert index size to KB
-                            memorySize += (indexMetadata.getIndex().getMemorySize() / KILOBYTE);
+                            memorySize += (indexMetadata.getIndex().getMemoryUsage() / KILOBYTE);
                         }
                         return memorySize;
                     });
             if (PropertyService.getBooleanProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE)) {
                 cacheBuilder.softValues();
             }
+
             cache = cacheBuilder.build(loader);
         }
     }
@@ -140,7 +150,7 @@ public class IndexCache
                                     if (e.getCause() instanceof IndexNotCreatedException) {
                                         // Do nothing. Index not registered.
                                     }
-                                    if (LOG.isDebugEnabled()) {
+                                    else if (LOG.isDebugEnabled()) {
                                         LOG.debug(e, "Unable to load index for %s. ", indexCacheKeyPath);
                                     }
                                 }
