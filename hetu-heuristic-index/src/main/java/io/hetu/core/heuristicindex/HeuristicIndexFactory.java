@@ -15,6 +15,7 @@
 
 package io.hetu.core.heuristicindex;
 
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.heuristicindex.filter.HeuristicIndexFilter;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
@@ -29,9 +30,9 @@ import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexWriter;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
@@ -47,6 +48,7 @@ public class HeuristicIndexFactory
         implements IndexFactory
 {
     private static final Logger LOG = Logger.get(HeuristicIndexFactory.class);
+    private static final List<Index> supportedIndices = ImmutableList.of(new BloomIndex(), new MinMaxIndex());
 
     public HeuristicIndexFactory()
     {
@@ -54,33 +56,23 @@ public class HeuristicIndexFactory
 
     public static Index createIndex(String indexType)
     {
-        switch (indexType.toUpperCase(Locale.ENGLISH)) {
-            case BloomIndex.ID:
-                return new BloomIndex();
-            case MinMaxIndex.ID:
-                return new MinMaxIndex();
-            default:
-                throw new IllegalArgumentException("Index type " + indexType + " not supported.");
+        try {
+            return getIndexObjFromID(indexType).getClass().getConstructor().newInstance();
+        }
+        catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException("Error creating new instance of class: " + indexType);
         }
     }
 
-    @Override
-    public IndexWriter getIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root)
+    private static Index getIndexObjFromID(String indexType)
     {
-        LOG.debug("Creating index writer for catalogName: %s", connectorMetadata.getProperty(HetuConstant.DATASOURCE_CATALOG));
-
-        Properties indexProps = createIndexMetadata.getProperties();
-        LOG.debug("indexProps: %s", indexProps);
-
-        String indexType = createIndexMetadata.getIndexType();
-
-        switch (indexType.toUpperCase(Locale.ENGLISH)) {
-            case BloomIndex.ID:
-            case MinMaxIndex.ID:
-                return new FileIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
-            default:
-                throw new IllegalArgumentException(indexType + " has no supported index writer");
+        for (Index i : supportedIndices) {
+            if (i.getId().equalsIgnoreCase(indexType)) {
+                return i;
+            }
         }
+
+        throw new IllegalArgumentException("Index type " + indexType + " not supported.");
     }
 
     @Override
@@ -97,5 +89,29 @@ public class HeuristicIndexFactory
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         return new HeuristicIndexFilter(indices);
+    }
+
+    @Override
+    public IndexWriter getIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root)
+    {
+        LOG.debug("Creating index writer for catalogName: %s", connectorMetadata.getProperty(HetuConstant.DATASOURCE_CATALOG));
+
+        Properties indexProps = createIndexMetadata.getProperties();
+        LOG.debug("indexProps: %s", indexProps);
+
+        String indexType = createIndexMetadata.getIndexType();
+        Index index = getIndexObjFromID(indexType);
+
+        if (!index.getSupportedIndexLevels().contains(createIndexMetadata.getCreateLevel())) {
+            throw new IllegalArgumentException(indexType + " does not support specified index level");
+        }
+
+        switch (createIndexMetadata.getCreateLevel()) {
+            case STRIPE:
+                return new FileIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
+            case PARTITION:
+            default:
+                throw new IllegalArgumentException(indexType + " has no supported index writer");
+        }
     }
 }

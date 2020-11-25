@@ -17,7 +17,6 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <air.check.fail-duplicate-finder>false</air.check.fail-duplicate-finder>
         <org.slf4j.version>1.7.30</org.slf4j.version>
-        <org.roaringbitmap.version>0.8.11</org.roaringbitmap.version>
     </properties>
 
     <dependencies>
@@ -25,11 +24,6 @@
             <artifactId>commons-compress</artifactId>
             <groupId>org.apache.commons</groupId>
             <version>1.19</version>
-        </dependency>
-        <dependency>
-            <groupId>io.prestosql.hive</groupId>
-            <artifactId>hive-apache-jdbc</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>

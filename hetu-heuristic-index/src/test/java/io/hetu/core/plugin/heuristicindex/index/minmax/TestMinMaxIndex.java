@@ -43,7 +43,6 @@ public class TestMinMaxIndex
     {
         MinMaxIndex minMaxIndex = new MinMaxIndex();
         List<Object> minmaxValues = ImmutableList.of(1L, 10L, 100L, 1000L);
-        minMaxIndex.setExpectedNumOfEntries(minmaxValues.size());
         minMaxIndex.addValues(ImmutableMap.of("testColumn", minmaxValues));
 
         Expression expression1 = new SqlParser().createExpression("(testColumn < 0)", new ParsingOptions());
@@ -224,13 +223,5 @@ public class TestMinMaxIndex
         assertEquals(index.union(index2), new MinMaxIndex(-10, 5));
         assertEquals(index.union(index3), index);
         assertEquals(index.union(index4), index4);
-    }
-
-    @Test
-    public void testMemorySize()
-    {
-        MinMaxIndex index = new MinMaxIndex();
-        index.setMemorySize(10);
-        assertEquals(index.getMemorySize(), 10);
     }
 }

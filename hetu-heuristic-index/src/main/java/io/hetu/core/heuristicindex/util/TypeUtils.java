@@ -16,6 +16,7 @@
 package io.hetu.core.heuristicindex.util;
 
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.DecimalLiteral;
@@ -86,5 +87,10 @@ public class TypeUtils
         }
 
         throw new UnsupportedOperationException("Not Implemented Exception: " + expression.toString());
+    }
+
+    public static Object getNativeValue(Object object)
+    {
+        return object instanceof Slice ? ((Slice) object).toStringUtf8() : object;
     }
 }

@@ -16,6 +16,7 @@
 package io.hetu.core.heuristicindex.util;
 
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.sql.tree.ComparisonExpression;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
@@ -30,9 +31,11 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 
 /**
  * Util class for creating external index.
@@ -79,7 +82,8 @@ public class IndexServiceUtils
      *
      * @param filePath filesPath that need to be checked
      */
-    public static void isFileExisting(String filePath) throws IOException
+    public static void isFileExisting(String filePath)
+            throws IOException
     {
         File file = Paths.get(filePath).toFile();
         isFileExisting(file);
@@ -92,7 +96,8 @@ public class IndexServiceUtils
      * @return Property object which holds all properties
      * @throws IOException when property file does NOT exist
      */
-    public static Properties loadProperties(String propertyFilePath) throws IOException
+    public static Properties loadProperties(String propertyFilePath)
+            throws IOException
     {
         File propertyFile = Paths.get(propertyFilePath).toFile();
         return loadProperties(propertyFile);
@@ -171,7 +176,7 @@ public class IndexServiceUtils
 
     /**
      * Returns the subset of properties that start with the prefix, prefix is removed.
-     *
+     * <p>
      * All keys and values are also converted to Strings
      *
      * @param properties <code>Properties</code> object to extract properties with
@@ -233,8 +238,26 @@ public class IndexServiceUtils
         }
     }
 
+    public static boolean matchCompExpEqual(Object expression, Function<Object, Boolean> matchingFunction)
+    {
+        if (expression instanceof ComparisonExpression) {
+            ComparisonExpression compExp = (ComparisonExpression) expression;
+            ComparisonExpression.Operator operator = compExp.getOperator();
+            Object value = extractSingleValue(compExp.getRight());
+
+            if (operator == ComparisonExpression.Operator.EQUAL) {
+                return matchingFunction.apply(value);
+            }
+
+            return true;
+        }
+
+        return true;
+    }
+
     /**
      * get object as string and remove surrounding quotes if present
+     *
      * @param input
      * @return
      */

@@ -15,6 +15,7 @@
 
 package io.prestosql.spi.heuristicindex;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -22,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Interface implemented by all types of indexes (ie, Bloom, minmax etc)
@@ -29,7 +31,17 @@ import java.util.Properties;
  * @since 2019-08-18
  */
 public interface Index
+        extends Closeable
 {
+    /**
+     * The data unit on which the index should be applied on.
+     * <p>
+     * The index should be self-contained on the data unit specified and can work independently.
+     *
+     * @return data level on which the index should be applied on.
+     */
+    Set<Level> getSupportedIndexLevels();
+
     /**
      * Gets the id of the IndexStore.
      * <p>
@@ -39,6 +51,11 @@ public interface Index
      * @return String id
      */
     String getId();
+
+    default boolean supportMultiColumn()
+    {
+        return false;
+    }
 
     /**
      * Adds the given values to the index.
@@ -153,40 +170,57 @@ public interface Index
     {
     }
 
-    int getExpectedNumOfEntries();
-
-    void setExpectedNumOfEntries(int expectedNumOfEntries);
+    /**
+     * Sets the expected number of entries that will be written to this index.
+     * <p>
+     * This value can help some index types to be better optimized.
+     *
+     * @return
+     */
+    default void setExpectedNumOfEntries(int expectedNumOfEntries)
+    {
+    }
 
     /**
      * <pre>
-     * Returns the memorySize of the Index.
+     * Returns the estimated memory consumed by this index.
      *
-     * The memorySize may be used to estimate the memory usage for index.
-     * Index cache can evict entries according to all indices memory size.
-     * The unit is Byte.
+     * This memory usage can help with memory usage based cache eviction.
+     *
+     * The unit is Bytes.
      * </pre>
      *
-     * @return long returns memorySize of the index
+     * @return long returns estimated bytes of memory consumed by this index
      */
-    default long getMemorySize()
+    default long getMemoryUsage()
     {
         return 0;
     }
 
     /**
      * <pre>
-     * Sets the memorySize of the Index.
+     * Returns the estimated disk consumed by this index.
      *
-     * The memorySize may be used to estimate the memory usage for index.
-     * Index cache can evict entries according to all indices memory size.
-     * The unit is Byte.
+     * This disk usage can help with disk usage based cache eviction.
+     *
+     * The unit is Bytes.
      * </pre>
      *
-     * @param memorySize Properties being set
+     * @return long returns estimated bytes of disk consumed by this index
      */
-    default void setMemorySize(long memorySize)
+    default long getDiskUsage()
     {
+        return 0;
     }
 
-    boolean supportMultiColumn();
+    default void close() throws IOException
+    {
+        return;
+    }
+
+    enum Level
+    {
+        STRIPE,
+        PARTITION
+    }
 }

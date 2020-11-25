@@ -15,11 +15,11 @@
 
 package io.hetu.core.plugin.heuristicindex.index.bloom;
 
+import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.util.BloomFilter;
-import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,8 +27,9 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
-import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCompExpEqual;
 
 /**
  * Bloom index implementation
@@ -44,12 +45,17 @@ public class BloomIndex
     private BloomFilter filter;
     private double fpp = DEFAULT_FPP;
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
-    private long memorySize;
 
     @Override
     public String getId()
     {
         return ID;
+    }
+
+    @Override
+    public Set<Level> getSupportedIndexLevels()
+    {
+        return ImmutableSet.of(Level.STRIPE);
     }
 
     @Override
@@ -68,32 +74,17 @@ public class BloomIndex
     @Override
     public synchronized boolean matches(Object expression)
     {
+        // test Domain matching
         if (expression instanceof Domain) {
             Domain predicate = (Domain) expression;
             if (predicate.isSingleValue()) {
                 Class<?> javaType = predicate.getValues().getType().getJavaType();
                 return getFilter().test(rangeValueToString(predicate.getSingleValue(), javaType).getBytes());
             }
-            else {
-                // Does not support multiple predicate for now. Do not filter.
-                return true;
-            }
         }
 
-        if (expression instanceof ComparisonExpression) {
-            ComparisonExpression compExp = (ComparisonExpression) expression;
-            ComparisonExpression.Operator operator = compExp.getOperator();
-            Object value = extractSingleValue(compExp.getRight());
-
-            if (operator == ComparisonExpression.Operator.EQUAL) {
-                return getFilter().test(value.toString().getBytes());
-            }
-
-            throw new IllegalArgumentException("Unsupported operator " + operator);
-        }
-
-        // Not supported expression. Do not filter.
-        return true;
+        // test ComparisonExpression matching
+        return matchCompExpEqual(expression, value -> getFilter().test(value.toString().getBytes()));
     }
 
     @Override
@@ -123,8 +114,7 @@ public class BloomIndex
         this.properties = properties;
     }
 
-    @Override
-    public int getExpectedNumOfEntries()
+    private int getExpectedNumOfEntries()
     {
         return expectedNumOfEntries;
     }
@@ -133,12 +123,6 @@ public class BloomIndex
     public void setExpectedNumOfEntries(int expectedNumOfEntries)
     {
         this.expectedNumOfEntries = expectedNumOfEntries;
-    }
-
-    @Override
-    public boolean supportMultiColumn()
-    {
-        return false;
     }
 
     private double getFpp()
@@ -165,7 +149,7 @@ public class BloomIndex
      *  get range value, if it is slice, we should change it to string
      * </pre>
      *
-     * @param object value
+     * @param object   value
      * @param javaType value java type
      * @return string
      */
@@ -175,14 +159,8 @@ public class BloomIndex
     }
 
     @Override
-    public long getMemorySize()
+    public long getMemoryUsage()
     {
-        return this.memorySize;
-    }
-
-    @Override
-    public void setMemorySize(long memorySize)
-    {
-        this.memorySize = memorySize;
+        return getFilter().getRetainedSizeInBytes();
     }
 }

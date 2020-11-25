@@ -27,6 +27,7 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Field;
@@ -616,14 +617,14 @@ class QueryPlanner
                 .stream().map(Field::getType).toArray(Type[]::new)).iterator();
 
         Properties indexProperties = new Properties();
-        CreateIndexMetadata.Level indexCreationLevel = LEVEL_DEFAULT;
+        Index.Level indexCreationLevel = LEVEL_DEFAULT;
         indexProperties.setProperty(LEVEL_PROP_KEY, String.valueOf(LEVEL_DEFAULT));
 
         for (Property property : createIndex.getProperties()) {
             String key = property.getName().toString().replaceAll("\"", "");
             String val = property.getValue().toString().replaceAll("\"", "").toUpperCase(Locale.ENGLISH);
             if (key.equals(LEVEL_PROP_KEY)) {
-                indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
+                indexCreationLevel = Index.Level.valueOf(val);
             }
             indexProperties.setProperty(key, val);
         }

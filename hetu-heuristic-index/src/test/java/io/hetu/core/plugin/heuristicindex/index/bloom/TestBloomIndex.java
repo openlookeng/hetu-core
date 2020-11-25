@@ -242,19 +242,16 @@ public class TestBloomIndex
     {
         // adding 3 values to default size should pass
         BloomIndex defaultSizedIndex = new BloomIndex();
-        assertEquals(defaultSizedIndex.getExpectedNumOfEntries(), BloomIndex.DEFAULT_EXPECTED_NUM_OF_SIZE);
         defaultSizedIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f, 3f)));
 
         // adding 2 values to an index of size 2 should pass
         BloomIndex equalSizedIndex = new BloomIndex();
         equalSizedIndex.setExpectedNumOfEntries(2);
-        assertEquals(equalSizedIndex.getExpectedNumOfEntries(), 2);
         equalSizedIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f)));
 
         // adding 3 values to an index of size 2 should pass (bloom doesn't have strict size limit)
         BloomIndex smallSizedIndex = new BloomIndex();
         smallSizedIndex.setExpectedNumOfEntries(2);
-        assertEquals(smallSizedIndex.getExpectedNumOfEntries(), 2);
         smallSizedIndex.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f, 3f)));
     }
 
@@ -262,8 +259,9 @@ public class TestBloomIndex
     public void testMemorySize()
     {
         BloomIndex index = new BloomIndex();
-        index.setMemorySize(10);
-        assertEquals(index.getMemorySize(), 10);
+        index.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1f, 2f, 3f)));
+
+        assertTrue(index.getMemoryUsage() > 0);
     }
 
     private boolean mightContain(BloomIndex index, Object value)
