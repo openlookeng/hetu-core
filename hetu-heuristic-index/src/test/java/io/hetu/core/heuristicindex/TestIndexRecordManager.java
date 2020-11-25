@@ -23,16 +23,13 @@ import io.prestosql.spi.heuristicindex.IndexRecord;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
@@ -227,48 +224,8 @@ public class TestIndexRecordManager
         testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("12", "123"));
     }
 
-    @Test
-    public void testRecordEqualAndHash()
-    {
-        IndexRecord r1 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Collections.emptyList());
-        IndexRecord r2 = new IndexRecord("testName", "testUser", "testTable", new String[] {
-                "testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("note"));
-        IndexRecord r3 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList(), Collections.emptyList());
-        IndexRecord r4 = new IndexRecord("testName", "testUser", "testTable", new String[] {"testColumn",
-                "testColumn2"}, "minmax", Collections.emptyList(), Collections.emptyList());
-        assertEquals(r1, r1);
-        assertEquals(r1, r2);
-        assertNotEquals(r1, r3);
-        assertNotEquals(r1, r4);
-
-        HashSet<IndexRecord> testSet = new HashSet<>();
-        testSet.add(r1);
-        assertEquals(testSet.size(), 1);
-        testSet.add(r2);
-        assertEquals(testSet.size(), 1);
-        testSet.add(r3);
-        assertEquals(testSet.size(), 2);
-        testSet.add(r4);
-        assertEquals(testSet.size(), 3);
-    }
-
-    @Test(expectedExceptions = AssertionError.class)
-    public void testAddAndLookUpDifferentPartitions()
-            throws IOException, IllegalAccessException
-    {
-        try (TempFolder folder = new TempFolder()) {
-            folder.create();
-            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-            IndexRecord expected = new IndexRecord("testName", "testUser", "testTable", new String[] {
-                    "testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of(""));
-            indexRecordManager.addIndexRecord("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
-            IndexRecord actual = indexRecordManager.lookUpIndexRecord("testName");
-            assertIndexRecordFullyEqual(actual, expected);
-        }
-    }
-
     private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
-            throws IOException, IllegalAccessException
+            throws IOException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
@@ -278,22 +235,11 @@ public class TestIndexRecordManager
 
             IndexRecord actual1 = indexRecordManager.lookUpIndexRecord(name);
             assertNotNull(actual1);
-            assertIndexRecordFullyEqual(actual1, expected);
+            assertEquals(actual1, expected);
 
             IndexRecord actual2 = indexRecordManager.lookUpIndexRecord(table, columns, indexType);
             assertNotNull(actual2);
-            assertIndexRecordFullyEqual(actual2, expected);
-        }
-    }
-
-    // Compare two IndexRecord objects and assert all fields are equal.
-    // Unlike the equals() method of IndexRecord, this method compares ALL fields for testing.
-    private void assertIndexRecordFullyEqual(IndexRecord actual, IndexRecord expected)
-            throws IllegalAccessException
-    {
-        for (Field field : actual.getClass().getDeclaredFields()) {
-            field.setAccessible(true);
-            assertEquals(field.get(actual), field.get(expected));
+            assertEquals(actual2, expected);
         }
     }
 }

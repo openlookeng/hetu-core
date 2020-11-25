@@ -27,6 +27,7 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.service.PropertyService;
+import io.prestosql.testing.NoOpIndexClient;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -102,7 +103,7 @@ public class TestIndexCache
             IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
             when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader);
+            IndexCache indexCache = new IndexCache(indexCacheLoader, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
@@ -128,7 +129,7 @@ public class TestIndexCache
             IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
             when(indexCacheLoader.load(any())).thenThrow(ExecutionException.class);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
@@ -155,7 +156,7 @@ public class TestIndexCache
             IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
             when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
@@ -190,7 +191,7 @@ public class TestIndexCache
             IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
             when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicateForPartition, partitionColumns);
             assertEquals(actualSplitIndex.size(), 0);
@@ -207,7 +208,7 @@ public class TestIndexCache
     {
         synchronized (this) {
             IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
 
             //get index for split1

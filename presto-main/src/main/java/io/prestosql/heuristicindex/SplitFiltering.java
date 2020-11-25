@@ -82,7 +82,7 @@ public class SplitFiltering
     {
         if (indexCache == null) {
             CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new IndexCacheLoader(indexClient);
-            indexCache = new IndexCache(cacheLoader);
+            indexCache = new IndexCache(cacheLoader, indexClient);
         }
     }
 

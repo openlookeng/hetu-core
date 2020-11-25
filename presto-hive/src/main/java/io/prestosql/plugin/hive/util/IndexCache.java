@@ -18,7 +18,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.cache.Weigher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -27,8 +26,10 @@ import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveSplit;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
 import org.apache.hadoop.fs.Path;
@@ -56,18 +57,21 @@ public class IndexCache
     private static ScheduledExecutorService executor;
 
     private Long loadDelay; // in millisecond
+    private Long refreshRate; // in millisecond
     private LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
+    private List<IndexRecord> indexRecords;
 
     @Inject
-    public IndexCache(CacheLoader loader)
+    public IndexCache(CacheLoader loader, IndexClient indexClient)
     {
         // If the static variables have not been initialized
         if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
             loadDelay = PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY).toMillis();
+            refreshRate = Math.min(loadDelay / 2, 5000L);
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
             executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
-            CacheBuilder cacheBuilder = CacheBuilder.newBuilder()
-                    .removalListener(e -> ((List<IndexMetadata>) e.getValue()).stream().forEach(i -> {
+            CacheBuilder<IndexCacheKey, List<IndexMetadata>> cacheBuilder = CacheBuilder.newBuilder()
+                    .removalListener(e -> ((List<IndexMetadata>) e.getValue()).forEach(i -> {
                         try {
                             i.getIndex().close();
                         }
@@ -77,7 +81,7 @@ public class IndexCache
                     }))
                     .expireAfterWrite(PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_TTL).toMillis(), TimeUnit.MILLISECONDS)
                     .maximumWeight(PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY))
-                    .weigher((Weigher<IndexCacheKey, List<IndexMetadata>>) (indexCacheKey, indices) -> {
+                    .weigher((indexCacheKey, indices) -> {
                         int memorySize = 0;
                         for (IndexMetadata indexMetadata : indices) {
                             // HetuConstant.FILTER_CACHE_MAX_MEMORY is set in KBs
@@ -89,15 +93,45 @@ public class IndexCache
             if (PropertyService.getBooleanProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE)) {
                 cacheBuilder.softValues();
             }
+            executor.scheduleAtFixedRate(() -> {
+                try {
+                    List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
 
+                    if (indexRecords != null) {
+                        for (IndexRecord old : indexRecords) {
+                            boolean found = false;
+                            for (IndexRecord now : newRecords) {
+                                if (now.name.equals(old.name)) {
+                                    found = true;
+                                    if (now.getLastModifiedTime() != old.getLastModifiedTime()) {
+                                        // index record has been updated. evict
+                                        evictFromCache(old);
+                                        LOG.debug("Index for {%s} has been evicted from cache because the index has been updated.", old);
+                                    }
+                                }
+                            }
+                            // old record is gone. evict from cache
+                            if (!found) {
+                                evictFromCache(old);
+                                LOG.debug("Index for {%s} has been evicted from cache because the index has been dropped.", old);
+                            }
+                        }
+                    }
+
+                    indexRecords = newRecords;
+                }
+                catch (Exception e) {
+                    LOG.debug(e, "Error using index records to refresh cache");
+                }
+            }, loadDelay, refreshRate, TimeUnit.MILLISECONDS);
             cache = cacheBuilder.build(loader);
         }
     }
 
     // Override the loadDelay, for testing
-    public IndexCache(CacheLoader loader, Long loadDelay)
+    public IndexCache(CacheLoader<IndexCacheKey, List<IndexMetadata>> loader, Long loadDelay, IndexClient indexClient)
     {
-        this(loader);
+        this(loader, indexClient);
         this.loadDelay = loadDelay;
     }
 
@@ -168,9 +202,7 @@ public class IndexCache
                             }
 
                             // cache contained the key
-                            if (predicateIndexes != null) {
-                                splitIndexes.addAll(predicateIndexes);
-                            }
+                            splitIndexes.addAll(predicateIndexes);
                         }
                     }
                 });
@@ -182,5 +214,15 @@ public class IndexCache
     protected long getCacheSize()
     {
         return cache.size();
+    }
+
+    private void evictFromCache(IndexRecord record)
+    {
+        String recordInCacheKey = String.format("%s/%s/%s", record.table, String.join(",", record.columns), record.indexType);
+        for (IndexCacheKey key : cache.asMap().keySet()) {
+            if (key.getPath().startsWith(recordInCacheKey)) {
+                cache.invalidate(key);
+            }
+        }
     }
 }

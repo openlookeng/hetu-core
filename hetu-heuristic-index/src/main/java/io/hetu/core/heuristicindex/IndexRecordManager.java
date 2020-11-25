@@ -61,12 +61,12 @@ public class IndexRecordManager
             throws IOException
     {
         Path recordFile = root.resolve(RECORD_FILE_NAME);
-        List<IndexRecord> records = new ArrayList<>();
+        ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
 
         if (!fs.exists(recordFile)) {
             synchronized (cacheLock) {
                 // invalidate cache
-                cache = records;
+                cache = records.build();
                 cacheLastModifiedTime = 0;
             }
             return cache;
@@ -91,7 +91,7 @@ public class IndexRecordManager
                     throw new IllegalArgumentException(
                             "Error reading index record. Index record storage has been updated. Please delete old index directory and recreate the indices.");
                 }
-                cache = records;
+                cache = records.build();
                 cacheLastModifiedTime = modifiedTime;
             }
         }
@@ -138,7 +138,7 @@ public class IndexRecordManager
         FileBasedLock lock = new FileBasedLock(fs, root);
         try {
             lock.lock();
-            List<IndexRecord> records = getIndexRecords();
+            List<IndexRecord> records = new ArrayList<>(getIndexRecords()); // read from records and make a copy
             Iterator<IndexRecord> iterator = records.iterator();
             while (iterator.hasNext()) {
                 IndexRecord record = iterator.next();
@@ -162,7 +162,7 @@ public class IndexRecordManager
         FileBasedLock lock = new FileBasedLock(fs, root);
         try {
             lock.lock();
-            List<IndexRecord> records = getIndexRecords();
+            List<IndexRecord> records = new ArrayList<>(getIndexRecords()); // read from records and make a copy
             if (partitionsToRemove.isEmpty()) {
                 // remove record
                 records.removeIf(record -> record.name.equals(name));
@@ -174,6 +174,7 @@ public class IndexRecordManager
                     IndexRecord record = iterator.next();
                     if (record.name.equals(name)) {
                         record.partitions.removeAll(partitionsToRemove);
+                        record.setLastModifiedTime(System.currentTimeMillis());
                         if (record.partitions.isEmpty()) {
                             iterator.remove();
                         }
@@ -196,11 +197,9 @@ public class IndexRecordManager
     {
         Path recordFile = root.resolve(RECORD_FILE_NAME);
 
-        boolean writeHead = false;
         try (OutputStream os = fs.newOutputStream(recordFile)) {
             // Use IndexRecord to generate a special "entry" as table head so it's easier to maintain when csv format changes
-            String head = new IndexRecord("Name", "User", "Table", new String[] {"Columns"}, "IndexType",
-                    ImmutableList.of("Properties"), ImmutableList.of("Partitions")).toCsvRecord();
+            String head = IndexRecord.getHeader();
             os.write(head.getBytes());
             for (IndexRecord record : records) {
                 os.write(record.toCsvRecord().getBytes());

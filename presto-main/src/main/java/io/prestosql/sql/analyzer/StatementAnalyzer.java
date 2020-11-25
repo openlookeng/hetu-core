@@ -1044,11 +1044,13 @@ class StatementAnalyzer
                     partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
                     // check partition name validate, create index …… where pt_d = xxx;
                     // pt_d must be partition column
-                    List<String> partitionColumns = partitions.stream().map(k -> k.substring(0, k.indexOf("="))).collect(Collectors.toList());
+                    Set<String> partitionColumns = partitions.stream().map(k -> k.substring(0, k.indexOf("="))).collect(Collectors.toSet());
                     if (partitionColumns.size() > 1) {
+                        // currently only support one partition column
                         throw new IllegalArgumentException("Heuristic index only supports predicates on one column");
                     }
-                    partitionColumn = partitionColumns.get(0);
+                    // The only entry in set should be the only partition column name
+                    partitionColumn = partitionColumns.iterator().next();
                 }
 
                 Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
