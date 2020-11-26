@@ -17,53 +17,22 @@ package io.prestosql.catalog;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
-import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.security.CipherTextDecryptUtil;
 
-import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 import static io.prestosql.spi.HetuConstant.ENCRYPTED_PROPERTIES;
-import static java.util.Objects.requireNonNull;
 
 public class CatalogStoreUtil
 {
-    private static final String LOCAL_FS_CLIENT_CONFIG_NAME = "local-config-catalog";
-    private static final String SHARE_FS_CLIENT_CONFIG_NAME = "hdfs-config-catalog";
-    private FileSystemClientManager fileSystemClientManager;
-    private String localConfigurationDir;
-    private String shareConfigurationDir;
-    private int maxCatalogFileSize;
     private CipherTextDecryptUtil cipherTextDecryptUtil;
 
     @Inject
-    private CatalogStoreUtil(FileSystemClientManager fileSystemClientManager, DynamicCatalogConfig dynamicCatalogConfig, CipherTextDecryptUtil cipherTextDecryptUtil)
+    private CatalogStoreUtil(CipherTextDecryptUtil cipherTextDecryptUtil)
     {
-        requireNonNull(dynamicCatalogConfig, "dynamicCatalogConfig is null");
-        this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClientManager is null");
-        this.localConfigurationDir = dynamicCatalogConfig.getCatalogConfigurationDir();
-        this.shareConfigurationDir = dynamicCatalogConfig.getCatalogShareConfigurationDir();
-        this.maxCatalogFileSize = (int) dynamicCatalogConfig.getCatalogMaxFileSize().toBytes();
         this.cipherTextDecryptUtil = cipherTextDecryptUtil;
-    }
-
-    public CatalogStore getLocalCatalogStore()
-            throws IOException
-    {
-        return new LocalCatalogStore(localConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(LOCAL_FS_CLIENT_CONFIG_NAME, Paths.get(localConfigurationDir)),
-                maxCatalogFileSize);
-    }
-
-    public CatalogStore getShareCatalogStore()
-            throws IOException
-    {
-        return new ShareCatalogStore(shareConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get(shareConfigurationDir)),
-                maxCatalogFileSize);
     }
 
     private Set<String> splitEncryptedProperties(String encryptedPropertyNamesValue)

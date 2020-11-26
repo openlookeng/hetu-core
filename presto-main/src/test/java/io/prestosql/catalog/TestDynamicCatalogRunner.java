@@ -97,6 +97,7 @@ public class TestDynamicCatalogRunner
         prepareDirectory(localPath);
         prepareDirectory(sharePath);
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
+                .put("catalog.share.filesystem.profile", "local-config-default")
                 .put("catalog.dynamic-enabled", "true")
                 .put("catalog.config-dir", localPath)
                 .put("catalog.share.config-dir", sharePath)
@@ -120,6 +121,7 @@ public class TestDynamicCatalogRunner
         }
         securityKeyManager = server.getInstance(Key.get(SecurityKeyManager.class));
         catalogStoreUtil = server.getInstance(Key.get(CatalogStoreUtil.class));
+        server.getInstance(Key.get(DynamicCatalogStore.class)).loadCatalogStores(new FileSystemClientManager());
     }
 
     private void prepareDirectory(String directory)

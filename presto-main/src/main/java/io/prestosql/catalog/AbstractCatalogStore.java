@@ -160,7 +160,6 @@ public abstract class AbstractCatalogStore
     }
 
     public void deleteCatalog(String catalogName, boolean totalDelete)
-            throws IOException
     {
         CatalogFilePath catalogPath = new CatalogFilePath(baseDirectory, catalogName);
 
