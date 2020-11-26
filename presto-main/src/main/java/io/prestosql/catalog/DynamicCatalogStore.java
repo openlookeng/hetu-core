@@ -95,6 +95,10 @@ public class DynamicCatalogStore
     public void loadCatalogStores(FileSystemClientManager fileSystemClientManager)
             throws IOException
     {
+        if (!dynamicCatalogConfig.isDynamicCatalogEnabled()) {
+            return;
+        }
+
         int maxCatalogFileSize = (int) dynamicCatalogConfig.getCatalogMaxFileSize().toBytes();
         String localConfigurationDir = dynamicCatalogConfig.getCatalogConfigurationDir();
         Properties properties = new Properties();
