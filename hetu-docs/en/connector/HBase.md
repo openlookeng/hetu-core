@@ -74,6 +74,7 @@ debug=true;
 | ----------------------------------- | ------------- | -------- | ------------------------------------------------------------ |
 | hbase.zookeeper.quorum              | (none)        | Yes      | Zookeeper cluster address                                    |
 | hbase.zookeeper.property.clientPort | (none)        | Yes      | Zookeeper client port                                        |
+| hbase.zookeeper.znode.parent        | /hbase        | No       | Zookeeper znode parent of hbase                                   |
 | hbase.client.retries.number         | 3             | No       | Retry times to connect to hbase client                       |
 | hbase.client.pause.time             | 100           | No       | HBase client disconnect time                                 |
 | hbase.rpc.protection.enable         | false         | No       | Communication privacy protection. You can get this from `hbase-site.xml`. |

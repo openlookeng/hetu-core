@@ -74,10 +74,11 @@ debug=true;
 | 属性名称| 默认值| 是否必填| 说明|
 |----------|----------|----------|----------|
 | hbase.zookeeper.quorum| （无）| 是| ZooKeeper集群地址|
-| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口。|
+| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口|
+| hbase.zookeeper.znode.parent| /hbase| 否| HBase的Zookeeper根节点路径|
 | hbase.client.retries.number| 3| 否| HBase客户端连接重试次数|
 | hbase.client.pause.time| 100| 否| HBase客户端断连时间|
-| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值。|
+| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值|
 | hbase.default.value| NULL| 否| 表中数据的默认值|
 | hbase.metastore.type| hetuMetastore| 否| HBase元数据的存储，`hetuMetastore`|
 | hbase.authentication.type| （无）| 否| HDFS/HBase组件访问安全身份验证方式|
