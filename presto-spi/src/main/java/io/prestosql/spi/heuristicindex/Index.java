@@ -63,7 +63,7 @@ public interface Index
      * @param values a map of columnName-columnValues
      * @return whether the values are successfully added
      */
-    boolean addValues(Map<String, List<Object>> values);
+    boolean addValues(Map<String, List<Object>> values) throws IOException;
 
     /**
      * The Index will apply the provided Expression but only return a
@@ -72,7 +72,7 @@ public interface Index
      * @param expression the expression to apply
      * @return whether the expression result contains
      */
-    boolean matches(Object expression);
+    boolean matches(Object expression) throws UnsupportedOperationException;
 
     /**
      * Given an Expression, the Index should apply it and return the matching positions.
@@ -84,7 +84,7 @@ public interface Index
      * @param expression the expression to apply
      * @return the Iterator of positions that matches the expression result
      */
-    default <I> Iterator<I> lookUp(Object expression)
+    default <I> Iterator<I> lookUp(Object expression) throws UnsupportedOperationException
     {
         throw new UnsupportedOperationException(String.format("The current index type %s does not support lookUp() operation.", getId()));
     }
@@ -100,8 +100,7 @@ public interface Index
      * @param out OutputStream to write index to
      * @throws IOException In the case that an error with the filesystem occurs
      */
-    void serialize(OutputStream out)
-            throws IOException;
+    void serialize(OutputStream out) throws IOException;
 
     /**
      * <pre>
@@ -114,8 +113,7 @@ public interface Index
      * @param in InputStream to read index from
      * @throws IOException In the case that an error with the filesystem occurs
      */
-    Index deserialize(InputStream in)
-            throws IOException;
+    Index deserialize(InputStream in) throws IOException;
 
     /**
      * Intersect this index with another index and return the intersection index object.
@@ -123,7 +121,7 @@ public interface Index
      * @param another another index to intersect with
      * @return the intersect index
      */
-    default Index intersect(Index another)
+    default Index intersect(Index another) throws UnsupportedOperationException
     {
         throw new UnsupportedOperationException(String.format("Intersect operation on %s index is not currently supported", getId()));
     }
@@ -134,7 +132,7 @@ public interface Index
      * @param another another index to union with
      * @return the union index
      */
-    default Index union(Index another)
+    default Index union(Index another) throws UnsupportedOperationException
     {
         throw new UnsupportedOperationException(String.format("Union operation on %s index is not currently supported", getId()));
     }

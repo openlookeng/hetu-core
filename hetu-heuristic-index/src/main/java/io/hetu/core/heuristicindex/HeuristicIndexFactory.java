@@ -18,6 +18,7 @@ package io.hetu.core.heuristicindex;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.heuristicindex.filter.HeuristicIndexFilter;
+import io.hetu.core.plugin.heuristicindex.index.bitmap.BitmapIndex;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
 import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
 import io.prestosql.spi.HetuConstant;
@@ -48,7 +49,7 @@ public class HeuristicIndexFactory
         implements IndexFactory
 {
     private static final Logger LOG = Logger.get(HeuristicIndexFactory.class);
-    private static final List<Index> supportedIndices = ImmutableList.of(new BloomIndex(), new MinMaxIndex());
+    private static final List<Index> supportedIndices = ImmutableList.of(new BloomIndex(), new MinMaxIndex(), new BitmapIndex());
 
     public HeuristicIndexFactory()
     {

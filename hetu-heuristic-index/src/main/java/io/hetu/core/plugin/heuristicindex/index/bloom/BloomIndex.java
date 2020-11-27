@@ -20,6 +20,7 @@ import io.airlift.slice.Slice;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.util.BloomFilter;
+import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -82,9 +83,12 @@ public class BloomIndex
                 return getFilter().test(rangeValueToString(predicate.getSingleValue(), javaType).getBytes());
             }
         }
+        else if (expression instanceof ComparisonExpression) {
+            // test ComparisonExpression matching
+            return matchCompExpEqual(expression, value -> getFilter().test(value.toString().getBytes()));
+        }
 
-        // test ComparisonExpression matching
-        return matchCompExpEqual(expression, value -> getFilter().test(value.toString().getBytes()));
+        throw new UnsupportedOperationException("Expression not supported by " + ID + " index.");
     }
 
     @Override
