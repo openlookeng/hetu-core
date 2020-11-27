@@ -104,7 +104,7 @@ statement
     | ALTER TABLE qualifiedName (PARTITION partitionSpec)? SET LOCATION string                                                                  #alterTablePartitionLocation
     | ALTER TABLE qualifiedName TOUCH (PARTITION partitionSpec)?                                                                                #alterTablePartitionTouch
     | ALTER TABLE qualifiedName PARTITION partitionSpec (ENABLE | DISABLE) (NO_DROP CASCADE? | OFFLINE)                                         #alterTablePartitionProtections
-    | ALTER TABLE qualifiedName PARTITION partitionSpec COMPACT string (AND WAIT)? WITH OVERWRITE TBLPROPERTIES properties                      #alterTablePartitionCompact
+    | ALTER TABLE qualifiedName (PARTITION partitionSpec)? COMPACT (MAJOR | MINOR) (AND WAIT)? (WITH OVERWRITE TBLPROPERTIES properties)?       #alterTablePartitionCompact
     | ALTER TABLE qualifiedName PARTITION partitionSpec CONCATENATE                                                                             #alterTablePartitionConcatenate
     | ALTER TABLE qualifiedName PARTITION partitionSpec UPDATE COLUMNS                                                                          #alterTablePartitionUpdateColumns
     | ALTER TABLE qualifiedName (PARTITION partitionSpec)? CHANGE COLUMN? oldName=identifier newName=identifier type
@@ -846,6 +846,8 @@ LOCALTIMESTAMP: 'LOCALTIMESTAMP';
 LOCKS: 'LOCKS';
 LOGICAL: 'LOGICAL';
 MACRO: 'MACRO';
+MAJOR: 'MAJOR';
+MINOR: 'MINOR';
 MANAGEDLOCATION: 'MANAGEDLOCATION';
 MATERIALIZED: 'MATERIALIZED';
 MAP: 'MAP';
