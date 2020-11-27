@@ -119,7 +119,7 @@ public class HeuristicIndexFilter
                     return true;
                 }
             }
-            catch (IllegalArgumentException e) {
+            catch (UnsupportedOperationException e) {
                 // Unable to apply the index. Don't filter out
                 return true;
             }

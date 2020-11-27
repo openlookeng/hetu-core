@@ -346,8 +346,13 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                     matchings.add(e.getKey().lookUp(e.getValue()));
                 }
                 catch (UnsupportedOperationException uoe) {
-                    if (!e.getKey().matches(e.getValue())) {
-                        return true;
+                    try {
+                        if (!e.getKey().matches(e.getValue())) {
+                            return true;
+                        }
+                    }
+                    catch (UnsupportedOperationException uoe2) {
+                        return false;
                     }
                 }
             }
@@ -368,7 +373,12 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                     }
                 }
                 catch (UnsupportedOperationException uoe) {
-                    if (!e.getKey().matches(e.getValue())) {
+                    try {
+                        if (!e.getKey().matches(e.getValue())) {
+                            return false;
+                        }
+                    }
+                    catch (UnsupportedOperationException uoe2) {
                         return false;
                     }
                 }
@@ -607,7 +617,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     }
 
     private void advanceToNextStripe()
-                throws IOException
+            throws IOException
     {
         currentStripeSystemMemoryContext.close();
         currentStripeSystemMemoryContext = systemMemoryUsage.newAggregatedMemoryContext();
