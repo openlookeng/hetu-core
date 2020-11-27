@@ -41,11 +41,10 @@ import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveUtil;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.Domain;
@@ -76,7 +75,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -159,7 +157,7 @@ public class OrcPageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
+            Optional<DynamicFilterSupplier> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -235,7 +233,7 @@ public class OrcPageSourceFactory
             boolean lazyReadSmallRanges,
             boolean orcBloomFiltersEnabled,
             FileFormatDataSourceStats stats,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
+            Optional<DynamicFilterSupplier> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

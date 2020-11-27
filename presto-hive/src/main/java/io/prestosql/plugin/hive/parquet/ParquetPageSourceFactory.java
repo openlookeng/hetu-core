@@ -30,10 +30,9 @@ import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HivePageSourceFactory;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.Domain;
@@ -63,7 +62,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
@@ -119,7 +117,7 @@ public class ParquetPageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter,
+            Optional<DynamicFilterSupplier> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

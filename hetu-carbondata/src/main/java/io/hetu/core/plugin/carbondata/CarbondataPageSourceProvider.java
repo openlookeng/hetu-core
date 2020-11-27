@@ -32,6 +32,7 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
@@ -41,6 +42,7 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -109,6 +111,15 @@ public class CarbondataPageSourceProvider
                     isDirectVectorFill, isFullACID,
                     session.getUser(), hdfsEnvironment);
         });
+    }
+
+    @Override
+    public ConnectorPageSource createPageSource(ConnectorTransactionHandle transactionHandle,
+            ConnectorSession session, ConnectorSplit split, ConnectorTableHandle table,
+            List<ColumnHandle> columns, Optional<DynamicFilterSupplier> supplier)
+    {
+        // dynamicFilterSupplier is not supporting carbondata
+        return createPageSource(transactionHandle, session, split, table, columns);
     }
 
     /**

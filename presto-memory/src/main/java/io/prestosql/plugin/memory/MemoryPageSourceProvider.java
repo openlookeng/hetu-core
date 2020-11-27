@@ -22,7 +22,7 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedPageSource;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.TypeUtils;
 
@@ -30,8 +30,8 @@ import javax.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -55,7 +55,7 @@ public final class MemoryPageSourceProvider
             ConnectorTableHandle table,
             List<ColumnHandle> columns)
     {
-        return createPageSource(transaction, session, split, table, columns, null);
+        return createPageSource(transaction, session, split, table, columns, Optional.empty());
     }
 
     @Override
@@ -65,7 +65,7 @@ public final class MemoryPageSourceProvider
             ConnectorSplit split,
             ConnectorTableHandle table,
             List<ColumnHandle> columns,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier)
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier)
     {
         MemorySplit memorySplit = (MemorySplit) split;
         long tableId = memorySplit.getTable();

@@ -117,7 +117,7 @@ public class TestFeaturesConfig
                 .setEnableDynamicFiltering(false)
                 .setDynamicFilteringMaxPerDriverRowCount(10000)
                 .setDynamicFilteringDataType(BLOOM_FILTER)
-                .setDynamicFilteringWaitTime(new Duration(0, MILLISECONDS))
+                .setDynamicFilteringWaitTime(new Duration(1000, MILLISECONDS))
                 .setDynamicFilteringMaxSize(1000000)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(1, MEGABYTE))
                 .setDynamicFilteringBloomFilterFpp(0.1)

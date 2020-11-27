@@ -139,7 +139,7 @@ public class FeaturesConfig
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering;
-    private Duration dynamicFilteringWaitTime = new Duration(0, MILLISECONDS);
+    private Duration dynamicFilteringWaitTime = new Duration(1000, MILLISECONDS);
     private int dynamicFilteringMaxSize = 1000000;
     private int dynamicFilteringMaxPerDriverRowCount = 10000;
     private DynamicFilterDataType dynamicFilteringDataType = BLOOM_FILTER;

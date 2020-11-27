@@ -13,10 +13,9 @@
  */
 package io.prestosql.plugin.hive;
 
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -25,10 +24,8 @@ import org.apache.hadoop.fs.Path;
 import org.joda.time.DateTimeZone;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.function.Supplier;
 
 public interface HivePageSourceFactory
 {
@@ -43,7 +40,7 @@ public interface HivePageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

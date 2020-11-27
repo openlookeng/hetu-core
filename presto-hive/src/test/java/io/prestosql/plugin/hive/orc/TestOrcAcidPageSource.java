@@ -177,7 +177,7 @@ public class TestOrcAcidPageSource
                 columnHandles,
                 tupleDomain,
                 DateTimeZone.UTC,
-                null,
+                Optional.empty(),
                 deleteDeltaLocations,
                 Optional.empty(),
                 Optional.empty(),

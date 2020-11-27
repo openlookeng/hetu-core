@@ -499,7 +499,7 @@ public class TestOrcPageSourceMemoryTracking
                     ImmutableMap.of(),
                     Optional.empty(),
                     false,
-                    null,
+                    Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
@@ -543,7 +543,7 @@ public class TestOrcPageSourceMemoryTracking
                     pageProcessor,
                     TEST_TABLE_HANDLE,
                     columns.stream().map(columnHandle -> (ColumnHandle) columnHandle).collect(toList()),
-                    null,
+                    Optional.empty(),
                     types,
                     new DataSize(0, BYTE),
                     0);

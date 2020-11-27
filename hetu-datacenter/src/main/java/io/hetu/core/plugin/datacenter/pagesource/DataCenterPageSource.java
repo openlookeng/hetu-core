@@ -24,6 +24,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
 import okhttp3.OkHttpClient;
 
@@ -32,9 +33,9 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * Data center page source.
@@ -52,7 +53,7 @@ public class DataCenterPageSource
     private long readBytes;
     private long lastMemoryUsage;
     private Queue<Page> pages = new LinkedList<>();
-    private final Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier;
+    private final Optional<DynamicFilterSupplier> dynamicFilterSupplier;
     private final Set<String> appliedDynamicFilters = new HashSet<>();
 
     /**
@@ -71,7 +72,7 @@ public class DataCenterPageSource
     }
 
     public DataCenterPageSource(OkHttpClient httpClient, DataCenterClientSession clientSession, String sql,
-            String queryId, List<ColumnHandle> columns, Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier)
+            String queryId, List<ColumnHandle> columns, Optional<DynamicFilterSupplier> dynamicFilterSupplier)
     {
         this.startTime = System.nanoTime();
         this.client = DataCenterStatementClient.newStatementClient(httpClient, clientSession, sql, queryId);
@@ -100,8 +101,8 @@ public class DataCenterPageSource
     @Override
     public Page getNextPage()
     {
-        if (dynamicFilterSupplier != null) {
-            applyDynamicFilters(dynamicFilterSupplier.get());
+        if (dynamicFilterSupplier.isPresent()) {
+            applyDynamicFilters(dynamicFilterSupplier.get().getDynamicFilters());
         }
 
         if (!this.pages.isEmpty()) {
