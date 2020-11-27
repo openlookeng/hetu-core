@@ -14,11 +14,13 @@
  */
 package io.hetu.core.heuristicindex;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
+import io.hetu.core.plugin.heuristicindex.index.btree.BTreeIndex;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -31,15 +33,18 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.locks.Lock;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.prestosql.spi.heuristicindex.IndexRecord.COLUMN_DELIMITER;
@@ -79,7 +84,7 @@ public class HeuristicIndexClient
         Path indexKeyPath = Paths.get(path);
         try {
             if (indexRecordManager.lookUpIndexRecord(indexKeyPath.subpath(0, 1).toString(),
-                    new String[] {indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
+                    new String[]{indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
                 // Use index record file to pre-screen. If record does not contain the index, skip loading
                 return null;
             }
@@ -118,7 +123,7 @@ public class HeuristicIndexClient
             IndexMetadata index = new IndexMetadata(
                     entry.getValue(),
                     table.toString(),
-                    new String[] {column.toString()},
+                    new String[]{column.toString()},
                     root.toString(),
                     remainder.toString(),
                     splitStart,
@@ -278,7 +283,7 @@ public class HeuristicIndexClient
      * as a BloomIndex.
      *
      * @param path relative path to the index file or dir, if dir, it will be searched recursively (relative to the
-     * root uri, if one was set)
+     *             root uri, if one was set)
      * @return an immutable mapping from all index files read to the corresponding index that was loaded
      * @throws IOException
      */
@@ -291,7 +296,7 @@ public class HeuristicIndexClient
         Path absolutePath = Paths.get(root.toString(), path);
 
         if (!fs.exists(absolutePath)) {
-            return result.build();
+            return ImmutableMap.of();
         }
 
         try (Stream<Path> tarsOnRemote = fs.walk(absolutePath).filter(p -> p.toString().contains(".tar"))) {
@@ -323,5 +328,39 @@ public class HeuristicIndexClient
         Map<String, Index> resultMap = result.build();
 
         return resultMap;
+    }
+
+    @Override
+    public List<IndexMetadata> readPartitionIndex(String path)
+            throws IOException
+    {
+        Path indexKeyPath = Paths.get(path);
+        Path absolutePath = Paths.get(this.root.toString(), path);
+        String tableName = indexKeyPath.subpath(0, 1).toString();
+        String column = indexKeyPath.subpath(1, 2).toString();
+        List<IndexMetadata> result = new ArrayList<>();
+        if (fs.exists(absolutePath)) {
+            List<Path> paths = fs.list(absolutePath).collect(Collectors.toList());
+            for (Path filePath : paths) {
+                BTreeIndex index = new BTreeIndex();
+                InputStream inputStream = fs.newInputStream(filePath);
+                index.deserialize(inputStream);
+                IndexMetadata indexMetadata = new IndexMetadata(
+                        index,
+                        tableName,
+                        new String[]{column},
+                        root.toString(),
+                        filePath.toString(),
+                        0L,
+                        0L);
+                result.add(indexMetadata);
+            }
+
+            return result;
+        }
+        else {
+            LOG.debug("File path doesn't exists" + absolutePath);
+            return ImmutableList.of();
+        }
     }
 }

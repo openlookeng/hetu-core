@@ -25,6 +25,7 @@ import io.airlift.log.Logger;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
 import io.prestosql.spi.service.PropertyService;
@@ -34,6 +35,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -140,6 +142,63 @@ public class IndexCache
         }
 
         return indices;
+    }
+
+    public List<IndexMetadata> getIndices(String table, String column, Set<String> partitions, long lastModifiedTime)
+    {
+        if (cache == null) {
+            return Collections.emptyList();
+        }
+
+        List<IndexMetadata> indices = new LinkedList<>();
+        if (partitions.isEmpty()) {
+            String filterKeyPath = table + "/" + column;
+            IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
+            List<IndexMetadata> result = loadIndex(filterKey);
+            if (result != null) {
+                indices.addAll(result);
+            }
+        }
+        else {
+            for (String partition : partitions) {
+                String filterKeyPath = table + "/" + column + "/" + partition;
+                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
+                List<IndexMetadata> result = loadIndex(filterKey);
+                if (result != null) {
+                    indices.addAll(result);
+                }
+            }
+        }
+        return indices;
+    }
+
+    private List<IndexMetadata> loadIndex(IndexCacheKey cacheKey)
+    {
+        //it is possible to return multiple SplitIndexMetadata due to the range mismatch, especially in the case
+        //where the split has a wider range than the original splits used for index creation
+        // check if cache contains the key
+        List<IndexMetadata> partitionIndexList;
+
+        // if cache didn't contain the key, it has not been loaded, load it asynchronously
+        partitionIndexList = cache.getIfPresent(cacheKey);
+
+        if (partitionIndexList == null) {
+            executor.schedule(() -> {
+                try {
+                    cache.get(cacheKey);
+                    LOG.debug("Loaded index for %s.", cacheKey);
+                }
+                catch (ExecutionException e) {
+                    if (e.getCause() instanceof IndexNotCreatedException) {
+                        // Do nothing. Index not registered.
+                    }
+                    else if (LOG.isDebugEnabled()) {
+                        LOG.debug(e, "Unable to load index for %s. ", cacheKey);
+                    }
+                }
+            }, loadDelay, TimeUnit.MILLISECONDS);
+        }
+        return partitionIndexList;
     }
 
     @VisibleForTesting

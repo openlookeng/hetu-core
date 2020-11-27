@@ -41,6 +41,13 @@ public interface IndexClient
             throws IOException;
 
     /**
+     * Reads the partition index file from the specified path.
+     * @param path
+     */
+    List<IndexMetadata> readPartitionIndex(String path)
+            throws IOException;
+
+    /**
      * Delete the indexes for the table, according to the index name.
      *
      * @param indexName index name

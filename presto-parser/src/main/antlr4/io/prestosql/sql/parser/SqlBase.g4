@@ -383,7 +383,7 @@ booleanValue
     ;
 
 indexType
-    : BITMAP | BLOOM | MINMAX
+    : BITMAP | BLOOM | MINMAX | BTREE
     ;
 
 interval
@@ -752,6 +752,7 @@ INDEX: 'INDEX';
 BITMAP: 'BITMAP';
 BLOOM: 'BLOOM';
 MINMAX: 'MINMAX';
+BTREE: 'BTREE';
 
 EQ  : '=';
 NEQ : '<>' | '!=';

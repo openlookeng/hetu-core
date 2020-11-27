@@ -20,6 +20,7 @@ import io.airlift.log.Logger;
 import io.hetu.core.heuristicindex.filter.HeuristicIndexFilter;
 import io.hetu.core.plugin.heuristicindex.index.bitmap.BitmapIndex;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
+import io.hetu.core.plugin.heuristicindex.index.btree.BTreeIndex;
 import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
@@ -49,7 +50,7 @@ public class HeuristicIndexFactory
         implements IndexFactory
 {
     private static final Logger LOG = Logger.get(HeuristicIndexFactory.class);
-    private static final List<Index> supportedIndices = ImmutableList.of(new BloomIndex(), new MinMaxIndex(), new BitmapIndex());
+    private static final List<Index> supportedIndices = ImmutableList.of(new BloomIndex(), new MinMaxIndex(), new BitmapIndex(), new BTreeIndex());
 
     public HeuristicIndexFactory()
     {
@@ -111,6 +112,7 @@ public class HeuristicIndexFactory
             case STRIPE:
                 return new FileIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
             case PARTITION:
+                return new PartitionIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
             default:
                 throw new IllegalArgumentException(indexType + " has no supported index writer");
         }
