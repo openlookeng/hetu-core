@@ -15,6 +15,7 @@
 
 package io.hetu.core.heuristicindex.util;
 
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.sql.tree.ComparisonExpression;
 import org.apache.commons.compress.archivers.ArchiveEntry;
@@ -85,6 +86,16 @@ public class IndexServiceUtils
     public static void isFileExisting(String filePath)
             throws IOException
     {
+        try {
+            checkArgument(!filePath.contains("../"),
+                    filePath + "Path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(filePath),
+                    filePath + "Path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Failed to get secure path list.", e);
+        }
+
         File file = Paths.get(filePath).toFile();
         isFileExisting(file);
     }
