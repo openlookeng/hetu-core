@@ -228,6 +228,18 @@ public class Patterns
         {
             return property("correlation", ApplyNode::getCorrelation);
         }
+
+        public static Property<ApplyNode, Lookup, PlanNode> subQuery()
+        {
+            return property("subquery",
+                    (node, lookup) -> lookup.resolve(node.getSubquery()));
+        }
+
+        public static Property<ApplyNode, Lookup, PlanNode> input()
+        {
+            return property("input",
+                    (node, lookup) -> lookup.resolve(node.getInput()));
+        }
     }
 
     public static class Exchange

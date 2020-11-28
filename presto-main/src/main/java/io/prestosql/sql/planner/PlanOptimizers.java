@@ -109,6 +109,7 @@ import io.prestosql.sql.planner.iterative.rule.RemoveEmptyDelete;
 import io.prestosql.sql.planner.iterative.rule.RemoveFullSample;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantDistinctLimit;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import io.prestosql.sql.planner.iterative.rule.RemoveRedundantInPredicates;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantLimit;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantSort;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantTopN;
@@ -129,6 +130,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedScalarSubquery
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedSingleRowSubqueryToProject;
 import io.prestosql.sql.planner.iterative.rule.TransformExistsApplyToLateralNode;
 import io.prestosql.sql.planner.iterative.rule.TransformFilteringSemiJoinToInnerJoin;
+import io.prestosql.sql.planner.iterative.rule.TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoin;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
@@ -385,6 +387,8 @@ public class PlanOptimizers
                         ImmutableSet.of(
                                 new RemoveUnreferencedScalarLateralNodes(),
                                 new TransformUncorrelatedLateralToJoin(),
+                                new RemoveRedundantInPredicates(),
+                                new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(),
                                 new TransformUncorrelatedInPredicateSubqueryToSemiJoin(),
                                 new TransformCorrelatedScalarAggregationToJoin(metadata),
                                 new TransformCorrelatedLateralJoinToJoin())),

@@ -147,6 +147,8 @@ public final class SystemSessionProperties
     public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
     public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
     public static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
+    public static final String TRANSFORM_SELF_JOIN_TO_GROUPBY = "transform_self_join_to_groupby";
+    public static final String REMOVE_REDUNDANT_IN_PREDICATES = "remove_redundant_in_predicates";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -178,6 +180,16 @@ public final class SystemSessionProperties
                         FILTERING_SEMI_JOIN_TO_INNER,
                         "Rewrite semi join in filtering context to inner join",
                         featuresConfig.isRewriteFilteringSemiJoinToInnerJoin(),
+                        false),
+                booleanProperty(
+                        TRANSFORM_SELF_JOIN_TO_GROUPBY,
+                        "Transform Self Join to Group BY if possible",
+                        true,
+                        false),
+                booleanProperty(
+                        REMOVE_REDUNDANT_IN_PREDICATES,
+                        "Remove redundant IN predicates",
+                        true,
                         false),
                 stringProperty(
                         JOIN_ORDER,

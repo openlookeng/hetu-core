@@ -25,12 +25,16 @@ import io.prestosql.sql.planner.iterative.rule.HintedReorderJoins;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughOuterJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughUnion;
+import io.prestosql.sql.planner.iterative.rule.RemoveRedundantInPredicates;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
+import io.prestosql.sql.planner.iterative.rule.TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 
+import static io.prestosql.SystemSessionProperties.REMOVE_REDUNDANT_IN_PREDICATES;
+import static io.prestosql.SystemSessionProperties.TRANSFORM_SELF_JOIN_TO_GROUPBY;
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
 
 public class OptimizerUtils
@@ -73,6 +77,12 @@ public class OptimizerUtils
             // Use Hetu HintedReorderJoins
             String joinOrder = SystemSessionProperties.getJoinOrder(session);
             return joinOrder == null || "".equals(joinOrder);
+        }
+        if (rule instanceof TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate) {
+            return session.getSystemProperty(TRANSFORM_SELF_JOIN_TO_GROUPBY, Boolean.class);
+        }
+        if (rule instanceof RemoveRedundantInPredicates) {
+            return session.getSystemProperty(REMOVE_REDUNDANT_IN_PREDICATES, Boolean.class);
         }
         return true;
     }
