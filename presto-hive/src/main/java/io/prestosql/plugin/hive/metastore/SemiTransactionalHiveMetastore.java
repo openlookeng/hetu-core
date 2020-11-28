@@ -3012,6 +3012,9 @@ public class SemiTransactionalHiveMetastore
 
         private PartitionStatistics updateStatistics(PartitionStatistics currentStatistics)
         {
+            if (currentStatistics.getBasicStatistics().getRowCount().orElse(1) == 0) {
+                return statistics;
+            }
             return merge ? merge(currentStatistics, statistics) : statistics;
         }
 
