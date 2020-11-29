@@ -225,7 +225,7 @@ class QueryPlanner
                 computeOutputs(builder, outputs));
     }
 
-    public DeleteRelationPlan planDeleteRowAsInsert(Delete node)
+    public UpdateDeleteRelationPlan planDeleteRowAsInsert(Delete node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());
         TableHandle handle = analysis.getTableHandle(node.getTable());
@@ -261,8 +261,12 @@ class QueryPlanner
         TranslationMap translations = new TranslationMap(relationPlan, analysis, lambdaDeclarationToSymbolMap);
         translations.setFieldMappings(relationPlan.getFieldMappings());
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
+        Optional<Expression> predicate = Optional.empty();
         if (node.getWhere().isPresent()) {
             builder = filter(builder, node.getWhere().get(), node);
+            if (builder.getRoot() instanceof FilterNode) {
+                predicate = Optional.of(((FilterNode) builder.getRoot()).getPredicate());
+            }
         }
 
         Assignments.Builder assignments = Assignments.builder();
@@ -317,7 +321,7 @@ class QueryPlanner
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
-        return new DeleteRelationPlan(plan, visibleTableColumnNames, sortSymbol);
+        return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
     public DeleteNode plan(Delete node)
@@ -368,7 +372,7 @@ class QueryPlanner
         return new DeleteNode(idAllocator.getNextId(), builder.getRoot(), new DeleteTarget(handle, metadata.getTableMetadata(session, handle).getTable()), rowId, outputs);
     }
 
-    public UpdateRelationPlan plan(Update node)
+    public UpdateDeleteRelationPlan plan(Update node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());
         TableHandle handle = analysis.getTableHandle(node.getTable());
@@ -405,8 +409,12 @@ class QueryPlanner
 
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
 
+        Optional<Expression> predicate = Optional.empty();
         if (node.getWhere().isPresent()) {
             builder = filter(builder, node.getWhere().get(), node);
+            if (builder.getRoot() instanceof FilterNode) {
+                predicate = Optional.of(((FilterNode) builder.getRoot()).getPredicate());
+            }
         }
 
         List<AssignmentItem> assignmentItems = node.getAssignmentItems();
@@ -477,7 +485,7 @@ class QueryPlanner
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
-        return new UpdateRelationPlan(plan, visibleTableColumnNames);
+        return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
     private static List<Symbol> computeOutputs(PlanBuilder builder, List<Expression> outputExpressions)
@@ -1236,15 +1244,21 @@ class QueryPlanner
                 .collect(toImmutableMap(expression -> expression, builder::translate));
     }
 
-    static class UpdateRelationPlan
+    static class UpdateDeleteRelationPlan
     {
         private final RelationPlan plan;
         private final List<String> columNames;
+        private final Map<Symbol, ColumnHandle> columnAssignments;
+        private final Optional<Expression> predicate;
 
-        UpdateRelationPlan(RelationPlan plan, List<String> columNames)
+        UpdateDeleteRelationPlan(RelationPlan plan, List<String> columNames,
+                Map<Symbol, ColumnHandle> columnAssignments,
+                Optional<Expression> predicate)
         {
             this.plan = plan;
             this.columNames = columNames;
+            this.columnAssignments = columnAssignments;
+            this.predicate = predicate;
         }
 
         public List<String> getColumNames()
@@ -1252,38 +1266,19 @@ class QueryPlanner
             return columNames;
         }
 
-        public RelationPlan getPlan()
+        public Map<Symbol, ColumnHandle> getColumnAssignments()
         {
-            return plan;
-        }
-    }
-
-    static class DeleteRelationPlan
-    {
-        private final RelationPlan plan;
-        private final List<String> columNames;
-        private final Symbol rowIdSymbol;
-
-        DeleteRelationPlan(RelationPlan plan, List<String> columNames, Symbol rowIdSymbol)
-        {
-            this.plan = plan;
-            this.columNames = columNames;
-            this.rowIdSymbol = rowIdSymbol;
+            return columnAssignments;
         }
 
-        public List<String> getColumNames()
+        public Optional<Expression> getPredicate()
         {
-            return columNames;
+            return predicate;
         }
 
         public RelationPlan getPlan()
         {
             return plan;
-        }
-
-        public Symbol getRowIdSymbol()
-        {
-            return rowIdSymbol;
         }
     }
 }

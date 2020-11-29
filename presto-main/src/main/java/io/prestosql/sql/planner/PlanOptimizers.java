@@ -94,6 +94,7 @@ import io.prestosql.sql.planner.iterative.rule.PushOffsetThroughProject;
 import io.prestosql.sql.planner.iterative.rule.PushPartialAggregationThroughExchange;
 import io.prestosql.sql.planner.iterative.rule.PushPartialAggregationThroughJoin;
 import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
+import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoUpdateDelete;
 import io.prestosql.sql.planner.iterative.rule.PushProjectionIntoTableScan;
 import io.prestosql.sql.planner.iterative.rule.PushProjectionThroughExchange;
 import io.prestosql.sql.planner.iterative.rule.PushProjectionThroughUnion;
@@ -423,6 +424,7 @@ public class PlanOptimizers
                                 .addAll(projectionPushdownRules)
                                 .add(new PushLimitIntoTableScan(metadata))
                                 .add(new PushPredicateIntoTableScan(metadata, typeAnalyzer, true))
+                                .add(new PushPredicateIntoUpdateDelete(metadata))
                                 .add(new PushSampleIntoTableScan(metadata))
                                 .build()),
                 new IterativeOptimizer(
