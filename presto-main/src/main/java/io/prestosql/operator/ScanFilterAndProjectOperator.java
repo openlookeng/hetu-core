@@ -42,6 +42,7 @@ import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.util.BloomFilter;
+import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.EmptySplitPageSource;
 import io.prestosql.split.PageSourceProvider;
@@ -531,8 +532,12 @@ public class ScanFilterAndProjectOperator
         private Optional<QueryId> queryIdOptional = Optional.empty();
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
-        private Integer strategy;
+        private ReuseExchangeOperator.STRATEGY strategy;
         private Integer slot;
+        private boolean spillEnabled;
+        private final Optional<SpillerFactory> spillerFactory;
+        private Integer spillerThreshold;
+        private Integer consumerCount;
 
         public ScanFilterAndProjectOperatorFactory(
                 Session session,
@@ -550,9 +555,15 @@ public class ScanFilterAndProjectOperator
                 Metadata metadata,
                 DynamicFilterCacheManager dynamicFilterCacheManager,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                ReuseExchangeOperator.STRATEGY strategy,
+                Integer slot,
+                boolean spillEnabled,
+                Optional<SpillerFactory> spillerFactory,
+                Integer spillerThreshold,
+                Integer consumerCount)
         {
-            this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount, 0, 0);
+            this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount, strategy, slot, spillEnabled, spillerFactory, spillerThreshold, consumerCount);
 
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 if (sourceNode instanceof TableScanNode) {
@@ -580,8 +591,12 @@ public class ScanFilterAndProjectOperator
                 List<Type> types,
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
-                Integer strategy,
-                Integer slot)
+                ReuseExchangeOperator.STRATEGY strategy,
+                Integer slot,
+                boolean spillEnabled,
+                Optional<SpillerFactory> spillerFactory,
+                Integer spillerThreshold,
+                Integer consumerCount)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -597,6 +612,10 @@ public class ScanFilterAndProjectOperator
             this.minOutputPageRowCount = minOutputPageRowCount;
             this.strategy = strategy;
             this.slot = slot;
+            this.spillEnabled = spillEnabled;
+            this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
+            this.spillerThreshold = spillerThreshold;
+            this.consumerCount = consumerCount;
         }
 
         @Override
@@ -622,7 +641,7 @@ public class ScanFilterAndProjectOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, getOperatorType());
-            return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, slot);
+            return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, slot, spillEnabled, types, spillerFactory, spillerThreshold, consumerCount);
         }
 
         @Override

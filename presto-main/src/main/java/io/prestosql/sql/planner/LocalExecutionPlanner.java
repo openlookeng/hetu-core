@@ -79,6 +79,7 @@ import io.prestosql.operator.PartitionFunction;
 import io.prestosql.operator.PartitionedLookupSourceFactory;
 import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputFactory;
 import io.prestosql.operator.PipelineExecutionStrategy;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.RowNumberOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory;
 import io.prestosql.operator.SetBuilderOperator.SetBuilderOperatorFactory;
@@ -243,6 +244,7 @@ import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriv
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageRowCount;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageSize;
+import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
 import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
 import static io.prestosql.SystemSessionProperties.getTaskWriterCount;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
@@ -250,6 +252,7 @@ import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
+import static io.prestosql.SystemSessionProperties.isSpillReuseExchange;
 import static io.prestosql.SystemSessionProperties.isSpillWindowOperator;
 import static io.prestosql.dynamicfilter.DynamicFilterCacheManager.createCacheKey;
 import static io.prestosql.operator.CreateIndexOperator.CreateIndexOperatorFactory;
@@ -258,7 +261,7 @@ import static io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOpera
 import static io.prestosql.operator.NestedLoopJoinOperator.NestedLoopJoinOperatorFactory;
 import static io.prestosql.operator.PipelineExecutionStrategy.GROUPED_EXECUTION;
 import static io.prestosql.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_DEFAULT;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.operator.TableFinishOperator.TableFinishOperatorFactory;
 import static io.prestosql.operator.TableFinishOperator.TableFinisher;
 import static io.prestosql.operator.TableWriterOperator.FRAGMENT_CHANNEL;
@@ -1252,8 +1255,9 @@ public class LocalExecutionPlanner
             TableHandle table = null;
             List<ColumnHandle> columns = null;
             PhysicalOperation source = null;
-            Integer strategy = REUSE_STRATEGY_DEFAULT;
+            ReuseExchangeOperator.STRATEGY strategy = REUSE_STRATEGY_DEFAULT;
             Integer slot = 0;
+            Integer consumerCount = 0;
             if (sourceNode instanceof TableScanNode) {
                 TableScanNode tableScanNode = (TableScanNode) sourceNode;
                 table = tableScanNode.getTable();
@@ -1273,6 +1277,7 @@ public class LocalExecutionPlanner
 
                 strategy = tableScanNode.getStrategy();
                 slot = tableScanNode.getSlot();
+                consumerCount = tableScanNode.getConsumerCount();
             }
             //TODO: This is a simple hack, it will be replaced when we add ability to push down sampling into connectors.
             // SYSTEM sampling is performed in the coordinator by dropping some random splits so the SamplingNode can be skipped here.
@@ -1332,6 +1337,9 @@ public class LocalExecutionPlanner
                     Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(translatedFilter, translatedProjections, sourceNode.getId());
                     Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections, Optional.of(context.getStageId() + "_" + planNodeId));
 
+                    boolean spillEnabled = isSpillEnabled(session) && isSpillReuseExchange(session);
+                    int spillerThreshold = getSpillOperatorThresholdReuseExchange(session) * 1024 * 1024; //convert from MB to bytes
+
                     SourceOperatorFactory operatorFactory = new ScanFilterAndProjectOperatorFactory(
                             context.getSession(),
                             context.getNextOperatorId(),
@@ -1349,7 +1357,7 @@ public class LocalExecutionPlanner
                             dynamicFilterCacheManager,
                             getFilterAndProjectMinOutputPageSize(session),
                             getFilterAndProjectMinOutputPageRowCount(session),
-                            strategy, slot);
+                            strategy, slot, spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerCount);
 
                     return new PhysicalOperation(operatorFactory, outputMappings, context, stageExecutionDescriptor.isScanGroupedExecution(sourceNode.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
                 }
@@ -1416,6 +1424,10 @@ public class LocalExecutionPlanner
                     context.getTypes(),
                     concat(assignments.getExpressions()));
 
+            boolean spillEnabled = isSpillEnabled(session) && isSpillReuseExchange(session);
+            int spillerThreshold = getSpillOperatorThresholdReuseExchange(session) * 1024 * 1024; //convert from MB to bytes
+            Integer consumerCount = node.getConsumerCount();
+
             OperatorFactory operatorFactory = new TableScanOperatorFactory(context.getSession(),
                     context.getNextOperatorId(),
                     node,
@@ -1427,8 +1439,7 @@ public class LocalExecutionPlanner
                     metadata,
                     dynamicFilterCacheManager,
                     getFilterAndProjectMinOutputPageSize(session),
-                    getFilterAndProjectMinOutputPageRowCount(session),
-                    node.getStrategy(), node.getSlot());
+                    getFilterAndProjectMinOutputPageRowCount(session), node.getStrategy(), node.getSlot(), spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerCount);
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
         }
 

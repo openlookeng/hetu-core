@@ -124,8 +124,8 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.execution.StageInfo.getAllStages;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_CONSUMER;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_PRODUCER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
@@ -690,11 +690,11 @@ public class PlanPrinter
             NodeRepresentation nodeOutput;
             String operatorName = "";
             String reuseTypeName = "";
-            if (node.getStrategy() == REUSE_STRATEGY_PRODUCER) {
+            if (node.getStrategy().equals(REUSE_STRATEGY_PRODUCER)) {
                 operatorName = "ReuseTableScan";
                 reuseTypeName = "(Producer)";
             }
-            else if (node.getStrategy() == REUSE_STRATEGY_CONSUMER) {
+            else if (node.getStrategy().equals(REUSE_STRATEGY_CONSUMER)) {
                 operatorName = "ReuseTableScan";
                 reuseTypeName = "(Consumer)";
             }

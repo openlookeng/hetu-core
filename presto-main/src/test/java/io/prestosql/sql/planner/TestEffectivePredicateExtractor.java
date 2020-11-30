@@ -27,6 +27,7 @@ import io.prestosql.metadata.AbstractMockMetadata;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableProperties;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -193,8 +194,7 @@ public class TestEffectivePredicateExtractor
                 newId(),
                 makeTableHandle(TupleDomain.all()),
                 ImmutableList.copyOf(assignments.keySet()),
-                assignments,
-                0, 0);
+                assignments, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
 
         expressionNormalizer = new ExpressionIdentityNormalizer();
     }
@@ -402,7 +402,7 @@ public class TestEffectivePredicateExtractor
                 newId(),
                 makeTableHandle(TupleDomain.all()),
                 ImmutableList.copyOf(assignments.keySet()),
-                assignments, 0, 0);
+                assignments, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Expression effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(effectivePredicate, BooleanLiteral.TRUE_LITERAL);
         node = new TableScanNode(
@@ -410,8 +410,7 @@ public class TestEffectivePredicateExtractor
                 makeTableHandle(TupleDomain.none()),
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
-                TupleDomain.none(),
-                Optional.empty(), 0, 0);
+                TupleDomain.none(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(effectivePredicate, FALSE_LITERAL);
         TupleDomain<ColumnHandle> predicate = TupleDomain.withColumnDomains(ImmutableMap.of(scanAssignments.get(A), Domain.singleValue(BIGINT, 1L)));
@@ -420,8 +419,7 @@ public class TestEffectivePredicateExtractor
                 makeTableHandle(predicate),
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
-                predicate,
-                Optional.empty(), 0, 0);
+                predicate, Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(1L), AE)));
         predicate = TupleDomain.withColumnDomains(ImmutableMap.of(
@@ -432,8 +430,7 @@ public class TestEffectivePredicateExtractor
                 makeTableHandle(TupleDomain.withColumnDomains(ImmutableMap.of(scanAssignments.get(A), Domain.singleValue(BIGINT, 1L)))),
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
-                predicate,
-                Optional.empty(), 0, 0);
+                predicate, Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         effectivePredicate = effectivePredicateExtractorWithoutTableProperties.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
 
@@ -443,7 +440,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 TupleDomain.all(),
-                Optional.empty(), 0, 0);
+                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0, 0);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(effectivePredicate, and(equals(AE, bigintLiteral(1)), equals(BE, bigintLiteral(2))));
 
@@ -455,7 +453,8 @@ public class TestEffectivePredicateExtractor
                 TupleDomain.withColumnDomains(ImmutableMap.of(
                         scanAssignments.get(A), Domain.multipleValues(BIGINT, ImmutableList.of(1L, 2L, 3L)),
                         scanAssignments.get(B), Domain.multipleValues(BIGINT, ImmutableList.of(1L, 2L, 3L)))),
-                Optional.empty(), 0, 0);
+                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0, 0);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
 
@@ -464,8 +463,7 @@ public class TestEffectivePredicateExtractor
                 makeTableHandle(TupleDomain.all()),
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
-                TupleDomain.all(),
-                Optional.empty(), 0, 0);
+                TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
         assertEquals(effectivePredicate, BooleanLiteral.TRUE_LITERAL);
     }
@@ -937,8 +935,7 @@ public class TestEffectivePredicateExtractor
                 makeTableHandle(TupleDomain.all()),
                 ImmutableList.copyOf(scanAssignments.keySet()),
                 scanAssignments,
-                TupleDomain.all(),
-                Optional.empty(), 0, 0);
+                TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
     }
 
     private static PlanNodeId newId()

@@ -42,9 +42,6 @@ public class PruneTableScanColumns
                         tableScanNode.getTable(),
                         filteredCopy(tableScanNode.getOutputSymbols(), referencedOutputs::contains),
                         filterKeys(tableScanNode.getAssignments(), referencedOutputs::contains),
-                        tableScanNode.getEnforcedConstraint(),
-                        tableScanNode.getPredicate(),
-                        tableScanNode.getStrategy(),
-                        tableScanNode.getSlot()));
+                        tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), tableScanNode.getStrategy(), tableScanNode.getSlot(), 0));
     }
 }

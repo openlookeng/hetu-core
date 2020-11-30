@@ -114,7 +114,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, BYTE),
                 0,
-                0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -159,7 +159,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(64, KILOBYTE),
                 2,
-                0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(newDriverContext());
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -205,7 +205,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
                 0,
-                0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -241,7 +241,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, BYTE),
                 0,
-                0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -295,7 +295,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
                 0,
-                0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -362,7 +362,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
                 0,
-                0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));

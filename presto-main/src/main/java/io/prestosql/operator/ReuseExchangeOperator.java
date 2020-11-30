@@ -18,9 +18,7 @@ import io.prestosql.spi.Page;
 
 public interface ReuseExchangeOperator
 {
-    int REUSE_STRATEGY_DEFAULT = 0;
-    int REUSE_STRATEGY_PRODUCER = 1;
-    int REUSE_STRATEGY_CONSUMER = 2;
+    enum STRATEGY {REUSE_STRATEGY_DEFAULT, REUSE_STRATEGY_PRODUCER, REUSE_STRATEGY_CONSUMER}
 
     Page getPage();
 

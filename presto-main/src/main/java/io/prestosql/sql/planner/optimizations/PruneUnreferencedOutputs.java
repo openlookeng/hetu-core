@@ -444,9 +444,8 @@ public class PruneUnreferencedOutputs
                     newOutputs,
                     newAssignments,
                     node.getEnforcedConstraint(),
-                    node.getPredicate(),
-                    node.getStrategy(),
-                    node.getSlot());
+                    node.getPredicate(), node.getStrategy(),
+                    node.getSlot(), 0);
         }
 
         @Override

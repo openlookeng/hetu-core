@@ -21,6 +21,7 @@ import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ConnectorSplit;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -52,6 +53,11 @@ public final class Split
     public ConnectorSplit getConnectorSplit()
     {
         return connectorSplit;
+    }
+
+    public List<Split> getSplits()
+    {
+        return connectorSplit.getUnwrapSplits().stream().map(x -> new Split(catalogName, x, lifespan)).collect(Collectors.toList());
     }
 
     @JsonProperty

@@ -23,6 +23,7 @@ import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.IndexHandle;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -456,9 +457,7 @@ public class PlanBuilder
                 tableHandle,
                 symbols,
                 assignments,
-                enforcedConstraint,
-                Optional.empty(),
-                0, 0);
+                enforcedConstraint, Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
     }
 
     public TableFinishNode tableDelete(SchemaTableName schemaTableName, PlanNode deleteSource, Symbol deleteRowId)

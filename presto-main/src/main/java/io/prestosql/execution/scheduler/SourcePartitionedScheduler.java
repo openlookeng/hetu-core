@@ -302,7 +302,7 @@ public class SourcePartitionedScheduler
                 }
 
                 // calculate placements for splits
-                SplitPlacementResult splitPlacementResult = splitPlacementPolicy.computeAssignments(pendingSplits);
+                SplitPlacementResult splitPlacementResult = splitPlacementPolicy.computeAssignments(pendingSplits, this.stage);
                 splitAssignment = splitPlacementResult.getAssignments();
 
                 // remove splits with successful placements

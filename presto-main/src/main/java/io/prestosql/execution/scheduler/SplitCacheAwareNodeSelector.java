@@ -25,6 +25,7 @@ import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.SplitKey;
+import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Split;
@@ -104,7 +105,7 @@ public class SplitCacheAwareNodeSelector
     }
 
     @Override
-    public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks)
+    public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage)
     {
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
         NodeMap nodeMap = this.nodeMap.get().get();
@@ -152,7 +153,7 @@ public class SplitCacheAwareNodeSelector
         unassignedSplits.addAll(uncacheableSplits);
 
         // Compute split assignments for splits that cannot be cached, newly cacheable, and already cached but cached worker is inactive now.
-        SplitPlacementResult defaultSplitPlacementResult = defaultNodeSelector.computeAssignments(unassignedSplits, existingTasks);
+        SplitPlacementResult defaultSplitPlacementResult = defaultNodeSelector.computeAssignments(unassignedSplits, existingTasks, Optional.empty());
         defaultSplitPlacementResult.getAssignments().forEach(((internalNode, split) -> {
             //Set or Update cached node id only if split is cacheable
             if (newCacheableSplits.contains(split)) {

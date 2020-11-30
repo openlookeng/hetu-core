@@ -13,23 +13,34 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.UpdatablePageSource;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spiller.FileSingleStreamSpillerFactory;
+import io.prestosql.spiller.GenericSpiller;
+import io.prestosql.spiller.Spiller;
+import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_CONSUMER;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_PRODUCER;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.operator.WorkProcessor.ProcessState.blocked;
 import static io.prestosql.operator.WorkProcessor.ProcessState.finished;
 import static io.prestosql.operator.WorkProcessor.ProcessState.ofResult;
@@ -55,22 +66,26 @@ public class WorkProcessorSourceOperatorAdapter
     private long previousInputPositions;
     private long previousReadTimeNanos;
 
-    private Integer strategy;
-    private Integer slot;
-    private static ConcurrentMap<String, Integer> indexes;
-    private static ConcurrentMap<Integer, List<Page>> pageCaches;
+    private ReuseExchangeOperator.STRATEGY strategy;
+    private Integer producerConsumerMappingId;
+    private static ConcurrentMap<String, Integer> sourceSlotPositionIndex;
+    private final Optional<SpillerFactory> spillerFactory;
+    private final List<Type> projectionTypes;
+    private ListenableFuture<?> spillInProgress = immediateFuture(null);
+    private boolean spillEnabled;
+    private final long spillThreshold;
+    private static ConcurrentMap<Integer, ReuseExchangeSlotUtils> slotUtilsMap = new ConcurrentHashMap<>();
+    private ReuseExchangeSlotUtils slotUtils;
+
+    private enum STATE {READ_MEMORY, READ_DISK}
 
     // sourceIdString is required, as multiple resue nodes can be there with the same slot. It needs
     // to differentiate by concatenating SourceId and Slot.
-    private final String sourceIdString;
-
-    public int getStrategy()
-    {
-        return strategy;
-    }
+    private String sourceIdString;
 
     public WorkProcessorSourceOperatorAdapter(OperatorContext operatorContext, WorkProcessorSourceOperatorFactory sourceOperatorFactory,
-                                                Integer strategy, Integer slot)
+                                              ReuseExchangeOperator.STRATEGY strategy, Integer producerConsumerMappingId, boolean spillEnabled, List<Type> projectionTypes,
+                                              Optional<SpillerFactory> spillerFactory, Integer spillerThreshold, Integer consumerCount)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sourceId = requireNonNull(sourceOperatorFactory, "sourceOperatorFactory is null").getSourceId();
@@ -89,14 +104,30 @@ public class WorkProcessorSourceOperatorAdapter
                 .withProcessStateMonitor(state -> updateOperatorStats())
                 .finishWhen(() -> operatorFinishing);
         this.strategy = strategy;
-        this.slot = slot;
-        synchronized (WorkProcessorSourceOperatorAdapter.class) {
-            if (pageCaches == null) {
-                pageCaches = new ConcurrentHashMap<>();
-                indexes = new ConcurrentHashMap<>();
-            }
+        this.producerConsumerMappingId = producerConsumerMappingId;
+        this.spillEnabled = spillEnabled;
+        this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
+        this.spillThreshold = spillerThreshold;
+        this.projectionTypes = requireNonNull(projectionTypes, "types is null");
 
-            sourceIdString = sourceId.toString().concat(slot.toString());
+        if (!strategy.equals(REUSE_STRATEGY_DEFAULT)) {
+            synchronized (WorkProcessorSourceOperatorAdapter.class) {
+                if (strategy.equals(REUSE_STRATEGY_PRODUCER) && !slotUtilsMap.containsKey(producerConsumerMappingId)) {
+                    ReuseExchangeSlotUtils reuseExchangeSlotUtils = new ReuseExchangeSlotUtils(strategy, producerConsumerMappingId, operatorContext, consumerCount);
+                    slotUtilsMap.put(producerConsumerMappingId, reuseExchangeSlotUtils);
+                }
+
+                this.slotUtils = slotUtilsMap.get(producerConsumerMappingId);
+
+                if (strategy.equals(REUSE_STRATEGY_CONSUMER)) {
+                    sourceIdString = sourceId.toString().concat(producerConsumerMappingId.toString());
+                    slotUtilsMap.get(producerConsumerMappingId).addToSourceIdList(sourceIdString);
+                }
+
+                if (sourceSlotPositionIndex == null) {
+                    sourceSlotPositionIndex = new ConcurrentHashMap<>();
+                }
+            }
         }
     }
 
@@ -144,6 +175,27 @@ public class WorkProcessorSourceOperatorAdapter
         return pages.getBlockedFuture();
     }
 
+    public ReuseExchangeOperator.STRATEGY getStrategy()
+    {
+        return strategy;
+    }
+
+    public int getProducerConsumerMappingId()
+    {
+        return producerConsumerMappingId;
+    }
+
+    public boolean isNotSpilled()
+    {
+        int pagesWrittenCount = slotUtils.getPagesWrittenCount();
+
+        if (pagesWrittenCount == 0) {
+            // there was no spilling of data- either spilling is not used, or not enough data to spill
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public boolean needsInput()
     {
@@ -159,7 +211,7 @@ public class WorkProcessorSourceOperatorAdapter
     @Override
     public Page getOutput()
     {
-        if (strategy == REUSE_STRATEGY_CONSUMER) {
+        if (strategy.equals(REUSE_STRATEGY_CONSUMER)) {
             return getPage();
         }
 
@@ -169,14 +221,14 @@ public class WorkProcessorSourceOperatorAdapter
 
         if (pages.isFinished()) {
             //In-case result is empty it will never initialize and reuse will keep on waiting.
-            if (strategy == REUSE_STRATEGY_PRODUCER) {
+            if (strategy.equals(REUSE_STRATEGY_PRODUCER)) {
                 initPageCache();
             }
             return null;
         }
 
         Page page = pages.getResult();
-        if (strategy == REUSE_STRATEGY_PRODUCER && page != null) {
+        if (strategy.equals(REUSE_STRATEGY_PRODUCER) && page != null) {
             setPage(page);
         }
 
@@ -185,8 +237,23 @@ public class WorkProcessorSourceOperatorAdapter
 
     public static synchronized void releaseCache(Integer slot)
     {
-        if (pageCaches != null) {
-            pageCaches.remove(slot);
+        if (slotUtilsMap.containsKey(slot)) {
+            if (slotUtilsMap.get(slot).getPageCaches() != null) {
+                slotUtilsMap.get(slot).setPageCaches(null);
+            }
+        }
+    }
+
+    public static synchronized void deleteSpilledFiles(Integer slot)
+    {
+        if (slotUtilsMap.containsKey(slot)) {
+            if (slotUtilsMap.get(slot).getSpiller().isPresent()) {
+                GenericSpiller spillerObject = (GenericSpiller) slotUtilsMap.get(slot).getSpiller().get();
+                if (spillerObject != null) {
+                    FileSingleStreamSpillerFactory singleStreamSpillerFactory = (FileSingleStreamSpillerFactory) spillerObject.getSingleStreamSpillerFactory();
+                    singleStreamSpillerFactory.cleanupOldSpillFiles();
+                }
+            }
         }
     }
 
@@ -200,7 +267,7 @@ public class WorkProcessorSourceOperatorAdapter
     @Override
     public boolean isFinished()
     {
-        if (strategy == REUSE_STRATEGY_CONSUMER) {
+        if (strategy.equals(REUSE_STRATEGY_CONSUMER)) {
             return checkFinished();
         }
 
@@ -262,45 +329,180 @@ public class WorkProcessorSourceOperatorAdapter
 
     private Page getPage()
     {
-        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+        synchronized (producerConsumerMappingId) {
+            Page newPage = null;
+            STATE state = STATE.READ_MEMORY;
             initIndex();
-            if (indexes.get(sourceIdString) == null || pageCaches.get(slot) == null || indexes.get(sourceIdString) >= pageCaches.get(slot).size()) {
-                return null;
+
+            if (!slotUtils.getPagesToSpill().isEmpty()) {
+                // some pages are leftover to spill because the size is < spillThreshold/2
+                List<Page> inMemoryPages = slotUtils.getPageCaches();
+                inMemoryPages.addAll(slotUtils.getPagesToSpill());
+                slotUtils.setPageCaches(inMemoryPages);
+                slotUtils.clearPagesToSpill();
             }
 
-            Page newPage = pageCaches.get(slot).get(indexes.get(sourceIdString));
-            indexes.merge(sourceIdString, 1, Integer::sum);
+            if (sourceSlotPositionIndex.get(sourceIdString) == null || slotUtils.getPageCaches() == null
+                    || sourceSlotPositionIndex.get(sourceIdString) >= slotUtils.getPageCaches().size()) {
+                if (slotUtils.getPagesWrittenCount() != 0) {
+                    if (slotUtils.getCurConsumerRefCount() > 0
+                            && slotUtils.getPageCaches().size() != 0) {
+                        return null;
+                    }
+                    state = STATE.READ_DISK;
+                }
+                else {
+                    return null;
+                }
+            }
+
+            if (!slotUtils.getPageCaches().isEmpty() && state == STATE.READ_MEMORY) {
+                newPage = slotUtils.getPageCaches().get(sourceSlotPositionIndex.get(sourceIdString));
+                sourceSlotPositionIndex.merge(sourceIdString, 1, Integer::sum);
+
+                if (sourceSlotPositionIndex.get(sourceIdString) >= slotUtils.getPageCaches().size()) {
+                    int currentConsumerCount = slotUtils.getCurConsumerRefCount() - 1;
+                    slotUtils.setCurConsumerRefCount(currentConsumerCount);
+                    if (currentConsumerCount == 0) {
+                        slotUtils.getPageCaches().clear();
+                    }
+                }
+            }
+            else if (state == STATE.READ_DISK) {
+                // no page available in memory, unspill from disk and read
+                List<Iterator<Page>> spilledPages = getSpilledPages();
+                Iterator<Page> readPages;
+                List<Page> pagesRead = new ArrayList<>();
+                if (!spilledPages.isEmpty()) {
+                    for (int i = 0; i < spilledPages.size(); ++i) {
+                        readPages = spilledPages.get(i);
+                        readPages.forEachRemaining(pagesRead::add);
+                    }
+                    slotUtils.setPageCaches(pagesRead);
+
+                    for (String sourceId : slotUtils.getSourceIdList()) {
+                        //reinitialize indexes for all consumers in this slot here
+                        sourceSlotPositionIndex.put(sourceId, 0);
+                    }
+
+                    //restore original count so that all consumers are now active again
+                    slotUtils.setCurConsumerRefCount(slotUtils.getTotalConsumerCount());
+                    slotUtils.setPagesWritten(slotUtils.getPagesWrittenCount() - pagesRead.size());
+
+                    if (slotUtils.getPagesWrittenCount() < 0) {
+                        throw new ArrayIndexOutOfBoundsException("MORE PAGES READ THAN WRITTEN");
+                    }
+
+                    if (slotUtils.getPagesWrittenCount() == 0) {
+                        slotUtils.getOperatorContext().destroy();
+                        //destroy context for producer from here.
+                    }
+                    newPage = slotUtils.getPageCaches().get(sourceSlotPositionIndex.get(sourceIdString));
+                    sourceSlotPositionIndex.merge(sourceIdString, 1, Integer::sum);
+                }
+            }
             return newPage;
         }
     }
 
     private void setPage(Page page)
     {
-        synchronized (WorkProcessorSourceOperatorAdapter.class) {
+        synchronized (producerConsumerMappingId) {
             initPageCache(); // Actually it should not be required but somehow TSO Strategy-2 is get scheduled in parallel and clear the cache.
-            pageCaches.get(slot).add(page);
+            if (!spillEnabled) {
+                //spilling is not enabled so keep adding pages to cache in-memory
+                List<Page> pageCachesList = slotUtils.getPageCaches();
+                pageCachesList.add(page);
+                slotUtils.setPageCaches(pageCachesList);
+            }
+            else {
+                if (totalPageSize(slotUtils.getPageCaches()) < (spillThreshold / 2)) {
+                    // if pageCaches hasn't reached spillThreshold/2, keep adding pages to it.
+                    List<Page> pageCachesList = slotUtils.getPageCaches();
+                    pageCachesList.add(page);
+                    slotUtils.setPageCaches(pageCachesList);
+                }
+                else {
+                    // no more space available in memory to store pages. pages will be spilled now
+                    List<Page> pageSpilledList = slotUtils.getPagesToSpill();
+                    pageSpilledList.add(page);
+                    slotUtils.setPagesToSpill(pageSpilledList);
+
+                    if (totalPageSize(pageSpilledList) >= (spillThreshold / 2)) {
+                        if (!slotUtils.getSpiller().isPresent()) {
+                            Optional<Spiller> spillObject = Optional.of(spillerFactory.get().create(projectionTypes, operatorContext.getSpillContext(),
+                                    operatorContext.newAggregateSystemMemoryContext()));
+                            slotUtils.setSpiller(spillObject);
+                        }
+
+                        spillInProgress = slotUtils.getSpiller().get().spill(pageSpilledList.iterator());
+
+                        slotUtils.setPagesWritten(slotUtils.getPagesWrittenCount() + pageSpilledList.size());
+
+                        try {
+                            // blocking call to ensure spilling completes before we move forward
+                            spillInProgress.get();
+                        }
+                        catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        catch (ExecutionException e) {
+                            e.printStackTrace();
+                        }
+
+                        slotUtils.clearPagesToSpill(); //clear the memory pressure once the data is spilled to disk
+                    }
+                }
+            }
         }
     }
 
     private Boolean checkFinished()
     {
         synchronized (WorkProcessorSourceOperatorAdapter.class) {
-            return indexes.get(sourceIdString) != null && pageCaches.get(slot) != null
-                    && indexes.get(sourceIdString) >= pageCaches.get(slot).size();
+            return sourceSlotPositionIndex.get(sourceIdString) != null && slotUtils.getPageCaches() != null
+                    && sourceSlotPositionIndex.get(sourceIdString) >= slotUtils.getPageCaches().size()
+                    && slotUtils.getPagesWrittenCount() == 0;
         }
     }
 
     private void initPageCache()
     {
-        synchronized (WorkProcessorSourceOperatorAdapter.class) {
-            pageCaches.putIfAbsent(slot, new ArrayList<>());
+        synchronized (producerConsumerMappingId) {
+            if (slotUtils.getPageCaches() == null) {
+                slotUtils.setPageCaches(new ArrayList<>());
+            }
+
+            if (slotUtils.getPagesToSpill() == null) {
+                slotUtils.setPagesToSpill(new ArrayList<>());
+            }
         }
+    }
+
+    private List<Iterator<Page>> getSpilledPages()
+    {
+        if (!slotUtils.getSpiller().isPresent()) {
+            return ImmutableList.of();
+        }
+        return slotUtils.getSpiller().get().getSpills().stream().collect(toImmutableList());
+    }
+
+    private long totalPageSize(List<Page> pageList)
+    {
+        if (pageList != null && pageList.size() > 0) {
+            long totalSize = 0;
+            for (Page page : pageList) {
+                totalSize += page.getSizeInBytes();
+            }
+            return totalSize;
+        }
+        return 0;
     }
 
     private void initIndex()
     {
         synchronized (WorkProcessorSourceOperatorAdapter.class) {
-            indexes.putIfAbsent(sourceIdString, 0);
+            sourceSlotPositionIndex.putIfAbsent(sourceIdString, 0);
         }
     }
 

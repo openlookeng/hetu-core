@@ -309,7 +309,6 @@ public class PlanFragmenter
                     .getTablePartitioning()
                     .map(TablePartitioning::getPartitioningHandle)
                     .orElse(SOURCE_DISTRIBUTION);
-
             context.get().addSourceDistribution(node.getId(), partitioning, metadata, session);
             return context.defaultRewrite(node, context.get());
         }
@@ -796,9 +795,8 @@ public class PlanFragmenter
                     node.getOutputSymbols(),
                     node.getAssignments(),
                     node.getEnforcedConstraint(),
-                    node.getPredicate(),
-                    node.getStrategy(),
-                    node.getSlot());
+                    node.getPredicate(), node.getStrategy(),
+                    node.getSlot(), 0);
         }
     }
 }

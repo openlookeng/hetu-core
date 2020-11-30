@@ -130,7 +130,10 @@ public class TestFeaturesConfig
                 .setImplicitConversionEnabled(false)
                 .setPushTableThroughSubquery(false)
                 .setRewriteFilteringSemiJoinToInnerJoin(false)
-                .setTransformSelfJoinToGroupby(false));
+                .setTransformSelfJoinToGroupby(false)
+                .setRewriteFilteringSemiJoinToInnerJoin(false)
+                .setSpillReuseExchange(false)
+                .setSpillOperatorThresholdReuseExchange(10485760));
     }
 
     @Test
@@ -299,7 +302,9 @@ public class TestFeaturesConfig
                 .setDynamicFilteringMaxSize(10000)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
                 .setDynamicFilteringBloomFilterFpp(0.001)
-                .setTransformSelfJoinToGroupby(true);
+                .setTransformSelfJoinToGroupby(true)
+                .setSpillReuseExchange(true)
+                .setSpillOperatorThresholdReuseExchange(10000000);
         assertFullMapping(properties, expected);
     }
 

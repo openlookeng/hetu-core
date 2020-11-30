@@ -21,6 +21,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -317,8 +318,7 @@ public class SubQueryPushDown
                                 symbolsBuilder.build(),
                                 columnHandleBuilder.build(),
                                 TupleDomain.all(),
-                                Optional.empty(),
-                                0, 0),
+                                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0),
                         new Assignments(assignmentsBuilder.build()));
 
                 return Optional.of(output);

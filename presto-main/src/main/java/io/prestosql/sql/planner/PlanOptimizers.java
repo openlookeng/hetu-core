@@ -24,7 +24,6 @@ import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.QueryId;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -156,7 +155,6 @@ import io.prestosql.sql.planner.optimizations.TableDeleteOptimizer;
 import io.prestosql.sql.planner.optimizations.TransformQuantifiedComparisonApplyToLateralJoin;
 import io.prestosql.sql.planner.optimizations.UnaliasSymbolReferences;
 import io.prestosql.sql.planner.optimizations.WindowFilterPushDown;
-import io.prestosql.sql.planner.plan.PlanNode;
 import org.weakref.jmx.MBeanExporter;
 
 import javax.annotation.PostConstruct;
@@ -164,9 +162,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class PlanOptimizers
 {
@@ -238,8 +234,6 @@ public class PlanOptimizers
     {
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
-
-        Map<QueryId, Map<PlanNode, Integer>> planNodeListHashMapList = new ConcurrentHashMap<>();
 
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(
                 new MergeFilters());
@@ -639,8 +633,7 @@ public class PlanOptimizers
                         new AddIntermediateAggregations(),
                         new RemoveRedundantIdentityProjections())));
 
-        builder.add(new AddReuseExchange(metadata, false, planNodeListHashMapList));
-        builder.add(new AddReuseExchange(metadata, true, planNodeListHashMapList));
+        builder.add(new AddReuseExchange(metadata));
 
         // DO NOT add optimizers that change the plan shape (computations) after this point
 

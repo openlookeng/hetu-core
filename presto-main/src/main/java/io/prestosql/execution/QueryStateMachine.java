@@ -866,6 +866,7 @@ public class QueryStateMachine
         // only execute cleanup once
         if (queryCleanedUp.compareAndSet(false, true)) {
             metadata.cleanupQuery(session);
+            SqlStageExecution.cleanupDataResultCache(queryId);
         }
     }
 

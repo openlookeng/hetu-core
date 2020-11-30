@@ -30,6 +30,7 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -121,7 +122,8 @@ public class TestUtil
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 TupleDomain.none(),
-                Optional.empty(), 0, 0);
+                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0, 0);
         PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());
         FilterNode filterNode = planBuilder.filter(expr, tableScanNode);
 

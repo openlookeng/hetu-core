@@ -25,6 +25,7 @@ import io.prestosql.execution.TaskSource;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.Driver;
 import io.prestosql.operator.DriverContext;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.TableScanOperator;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.HostAddress;
@@ -41,6 +42,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -105,7 +107,7 @@ public class TestSystemMemoryBlocking
                         .addSequencePage(10, 1)
                         .build()),
                 TEST_TABLE_HANDLE,
-                ImmutableList.of(), 0, 0);
+                ImmutableList.of(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, types, false, Optional.empty(), 0, 0);
         PageConsumerOperator sink = createSinkOperator(types);
         Driver driver = Driver.createDriver(driverContext, source, sink);
         assertSame(driver.getDriverContext(), driverContext);

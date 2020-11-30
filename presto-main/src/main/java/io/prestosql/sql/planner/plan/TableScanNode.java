@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.sql.planner.Symbol;
@@ -48,9 +49,10 @@ public class TableScanNode
     private final TupleDomain<ColumnHandle> enforcedConstraint;
     private final Optional<Expression> predicate;
 
-    private Integer strategy;
+    private ReuseExchangeOperator.STRATEGY strategy;
     private Integer slot;
     private Expression filterExpr;
+    private Integer consumerCount;
 
     // We need this factory method to disambiguate with the constructor used for deserializing
     // from a json object. The deserializer sets some fields which are never transported
@@ -60,10 +62,10 @@ public class TableScanNode
             TableHandle table,
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments,
-            Integer strategy,
-            Integer slot)
+            ReuseExchangeOperator.STRATEGY strategy,
+            Integer slot, Integer consumerCount)
     {
-        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, slot);
+        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, slot, consumerCount);
     }
 
     @JsonCreator
@@ -73,8 +75,9 @@ public class TableScanNode
             @JsonProperty("outputSymbols") List<Symbol> outputs,
             @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
             @JsonProperty("predicate") Optional<Expression> predicate,
-            @JsonProperty("strategy") Integer strategy,
-            @JsonProperty("slot") Integer slot)
+            @JsonProperty("strategy") ReuseExchangeOperator.STRATEGY strategy,
+            @JsonProperty("slot") Integer slot,
+            @JsonProperty("consumerCount") Integer consumerCount)
     {
         // This constructor is for JSON deserialization only. Do not use.
         super(id);
@@ -87,6 +90,7 @@ public class TableScanNode
         this.strategy = strategy;
         this.slot = slot;
         this.filterExpr = null;
+        this.consumerCount = consumerCount;
     }
 
     public TableScanNode(
@@ -96,8 +100,9 @@ public class TableScanNode
             Map<Symbol, ColumnHandle> assignments,
             TupleDomain<ColumnHandle> enforcedConstraint,
             Optional<Expression> predicate,
-            Integer strategy,
-            Integer slot)
+            ReuseExchangeOperator.STRATEGY strategy,
+            Integer slot,
+            Integer consumerCount)
     {
         super(id);
         this.table = requireNonNull(table, "table is null");
@@ -109,6 +114,7 @@ public class TableScanNode
         this.strategy = strategy;
         this.slot = slot;
         this.filterExpr = null;
+        this.consumerCount = consumerCount;
     }
 
     public Expression getFilterExpr()
@@ -121,7 +127,7 @@ public class TableScanNode
         this.filterExpr = filterExpr;
     }
 
-    public void setStrategy(Integer strategy)
+    public void setStrategy(ReuseExchangeOperator.STRATEGY strategy)
     {
         this.strategy = strategy;
     }
@@ -151,7 +157,7 @@ public class TableScanNode
     }
 
     @JsonProperty("strategy")
-    public Integer getStrategy()
+    public ReuseExchangeOperator.STRATEGY getStrategy()
     {
         return strategy;
     }
@@ -160,6 +166,17 @@ public class TableScanNode
     public Integer getSlot()
     {
         return slot;
+    }
+
+    public void setConsumerCount(Integer consumerCount)
+    {
+        this.consumerCount = consumerCount;
+    }
+
+    @JsonProperty("consumerCount")
+    public Integer getConsumerCount()
+    {
+        return consumerCount;
     }
 
     /**
@@ -205,6 +222,7 @@ public class TableScanNode
                 .add("enforcedConstraint", enforcedConstraint)
                 .add("strategy", strategy)
                 .add("slot", slot)
+                .add("consumerCount", consumerCount)
                 .toString();
     }
 

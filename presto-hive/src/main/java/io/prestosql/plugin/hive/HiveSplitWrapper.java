@@ -79,6 +79,12 @@ public class HiveSplitWrapper
         return splits;
     }
 
+    @Override
+    public List<ConnectorSplit> getUnwrapSplits()
+    {
+        return splits.stream().map(x -> wrap(x)).collect(Collectors.toList());
+    }
+
     @JsonProperty
     public OptionalInt getBucketNumber()
     {
@@ -128,5 +134,11 @@ public class HiveSplitWrapper
     public static HiveSplit getOnlyHiveSplit(ConnectorSplit connectorSplit)
     {
         return getOnlyElement(((HiveSplitWrapper) connectorSplit).getSplits());
+    }
+
+    @Override
+    public int getSplitNum()
+    {
+        return splits.size();
     }
 }

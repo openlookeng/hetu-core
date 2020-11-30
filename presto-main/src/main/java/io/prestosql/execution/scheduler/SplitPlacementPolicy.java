@@ -13,6 +13,7 @@
  */
 package io.prestosql.execution.scheduler;
 
+import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 
@@ -21,7 +22,7 @@ import java.util.Set;
 
 public interface SplitPlacementPolicy
 {
-    SplitPlacementResult computeAssignments(Set<Split> splits);
+    SplitPlacementResult computeAssignments(Set<Split> splits, SqlStageExecution stage);
 
     void lockDownNodes();
 

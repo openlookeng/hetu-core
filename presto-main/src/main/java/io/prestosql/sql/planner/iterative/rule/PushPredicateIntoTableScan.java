@@ -263,9 +263,8 @@ public class PushPredicateIntoTableScan
                 node.getOutputSymbols(),
                 node.getAssignments(),
                 computeEnforced(newDomain, remainingFilter),
-                Optional.of(deterministicPredicate),
-                node.getStrategy(),
-                node.getSlot());
+                Optional.of(deterministicPredicate), node.getStrategy(),
+                node.getSlot(), 0);
 
         // The order of the arguments to combineConjuncts matters:
         // * Unenforced constraints go first because they can only be simple column references,

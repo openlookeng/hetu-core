@@ -50,4 +50,14 @@ public interface ConnectorSplit
     }
 
     Object getInfo();
+
+    default int getSplitNum()
+    {
+        return 1;
+    }
+
+    default List<ConnectorSplit> getUnwrapSplits()
+    {
+        throw new NotImplementedException();
+    }
 }

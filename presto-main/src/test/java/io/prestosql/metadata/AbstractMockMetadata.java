@@ -76,7 +76,8 @@ public abstract class AbstractMockMetadata
 {
     public static Metadata dummyMetadata()
     {
-        return new AbstractMockMetadata() {};
+        return new AbstractMockMetadata() {
+        };
     }
 
     @Override

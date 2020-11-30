@@ -84,7 +84,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_DEFAULT;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.mangleOperatorName;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -785,7 +785,7 @@ public class HashGenerationOptimizer
 
         private void readjustScanNode(TableScanNode node, HashComputationSet requiredHashes)
         {
-            if (node.getStrategy() != REUSE_STRATEGY_DEFAULT) {
+            if (!node.getStrategy().equals(REUSE_STRATEGY_DEFAULT)) {
                 List<Symbol> fields = new ArrayList<>();
                 boolean isDerivedExpr = false;
                 for (HashComputation hashComputation : requiredHashes.getHashes()) {

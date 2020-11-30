@@ -73,8 +73,8 @@ import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_CONSUMER;
-import static io.prestosql.operator.ReuseExchangeOperator.REUSE_STRATEGY_PRODUCER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
 import static java.util.Objects.requireNonNull;
@@ -571,7 +571,8 @@ public final class SqlStageExecution
     //Assuming there will be only one table scan in one stage
     private static synchronized void setSlotStatus(StageStateMachine state)
     {
-        Optional<PlanNode> planNode = state.getFragment().getPartitionedSourceNodes().stream().filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy() == REUSE_STRATEGY_PRODUCER).findAny();
+        Optional<PlanNode> planNode = state.getFragment().getPartitionedSourceNodes().stream()
+                .filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy().equals(REUSE_STRATEGY_PRODUCER)).findAny();
         if (planNode.equals(Optional.empty())) {
             return;
         }
@@ -591,11 +592,12 @@ public final class SqlStageExecution
 
     public static synchronized Boolean getSlotStatus(StageStateMachine state)
     {
-        if (state.getFragment().getRoot() instanceof JoinNode) {
-            return true;
-        }
+//        if (state.getFragment().getRoot() instanceof JoinNode) {
+//            return true;
+//        }
 
-        Optional<PlanNode> planNode = state.getFragment().getPartitionedSourceNodes().stream().filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy() == REUSE_STRATEGY_CONSUMER).findAny();
+        Optional<PlanNode> planNode = state.getFragment().getPartitionedSourceNodes().stream()
+                .filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy().equals(REUSE_STRATEGY_CONSUMER)).findAny();
         if (planNode.equals(Optional.empty())) {
             return true;
         }
@@ -614,7 +616,9 @@ public final class SqlStageExecution
 
         for (Integer slot : slots) {
             WorkProcessorSourceOperatorAdapter.releaseCache(slot);
+            WorkProcessorSourceOperatorAdapter.deleteSpilledFiles(slot);
             TableScanOperator.releaseCache(slot);
+            TableScanOperator.deleteSpilledFiles(slot);
         }
 
         finishedSlot.remove(queryId);

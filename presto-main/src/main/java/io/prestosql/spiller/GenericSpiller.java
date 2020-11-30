@@ -76,6 +76,11 @@ public class GenericSpiller
                 .collect(toList());
     }
 
+    public SingleStreamSpillerFactory getSingleStreamSpillerFactory()
+    {
+        return singleStreamSpillerFactory;
+    }
+
     @Override
     public void close()
     {

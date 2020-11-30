@@ -23,6 +23,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -256,7 +257,7 @@ class QueryPlanner
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, 0, 0);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -352,7 +353,7 @@ class QueryPlanner
         fields.add(rowIdField);
 
         // create table scan
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build(), 0, 0);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -402,7 +403,7 @@ class QueryPlanner
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, 0, 0);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
