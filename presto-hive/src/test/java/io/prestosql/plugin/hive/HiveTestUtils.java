@@ -78,7 +78,7 @@ public final class HiveTestUtils
     }
 
     public static final ConnectorSession SESSION = new TestingConnectorSession(
-            new HiveSessionProperties(new HiveConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
+            new HiveSessionProperties(new HiveConfig().setOrcLazyReadSmallRanges(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
 
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);

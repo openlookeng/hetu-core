@@ -456,14 +456,14 @@
 ### `hetu.heuristicindex.filter.cache.max-memory`
  
 > -   **类型：** `data size`
-> -   **默认值：** `1GB`
+> -   **默认值：** `10GB`
 >
 > 由于索引文件很少被改动，将索引缓存可以提升性能，减少从文件系统读取索引所需时间。这一属性控制索引缓存允许使用的内存大小，当缓存已满，最旧的缓存将被移除，由新的缓存替代（LRU缓存）。
 
 ### `hetu.heuristicindex.filter.cache.soft-reference`
  
 > -   **类型:** `boolean`
-> -   **默认值：** `false`
+> -   **默认值：** `true`
 >
 > 缓存索引可以提供更好的性能，但是需要使用一部分内存空间。启用这一属性将允许垃圾回收器（GC）在内存不足时从缓存中清除内容来释放内存。
 >
@@ -472,14 +472,14 @@
 ### `hetu.heuristicindex.filter.cache.ttl`
 
 > - 类型：`Duration`
-> - **默认值：** `1h`
+> - **默认值：** `24h`
 > 
 > 索引缓存的有效时间。
 
 ### `hetu.heuristicindex.filter.cache.loading-threads`
 
 > - 类型：`integer`
-> - **默认值：** `2`
+> - **默认值：** `10`
 > 
 > 从索引存储文件系统并行加载索引时使用的线程数量。
 
@@ -517,14 +517,14 @@
 ### `hetu.executionplan.cache.limit`
 
 > - **类型：** `integer`
-> - **默认值：** `1000`
+> - **默认值：** `10000`
 > 
 > 保留在缓存中的最大执行计划数
 
 ### `hetu.executionplan.cache.timeout`
 
 > - **类型：** `integer`
-> - **默认值：** `60000 ms`
+> - **默认值：** `86400000 ms`
 > 
 > 上次访问后使缓存的执行计划失效的时间（以毫秒为单位）
 
