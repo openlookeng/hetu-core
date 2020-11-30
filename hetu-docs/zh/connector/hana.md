@@ -132,9 +132,9 @@ openLooKeng支持在SAP HANA数据库中创建以下类型的表。下表显示�
 
 可映射到SAP HANA函数的openLooKeng函数如下表所示。说明：“$n”是占位符，用于在函数中表示参数。
 
-> | openLooKeng函数\|HANA函数| 说明| |
+> | openLooKeng函数|HANA函数| 说明|
 > |----------|----------|----------|
-> | DATE\_ADD(单位, $1, $2)| ADD\_SECONDS($2, $1)或ADD\_DAYS($2, $1)或ADD\_MONTHS($2, $1)或ADD\_YEARS($2, $1)| 单位是秒、分钟、小时时，映射到ADD\_SECONDS。当单位为天或周时，映射到ADD\_DAYS。当单位为月、季度时，映射到ADD\_MONTHS。当单位为年时，映射ADD\_YEARS。|
+> | DATE_ADD(unit, $1, $2)| ADD_SECONDS($2, $1)<br>或ADD_DAYS($2, $1)<br>或ADD_MONTHS($2, $1)<br>或ADD_YEARS($2, $1)| 'unit'是second、minute、hour时，映射到ADD_SECONDS。<br>当'unit'为day或week时，映射到ADD_DAYS。<br>当'unit'为month、quarter时，映射到ADD_MONTHS。<br>当'unit'为year时，映射ADD_YEARS。|
 > | CORR($1,$2)| CORR($1, $2)| |
 > | STDDEV($1)| STDDEV($1)| |
 > | VARIANCE($1)| VAR($1)| |
@@ -183,13 +183,8 @@ openLooKeng支持在SAP HANA数据库中创建以下类型的表。下表显示�
 > | HOUR($1)| EXTRACT(HOUR FROM $1)| |
 > | MINUTE($1)| EXTRACT(MINUTE FROM $1)| |
 > | SECOND($1)| EXTRACT(SECOND FROM $1)| |
-> | DAY\_OF\_WEEK($1)| WEEKDAY($1)| |
+> | DAY_OF_WEEK($1)| WEEKDAY($1)| |
 
-
-
-**说明**
-
-DATE\_ADD(单位, $1, $2)单位是秒、分钟、小时时，映射到ADD\_SECONDS。当单位为天或周时，映射到ADD\_DAYS。当单位为月、季度时，映射到ADD\_MONTHS。当单位为年时，映射ADD\_YEARS。
 
 ## Hana SQL迁移到openLooKeng SQL指南
 
