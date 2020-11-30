@@ -120,6 +120,11 @@ public class HiveSplitWrapper
         return new HiveSplitWrapper(ImmutableList.of(hiveSplit), hiveSplit.getBucketNumber());
     }
 
+    public static HiveSplitWrapper wrap(List<HiveSplit> hiveSplitList, OptionalInt bucketNumber)
+    {
+        return new HiveSplitWrapper(hiveSplitList, bucketNumber);
+    }
+
     public static HiveSplit getOnlyHiveSplit(ConnectorSplit connectorSplit)
     {
         return getOnlyElement(((HiveSplitWrapper) connectorSplit).getSplits());

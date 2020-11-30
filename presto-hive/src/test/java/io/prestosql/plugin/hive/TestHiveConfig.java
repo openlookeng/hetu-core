@@ -141,7 +141,8 @@ public class TestHiveConfig
                 .setAutoVacuumEnabled(false)
                 .setVacuumDeltaPercentThreshold(0.1)
                 .setOrcPredicatePushdownEnabled(false)
-                .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES)));
+                .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES))
+                .setMaxSplitsToGroup(100));
     }
 
     @Test
@@ -263,6 +264,7 @@ public class TestHiveConfig
                 .put("hive.auto-vacuum-enabled", "true")
                 .put("hive.orc-predicate-pushdown-enabled", "true")
                 .put("hive.vacuum-collector-interval", "5s")
+                .put("hive.max-splits-to-group", "20")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -370,7 +372,8 @@ public class TestHiveConfig
                 .setAutoVacuumEnabled(true)
                 .setVacuumDeltaPercentThreshold(0.6)
                 .setOrcPredicatePushdownEnabled(true)
-                .setVacuumCollectorInterval(new Duration(5, TimeUnit.SECONDS));
+                .setVacuumCollectorInterval(new Duration(5, TimeUnit.SECONDS))
+                .setMaxSplitsToGroup(20);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

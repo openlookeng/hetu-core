@@ -14,7 +14,9 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
@@ -22,6 +24,7 @@ import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.prestosql.plugin.hive.util.AsyncQueue;
 import io.prestosql.plugin.hive.util.ThrottledAsyncQueue;
+import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
@@ -35,6 +38,7 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
 
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -105,6 +109,7 @@ class HiveSplitSource
     private final HiveConfig hiveConfig;
 
     private final TypeManager typeManager;
+    private final HiveStorageFormat hiveStorageFormat;
 
     private HiveSplitSource(
             ConnectorSession session,
@@ -119,7 +124,8 @@ class HiveSplitSource
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachedPredicates,
             TypeManager typeManager,
-            HiveConfig hiveConfig)
+            HiveConfig hiveConfig,
+            HiveStorageFormat hiveStorageFormat)
     {
         requireNonNull(session, "session is null");
         this.queryId = session.getQueryId();
@@ -140,6 +146,7 @@ class HiveSplitSource
         this.userDefinedCachePredicates = userDefinedCachedPredicates;
         this.typeManager = typeManager;
         this.hiveConfig = hiveConfig;
+        this.hiveStorageFormat = hiveStorageFormat;
     }
 
     public static HiveSplitSource allAtOnce(
@@ -156,7 +163,8 @@ class HiveSplitSource
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
             TypeManager typeManager,
-            HiveConfig hiveConfig)
+            HiveConfig hiveConfig,
+            HiveStorageFormat hiveStorageFormat)
     {
         AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
@@ -202,7 +210,8 @@ class HiveSplitSource
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,
                 typeManager,
-                hiveConfig);
+                hiveConfig,
+                hiveStorageFormat);
     }
 
     public static HiveSplitSource bucketed(
@@ -219,7 +228,8 @@ class HiveSplitSource
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
             TypeManager typeManager,
-            HiveConfig hiveConfig)
+            HiveConfig hiveConfig,
+            HiveStorageFormat hiveStorageFormat)
     {
         AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
@@ -285,7 +295,8 @@ class HiveSplitSource
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,
                 typeManager,
-                hiveConfig);
+                hiveConfig,
+                hiveStorageFormat);
     }
 
     /**
@@ -381,12 +392,8 @@ class HiveSplitSource
             ImmutableList.Builder<ConnectorSplit> resultBuilder = ImmutableList.builder();
             int removedEstimatedSizeInBytes = 0;
             for (InternalHiveSplit internalSplit : internalSplits) {
-                long maxSplitBytes = maxSplitSize.toBytes();
-                if (remainingInitialSplits.get() > 0) {
-                    if (remainingInitialSplits.getAndDecrement() > 0) {
-                        maxSplitBytes = maxInitialSplitSize.toBytes();
-                    }
-                }
+                long maxSplitBytes = getMaxSplitBytes();
+
                 InternalHiveSplit.InternalHiveBlock block = internalSplit.currentBlock();
                 long splitBytes;
                 if (internalSplit.isSplittable()) {
@@ -641,5 +648,180 @@ class HiveSplitSource
         NO_MORE_SPLITS,
         FAILED,
         CLOSED,
+    }
+
+    @Override
+    public List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> splitList)
+    {
+        if (splitList.isEmpty()) {
+            return splitList;
+        }
+
+        int maxSmallSplitsCanBeGrouped = hiveConfig.getMaxSplitsToGroup();
+        if (maxSmallSplitsCanBeGrouped < 2) {
+            return splitList;
+        }
+
+        if (hiveStorageFormat != HiveStorageFormat.ORC) {
+            return splitList;
+        }
+
+        ImmutableList.Builder<ConnectorSplit> connectorSplitList = ImmutableList.builder();
+        List<HiveSplitWrapper> hiveSplitWrappers = new ArrayList<>();
+        splitList.forEach(pendingSplit -> hiveSplitWrappers.add((HiveSplitWrapper) pendingSplit));
+
+        long maxSplitBytes = getMaxSplitBytes();
+
+        /*
+        1) selecting  splits that are less than MaxSplitSize and Not cached
+        2) using MultiMap bucketNumToHiveSplitsMap separating splits based on bucked Id
+        3) in every same bucket ID list, using MultiMap separating splits based on locations
+        4) Sorting the List base on size, in descending order
+        5) grouping first element from list (large file size) + last element  from list (small file size)
+                i) till it reaches maxSplitSize and other conditions.
+                ii) Number of files should not cross MinValue(max-splits-to-group, Total number of files with location / Number of selected locations).
+         */
+
+        Multimap<Integer, HiveSplit> bucketNumToHiveSplitsMap = HashMultimap.create();
+        int replicationFactor = hiveSplitWrappers.get(0).getSplits().get(0).getAddresses().size();
+        boolean bucketNumberPresent = hiveSplitWrappers.get(0).getBucketNumber().isPresent();
+
+        //1> add to MultiMap bucketNumToHiveSplitsMap small files base of bucket number.
+        if (false == getSmallerSplits(hiveSplitWrappers, bucketNumToHiveSplitsMap, maxSplitBytes, replicationFactor, connectorSplitList)) {
+            return splitList;
+        }
+
+        // 3> in each and very Bucket, Multimap based on location, key first 3 location & value  List<HiveSplit>
+        for (Integer bucketNumber : bucketNumToHiveSplitsMap.keySet()) {
+            Multimap<String, HiveSplit> hostAddressHiveSplits = HashMultimap.create();
+
+            Collection<HiveSplit> hiveSplits = bucketNumToHiveSplitsMap.get(bucketNumber);
+            //Location base Multimap
+            groupBaseOnLocation(hiveSplits, hostAddressHiveSplits);
+
+            /*
+            Number of files should not cross MinValue(max-splits-to-group, Total number of files with location / Number of selected locations).
+             */
+
+            for (String hostAddressText : hostAddressHiveSplits.keySet()) {
+                List<HiveSplit> locationBaseHiveSplits = new ArrayList<>();
+                hostAddressHiveSplits.get(hostAddressText).forEach(split1 -> locationBaseHiveSplits.add(split1));
+
+                //4> sort in descending order by file size
+                //locationBaseHiveSplits.sort(new HiveSplitSortBySize());
+                locationBaseHiveSplits.sort((split1, split2) -> ((int) (split2.getFileSize() - split1.getFileSize())));
+
+                int numberOfSplitsPerLocation = locationBaseHiveSplits.size();
+
+                //when number of flies are less than number of replication factor,splits are grouped in to single group.
+                int avgSplitsPerNode = ((replicationFactor != 0) && (numberOfSplitsPerLocation >= replicationFactor)) ? numberOfSplitsPerLocation / replicationFactor : numberOfSplitsPerLocation;
+
+                List<HiveSplit> groupedHiveSplit = new ArrayList<>();
+                long totalSize = 0;
+                int numberOfSplitsGrouped = 0;
+
+                // to mean the size , add one big size file + one small size file present in the list
+                while (!locationBaseHiveSplits.isEmpty()) {
+                    int i = 0;
+                    // add bigger file
+                    totalSize += locationBaseHiveSplits.get(i).getFileSize();
+                    numberOfSplitsGrouped += 1;
+                    if ((maxSplitBytes < totalSize) || (avgSplitsPerNode < numberOfSplitsGrouped) || (maxSmallSplitsCanBeGrouped < numberOfSplitsGrouped)) {
+                        connectorSplitList.add(HiveSplitWrapper.wrap(groupedHiveSplit, bucketNumberPresent ? OptionalInt.of(bucketNumber) : OptionalInt.empty()));
+                        log.debug("info table %s,  groupedHiveSplit size %d, maxSplitBytes %d, totalSize %d, avgSplitsPerNode %d, numberOfSplitsGrouped %d, maxSmallSplitsCanBeGrouped %d, numberOfSplitsGrouped %d ",
+                                groupedHiveSplit.get(0).getTable(), groupedHiveSplit.size(), maxSplitBytes, totalSize, avgSplitsPerNode, numberOfSplitsGrouped, maxSmallSplitsCanBeGrouped, numberOfSplitsGrouped);
+                        totalSize = 0;
+                        numberOfSplitsGrouped = 0;
+                        groupedHiveSplit = new ArrayList<>();
+                        continue;
+                    }
+                    groupedHiveSplit.add(locationBaseHiveSplits.get(i));
+                    locationBaseHiveSplits.remove(i);
+                    if (locationBaseHiveSplits.isEmpty()) {
+                        break;
+                    }
+
+                    // add smaller file
+                    int lastSplitLocation = locationBaseHiveSplits.size() - 1;
+                    totalSize += locationBaseHiveSplits.get(lastSplitLocation).getFileSize();
+                    numberOfSplitsGrouped += 1;
+                    if ((maxSplitBytes < totalSize) || (avgSplitsPerNode < numberOfSplitsGrouped) || (maxSmallSplitsCanBeGrouped < numberOfSplitsGrouped)) {
+                        connectorSplitList.add(HiveSplitWrapper.wrap(groupedHiveSplit, bucketNumberPresent ? OptionalInt.of(bucketNumber) : OptionalInt.empty()));
+                        log.debug("info table %s,  groupedHiveSplit size %d, maxSplitBytes %d, totalSize %d, avgSplitsPerNode %d, numberOfSplitsGrouped %d, maxSmallSplitsCanBeGrouped %d, numberOfSplitsGrouped %d ",
+                                groupedHiveSplit.get(0).getTable(), groupedHiveSplit.size(), maxSplitBytes, totalSize, avgSplitsPerNode, numberOfSplitsGrouped, maxSmallSplitsCanBeGrouped, numberOfSplitsGrouped);
+                        totalSize = 0;
+                        numberOfSplitsGrouped = 0;
+                        groupedHiveSplit = new ArrayList<>();
+                        continue;
+                    }
+
+                    groupedHiveSplit.add(locationBaseHiveSplits.get(lastSplitLocation));
+                    locationBaseHiveSplits.remove(lastSplitLocation);
+                }
+                if (!groupedHiveSplit.isEmpty()) {
+                    connectorSplitList.add(HiveSplitWrapper.wrap(groupedHiveSplit, bucketNumberPresent ? OptionalInt.of(bucketNumber) : OptionalInt.empty()));
+                }
+            }
+        }
+        List<ConnectorSplit> resultConnectorSplits = connectorSplitList.build();
+        log.debug("info resultBuilder size %d", resultConnectorSplits.size());
+        return resultConnectorSplits;
+    }
+
+    private boolean getSmallerSplits(List<HiveSplitWrapper> hiveSplitWrappers, Multimap<Integer, HiveSplit> bucketNumberHiveSplits,
+            long maxSplitBytes, int replicationFactor, ImmutableList.Builder<ConnectorSplit> connectorSplitList)
+    {
+        int numSmallSplits = 0;
+        for (HiveSplitWrapper hiveSplitWrapper : hiveSplitWrappers) {
+            HiveSplit hiveSplit = hiveSplitWrapper.getSplits().get(0);
+            long fileSize = hiveSplit.getFileSize();
+
+            if (hiveSplit.isCacheable() || (replicationFactor != hiveSplit.getAddresses().size())) {
+                //if different files have different replication factor or cache table, if will not be grouped.
+                return false;
+            }
+
+            // 1) filtering small files.
+            if (fileSize < maxSplitBytes) {
+                //2) using MultiMap separating splits based on bucked Id.
+                bucketNumberHiveSplits.put(hiveSplit.getBucketNumber().isPresent() ? hiveSplit.getBucketNumber().getAsInt() : 0, hiveSplit);
+                numSmallSplits++;
+            }
+            else {
+                connectorSplitList.add(HiveSplitWrapper.wrap(hiveSplit));
+            }
+        }
+
+        if (0 == numSmallSplits) {
+            // There are no small files to group
+            return false;
+        }
+
+        log.info("info total Split %d,  numSmallSplits %d ", hiveSplitWrappers.size(), numSmallSplits);
+        return true;
+    }
+
+    private void groupBaseOnLocation(Collection<HiveSplit> bucketBasedHiveSplits, Multimap<String, HiveSplit> hostAddressHiveSplits)
+    {
+        for (HiveSplit hiveSplit : bucketBasedHiveSplits) {
+            List<HostAddress> hostAddresses = new ArrayList<>();
+            hostAddresses.addAll(hiveSplit.getAddresses());
+            hostAddresses.sort((host1, host2) -> (host1.getHostText().compareTo(host2.getHostText())));
+
+            StringBuilder hostAddressText = new StringBuilder();
+            hostAddresses.forEach(hostAddress -> hostAddressText.append(hostAddress.getHostText()));
+            hostAddressHiveSplits.put(hostAddressText.toString(), hiveSplit);
+        }
+    }
+
+    private long getMaxSplitBytes()
+    {
+        long maxSplitBytes = maxSplitSize.toBytes();
+        if (remainingInitialSplits.get() > 0) {
+            if (remainingInitialSplits.getAndDecrement() > 0) {
+                maxSplitBytes = maxInitialSplitSize.toBytes();
+            }
+        }
+        return maxSplitBytes;
     }
 }

@@ -2546,7 +2546,7 @@ public class HiveMetadata
         }
     }
 
-    private static HiveStorageFormat extractHiveStorageFormat(Table table)
+    public static HiveStorageFormat extractHiveStorageFormat(Table table)
     {
         StorageFormat storageFormat = table.getStorage().getStorageFormat();
         String outputFormat = storageFormat.getOutputFormat();

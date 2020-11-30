@@ -62,4 +62,9 @@ public interface SplitSource
             return lastBatch;
         }
     }
+
+    default List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan)
+    {
+        return pendingSplits;
+    }
 }

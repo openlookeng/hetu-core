@@ -24,6 +24,9 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorSplitSource.ConnectorSplitBatch;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static java.util.Objects.requireNonNull;
@@ -75,5 +78,19 @@ public class ConnectorAwareSplitSource
     public String toString()
     {
         return catalogName + ":" + source;
+    }
+
+    public List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan)
+    {
+        List<ConnectorSplit> connectorSplits = new ArrayList<>();
+        for (Split split : pendingSplits) {
+            connectorSplits.add(split.getConnectorSplit());
+        }
+        List<ConnectorSplit> connectorSplits1 = source.groupSmallSplits(connectorSplits);
+        ImmutableList.Builder<Split> result = ImmutableList.builder();
+        for (ConnectorSplit connectorSplit : connectorSplits1) {
+            result.add(new Split(catalogName, connectorSplit, lifespan));
+        }
+        return result.build();
     }
 }

@@ -259,6 +259,10 @@ public class SourcePartitionedScheduler
                     List<Split> filteredSplit = applyFilter ? SplitFiltering.getFilteredSplit(pair.first,
                             SplitFiltering.getFullyQualifiedName(stage), pair.second, nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
+                    //In case of ORC small size files/splits are grouped
+                    List<Split> groupedSmallFilesList = splitSource.groupSmallSplits(filteredSplit, lifespan);
+                    filteredSplit = groupedSmallFilesList;
+
                     pendingSplits.addAll(filteredSplit);
                     if (nextSplits.isLastBatch()) {
                         if (scheduleGroup.state == ScheduleGroupState.INITIALIZED && pendingSplits.isEmpty()) {
