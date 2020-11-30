@@ -192,9 +192,9 @@ public class CreateIndexOperator
                 case PARTITION: {
                     String partition = getPartitionName(page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH),
                             createIndexMetadata.getTableName());
-                    levelWriter.computeIfAbsent(partition, k -> heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
-                    IndexWriter indexWriter = levelWriter.get(partition);
-                    // TODO: use partitioned index writer here
+                    levelWriter.putIfAbsent(partition, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    persistBy.putIfAbsent(levelWriter.get(partition), this);
+                    levelWriter.get(partition).addData(values, connectorMetadata);
                     break;
                 }
                 default:
@@ -304,6 +304,6 @@ public class CreateIndexOperator
             }
         }
 
-        throw new IllegalStateException("Datasource path " + uri + " does not include a partition");
+        throw new IllegalStateException("Partition level is not supported for non partitioned table.");
     }
 }

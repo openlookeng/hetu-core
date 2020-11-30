@@ -19,6 +19,7 @@ import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class NoOpIndexClient
@@ -35,6 +36,13 @@ public class NoOpIndexClient
 
     @Override
     public long getLastModified(String path)
+            throws IOException
+    {
+        throw new UnsupportedOperationException(ERROR_MSG);
+    }
+
+    @Override
+    public List<IndexMetadata> readPartitionIndex(String path)
             throws IOException
     {
         throw new UnsupportedOperationException(ERROR_MSG);
@@ -65,7 +73,7 @@ public class NoOpIndexClient
     public List<IndexRecord> getAllIndexRecords()
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        return new ArrayList<IndexRecord>();
     }
 
     @Override

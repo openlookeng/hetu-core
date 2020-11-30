@@ -20,15 +20,29 @@ public class IndexCacheKey
 {
     private String path;
     private long lastModifiedTime;
+    private String indexLevel = "STRIPE";
 
     /**
-     * @param path path to the file the index files should be read for
+     * @param path             path to the file the index files should be read for
      * @param lastModifiedTime lastModifiedTime of the file, used to validate the indexes
+     * @param indexLevel       see Index.Level in presto-spi
      */
-    public IndexCacheKey(String path, long lastModifiedTime)
+    public IndexCacheKey(String path, long lastModifiedTime, String indexLevel)
     {
         this.path = path;
         this.lastModifiedTime = lastModifiedTime;
+        this.indexLevel = indexLevel;
+    }
+
+    /**
+     * Create a cache with a index level it could be Stripe or partition
+     *
+     * @param path
+     * @param lastModifiedTime
+     */
+    public IndexCacheKey(String path, long lastModifiedTime)
+    {
+        this(path, lastModifiedTime, "STRIPE");
     }
 
     public String getPath()
@@ -39,6 +53,11 @@ public class IndexCacheKey
     public long getLastModifiedTime()
     {
         return lastModifiedTime;
+    }
+
+    public String getIndexLevel()
+    {
+        return this.indexLevel;
     }
 
     // only the path should be used as the key

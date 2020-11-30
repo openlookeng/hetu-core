@@ -66,6 +66,20 @@ public interface Index
     boolean addValues(Map<String, List<Object>> values) throws IOException;
 
     /**
+     * Add a list of Key-Value pairs to the index. Only map-like Indexes will support this operation.
+     * For example Bloom Index just requires a list of values, whereas a Btree Index requires Key-Value pairs
+     * to be added.
+     *
+     * If the list contains duplicate keys, the value of the first occurrence is used.
+     * @param keyValues an ordered list of KeyValues to add to index, sorted ascending on Keys
+     * @return true if operation was successful
+     */
+    default boolean addKeyValues(List<KeyValue> keyValues)
+    {
+        throw new UnsupportedOperationException("This index does not support adding Key-Value pairs.");
+    }
+
+    /**
      * The Index will apply the provided Expression but only return a
      * boolean indicating whether the Expression matches any values in the index.
      *

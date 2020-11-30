@@ -93,4 +93,23 @@ public class TypeUtils
     {
         return object instanceof Slice ? ((Slice) object).toStringUtf8() : object;
     }
+
+    public static String extractType(Object object)
+    {
+        if (object instanceof Long) {
+            return "Long";
+        }
+        else if (object instanceof String) {
+            return "String";
+        }
+        else if (object instanceof Integer) {
+            return "Integer";
+        }
+        else if (object instanceof Slice) {
+            return "String";
+        }
+        else {
+            throw new UnsupportedOperationException("Not a valid type to create index: " + object.getClass());
+        }
+    }
 }
