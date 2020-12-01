@@ -546,14 +546,17 @@ public class LogicalPlanner
             RelationPlan plan = deletePlan.getPlan();
 
             Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, handle);
-
+            TableMetadata tableMetadata = metadata.getTableMetadata(session, handle);
+            String catalogName = handle.getCatalogName().getCatalogName();
+            TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session,
+                    catalogName, tableMetadata.getMetadata());
             return createTableWriterPlan(
                     analysis,
                     plan,
                     new TableWriterNode.DeleteAsInsertReference(handle, deletePlan.getPredicate(), deletePlan.getColumnAssignments()),
                     deletePlan.getColumNames(),
                     newTableLayout,
-                    TableStatisticsMetadata.empty());
+                    statisticsMetadata);
         }
         else {
             DeleteNode deleteNode = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
