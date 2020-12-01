@@ -15,8 +15,8 @@
 package io.hetu.core.plugin.heuristicindex.index.bitmap;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.type.IntegerType;
@@ -28,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -52,7 +53,7 @@ public class TestBitmapIndex
             List<Object> columnValues = ImmutableList.of("foo", "bar", "baz", "foo", "foo", "baz");
 
             bitmapIndexWrite.setExpectedNumOfEntries(columnValues.size());
-            bitmapIndexWrite.addValues(ImmutableMap.of(columnName, columnValues));
+            bitmapIndexWrite.addValues(Collections.singletonList(new Pair<>(columnName, columnValues)));
 
             try (FileOutputStream os = new FileOutputStream(file); FileInputStream is = new FileInputStream(file)) {
                 bitmapIndexWrite.serialize(os);
@@ -84,7 +85,7 @@ public class TestBitmapIndex
             List<Object> columnValues = ImmutableList.of(3, 1024, 12345, 3, 2048, 999);
 
             bitmapIndexWrite.setExpectedNumOfEntries(columnValues.size());
-            bitmapIndexWrite.addValues(ImmutableMap.of(columnName, columnValues));
+            bitmapIndexWrite.addValues(Collections.singletonList(new Pair<>(columnName, columnValues)));
 
             try (FileOutputStream os = new FileOutputStream(file); FileInputStream is = new FileInputStream(file)) {
                 bitmapIndexWrite.serialize(os);
@@ -120,7 +121,7 @@ public class TestBitmapIndex
             List<Object> columnValues = Arrays.asList(values);
 
             bitmapIndexWrite.setExpectedNumOfEntries(columnValues.size());
-            bitmapIndexWrite.addValues(ImmutableMap.of(columnName, columnValues));
+            bitmapIndexWrite.addValues(Collections.singletonList(new Pair<>(columnName, columnValues)));
 
             try (FileOutputStream os = new FileOutputStream(file); FileInputStream is = new FileInputStream(file)) {
                 bitmapIndexWrite.serialize(os);
@@ -152,7 +153,7 @@ public class TestBitmapIndex
             List<Object> columnValues = ImmutableList.of(3, 1024, 12345, 3, 2048, 999);
 
             bitmapIndexWrite.setExpectedNumOfEntries(columnValues.size());
-            bitmapIndexWrite.addValues(ImmutableMap.of(columnName, columnValues));
+            bitmapIndexWrite.addValues(Collections.singletonList(new Pair<>(columnName, columnValues)));
 
             try (FileOutputStream os = new FileOutputStream(file); FileInputStream is = new FileInputStream(file)) {
                 bitmapIndexWrite.serialize(os);

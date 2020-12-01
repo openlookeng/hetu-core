@@ -24,6 +24,7 @@ import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexWriter;
+import io.prestosql.spi.heuristicindex.Pair;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -32,10 +33,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -66,8 +67,8 @@ public class FileIndexWriter
     private final String dataSourceFileName;
     private final String dataSourceFileLastModifiedTime;
     // "stripe offset" -> (column name -> list<entry<page values, page number>>)
-    private final Map<Integer, Map<String, List<Map.Entry<List<Object>, Integer>>>> indexPages;
-    private final Map<Integer, AtomicInteger> pageCountExpected;
+    private final Map<Long, Map<String, List<Map.Entry<List<Object>, Integer>>>> indexPages;
+    private final Map<Long, AtomicInteger> pageCountExpected;
     private final CreateIndexMetadata createIndexMetadata;
     private final HetuFileSystemClient fs;
     private final Path root;
@@ -100,7 +101,7 @@ public class FileIndexWriter
     public void addData(Map<String, List<Object>> values, Properties connectorMetadata)
             throws IOException
     {
-        int stripeOffset = Integer.parseInt(connectorMetadata.getProperty(DATASOURCE_STRIPE_OFFSET));
+        long stripeOffset = Long.parseLong(connectorMetadata.getProperty(DATASOURCE_STRIPE_OFFSET));
 
         // Add values first
         indexPages.computeIfAbsent(stripeOffset, k -> new ConcurrentHashMap<>());
@@ -125,7 +126,7 @@ public class FileIndexWriter
                 if (indexPages.containsKey(stripeOffset)) {
                     LOG.debug("All pages for offset %d have been received. Persisting.", stripeOffset);
                     // sort the stripe's pages and collect the values into a single list
-                    Map<String, List<Object>> columnValuesMap = new HashMap<>();
+                    List<Pair<String, List<Object>>> columnValuesMap = new ArrayList<>();
                     // each entry represents a mapping from column name -> list<entry<page values, page number>>
                     for (Map.Entry<String, List<Map.Entry<List<Object>, Integer>>> entry : indexPages.get(stripeOffset).entrySet()) {
                         // sort the page values lists based on page numbers
@@ -133,7 +134,7 @@ public class FileIndexWriter
                         // collect all page values lists into a single list
                         List<Object> columnValues = entry.getValue().stream()
                                 .map(Map.Entry::getKey).flatMap(Collection::stream).collect(Collectors.toList());
-                        columnValuesMap.put(entry.getKey(), columnValues);
+                        columnValuesMap.add(new Pair(entry.getKey(), columnValues));
                     }
 
                     persistStripe(stripeOffset, columnValuesMap);
@@ -172,7 +173,7 @@ public class FileIndexWriter
     public void persist()
             throws IOException
     {
-        for (Integer offset : indexPages.keySet()) {
+        for (Long offset : indexPages.keySet()) {
             LOG.error("Offset %d data is NOT PERSISTED. Current page count: %d. Check debug log.", offset, pageCountExpected.get(offset).get());
         }
         // Package index files for one File and write to remote filesystem
@@ -196,7 +197,7 @@ public class FileIndexWriter
         }
     }
 
-    private void persistStripe(Integer offset, Map<String, List<Object>> stripeData)
+    private void persistStripe(Long offset, List<Pair<String, List<Object>>> stripeData)
             throws IOException
     {
         synchronized (this) {
@@ -207,8 +208,8 @@ public class FileIndexWriter
 
         // Get sum of expected entries
         int expectedNumEntries = 0;
-        for (List<Object> l : stripeData.values()) {
-            expectedNumEntries += l.size();
+        for (Pair<String, List<Object>> l : stripeData) {
+            expectedNumEntries += l.getSecond().size();
         }
 
         // Create index and put values

@@ -55,6 +55,7 @@ import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FetchFirst;
@@ -75,6 +76,7 @@ import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.SortItem;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.Window;
@@ -629,8 +631,8 @@ class QueryPlanner
         indexProperties.setProperty(LEVEL_PROP_KEY, String.valueOf(LEVEL_DEFAULT));
 
         for (Property property : createIndex.getProperties()) {
-            String key = property.getName().toString().replaceAll("\"", "");
-            String val = property.getValue().toString().replaceAll("\"", "").toUpperCase(Locale.ENGLISH);
+            String key = extractPropertyValue(property.getName());
+            String val = extractPropertyValue(property.getValue()).toUpperCase(Locale.ENGLISH);
             if (key.equals(LEVEL_PROP_KEY)) {
                 indexCreationLevel = Index.Level.valueOf(val);
             }
@@ -648,6 +650,20 @@ class QueryPlanner
                         indexProperties,
                         session.getUser(),
                         indexCreationLevel)));
+    }
+
+    private String extractPropertyValue(Expression expression)
+    {
+        if (expression instanceof Identifier) {
+            return ((Identifier) expression).getValue();
+        }
+        else if (expression instanceof DecimalLiteral) {
+            return ((DecimalLiteral) expression).getValue();
+        }
+        else if (expression instanceof StringLiteral) {
+            return ((StringLiteral) expression).getValue();
+        }
+        return expression.toString().replaceAll("\"", "");
     }
 
     private Map<Symbol, Expression> coerce(Iterable<? extends Expression> expressions, PlanBuilder subPlan, TranslationMap translations)

@@ -182,7 +182,7 @@ public class IndexCache
         return indices;
     }
 
-    public List<IndexMetadata> getIndices(String table, String column, Set<String> partitions, long lastModifiedTime)
+    public List<IndexMetadata> getIndices(String table, String column, String indexType, Set<String> partitions, long lastModifiedTime)
     {
         if (cache == null) {
             return Collections.emptyList();
@@ -190,7 +190,7 @@ public class IndexCache
 
         List<IndexMetadata> indices = new LinkedList<>();
         if (partitions.isEmpty()) {
-            String filterKeyPath = table + "/" + column;
+            String filterKeyPath = table + "/" + column + "/" + indexType;
             IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
             List<IndexMetadata> result = loadIndex(filterKey);
             if (result != null) {
@@ -199,7 +199,7 @@ public class IndexCache
         }
         else {
             for (String partition : partitions) {
-                String filterKeyPath = table + "/" + column + "/" + partition;
+                String filterKeyPath = table + "/" + column + "/" + indexType + "/" + partition;
                 IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
                 List<IndexMetadata> result = loadIndex(filterKey);
                 if (result != null) {

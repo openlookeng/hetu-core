@@ -24,11 +24,13 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexWriter;
 import io.prestosql.spi.heuristicindex.KeyValue;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.type.Type;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class PartitionIndexWriter
         implements IndexWriter
 {
-    private static final Logger LOG = Logger.get(FileIndexWriter.class);
+    private static final Logger LOG = Logger.get(PartitionIndexWriter.class);
     private static final String SYMBOL_TABLE_KEY_NAME = "__hetu__symboltable";
     private static final String PREFIX_KEY_NAME = "__hetu__partitionprefix";
     private static final String LAST_MODIFIED_KEY_NAME = "__hetu__lastmodified";
@@ -160,18 +162,20 @@ public class PartitionIndexWriter
             String dbPath = "";
             for (Map.Entry<String, Type> entry : createIndexMetadata.getIndexColumns()) {
                 if (partition != null) {
-                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey() + "/" + partition;
+                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey() + "/" + createIndexMetadata.getIndexType().toUpperCase() + "/" + partition;
                 }
                 else {
-                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey();
+                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + createIndexMetadata.getIndexType().toUpperCase() + "/" + entry.getKey();
                 }
                 partitionIndex = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType());
             }
 
+            List<KeyValue> values = new ArrayList<>(dataMap.size());
             for (Map.Entry<Object, String> entry : dataMap.entrySet()) {
-                KeyValue keyValue = new KeyValue(entry.getKey(), entry.getValue());
-                partitionIndex.addKeyValues(Collections.singletonList(keyValue));
+                values.add(new KeyValue(entry.getKey(), entry.getValue()));
             }
+            String columnName = createIndexMetadata.getIndexColumns().get(0).getKey();
+            partitionIndex.addKeyValues(Collections.singletonList(new Pair<>(columnName, values)));
 
             properties.put(SYMBOL_TABLE_KEY_NAME, serializedSymbolTable);
             properties.put(LAST_MODIFIED_KEY_NAME, serializeMap(lastModifiedTable));

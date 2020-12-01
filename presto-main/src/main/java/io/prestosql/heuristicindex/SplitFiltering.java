@@ -111,7 +111,7 @@ public class SplitFiltering
         }
         // TODO: Currently we give partition index a priority for split filtering.
         for (IndexRecord indexRecord : indexRecords) {
-            if (PARTITION_INDEX_TYPES.contains(indexRecord.indexType)) {
+            if (PARTITION_INDEX_TYPES.contains(indexRecord.indexType.toUpperCase())) {
                 return filterUsingPartitionIndex(expression.get(), allSplits, fullQualifiedTableName, assignments, heuristicIndexerManager);
             }
         }
@@ -202,11 +202,18 @@ public class SplitFiltering
             List<Split> result = new ArrayList<>();
             boolean filtered = false;
             for (String column : referencedColumns) {
-                List<IndexMetadata> indexMetadataList = indexCache.getIndices(fullQualifiedTableName, column, partitionSplitMap.keySet(), maxLastUpdated);
+                List<IndexMetadata> indexMetadataList = new ArrayList<>();
+                for (String indexType : PARTITION_INDEX_TYPES) {
+                    List<IndexMetadata> output = indexCache.getIndices(fullQualifiedTableName, column, indexType, partitionSplitMap.keySet(), maxLastUpdated);
+                    if (output != null && !output.isEmpty()) {
+                        indexMetadataList.addAll(output);
+                    }
+                }
+
                 Map<String, PartitionIndexHolder> partitionIndexHolderMap = new HashMap<>();
                 if (indexMetadataList != null && !indexMetadataList.isEmpty()) {
-                    Map<String, String> outputMap = new HashMap<>();
                     for (IndexMetadata indexMetadata : indexMetadataList) {
+                        Map<String, String> outputMap = new HashMap<>();
                         Index index = indexMetadata.getIndex();
                         String partition = getPartitionFromPath(indexMetadata.getUri());
                         Iterator iterator = index.lookUp(expression);
@@ -215,21 +222,21 @@ public class SplitFiltering
                         Map<String, String> symbolTable = deserializePropertyToMapString(symbolTableStr);
                         Map<String, Long> lastUpdateTable = deserializePropertyToMapLong(properties.getProperty(LAST_MODIFIED_KEY_NAME));
                         long maxLastUpdate = Long.parseLong(properties.getProperty(MAX_MODIFIED_TIME));
-                        partitionIndexHolderMap.putIfAbsent(partition, new PartitionIndexHolder(index, partition, symbolTable, lastUpdateTable, maxLastUpdate));
                         while (iterator.hasNext()) {
                             String output = iterator.next().toString();
                             Map<String, String> map = deserializePropertyToMapString(output);
                             outputMap.putAll(map);
                         }
+                        partitionIndexHolderMap.putIfAbsent(partition, new PartitionIndexHolder(index, partition, symbolTable, lastUpdateTable, outputMap, maxLastUpdate));
                     }
 
-                    LOG.debug("Output map: ", outputMap);
                     // Start filtering
                     if (!partitionIndexHolderMap.isEmpty()) {
                         for (Map.Entry<String, List<Split>> entry : partitionSplitMap.entrySet()) {
                             String partition = entry.getKey();
                             if (partitionIndexHolderMap.containsKey(partition)) {
                                 PartitionIndexHolder partitionIndexHolder = partitionIndexHolderMap.get(partition);
+                                Map<String, String> outputMap = partitionIndexHolder.getResultMap();
                                 for (Split split : entry.getValue()) {
                                     ConnectorSplit connectorSplit = split.getConnectorSplit();
                                     String filePathStr = connectorSplit.getFilePath();
