@@ -29,6 +29,7 @@ public class IndexRecord
     public final String indexType;
     public final List<String> properties;
     public final List<String> partitions;
+    private long lastModifiedTime;
 
     public IndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> properties, List<String> partitions)
     {
@@ -39,6 +40,7 @@ public class IndexRecord
         this.indexType = indexType;
         this.properties = properties;
         this.partitions = partitions;
+        this.lastModifiedTime = System.currentTimeMillis();
     }
 
     public IndexRecord(String csvRecord)
@@ -51,12 +53,18 @@ public class IndexRecord
         this.indexType = records[4];
         this.properties = Arrays.stream(records[5].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
         this.partitions = Arrays.stream(records[6].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
+        this.lastModifiedTime = Long.parseLong(records[7]);
+    }
+
+    public static String getHeader()
+    {
+        return String.format("%s|%s|%s|%s|%s|%s|%s|%s\n", "name", "user", "table", "columns", "indexType", "properties", "partitions", "lastModifiedTime");
     }
 
     public String toCsvRecord()
     {
-        return String.format("%s|%s|%s|%s|%s|%s|%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType,
-                String.join(",", properties), String.join(",", partitions));
+        return String.format("%s|%s|%s|%s|%s|%s|%s|%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType,
+                String.join(",", properties), String.join(",", partitions), lastModifiedTime);
     }
 
     @Override
@@ -79,7 +87,7 @@ public class IndexRecord
     @Override
     public int hashCode()
     {
-        int result = Objects.hash(name, user, table, indexType);
+        int result = Objects.hash(name, user, table, columns, indexType);
         result = 31 * result + Arrays.hashCode(columns);
         return result;
     }
@@ -87,10 +95,22 @@ public class IndexRecord
     @Override
     public String toString()
     {
-        return name + ","
-                + user + ","
-                + table + ","
-                + "[" + String.join(",", columns) + "],"
-                + indexType;
+        return "IndexRecord{" +
+                "name='" + name + '\'' +
+                ", table='" + table + '\'' +
+                ", columns=" + Arrays.toString(columns) +
+                ", indexType='" + indexType + '\'' +
+                ", lastModifiedTime=" + lastModifiedTime +
+                '}';
+    }
+
+    public long getLastModifiedTime()
+    {
+        return lastModifiedTime;
+    }
+
+    public void setLastModifiedTime(long lastModifiedTime)
+    {
+        this.lastModifiedTime = lastModifiedTime;
     }
 }

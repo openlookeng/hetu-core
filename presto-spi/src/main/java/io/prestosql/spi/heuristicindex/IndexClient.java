@@ -51,9 +51,10 @@ public interface IndexClient
      * Delete the indexes for the table, according to the index name.
      *
      * @param indexName index name
+     * @param partitionsToDelete partitionsToDelete. Delete all partitions if empty list provided
      * @throws IOException any IOException thrown by filesystem client during file deletion
      */
-    void deleteIndex(String indexName)
+    void deleteIndex(String indexName, List<String> partitionsToDelete)
             throws IOException;
 
     /**

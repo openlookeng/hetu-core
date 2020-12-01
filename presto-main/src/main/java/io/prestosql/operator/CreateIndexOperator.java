@@ -180,13 +180,9 @@ public class CreateIndexOperator
             switch (createIndexMetadata.getCreateLevel()) {
                 case STRIPE: {
                     String filePath = page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH);
-                    IndexWriter indexWriter = levelWriter.computeIfAbsent(filePath,
-                            k -> {
-                                IndexWriter writer = heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata);
-                                persistBy.putIfAbsent(writer, this);
-                                return writer;
-                            });
-                    indexWriter.addData(values, connectorMetadata);
+                    levelWriter.computeIfAbsent(filePath, k -> heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    persistBy.putIfAbsent(levelWriter.get(filePath), this);
+                    levelWriter.get(filePath).addData(values, connectorMetadata);
                     break;
                 }
                 case PARTITION: {

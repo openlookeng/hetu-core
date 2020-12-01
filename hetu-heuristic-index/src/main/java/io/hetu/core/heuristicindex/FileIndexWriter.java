@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.AbstractMap;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -128,10 +129,10 @@ public class FileIndexWriter
                     // each entry represents a mapping from column name -> list<entry<page values, page number>>
                     for (Map.Entry<String, List<Map.Entry<List<Object>, Integer>>> entry : indexPages.get(stripeOffset).entrySet()) {
                         // sort the page values lists based on page numbers
-                        Collections.sort(entry.getValue(), Comparator.comparingInt(o -> o.getValue()));
+                        entry.getValue().sort(Comparator.comparingInt(Map.Entry::getValue));
                         // collect all page values lists into a single list
                         List<Object> columnValues = entry.getValue().stream()
-                                .map(Map.Entry::getKey).flatMap(i -> i.stream()).collect(Collectors.toList());
+                                .map(Map.Entry::getKey).flatMap(Collection::stream).collect(Collectors.toList());
                         columnValuesMap.put(entry.getKey(), columnValues);
                     }
 

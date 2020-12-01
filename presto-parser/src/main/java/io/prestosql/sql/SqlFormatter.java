@@ -865,7 +865,7 @@ public final class SqlFormatter
         protected Void visitDropIndex(DropIndex node, Integer context)
         {
             append(context, "DROP INDEX ");
-            if (node.isExists()) {
+            if (node.exists()) {
                 builder.append("IF EXISTS ");
             }
             builder.append(node.getIndexName());
