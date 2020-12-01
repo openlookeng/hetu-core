@@ -72,6 +72,9 @@ public class HeuristicIndexerManager
 
             root = Paths.get(indexStoreRoot);
             fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
+            if (!fileSystemClientManager.isFileSystemShared(fsProfile)) {
+                LOG.warn("Profile %s is not a shared filesystem. It may not work properly if the cluster has more than 1 nodes.");
+            }
             if (factory != null) {
                 indexClient = factory.getIndexClient(fs, root);
             }

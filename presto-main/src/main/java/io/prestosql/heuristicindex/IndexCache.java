@@ -33,7 +33,6 @@ import io.prestosql.spi.service.PropertyService;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -56,7 +55,7 @@ public class IndexCache
 
     private Long loadDelay; // in millisecond
     private LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
-    private final List<IndexRecord> indexRecords = new ArrayList<>();
+    private List<IndexRecord> indexRecords;
 
     public IndexCache(CacheLoader loader, IndexClient indexClient)
     {
@@ -92,24 +91,20 @@ public class IndexCache
             }
             executor.scheduleAtFixedRate(() -> {
                 try {
-                    synchronized (indexRecords) {
+                    if (cache.size() > 0) {
+                        // only refresh cache is it's not empty
                         List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
 
-                        if (indexRecords.isEmpty()) {
-                            indexRecords.addAll(newRecords);
-                        }
-                        else {
+                        if (indexRecords != null) {
                             for (IndexRecord old : indexRecords) {
                                 boolean found = false;
                                 for (IndexRecord now : newRecords) {
                                     if (now.name.equals(old.name)) {
                                         found = true;
-                                        if (now.getLastModifiedTime() != old.getLastModifiedTime()) {
+                                        if (now.lastModifiedTime != old.lastModifiedTime) {
                                             // index record has been updated. evict
                                             evictFromCache(old);
                                             LOG.debug("Index for {%s} has been evicted from cache because the index has been updated.", old);
-                                            indexRecords.clear();
-                                            indexRecords.addAll(newRecords);
                                         }
                                     }
                                 }
@@ -117,11 +112,11 @@ public class IndexCache
                                 if (!found) {
                                     evictFromCache(old);
                                     LOG.debug("Index for {%s} has been evicted from cache because the index has been dropped.", old);
-                                    indexRecords.clear();
-                                    indexRecords.addAll(newRecords);
                                 }
                             }
                         }
+
+                        indexRecords = newRecords;
                     }
                 }
                 catch (Exception e) {

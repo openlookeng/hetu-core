@@ -244,6 +244,7 @@ public class HeuristicIndexClient
         Path toDelete = root.resolve(indexRecord.table).resolve(String.join(COLUMN_DELIMITER, indexRecord.columns)).resolve(indexRecord.indexType);
 
         if (!fs.exists(toDelete)) {
+            indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
             return;
         }
 
