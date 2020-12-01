@@ -245,7 +245,7 @@ public class TestFilterStatsCalculator
         assertExpression("sin(x)")
                 .outputRowsCountUnknown();
         assertExpression("x = sin(x)")
-                .outputRowsCountUnknown();
+                .outputRowsCount(18.75);
     }
 
     @Test

@@ -353,7 +353,7 @@ public class TestTpchLocalStats
     {
         statisticsAssertion.check("SELECT count() AS count FROM nation",
                 checks -> checks
-                        .estimate(OUTPUT_ROW_COUNT, defaultTolerance())
+                        .estimate(OUTPUT_ROW_COUNT, absoluteError(22))
                         .verifyNoColumnStatistics("count"));
 
         statisticsAssertion.check("SELECT n_name, count() AS count FROM nation GROUP BY n_name",
