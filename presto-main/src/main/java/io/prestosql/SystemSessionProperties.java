@@ -127,7 +127,7 @@ public final class SystemSessionProperties
     public static final String WORK_PROCESSOR_PIPELINES = "work_processor_pipelines";
     public static final String ENABLE_DYNAMIC_FILTERING = "enable_dynamic_filtering";
     public static final String QUERY_PUSHDOWN = "query_pushdown";
-    public static final String TRANSFORM_IN_TO_JOIN = "transform_in_to_join";
+    public static final String FILTERING_SEMI_JOIN_TO_INNER = "rewrite_filtering_semi_join_to_inner_join";
     public static final String JOIN_ORDER = "join_order";
     public static final String IMPLICIT_CONVERSION = "implicit_conversion";
     public static final String PUSH_LIMIT_THROUGH_UNION = "push_limit_through_union";
@@ -173,9 +173,9 @@ public final class SystemSessionProperties
                         featuresConfig.isQueryPushDown(),
                         false),
                 booleanProperty(
-                        TRANSFORM_IN_TO_JOIN,
-                        "Transform IN to join",
-                        false,
+                        FILTERING_SEMI_JOIN_TO_INNER,
+                        "Rewrite semi join in filtering context to inner join",
+                        featuresConfig.isRewriteFilteringSemiJoinToInnerJoin(),
                         false),
                 stringProperty(
                         JOIN_ORDER,
@@ -693,9 +693,9 @@ public final class SystemSessionProperties
         return session.getSystemProperty(IMPLICIT_CONVERSION, Boolean.class);
     }
 
-    public static boolean isTransformUncorrelatedInToJoin(Session session)
+    public static boolean isRewriteFilteringSemiJoinToInnerJoin(Session session)
     {
-        return session.getSystemProperty(TRANSFORM_IN_TO_JOIN, Boolean.class);
+        return session.getSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, Boolean.class);
     }
 
     public static String getJoinOrder(Session session)
