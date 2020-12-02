@@ -15,493 +15,564 @@ package io.prestosql.elasticsearch;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.floragunn.searchguard.ssl.SearchGuardSSLPlugin;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Closer;
+import com.google.common.collect.ImmutableSet;
+import io.airlift.json.JsonCodec;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.log.Logger;
+import io.airlift.security.pem.PemReader;
 import io.airlift.units.Duration;
+import io.prestosql.elasticsearch.client.IndexMetadata;
+import io.prestosql.elasticsearch.client.Node;
+import io.prestosql.elasticsearch.client.NodesResponse;
+import io.prestosql.elasticsearch.client.SearchShardsResponse;
+import io.prestosql.elasticsearch.client.Shard;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnMetadata;
-import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.type.RowType;
-import io.prestosql.spi.type.RowType.Field;
-import io.prestosql.spi.type.Type;
-import org.elasticsearch.action.admin.cluster.shards.ClusterSearchShardsRequest;
-import org.elasticsearch.action.admin.cluster.shards.ClusterSearchShardsResponse;
-import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
-import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest;
-import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.cluster.metadata.MappingMetaData;
-import org.elasticsearch.common.collect.ImmutableOpenMap;
-import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.TransportAddress;
-import org.elasticsearch.transport.client.PreBuiltTransportClient;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.http.impl.nio.reactor.IOReactorConfig;
+import org.apache.http.util.EntityUtils;
+import org.elasticsearch.ElasticsearchStatusException;
+import org.elasticsearch.action.search.ClearScrollRequest;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchScrollRequest;
+import org.elasticsearch.client.Response;
+import org.elasticsearch.client.ResponseException;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+import javax.security.auth.x500.X500Principal;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.InetAddress;
-import java.util.ArrayList;
+import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeMap;
-import java.util.concurrent.ExecutorService;
+import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_PEMCERT_FILEPATH;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_PEMKEY_FILEPATH;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_PEMKEY_PASSWORD;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH;
-import static com.floragunn.searchguard.ssl.util.SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD;
-import static com.google.common.base.Strings.isNullOrEmpty;
-import static com.google.common.base.Verify.verify;
-import static com.google.common.cache.CacheLoader.asyncReloading;
-import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.prestosql.elasticsearch.ElasticsearchErrorCode.ELASTICSEARCH_CORRUPTED_MAPPING_METADATA;
-import static io.prestosql.elasticsearch.RetryDriver.retry;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.spi.type.IntegerType.INTEGER;
-import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
-import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static java.util.Map.Entry;
+import static io.airlift.json.JsonCodec.jsonCodec;
+import static io.prestosql.elasticsearch.ElasticsearchErrorCode.ELASTICSEARCH_CONNECTION_ERROR;
+import static io.prestosql.elasticsearch.ElasticsearchErrorCode.ELASTICSEARCH_INVALID_RESPONSE;
+import static io.prestosql.elasticsearch.ElasticsearchErrorCode.ELASTICSEARCH_QUERY_FAILURE;
+import static io.prestosql.elasticsearch.ElasticsearchErrorCode.ELASTICSEARCH_SSL_INITIALIZATION_FAILURE;
+import static java.lang.StrictMath.toIntExact;
+import static java.lang.String.format;
+import static java.util.Collections.list;
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static org.elasticsearch.action.search.SearchType.QUERY_THEN_FETCH;
 
 public class ElasticsearchClient
 {
     private static final Logger LOG = Logger.get(ElasticsearchClient.class);
 
-    private final ExecutorService executor = newFixedThreadPool(1, daemonThreadsNamed("elasticsearch-metadata-%s"));
-    private final ObjectMapper objecMapper = new ObjectMapperProvider().get();
-    private final ElasticsearchTableDescriptionProvider tableDescriptions;
-    private final Map<String, TransportClient> clients = new HashMap<>();
-    private final LoadingCache<ElasticsearchTableDescription, List<ColumnMetadata>> columnMetadataCache;
-    private final Duration requestTimeout;
-    private final int maxAttempts;
-    private final Duration maxRetryTime;
+    private static final JsonCodec<SearchShardsResponse> SEARCH_SHARDS_RESPONSE_CODEC = jsonCodec(SearchShardsResponse.class);
+    private static final JsonCodec<NodesResponse> NODES_RESPONSE_CODEC = jsonCodec(NodesResponse.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapperProvider().get();
+
+    private final RestHighLevelClient client;
+    private final int scrollSize;
+    private final Duration scrollTimeout;
+
+    private final AtomicReference<Set<Node>> nodes = new AtomicReference<>(ImmutableSet.of());
+    private final ScheduledExecutorService executor = newSingleThreadScheduledExecutor(daemonThreadsNamed("NodeRefresher"));
+    private final AtomicBoolean started = new AtomicBoolean();
+    private final Duration refreshInterval;
+    private final boolean tlsEnabled;
 
     @Inject
-    public ElasticsearchClient(ElasticsearchTableDescriptionProvider descriptions, ElasticsearchConnectorConfig config)
-            throws IOException
+    public ElasticsearchClient(ElasticsearchConfig config, Optional<PasswordConfig> passwordConfig)
     {
-        tableDescriptions = requireNonNull(descriptions, "description is null");
-        ElasticsearchConnectorConfig configuration = requireNonNull(config, "config is null");
-        requestTimeout = configuration.getRequestTimeout();
-        maxAttempts = configuration.getMaxRequestRetries();
-        maxRetryTime = configuration.getMaxRetryTime();
+        requireNonNull(config, "config is null");
 
-        for (ElasticsearchTableDescription tableDescription : tableDescriptions.getAllTableDescriptions()) {
-            if (!clients.containsKey(tableDescription.getClusterName())) {
-                TransportAddress address = new TransportAddress(InetAddress.getByName(tableDescription.getHost()), tableDescription.getPort());
-                TransportClient client = createTransportClient(config, address, Optional.of(tableDescription.getClusterName()));
-                clients.put(tableDescription.getClusterName(), client);
-            }
+        client = createClient(config, passwordConfig);
+
+        this.scrollSize = config.getScrollSize();
+        this.scrollTimeout = config.getScrollTimeout();
+        this.refreshInterval = config.getNodeRefreshInterval();
+        this.tlsEnabled = config.isTlsEnabled();
+    }
+
+    @PostConstruct
+    public void initialize()
+    {
+        if (!started.getAndSet(true)) {
+            // do the first refresh eagerly
+            refreshNodes();
+
+            executor.scheduleWithFixedDelay(this::refreshNodes, refreshInterval.toMillis(), refreshInterval.toMillis(), TimeUnit.MILLISECONDS);
         }
-        this.columnMetadataCache = CacheBuilder.newBuilder()
-                .expireAfterWrite(30, MINUTES)
-                .refreshAfterWrite(15, MINUTES)
-                .maximumSize(500)
-                .build(asyncReloading(CacheLoader.from(this::loadColumns), executor));
     }
 
     @PreDestroy
-    public void tearDown()
+    public void close()
+            throws IOException
     {
-        // Closer closes the resources in reverse order.
-        // Therefore, we first clear the clients map, then close each client.
-        try (Closer closer = Closer.create()) {
-            closer.register(clients::clear);
-            for (Entry<String, TransportClient> entry : clients.entrySet()) {
-                closer.register(entry.getValue());
-            }
-            closer.register(executor::shutdown);
-        }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        executor.shutdownNow();
+        client.close();
     }
 
-    public List<String> listSchemas()
+    private void refreshNodes()
     {
-        return tableDescriptions.getAllSchemaTableNames()
-                .stream()
-                .map(SchemaTableName::getSchemaName)
-                .collect(toImmutableList());
-    }
-
-    public List<SchemaTableName> listTables(Optional<String> schemaName)
-    {
-        return tableDescriptions.getAllSchemaTableNames()
-                .stream()
-                .filter(schemaTableName -> !schemaName.isPresent() || schemaTableName.getSchemaName().equals(schemaName.get()))
-                .collect(toImmutableList());
-    }
-
-    private List<ColumnMetadata> loadColumns(ElasticsearchTableDescription table)
-    {
-        if (table.getColumns().isPresent()) {
-            return buildMetadata(table.getColumns().get());
-        }
-        return buildMetadata(buildColumns(table));
-    }
-
-    public List<ColumnMetadata> getColumnMetadata(ElasticsearchTableDescription tableDescription)
-    {
-        return columnMetadataCache.getUnchecked(tableDescription);
-    }
-
-    public ElasticsearchTableDescription getTable(String schemaName, String tableName)
-    {
-        requireNonNull(schemaName, "schemaName is null");
-        requireNonNull(tableName, "tableName is null");
-        ElasticsearchTableDescription table = tableDescriptions.get(new SchemaTableName(schemaName, tableName));
-        if (table == null) {
-            return null;
-        }
-        if (table.getColumns().isPresent()) {
-            return table;
-        }
-        return new ElasticsearchTableDescription(
-                table.getTableName(),
-                table.getSchemaName(),
-                table.getHost(),
-                table.getPort(),
-                table.getClusterName(),
-                table.getIndex(),
-                table.getIndexExactMatch(),
-                table.getType(),
-                Optional.of(buildColumns(table)));
-    }
-
-    public List<String> getIndices(ElasticsearchTableDescription tableDescription)
-    {
-        if (tableDescription.getIndexExactMatch()) {
-            return ImmutableList.of(tableDescription.getIndex());
-        }
-        TransportClient client = clients.get(tableDescription.getClusterName());
-        verify(client != null, "client is null");
-        String[] indices = getIndices(client, new GetIndexRequest());
-        return Arrays.stream(indices)
-                .filter(index -> index.startsWith(tableDescription.getIndex()))
-                .collect(toImmutableList());
-    }
-
-    public ClusterSearchShardsResponse getSearchShards(String index, ElasticsearchTableDescription tableDescription)
-    {
-        TransportClient client = clients.get(tableDescription.getClusterName());
-        verify(client != null, "client is null");
-        return getSearchShardsResponse(client, new ClusterSearchShardsRequest(index));
-    }
-
-    private String[] getIndices(TransportClient client, GetIndexRequest request)
-    {
+        // discover other nodes in the cluster and add them to the client
         try {
-            return retry()
-                    .maxAttempts(maxAttempts)
-                    .exponentialBackoff(maxRetryTime)
-                    .run("getIndices", () -> client.admin()
-                            .indices()
-                            .getIndex(request)
-                            .actionGet(requestTimeout.toMillis())
-                            .getIndices());
+            Set<Node> nodes = fetchNodes();
+
+            HttpHost[] hosts = nodes.stream()
+                    .map(Node::getAddress)
+                    .map(address -> HttpHost.create(format("%s://%s", tlsEnabled ? "https" : "http", address)))
+                    .toArray(HttpHost[]::new);
+
+            client.getLowLevelClient().setHosts(hosts);
+            this.nodes.set(nodes);
         }
-        catch (Exception e) {
-            throw new RuntimeException(e);
+        catch (Throwable e) {
+            // Catch all exceptions here since throwing an exception from executor#scheduleWithFixedDelay method
+            // suppresses all future scheduled invocations
+            LOG.error(e, "Error refreshing nodes");
         }
     }
 
-    private ClusterSearchShardsResponse getSearchShardsResponse(TransportClient client, ClusterSearchShardsRequest request)
+    private static RestHighLevelClient createClient(ElasticsearchConfig config, Optional<PasswordConfig> passwordConfig)
     {
-        try {
-            return retry()
-                    .maxAttempts(maxAttempts)
-                    .exponentialBackoff(maxRetryTime)
-                    .run("getSearchShardsResponse", () -> client.admin()
-                            .cluster()
-                            .searchShards(request)
-                            .actionGet(requestTimeout.toMillis()));
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
+        RestClientBuilder builder = RestClient.builder(
+                new HttpHost(config.getHost(), config.getPort(), config.isTlsEnabled() ? "https" : "http"))
+                .setMaxRetryTimeoutMillis(toIntExact(config.getMaxRetryTime().toMillis()));
 
-    private List<ColumnMetadata> buildMetadata(List<ElasticsearchColumn> columns)
-    {
-        List<ColumnMetadata> result = new ArrayList<>();
-        for (ElasticsearchColumn column : columns) {
-            Map<String, Object> properties = new HashMap<>();
-            properties.put("originalColumnName", column.getName());
-            properties.put("jsonPath", column.getJsonPath());
-            properties.put("jsonType", column.getJsonType());
-            properties.put("isList", column.isList());
-            properties.put("ordinalPosition", column.getOrdinalPosition());
-            result.add(new ColumnMetadata(column.getName(), column.getType(), "", "", false, properties));
-        }
-        return result;
-    }
+        builder.setHttpClientConfigCallback(ignored -> {
+            RequestConfig requestConfig = RequestConfig.custom()
+                    .setConnectTimeout(toIntExact(config.getConnectTimeout().toMillis()))
+                    .setSocketTimeout(toIntExact(config.getRequestTimeout().toMillis()))
+                    .build();
 
-    private List<ElasticsearchColumn> buildColumns(ElasticsearchTableDescription tableDescription)
-    {
-        List<ElasticsearchColumn> columns = new ArrayList<>();
-        TransportClient client = clients.get(tableDescription.getClusterName());
-        verify(client != null, "client is null");
-        for (String index : getIndices(tableDescription)) {
-            GetMappingsRequest mappingsRequest = new GetMappingsRequest().types(tableDescription.getType());
+            IOReactorConfig reactorConfig = IOReactorConfig.custom()
+                    .setIoThreadCount(config.getHttpThreadCount())
+                    .build();
 
-            if (!isNullOrEmpty(index)) {
-                mappingsRequest.indices(index);
+            // the client builder passed to the call-back is configured to use system properties, which makes it
+            // impossible to configure concurrency settings, so we need to build a new one from scratch
+            HttpAsyncClientBuilder clientBuilder = HttpAsyncClientBuilder.create()
+                    .setDefaultRequestConfig(requestConfig)
+                    .setDefaultIOReactorConfig(reactorConfig)
+                    .setMaxConnPerRoute(config.getMaxHttpConnections())
+                    .setMaxConnTotal(config.getMaxHttpConnections());
+            if (config.isTlsEnabled()) {
+                buildSslContext(config.getKeystorePath(), config.getKeystorePassword(), config.getTrustStorePath(), config.getTruststorePassword())
+                        .ifPresent(clientBuilder::setSSLContext);
+
+                if (config.isVerifyHostnames()) {
+                    clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
+                }
             }
-            ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings = getMappings(client, mappingsRequest);
 
-            Iterator<String> indexIterator = mappings.keysIt();
-            while (indexIterator.hasNext()) {
-                // TODO use io.airlift.json.JsonCodec
-                MappingMetaData mappingMetaData = mappings.get(indexIterator.next()).get(tableDescription.getType());
-                JsonNode rootNode;
+            passwordConfig.ifPresent(securityConfig -> {
+                CredentialsProvider credentials = new BasicCredentialsProvider();
+                credentials.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(securityConfig.getUser(), securityConfig.getPassword()));
+                clientBuilder.setDefaultCredentialsProvider(credentials);
+            });
+
+            return clientBuilder;
+        });
+
+        return new RestHighLevelClient(builder);
+    }
+
+    private static Optional<SSLContext> buildSslContext(
+            Optional<File> keyStorePath,
+            Optional<String> keyStorePassword,
+            Optional<File> trustStorePath,
+            Optional<String> trustStorePassword)
+    {
+        if (!keyStorePath.isPresent() && !trustStorePath.isPresent()) {
+            return Optional.empty();
+        }
+
+        try {
+            // load KeyStore if configured and get KeyManagers
+            KeyStore keyStore = null;
+            KeyManager[] keyManagers = null;
+            if (keyStorePath.isPresent()) {
+                char[] keyManagerPassword;
                 try {
-                    rootNode = objecMapper.readTree(mappingMetaData.source().uncompressed());
+                    // attempt to read the key store as a PEM file
+                    keyStore = PemReader.loadKeyStore(keyStorePath.get(), keyStorePath.get(), keyStorePassword);
+                    // for PEM encoded keys, the password is used to decrypt the specific key (and does not protect the keystore itself)
+                    keyManagerPassword = new char[0];
                 }
-                catch (IOException e) {
-                    throw new PrestoException(ELASTICSEARCH_CORRUPTED_MAPPING_METADATA, e);
-                }
-                // parse field mapping JSON: https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-get-field-mapping.html
-                JsonNode mappingNode = rootNode.get(tableDescription.getType());
-                JsonNode propertiesNode = mappingNode.get("properties");
+                catch (IOException | GeneralSecurityException ignored) {
+                    keyManagerPassword = keyStorePassword.map(String::toCharArray).orElse(null);
 
-                List<String> lists = new ArrayList<>();
-                JsonNode metaNode = mappingNode.get("_meta");
-                if (metaNode != null) {
-                    JsonNode arrayNode = metaNode.get("lists");
-                    if (arrayNode != null && arrayNode.isArray()) {
-                        ArrayNode arrays = (ArrayNode) arrayNode;
-                        for (int i = 0; i < arrays.size(); i++) {
-                            lists.add(arrays.get(i).textValue());
-                        }
+                    keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                    try (InputStream in = new FileInputStream(keyStorePath.get())) {
+                        keyStore.load(in, keyManagerPassword);
                     }
                 }
-                populateColumns(propertiesNode, lists, columns);
+                validateCertificates(keyStore);
+                KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                keyManagerFactory.init(keyStore, keyManagerPassword);
+                keyManagers = keyManagerFactory.getKeyManagers();
+            }
+
+            // load TrustStore if configured, otherwise use KeyStore
+            KeyStore trustStore = keyStore;
+            if (trustStorePath.isPresent()) {
+                trustStore = loadTrustStore(trustStorePath.get(), trustStorePassword);
+            }
+
+            // create TrustManagerFactory
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+
+            // get X509TrustManager
+            TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
+            if ((trustManagers.length != 1) || !(trustManagers[0] instanceof X509TrustManager)) {
+                throw new RuntimeException("Unexpected default trust managers:" + Arrays.toString(trustManagers));
+            }
+            X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
+
+            // create SSLContext
+            SSLContext result = SSLContext.getInstance("SSL");
+            result.init(keyManagers, new TrustManager[] {trustManager}, null);
+            return Optional.of(result);
+        }
+        catch (GeneralSecurityException | IOException e) {
+            throw new PrestoException(ELASTICSEARCH_SSL_INITIALIZATION_FAILURE, e);
+        }
+    }
+
+    private static KeyStore loadTrustStore(File trustStorePath, Optional<String> trustStorePassword)
+            throws IOException, GeneralSecurityException
+    {
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        try {
+            // attempt to read the trust store as a PEM file
+            List<X509Certificate> certificateChain = PemReader.readCertificateChain(trustStorePath);
+            if (!certificateChain.isEmpty()) {
+                trustStore.load(null, null);
+                for (X509Certificate certificate : certificateChain) {
+                    X500Principal principal = certificate.getSubjectX500Principal();
+                    trustStore.setCertificateEntry(principal.getName(), certificate);
+                }
+                return trustStore;
             }
         }
-        return columns;
+        catch (IOException | GeneralSecurityException ignored) {
+        }
+
+        try (InputStream in = new FileInputStream(trustStorePath)) {
+            trustStore.load(in, trustStorePassword.map(String::toCharArray).orElse(null));
+        }
+        return trustStore;
     }
 
-    private ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> getMappings(TransportClient client, GetMappingsRequest request)
+    private static void validateCertificates(KeyStore keyStore)
+            throws GeneralSecurityException
     {
-        try {
-            return retry()
-                    .maxAttempts(maxAttempts)
-                    .exponentialBackoff(maxRetryTime)
-                    .run("getMappings", () -> client.admin()
-                            .indices()
-                            .getMappings(request)
-                            .actionGet(requestTimeout.toMillis())
-                            .getMappings());
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
+        for (String alias : list(keyStore.aliases())) {
+            if (!keyStore.isKeyEntry(alias)) {
+                continue;
+            }
+            Certificate certificate = keyStore.getCertificate(alias);
+            if (!(certificate instanceof X509Certificate)) {
+                continue;
+            }
+
+            try {
+                ((X509Certificate) certificate).checkValidity();
+            }
+            catch (CertificateExpiredException e) {
+                throw new CertificateExpiredException("KeyStore certificate is expired: " + e.getMessage());
+            }
+            catch (CertificateNotYetValidException e) {
+                throw new CertificateNotYetValidException("KeyStore certificate is not yet valid: " + e.getMessage());
+            }
         }
     }
 
-    private List<String> getColumnMetadata(Optional<String> parent, JsonNode propertiesNode)
+    private Set<Node> fetchNodes()
     {
-        ImmutableList.Builder<String> metadata = ImmutableList.builder();
-        Iterator<Entry<String, JsonNode>> iterator = propertiesNode.fields();
-        while (iterator.hasNext()) {
-            Entry<String, JsonNode> entry = iterator.next();
-            String key = entry.getKey();
-            JsonNode value = entry.getValue();
-            String childKey;
-            if (parent.isPresent()) {
-                if (parent.get().isEmpty()) {
-                    childKey = key;
+        NodesResponse nodesResponse = doRequest("_nodes/http", NODES_RESPONSE_CODEC::fromJson);
+
+        ImmutableSet.Builder<Node> result = ImmutableSet.builder();
+        for (Map.Entry<String, NodesResponse.Node> entry : nodesResponse.getNodes().entrySet()) {
+            String nodeId = entry.getKey();
+            NodesResponse.Node node = entry.getValue();
+
+            if (node.getRoles().contains("data")) {
+                result.add(new Node(nodeId, node.getHttp().getAddress()));
+            }
+        }
+
+        return result.build();
+    }
+
+    public Set<Node> getNodes()
+    {
+        return nodes.get();
+    }
+
+    public List<Shard> getSearchShards(String index)
+    {
+        Map<String, Node> nodeById = getNodes().stream()
+                .collect(toImmutableMap(Node::getId, Function.identity()));
+
+        SearchShardsResponse shardsResponse = doRequest(format("%s/_search_shards", index), SEARCH_SHARDS_RESPONSE_CODEC::fromJson);
+
+        ImmutableList.Builder<Shard> shards = ImmutableList.builder();
+        List<Node> nodes = ImmutableList.copyOf(nodeById.values());
+
+        for (List<SearchShardsResponse.Shard> shardGroup : shardsResponse.getShardGroups()) {
+            Stream<SearchShardsResponse.Shard> preferred = shardGroup.stream()
+                    .sorted(this::shardPreference);
+
+            Optional<SearchShardsResponse.Shard> candidate = preferred
+                    .filter(shard -> shard.getNode() != null && nodeById.containsKey(shard.getNode()))
+                    .findFirst();
+
+            SearchShardsResponse.Shard chosen;
+            Node node;
+            if (!candidate.isPresent()) {
+                // pick an arbitrary shard with and assign to an arbitrary node
+                chosen = preferred.findFirst().get();
+                node = nodes.get(chosen.getShard() % nodes.size());
+            }
+            else {
+                chosen = candidate.get();
+                node = nodeById.get(chosen.getNode());
+            }
+
+            shards.add(new Shard(chosen.getShard(), node.getAddress()));
+        }
+
+        return shards.build();
+    }
+
+    private int shardPreference(SearchShardsResponse.Shard left, SearchShardsResponse.Shard right)
+    {
+        // Favor non-primary shards
+        if (left.isPrimary() == right.isPrimary()) {
+            return 0;
+        }
+
+        return left.isPrimary() ? 1 : -1;
+    }
+
+    public List<String> getIndexes()
+    {
+        return doRequest("_cat/indices?h=index&format=json&s=index:asc", body -> {
+            try {
+                ImmutableList.Builder<String> result = ImmutableList.builder();
+                JsonNode root = OBJECT_MAPPER.readTree(body);
+                for (int i = 0; i < root.size(); i++) {
+                    result.add(root.get(i).get("index").asText());
+                }
+                return result.build();
+            }
+            catch (IOException e) {
+                throw new PrestoException(ELASTICSEARCH_INVALID_RESPONSE, e);
+            }
+        });
+    }
+
+    public IndexMetadata getIndexMetadata(String index)
+    {
+        String path = format("/%s/_mappings", index);
+
+        return doRequest(path, body -> {
+            try {
+                JsonNode mappings = OBJECT_MAPPER.readTree(body)
+                        .get(index)
+                        .get("mappings");
+
+                if (!mappings.has("properties")) {
+                    // Older versions of ElasticSearch supported multiple "type" mappings
+                    // for a given index. Newer versions support only one and don't
+                    // expose it in the document. Here we skip it if it's present.
+                    mappings = mappings.elements().next();
+                }
+
+                return new IndexMetadata(parseType(mappings.get("properties")));
+            }
+            catch (IOException e) {
+                throw new PrestoException(ELASTICSEARCH_INVALID_RESPONSE, e);
+            }
+        });
+    }
+
+    private IndexMetadata.ObjectType parseType(JsonNode properties)
+    {
+        Iterator<Map.Entry<String, JsonNode>> entries = properties.fields();
+
+        ImmutableList.Builder<IndexMetadata.Field> result = ImmutableList.builder();
+        while (entries.hasNext()) {
+            Map.Entry<String, JsonNode> field = entries.next();
+
+            String name = field.getKey();
+            JsonNode value = field.getValue();
+            if (value.has("type")) {
+                String type = value.get("type").asText();
+
+                if (type.equals("date")) {
+                    List<String> formats = ImmutableList.of();
+                    if (value.has("format")) {
+                        formats = Arrays.asList(value.get("format").asText().split("\\|\\|"));
+                    }
+                    result.add(new IndexMetadata.Field(name, new IndexMetadata.DateTimeType(formats)));
                 }
                 else {
-                    childKey = parent.get().concat(".").concat(key);
+                    result.add(new IndexMetadata.Field(name, new IndexMetadata.PrimitiveType(type)));
                 }
+            }
+            else if (value.has("properties")) {
+                result.add(new IndexMetadata.Field(name, parseType(value.get("properties"))));
+            }
+        }
+
+        return new IndexMetadata.ObjectType(result.build());
+    }
+
+    public SearchResponse beginSearch(String index, int shard, QueryBuilder query, Optional<List<String>> fields, List<String> documentFields)
+    {
+        SearchSourceBuilder sourceBuilder = SearchSourceBuilder.searchSource()
+                .query(query)
+                .size(scrollSize);
+
+        fields.ifPresent(values -> {
+            if (values.isEmpty()) {
+                sourceBuilder.fetchSource(false);
             }
             else {
-                childKey = key;
+                sourceBuilder.fetchSource(values.toArray(new String[0]), null);
             }
+        });
+        documentFields.forEach(sourceBuilder::docValueField);
 
-            if (value.isObject()) {
-                metadata.addAll(getColumnMetadata(Optional.of(childKey), value));
-                continue;
-            }
+        SearchRequest request = new SearchRequest(index)
+                .searchType(QUERY_THEN_FETCH)
+                .preference("_shards:" + shard)
+                .scroll(new TimeValue(scrollTimeout.toMillis()))
+                .source(sourceBuilder);
 
-            if (!value.isArray()) {
-                metadata.add(childKey.concat(":").concat(value.textValue()));
-            }
+        try {
+            return client.search(request);
         }
-        return metadata.build();
-    }
+        catch (IOException e) {
+            throw new PrestoException(ELASTICSEARCH_CONNECTION_ERROR, e);
+        }
+        catch (ElasticsearchStatusException e) {
+            Throwable[] suppressed = e.getSuppressed();
+            if (suppressed.length > 0) {
+                Throwable cause = suppressed[0];
+                if (cause instanceof ResponseException) {
+                    HttpEntity entity = ((ResponseException) cause).getResponse().getEntity();
+                    try {
+                        JsonNode reason = OBJECT_MAPPER.readTree(entity.getContent()).path("error")
+                                .path("root_cause")
+                                .path(0)
+                                .path("reason");
 
-    private void populateColumns(JsonNode propertiesNode, List<String> arrays, List<ElasticsearchColumn> columns)
-    {
-        FieldNestingComparator comparator = new FieldNestingComparator();
-        TreeMap<String, Type> fieldsMap = new TreeMap<>(comparator);
-        for (String columnMetadata : getColumnMetadata(Optional.empty(), propertiesNode)) {
-            int delimiterIndex = columnMetadata.lastIndexOf(":");
-            if (delimiterIndex == -1 || delimiterIndex == columnMetadata.length() - 1) {
-                LOG.debug("Invalid column path format: %s", columnMetadata);
-                continue;
-            }
-            String fieldName = columnMetadata.substring(0, delimiterIndex);
-            String typeName = columnMetadata.substring(delimiterIndex + 1);
-
-            if (!fieldName.endsWith(".type")) {
-                LOG.debug("Ignoring column with no type info: %s", columnMetadata);
-                continue;
-            }
-            String propertyName = fieldName.substring(0, fieldName.lastIndexOf('.'));
-            String nestedName = propertyName.replaceAll("properties\\.", "");
-            if (nestedName.contains(".")) {
-                fieldsMap.put(nestedName, getHetuType(typeName));
-            }
-            else {
-                boolean newColumnFound = columns.stream()
-                        .noneMatch(column -> column.getName().equalsIgnoreCase(nestedName));
-                if (newColumnFound) {
-                    columns.add(new ElasticsearchColumn(nestedName, getHetuType(typeName), nestedName, typeName, arrays.contains(nestedName), -1));
+                        if (!reason.isMissingNode()) {
+                            throw new PrestoException(ELASTICSEARCH_QUERY_FAILURE, reason.asText(), e);
+                        }
+                    }
+                    catch (IOException ex) {
+                        e.addSuppressed(ex);
+                    }
                 }
             }
-        }
-        processNestedFields(fieldsMap, columns, arrays);
-    }
 
-    private void processNestedFields(TreeMap<String, Type> fieldsMap, List<ElasticsearchColumn> columns, List<String> arrays)
-    {
-        if (fieldsMap.size() == 0) {
-            return;
-        }
-        Entry<String, Type> first = fieldsMap.firstEntry();
-        String field = first.getKey();
-        Type type = first.getValue();
-        if (field.contains(".")) {
-            String prefix = field.substring(0, field.lastIndexOf('.'));
-            ImmutableList.Builder<Field> fieldsBuilder = ImmutableList.builder();
-            int size = field.split("\\.").length;
-            Iterator<String> iterator = fieldsMap.navigableKeySet().iterator();
-            while (iterator.hasNext()) {
-                String name = iterator.next();
-                if (name.split("\\.").length == size && name.startsWith(prefix)) {
-                    Optional<String> columnName = Optional.of(name.substring(name.lastIndexOf('.') + 1));
-                    Type columnType = fieldsMap.get(name);
-                    Field column = new Field(columnName, columnType);
-                    fieldsBuilder.add(column);
-                    iterator.remove();
-                }
-            }
-            fieldsMap.put(prefix, RowType.from(fieldsBuilder.build()));
-        }
-        else {
-            boolean newColumnFound = columns.stream()
-                    .noneMatch(column -> column.getName().equalsIgnoreCase(field));
-            if (newColumnFound) {
-                columns.add(new ElasticsearchColumn(field, type, field, type.getDisplayName(), arrays.contains(field), -1));
-            }
-            fieldsMap.remove(field);
-        }
-        processNestedFields(fieldsMap, columns, arrays);
-    }
-
-    private static Type getHetuType(String elasticsearchType)
-    {
-        switch (elasticsearchType) {
-            case "double":
-            case "float":
-                return DOUBLE;
-            case "integer":
-                return INTEGER;
-            case "long":
-                return BIGINT;
-            case "string":
-            case "text":
-            case "keyword":
-                return VARCHAR;
-            case "boolean":
-                return BOOLEAN;
-            case "binary":
-                return VARBINARY;
-            default:
-                throw new IllegalArgumentException("Unsupported type: " + elasticsearchType);
+            throw new PrestoException(ELASTICSEARCH_CONNECTION_ERROR, e);
         }
     }
 
-    private static class FieldNestingComparator
-            implements Comparator<String>
+    public SearchResponse nextPage(String scrollId)
     {
-        FieldNestingComparator() {}
+        SearchScrollRequest request = new SearchScrollRequest(scrollId)
+                .scroll(new TimeValue(scrollTimeout.toMillis()));
 
-        @Override
-        public int compare(String left, String right)
-        {
-            // comparator based on levels of nesting
-            int leftLength = left.split("\\.").length;
-            int rightLength = right.split("\\.").length;
-            if (leftLength == rightLength) {
-                return left.compareTo(right);
-            }
-            return rightLength - leftLength;
+        try {
+            return client.searchScroll(request);
+        }
+        catch (IOException e) {
+            throw new PrestoException(ELASTICSEARCH_CONNECTION_ERROR, e);
         }
     }
 
-    static TransportClient createTransportClient(ElasticsearchConnectorConfig config, TransportAddress address)
+    public void clearScroll(String scrollId)
     {
-        return createTransportClient(config, address, Optional.empty());
+        ClearScrollRequest request = new ClearScrollRequest();
+        request.addScrollId(scrollId);
+        try {
+            client.clearScroll(request);
+        }
+        catch (IOException e) {
+            throw new PrestoException(ELASTICSEARCH_CONNECTION_ERROR, e);
+        }
     }
 
-    static TransportClient createTransportClient(ElasticsearchConnectorConfig config, TransportAddress address, Optional<String> clusterName)
+    private <T> T doRequest(String path, ResponseHandler<T> handler)
     {
-        Settings settings;
-        Settings.Builder builder = Settings.builder();
-        if (clusterName.isPresent()) {
-            builder.put("cluster.name", clusterName.get());
+        Response response;
+        try {
+            response = client.getLowLevelClient()
+                    .performRequest("GET", path);
         }
-        else {
-            builder.put("client.transport.ignore_cluster_name", true);
+        catch (IOException e) {
+            throw new PrestoException(ELASTICSEARCH_CONNECTION_ERROR, e);
         }
-        switch (config.getCertificateFormat()) {
-            case PEM:
-                settings = builder
-                        .put(SEARCHGUARD_SSL_TRANSPORT_PEMCERT_FILEPATH, config.getPemcertFilepath())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_PEMKEY_FILEPATH, config.getPemkeyFilepath())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_PEMKEY_PASSWORD, config.getPemkeyPassword())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH, config.getPemtrustedcasFilepath())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION, false)
-                        .build();
-                return new PreBuiltTransportClient(settings, SearchGuardSSLPlugin.class).addTransportAddress(address);
-            case JKS:
-                settings = builder
-                        .put(SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, config.getKeystoreFilepath())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, config.getTruststoreFilepath())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, config.getKeystorePassword())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, config.getTruststorePassword())
-                        .put(SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION, false)
-                        .build();
-                return new PreBuiltTransportClient(settings, SearchGuardSSLPlugin.class).addTransportAddress(address);
-            default:
-                settings = builder.build();
-                return new PreBuiltTransportClient(settings).addTransportAddress(address);
+
+        String body;
+        try {
+            body = EntityUtils.toString(response.getEntity());
         }
+        catch (IOException e) {
+            throw new PrestoException(ELASTICSEARCH_INVALID_RESPONSE, e);
+        }
+
+        return handler.process(body);
+    }
+
+    private interface ResponseHandler<T>
+    {
+        T process(String body);
     }
 }
