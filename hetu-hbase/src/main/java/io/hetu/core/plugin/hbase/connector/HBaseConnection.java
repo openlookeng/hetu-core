@@ -191,6 +191,7 @@ public class HBaseConnection
     {
         cfg.set("hbase.zookeeper.quorum", hbaseConfig.getZkQuorum());
         cfg.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
+        cfg.set("zookeeper.znode.parent", hbaseConfig.getZkZnodeParent());
 
         try {
             init();
