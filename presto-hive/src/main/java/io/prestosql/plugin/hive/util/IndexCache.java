@@ -57,7 +57,6 @@ public class IndexCache
     private static ScheduledExecutorService executor;
 
     private Long loadDelay; // in millisecond
-    private Long refreshRate; // in millisecond
     private LoadingCache<IndexCacheKey, List<IndexMetadata>> cache;
     private List<IndexRecord> indexRecords;
 
@@ -67,7 +66,8 @@ public class IndexCache
         // If the static variables have not been initialized
         if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
             loadDelay = PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY).toMillis();
-            refreshRate = Math.min(loadDelay / 2, 5000L);
+            // in millisecond
+            Long refreshRate = Math.min(loadDelay / 2, 5000L);
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
             executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
             CacheBuilder<IndexCacheKey, List<IndexMetadata>> cacheBuilder = CacheBuilder.newBuilder()
@@ -95,30 +95,33 @@ public class IndexCache
             }
             executor.scheduleAtFixedRate(() -> {
                 try {
-                    List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
+                    if (cache.size() > 0) {
+                        // only refresh cache is it's not empty
+                        List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
 
-                    if (indexRecords != null) {
-                        for (IndexRecord old : indexRecords) {
-                            boolean found = false;
-                            for (IndexRecord now : newRecords) {
-                                if (now.name.equals(old.name)) {
-                                    found = true;
-                                    if (now.getLastModifiedTime() != old.getLastModifiedTime()) {
-                                        // index record has been updated. evict
-                                        evictFromCache(old);
-                                        LOG.debug("Index for {%s} has been evicted from cache because the index has been updated.", old);
+                        if (indexRecords != null) {
+                            for (IndexRecord old : indexRecords) {
+                                boolean found = false;
+                                for (IndexRecord now : newRecords) {
+                                    if (now.name.equals(old.name)) {
+                                        found = true;
+                                        if (now.lastModifiedTime != old.lastModifiedTime) {
+                                            // index record has been updated. evict
+                                            evictFromCache(old);
+                                            LOG.debug("Index for {%s} has been evicted from cache because the index has been updated.", old);
+                                        }
                                     }
                                 }
-                            }
-                            // old record is gone. evict from cache
-                            if (!found) {
-                                evictFromCache(old);
-                                LOG.debug("Index for {%s} has been evicted from cache because the index has been dropped.", old);
+                                // old record is gone. evict from cache
+                                if (!found) {
+                                    evictFromCache(old);
+                                    LOG.debug("Index for {%s} has been evicted from cache because the index has been dropped.", old);
+                                }
                             }
                         }
-                    }
 
-                    indexRecords = newRecords;
+                        indexRecords = newRecords;
+                    }
                 }
                 catch (Exception e) {
                     LOG.debug(e, "Error using index records to refresh cache");

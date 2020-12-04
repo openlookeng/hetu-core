@@ -181,4 +181,22 @@ public class FileSystemClientManager
         }
         return val;
     }
+
+    /**
+     * Utility method to evaluate if a filesystem profile can be used as a shared filesystem (e.g. hdfs).
+     * <p>
+     * Filesystems which are not shared may not work for distributed tasks across the cluster if it has more than 1 nodes.
+     *
+     * @param name name of the filesystem profile defined in the filesystem config folder,
+     * or the default profile name (same as {@link FileSystemClientManager#getFileSystemClient(Path)} if provide default name)
+     * @return if the filesystem client linked to this name can be used as a shared filesystem across the cluster
+     */
+    public boolean isFileSystemShared(String name)
+    {
+        if (!DEFAULT_CONFIG_NAME.equals(name) && !availableFileSystemConfigs.containsKey(name)) {
+            throw new IllegalArgumentException(String.format("Profile %s is not available. Please check the name provided.", name));
+        }
+        Properties fsConfig = DEFAULT_CONFIG_NAME.equals(name) ? defaultProfile : availableFileSystemConfigs.get(name);
+        return !fsConfig.getProperty(FS_CLIENT_TYPE).equals("local");
+    }
 }

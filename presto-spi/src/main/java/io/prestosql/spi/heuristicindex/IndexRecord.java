@@ -29,7 +29,7 @@ public class IndexRecord
     public final String indexType;
     public final List<String> properties;
     public final List<String> partitions;
-    private long lastModifiedTime;
+    public final long lastModifiedTime;
 
     public IndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> properties, List<String> partitions)
     {
@@ -102,15 +102,5 @@ public class IndexRecord
                 ", indexType='" + indexType + '\'' +
                 ", lastModifiedTime=" + lastModifiedTime +
                 '}';
-    }
-
-    public long getLastModifiedTime()
-    {
-        return lastModifiedTime;
-    }
-
-    public void setLastModifiedTime(long lastModifiedTime)
-    {
-        this.lastModifiedTime = lastModifiedTime;
     }
 }

@@ -170,15 +170,19 @@ public class IndexRecordManager
             else {
                 // only remove partitions
                 Iterator<IndexRecord> iterator = records.iterator();
+                IndexRecord newRecord = null;
                 while (iterator.hasNext()) {
                     IndexRecord record = iterator.next();
                     if (record.name.equals(name)) {
                         record.partitions.removeAll(partitionsToRemove);
-                        record.setLastModifiedTime(System.currentTimeMillis());
-                        if (record.partitions.isEmpty()) {
-                            iterator.remove();
-                        }
+                        newRecord = new IndexRecord(record.name, record.user, record.table,
+                                record.columns, record.indexType, record.properties, record.partitions);
+                        iterator.remove();
                     }
+                }
+                // If this is a partial remove, and there are still partitions remaining, put the updated record back
+                if (newRecord != null && !newRecord.partitions.isEmpty()) {
+                    records.add(newRecord);
                 }
             }
             writeIndexRecords(records);
