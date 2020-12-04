@@ -143,7 +143,7 @@ public class TestHiveConfig
                 .setVacuumDeltaPercentThreshold(0.1)
                 .setOrcPredicatePushdownEnabled(false)
                 .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES))
-                .setMaxSplitsToGroup(100));
+                .setMaxSplitsToGroup(1));
     }
 
     @Test

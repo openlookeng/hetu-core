@@ -211,7 +211,7 @@ public class HiveConfig
     private int vacuumServiceThreads = 2;
     private Optional<Duration> vacuumCollectorInterval = Optional.of(new Duration(5, MINUTES));
 
-    private int maxNumbSplitsToGroup = 100;
+    private int maxNumbSplitsToGroup = 1;
 
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
