@@ -491,7 +491,7 @@ public interface ConnectorMetadata
     /**
      * Begin Vacuum query
      */
-    default ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
+    default ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support vacuum");
     }

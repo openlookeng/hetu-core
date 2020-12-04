@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -158,6 +159,7 @@ public class HivePageSink
                 bucketProperty.isPresent() ||
                         (handle.getTableStorageFormat() == HiveStorageFormat.ORC &&
                                 HiveACIDWriteType.isRowIdNeeded(acidWriteType) &&
+                                HiveACIDWriteType.VACUUM_MERGE != acidWriteType &&
                                 !isInsertOnlyTable()),
                 isVacuumOperationValid() && !isInsertOnlyTable(),
                 pageIndexerFactory,
@@ -205,7 +207,8 @@ public class HivePageSink
             bucketColumns = new int[]{rowIdColumnIndex};
             bucketFunction = new HiveBucketFunction(BucketingVersion.BUCKETING_V2,
                     HiveBucketing.MAX_BUCKET_NUMBER,
-                    ImmutableList.of(HiveColumnHandle.updateRowIdHandle().getHiveType()));
+                    ImmutableList.of(HiveColumnHandle.updateRowIdHandle().getHiveType()),
+                    true);
         }
         else {
             bucketColumns = null;
@@ -378,12 +381,21 @@ public class HivePageSink
             });
 
             List<ColumnHandle> inputColumns = new ArrayList<>(HivePageSink.this.inputColumns);
-            if (isInsertOnlyTable()) {
+            if (isInsertOnlyTable() || acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
                 //Insert only tables Just need to merge contents together. No processing required.
+                //During vacuum merge, all buckets will be merged to one.
+                //There is no need to sort again. sort_by is valid only on bucketed table,
+                //for which Vacuum_merge is not valid.
                 List<HiveSplitWrapper> multiSplits = hiveSplits.stream()
                         .map(HiveSplitWrapper::wrap)
-                        .sorted(this::compareInsertOnlySplits)
                         .collect(toList());
+                if (isInsertOnlyTable()) {
+                    Collections.sort(multiSplits, this::compareInsertOnlySplits);
+                }
+                else if (acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+                    HiveColumnHandle rowIdHandle = HiveColumnHandle.updateRowIdHandle();
+                    inputColumns.add(rowIdHandle);
+                }
 
                 pageSources = multiSplits.stream()
                         .map(split -> pageSourceProvider.createPageSource(
@@ -501,7 +513,7 @@ public class HivePageSink
                         options.minimumWriteId(range.getMin());
                         options.maximumWriteId(range.getMax());
                         Path bucketFile = new Path(split.getPath());
-                        OptionalInt bucketNumber = HiveUtil.getBucketNumber(bucketFile.getName());
+                        OptionalInt bucketNumber = vacuumTableHandle.isMerge() ? OptionalInt.of(0) : HiveUtil.getBucketNumber(bucketFile.getName());
                         if (bucketNumber.isPresent()) {
                             options.bucket(bucketNumber.getAsInt());
                         }
@@ -725,12 +737,15 @@ public class HivePageSink
             if (bucketBlock != null) {
                 bucketNumber = OptionalInt.of(bucketBlock.getInt(position, 0));
             }
+            else if (acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+                bucketNumber = OptionalInt.of(0);
+            }
             else if (isVacuumOperationValid() && isInsertOnlyTable()) {
                 bucketNumber = OptionalInt.of(partitionOptions.get().getBucketId());
             }
             else if (session.getTaskId().isPresent() && writerFactory.isTxnTable()) {
                 //Use the taskId and driverId to get bucketId for ACID table
-                bucketNumber = generateBucketNumber();
+                bucketNumber = generateBucketNumber(partitionColumns.getChannelCount() != 0);
             }
             HiveWriter writer = writerFactory.createWriter(partitionColumns, position, bucketNumber, partitionOptions);
             writers.set(writerIndex, writer);
@@ -741,9 +756,10 @@ public class HivePageSink
         return writerIndexes;
     }
 
-    private OptionalInt generateBucketNumber()
+    private OptionalInt generateBucketNumber(boolean isPartitionedTable)
     {
-        if (session.getTaskId().isPresent() && session.getDriverId().isPresent() && writerFactory.isTxnTable()) {
+        if (session.getTaskId().isPresent() && session.getDriverId().isPresent() && writerFactory.isTxnTable() &&
+                (!(isPartitionedTable && HiveSessionProperties.isWritePartitionDistributionEnabled(session)))) {
             int taskId = session.getTaskId().getAsInt();
             int driverId = session.getDriverId().getAsInt();
             int taskWriterCount = session.getTaskWriterCount();
@@ -784,6 +800,10 @@ public class HivePageSink
 
     private Block buildBucketBlock(Page page)
     {
+        if (acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+            //There is no pre bucket block in case of merge
+            return null;
+        }
         if (bucketFunction == null) {
             return null;
         }
@@ -826,7 +846,7 @@ public class HivePageSink
 
     private boolean isVacuumOperationValid()
     {
-        return acidWriteType == HiveACIDWriteType.VACUUM &&
+        return HiveACIDWriteType.isVacuum(acidWriteType) &&
                 writableTableHandle != null &&
                 writableTableHandle.getTableStorageFormat() == HiveStorageFormat.ORC;
     }

@@ -31,7 +31,6 @@ import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
-import io.prestosql.plugin.hive.metastore.BooleanStatistics;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
@@ -121,6 +120,8 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -145,6 +146,7 @@ import static io.prestosql.plugin.hive.HiveTableProperties.TRANSACTIONAL;
 import static io.prestosql.plugin.hive.HiveTableProperties.getExternalLocation;
 import static io.prestosql.plugin.hive.HiveTableProperties.getHiveStorageFormat;
 import static io.prestosql.plugin.hive.HiveTableProperties.getLocation;
+import static io.prestosql.plugin.hive.HiveTableProperties.getPartitionedBy;
 import static io.prestosql.plugin.hive.HiveTableProperties.getTransactionalValue;
 import static io.prestosql.plugin.hive.HiveTableProperties.isExternalTable;
 import static io.prestosql.plugin.hive.HiveUtil.PRESTO_VIEW_FLAG;
@@ -225,6 +227,7 @@ public class HiveMetadata
     private final double vacuumDeltaPercentThreshold;
     private final boolean autoVacuumEnabled;
     protected final ScheduledExecutorService vacuumExecutorService;
+    protected final ScheduledExecutorService hiveMetastoreClientService;
     private final long vacuumCollectorInterval;
 
     private boolean externalTable;
@@ -249,7 +252,8 @@ public class HiveMetadata
             int vacuumDeltaNumThreshold,
             double vacuumDeltaPercentThreshold,
             ScheduledExecutorService vacuumExecutorService,
-            Optional<Duration> vacuumCollectorInterval)
+            Optional<Duration> vacuumCollectorInterval,
+            ScheduledExecutorService hiveMetastoreClientService)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
 
@@ -275,6 +279,7 @@ public class HiveMetadata
         this.vacuumExecutorService = vacuumExecutorService;
         this.vacuumCollectorInterval = vacuumCollectorInterval.map(Duration::toMillis)
                 .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Vacuum collector interval is not set correctly"));
+        this.hiveMetastoreClientService = hiveMetastoreClientService;
     }
 
     public SemiTransactionalHiveMetastore getMetastore()
@@ -331,7 +336,7 @@ public class HiveMetadata
         ConnectorTableMetadata tableMetadata = getTableMetadata(session, handle.getSchemaTableName());
         handle = handle.withAnalyzePartitionValues(partitionValuesList);
 
-        List<String> partitionedBy = HiveTableProperties.getPartitionedBy(tableMetadata.getProperties());
+        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
 
         partitionValuesList.ifPresent(list -> {
             if (partitionedBy.isEmpty()) {
@@ -725,7 +730,7 @@ public class HiveMetadata
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
-        List<String> partitionedBy = HiveTableProperties.getPartitionedBy(tableMetadata.getProperties());
+        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
         Optional<HiveBucketProperty> bucketProperty = HiveTableProperties.getBucketProperty(tableMetadata.getProperties());
 
         if ((bucketProperty.isPresent() || !partitionedBy.isEmpty()) && HiveTableProperties.getAvroSchemaUrl(tableMetadata.getProperties()) != null) {
@@ -1188,7 +1193,7 @@ public class HiveMetadata
         }
 
         HiveStorageFormat tableStorageFormat = HiveTableProperties.getHiveStorageFormat(tableMetadata.getProperties());
-        List<String> partitionedBy = HiveTableProperties.getPartitionedBy(tableMetadata.getProperties());
+        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
         Optional<HiveBucketProperty> bucketProperty = HiveTableProperties.getBucketProperty(tableMetadata.getProperties());
 
         // get the root directory for the database
@@ -1329,21 +1334,30 @@ public class HiveMetadata
             if (HiveSessionProperties.isRespectTableFormat(session)) {
                 verify(handle.getPartitionStorageFormat() == handle.getTableStorageFormat());
             }
-            for (PartitionUpdate update : partitionUpdates) {
-                Partition partition = buildPartitionObject(session, table, update);
-                PartitionStatistics partitionStatistics = createPartitionStatistics(
-                        session,
-                        update.getStatistics(),
-                        columnTypes,
-                        getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-                metastore.addPartition(
-                        session,
-                        handle.getSchemaName(),
-                        handle.getTableName(),
-                        buildPartitionObject(session, table, update),
-                        update.getWritePath(),
-                        partitionStatistics);
-            }
+            List<? extends Future<?>> futures = partitionUpdates.stream().map(update ->
+                    hiveMetastoreClientService.submit(() -> {
+                        Partition partition = buildPartitionObject(session, table, update);
+                        PartitionStatistics partitionStatistics = createPartitionStatistics(
+                                session,
+                                update.getStatistics(),
+                                columnTypes,
+                                getColumnStatistics(partitionComputedStatistics, partition.getValues()));
+                        metastore.addPartition(
+                                session,
+                                handle.getSchemaName(),
+                                handle.getTableName(),
+                                buildPartitionObject(session, table, update),
+                                update.getWritePath(),
+                                partitionStatistics,
+                                HiveACIDWriteType.NONE);
+                    })).collect(toList());
+            futures.forEach(future -> {
+                try {
+                    future.get();
+                }
+                catch (InterruptedException | ExecutionException ignore) {
+                }
+            });
         }
 
         return Optional.of(new HiveWrittenPartitions(
@@ -1591,7 +1605,6 @@ public class HiveMetadata
                 .collect(toImmutableMap(HiveColumnHandle::getName, column -> column.getHiveType().getType(typeManager)));
         Map<List<String>, ComputedStatistics> partitionComputedStatistics = Statistics.createComputedStatisticsToPartitionMap(computedStatistics, partitionedBy, columnTypes);
 
-        boolean isVacuum = hiveACIDWriteType == HiveACIDWriteType.VACUUM;
         for (PartitionUpdate partitionUpdate : partitionUpdates) {
             if (partitionUpdate.getName().isEmpty()) {
                 // insert into unpartitioned table
@@ -1609,7 +1622,6 @@ public class HiveMetadata
                     finishInsertOverwrite(session, handle, table, partitionUpdate, partitionStatistics);
                 }
                 else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.NEW || partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.APPEND) {
-                    partitionStatistics = updateStatsForAcidOperation(hiveACIDWriteType, partitionStatistics);
                     // insert into unpartitioned table
                     metastore.finishInsertIntoExistingTable(
                             session,
@@ -1618,7 +1630,7 @@ public class HiveMetadata
                             partitionUpdate.getWritePath(),
                             partitionUpdate.getFileNames(),
                             partitionStatistics,
-                            isVacuum);
+                            hiveACIDWriteType);
                 }
                 else {
                     throw new IllegalArgumentException("Unsupported update mode: " + partitionUpdate.getUpdateMode());
@@ -1632,7 +1644,6 @@ public class HiveMetadata
                         partitionUpdate.getStatistics(),
                         columnTypes,
                         getColumnStatistics(partitionComputedStatistics, partitionValues));
-                partitionStatistics = updateStatsForAcidOperation(hiveACIDWriteType, partitionStatistics);
                 metastore.finishInsertIntoExistingPartition(
                         session,
                         handle.getSchemaName(),
@@ -1641,10 +1652,10 @@ public class HiveMetadata
                         partitionUpdate.getWritePath(),
                         partitionUpdate.getFileNames(),
                         partitionStatistics,
-                        isVacuum);
+                        hiveACIDWriteType);
             }
             else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.NEW || partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.OVERWRITE) {
-                finishInsertInNewPartition(session, handle, table, columnTypes, partitionUpdate, partitionComputedStatistics);
+                finishInsertInNewPartition(session, handle, table, columnTypes, partitionUpdate, partitionComputedStatistics, hiveACIDWriteType);
             }
             else {
                 throw new IllegalArgumentException(format("Unsupported update mode: %s", partitionUpdate.getUpdateMode()));
@@ -1659,56 +1670,6 @@ public class HiveMetadata
                 partitionUpdates.stream()
                         .map(PartitionUpdate::getName)
                         .collect(toList())));
-    }
-
-    private PartitionStatistics updateStatsForAcidOperation(HiveACIDWriteType hiveACIDWriteType, PartitionStatistics partitionStatistics)
-    {
-        Map<String, HiveColumnStatistics> updatedColumnStatistics = new HashMap<>();
-        if (hiveACIDWriteType == HiveACIDWriteType.UPDATE || hiveACIDWriteType == HiveACIDWriteType.VACUUM) {
-            //No change in rowcount, so keep delta as empty for rowCount
-            HiveBasicStatistics basicStatistics = partitionStatistics.getBasicStatistics();
-            HiveBasicStatistics updatedBasicStatistics = new HiveBasicStatistics(basicStatistics.getFileCount(),
-                    OptionalLong.of(0L),
-                    basicStatistics.getInMemoryDataSizeInBytes(),
-                    basicStatistics.getOnDiskDataSizeInBytes());
-            updateBooleanStatisticsInColumnStatistics(hiveACIDWriteType, partitionStatistics, updatedColumnStatistics);
-            return new PartitionStatistics(updatedBasicStatistics, updatedColumnStatistics);
-            //return new PartitionStatistics(updatedBasicStatistics, partitionStatistics.getColumnStatistics());
-        }
-        else if (hiveACIDWriteType == HiveACIDWriteType.DELETE) {
-            //rowCount should reduce for DELETE operation
-            HiveBasicStatistics basicStatistics = partitionStatistics.getBasicStatistics();
-            HiveBasicStatistics updatedBasicStatistics = new HiveBasicStatistics(basicStatistics.getFileCount(),
-                    OptionalLong.of(Math.negateExact(basicStatistics.getRowCount().getAsLong())),
-                    basicStatistics.getInMemoryDataSizeInBytes(), basicStatistics.getOnDiskDataSizeInBytes());
-            updateBooleanStatisticsInColumnStatistics(hiveACIDWriteType, partitionStatistics, updatedColumnStatistics);
-            return new PartitionStatistics(updatedBasicStatistics, updatedColumnStatistics);
-        }
-        return partitionStatistics;
-    }
-
-    private void updateBooleanStatisticsInColumnStatistics(HiveACIDWriteType hiveACIDWriteType, PartitionStatistics partitionStatistics,
-                                                           Map<String, HiveColumnStatistics> updatedColumnStatistics)
-    {
-        partitionStatistics.getColumnStatistics().forEach((k, v) -> {
-            BooleanStatistics booleanStatistics = null;
-            if (v.getBooleanStatistics().isPresent()) {
-                if (hiveACIDWriteType == HiveACIDWriteType.UPDATE || hiveACIDWriteType == HiveACIDWriteType.VACUUM) {
-                    booleanStatistics = new BooleanStatistics(OptionalLong.of(0), OptionalLong.of(0));
-                }
-                else if (hiveACIDWriteType == HiveACIDWriteType.DELETE) {
-                    booleanStatistics = new BooleanStatistics(OptionalLong.of(Math.negateExact(v.getBooleanStatistics().get().getTrueCount().getAsLong())),
-                            OptionalLong.of(Math.negateExact(v.getBooleanStatistics().get().getFalseCount().getAsLong())));
-                }
-                HiveColumnStatistics hiveColumnStatistics = new HiveColumnStatistics(v.getIntegerStatistics(), v.getDoubleStatistics(),
-                        v.getDecimalStatistics(), v.getDateStatistics(), Optional.of(booleanStatistics),
-                        v.getMaxValueSizeInBytes(), v.getTotalSizeInBytes(), v.getNullsCount(), v.getDistinctValuesCount());
-                updatedColumnStatistics.put(k, hiveColumnStatistics);
-            }
-            else {
-                updatedColumnStatistics.put(k, v);
-            }
-        });
     }
 
     @Override
@@ -1755,9 +1716,9 @@ public class HiveMetadata
     }
 
     @Override
-    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
+    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, HiveACIDWriteType.VACUUM);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, merge ? HiveACIDWriteType.VACUUM_MERGE : HiveACIDWriteType.VACUUM);
         if ((!session.getSource().get().isEmpty()) &&
                 session.getSource().get().equals("auto-vacuum")) {
             metastore.setVacuumTableHandle((HiveTableHandle) tableHandle);
@@ -1765,7 +1726,7 @@ public class HiveMetadata
         return new HiveVacuumTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
-                insertTableHandle.getTableStorageFormat(), insertTableHandle.getPartitionStorageFormat(), full, null);
+                insertTableHandle.getTableStorageFormat(), insertTableHandle.getPartitionStorageFormat(), full, merge, null);
     }
 
     @Override
@@ -1778,7 +1739,8 @@ public class HiveMetadata
                 vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false);
         List<PartitionUpdate> partitionUpdates = new ArrayList<>();
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
-                finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates, HiveACIDWriteType.VACUUM);
+                finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates,
+                        vacuumTableHandle.isMerge() ? HiveACIDWriteType.VACUUM_MERGE : HiveACIDWriteType.VACUUM);
 
         metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
         return connectorOutputMetadata;
@@ -2434,7 +2396,16 @@ public class HiveMetadata
 
         Optional<HiveBucketHandle> hiveBucketHandle = HiveBucketing.getHiveBucketHandle(table);
         if (!hiveBucketHandle.isPresent()) {
-            return Optional.empty();
+            // return preferred layout which is partitioned by partition columns
+            List<Column> partitionColumns = table.getPartitionColumns();
+            if (partitionColumns.isEmpty() || !HiveSessionProperties.isWritePartitionDistributionEnabled(session)) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new ConnectorNewTableLayout(
+                    partitionColumns.stream()
+                            .map(Column::getName)
+                            .collect(toImmutableList())));
         }
         HiveBucketProperty bucketProperty = table.getStorage().getBucketProperty()
                 .orElseThrow(() -> new NoSuchElementException("Bucket property should be set"));
@@ -2462,20 +2433,25 @@ public class HiveMetadata
         SchemaTableName tableName = hiveTableHandle.getSchemaTableName();
         Table table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
-        Optional<ConnectorNewTableLayout> insertTableLayout = getInsertTableLayoutInternal(session, table);
-        if (insertTableLayout.isPresent()) {
-            //Use the bucketing logic to partition
-            return insertTableLayout;
-        }
 
         //When bucketing is not enabled, do the bucketing based on the RowId handle for update/delete
+        //In case of partitioned table, include the partition columns also for the parallel partitioning of writes.
+        List<Column> tablePartitionColumns = table.getPartitionColumns();
+        List<String> partitionColumnNames = new ArrayList<>();
+        List<HiveType> partitionColumnTypes = new ArrayList<>();
+        tablePartitionColumns.forEach(column -> {
+            partitionColumnNames.add(column.getName());
+            partitionColumnTypes.add(column.getType());
+        });
+        partitionColumnNames.add(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME.toLowerCase(ENGLISH));
+        partitionColumnTypes.add(HiveColumnHandle.updateRowIdHandle().getHiveType());
         HivePartitioningHandle partitioningHandle = new HivePartitioningHandle(
                 BucketingVersion.BUCKETING_V2,
                 HiveBucketing.MAX_BUCKET_NUMBER,
-                ImmutableList.of(HiveColumnHandle.updateRowIdHandle().getHiveType()),
-                OptionalInt.empty());
-        List<String> partitionColumns = ImmutableList.of(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME.toLowerCase(ENGLISH));
-        return Optional.of(new ConnectorNewTableLayout(partitioningHandle, partitionColumns));
+                partitionColumnTypes,
+                OptionalInt.empty(),
+                true);
+        return Optional.of(new ConnectorNewTableLayout(partitioningHandle, partitionColumnNames));
     }
 
     @Override
@@ -2486,7 +2462,13 @@ public class HiveMetadata
         validateCsvColumns(tableMetadata);
         Optional<HiveBucketProperty> bucketProperty = HiveTableProperties.getBucketProperty(tableMetadata.getProperties());
         if (!bucketProperty.isPresent()) {
-            return Optional.empty();
+            // return preferred layout which is partitioned by partition columns
+            List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
+            if (partitionedBy.isEmpty() || !HiveSessionProperties.isWritePartitionDistributionEnabled(session)) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new ConnectorNewTableLayout(partitionedBy));
         }
         if (!bucketProperty.get().getSortedBy().isEmpty() && !HiveSessionProperties.isSortedWritingEnabled(session)) {
             throw new PrestoException(NOT_SUPPORTED, "Writing to bucketed sorted Hive tables is disabled");
@@ -2512,14 +2494,14 @@ public class HiveMetadata
         if (!HiveSessionProperties.isCollectColumnStatisticsOnWrite(session)) {
             return TableStatisticsMetadata.empty();
         }
-        List<String> partitionedBy = firstNonNull(HiveTableProperties.getPartitionedBy(tableMetadata.getProperties()), ImmutableList.of());
+        List<String> partitionedBy = firstNonNull(getPartitionedBy(tableMetadata.getProperties()), ImmutableList.of());
         return getStatisticsCollectionMetadata(tableMetadata.getColumns(), partitionedBy, false);
     }
 
     @Override
     public TableStatisticsMetadata getStatisticsCollectionMetadata(ConnectorSession session, ConnectorTableMetadata tableMetadata)
     {
-        List<String> partitionedBy = firstNonNull(HiveTableProperties.getPartitionedBy(tableMetadata.getProperties()), ImmutableList.of());
+        List<String> partitionedBy = firstNonNull(getPartitionedBy(tableMetadata.getProperties()), ImmutableList.of());
         return getStatisticsCollectionMetadata(tableMetadata.getColumns(), partitionedBy, true);
     }
 
@@ -2661,7 +2643,7 @@ public class HiveMetadata
 
     private static void validatePartitionColumns(ConnectorTableMetadata tableMetadata)
     {
-        List<String> partitionedBy = HiveTableProperties.getPartitionedBy(tableMetadata.getProperties());
+        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
 
         List<String> allColumns = tableMetadata.getColumns().stream()
                 .map(ColumnMetadata::getName)
@@ -2718,7 +2700,7 @@ public class HiveMetadata
             return;
         }
 
-        Set<String> partitionedBy = ImmutableSet.copyOf(HiveTableProperties.getPartitionedBy(tableMetadata.getProperties()));
+        Set<String> partitionedBy = ImmutableSet.copyOf(getPartitionedBy(tableMetadata.getProperties()));
         List<ColumnMetadata> unsupportedColumns = tableMetadata.getColumns().stream()
                 .filter(columnMetadata -> !partitionedBy.contains(columnMetadata.getName()))
                 .filter(columnMetadata -> !columnMetadata.getType().equals(createUnboundedVarcharType()))
@@ -2888,7 +2870,7 @@ public class HiveMetadata
         metastore.createTable(session, table, principalPrivileges, Optional.of(partitionUpdate.getWritePath()), false, partitionStatistics);
     }
 
-    protected void finishInsertInNewPartition(ConnectorSession session, HiveInsertTableHandle handle, Table table, Map<String, Type> columnTypes, PartitionUpdate partitionUpdate, Map<List<String>, ComputedStatistics> partitionComputedStatistics)
+    protected void finishInsertInNewPartition(ConnectorSession session, HiveInsertTableHandle handle, Table table, Map<String, Type> columnTypes, PartitionUpdate partitionUpdate, Map<List<String>, ComputedStatistics> partitionComputedStatistics, HiveACIDWriteType acidWriteType)
     {
         // insert into new partition or overwrite existing partition
         Partition partition = buildPartitionObject(session, table, partitionUpdate);
@@ -2903,7 +2885,7 @@ public class HiveMetadata
                 partitionUpdate.getStatistics(),
                 columnTypes,
                 getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-        metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics);
+        metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics, acidWriteType);
     }
 
     public void setExternalTable(boolean externalTable)

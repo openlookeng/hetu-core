@@ -21,6 +21,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.hetu.core.plugin.carbondata.impl.CarbondataTableReader;
 import io.prestosql.plugin.hive.ForHive;
+import io.prestosql.plugin.hive.ForHiveMetastore;
 import io.prestosql.plugin.hive.ForHiveTransactionHeartbeats;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveMetadata;
@@ -64,6 +65,7 @@ public class CarbondataMetadataFactory
     private final LocationService locationService;
     private final BoundedExecutor renameExecution;
     private final ScheduledExecutorService vacuumExecutorService;
+    private final ScheduledExecutorService hiveMetastoreClientService;
     private final TypeTranslator typeTranslator;
     private final String hetuVersion;
     private final AccessControlMetadataFactory accessControlMetadataFactory;
@@ -83,6 +85,7 @@ public class CarbondataMetadataFactory
                                      @ForHive ExecutorService executorService,
                                      @ForCarbonVacuum ScheduledExecutorService vacuumExecutorService,
                                      @ForHiveTransactionHeartbeats ScheduledExecutorService heartbeatService,
+                                     @ForHiveMetastore ScheduledExecutorService hiveMetastoreClientService,
                                      TypeManager typeManager, LocationService locationService,
                                      JsonCodec<PartitionUpdate> partitionUpdateCodec,
                                      JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
@@ -102,7 +105,7 @@ public class CarbondataMetadataFactory
                 carbondataConfig.getHiveTransactionHeartbeatInterval(),
                 carbondataConfig.getVacuumCleanupRecheckInterval(), typeManager, locationService,
                 partitionUpdateCodec, segmentInfoCodec, executorService,
-                vacuumExecutorService, heartbeatService, typeTranslator, nodeVersion.toString(),
+                vacuumExecutorService, heartbeatService, hiveMetastoreClientService, typeTranslator, nodeVersion.toString(),
                 accessControlMetadataFactory, carbondataTableReader, carbondataConfig.getStoreLocation(),
                 carbondataConfig.getMajorVacuumSegSize(), carbondataConfig.getMinorVacuumSegCount(),
                 carbondataConfig.getAutoVacuumEnable());
@@ -121,6 +124,7 @@ public class CarbondataMetadataFactory
                                      JsonCodec<PartitionUpdate> partitionUpdateCodec,
                                      JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
                                      ExecutorService executorService, ScheduledExecutorService vacuumExecutorService, ScheduledExecutorService heartbeatService,
+                                     ScheduledExecutorService hiveMetastoreClientService,
                                      TypeTranslator typeTranslator, String hetuVersion,
                                      AccessControlMetadataFactory accessControlMetadataFactory,
                                      CarbondataTableReader carbondataTableReader, String storeLocation, long majorVacuumSegSize, long minorVacuumSegCount,
@@ -146,6 +150,7 @@ public class CarbondataMetadataFactory
                 executorService,
                 vacuumExecutorService,
                 heartbeatService,
+                hiveMetastoreClientService,
                 typeTranslator,
                 hetuVersion,
                 accessControlMetadataFactory,
@@ -178,6 +183,7 @@ public class CarbondataMetadataFactory
 
         this.renameExecution = new BoundedExecutor(executorService, maxConcurrentFileRenames);
         this.vacuumExecutorService = requireNonNull(vacuumExecutorService, "vacuumExecutorService is null");
+        this.hiveMetastoreClientService = requireNonNull(hiveMetastoreClientService, "hiveMetastoreClientService is null");
         this.vacuumCleanupInterval = requireNonNull(vacuumCleanupInterval,
                 "vacuumCleanupInterval is null");
         this.hiveTransactionHeartbeatInterval = requireNonNull(hiveTransactionHeartbeatInterval,
@@ -205,7 +211,7 @@ public class CarbondataMetadataFactory
                         vacuumExecutorService, this.vacuumCleanupInterval, this.skipDeletionForAlter,
                         this.skipTargetCleanupOnRollback,
                         this.hiveTransactionHeartbeatInterval,
-                        this.heartbeatService);
+                        this.heartbeatService, hiveMetastoreClientService);
 
         return new CarbondataMetadata(metastore,
                 this.hdfsEnvironment,
@@ -227,6 +233,7 @@ public class CarbondataMetadataFactory
                 this.carbondataTableStore,
                 this.carbondataMajorVacuumSegmentSize,
                 this.carbondataMinorVacuumSegmentCount,
-                vacuumExecutorService);
+                vacuumExecutorService,
+                hiveMetastoreClientService);
     }
 }

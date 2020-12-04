@@ -116,6 +116,7 @@ import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Use;
+import io.prestosql.sql.tree.VacuumTable;
 import io.prestosql.sql.tree.Values;
 import io.prestosql.sql.tree.With;
 import io.prestosql.sql.tree.WithQuery;
@@ -1193,6 +1194,30 @@ public final class SqlFormatter
                         .append('\n');
             }
 
+            return null;
+        }
+
+        @Override
+        public Void visitVacuumTable(VacuumTable node, Integer context)
+        {
+            builder.append("VACUUM TABLE ")
+                    .append(node.getTable().getName());
+
+            if (node.isFull()) {
+                builder.append(" FULL");
+                if (node.isMerge()) {
+                    builder.append(" UNIFY");
+                }
+            }
+
+            if (node.getPartition().isPresent()) {
+                builder.append(" PARTITION ")
+                        .append("'" + node.getPartition().get() + "'");
+            }
+
+            if (!node.isAsync()) {
+                builder.append(" AND WAIT");
+            }
             return null;
         }
 

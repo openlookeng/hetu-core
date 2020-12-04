@@ -46,7 +46,6 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.plugin.hive.HiveBucketing.BucketingVersion.BUCKETING_V1;
 import static io.prestosql.plugin.hive.HiveBucketing.BucketingVersion.BUCKETING_V2;
 import static io.prestosql.plugin.hive.HiveColumnHandle.BUCKET_COLUMN_NAME;
@@ -110,11 +109,17 @@ public final class HiveBucketing
     @VisibleForTesting
     static int getBucketHashCode(BucketingVersion bucketingVersion, List<TypeInfo> types, Page page, int position)
     {
+        int channelCount = page.getChannelCount();
+        return getBucketHashCode(bucketingVersion, types, page, position, channelCount);
+    }
+
+    static int getBucketHashCode(BucketingVersion bucketingVersion, List<TypeInfo> types, Page page, int position, int channelCount)
+    {
         switch (bucketingVersion) {
             case BUCKETING_V1:
-                return HiveBucketingV1.getBucketHashCode(types, page, position);
+                return HiveBucketingV1.getBucketHashCode(types, page, position, channelCount);
             case BUCKETING_V2:
-                return HiveBucketingV2.getBucketHashCode(types, page, position);
+                return HiveBucketingV2.getBucketHashCode(types, page, position, channelCount);
             default:
                 throw new IllegalArgumentException("Unsupported bucketing version: " + bucketingVersion);
         }
@@ -317,14 +322,13 @@ public final class HiveBucketing
     }
 
     /**
-     * Extracts the bucketNumber from page. Its expected that page contains only the $rowId column
+     * Extracts the bucketNumber from page. Its expected that page contains $rowId as last column
      *
      * @return BucketNumber
      */
     static int extractBucketNumber(Page page, int position)
     {
-        checkArgument(page.getChannelCount() == 1);
-        Block block = page.getBlock(0);
+        Block block = page.getBlock(page.getChannelCount() - 1);
         RowBlock rowBlock = (RowBlock) block.getSingleValueBlock(position);
         int encodedBucketNumber = rowBlock.getRawFieldBlocks()[1].getInt(0, 0);
         return BucketCodec.determineVersion(encodedBucketNumber).decodeWriterId(encodedBucketNumber);

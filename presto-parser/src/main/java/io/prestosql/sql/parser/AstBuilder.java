@@ -495,6 +495,7 @@ class AstBuilder
     public Node visitVacuumTable(SqlBaseParser.VacuumTableContext context)
     {
         boolean isFull = context.FULL() != null;
+        boolean isMerge = context.UNIFY() != null;
         //Exclude single quotes
         Optional<String> partition = getTextIfPresent(context.partition).map(s -> {
             if (s.startsWith("'") && s.endsWith("'")) {
@@ -506,6 +507,7 @@ class AstBuilder
         return new VacuumTable(Optional.of(getLocation(context)),
                 new Table(getLocation(context), getQualifiedName(context.qualifiedName())),
                 isFull,
+                isMerge,
                 partition,
                 isAsync);
     }

@@ -89,6 +89,7 @@ public final class HiveSessionProperties
     private static final String ORC_PREDICATE_PUSHDOWN = "orc_predicate_pushdown_enabled";
     private static final String ORC_DISJUCT_PREDICATE_PUSHDOWN = "orc_disjunct_predicate_pushdown_enabled";
     private static final String ORC_PUSHDOWN_DATACACHE = "orc_pushdown_data_cache_enabled";
+    private static final String WRITE_PARTITION_DISTRIBUTION = "write_partition_distribution";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -121,6 +122,11 @@ public final class HiveSessionProperties
                         BUCKET_EXECUTION_ENABLED,
                         "Enable bucket-aware execution: only use a single worker per bucket",
                         hiveConfig.isBucketExecutionEnabled(),
+                        false),
+                booleanProperty(
+                        WRITE_PARTITION_DISTRIBUTION,
+                        "Distribute writes based on partition columns",
+                        false,
                         false),
                 booleanProperty(
                         FORCE_LOCAL_SCHEDULING,
@@ -390,6 +396,11 @@ public final class HiveSessionProperties
     public static boolean isBucketExecutionEnabled(ConnectorSession session)
     {
         return session.getProperty(BUCKET_EXECUTION_ENABLED, Boolean.class);
+    }
+
+    public static boolean isWritePartitionDistributionEnabled(ConnectorSession session)
+    {
+        return session.getProperty(WRITE_PARTITION_DISTRIBUTION, Boolean.class);
     }
 
     public static boolean isForceLocalScheduling(ConnectorSession session)

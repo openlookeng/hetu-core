@@ -162,7 +162,12 @@ public class MetastoreUtil
         return getProtectMode(table.getParameters());
     }
 
-    public static String makePartName(List<Column> partitionColumns, List<String> values)
+    public static String makePartitionName(Table table, Partition partition)
+    {
+        return makePartitionName(table.getPartitionColumns(), partition.getValues());
+    }
+
+    public static String makePartitionName(List<Column> partitionColumns, List<String> values)
     {
         return toPartitionName(partitionColumns.stream().map(Column::getName).collect(toList()), values);
     }

@@ -160,6 +160,16 @@ public class HiveModule
                 daemonThreadsNamed("hive-vacuum-service-" + catalogName + "-%s"));
     }
 
+    @ForHiveMetastore
+    @Singleton
+    @Provides
+    public ScheduledExecutorService createHiveMetadataClientServiceExecutor(HiveCatalogName catalogName, HiveConfig hiveConfig)
+    {
+        return newScheduledThreadPool(
+                hiveConfig.getMetastoreClientServiceThreads(),
+                daemonThreadsNamed("hive-metastore-client-service-" + catalogName + "-%s"));
+    }
+
     @ForHiveTransactionHeartbeats
     @Singleton
     @Provides

@@ -448,10 +448,10 @@ public class ClassLoaderSafeConnectorMetadata
     }
 
     @Override
-    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition)
+    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.beginVacuum(session, tableHandle, full, partition);
+            return delegate.beginVacuum(session, tableHandle, full, merge, partition);
         }
     }
 

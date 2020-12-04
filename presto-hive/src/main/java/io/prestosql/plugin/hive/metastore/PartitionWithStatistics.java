@@ -24,13 +24,20 @@ public class PartitionWithStatistics
     private final Partition partition;
     private final String partitionName;
     private final PartitionStatistics statistics;
+    private final boolean updateStats;
 
     public PartitionWithStatistics(Partition partition, String partitionName, PartitionStatistics statistics)
+    {
+        this(partition, partitionName, statistics, true);
+    }
+
+    public PartitionWithStatistics(Partition partition, String partitionName, PartitionStatistics statistics, boolean updateStats)
     {
         this.partition = requireNonNull(partition, "partition is null");
         this.partitionName = requireNonNull(partitionName, "partitionName is null");
         checkArgument(toPartitionValues(partitionName).equals(partition.getValues()), "unexpected partition name: %s != %s", partitionName, partition.getValues());
         this.statistics = requireNonNull(statistics, "statistics is null");
+        this.updateStats = updateStats;
     }
 
     public Partition getPartition()
@@ -46,5 +53,10 @@ public class PartitionWithStatistics
     public PartitionStatistics getStatistics()
     {
         return statistics;
+    }
+
+    public boolean isUpdateStats()
+    {
+        return updateStats;
     }
 }

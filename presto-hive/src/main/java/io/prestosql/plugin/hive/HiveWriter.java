@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
 
@@ -131,6 +132,12 @@ public class HiveWriter
                 inputSizeInBytes,
                 fileWriter.getWrittenBytes(),
                 miscData);
+    }
+
+    @VisibleForTesting
+    public HiveFileWriter getFileWriter()
+    {
+        return fileWriter;
     }
 
     @Override

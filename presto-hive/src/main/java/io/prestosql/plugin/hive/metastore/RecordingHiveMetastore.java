@@ -45,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.json.JsonCodec.jsonCodec;
@@ -217,21 +218,23 @@ public class RecordingHiveMetastore
     }
 
     @Override
-    public PartitionStatistics getTableStatistics(HiveIdentity identity, String databaseName, String tableName)
+    public PartitionStatistics getTableStatistics(HiveIdentity identity, Table table)
     {
         return loadValue(
                 tableStatisticsCache,
-                hiveTableName(databaseName, tableName),
-                () -> delegate.getTableStatistics(identity, databaseName, tableName));
+                hiveTableName(table.getDatabaseName(), table.getTableName()),
+                () -> delegate.getTableStatistics(identity, table));
     }
 
     @Override
-    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, String databaseName, String tableName, Set<String> partitionNames)
+    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, Table table, List<Partition> partitions)
     {
         return loadValue(
                 partitionStatisticsCache,
-                getHivePartitionNames(databaseName, tableName, partitionNames),
-                () -> delegate.getPartitionStatistics(identity, databaseName, tableName, partitionNames));
+                partitions.stream()
+                        .map(partition -> hivePartitionName(table.getDatabaseName(), table.getTableName(), partition.getValues()))
+                        .collect(Collectors.toSet()),
+                () -> delegate.getPartitionStatistics(identity, table, partitions));
     }
 
     @Override
@@ -246,6 +249,14 @@ public class RecordingHiveMetastore
     {
         verifyRecordingMode();
         delegate.updatePartitionStatistics(identity, databaseName, tableName, partitionName, update);
+    }
+
+    @Override
+    public void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames, List<Function<PartitionStatistics, PartitionStatistics>> updateFunctionList)
+    {
+        for (int i = 0; i < partitionNames.size(); i++) {
+            updatePartitionStatistics(identity, databaseName, tableName, partitionNames.get(i), updateFunctionList.get(i));
+        }
     }
 
     @Override

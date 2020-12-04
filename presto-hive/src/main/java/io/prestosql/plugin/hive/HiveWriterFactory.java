@@ -496,7 +496,7 @@ public class HiveWriterFactory
                 //In case of ACID txn tables, dont delete old data. Just create new base in same partition.
                 options.writingBase(true);
             }
-            if (vacuumOptions.isPresent() && acidWriteType == HiveACIDWriteType.VACUUM) {
+            if (vacuumOptions.isPresent() && HiveACIDWriteType.isVacuum(acidWriteType)) {
                 Options vOptions = vacuumOptions.get();
                 //Use the original bucket file number itself.
                 //Compacted delta directories will not have statementId
@@ -512,7 +512,7 @@ public class HiveWriterFactory
                 if (options.isWritingBase()) {
                     subdir = AcidUtils.baseDir(options.getMaximumWriteId());
                 }
-                else if (acidWriteType == HiveACIDWriteType.VACUUM) {
+                else if (HiveACIDWriteType.isVacuum(acidWriteType)) {
                     //Only for Minor compacted delta will not have statement Id.
                     subdir = AcidUtils.deltaSubdir(options.getMinimumWriteId(), options.getMaximumWriteId());
                 }
@@ -639,7 +639,7 @@ public class HiveWriterFactory
             for (SortingColumn column : sortigColumns) {
                 Integer index = columnIndexes.get(column.getColumnName());
                 if (index == null) {
-                    throw new PrestoException(HIVE_INVALID_METADATA, format("Sorting column '%s' does exist in table '%s.%s'", column.getColumnName(), schemaName, tableName));
+                    throw new PrestoException(HIVE_INVALID_METADATA, format("Sorting column '%s' does not exist in table '%s.%s'", column.getColumnName(), schemaName, tableName));
                 }
                 sortFields.add(index);
                 sortOrders.add(column.getOrder().getSortOrder());

@@ -17,6 +17,7 @@ import io.airlift.units.Duration;
 import org.apache.thrift.TException;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +31,7 @@ public class TestStaticMetastoreLocator
 {
     private static final ThriftMetastoreClient DEFAULT_CLIENT = createFakeMetastoreClient();
     private static final ThriftMetastoreClient FALLBACK_CLIENT = createFakeMetastoreClient();
+    private static final ThriftMetastoreClient FALLBACK_CLIENT2 = createFakeMetastoreClient();
 
     private static final StaticMetastoreConfig CONFIG_WITH_FALLBACK = new StaticMetastoreConfig()
             .setMetastoreUris("thrift://default:8080,thrift://fallback:8090,thrift://fallback2:8090");
@@ -65,7 +67,7 @@ public class TestStaticMetastoreLocator
     public void testFallbackHiveMetastoreFails()
     {
         MetastoreLocator locator = createMetastoreLocator(CONFIG_WITH_FALLBACK, asList(null, null, null));
-        assertCreateClientFails(locator, "Failed connecting to Hive metastore: [default:8080, fallback:8090, fallback2:8090]");
+        assertCreateClientFails(locator, "Failed connecting to Hive metastore:");
     }
 
     @Test
@@ -90,11 +92,49 @@ public class TestStaticMetastoreLocator
         assertCreateClientFails(locator, "Failed connecting to Hive metastore: [default:8080]");
     }
 
+    @Test
+    public void testRoundRobinHiveMetastore()
+            throws TException
+    {
+        MetastoreLocator locator = createMetastoreLocator(CONFIG_WITH_FALLBACK,
+                asList(DEFAULT_CLIENT, FALLBACK_CLIENT, FALLBACK_CLIENT2,
+                        DEFAULT_CLIENT, FALLBACK_CLIENT, FALLBACK_CLIENT2));
+        MockThriftMetastoreClient client;
+        List<String> pass1 = new ArrayList<String>(){{
+                add("default:8080");
+                add("fallback:8090");
+                add("fallback2:8090");
+            }};
+        List<String> pass2 = new ArrayList<>();
+
+        /* PASS-1 */
+        client = (MockThriftMetastoreClient) locator.createMetastoreClient();
+        pass2.add(client.getHostAddress());
+        assertEquals(pass1.contains(client.getHostAddress()), true);
+        pass1.remove(client.getHostAddress());
+        client = (MockThriftMetastoreClient) locator.createMetastoreClient();
+        pass2.add(client.getHostAddress());
+        assertEquals(pass1.contains(client.getHostAddress()), true);
+        pass1.remove(client.getHostAddress());
+        client = (MockThriftMetastoreClient) locator.createMetastoreClient();
+        pass2.add(client.getHostAddress());
+        assertEquals(pass1.contains(client.getHostAddress()), true);
+        pass1.remove(client.getHostAddress());
+
+        /* PASS-2 */
+        client = (MockThriftMetastoreClient) locator.createMetastoreClient();
+        assertEquals(pass2.get(0), client.getHostAddress());
+        client = (MockThriftMetastoreClient) locator.createMetastoreClient();
+        assertEquals(pass2.get(1), client.getHostAddress());
+        client = (MockThriftMetastoreClient) locator.createMetastoreClient();
+        assertEquals(pass2.get(2), client.getHostAddress());
+    }
+
     private static void assertCreateClientFails(MetastoreLocator locator, String message)
     {
         assertThatThrownBy(locator::createMetastoreClient)
                 .hasCauseInstanceOf(TException.class)
-                .hasMessage(message);
+                .hasMessageStartingWith(message);
     }
 
     private static MetastoreLocator createMetastoreLocator(StaticMetastoreConfig config, List<ThriftMetastoreClient> clients)

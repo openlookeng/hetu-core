@@ -146,6 +146,7 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import io.prestosql.sql.tree.TransactionAccessMode;
 import io.prestosql.sql.tree.Union;
 import io.prestosql.sql.tree.Unnest;
+import io.prestosql.sql.tree.VacuumTable;
 import io.prestosql.sql.tree.Values;
 import io.prestosql.sql.tree.With;
 import io.prestosql.sql.tree.WithQuery;
@@ -1688,6 +1689,16 @@ public class TestSqlParser
                 new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
                         new Identifier("a"),
                         new Identifier("b")))));
+    }
+
+    @Test
+    public void testVacuum()
+    {
+        assertStatement("VACUUM TABLE t", new VacuumTable(Optional.empty(), table(QualifiedName.of("t")), false, false, Optional.empty(), true));
+        assertStatement("VACUUM TABLE t AND WAIT", new VacuumTable(Optional.empty(), table(QualifiedName.of("t")), false, false, Optional.empty(), false));
+        assertStatement("VACUUM TABLE t FULL AND WAIT", new VacuumTable(Optional.empty(), table(QualifiedName.of("t")), true, false, Optional.empty(), false));
+        assertStatement("VACUUM TABLE t FULL UNIFY AND WAIT", new VacuumTable(Optional.empty(), table(QualifiedName.of("t")), true, true, Optional.empty(), false));
+        assertStatement("VACUUM TABLE t PARTITION 'age = 10' AND WAIT", new VacuumTable(Optional.empty(), table(QualifiedName.of("t")), false, false, Optional.of("age = 10"), false));
     }
 
     @Test

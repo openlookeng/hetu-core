@@ -188,8 +188,7 @@ public class PartitionUpdate
             for (PartitionUpdate partition : partitionGroup) {
                 // verify partitions have the same new flag, write path and target path
                 // this shouldn't happen but could if another user added a partition during the write
-                if (partition.getUpdateMode() != firstPartition.getUpdateMode() ||
-                        !partition.getWritePath().equals(firstPartition.getWritePath()) ||
+                if (!partition.getWritePath().equals(firstPartition.getWritePath()) ||
                         !partition.getTargetPath().equals(firstPartition.getTargetPath())) {
                     throw new PrestoException(HiveErrorCode.HIVE_CONCURRENT_MODIFICATION_DETECTED, format("Partition %s was added or modified during INSERT", firstPartition.getName()));
                 }

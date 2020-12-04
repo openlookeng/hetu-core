@@ -314,7 +314,7 @@ public interface Metadata
      * Begin update query
      * @return
      */
-    default VacuumTableHandle beginVacuum(Session session, TableHandle tableHandle, boolean full, Optional<String> partition)
+    default VacuumTableHandle beginVacuum(Session session, TableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
     {
         throw new PrestoException(NOT_SUPPORTED, "vacuum not supported yet for this connector!!");
     }

@@ -60,6 +60,7 @@ public class HiveMetadataFactory
     private final AccessControlMetadataFactory accessControlMetadataFactory;
     private final Optional<Duration> hiveTransactionHeartbeatInterval;
     private final ScheduledExecutorService heartbeatService;
+    private final ScheduledExecutorService hiveMetastoreClientService;
     private final Duration vacuumCleanupRecheckInterval;
     private final int vacuumDeltaNumThreshold;
     private final double vacuumDeltaPercentThreshold;
@@ -75,6 +76,7 @@ public class HiveMetadataFactory
             HivePartitionManager partitionManager,
             @ForHive ExecutorService executorService,
             @ForHiveVacuum ScheduledExecutorService hiveVacuumService,
+            @ForHiveMetastore ScheduledExecutorService hiveMetastoreClientService,
             @ForHiveTransactionHeartbeats ScheduledExecutorService heartbeatService,
             TypeManager typeManager,
             LocationService locationService,
@@ -104,6 +106,7 @@ public class HiveMetadataFactory
                 executorService,
                 hiveVacuumService,
                 heartbeatService,
+                hiveMetastoreClientService,
                 typeTranslator,
                 nodeVersion.toString(),
                 accessControlMetadataFactory,
@@ -134,6 +137,7 @@ public class HiveMetadataFactory
             ExecutorService executorService,
             ScheduledExecutorService hiveVacuumService,
             ScheduledExecutorService heartbeatService,
+            ScheduledExecutorService hiveMetastoreClientService,
             TypeTranslator typeTranslator,
             String prestoVersion,
             AccessControlMetadataFactory accessControlMetadataFactory,
@@ -173,6 +177,7 @@ public class HiveMetadataFactory
         renameExecution = new BoundedExecutor(executorService, maxConcurrentFileRenames);
         this.hiveVacuumService = requireNonNull(hiveVacuumService, "hiveVacuumService is null");
         this.heartbeatService = requireNonNull(heartbeatService, "heartbeatService is null");
+        this.hiveMetastoreClientService = requireNonNull(hiveMetastoreClientService, "heartbeatService is null");
         this.vacuumDeltaNumThreshold = vacuumDeltaNumThreshold;
         this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
         this.autoVacuumEnabled = autoVacuumEnabled;
@@ -191,7 +196,8 @@ public class HiveMetadataFactory
                 skipDeletionForAlter,
                 skipTargetCleanupOnRollback,
                 hiveTransactionHeartbeatInterval,
-                heartbeatService);
+                heartbeatService,
+                hiveMetastoreClientService);
 
         return new HiveMetadata(
                 metastore,
@@ -213,6 +219,7 @@ public class HiveMetadataFactory
                 vacuumDeltaNumThreshold,
                 vacuumDeltaPercentThreshold,
                 hiveVacuumService,
-                vacuumCollectorInterval);
+                vacuumCollectorInterval,
+                hiveMetastoreClientService);
     }
 }

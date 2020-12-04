@@ -27,14 +27,16 @@ public class VacuumTable
     private final Table table;
 
     private final boolean isFull;
+    private final boolean isMerge;
     private final Optional<String> partition;
     private final boolean isAsync;
 
-    public VacuumTable(Optional<NodeLocation> location, Table table, boolean isFull, Optional<String> partition, boolean isAsync)
+    public VacuumTable(Optional<NodeLocation> location, Table table, boolean isFull, boolean isMerge, Optional<String> partition, boolean isAsync)
     {
         super(location);
         this.table = requireNonNull(table, "table is null");
         this.isFull = isFull;
+        this.isMerge = isMerge;
         this.partition = requireNonNull(partition, "partition is null");
         this.isAsync = isAsync;
     }
@@ -47,6 +49,11 @@ public class VacuumTable
     public boolean isFull()
     {
         return isFull;
+    }
+
+    public boolean isMerge()
+    {
+        return isMerge;
     }
 
     public boolean isAsync()

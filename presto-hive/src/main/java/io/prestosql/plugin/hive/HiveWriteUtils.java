@@ -435,8 +435,12 @@ public final class HiveWriteUtils
             }
         }
         // verify transactional for Vacuum
-        if (writeType == HiveACIDWriteType.VACUUM && !isTransactionalTable(parameters)) {
+        if (HiveACIDWriteType.isVacuum(writeType) && !isTransactionalTable(parameters)) {
             throw new PrestoException(NOT_SUPPORTED, "Vacuum on Hive Non-transactional tables are not supported: " + tableName);
+        }
+        if (HiveACIDWriteType.VACUUM_MERGE == writeType &&
+                storage.getBucketProperty().isPresent()) {
+            throw new PrestoException(NOT_SUPPORTED, String.format("Vacuum merge on Bucketed Hive table %s not supported", tableName));
         }
     }
 

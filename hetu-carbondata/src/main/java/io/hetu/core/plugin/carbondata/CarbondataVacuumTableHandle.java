@@ -61,6 +61,7 @@ public class CarbondataVacuumTableHandle
                 tableStorageFormat,
                 partitionStorageFormat,
                 full,
+                false,
                 null);
         // Additional conf is used to store the encoded load model
         this.additionalConf = ImmutableMap.copyOf(requireNonNull(additionalConf, "additional conf map is null"));

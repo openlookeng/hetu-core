@@ -222,7 +222,8 @@ public class BeginTableWrite
             }
             if (target instanceof VacuumTargetReference) {
                 VacuumTargetReference vacuum = (VacuumTargetReference) target;
-                return new VacuumTarget(metadata.beginVacuum(session, vacuum.getHandle(), vacuum.isFull(), vacuum.getPartition()), metadata.getTableMetadata(session, vacuum.getHandle()).getTable());
+                return new VacuumTarget(metadata.beginVacuum(session, vacuum.getHandle(), vacuum.isFull(), vacuum.isMerge(), vacuum.getPartition()),
+                        metadata.getTableMetadata(session, vacuum.getHandle()).getTable());
             }
             throw new IllegalArgumentException("Unhandled target type: " + target.getClass().getSimpleName());
         }

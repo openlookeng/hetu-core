@@ -19,6 +19,7 @@ import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveVacuumTableHandle.Range;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
+import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import org.apache.hadoop.conf.Configuration;
@@ -55,15 +56,14 @@ class HiveVacuumSplitSource
      * Minor Vacuums will also have delete_delta splits separately, which can be run in parallel.
      * Each grouped splits will be scheduled separately and run in parallel if enough number of workers available.
      * Splits are grouped as below to execute in parallel.
-     * buckets->partition->(type of delta)->List of HiveSplits
+     * partition->buckets->(type of delta)->List of HiveSplits
      */
     private Map<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> splitsMap = new HashMap<>();
-    private Map<String, List<Range>> partitionToRanges = new HashMap<>();
     private HiveVacuumTableHandle vacuumTableHandle;
     private HdfsEnvironment hdfsEnvironment;
     private HdfsContext hdfsContext;
 
-    HiveVacuumSplitSource(HiveSplitSource splitSource, HiveVacuumTableHandle vacuumTableHandle, HdfsEnvironment hdfsEnvironment, HdfsContext hdfsContext)
+    HiveVacuumSplitSource(HiveSplitSource splitSource, HiveVacuumTableHandle vacuumTableHandle, HdfsEnvironment hdfsEnvironment, HdfsContext hdfsContext, ConnectorSession session)
     {
         this.splitSource = splitSource;
         this.vacuumTableHandle = vacuumTableHandle;
@@ -132,7 +132,7 @@ class HiveVacuumSplitSource
                 List<ConnectorSplit> splits = splitBatch.getSplits();
                 for (ConnectorSplit split : splits) {
                     HiveSplit hiveSplit = ((HiveSplitWrapper) split).getSplits().get(0);
-                    int bucketNumber = getBucketNumber(hiveSplit);
+                    int bucketNumber = vacuumTableHandle.isMerge() ? 0 : getBucketNumber(hiveSplit); //In case of merge there are no bucket numbers
                     boolean isDeleteDelta = isDeleteDelta(hiveSplit);
                     List<HiveSplit> hiveSplits = getHiveSplitsFor(bucketNumber, hiveSplit.getPartitionName(), isDeleteDelta);
                     hiveSplits.add(hiveSplit);
@@ -170,6 +170,11 @@ class HiveVacuumSplitSource
         while (partitions.hasNext()) {
             Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> currentPartitionEntry = partitions.next();
             String currentPartition = currentPartitionEntry.getKey();
+            if (vacuumTableHandle.isMerge() && currentPartition.contains(HivePartitionKey.HIVE_DEFAULT_DYNAMIC_PARTITION)) {
+                //skip the dynamic partition for now.
+                partitions.remove();
+                continue;
+            }
             Map<Integer, Map<Boolean, List<HiveSplit>>> buckets = currentPartitionEntry.getValue();
             Map<Boolean, List<HiveSplit>> deltaTypeToSplits = null;
             if (bucketToChoose != -1) {
