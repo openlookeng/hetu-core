@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.base.security.ForwardingSystemAccessControl;
+import io.prestosql.security.IndexAccessControlRule.IndexPrivilege;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
@@ -42,10 +43,21 @@ import static com.google.common.base.Suppliers.memoizeWithExpiration;
 import static io.prestosql.plugin.base.JsonUtils.parseJson;
 import static io.prestosql.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
 import static io.prestosql.plugin.base.security.FileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
+import static io.prestosql.security.IndexAccessControlRule.IndexPrivilege.ALL;
+import static io.prestosql.security.IndexAccessControlRule.IndexPrivilege.CREATE;
+import static io.prestosql.security.IndexAccessControlRule.IndexPrivilege.DROP;
+import static io.prestosql.security.IndexAccessControlRule.IndexPrivilege.RENAME;
+import static io.prestosql.security.IndexAccessControlRule.IndexPrivilege.SHOW;
+import static io.prestosql.security.IndexAccessControlRule.IndexPrivilege.UPDATE;
 import static io.prestosql.spi.StandardErrorCode.CONFIGURATION_INVALID;
 import static io.prestosql.spi.security.AccessDeniedException.denyAccessNodeInfo;
 import static io.prestosql.spi.security.AccessDeniedException.denyCatalogAccess;
+import static io.prestosql.spi.security.AccessDeniedException.denyCreateIndex;
+import static io.prestosql.spi.security.AccessDeniedException.denyDropIndex;
+import static io.prestosql.spi.security.AccessDeniedException.denyRenameIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denySetUser;
+import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
+import static io.prestosql.spi.security.AccessDeniedException.denyUpdateIndex;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -58,12 +70,14 @@ public class FileBasedSystemAccessControl
     private final List<CatalogAccessControlRule> catalogRules;
     private final Optional<List<PrincipalUserMatchRule>> principalUserMatchRules;
     private final List<NodeInformationRule> nodeInfoRules;
+    private final List<IndexAccessControlRule> indexRules;
 
-    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules, List<NodeInformationRule> nodeInfoRules)
+    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules, List<NodeInformationRule> nodeInfoRules, List<IndexAccessControlRule> indexRules)
     {
         this.catalogRules = catalogRules;
         this.principalUserMatchRules = principalUserMatchRules;
         this.nodeInfoRules = nodeInfoRules;
+        this.indexRules = indexRules;
     }
 
     @Override
@@ -106,21 +120,52 @@ public class FileBasedSystemAccessControl
     @Override
     public void checkCanCreateIndex(Identity identity, CatalogSchemaTableName index)
     {
+        if (!checkIndexPermission(identity, CREATE) && !checkIndexPermission(identity, ALL)) {
+            denyCreateIndex();
+        }
     }
 
     @Override
     public void checkCanDropIndex(Identity identity, CatalogSchemaTableName index)
     {
+        if (!checkIndexPermission(identity, DROP) && !checkIndexPermission(identity, ALL)) {
+            denyDropIndex();
+        }
     }
 
     @Override
     public void checkCanRenameIndex(Identity identity, CatalogSchemaTableName index, CatalogSchemaTableName indexNew)
     {
+        if (!checkIndexPermission(identity, RENAME) && !checkIndexPermission(identity, ALL)) {
+            denyRenameIndex();
+        }
     }
 
     @Override
     public void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index)
     {
+        if (!checkIndexPermission(identity, UPDATE) && !checkIndexPermission(identity, ALL)) {
+            denyUpdateIndex();
+        }
+    }
+
+    @Override
+    public void checkCanShowIndex(Identity identity, CatalogSchemaTableName index)
+    {
+        if (!checkIndexPermission(identity, SHOW) && !checkIndexPermission(identity, ALL)) {
+            denyShowIndex();
+        }
+    }
+
+    private boolean checkIndexPermission(Identity identity, IndexPrivilege... privileges)
+    {
+        for (IndexAccessControlRule rule : indexRules) {
+            Optional<Set<IndexPrivilege>> indexPrivileges = rule.match(identity.getUser());
+            if (indexPrivileges.isPresent()) {
+                return indexPrivileges.get().containsAll(ImmutableSet.copyOf(privileges));
+            }
+        }
+        return false;
     }
 
     @Override
@@ -429,7 +474,7 @@ public class FileBasedSystemAccessControl
                     Optional.of(Pattern.compile(".*")),
                     Optional.of(Pattern.compile("system"))));
 
-            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules(), rules.getNodeInfoRules());
+            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules(), rules.getNodeInfoRules(), rules.getIndexRules());
         }
     }
 }

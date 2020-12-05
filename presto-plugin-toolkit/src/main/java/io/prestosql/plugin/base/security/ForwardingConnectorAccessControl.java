@@ -276,6 +276,12 @@ public abstract class ForwardingConnectorAccessControl
     }
 
     @Override
+    public void checkCanShowIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+        delegate().checkCanShowIndex(transactionHandle, identity, indexName);
+    }
+
+    @Override
     public String applyRowlevelFiltering(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
     {
         return null;

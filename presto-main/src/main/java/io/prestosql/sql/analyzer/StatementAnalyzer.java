@@ -1027,8 +1027,11 @@ class StatementAnalyzer
         protected Scope visitTable(Table table, Optional<Scope> scope)
         {
             if (analysis.getOriginalStatement() instanceof CreateIndex) {
-                // check index parameters validate
                 CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
+                // check can create index
+                QualifiedObjectName indexFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getIndexName());
+                accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
+                // check index parameters validate
                 QualifiedObjectName tableFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getTableName());
                 String tableName = tableFullName.toString();
                 // check whether catalog support create index

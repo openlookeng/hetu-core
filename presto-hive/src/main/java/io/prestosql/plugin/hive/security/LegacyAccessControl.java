@@ -299,4 +299,9 @@ public class LegacyAccessControl
     public void checkCanUpdateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
     {
     }
+
+    @Override
+    public void checkCanShowIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+    }
 }

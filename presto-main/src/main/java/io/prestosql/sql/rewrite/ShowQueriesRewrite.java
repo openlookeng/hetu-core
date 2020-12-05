@@ -27,6 +27,7 @@ import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager.SessionPropertyValue;
 import io.prestosql.metadata.TableHandle;
@@ -641,6 +642,14 @@ final class ShowQueriesRewrite
         @Override
         protected Node visitShowIndex(ShowIndex node, Void context)
         {
+            if (node.getIndexName() == null) {
+                accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), null);
+            }
+            else {
+                QualifiedObjectName indexFullName = MetadataUtil.createQualifiedObjectName(session, node, QualifiedName.of(node.getIndexName()));
+                accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
+            }
+
             List<IndexRecord> indexRecords = null;
             try {
                 indexRecords = readIndexRecords(node.getIndexName());

@@ -15,8 +15,10 @@
 package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.prestosql.Session;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.sql.analyzer.SemanticException;
@@ -32,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_INDEX;
 
 public class DropIndexTask
@@ -48,6 +51,11 @@ public class DropIndexTask
     {
         IndexClient indexClient = heuristicIndexerManager.getIndexClient();
         String indexName = statement.getIndexName().toString();
+
+        Session session = stateMachine.getSession();
+        QualifiedObjectName fullObjectName = createQualifiedObjectName(session, statement, statement.getIndexName());
+
+        accessControl.checkCanDropIndex(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
 
         try {
             // check indexName exist, call heuristic index api to drop index

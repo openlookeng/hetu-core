@@ -329,6 +329,11 @@ public class FileBasedAccessControl
     {
     }
 
+    @Override
+    public void checkCanShowIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    {
+    }
+
     private boolean canSetSessionProperty(ConnectorIdentity identity, String property)
     {
         for (SessionPropertyAccessControlRule rule : sessionPropertyRules) {
