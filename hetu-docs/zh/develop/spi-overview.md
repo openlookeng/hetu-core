@@ -18,7 +18,7 @@ com.example.plugin.ExamplePlugin
 对于包含在 openLooKeng 源代码中的内置插件，每当插件的 `pom.xml` 文件包含以下行时，就会创建该资源文件：
 
 ``` xml
-<packaging>presto-plugin</packaging>
+<packaging>hetu-plugin</packaging>
 ```
 
 ## 插件
