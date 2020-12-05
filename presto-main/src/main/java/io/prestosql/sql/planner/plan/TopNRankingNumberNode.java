@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.sql.planner.OrderingScheme;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.WindowNode.Specification;
@@ -31,7 +32,7 @@ import static com.google.common.collect.Iterables.concat;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
-public final class TopNRowNumberNode
+public final class TopNRankingNumberNode
         extends PlanNode
 {
     private final PlanNode source;
@@ -40,16 +41,17 @@ public final class TopNRowNumberNode
     private final int maxRowCountPerPartition;
     private final boolean partial;
     private final Optional<Symbol> hashSymbol;
+    private final Optional<RankingFunction> rankingFunction;
 
     @JsonCreator
-    public TopNRowNumberNode(
-            @JsonProperty("id") PlanNodeId id,
+    public TopNRankingNumberNode(@JsonProperty("id") PlanNodeId id,
             @JsonProperty("source") PlanNode source,
             @JsonProperty("specification") Specification specification,
             @JsonProperty("rowNumberSymbol") Symbol rowNumberSymbol,
             @JsonProperty("maxRowCountPerPartition") int maxRowCountPerPartition,
             @JsonProperty("partial") boolean partial,
-            @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol)
+            @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
+            @JsonProperty("rankingFunction") Optional<RankingFunction> rankingFunction)
     {
         super(id);
 
@@ -59,6 +61,7 @@ public final class TopNRowNumberNode
         requireNonNull(rowNumberSymbol, "rowNumberSymbol is null");
         checkArgument(maxRowCountPerPartition > 0, "maxRowCountPerPartition must be > 0");
         requireNonNull(hashSymbol, "hashSymbol is null");
+        requireNonNull(rankingFunction, "rankingFunction is null");
 
         this.source = source;
         this.specification = specification;
@@ -66,6 +69,7 @@ public final class TopNRowNumberNode
         this.maxRowCountPerPartition = maxRowCountPerPartition;
         this.partial = partial;
         this.hashSymbol = hashSymbol;
+        this.rankingFunction = rankingFunction;
     }
 
     @Override
@@ -112,6 +116,12 @@ public final class TopNRowNumberNode
     }
 
     @JsonProperty
+    public Optional<RankingFunction> getRankingFunction()
+    {
+        return this.rankingFunction;
+    }
+
+    @JsonProperty
     public int getMaxRowCountPerPartition()
     {
         return maxRowCountPerPartition;
@@ -132,12 +142,12 @@ public final class TopNRowNumberNode
     @Override
     public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
-        return visitor.visitTopNRowNumber(this, context);
+        return visitor.visitTopNRankingNumber(this, context);
     }
 
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        return new TopNRowNumberNode(getId(), Iterables.getOnlyElement(newChildren), specification, rowNumberSymbol, maxRowCountPerPartition, partial, hashSymbol);
+        return new TopNRankingNumberNode(getId(), Iterables.getOnlyElement(newChildren), specification, rowNumberSymbol, maxRowCountPerPartition, partial, hashSymbol, rankingFunction);
     }
 }

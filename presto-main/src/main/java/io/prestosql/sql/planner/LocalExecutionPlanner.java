@@ -94,7 +94,7 @@ import io.prestosql.operator.TableScanOperator.TableScanOperatorFactory;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskOutputOperator.TaskOutputFactory;
 import io.prestosql.operator.TopNOperator.TopNOperatorFactory;
-import io.prestosql.operator.TopNRowNumberOperator;
+import io.prestosql.operator.TopNRankingNumberOperator;
 import io.prestosql.operator.VacuumTableOperator;
 import io.prestosql.operator.ValuesOperator.ValuesOperatorFactory;
 import io.prestosql.operator.WindowFunctionDefinition;
@@ -184,7 +184,7 @@ import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteTarget;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
@@ -883,7 +883,7 @@ public class LocalExecutionPlanner
         }
 
         @Override
-        public PhysicalOperation visitTopNRowNumber(TopNRowNumberNode node, LocalExecutionPlanContext context)
+        public PhysicalOperation visitTopNRankingNumber(TopNRankingNumberNode node, LocalExecutionPlanContext context)
         {
             PhysicalOperation source = node.getSource().accept(this, context);
 
@@ -915,7 +915,7 @@ public class LocalExecutionPlanner
             }
 
             Optional<Integer> hashChannel = node.getHashSymbol().map(channelGetter(source));
-            OperatorFactory operatorFactory = new TopNRowNumberOperator.TopNRowNumberOperatorFactory(
+            OperatorFactory operatorFactory = new TopNRankingNumberOperator.TopNRankingNumberOperatorFactory(
                     context.getNextOperatorId(),
                     node.getId(),
                     source.getTypes(),
@@ -928,7 +928,8 @@ public class LocalExecutionPlanner
                     node.isPartial(),
                     hashChannel,
                     1000,
-                    joinCompiler);
+                    joinCompiler,
+                    node.getRankingFunction());
 
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, source);
         }

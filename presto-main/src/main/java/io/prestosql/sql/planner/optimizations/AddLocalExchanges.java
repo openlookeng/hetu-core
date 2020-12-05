@@ -55,7 +55,7 @@ import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.UpdateReference;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 
@@ -463,7 +463,7 @@ public class AddLocalExchanges
         }
 
         @Override
-        public PlanWithProperties visitTopNRowNumber(TopNRowNumberNode node, StreamPreferredProperties parentPreferences)
+        public PlanWithProperties visitTopNRankingNumber(TopNRankingNumberNode node, StreamPreferredProperties parentPreferences)
         {
             StreamPreferredProperties requiredProperties = parentPreferences.withDefaultParallelism(session);
 

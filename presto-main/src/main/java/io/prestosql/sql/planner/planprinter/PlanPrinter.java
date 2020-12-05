@@ -93,7 +93,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
@@ -621,7 +621,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitTopNRowNumber(TopNRowNumberNode node, Void context)
+        public Void visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             List<String> partitionBy = node.getPartitionBy().stream()
                     .map(Functions.toStringFunction())
@@ -636,7 +636,7 @@ public class PlanPrinter
             args.add(format("order by (%s)", Joiner.on(", ").join(orderBy)));
 
             NodeRepresentation nodeOutput = addNode(node,
-                    "TopNRowNumber",
+                    "TopNRankingNumber",
                     format("[%s limit %s]%s", Joiner.on(", ").join(args), node.getMaxRowCountPerPartition(), formatHash(node.getHashSymbol())));
 
             nodeOutput.appendDetailsLine("%s := %s", node.getRowNumberSymbol(), "row_number()");

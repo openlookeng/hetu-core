@@ -16,6 +16,7 @@ package io.prestosql.sql.planner.optimizations;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import org.testng.annotations.Test;
@@ -36,7 +37,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.rowNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
-import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topNRowNumber;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topNRankingNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
 import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
@@ -47,6 +48,7 @@ import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPLICATE;
 import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
 import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
+import static java.lang.String.format;
 
 public class TestWindow
         extends BasePlanTest
@@ -68,15 +70,6 @@ public class TestWindow
                                         .partitionBy(ImmutableList.of("orderkey")),
                                 project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey"))))));
 
-        assertDistributedPlan("SELECT orderkey FROM (SELECT orderkey, row_number() OVER (PARTITION BY orderkey ORDER BY custkey) n FROM orders) WHERE n = 1",
-                anyTree(
-                        topNRowNumber(pattern -> pattern
-                                        .specification(
-                                                ImmutableList.of("orderkey"),
-                                                ImmutableList.of("custkey"),
-                                                ImmutableMap.of("custkey", ASC_NULLS_LAST)),
-                                project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey", "custkey", "custkey"))))));
-
         // Window partition key is not pre-bucketed.
         assertDistributedPlan("SELECT rank() OVER (PARTITION BY orderstatus) FROM orders",
                 anyTree(
@@ -95,23 +88,35 @@ public class TestWindow
                                         exchange(REMOTE, REPARTITION,
                                                 project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus"))))))));
 
-        assertDistributedPlan("SELECT orderstatus FROM (SELECT orderstatus, row_number() OVER (PARTITION BY orderstatus ORDER BY custkey) n FROM orders) WHERE n = 1",
-                anyTree(
-                        topNRowNumber(pattern -> pattern
-                                        .specification(
-                                                ImmutableList.of("orderstatus"),
-                                                ImmutableList.of("custkey"),
-                                                ImmutableMap.of("custkey", ASC_NULLS_LAST))
-                                        .partial(false),
-                                exchange(LOCAL, GATHER,
-                                        exchange(REMOTE, REPARTITION,
-                                                topNRowNumber(topNRowNumber -> topNRowNumber
-                                                                .specification(
-                                                                        ImmutableList.of("orderstatus"),
-                                                                        ImmutableList.of("custkey"),
-                                                                        ImmutableMap.of("custkey", ASC_NULLS_LAST))
-                                                                .partial(true),
-                                                        project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus", "custkey", "custkey")))))))));
+        //Window to TopN RankingFunction
+        for (RankingFunction rankingFunction : RankingFunction.values()) {
+            assertDistributedPlan(format("SELECT orderkey FROM (SELECT orderkey, %s() OVER (PARTITION BY orderkey ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getValue().getName()),
+                    anyTree(
+                            topNRankingNumber(pattern -> pattern
+                                            .specification(
+                                                    ImmutableList.of("orderkey"),
+                                                    ImmutableList.of("custkey"),
+                                                    ImmutableMap.of("custkey", ASC_NULLS_LAST)),
+                                    project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey", "custkey", "custkey"))))));
+
+            assertDistributedPlan(format("SELECT orderstatus FROM (SELECT orderstatus, %s() OVER (PARTITION BY orderstatus ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getValue().getName()),
+                    anyTree(
+                            topNRankingNumber(pattern -> pattern
+                                            .specification(
+                                                    ImmutableList.of("orderstatus"),
+                                                    ImmutableList.of("custkey"),
+                                                    ImmutableMap.of("custkey", ASC_NULLS_LAST))
+                                            .partial(false),
+                                    exchange(LOCAL, GATHER,
+                                            exchange(REMOTE, REPARTITION,
+                                                    topNRankingNumber(topNRowNumber -> topNRowNumber
+                                                                    .specification(
+                                                                            ImmutableList.of("orderstatus"),
+                                                                            ImmutableList.of("custkey"),
+                                                                            ImmutableMap.of("custkey", ASC_NULLS_LAST))
+                                                                    .partial(true),
+                                                            project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus", "custkey", "custkey")))))))));
+        }
     }
 
     @Test

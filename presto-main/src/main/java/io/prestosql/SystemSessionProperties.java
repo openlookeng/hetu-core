@@ -114,7 +114,7 @@ public final class SystemSessionProperties
     public static final String DISTRIBUTED_SORT = "distributed_sort";
     public static final String USE_MARK_DISTINCT = "use_mark_distinct";
     public static final String PREFER_PARTIAL_AGGREGATION = "prefer_partial_aggregation";
-    public static final String OPTIMIZE_TOP_N_ROW_NUMBER = "optimize_top_n_row_number";
+    public static final String OPTIMIZE_TOP_N_RANKING_NUMBER = "optimize_top_n_ranking_number";
     public static final String MAX_GROUPING_SETS = "max_grouping_sets";
     public static final String STATISTICS_CPU_TIMER_ENABLED = "statistics_cpu_timer_enabled";
     public static final String ENABLE_STATS_CALCULATOR = "enable_stats_calculator";
@@ -542,9 +542,9 @@ public final class SystemSessionProperties
                         featuresConfig.isPreferPartialAggregation(),
                         false),
                 booleanProperty(
-                        OPTIMIZE_TOP_N_ROW_NUMBER,
+                        OPTIMIZE_TOP_N_RANKING_NUMBER,
                         "Use top N row number optimization",
-                        featuresConfig.isOptimizeTopNRowNumber(),
+                        featuresConfig.isOptimizeTopNRankingNumber(),
                         false),
                 integerProperty(
                         MAX_GROUPING_SETS,
@@ -1017,9 +1017,9 @@ public final class SystemSessionProperties
         return session.getSystemProperty(PREFER_PARTIAL_AGGREGATION, Boolean.class);
     }
 
-    public static boolean isOptimizeTopNRowNumber(Session session)
+    public static boolean isOptimizeTopNRankingNumber(Session session)
     {
-        return session.getSystemProperty(OPTIMIZE_TOP_N_ROW_NUMBER, Boolean.class);
+        return session.getSystemProperty(OPTIMIZE_TOP_N_RANKING_NUMBER, Boolean.class);
     }
 
     public static boolean isDistributedSortEnabled(Session session)

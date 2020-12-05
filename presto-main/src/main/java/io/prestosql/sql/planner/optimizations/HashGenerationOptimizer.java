@@ -53,7 +53,7 @@ import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.WindowNode;
@@ -283,7 +283,7 @@ public class HashGenerationOptimizer
         }
 
         @Override
-        public PlanWithProperties visitTopNRowNumber(TopNRowNumberNode node, HashComputationSet parentPreference)
+        public PlanWithProperties visitTopNRankingNumber(TopNRankingNumberNode node, HashComputationSet parentPreference)
         {
             if (node.getPartitionBy().isEmpty()) {
                 return planSimpleNodeWithProperties(node, parentPreference);
@@ -298,14 +298,15 @@ public class HashGenerationOptimizer
             Symbol hashSymbol = child.getRequiredHashSymbol(hashComputation.get());
 
             return new PlanWithProperties(
-                    new TopNRowNumberNode(
+                    new TopNRankingNumberNode(
                             node.getId(),
                             child.getNode(),
                             node.getSpecification(),
                             node.getRowNumberSymbol(),
                             node.getMaxRowCountPerPartition(),
                             node.isPartial(),
-                            Optional.of(hashSymbol)),
+                            Optional.of(hashSymbol),
+                            node.getRankingFunction()),
                     child.getHashSymbols());
         }
 

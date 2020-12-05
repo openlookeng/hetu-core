@@ -19,7 +19,6 @@ import io.airlift.slice.Slices;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
-import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
@@ -72,6 +71,7 @@ import static io.prestosql.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
 import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
+import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
 import static io.prestosql.spi.predicate.Domain.singleValue;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static io.prestosql.sql.planner.LogicalPlanner.Stage.OPTIMIZED;
@@ -98,13 +98,12 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.rowNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.semiJoin;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.sort;
-import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictTableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topN;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topNRankingNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
 import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
 import static io.prestosql.sql.planner.plan.AggregationNode.Step.PARTIAL;
@@ -1019,27 +1018,18 @@ public class TestLogicalPlanner
                 any(
                         strictProject(
                                 ImmutableMap.of("name", new ExpressionMatcher("name"), "regionkey", new ExpressionMatcher("regionkey")),
-                                filter(
-                                        "rank_num <= BIGINT '6'",
-                                        window(
-                                                windowMatcherBuilder -> windowMatcherBuilder
-                                                        .specification(specification(
-                                                                ImmutableList.of(),
-                                                                ImmutableList.of("regionkey"),
-                                                                ImmutableMap.of("regionkey", SortOrder.ASC_NULLS_LAST)))
-                                                        .addFunction(
-                                                                "rank_num",
-                                                                functionCall(
-                                                                        "rank",
-                                                                        Optional.empty(),
-                                                                        ImmutableList.of())),
-                                                anyTree(
-                                                        sort(
-                                                                ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
-                                                                any(
-                                                                        tableScan(
-                                                                                "nation",
-                                                                                ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey"))))))))));
+                                topNRankingNumber(pattern -> pattern
+                                                .specification(
+                                                        ImmutableList.of(),
+                                                        ImmutableList.of("regionkey"),
+                                                        ImmutableMap.of("regionkey", ASC_NULLS_LAST)),
+                                        anyTree(
+                                                sort(
+                                                        ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
+                                                        any(
+                                                                tableScan(
+                                                                        "nation",
+                                                                        ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey")))))))));
 
         assertPlan(
                 "SELECT name, regionkey FROM nation ORDER BY regionkey OFFSET 10 ROWS FETCH FIRST 6 ROWS WITH TIES",
@@ -1053,27 +1043,18 @@ public class TestLogicalPlanner
                                                         .partitionBy(ImmutableList.of()),
                                                 strictProject(
                                                         ImmutableMap.of("name", new ExpressionMatcher("name"), "regionkey", new ExpressionMatcher("regionkey")),
-                                                        filter(
-                                                                "rank_num <= BIGINT '16'",
-                                                                window(
-                                                                        windowMatcherBuilder -> windowMatcherBuilder
-                                                                                .specification(specification(
-                                                                                        ImmutableList.of(),
-                                                                                        ImmutableList.of("regionkey"),
-                                                                                        ImmutableMap.of("regionkey", SortOrder.ASC_NULLS_LAST)))
-                                                                                .addFunction(
-                                                                                        "rank_num",
-                                                                                        functionCall(
-                                                                                                "rank",
-                                                                                                Optional.empty(),
-                                                                                                ImmutableList.of())),
-                                                                        anyTree(
-                                                                                sort(
-                                                                                        ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
-                                                                                        any(
-                                                                                                tableScan(
-                                                                                                        "nation",
-                                                                                                        ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey")))))))))
+                                                        topNRankingNumber(pattern -> pattern
+                                                                        .specification(
+                                                                                ImmutableList.of(),
+                                                                                ImmutableList.of("regionkey"),
+                                                                                ImmutableMap.of("regionkey", ASC_NULLS_LAST)),
+                                                                anyTree(
+                                                                        sort(
+                                                                                ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
+                                                                                any(
+                                                                                        tableScan(
+                                                                                                "nation",
+                                                                                                ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey"))))))))
                                                 .withAlias("row_num", new RowNumberSymbolMatcher())))));
     }
 

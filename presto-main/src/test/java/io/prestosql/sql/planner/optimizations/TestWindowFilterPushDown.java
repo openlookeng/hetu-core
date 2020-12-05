@@ -14,19 +14,21 @@
 package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
-import static io.prestosql.SystemSessionProperties.OPTIMIZE_TOP_N_ROW_NUMBER;
+import static io.prestosql.SystemSessionProperties.OPTIMIZE_TOP_N_RANKING_NUMBER;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyNot;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.limit;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
+import static java.lang.String.format;
 
 public class TestWindowFilterPushDown
         extends BasePlanTest
@@ -34,63 +36,70 @@ public class TestWindowFilterPushDown
     @Test
     public void testLimitAboveWindow()
     {
-        @Language("SQL") String sql = "SELECT " +
-                "row_number() OVER (PARTITION BY suppkey ORDER BY orderkey) partition_row_number FROM lineitem LIMIT 10";
+        String sqlFormat = "SELECT " +
+                "%s() OVER (PARTITION BY suppkey ORDER BY orderkey) partition_number FROM lineitem LIMIT 10";
 
-        assertPlanWithSession(
-                sql,
-                optimizeTopNRowNumber(true),
-                true,
-                anyTree(
-                        limit(10, anyTree(
-                                node(TopNRowNumberNode.class,
-                                        anyTree(
-                                                tableScan("lineitem")))))));
+        for (RankingFunction rankingFunction : RankingFunction.values()) {
+            @Language("SQL") String sql = format(sqlFormat, rankingFunction.getValue().getName());
 
-        assertPlanWithSession(
-                sql,
-                optimizeTopNRowNumber(false),
-                true,
-                anyTree(
-                        limit(10, anyTree(
-                                node(WindowNode.class,
-                                        anyTree(
-                                                tableScan("lineitem")))))));
+            assertPlanWithSession(
+                    sql,
+                    optimizeTopNRankingNumber(true),
+                    true,
+                    anyTree(
+                            limit(10, anyTree(
+                                    node(TopNRankingNumberNode.class,
+                                            anyTree(
+                                                    tableScan("lineitem")))))));
+
+            assertPlanWithSession(
+                    sql,
+                    optimizeTopNRankingNumber(false),
+                    true,
+                    anyTree(
+                            limit(10, anyTree(
+                                    node(WindowNode.class,
+                                            anyTree(
+                                                    tableScan("lineitem")))))));
+        }
     }
 
     @Test
     public void testFilterAboveWindow()
     {
-        @Language("SQL") String sql = "SELECT * FROM " +
-                "(SELECT row_number() OVER (PARTITION BY suppkey ORDER BY orderkey) partition_row_number FROM lineitem) " +
+        String sqlFormat = "SELECT * FROM " +
+                "(SELECT %s() OVER (PARTITION BY suppkey ORDER BY orderkey) partition_row_number FROM lineitem) " +
                 "WHERE partition_row_number < 10";
 
-        assertPlanWithSession(
-                sql,
-                optimizeTopNRowNumber(true),
-                true,
-                anyTree(
-                        anyNot(FilterNode.class,
-                                node(TopNRowNumberNode.class,
-                                        anyTree(
-                                                tableScan("lineitem"))))));
+        for (RankingFunction rankingFunction : RankingFunction.values()) {
+            @Language("SQL") String sql = format(sqlFormat, rankingFunction.getValue().getName());
+            assertPlanWithSession(
+                    sql,
+                    optimizeTopNRankingNumber(true),
+                    true,
+                    anyTree(
+                            anyNot(FilterNode.class,
+                                    node(TopNRankingNumberNode.class,
+                                            anyTree(
+                                                    tableScan("lineitem"))))));
 
-        assertPlanWithSession(
-                sql,
-                optimizeTopNRowNumber(false),
-                true,
-                anyTree(
-                        node(FilterNode.class,
-                                anyTree(
-                                        node(WindowNode.class,
-                                                anyTree(
-                                                        tableScan("lineitem")))))));
+            assertPlanWithSession(
+                    sql,
+                    optimizeTopNRankingNumber(false),
+                    true,
+                    anyTree(
+                            node(FilterNode.class,
+                                    anyTree(
+                                            node(WindowNode.class,
+                                                    anyTree(
+                                                            tableScan("lineitem")))))));
+        }
     }
 
-    private Session optimizeTopNRowNumber(boolean enabled)
+    private Session optimizeTopNRankingNumber(boolean enabled)
     {
         return Session.builder(this.getQueryRunner().getDefaultSession())
-                .setSystemProperty(OPTIMIZE_TOP_N_ROW_NUMBER, Boolean.toString(enabled))
+                .setSystemProperty(OPTIMIZE_TOP_N_RANKING_NUMBER, Boolean.toString(enabled))
                 .build();
     }
 }
