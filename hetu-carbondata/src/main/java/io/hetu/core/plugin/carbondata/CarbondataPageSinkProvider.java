@@ -33,6 +33,7 @@ import io.prestosql.plugin.hive.HiveWriterStats;
 import io.prestosql.plugin.hive.LocationService;
 import io.prestosql.plugin.hive.OrcFileWriterFactory;
 import io.prestosql.plugin.hive.PartitionUpdate;
+import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.HivePageSinkMetadataProvider;
 import io.prestosql.plugin.hive.metastore.SortingColumn;
@@ -216,7 +217,7 @@ public class CarbondataPageSinkProvider
                 locationService,
                 session.getQueryId(),
                 new HivePageSinkMetadataProvider(handle.getPageSinkMetadata(),
-                        memoizeMetastore(metastore, perTransactionMetastoreCacheMaximumSize)),
+                        memoizeMetastore(metastore, perTransactionMetastoreCacheMaximumSize), new HiveIdentity(session)),
                 typeManager,
                 hdfsEnvironment,
                 pageSorter,

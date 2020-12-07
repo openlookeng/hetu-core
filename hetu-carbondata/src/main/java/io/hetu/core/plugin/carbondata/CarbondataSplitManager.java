@@ -33,6 +33,7 @@ import io.prestosql.plugin.hive.HiveSplitWrapper;
 import io.prestosql.plugin.hive.HiveTableHandle;
 import io.prestosql.plugin.hive.HiveTransactionHandle;
 import io.prestosql.plugin.hive.NamenodeStats;
+import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.MetastoreUtil;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Table;
@@ -146,10 +147,11 @@ public class CarbondataSplitManager
         SchemaTableName schemaTableName = hiveTable.getSchemaTableName();
 
         // get table metadata
+        HiveIdentity identity = new HiveIdentity(session);
         SemiTransactionalHiveMetastore metastore =
                 metastoreProvider.apply((HiveTransactionHandle) transactionHandle);
         Table table =
-                metastore.getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName())
+                metastore.getTable(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName())
                         .orElseThrow(() -> new TableNotFoundException(schemaTableName));
         if (!table.getStorage().getStorageFormat().getInputFormat().contains("carbon")) {
             throw new PrestoException(NOT_SUPPORTED, "Carbondata connector can only read carbondata tables");
@@ -210,7 +212,8 @@ public class CarbondataSplitManager
                 statisticRecorder.logStatisticsAsTableDriver();
                 if (queryType != null && queryType.isPresent() && queryType.get().equals(QueryType.VACUUM)) {
                     // Get Splits for compaction
-                    return getSplitsForCompaction(transactionHandle,
+                    return getSplitsForCompaction(identity,
+                            transactionHandle,
                             tableHandle,
                             cache.getCarbonTable().getTablePath(),
                             queryProperties,
@@ -229,7 +232,7 @@ public class CarbondataSplitManager
     /*
      * Convert the splits into batches based on task id and wrap around ConnectorSplitSource to send back
      */
-    public ConnectorSplitSource getSplitsForCompaction(ConnectorTransactionHandle transactionHandle, ConnectorTableHandle tableHandle,
+    public ConnectorSplitSource getSplitsForCompaction(HiveIdentity identity, ConnectorTransactionHandle transactionHandle, ConnectorTableHandle tableHandle,
             String tablePath, Map<String, Object> queryProperties, String queryId,
             ImmutableList.Builder<ConnectorSplit> allSplitsForComp, Configuration configuration) throws PrestoException
     {
@@ -240,7 +243,7 @@ public class CarbondataSplitManager
         // Step 1: Get table handles and metadata
         SemiTransactionalHiveMetastore metaStore =
                 metastoreProvider.apply((HiveTransactionHandle) transactionHandle);
-        Table table = metaStore.getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName())
+        Table table = metaStore.getTable(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(schemaTableName));
         Properties hiveSchema = MetastoreUtil.getHiveSchema(table);
         CarbonLoadModel carbonLoadModel = null;

@@ -17,6 +17,7 @@ package io.hetu.core.plugin.carbondata;
 import com.google.common.annotations.VisibleForTesting;
 import io.hetu.core.plugin.carbondata.impl.CarbondataTableReader;
 import io.prestosql.plugin.hive.HdfsEnvironment;
+import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.MetastoreUtil;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Table;
@@ -190,7 +191,7 @@ public class CarbondataAutoVacuumThread
     {
         try {
             for (String tableName : metastore.getAllTables(schemaName).orElse(emptyList())) {
-                Optional<Table> target = metastore.getTable(schemaName, tableName);
+                Optional<Table> target = metastore.getTable(new HiveIdentity(hdfsContext.getIdentity()), schemaName, tableName);
                 if (!target.isPresent()) {
                     continue;
                 }

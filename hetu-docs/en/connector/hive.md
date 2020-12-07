@@ -132,6 +132,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.metastore.uri`                                | The URI(s) of the Hive metastore to connect to using the Thrift protocol. If multiple URIs are provided, the first URI is used by default and the rest of the URIs are fallback metastores. This property is required. Example: `thrift://192.0.2.3:9083` or `thrift://192.0.2.3:9083,thrift://192.0.2.4:9083` |
 | `hive.metastore.username`                           | The username openLooKeng will use to access the Hive metastore.     |
 | `hive.metastore.authentication.type`                | Hive metastore authentication type. Possible values are `NONE` or `KERBEROS` (defaults to `NONE`). |
+| `hive.metastore.thrift.impersonation.enabled`       | Enable Hive metastore end user impersonation. |
 | `hive.metastore.thrift.client.ssl.enabled`          | Use SSL when connecting to metastore.  default value is `false` When it is true, either keystore or truststore is required. You should set the keystore/truststore path and password in the `jvm.config`. The keys are listed as below: `-Djavax.net.ssl.keystoreType= e.g. jks` `-Djavax.net.ssl.keyStore=` `-Djavax.net.ssl.keyStorePassword=` `-Djavax.net.ssl.trustStore=` `-Djavax.net.ssl.trustStorePassword=` |
 | `hive.metastore.service.principal`                  | The Kerberos principal of the Hive metastore service.        |
 | `hive.metastore.client.principal`                   | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
