@@ -457,7 +457,11 @@ public class PlanBuilder
                 tableHandle,
                 symbols,
                 assignments,
-                enforcedConstraint, Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
+                enforcedConstraint,
+                Optional.empty(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                0);
     }
 
     public TableFinishNode tableDelete(SchemaTableName schemaTableName, PlanNode deleteSource, Symbol deleteRowId)

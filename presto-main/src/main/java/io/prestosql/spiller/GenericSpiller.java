@@ -96,4 +96,9 @@ public class GenericSpiller
     {
         checkState(previousSpill.isDone(), "previous spill still in progress");
     }
+
+    public void deleteAllStreams()
+    {
+        singleStreamSpillers.stream().forEach(x -> x.deleteFile());
+    }
 }

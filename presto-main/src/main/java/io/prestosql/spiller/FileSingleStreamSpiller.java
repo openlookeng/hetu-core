@@ -211,4 +211,10 @@ public class FileSingleStreamSpiller
             }
         };
     }
+
+    @Override
+    public void deleteFile()
+    {
+        targetFile.close();
+    }
 }

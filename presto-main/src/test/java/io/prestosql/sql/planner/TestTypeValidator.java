@@ -98,7 +98,11 @@ public class TestTypeValidator
                 TEST_TABLE_HANDLE,
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
-                TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
+                TupleDomain.all(),
+                Optional.empty(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                0);
     }
 
     @Test

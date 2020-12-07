@@ -75,11 +75,12 @@ public class SplitManager
 
     public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        return getSplits(session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of());
+        return getSplits(session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of(), false);
     }
 
     public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
-                                 Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+                                 Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+                                 boolean partOfReuse)
     {
         CatalogName catalogName = table.getCatalogName();
         ConnectorSplitManager splitManager = getConnectorSplitManager(catalogName);
@@ -97,7 +98,7 @@ public class SplitManager
             source = splitManager.getSplits(table.getTransaction(), connectorSession, layout, splitSchedulingStrategy);
         }
         else {
-            source = splitManager.getSplits(table.getTransaction(), connectorSession, table.getConnectorHandle(), splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates);
+            source = splitManager.getSplits(table.getTransaction(), connectorSession, table.getConnectorHandle(), splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates, partOfReuse);
         }
 
         SplitSource splitSource = new ConnectorAwareSplitSource(catalogName, source);

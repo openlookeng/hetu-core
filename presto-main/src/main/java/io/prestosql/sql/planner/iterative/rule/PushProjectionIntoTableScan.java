@@ -133,7 +133,7 @@ public class PushProjectionIntoTableScan
                                 newScanOutputs,
                                 newScanAssignments,
                                 tableScan.getStrategy(),
-                                tableScan.getSlot(), tableScan.getConsumerCount()),
+                                tableScan.getReuseTableScanMappingId(), tableScan.getConsumerTableScanNodeCount()),
                         newProjectionAssignments.build()));
     }
 }

@@ -798,7 +798,11 @@ public class TestCostCalculator
                 new TableHandle(new CatalogName("tpch"), tableHandle, INSTANCE, Optional.of(new TpchTableLayoutHandle(tableHandle, TupleDomain.all()))),
                 symbolsList,
                 assignments.build(),
-                TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
+                TupleDomain.all(),
+                Optional.empty(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                0);
     }
 
     private PlanNode project(String id, PlanNode source, String symbol, Expression expression)

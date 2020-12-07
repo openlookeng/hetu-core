@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,8 +32,8 @@ import java.util.HashMap;
 public class TableSplitAssignmentInfo
 {
     private static TableSplitAssignmentInfo tableSplitAssignmentInfo;
-    private HashMap<Integer, Multimap<InternalNode, Split>> tableSlotSplitAssignment;
-    private HashMap<Integer, HashMap<SplitKey, InternalNode>> perTableSlotSplitKeyNodeAssignment;
+    private HashMap<Integer, Multimap<InternalNode, Split>> reuseTableScanMappingIdSplitAssignmentMap;
+    private HashMap<Integer, HashMap<SplitKey, InternalNode>> perTableReuseTableScanMappingIdSplitKeyNodeAssignment;
     private static final Logger log = Logger.get(TableSplitAssignmentInfo.class);
 
     /**
@@ -40,8 +41,8 @@ public class TableSplitAssignmentInfo
      */
     private TableSplitAssignmentInfo()
     {
-        tableSlotSplitAssignment = new HashMap<>();
-        perTableSlotSplitKeyNodeAssignment = new HashMap<>();
+        reuseTableScanMappingIdSplitAssignmentMap = new HashMap<>();
+        perTableReuseTableScanMappingIdSplitKeyNodeAssignment = new HashMap<>();
     }
 
     /**
@@ -56,53 +57,53 @@ public class TableSplitAssignmentInfo
     }
 
     /**
-     * Slot number uniquely identifies a producer-consumer pair for a reused table
-     * @return HashMap containing slot number as key and node-split multimap as value for all tables in this query
+     * reuseTableScanMappingId number uniquely identifies a producer-consumer pair for a reused table
+     * @return HashMap containing reuseTableScanMappingId number as key and node-split multimap as value for all tables in this query
      */
-    public HashMap<Integer, Multimap<InternalNode, Split>> getTableSlotSplitAssignment()
+    public HashMap<Integer, Multimap<InternalNode, Split>> getReuseTableScanMappingIdSplitAssignmentMap()
     {
-        return tableSlotSplitAssignment;
+        return reuseTableScanMappingIdSplitAssignmentMap;
     }
 
     /**
-     * Store the assignment multimap with the corresponding slot number
+     * Store the assignment multimap with the corresponding reuseTableScanMappingId number
      * @param qualifiedTableName name of the table which is as a producer(reads data from disk for the first time)
-     * @param slot unique identifier for producer-consumer pair for a reused table
+     * @param reuseTableScanMappingId unique identifier for producer-consumer pair for a reused table
      * @param assignmentInformation node-split assignment multimap created as part of the stage that processes this table
      */
-    public void setTableSplitAssignment(QualifiedObjectName qualifiedTableName, int slot, Multimap<InternalNode, Split> assignmentInformation)
+    public void setTableSplitAssignment(QualifiedObjectName qualifiedTableName, int reuseTableScanMappingId, Multimap<InternalNode, Split> assignmentInformation)
     {
         Multimap<InternalNode, Split> assignmentMap = HashMultimap.create();
         assignmentMap.putAll(assignmentInformation);
-        this.tableSlotSplitAssignment.put(slot, assignmentMap);
-        setPerTablesplitKeyNodeAssignment(qualifiedTableName, slot, assignmentMap);
+        this.reuseTableScanMappingIdSplitAssignmentMap.put(reuseTableScanMappingId, assignmentMap);
+        setPerTablesplitKeyNodeAssignment(qualifiedTableName, reuseTableScanMappingId, assignmentMap);
     }
 
     /**
-     * @param slot unique identifier for producer-consumer pair for a reused table
-     * @return map of splitkey-node mapping for corresponding slot number
+     * @param reuseTableScanMappingId unique identifier for producer-consumer pair for a reused table
+     * @return map of splitkey-node mapping for corresponding reuseTableScanMappingId number
      * NOTE: Works only with Hive data as other connectors don't support SplitKey currently
      */
-    public HashMap<SplitKey, InternalNode> getSplitKeyNodeAssignment(int slot)
+    public HashMap<SplitKey, InternalNode> getSplitKeyNodeAssignment(int reuseTableScanMappingId)
     {
-        return perTableSlotSplitKeyNodeAssignment.get(slot);
+        return perTableReuseTableScanMappingIdSplitKeyNodeAssignment.get(reuseTableScanMappingId);
     }
 
     /**
-     * Store the inverted assignment information [Split-Node mapping] for a given slot number
+     * Store the inverted assignment information [Split-Node mapping] for a given reuseTableScanMappingId number
      * @param qualifiedTableName name of the table which is as a producer(reads data from disk for the first time)
-     * @param slot unique identifier for producer-consumer pair for a reused table
+     * @param reuseTableScanMappingId unique identifier for producer-consumer pair for a reused table
      * @param assignmentInformation node-split assignment multimap created as part of the stage that processes this table
      * NOTE: Works only with Hive data as other connectors don't support SplitKey currently
      */
-    private void setPerTablesplitKeyNodeAssignment(QualifiedObjectName qualifiedTableName, int slot, Multimap<InternalNode, Split> assignmentInformation)
+    private void setPerTablesplitKeyNodeAssignment(QualifiedObjectName qualifiedTableName, int reuseTableScanMappingId, Multimap<InternalNode, Split> assignmentInformation)
     {
         String catalog = qualifiedTableName.getCatalogName();
         String schema = qualifiedTableName.getSchemaName();
         String table = qualifiedTableName.getObjectName();
         HashMap<SplitKey, InternalNode> splitKeyNodeAssignment;
         try {
-            splitKeyNodeAssignment = perTableSlotSplitKeyNodeAssignment.get(slot);
+            splitKeyNodeAssignment = perTableReuseTableScanMappingIdSplitKeyNodeAssignment.get(reuseTableScanMappingId);
             if (splitKeyNodeAssignment == null) {
                 splitKeyNodeAssignment = new HashMap<>();
             }
@@ -110,7 +111,7 @@ public class TableSplitAssignmentInfo
             for (InternalNode node : assignmentInformation.keySet()) {
                 Collection<Split> assigmentSplits = assignmentInformation.get(node);
                 for (Split assigmentSplit : assigmentSplits) {
-                    if (assigmentSplit.getConnectorSplit().getSplitNum() > 1) {
+                    if (assigmentSplit.getConnectorSplit().getSplitCount() > 1) {
                         for (Split unwrappedSplit : assigmentSplit.getSplits()) {
                             SplitKey splitKey = new SplitKey(unwrappedSplit, catalog, schema, table);
                             splitKeyNodeAssignment.put(splitKey, node);
@@ -123,7 +124,7 @@ public class TableSplitAssignmentInfo
                 }
             }
 
-            perTableSlotSplitKeyNodeAssignment.put(slot, splitKeyNodeAssignment);
+            perTableReuseTableScanMappingIdSplitKeyNodeAssignment.put(reuseTableScanMappingId, splitKeyNodeAssignment);
         }
         catch (NotImplementedException e) {
             log.error("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);

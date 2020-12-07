@@ -41,6 +41,7 @@ import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode.EquiJoinClause;
@@ -137,11 +138,9 @@ public class HashGenerationOptimizer
         private final PlanNodeIdAllocator idAllocator;
         private final SymbolAllocator symbolAllocator;
         private final TypeProvider types;
-        private final Map<Integer, Map<TableScanNode, List>> nodeList;
-//        private final Map<TableScanNode, List> nodeList;
-        private final Set<Integer> removedSlots;
-        private final Map<Integer, List> slotSymbols;
-        private final Map<Integer, List> slotNodes;
+        private final Set<Integer> removedReuseTableScanMappingIds;
+        private final Map<Integer, List> reuseTableScanMappingIdSymbols;
+        private final Map<Integer, List> reuseTableScanMappingIdNodes;
 
         private Rewriter(Metadata metadata, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, TypeProvider types)
         {
@@ -149,10 +148,9 @@ public class HashGenerationOptimizer
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
             this.types = requireNonNull(types, "types is null");
-            nodeList = new HashMap<>();
-            removedSlots = new HashSet<>();
-            slotSymbols = new HashMap<>();
-            slotNodes = new HashMap<>();
+            removedReuseTableScanMappingIds = new HashSet<>();
+            reuseTableScanMappingIdSymbols = new HashMap<>();
+            reuseTableScanMappingIdNodes = new HashMap<>();
         }
 
         @Override
@@ -734,6 +732,7 @@ public class HashGenerationOptimizer
             }
 
             if (preferenceSatisfied) {
+                checkIfTableScanNodeStrategyChangeRequired(result, preferredHashes);
                 return result;
             }
 
@@ -769,21 +768,31 @@ public class HashGenerationOptimizer
                 }
             }
 
-            if (planWithProperties.getNode() instanceof TableScanNode) {
-                readjustScanNode((TableScanNode) planWithProperties.getNode(), requiredHashes);
-            }
-            else if (planWithProperties.getNode() instanceof ProjectNode) {
-                ProjectNode projectNode = (ProjectNode) planWithProperties.getNode();
-                if (projectNode.getSource() instanceof TableScanNode) {
-                    readjustScanNode((TableScanNode) projectNode.getSource(), requiredHashes);
-                }
-            }
-
+            checkIfTableScanNodeStrategyChangeRequired(planWithProperties, requiredHashes);
             ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), planWithProperties.getNode(), assignments.build());
             return new PlanWithProperties(projectNode, outputHashSymbols);
         }
 
-        private void readjustScanNode(TableScanNode node, HashComputationSet requiredHashes)
+        private void checkIfTableScanNodeStrategyChangeRequired(PlanWithProperties planWithProperties, HashComputationSet requiredHashes)
+        {
+            if (planWithProperties.getNode() instanceof TableScanNode) {
+                changeTableScanNodeStrategy((TableScanNode) planWithProperties.getNode(), requiredHashes);
+            }
+            else if (planWithProperties.getNode() instanceof FilterNode && ((FilterNode) planWithProperties.getNode()).getSource() instanceof TableScanNode) {
+                changeTableScanNodeStrategy((TableScanNode) (((FilterNode) planWithProperties.getNode()).getSource()), requiredHashes);
+            }
+            else if (planWithProperties.getNode() instanceof ProjectNode) {
+                ProjectNode projectNode = (ProjectNode) planWithProperties.getNode();
+                if (projectNode.getSource() instanceof TableScanNode) {
+                    changeTableScanNodeStrategy((TableScanNode) projectNode.getSource(), requiredHashes);
+                }
+                else if (projectNode.getSource() instanceof FilterNode && ((FilterNode) projectNode.getSource()).getSource() instanceof TableScanNode) {
+                    changeTableScanNodeStrategy((TableScanNode) ((FilterNode) projectNode.getSource()).getSource(), requiredHashes);
+                }
+            }
+        }
+
+        private void changeTableScanNodeStrategy(TableScanNode node, HashComputationSet requiredHashes)
         {
             if (!node.getStrategy().equals(REUSE_STRATEGY_DEFAULT)) {
                 List<Symbol> fields = new ArrayList<>();
@@ -793,35 +802,34 @@ public class HashGenerationOptimizer
                     isDerivedExpr = !fields.stream().filter(field -> node.getAssignments().get(field) == null).findAny().equals(Optional.empty());
                 }
 
-                Integer slot = node.getSlot();
-                if (slotNodes.get(slot) == null) {
-                    slotSymbols.put(slot, fields);
+                Integer reuseTableScanMappingId = node.getReuseTableScanMappingId();
+                if (reuseTableScanMappingIdNodes.get(reuseTableScanMappingId) == null) {
+                    reuseTableScanMappingIdSymbols.put(reuseTableScanMappingId, fields);
                     List<TableScanNode> nodes = new ArrayList<>();
                     nodes.add(node);
-                    slotNodes.put(slot, nodes);
+                    reuseTableScanMappingIdNodes.put(reuseTableScanMappingId, nodes);
                 }
                 else {
                     // compare already saved field list.
-                    List<Symbol> nodeFields = slotSymbols.get(slot);
-                    if (removedSlots.contains(slot)) {
+                    List<Symbol> nodeFields = reuseTableScanMappingIdSymbols.get(reuseTableScanMappingId);
+                    if (removedReuseTableScanMappingIds.contains(reuseTableScanMappingId)) {
                         node.setStrategy(REUSE_STRATEGY_DEFAULT);
-                        node.setSlot(-1);
+                        node.setReuseTableScanMappingId(-1);
                     }
                     else if (!node.isSymbolsEqual(nodeFields, fields) || isDerivedExpr) {
                         // means two symbol fields are not same.
                         node.setStrategy(REUSE_STRATEGY_DEFAULT);
-                        node.setSlot(-1);
-                        removedSlots.add(slot);
-                        for (int i = 0; i < slotNodes.get(slot).size(); i++) {
-                            TableScanNode tnode = (TableScanNode) slotNodes.get(slot).get(0);
-                            tnode.setStrategy(REUSE_STRATEGY_DEFAULT);
-                            tnode.setSlot(-1);
-                        }
+                        node.setReuseTableScanMappingId(-1);
+                        removedReuseTableScanMappingIds.add(reuseTableScanMappingId);
+                        List<TableScanNode> scanNodes = reuseTableScanMappingIdNodes.get(reuseTableScanMappingId);
+                        scanNodes.forEach(x -> {
+                            x.setStrategy(REUSE_STRATEGY_DEFAULT);
+                            x.setReuseTableScanMappingId(-1); });
                     }
                     else {
-                        List<TableScanNode> nodes = slotNodes.get(slot);
+                        List<TableScanNode> nodes = reuseTableScanMappingIdNodes.get(reuseTableScanMappingId);
                         nodes.add(node);
-                        slotNodes.put(slot, nodes);
+                        reuseTableScanMappingIdNodes.put(reuseTableScanMappingId, nodes);
                     }
                 }
             }

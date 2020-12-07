@@ -248,33 +248,4 @@ public class ExchangeNode
     {
         return new ExchangeNode(getId(), type, scope, partitioningScheme, newChildren, inputs, orderingScheme);
     }
-
-    public boolean isSourcesEqual(List<PlanNode> n1, List<PlanNode> n2)
-    {
-        if (n1.size() != n2.size()) {
-            return false;
-        }
-        int count = 0;
-        for (PlanNode p1 : n1) {
-            for (PlanNode p2 : n2) {
-                if (p1.equals(p2)) {
-                    count++;
-                    break;
-                }
-            }
-        }
-        if (count == n1.size()) {
-            return true;
-        }
-        return false;
-    }
-
-    public boolean compareTo(ExchangeNode e)
-    {
-        if (this.type == e.type && this.scope == e.scope && this.partitioningScheme == e.partitioningScheme
-                && this.orderingScheme.equals(e.orderingScheme) && isSourcesEqual(this.sources, e.sources)) {
-            return true;
-        }
-        return false;
-    }
 }

@@ -180,7 +180,7 @@ public class HiveSplitManager
                                           ConnectorTableHandle table,
                                           SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        return getSplits(transaction, session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of());
+        return getSplits(transaction, session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of(), false);
     }
 
     @Override
@@ -192,7 +192,8 @@ public class HiveSplitManager
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Optional<QueryType> queryType,
             Map<String, Object> queryInfo,
-            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+            boolean partOfReuse)
     {
         HiveTableHandle hiveTable = (HiveTableHandle) tableHandle;
         SchemaTableName tableName = hiveTable.getSchemaTableName();
@@ -260,7 +261,7 @@ public class HiveSplitManager
                         session,
                         table.getDatabaseName(),
                         table.getTableName(),
-                        maxInitialSplits,
+                        partOfReuse ? 0 : maxInitialSplits, //For reuse, we should make sure to have same split size all time for a table.
                         maxOutstandingSplits,
                         maxOutstandingSplitsSize,
                         maxSplitsPerSecond,
@@ -278,7 +279,7 @@ public class HiveSplitManager
                         session,
                         table.getDatabaseName(),
                         table.getTableName(),
-                        maxInitialSplits,
+                        partOfReuse ? 0 : maxInitialSplits, //For reuse, we should make sure to have same split size all time for a table.
                         maxOutstandingSplits,
                         maxOutstandingSplitsSize,
                         maxSplitsPerSecond,

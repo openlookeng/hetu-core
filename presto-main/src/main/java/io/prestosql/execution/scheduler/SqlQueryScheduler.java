@@ -85,6 +85,7 @@ import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.getConcurrentLifespansPerNode;
 import static io.prestosql.SystemSessionProperties.getWriterMinSize;
+import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
 import static io.prestosql.connector.CatalogName.isInternalSystemConnector;
 import static io.prestosql.execution.BasicStageStats.aggregateBasicStageStats;
 import static io.prestosql.execution.SqlStageExecution.createSqlStageExecution;
@@ -125,6 +126,7 @@ public class SqlQueryScheduler
     private final AtomicBoolean started = new AtomicBoolean();
     private final DynamicFilterService dynamicFilterService;
     private final HeuristicIndexerManager heuristicIndexerManager;
+    private final Session session;
 
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
@@ -233,6 +235,7 @@ public class SqlQueryScheduler
         this.stageLinkages = stageLinkages.build();
 
         this.executor = queryExecutor;
+        this.session = session;
     }
 
     // this is a separate method to ensure that the `this` reference is not leaked during construction
@@ -557,7 +560,7 @@ public class SqlQueryScheduler
             while (!executionSchedule.isFinished()) {
                 List<ListenableFuture<?>> blockedStages = new ArrayList<>();
                 for (SqlStageExecution stage : executionSchedule.getStagesToSchedule()) {
-                    if (!SqlStageExecution.getSlotStatus(stage.getStateMachine())) {
+                    if (isReuseTableScanEnabled(session) && !SqlStageExecution.getReuseTableScanMappingIdStatus(stage.getStateMachine())) {
                         continue;
                     }
 

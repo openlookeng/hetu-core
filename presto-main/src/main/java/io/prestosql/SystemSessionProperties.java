@@ -682,7 +682,7 @@ public final class SystemSessionProperties
                         false),
                 integerProperty(
                         SPILL_THRESHOLD_REUSE_TABLESCAN,
-                        "Spiller Threshold for TableScanOperator and WorkProcessorSourceOperatorAdapter",
+                        "Spiller Threshold (in MB) for TableScanOperator and WorkProcessorSourceOperatorAdapter for Reuse Exchange",
                         featuresConfig.getSpillOperatorThresholdReuseExchange(),
                         false));
     }

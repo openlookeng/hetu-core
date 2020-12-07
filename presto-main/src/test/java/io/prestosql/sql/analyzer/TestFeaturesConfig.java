@@ -133,7 +133,8 @@ public class TestFeaturesConfig
                 .setTransformSelfJoinToGroupby(false)
                 .setRewriteFilteringSemiJoinToInnerJoin(false)
                 .setSpillReuseExchange(false)
-                .setSpillOperatorThresholdReuseExchange(10485760));
+                .setSpillOperatorThresholdReuseExchange(10)
+                .setReuseTableScanEnabled(false));
     }
 
     @Test
@@ -220,6 +221,9 @@ public class TestFeaturesConfig
                 .put("optimizer.push-table-through-subquery", "true")
                 .put("optimizer.rewrite-filtering-semi-join-to-inner-join", "true")
                 .put("optimizer.transform-self-join-to-groupby", "true")
+                .put("optimizer.reuse-table-scan", "true")
+                .put("experimental.spill-reuse-tablescan", "true")
+                .put("experimental.spill-threshold-reuse-tablescan", "100")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -303,8 +307,9 @@ public class TestFeaturesConfig
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
                 .setDynamicFilteringBloomFilterFpp(0.001)
                 .setTransformSelfJoinToGroupby(true)
+                .setReuseTableScanEnabled(true)
                 .setSpillReuseExchange(true)
-                .setSpillOperatorThresholdReuseExchange(10000000);
+                .setSpillOperatorThresholdReuseExchange(100);
         assertFullMapping(properties, expected);
     }
 

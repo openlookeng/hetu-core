@@ -35,7 +35,6 @@ import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
@@ -58,8 +57,6 @@ import static io.prestosql.execution.scheduler.NodeScheduler.selectDistributionN
 import static io.prestosql.execution.scheduler.NodeScheduler.selectExactNodes;
 import static io.prestosql.execution.scheduler.NodeScheduler.selectNodes;
 import static io.prestosql.execution.scheduler.NodeScheduler.toWhenHasSplitQueueSpaceFuture;
-import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
-import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static java.util.Comparator.comparingInt;
 import static java.util.Objects.requireNonNull;
@@ -128,7 +125,6 @@ public class SimpleNodeSelector
     @Override
     public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage)
     {
-        SqlStageExecution sqlStageExecutionInfo = stage.get();
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
         NodeMap nodeMap = this.nodeMap.get().get();
         NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMap, existingTasks);
@@ -141,55 +137,19 @@ public class SimpleNodeSelector
         Set<Split> remainingSplits = new HashSet<>();
 
         // Check if the current stage has a TableScanNode which is reading the table for the 2nd time or beyond
-        Optional<PlanNode> planNode = sqlStageExecutionInfo.getFragment().getPartitionedSourceNodes().stream().filter(
-                node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy().equals(REUSE_STRATEGY_CONSUMER)).findAny();
-
-        if (!planNode.equals(Optional.empty())) {
+        if (stage.isPresent() && stage.get().getStateMachine().getConsumerScanNode() != null) {
             try {
                 // if node exists, get the TableScanNode and cast it as consumer
-                TableScanNode consumer = (TableScanNode) planNode.get();
-                Map<PlanNodeId, TableInfo> tables = sqlStageExecutionInfo.getStageInfo().getTables(); //all tables part of this stage
+                TableScanNode consumer = stage.get().getStateMachine().getConsumerScanNode();
+                Map<PlanNodeId, TableInfo> tables = stage.get().getStageInfo().getTables(); //all tables part of this stage
                 QualifiedObjectName tableName;
                 for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
                     tableName = entry.getValue().getTableName();
-                    if (tableSplitAssignmentInfo.getTableSlotSplitAssignment().containsKey(consumer.getSlot())) {
+                    if (tableSplitAssignmentInfo.getReuseTableScanMappingIdSplitAssignmentMap().containsKey(consumer.getReuseTableScanMappingId())) {
                         //compare splitkey using equals and then assign nodes accordingly.
-                        HashMap<SplitKey, InternalNode> splitKeyNodeAssignment = tableSplitAssignmentInfo.getSplitKeyNodeAssignment(consumer.getSlot());
+                        HashMap<SplitKey, InternalNode> splitKeyNodeAssignment = tableSplitAssignmentInfo.getSplitKeyNodeAssignment(consumer.getReuseTableScanMappingId());
                         Set<SplitKey> splitKeySet = splitKeyNodeAssignment.keySet();
-                        for (Split split : splits) {
-                            if (split.getConnectorSplit().getSplitNum() > 1) {
-                                boolean matched = false;
-                                for (Split unwrappedSplit : split.getSplits()) {
-                                    SplitKey splitKey = new SplitKey(unwrappedSplit, tableName.getCatalogName(),
-                                            tableName.getSchemaName(), tableName.getObjectName());
-                                    for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
-                                        SplitKey prodSplitKey = it.next();
-                                        if (splitKey.equals(prodSplitKey)) {
-                                            InternalNode node = splitKeyNodeAssignment.get(prodSplitKey);
-                                            assignment.put(node, split);
-                                            matched = true;
-                                            break;
-                                        }
-                                    }
-
-                                    if (matched) {
-                                        break;
-                                    }
-                                }
-                            }
-                            else {
-                                SplitKey splitKey = new SplitKey(split, tableName.getCatalogName(),
-                                        tableName.getSchemaName(), tableName.getObjectName());
-                                for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
-                                    SplitKey prodSplitKey = it.next();
-                                    if (splitKey.equals(prodSplitKey)) {
-                                        InternalNode node = splitKeyNodeAssignment.get(prodSplitKey);
-                                        assignment.put(node, split);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        assignment.putAll(createConsumerScanNodeAssignment(tableName, splits, splitKeySet, splitKeyNodeAssignment));
                         for (Map.Entry<InternalNode, Split> nodeAssignmentEntry : assignment.entries()) {
                             InternalNode node = nodeAssignmentEntry.getKey();
                             assignmentStats.addAssignedSplit(node);
@@ -286,27 +246,70 @@ public class SimpleNodeSelector
             blocked = toWhenHasSplitQueueSpaceFuture(blockedExactNodes, existingTasks, calculateLowWatermark(maxPendingSplitsPerTask));
         }
 
-        if (planNode.equals(Optional.empty())) {
+        if (!stage.isPresent() || stage.get().getStateMachine().getConsumerScanNode() == null) {
             if (splitsToBeRedistributed) { //skip for consumer
                 equateDistribution(assignment, assignmentStats, nodeMap);
             }
         }
 
         // Check if the current stage has a TableScanNode which is reading the table for the 1st time
-        planNode = sqlStageExecutionInfo.getFragment().getPartitionedSourceNodes().stream().filter(
-                node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy().equals(REUSE_STRATEGY_PRODUCER)).findAny();
-
-        if (!planNode.equals(Optional.empty())) {
+        if (stage.isPresent() && stage.get().getStateMachine().getProducerScanNode() != null) {
             // if node exists, get the TableScanNode and annotate it as producer
-            TableScanNode producer = (TableScanNode) planNode.get();
-            Map<PlanNodeId, TableInfo> tables = sqlStageExecutionInfo.getStageInfo().getTables();
-            for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
-                QualifiedObjectName qualifiedTableName = entry.getValue().getTableName();
-                tableSplitAssignmentInfo.setTableSplitAssignment(qualifiedTableName, producer.getSlot(), assignment); //also sets the splitkey info internally
-                log.debug("Producer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
-            }
+            saveProducerScanNodeAssignment(stage, assignment, assignmentStats);
         }
         return new SplitPlacementResult(blocked, assignment);
+    }
+
+    private Multimap createConsumerScanNodeAssignment(QualifiedObjectName tableName, Set<Split> splits, Set<SplitKey> splitKeySet,
+                                                      HashMap<SplitKey, InternalNode> splitKeyNodeAssignment)
+    {
+        Multimap<InternalNode, Split> assignment = HashMultimap.create();
+        for (Split split : splits) {
+            if (split.getConnectorSplit().getSplitCount() > 1) {
+                boolean matched = false;
+                for (Split unwrappedSplit : split.getSplits()) {
+                    SplitKey splitKey = new SplitKey(unwrappedSplit, tableName.getCatalogName(),
+                            tableName.getSchemaName(), tableName.getObjectName());
+                    for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
+                        SplitKey producerSplitKey = it.next();
+                        if (splitKey.equals(producerSplitKey)) {
+                            InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
+                            assignment.put(node, split);
+                            matched = true;
+                            break;
+                        }
+                    }
+
+                    if (matched) {
+                        break;
+                    }
+                }
+            }
+            else {
+                SplitKey splitKey = new SplitKey(split, tableName.getCatalogName(),
+                        tableName.getSchemaName(), tableName.getObjectName());
+                for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
+                    SplitKey producerSplitKey = it.next();
+                    if (splitKey.equals(producerSplitKey)) {
+                        InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
+                        assignment.put(node, split);
+                        break;
+                    }
+                }
+            }
+        }
+        return assignment;
+    }
+
+    private void saveProducerScanNodeAssignment(Optional<SqlStageExecution> stage, Multimap<InternalNode, Split> assignment, NodeAssignmentStats assignmentStats)
+    {
+        TableScanNode producer = stage.get().getStateMachine().getProducerScanNode();
+        Map<PlanNodeId, TableInfo> tables = stage.get().getStageInfo().getTables();
+        for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
+            QualifiedObjectName qualifiedTableName = entry.getValue().getTableName();
+            tableSplitAssignmentInfo.setTableSplitAssignment(qualifiedTableName, producer.getReuseTableScanMappingId(), assignment); //also sets the splitkey info internally
+            log.debug("Producer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+        }
     }
 
     @Override
@@ -425,20 +428,4 @@ public class SimpleNodeSelector
         }
         return false;
     }
-
-//    class QuerySplitAssignmentInfo
-//    {
-//        private HashMap<String, Multimap<InternalNode, Split>> tableSplitAssgiment;
-//
-//        public HashMap<String, Multimap<InternalNode, Split>> getTableSplitAssgiment() {
-//            return tableSplitAssgiment;
-//        }
-//
-//        public void setTableSplitAssgiment(HashMap<String, Multimap<InternalNode, Split>> tableSplitAssgiment) {
-//            this.tableSplitAssgiment = tableSplitAssgiment;
-//        }
-//
-//
-//
-//    }
 }

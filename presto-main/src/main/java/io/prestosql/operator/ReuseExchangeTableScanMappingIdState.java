@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,34 +24,34 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 
-public class ReuseExchangeSlotUtils
+public class ReuseExchangeTableScanMappingIdState
 {
     private ReuseExchangeOperator.STRATEGY strategy;
-    private Integer slot;
+    private Integer reuseTableScanMappingId;
     private List<Page> pageCaches;
     private List<Page> pagesToSpill;
-    private ConcurrentLinkedQueue<String> sourceIdList;
+    private ConcurrentLinkedQueue<String> sourceNodeModifiedIdList;
     private Optional<Spiller> spiller;
     private int pagesWritten;
-    private int curConsumerRefCount;
-    private int totalConsumerCount;
+    private int curConsumerScanNodeRefCount;
+    private int totalConsumerScanNodeCount;
     private OperatorContext operatorContext;
 
-    public ReuseExchangeSlotUtils(ReuseExchangeOperator.STRATEGY strategy, Integer slot, OperatorContext operatorContext, int curConsumerRefCount)
+    public ReuseExchangeTableScanMappingIdState(ReuseExchangeOperator.STRATEGY strategy, Integer reuseTableScanMappingId, OperatorContext operatorContext, int curConsumerScanNodeRefCount)
     {
         this.strategy = strategy;
-        this.slot = slot;
+        this.reuseTableScanMappingId = reuseTableScanMappingId;
 
         if (strategy.equals(REUSE_STRATEGY_PRODUCER)) {
             this.operatorContext = operatorContext;
-            this.curConsumerRefCount = curConsumerRefCount;
-            this.totalConsumerCount = curConsumerRefCount;
+            this.curConsumerScanNodeRefCount = curConsumerScanNodeRefCount;
+            this.totalConsumerScanNodeCount = curConsumerScanNodeRefCount;
             pagesWritten = 0;
         }
 
         pageCaches = new ArrayList<>();
         pagesToSpill = new ArrayList<>();
-        sourceIdList = new ConcurrentLinkedQueue<>();
+        sourceNodeModifiedIdList = new ConcurrentLinkedQueue<>();
         spiller = Optional.empty();
     }
 
@@ -64,14 +65,14 @@ public class ReuseExchangeSlotUtils
         this.strategy = strategy;
     }
 
-    public Integer getSlot()
+    public Integer getReuseTableScanMappingId()
     {
-        return slot;
+        return reuseTableScanMappingId;
     }
 
-    public void setSlot(Integer slot)
+    public void setReuseTableScanMappingId(Integer reuseTableScanMappingId)
     {
-        this.slot = slot;
+        this.reuseTableScanMappingId = reuseTableScanMappingId;
     }
 
     public List<Page> getPageCaches()
@@ -94,19 +95,19 @@ public class ReuseExchangeSlotUtils
         this.pagesToSpill = pagesToSpill;
     }
 
-    public ConcurrentLinkedQueue<String> getSourceIdList()
+    public ConcurrentLinkedQueue<String> getSourceNodeModifiedIdList()
     {
-        return sourceIdList;
+        return sourceNodeModifiedIdList;
     }
 
-    public void setSourceIdList(ConcurrentLinkedQueue<String> sourceIdList)
+    public void setSourceNodeModifiedIdList(ConcurrentLinkedQueue<String> sourceNodeModifiedIdList)
     {
-        this.sourceIdList = sourceIdList;
+        this.sourceNodeModifiedIdList = sourceNodeModifiedIdList;
     }
 
-    public void addToSourceIdList(String sourceIdString)
+    public void addToSourceNodeModifiedIdList(String sourceNodeModifiedId)
     {
-        this.sourceIdList.add(sourceIdString);
+        this.sourceNodeModifiedIdList.add(sourceNodeModifiedId);
     }
 
     public Optional<Spiller> getSpiller()
@@ -129,24 +130,24 @@ public class ReuseExchangeSlotUtils
         this.pagesWritten = pagesWritten;
     }
 
-    public int getCurConsumerRefCount()
+    public int getCurConsumerScanNodeRefCount()
     {
-        return curConsumerRefCount;
+        return curConsumerScanNodeRefCount;
     }
 
-    public void setCurConsumerRefCount(int curConsumerRefCount)
+    public void setCurConsumerScanNodeRefCount(int curConsumerScanNodeRefCount)
     {
-        this.curConsumerRefCount = curConsumerRefCount;
+        this.curConsumerScanNodeRefCount = curConsumerScanNodeRefCount;
     }
 
-    public int getTotalConsumerCount()
+    public int getTotalConsumerScanNodeCount()
     {
-        return totalConsumerCount;
+        return totalConsumerScanNodeCount;
     }
 
-    public void setTotalConsumerCount(int totalConsumerCount)
+    public void setTotalConsumerScanNodeCount(int totalConsumerScanNodeCount)
     {
-        this.totalConsumerCount = totalConsumerCount;
+        this.totalConsumerScanNodeCount = totalConsumerScanNodeCount;
     }
 
     public OperatorContext getOperatorContext()

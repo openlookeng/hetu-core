@@ -29,8 +29,6 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
-import io.prestosql.operator.TableScanOperator;
-import io.prestosql.operator.WorkProcessorSourceOperatorAdapter;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.split.RemoteSplit;
@@ -71,10 +69,9 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
+import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
-import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
-import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
 import static java.util.Objects.requireNonNull;
@@ -120,7 +117,7 @@ public final class SqlStageExecution
     private final AtomicBoolean dynamicFilterSchedulingInfoPropagated = new AtomicBoolean();
 
     @GuardedBy("SqlStageExecution.class")
-    public static Map<QueryId, List<Integer>> finishedSlot = new ConcurrentHashMap<>();
+    public static Map<QueryId, List<Integer>> queryIdReuseTableScanMappingIdFinishedMap = new ConcurrentHashMap<>();
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -558,7 +555,9 @@ public final class SqlStageExecution
                 }
                 if (finishedTasks.containsAll(allTasks)) {
                     stateMachine.transitionToFinished();
-                    setSlotStatus(stateMachine);
+                    if (isReuseTableScanEnabled(stateMachine.getSession())) {
+                        setReuseTableScanMappingIdStatus(stateMachine);
+                    }
                 }
             }
         }
@@ -569,59 +568,33 @@ public final class SqlStageExecution
     }
 
     //Assuming there will be only one table scan in one stage
-    private static synchronized void setSlotStatus(StageStateMachine state)
+    private static synchronized void setReuseTableScanMappingIdStatus(StageStateMachine state)
     {
-        Optional<PlanNode> planNode = state.getFragment().getPartitionedSourceNodes().stream()
-                .filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy().equals(REUSE_STRATEGY_PRODUCER)).findAny();
-        if (planNode.equals(Optional.empty())) {
+        if (state.getProducerScanNode() == null) {
             return;
         }
 
-        TableScanNode scanNode = (TableScanNode) planNode.get();
-        List<Integer> slots = finishedSlot.get(state.getStageId().getQueryId());
-        if (slots == null) {
-            slots = new ArrayList<>();
-            slots.add(scanNode.getSlot());
-            finishedSlot.put(state.getStageId().getQueryId(), slots);
+        TableScanNode scanNode = state.getProducerScanNode();
+        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        if (reuseTableScanMappingIdList == null) {
+            reuseTableScanMappingIdList = new ArrayList<>();
+            reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
+            queryIdReuseTableScanMappingIdFinishedMap.put(state.getStageId().getQueryId(), reuseTableScanMappingIdList);
         }
-        else if (!slots.contains(scanNode.getSlot())) {
-            slots.add(scanNode.getSlot());
-            finishedSlot.put(state.getStageId().getQueryId(), slots);
+        else if (!reuseTableScanMappingIdList.contains(scanNode.getReuseTableScanMappingId())) {
+            reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
+            queryIdReuseTableScanMappingIdFinishedMap.put(state.getStageId().getQueryId(), reuseTableScanMappingIdList);
         }
     }
 
-    public static synchronized Boolean getSlotStatus(StageStateMachine state)
+    public static synchronized Boolean getReuseTableScanMappingIdStatus(StageStateMachine state)
     {
-//        if (state.getFragment().getRoot() instanceof JoinNode) {
-//            return true;
-//        }
-
-        Optional<PlanNode> planNode = state.getFragment().getPartitionedSourceNodes().stream()
-                .filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy().equals(REUSE_STRATEGY_CONSUMER)).findAny();
-        if (planNode.equals(Optional.empty())) {
+        if (state.getConsumerScanNode() == null) {
             return true;
         }
 
-        TableScanNode scanNode = (TableScanNode) planNode.get();
-        List<Integer> slots = finishedSlot.get(state.getStageId().getQueryId());
-        return slots != null && slots.contains(scanNode.getSlot());
-    }
-
-    public static synchronized void cleanupDataResultCache(QueryId queryId)
-    {
-        List<Integer> slots = finishedSlot.get(queryId);
-        if (slots == null) {
-            return;
-        }
-
-        for (Integer slot : slots) {
-            WorkProcessorSourceOperatorAdapter.releaseCache(slot);
-            WorkProcessorSourceOperatorAdapter.deleteSpilledFiles(slot);
-            TableScanOperator.releaseCache(slot);
-            TableScanOperator.deleteSpilledFiles(slot);
-        }
-
-        finishedSlot.remove(queryId);
+        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        return reuseTableScanMappingIdList != null && reuseTableScanMappingIdList.contains(state.getConsumerScanNode().getReuseTableScanMappingId());
     }
 
     private synchronized void updateFinalTaskInfo(TaskInfo finalTaskInfo)

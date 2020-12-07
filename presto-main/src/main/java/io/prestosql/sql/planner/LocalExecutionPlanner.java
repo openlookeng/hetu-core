@@ -1256,8 +1256,8 @@ public class LocalExecutionPlanner
             List<ColumnHandle> columns = null;
             PhysicalOperation source = null;
             ReuseExchangeOperator.STRATEGY strategy = REUSE_STRATEGY_DEFAULT;
-            Integer slot = 0;
-            Integer consumerCount = 0;
+            Integer reuseTableScanMappingId = 0;
+            Integer consumerTableScanNodeCount = 0;
             if (sourceNode instanceof TableScanNode) {
                 TableScanNode tableScanNode = (TableScanNode) sourceNode;
                 table = tableScanNode.getTable();
@@ -1276,8 +1276,8 @@ public class LocalExecutionPlanner
                 }
 
                 strategy = tableScanNode.getStrategy();
-                slot = tableScanNode.getSlot();
-                consumerCount = tableScanNode.getConsumerCount();
+                reuseTableScanMappingId = tableScanNode.getReuseTableScanMappingId();
+                consumerTableScanNodeCount = tableScanNode.getConsumerTableScanNodeCount();
             }
             //TODO: This is a simple hack, it will be replaced when we add ability to push down sampling into connectors.
             // SYSTEM sampling is performed in the coordinator by dropping some random splits so the SamplingNode can be skipped here.
@@ -1357,7 +1357,7 @@ public class LocalExecutionPlanner
                             dynamicFilterCacheManager,
                             getFilterAndProjectMinOutputPageSize(session),
                             getFilterAndProjectMinOutputPageRowCount(session),
-                            strategy, slot, spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerCount);
+                            strategy, reuseTableScanMappingId, spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerTableScanNodeCount);
 
                     return new PhysicalOperation(operatorFactory, outputMappings, context, stageExecutionDescriptor.isScanGroupedExecution(sourceNode.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
                 }
@@ -1426,7 +1426,7 @@ public class LocalExecutionPlanner
 
             boolean spillEnabled = isSpillEnabled(session) && isSpillReuseExchange(session);
             int spillerThreshold = getSpillOperatorThresholdReuseExchange(session) * 1024 * 1024; //convert from MB to bytes
-            Integer consumerCount = node.getConsumerCount();
+            Integer consumerTableScanNodeCount = node.getConsumerTableScanNodeCount();
 
             OperatorFactory operatorFactory = new TableScanOperatorFactory(context.getSession(),
                     context.getNextOperatorId(),
@@ -1439,7 +1439,7 @@ public class LocalExecutionPlanner
                     metadata,
                     dynamicFilterCacheManager,
                     getFilterAndProjectMinOutputPageSize(session),
-                    getFilterAndProjectMinOutputPageRowCount(session), node.getStrategy(), node.getSlot(), spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerCount);
+                    getFilterAndProjectMinOutputPageRowCount(session), node.getStrategy(), node.getReuseTableScanMappingId(), spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerTableScanNodeCount);
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
         }
 

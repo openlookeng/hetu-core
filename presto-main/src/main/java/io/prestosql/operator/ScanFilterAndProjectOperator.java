@@ -533,11 +533,11 @@ public class ScanFilterAndProjectOperator
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
         private ReuseExchangeOperator.STRATEGY strategy;
-        private Integer slot;
+        private Integer reuseTableScanMappingId;
         private boolean spillEnabled;
         private final Optional<SpillerFactory> spillerFactory;
         private Integer spillerThreshold;
-        private Integer consumerCount;
+        private Integer consumerTableScanNodeCount;
 
         public ScanFilterAndProjectOperatorFactory(
                 Session session,
@@ -557,13 +557,13 @@ public class ScanFilterAndProjectOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
                 ReuseExchangeOperator.STRATEGY strategy,
-                Integer slot,
+                Integer reuseTableScanMappingId,
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 Integer spillerThreshold,
-                Integer consumerCount)
+                Integer consumerTableScanNodeCount)
         {
-            this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount, strategy, slot, spillEnabled, spillerFactory, spillerThreshold, consumerCount);
+            this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount, strategy, reuseTableScanMappingId, spillEnabled, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
 
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 if (sourceNode instanceof TableScanNode) {
@@ -592,11 +592,11 @@ public class ScanFilterAndProjectOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
                 ReuseExchangeOperator.STRATEGY strategy,
-                Integer slot,
+                Integer reuseTableScanMappingId,
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 Integer spillerThreshold,
-                Integer consumerCount)
+                Integer consumerTableScanNodeCount)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -611,11 +611,11 @@ public class ScanFilterAndProjectOperator
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
             this.strategy = strategy;
-            this.slot = slot;
+            this.reuseTableScanMappingId = reuseTableScanMappingId;
             this.spillEnabled = spillEnabled;
             this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
             this.spillerThreshold = spillerThreshold;
-            this.consumerCount = consumerCount;
+            this.consumerTableScanNodeCount = consumerTableScanNodeCount;
         }
 
         @Override
@@ -641,7 +641,7 @@ public class ScanFilterAndProjectOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, getOperatorType());
-            return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, slot, spillEnabled, types, spillerFactory, spillerThreshold, consumerCount);
+            return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, reuseTableScanMappingId, spillEnabled, types, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
         }
 
         @Override

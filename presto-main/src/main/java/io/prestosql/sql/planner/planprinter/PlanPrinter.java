@@ -692,7 +692,7 @@ public class PlanPrinter
             String reuseTypeName = "";
             if (node.getStrategy().equals(REUSE_STRATEGY_PRODUCER)) {
                 operatorName = "ReuseTableScan";
-                reuseTypeName = "(Producer)";
+                reuseTypeName = "(Producer [ID: " + node.getId().toString() + "])";
             }
             else if (node.getStrategy().equals(REUSE_STRATEGY_CONSUMER)) {
                 operatorName = "ReuseTableScan";

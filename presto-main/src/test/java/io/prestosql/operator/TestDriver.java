@@ -175,7 +175,14 @@ public class TestDriver
                         .addSequencePage(10, 20, 30, 40)
                         .build()),
                 TEST_TABLE_HANDLE,
-                ImmutableList.of(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, types, false, Optional.empty(), 0, 0);
+                ImmutableList.of(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                types,
+                false,
+                Optional.empty(),
+                0,
+                0);
 
         PageConsumerOperator sink = createSinkOperator(types);
         Driver driver = Driver.createDriver(driverContext, source, sink);

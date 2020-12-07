@@ -194,7 +194,10 @@ public class TestEffectivePredicateExtractor
                 newId(),
                 makeTableHandle(TupleDomain.all()),
                 ImmutableList.copyOf(assignments.keySet()),
-                assignments, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
+                assignments,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                0);
 
         expressionNormalizer = new ExpressionIdentityNormalizer();
     }

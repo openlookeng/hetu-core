@@ -33,7 +33,6 @@ import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.util.BloomFilter;
-import io.prestosql.spiller.FileSingleStreamSpillerFactory;
 import io.prestosql.spiller.GenericSpiller;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
@@ -58,17 +57,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
+import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
 import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
-import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static java.util.Objects.requireNonNull;
 
 public class TableScanOperator
@@ -92,11 +90,11 @@ public class TableScanOperator
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
         private ReuseExchangeOperator.STRATEGY strategy;
-        private Integer producerConsumerMappingId;
+        private Integer reuseTableScanMappingId;
         private boolean spillEnabled;
         private final Optional<SpillerFactory> spillerFactory;
         private Integer spillerThreshold;
-        private Integer consumerCount;
+        private Integer consumerTableScanNodeCount;
 
         public TableScanOperatorFactory(
                 Session session,
@@ -112,13 +110,13 @@ public class TableScanOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
                 ReuseExchangeOperator.STRATEGY strategy,
-                Integer producerConsumerMappingId,
+                Integer reuseTableScanMappingId,
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 Integer spillerThreshold,
-                Integer consumerCount)
+                Integer consumerTableScanNodeCount)
         {
-            this(operatorId, sourceNode.getId(), pageSourceProvider, table, columns, types, minOutputPageSize, minOutputPageRowCount, strategy, producerConsumerMappingId, spillEnabled, spillerFactory, spillerThreshold, consumerCount);
+            this(operatorId, sourceNode.getId(), pageSourceProvider, table, columns, types, minOutputPageSize, minOutputPageRowCount, strategy, reuseTableScanMappingId, spillEnabled, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 if (sourceNode instanceof TableScanNode) {
                     tableScanNodeOptional = Optional.of((TableScanNode) sourceNode);
@@ -142,11 +140,11 @@ public class TableScanOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
                 ReuseExchangeOperator.STRATEGY strategy,
-                Integer producerConsumerMappingId,
+                Integer reuseTableScanMappingId,
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 Integer spillerThreshold,
-                Integer consumerCount)
+                Integer consumerTableScanNodeCount)
         {
             this.operatorId = operatorId;
             this.sourceId = requireNonNull(sourceId, "sourceId is null");
@@ -157,11 +155,11 @@ public class TableScanOperator
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
             this.strategy = strategy;
-            this.producerConsumerMappingId = producerConsumerMappingId;
+            this.reuseTableScanMappingId = reuseTableScanMappingId;
             this.spillEnabled = spillEnabled;
             this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
             this.spillerThreshold = spillerThreshold;
-            this.consumerCount = consumerCount;
+            this.consumerTableScanNodeCount = consumerTableScanNodeCount;
         }
 
         public ReuseExchangeOperator.STRATEGY getStrategy()
@@ -169,10 +167,11 @@ public class TableScanOperator
             return strategy;
         }
 
-        public void setStrategy(ReuseExchangeOperator.STRATEGY strategy)
-        {
-            this.strategy = strategy;
-        }
+//        public void setStrategy(ReuseExchangeOperator.STRATEGY strategy)
+//        {
+//            //todo: find usage
+//            this.strategy = strategy;
+//        }
 
         @Override
         public int getOperatorId()
@@ -198,7 +197,7 @@ public class TableScanOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, getOperatorType());
             if (table.getConnectorHandle().isSuitableForPushdown()) {
-                return new WorkProcessorSourceOperatorAdapter(operatorContext, this, REUSE_STRATEGY_DEFAULT, 0, spillEnabled, types, spillerFactory, spillerThreshold, consumerCount);
+                return new WorkProcessorSourceOperatorAdapter(operatorContext, this, REUSE_STRATEGY_DEFAULT, 0, spillEnabled, types, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
             }
 
             return new TableScanOperator(
@@ -213,12 +212,12 @@ public class TableScanOperator
                     metadataOptional,
                     dynamicFilterCacheManagerOptional,
                     strategy,
-                    producerConsumerMappingId,
+                    reuseTableScanMappingId,
                     types,
                     spillEnabled,
                     spillerFactory,
                     spillerThreshold,
-                    consumerCount);
+                    consumerTableScanNodeCount);
         }
 
         @Override
@@ -278,18 +277,18 @@ public class TableScanOperator
     boolean isDcTable;
 
     private ReuseExchangeOperator.STRATEGY strategy;
-    private Integer producerConsumerMappingId;
+    private Integer reuseTableScanMappingId;
     private static ConcurrentMap<String, Integer> indexes;
     private String sourceIdString;
     private final Optional<SpillerFactory> spillerFactory;
     private final List<Type> types;
     private boolean spillEnabled;
     private final long spillThreshold;
-    private static ConcurrentMap<Integer, ReuseExchangeSlotUtils> slotUtilsMap = new ConcurrentHashMap<>();
-    private ReuseExchangeSlotUtils slotUtils;
+    private static ConcurrentMap<Integer, ReuseExchangeTableScanMappingIdState> reuseExchangeTableScanMappingIdUtilsMap = new ConcurrentHashMap<>();
+    private ReuseExchangeTableScanMappingIdState reuseExchangeTableScanMappingIdState;
     private ListenableFuture<?> spillInProgress = immediateFuture(null);
 
-    private enum STATE {READ_MEMORY, READ_DISK}
+    private enum READSTATE {READ_MEMORY, READ_DISK}
 
     public TableScanOperator(
             OperatorContext operatorContext,
@@ -303,14 +302,14 @@ public class TableScanOperator
             Optional<Metadata> metadataOptional,
             Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer producerConsumerMappingId,
+            Integer reuseTableScanMappingId,
             List<Type> types,
             boolean spillEnabled,
             Optional<SpillerFactory> spillerFactory,
             Integer spillerThreshold,
-            Integer consumerCount)
+            Integer consumerTableScanNodeCount)
     {
-        this(operatorContext, planNodeId, pageSourceProvider, table, columns, strategy, producerConsumerMappingId, types, spillEnabled, spillerFactory, spillerThreshold, consumerCount);
+        this(operatorContext, planNodeId, pageSourceProvider, table, columns, strategy, reuseTableScanMappingId, types, spillEnabled, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
         this.tableScanNodeOptional = tableScanNodeOptional;
         this.stateStoreProviderOptional = stateStoreProviderOptional;
         this.queryIdOptional = queryIdOptional;
@@ -335,12 +334,12 @@ public class TableScanOperator
             TableHandle table,
             Iterable<ColumnHandle> columns,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer producerConsumerMappingId,
+            Integer reuseTableScanMappingId,
             List<Type> types,
             boolean spillEnabled,
             Optional<SpillerFactory> spillerFactory,
             Integer spillerThreshold,
-            Integer consumerCount)
+            Integer consumerTableScanNodeCount)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -349,7 +348,7 @@ public class TableScanOperator
         this.columns = ImmutableList.copyOf(requireNonNull(columns, "columns is null"));
         this.systemMemoryContext = operatorContext.newLocalSystemMemoryContext(TableScanOperator.class.getSimpleName());
         this.strategy = strategy;
-        this.producerConsumerMappingId = producerConsumerMappingId;
+        this.reuseTableScanMappingId = reuseTableScanMappingId;
         this.spillEnabled = spillEnabled;
         this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
         this.spillThreshold = spillerThreshold;
@@ -357,16 +356,16 @@ public class TableScanOperator
 
         if (!strategy.equals(REUSE_STRATEGY_DEFAULT)) {
             synchronized (TableScanOperator.class) {
-                if (strategy.equals(REUSE_STRATEGY_PRODUCER) && !slotUtilsMap.containsKey(producerConsumerMappingId)) {
-                    ReuseExchangeSlotUtils reuseExchangeSlotUtils = new ReuseExchangeSlotUtils(strategy, producerConsumerMappingId, operatorContext, consumerCount);
-                    slotUtilsMap.put(producerConsumerMappingId, reuseExchangeSlotUtils);
+                if (strategy.equals(REUSE_STRATEGY_PRODUCER) && !reuseExchangeTableScanMappingIdUtilsMap.containsKey(reuseTableScanMappingId)) {
+                    ReuseExchangeTableScanMappingIdState reuseExchangeTableScanMappingIdState = new ReuseExchangeTableScanMappingIdState(strategy, reuseTableScanMappingId, operatorContext, consumerTableScanNodeCount);
+                    reuseExchangeTableScanMappingIdUtilsMap.put(reuseTableScanMappingId, reuseExchangeTableScanMappingIdState);
                 }
 
-                this.slotUtils = slotUtilsMap.get(producerConsumerMappingId);
+                this.reuseExchangeTableScanMappingIdState = reuseExchangeTableScanMappingIdUtilsMap.get(reuseTableScanMappingId);
 
                 if (strategy.equals(REUSE_STRATEGY_CONSUMER)) {
-                    sourceIdString = planNodeId.toString().concat(producerConsumerMappingId.toString());
-                    slotUtilsMap.get(producerConsumerMappingId).addToSourceIdList(sourceIdString);
+                    sourceIdString = planNodeId.toString().concat(reuseTableScanMappingId.toString());
+                    reuseExchangeTableScanMappingIdUtilsMap.get(reuseTableScanMappingId).addToSourceNodeModifiedIdList(sourceIdString);
                 }
 
                 if (indexes == null) {
@@ -383,7 +382,7 @@ public class TableScanOperator
 
     public boolean isNotSpilled()
     {
-        int pagesWrittenCount = slotUtils.getPagesWrittenCount();
+        int pagesWrittenCount = reuseExchangeTableScanMappingIdState.getPagesWrittenCount();
 
         if (pagesWrittenCount == 0) {
             // there was no spilling of data- either spilling is not used, or not enough data to spill
@@ -393,14 +392,13 @@ public class TableScanOperator
         return false;
     }
 
-    public static synchronized void deleteSpilledFiles(Integer slot)
+    public static synchronized void deleteSpilledFiles(Integer reuseTableScanMappingId)
     {
-        if (slotUtilsMap.containsKey(slot)) {
-            if (slotUtilsMap.get(slot).getSpiller().isPresent()) {
-                GenericSpiller spillerObject = (GenericSpiller) slotUtilsMap.get(slot).getSpiller().get();
+        if (reuseExchangeTableScanMappingIdUtilsMap.containsKey(reuseTableScanMappingId)) {
+            if (reuseExchangeTableScanMappingIdUtilsMap.get(reuseTableScanMappingId).getSpiller().isPresent()) {
+                GenericSpiller spillerObject = (GenericSpiller) reuseExchangeTableScanMappingIdUtilsMap.get(reuseTableScanMappingId).getSpiller().get();
                 if (spillerObject != null) {
-                    FileSingleStreamSpillerFactory singleStreamSpillerFactory = (FileSingleStreamSpillerFactory) spillerObject.getSingleStreamSpillerFactory();
-                    singleStreamSpillerFactory.cleanupOldSpillFiles();
+                    spillerObject.deleteAllStreams();
                 }
             }
         }
@@ -408,10 +406,10 @@ public class TableScanOperator
 
     private List<Iterator<Page>> getSpilledPages()
     {
-        if (!slotUtils.getSpiller().isPresent()) {
+        if (!reuseExchangeTableScanMappingIdState.getSpiller().isPresent()) {
             return ImmutableList.of();
         }
-        return slotUtils.getSpiller().get().getSpills().stream().collect(toImmutableList());
+        return reuseExchangeTableScanMappingIdState.getSpiller().get().getSpills().stream().collect(toImmutableList());
     }
 
     private long totalPageSize(List<Page> pageList)
@@ -428,46 +426,46 @@ public class TableScanOperator
 
     private Page getPage()
     {
-        synchronized (producerConsumerMappingId) {
+        synchronized (reuseExchangeTableScanMappingIdUtilsMap) {
             Page newPage = null;
-            TableScanOperator.STATE state = TableScanOperator.STATE.READ_MEMORY;
+            READSTATE readState = READSTATE.READ_MEMORY;
             initIndex();
 
-            if (!slotUtils.getPagesToSpill().isEmpty()) {
+            if (!reuseExchangeTableScanMappingIdState.getPagesToSpill().isEmpty()) {
                 // some pages are leftover to spill because the size is < spillThreshold/2
-                List<Page> inMemoryPages = slotUtils.getPageCaches();
-                inMemoryPages.addAll(slotUtils.getPagesToSpill());
-                slotUtils.setPageCaches(inMemoryPages);
-                slotUtils.clearPagesToSpill();
+                List<Page> inMemoryPages = reuseExchangeTableScanMappingIdState.getPageCaches();
+                inMemoryPages.addAll(reuseExchangeTableScanMappingIdState.getPagesToSpill());
+                reuseExchangeTableScanMappingIdState.setPageCaches(inMemoryPages);
+                reuseExchangeTableScanMappingIdState.clearPagesToSpill();
             }
 
-            if (indexes.get(sourceIdString) == null || slotUtils.getPageCaches() == null
-                    || indexes.get(sourceIdString) >= slotUtils.getPageCaches().size()) {
-                if (slotUtils.getPagesWrittenCount() != 0) {
-                    if (slotUtils.getCurConsumerRefCount() > 0
-                            && slotUtils.getPageCaches().size() != 0) {
+            if (indexes.get(sourceIdString) == null || reuseExchangeTableScanMappingIdState.getPageCaches() == null
+                    || indexes.get(sourceIdString) >= reuseExchangeTableScanMappingIdState.getPageCaches().size()) {
+                if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() != 0) {
+                    if (reuseExchangeTableScanMappingIdState.getCurConsumerScanNodeRefCount() > 0
+                            && reuseExchangeTableScanMappingIdState.getPageCaches().size() != 0) {
                         return null;
                     }
-                    state = TableScanOperator.STATE.READ_DISK;
+                    readState = READSTATE.READ_DISK;
                 }
                 else {
                     return null;
                 }
             }
 
-            if (!slotUtils.getPageCaches().isEmpty() && state == TableScanOperator.STATE.READ_MEMORY) {
-                newPage = slotUtils.getPageCaches().get(indexes.get(sourceIdString));
+            if (!reuseExchangeTableScanMappingIdState.getPageCaches().isEmpty() && readState == READSTATE.READ_MEMORY) {
+                newPage = reuseExchangeTableScanMappingIdState.getPageCaches().get(indexes.get(sourceIdString));
                 indexes.merge(sourceIdString, 1, Integer::sum);
 
-                if (indexes.get(sourceIdString) >= slotUtils.getPageCaches().size()) {
-                    int currentConsumerCount = slotUtils.getCurConsumerRefCount() - 1;
-                    slotUtils.setCurConsumerRefCount(currentConsumerCount);
-                    if (currentConsumerCount == 0) {
-                        slotUtils.getPageCaches().clear();
+                if (indexes.get(sourceIdString) >= reuseExchangeTableScanMappingIdState.getPageCaches().size()) {
+                    int consumerTableScanNodeCount = reuseExchangeTableScanMappingIdState.getCurConsumerScanNodeRefCount() - 1;
+                    reuseExchangeTableScanMappingIdState.setCurConsumerScanNodeRefCount(consumerTableScanNodeCount);
+                    if (consumerTableScanNodeCount == 0) {
+                        reuseExchangeTableScanMappingIdState.getPageCaches().clear();
                     }
                 }
             }
-            else if (state == TableScanOperator.STATE.READ_DISK) {
+            else if (readState == READSTATE.READ_DISK) {
                 // no page available in memory, unspill from disk and read
                 List<Iterator<Page>> spilledPages = getSpilledPages();
                 Iterator<Page> readPages;
@@ -477,26 +475,27 @@ public class TableScanOperator
                         readPages = spilledPages.get(i);
                         readPages.forEachRemaining(pagesRead::add);
                     }
-                    slotUtils.setPageCaches(pagesRead);
+                    reuseExchangeTableScanMappingIdState.setPageCaches(pagesRead);
 
-                    for (String sourceId : slotUtils.getSourceIdList()) {
-                        //reinitialize indexes for all consumers in this slot here
+                    for (String sourceId : reuseExchangeTableScanMappingIdState.getSourceNodeModifiedIdList()) {
+                        //reinitialize indexes for all consumers in this reuseTableScanMappingId here
                         indexes.put(sourceId, 0);
                     }
 
                     //restore original count so that all consumers are now active again
-                    slotUtils.setCurConsumerRefCount(slotUtils.getTotalConsumerCount());
-                    slotUtils.setPagesWritten(slotUtils.getPagesWrittenCount() - pagesRead.size());
+                    reuseExchangeTableScanMappingIdState.setCurConsumerScanNodeRefCount(reuseExchangeTableScanMappingIdState.getTotalConsumerScanNodeCount());
+                    reuseExchangeTableScanMappingIdState.setPagesWritten(reuseExchangeTableScanMappingIdState.getPagesWrittenCount() - pagesRead.size());
 
-                    if (slotUtils.getPagesWrittenCount() < 0) {
+                    if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() < 0) {
                         throw new ArrayIndexOutOfBoundsException("MORE PAGES READ THAN WRITTEN");
                     }
 
-                    if (slotUtils.getPagesWrittenCount() == 0) {
-                        slotUtils.getOperatorContext().destroy();
+                    if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0) {
+                        reuseExchangeTableScanMappingIdState.getOperatorContext().destroy();
+                        deleteSpilledFiles(reuseTableScanMappingId);
                         //destroy context for producer from here.
                     }
-                    newPage = slotUtils.getPageCaches().get(indexes.get(sourceIdString));
+                    newPage = reuseExchangeTableScanMappingIdState.getPageCaches().get(indexes.get(sourceIdString));
                     indexes.merge(sourceIdString, 1, Integer::sum);
                 }
             }
@@ -506,37 +505,37 @@ public class TableScanOperator
 
     private void setPage(Page page)
     {
-        synchronized (producerConsumerMappingId) {
+        synchronized (reuseExchangeTableScanMappingIdUtilsMap) {
             initPageCache(); // Actually it should not be required but somehow TSO Strategy-2 is get scheduled in parallel and clear the cache.
             if (!spillEnabled) {
                 //spilling is not enabled so keep adding pages to cache in-memory
-                List<Page> pageCachesList = slotUtils.getPageCaches();
+                List<Page> pageCachesList = reuseExchangeTableScanMappingIdState.getPageCaches();
                 pageCachesList.add(page);
-                slotUtils.setPageCaches(pageCachesList);
+                reuseExchangeTableScanMappingIdState.setPageCaches(pageCachesList);
             }
             else {
-                if (totalPageSize(slotUtils.getPageCaches()) < (spillThreshold / 2)) {
+                if (totalPageSize(reuseExchangeTableScanMappingIdState.getPageCaches()) < (spillThreshold / 2)) {
                     // if pageCaches hasn't reached spillThreshold/2, keep adding pages to it.
-                    List<Page> pageCachesList = slotUtils.getPageCaches();
+                    List<Page> pageCachesList = reuseExchangeTableScanMappingIdState.getPageCaches();
                     pageCachesList.add(page);
-                    slotUtils.setPageCaches(pageCachesList);
+                    reuseExchangeTableScanMappingIdState.setPageCaches(pageCachesList);
                 }
                 else {
                     // no more space available in memory to store pages. pages will be spilled now
-                    List<Page> pageSpilledList = slotUtils.getPagesToSpill();
+                    List<Page> pageSpilledList = reuseExchangeTableScanMappingIdState.getPagesToSpill();
                     pageSpilledList.add(page);
-                    slotUtils.setPagesToSpill(pageSpilledList);
+                    reuseExchangeTableScanMappingIdState.setPagesToSpill(pageSpilledList);
 
                     if (totalPageSize(pageSpilledList) >= (spillThreshold / 2)) {
-                        if (!slotUtils.getSpiller().isPresent()) {
+                        if (!reuseExchangeTableScanMappingIdState.getSpiller().isPresent()) {
                             Optional<Spiller> spillObject = Optional.of(spillerFactory.get().create(types, operatorContext.getSpillContext(),
                                     operatorContext.newAggregateSystemMemoryContext()));
-                            slotUtils.setSpiller(spillObject);
+                            reuseExchangeTableScanMappingIdState.setSpiller(spillObject);
                         }
 
-                        spillInProgress = slotUtils.getSpiller().get().spill(pageSpilledList.iterator());
+                        spillInProgress = reuseExchangeTableScanMappingIdState.getSpiller().get().spill(pageSpilledList.iterator());
 
-                        slotUtils.setPagesWritten(slotUtils.getPagesWrittenCount() + pageSpilledList.size());
+                        reuseExchangeTableScanMappingIdState.setPagesWritten(reuseExchangeTableScanMappingIdState.getPagesWrittenCount() + pageSpilledList.size());
 
                         try {
                             // blocking call to ensure spilling completes before we move forward
@@ -549,7 +548,7 @@ public class TableScanOperator
                             e.printStackTrace();
                         }
 
-                        slotUtils.clearPagesToSpill(); //clear the memory pressure once the data is spilled to disk
+                        reuseExchangeTableScanMappingIdState.clearPagesToSpill(); //clear the memory pressure once the data is spilled to disk
                     }
                 }
             }
@@ -559,9 +558,9 @@ public class TableScanOperator
     private synchronized Boolean checkFinished()
     {
         synchronized (TableScanOperator.class) {
-            return indexes.get(sourceIdString) != null && slotUtils.getPageCaches() != null
-                    && indexes.get(sourceIdString) >= slotUtils.getPageCaches().size()
-                    && slotUtils.getPagesWrittenCount() == 0;
+            return indexes.get(sourceIdString) != null && reuseExchangeTableScanMappingIdState.getPageCaches() != null
+                    && indexes.get(sourceIdString) >= reuseExchangeTableScanMappingIdState.getPageCaches().size()
+                    && reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0;
         }
     }
 
@@ -574,13 +573,13 @@ public class TableScanOperator
 
     private void initPageCache()
     {
-        synchronized (producerConsumerMappingId) {
-            if (slotUtils.getPageCaches() == null) {
-                slotUtils.setPageCaches(new ArrayList<>());
+        synchronized (reuseExchangeTableScanMappingIdUtilsMap) {
+            if (reuseExchangeTableScanMappingIdState.getPageCaches() == null) {
+                reuseExchangeTableScanMappingIdState.setPageCaches(new ArrayList<>());
             }
 
-            if (slotUtils.getPagesToSpill() == null) {
-                slotUtils.setPagesToSpill(new ArrayList<>());
+            if (reuseExchangeTableScanMappingIdState.getPagesToSpill() == null) {
+                reuseExchangeTableScanMappingIdState.setPagesToSpill(new ArrayList<>());
             }
         }
     }
@@ -759,7 +758,6 @@ public class TableScanOperator
         return page;
     }
 
-
     private Page filter(Page page)
     {
         BloomFilterUtils.updateBloomFilter(queryIdOptional, isDcTable, stateStoreProviderOptional, tableScanNodeOptional, dynamicFilterCacheManagerOptional, bloomFiltersBackup, bloomFilters);
@@ -770,11 +768,11 @@ public class TableScanOperator
         return page;
     }
 
-    public static synchronized void releaseCache(Integer slot)
+    public static synchronized void releaseCache(Integer reuseTableScanMappingId)
     {
-        if (slotUtilsMap.containsKey(slot)) {
-            if (slotUtilsMap.get(slot).getPageCaches() != null) {
-                slotUtilsMap.get(slot).setPageCaches(null);
+        if (reuseExchangeTableScanMappingIdUtilsMap.containsKey(reuseTableScanMappingId)) {
+            if (reuseExchangeTableScanMappingIdUtilsMap.get(reuseTableScanMappingId).getPageCaches() != null) {
+                reuseExchangeTableScanMappingIdUtilsMap.get(reuseTableScanMappingId).setPageCaches(null);
             }
         }
     }

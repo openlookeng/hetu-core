@@ -57,7 +57,7 @@ public final class Split
 
     public List<Split> getSplits()
     {
-        return connectorSplit.getUnwrapSplits().stream().map(x -> new Split(catalogName, x, lifespan)).collect(Collectors.toList());
+        return connectorSplit.getUnwrappedSplits().stream().map(x -> new Split(catalogName, x, lifespan)).collect(Collectors.toList());
     }
 
     @JsonProperty

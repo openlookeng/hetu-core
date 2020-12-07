@@ -153,7 +153,7 @@ public class SplitCacheAwareNodeSelector
         unassignedSplits.addAll(uncacheableSplits);
 
         // Compute split assignments for splits that cannot be cached, newly cacheable, and already cached but cached worker is inactive now.
-        SplitPlacementResult defaultSplitPlacementResult = defaultNodeSelector.computeAssignments(unassignedSplits, existingTasks, Optional.empty());
+        SplitPlacementResult defaultSplitPlacementResult = defaultNodeSelector.computeAssignments(unassignedSplits, existingTasks, stage);
         defaultSplitPlacementResult.getAssignments().forEach(((internalNode, split) -> {
             //Set or Update cached node id only if split is cacheable
             if (newCacheableSplits.contains(split)) {

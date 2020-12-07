@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -50,9 +49,9 @@ public class TableScanNode
     private final Optional<Expression> predicate;
 
     private ReuseExchangeOperator.STRATEGY strategy;
-    private Integer slot;
+    private Integer reuseTableScanMappingId;
     private Expression filterExpr;
-    private Integer consumerCount;
+    private Integer consumerTableScanNodeCount;
 
     // We need this factory method to disambiguate with the constructor used for deserializing
     // from a json object. The deserializer sets some fields which are never transported
@@ -63,9 +62,9 @@ public class TableScanNode
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer slot, Integer consumerCount)
+            Integer reuseTableScanMappingId, Integer consumerTableScanNodeCount)
     {
-        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, slot, consumerCount);
+        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, reuseTableScanMappingId, consumerTableScanNodeCount);
     }
 
     @JsonCreator
@@ -76,8 +75,8 @@ public class TableScanNode
             @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
             @JsonProperty("predicate") Optional<Expression> predicate,
             @JsonProperty("strategy") ReuseExchangeOperator.STRATEGY strategy,
-            @JsonProperty("slot") Integer slot,
-            @JsonProperty("consumerCount") Integer consumerCount)
+            @JsonProperty("reuseTableScanMappingId") Integer reuseTableScanMappingId,
+            @JsonProperty("consumerTableScanNodeCount") Integer consumerTableScanNodeCount)
     {
         // This constructor is for JSON deserialization only. Do not use.
         super(id);
@@ -88,9 +87,9 @@ public class TableScanNode
         this.enforcedConstraint = null;
         this.predicate = predicate;
         this.strategy = strategy;
-        this.slot = slot;
+        this.reuseTableScanMappingId = reuseTableScanMappingId;
         this.filterExpr = null;
-        this.consumerCount = consumerCount;
+        this.consumerTableScanNodeCount = consumerTableScanNodeCount;
     }
 
     public TableScanNode(
@@ -101,8 +100,8 @@ public class TableScanNode
             TupleDomain<ColumnHandle> enforcedConstraint,
             Optional<Expression> predicate,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer slot,
-            Integer consumerCount)
+            Integer reuseTableScanMappingId,
+            Integer consumerTableScanNodeCount)
     {
         super(id);
         this.table = requireNonNull(table, "table is null");
@@ -112,9 +111,9 @@ public class TableScanNode
         this.enforcedConstraint = requireNonNull(enforcedConstraint, "enforcedConstraint is null");
         this.predicate = requireNonNull(predicate, "predicate expression cannot be empty");
         this.strategy = strategy;
-        this.slot = slot;
+        this.reuseTableScanMappingId = reuseTableScanMappingId;
         this.filterExpr = null;
-        this.consumerCount = consumerCount;
+        this.consumerTableScanNodeCount = consumerTableScanNodeCount;
     }
 
     public Expression getFilterExpr()
@@ -132,9 +131,9 @@ public class TableScanNode
         this.strategy = strategy;
     }
 
-    public void setSlot(Integer slot)
+    public void setReuseTableScanMappingId(Integer reuseTableScanMappingId)
     {
-        this.slot = slot;
+        this.reuseTableScanMappingId = reuseTableScanMappingId;
     }
 
     @JsonProperty("table")
@@ -162,21 +161,21 @@ public class TableScanNode
         return strategy;
     }
 
-    @JsonProperty("slot")
-    public Integer getSlot()
+    @JsonProperty("reuseTableScanMappingId")
+    public Integer getReuseTableScanMappingId()
     {
-        return slot;
+        return reuseTableScanMappingId;
     }
 
-    public void setConsumerCount(Integer consumerCount)
+    public void setConsumerTableScanNodeCount(Integer consumerTableScanNodeCount)
     {
-        this.consumerCount = consumerCount;
+        this.consumerTableScanNodeCount = consumerTableScanNodeCount;
     }
 
-    @JsonProperty("consumerCount")
-    public Integer getConsumerCount()
+    @JsonProperty("consumerTableScanNodeCount")
+    public Integer getConsumerTableScanNodeCount()
     {
-        return consumerCount;
+        return consumerTableScanNodeCount;
     }
 
     /**
@@ -221,8 +220,8 @@ public class TableScanNode
                 .add("assignments", assignments)
                 .add("enforcedConstraint", enforcedConstraint)
                 .add("strategy", strategy)
-                .add("slot", slot)
-                .add("consumerCount", consumerCount)
+                .add("reuseTableScanMappingId", reuseTableScanMappingId)
+                .add("consumerTableScanNodeCount", consumerTableScanNodeCount)
                 .toString();
     }
 
@@ -233,7 +232,7 @@ public class TableScanNode
         return this;
     }
 
-    private boolean isSourcesEqual(List<PlanNode> n1, List<PlanNode> n2)
+    public boolean isSourcesEqual(List<PlanNode> n1, List<PlanNode> n2)
     {
         if (n1.size() != n2.size()) {
             return false;
@@ -301,18 +300,7 @@ public class TableScanNode
         return true;
     }
 
-    @Override
-    public int hashCode()
-    {
-        int hashVal = Objects.hash(table);
-        for (int i = 0; i < outputSymbols.size(); i++) {
-            hashVal += Objects.hash(getActualColName(outputSymbols.get(i).getName()));
-        }
-
-        return hashVal;
-    }
-
-    private boolean isPredicateSame(TableScanNode curr)
+    public boolean isPredicateSame(TableScanNode curr)
     {
         if (filterExpr != null) {
             return filterExpr.absEquals(curr.getFilterExpr());
@@ -324,8 +312,7 @@ public class TableScanNode
         return false;
     }
 
-    @Override
-    public boolean equals(Object o)
+    public boolean isNodeEquals(Object o)
     {
         TableScanNode curr = (TableScanNode) (o);
         if (curr == this) {
@@ -336,7 +323,7 @@ public class TableScanNode
         }
 
         if (curr.table.getCatalogName().equals(this.table.getCatalogName())
-                && curr.getTable().equals(this.getTable())
+                && curr.getTable().equalsTo(this.getTable())
                 && isSourcesEqual(curr.getSources(), this.getSources())
                 && isSymbolsEqual(curr.getOutputSymbols(), this.getOutputSymbols())
                 && isPredicateSame(curr)) {

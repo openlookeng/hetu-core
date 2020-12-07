@@ -51,12 +51,12 @@ public interface ConnectorSplit
 
     Object getInfo();
 
-    default int getSplitNum()
+    default int getSplitCount()
     {
         return 1;
     }
 
-    default List<ConnectorSplit> getUnwrapSplits()
+    default List<ConnectorSplit> getUnwrappedSplits()
     {
         throw new NotImplementedException();
     }
