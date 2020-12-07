@@ -2131,6 +2131,20 @@ public class LocalExecutionPlanner
                     });
         }
 
+        private Optional<LocalDynamicFilter> createDynamicFilter(SemiJoinNode node, LocalExecutionPlanContext context)
+        {
+            if (!node.getDynamicFilterId().isPresent()) {
+                return Optional.empty();
+            }
+            LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
+            return LocalDynamicFilter
+                    .create(node, context.getSession(), context.taskContext.getTaskId(), stateStoreProvider)
+                    .map(filter -> {
+                        addSuccessCallback(filter.getDynamicFilterResultFuture(), collector::intersectDynamicFilter);
+                        return filter;
+                    });
+        }
+
         private JoinBridgeManager<PartitionedLookupSourceFactory> createLookupSourceFactory(
                 JoinNode node,
                 PlanNode buildNode,
@@ -2325,10 +2339,30 @@ public class LocalExecutionPlanner
             LocalExecutionPlanContext buildContext = context.createSubContext();
             PhysicalOperation buildSource = node.getFilteringSource().accept(this, buildContext);
             checkState(buildSource.getPipelineExecutionStrategy() == probeSource.getPipelineExecutionStrategy(), "build and probe have different pipelineExecutionStrategy");
-            checkArgument(buildContext.getDriverInstanceCount().orElse(1) == 1, "Expected local execution to not be parallel");
+            int partitionCount = buildContext.getDriverInstanceCount().orElse(1);
+            checkArgument(partitionCount == 1, "Expected local execution to not be parallel");
 
             int probeChannel = probeSource.getLayout().get(node.getSourceJoinSymbol());
             int buildChannel = buildSource.getLayout().get(node.getFilteringSourceJoinSymbol());
+
+            ImmutableList.Builder<OperatorFactory> buildOperatorFactories = new ImmutableList.Builder<>();
+            buildOperatorFactories.addAll(buildSource.getOperatorFactories());
+
+            node.getDynamicFilterId().ifPresent(filterId -> {
+                // Add a DynamicFilterSourceOperatorFactory to build operator factories
+                log.debug("[Semi-join] Dynamic filter: %s", filterId);
+                LocalDynamicFilter filterConsumer = createDynamicFilter(node, context).orElse(null);
+                if (filterConsumer != null) {
+                    addSuccessCallback(filterConsumer.getDynamicFilterResultFuture(), context::getDynamicFiltersCollector);
+                    buildOperatorFactories.add(new DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory(
+                            buildContext.getNextOperatorId(),
+                            node.getId(),
+                            filterConsumer.getValueConsumer(),
+                            ImmutableList.of(new DynamicFilterSourceOperator.Channel(filterId, buildSource.getTypes().get(buildChannel), buildChannel, context.getSession().getQueryId().toString())),
+                            getDynamicFilteringMaxPerDriverValueCount(context.getSession()),
+                            getDynamicFilteringMaxPerDriverSize(context.getSession())));
+                }
+            });
 
             Optional<Integer> buildHashChannel = node.getFilteringSourceHashSymbol().map(channelGetter(buildSource));
             Optional<Integer> probeHashChannel = node.getSourceHashSymbol().map(channelGetter(probeSource));
@@ -2341,14 +2375,12 @@ public class LocalExecutionPlanner
                     buildHashChannel,
                     10_000,
                     joinCompiler);
+            buildOperatorFactories.add(setBuilderOperatorFactory);
             SetSupplier setProvider = setBuilderOperatorFactory.getSetProvider();
             context.addDriverFactory(
                     buildContext.isInputDriver(),
                     false,
-                    ImmutableList.<OperatorFactory>builder()
-                            .addAll(buildSource.getOperatorFactories())
-                            .add(setBuilderOperatorFactory)
-                            .build(),
+                    buildOperatorFactories.build(),
                     buildContext.getDriverInstanceCount(),
                     buildSource.getPipelineExecutionStrategy());
 

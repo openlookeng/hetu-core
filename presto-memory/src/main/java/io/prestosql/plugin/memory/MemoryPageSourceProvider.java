@@ -22,8 +22,9 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedPageSource;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
-import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
 
 import javax.inject.Inject;
@@ -42,7 +43,7 @@ public final class MemoryPageSourceProvider
     private final MemoryPagesStore pagesStore;
 
     @Inject
-    public MemoryPageSourceProvider(MemoryPagesStore pagesStore)
+    public MemoryPageSourceProvider(MemoryPagesStore pagesStore, TypeManager typeManager, MemoryMetadata memoryMetadata)
     {
         this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
     }
@@ -89,21 +90,24 @@ public final class MemoryPageSourceProvider
                 memorySplit.getLimit(),
                 sampleRatio);
         return new FixedPageSource(pages.stream()
-                          //              .map(page -> applyFilter(page, domains))
+                                        .map(page -> applyFilter(page, dynamicFilterSupplier, columns))
                                         .collect(toList()));
     }
 
-    private Page applyFilter(Page page, Map<Integer, Domain> domains)
+    private Page applyFilter(Page page, Optional<DynamicFilterSupplier> dynamicFilters, List<ColumnHandle> columns)
     {
+        if (!dynamicFilters.isPresent()) {
+            return page;
+        }
         int[] positions = new int[page.getPositionCount()];
         int length = 0;
         for (int i = 0; i < page.getPositionCount(); ++i) {
             boolean match = true;
-            for (Map.Entry<Integer, Domain> entry : domains.entrySet()) {
-                int channel = entry.getKey();
-                Domain domain = entry.getValue();
-                Object value = TypeUtils.readNativeValue(domain.getType(), page.getBlock(channel), i);
-                if (!domain.includesNullableValue(value)) {
+            for (Map.Entry<ColumnHandle, DynamicFilter> entry : dynamicFilters.get().getDynamicFilters().entrySet()) {
+                MemoryColumnHandle columnHandle = (MemoryColumnHandle) entry.getKey();
+                DynamicFilter dynamicFilter = entry.getValue();
+                Object value = TypeUtils.readNativeValue(columnHandle.getType(), page.getBlock(columns.indexOf(columnHandle)), i);
+                if (!dynamicFilter.contains(value)) {
                     match = false;
                 }
             }

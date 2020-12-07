@@ -33,6 +33,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyNot;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.exchange;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.filter;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
@@ -270,5 +271,101 @@ public class TestDynamicFilter
                                                 tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))),
                                 exchange(
                                         project(tableScan("part", ImmutableMap.of("PART_PK", "partkey")))))));
+    }
+
+    @Test
+    public void testSemiJoin()
+    {
+        assertPlan(
+                "SELECT * FROM orders WHERE orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber % 4 = 0)",
+                anyTree(
+                        filter("S",
+                                project(
+                                        semiJoin("X", "Y", "S", true,
+                                                anyTree(
+                                                        tableScan("orders", ImmutableMap.of("X", "orderkey"))),
+                                                anyTree(
+                                                        tableScan("lineitem", ImmutableMap.of("Y", "orderkey"))))))));
+    }
+
+    @Test
+    public void testNonFilteringSemiJoin()
+    {
+        // Dynamic filtering is not applied to non-filtering semi-join queries
+        assertPlan(
+                "SELECT * FROM orders WHERE orderkey NOT IN (SELECT orderkey FROM lineitem WHERE linenumber < 0)",
+                anyTree(
+                        filter("NOT S",
+                                project(
+                                        semiJoin("X", "Y", "S", false,
+                                                anyTree(
+                                                        tableScan("orders", ImmutableMap.of("X", "orderkey"))),
+                                                anyTree(
+                                                        tableScan("lineitem", ImmutableMap.of("Y", "orderkey"))))))));
+
+        assertPlan(
+                "SELECT orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber < 0) FROM orders",
+                anyTree(
+                        semiJoin("X", "Y", "S", false,
+                                anyTree(
+                                        tableScan("orders", ImmutableMap.of("X", "orderkey"))),
+                                anyTree(
+                                        tableScan("lineitem", ImmutableMap.of("Y", "orderkey"))))));
+    }
+
+    @Test
+    public void testSemiJoinWithStaticFiltering()
+    {
+        assertPlan(
+                "SELECT * FROM orders WHERE orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber % 4 = 0) AND orderkey > 0",
+                anyTree(
+                        filter("S",
+                                project(
+                                        semiJoin("X", "Y", "S", true,
+                                                anyTree(
+                                                        filter("X > BIGINT '0'",
+                                                                tableScan("orders", ImmutableMap.of("X", "orderkey")))),
+                                                anyTree(
+                                                        tableScan("lineitem", ImmutableMap.of("Y", "orderkey"))))))));
+    }
+
+    @Test
+    public void testMultiSemiJoin()
+    {
+        assertPlan(
+                "SELECT part.partkey FROM part WHERE part.partkey IN " +
+                        "(SELECT lineitem.partkey FROM lineitem WHERE lineitem.orderkey IN (SELECT orders.orderkey FROM orders))",
+                anyTree(
+                        filter("S0",
+                                project(
+                                        semiJoin("PART_PK", "LINEITEM_PK", "S0", true,
+                                                anyTree(
+                                                        tableScan("part", ImmutableMap.of("PART_PK", "partkey"))),
+                                                anyTree(
+                                                        filter("S1",
+                                                                project(
+                                                                        semiJoin("LINEITEM_OK", "ORDERS_OK", "S1", true,
+                                                                                anyTree(
+                                                                                        tableScan("lineitem", ImmutableMap.of("LINEITEM_PK", "partkey", "LINEITEM_OK", "orderkey"))),
+                                                                                anyTree(
+                                                                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))))))))));
+    }
+
+    @Test
+    public void testSemiJoinUnsupportedDynamicFilterRemoval()
+    {
+        // Dynamic filters are supported only after a table scan
+        assertPlan(
+                "WITH t AS (SELECT lineitem.partkey + 1000 partkey FROM lineitem) " +
+                        "SELECT t.partkey FROM t WHERE t.partkey IN (SELECT part.partkey FROM part)",
+                anyTree(
+                        filter("S0",
+                                project(
+                                        semiJoin("LINEITEM_PK_PLUS_1000", "PART_PK", "S0", false,
+                                                anyTree(
+                                                        project(ImmutableMap.of("LINEITEM_PK_PLUS_1000", expression("(LINEITEM_PK + BIGINT '1000')")),
+                                                                tableScan("lineitem", ImmutableMap.of("LINEITEM_PK", "partkey")))),
+                                                anyTree(
+                                                        tableScan("part", ImmutableMap.of("PART_PK", "partkey"))))))));
     }
 }

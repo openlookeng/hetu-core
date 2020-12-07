@@ -557,7 +557,8 @@ public class UnaliasSymbolReferences
                     canonicalize(node.getSemiJoinOutput()),
                     canonicalize(node.getSourceHashSymbol()),
                     canonicalize(node.getFilteringSourceHashSymbol()),
-                    node.getDistributionType());
+                    node.getDistributionType(),
+                    node.getDynamicFilterId());
         }
 
         @Override
