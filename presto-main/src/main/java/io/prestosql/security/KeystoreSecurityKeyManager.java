@@ -37,11 +37,9 @@ import java.security.Key;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.interfaces.RSAPrivateKey;
 import java.util.Base64;
 
 import static java.lang.String.format;
@@ -151,21 +149,14 @@ public class KeystoreSecurityKeyManager
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
             Key key = keyStore.getKey(catalogName, config.getKeystorePassword().toCharArray());
 
-            if (key instanceof SecretKey) {
-                keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
-                LOG.info("success to load key for catalog[%s]...", catalogName);
-            }
-            else if (key instanceof PrivateKey) {
-                Certificate certificate = keyStore.getCertificate(catalogName);
-                PublicKey publicKey = certificate.getPublicKey();
-                keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8)).toCharArray();
-            }
-
-            if (key == null) {
-                Certificate certificate = keyStore.getCertificate(catalogName);
-                if (certificate != null) {
-                    PublicKey publicKey = certificate.getPublicKey();
-                    keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+            if (key != null) {
+                if (key instanceof SecretKey) {
+                    keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+                    LOG.info("success to load dynamic catalog key for catalog[%s]...", catalogName);
+                }
+                else if (key instanceof RSAPrivateKey) {
+                    keyStr = new String(Base64.getEncoder().encode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+                    LOG.info("success to load static catalog key for catalog[%s]...", catalogName);
                 }
             }
         }

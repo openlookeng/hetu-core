@@ -63,7 +63,7 @@ public class CatalogStoreUtil
             String cipherText = properties.get(propertyName);
             if (cipherText != null) {
                 String plainText = cipherTextDecryptUtil.decrypt(decryptKeyName, cipherText);
-                properties.put(propertyName, plainText);
+                properties.put(propertyName, plainText.replaceAll("\n", ""));
             }
         });
     }

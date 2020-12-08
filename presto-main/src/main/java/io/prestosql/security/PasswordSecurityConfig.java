@@ -93,7 +93,7 @@ public class PasswordSecurityConfig
         return rsaPadding;
     }
 
-    @Config("security.key.rsa-padding")
+    @Config("security.key.cipher-transformations")
     public void setRsaPadding(String rsaPadding)
     {
         this.rsaPadding = rsaPadding;
