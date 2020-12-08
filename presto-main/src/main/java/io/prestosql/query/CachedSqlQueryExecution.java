@@ -69,6 +69,7 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.CurrentPath;
@@ -130,6 +131,11 @@ public class CachedSqlQueryExecution
         SystemSessionProperties sessionProperties = new SystemSessionProperties();
         for (PropertyMetadata<?> property : sessionProperties.getSessionProperties()) {
             systemSessionProperties.put(property.getName(), session.getSystemProperty(property.getName(), property.getJavaType()));
+        }
+
+        // if the original statement before rewriting is CreateIndex, set session to let connector know that pageMetadata should be enabled
+        if (analysis.getOriginalStatement() instanceof CreateIndex) {
+            session.setPageMetadataEnabled(true);
         }
 
         // build list of fully qualified table names
