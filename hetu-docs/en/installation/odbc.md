@@ -1,4 +1,3 @@
-
 # openLooKeng ODBC User Manual
 
 ## Overview
@@ -9,7 +8,7 @@ This user manual contains information about the openLooKeng ODBC driver for Wind
 
 Open Database Connectivity (ODBC) is an interoperable interface protocol proposed by Microsoft for applications to access different DBMSs. It defines a universal database access mechanism and provides a set of ODBC APIs for accessing databases to simplify the interoperability between clients and different DBMSs.
 
-The ODBC driver enables applications to connect to databases. This product is the ODBC driver for openLooKeng and complies with the core level consistency specifications of ODBC 3.x.
+The ODBC driver enables applications to connect to databases. This product is the ODBC driver for openLooKeng and complies with the core level consistency specifications of ODBC 3.5.
 
 ### Prerequisites
 
@@ -25,6 +24,8 @@ The ODBC driver enables applications to connect to databases. This product is th
 
 - Windows 10 64-bit
 
+- Windows Server 2016 64-bit
+
 > This product has not been strictly tested for other Windows versions. You can try them by yourself. This product does not provide any quality assurance.
 
 ## Installing the openLooKeng ODBC Driver
@@ -33,15 +34,18 @@ This document describes installing from binary distribution for ODBC driver, whi
 
 ### System Requirements
 
-* This driver provides only the 64-bit installation package. Ensure that the OS is Windows 10 64-bit.
+The machine that the ODBC driver is installed must meet the following requirements:
 
-* Ensure that the installation disk has more than 100 MB available space.
+* One of the following operating systems:
+  * Windows 10 (64 bit)
+  * Windows Server 2016 (64 bit)
+* 180 MB of available disk space.
 
 ### Procedure
 
 Before installing the driver, ensure that you have the administrator rights.
 
-1. Double-click the **hetu-odbc-win64.msi** installation package. The welcome page is displayed. Click **Next**.
+1. Double-click the msi installation package. The welcome page is displayed. Click **Next**.
 2. The second page is the user agreement. accept the terms and click **Next**.
 3. On the third page, select an installation mode. You are advised to select **Complete**.
 4. On the fourth page, select an installation path and click **Next**.
@@ -62,7 +66,7 @@ Before an application uses the openLooKeng ODBC driver, the data source DSN must
 2. In **Control Panel**, click **System and Security**, and then click **Administrative Tools**.
 
 3. In **Administrative Tools**, click **ODBC Data Sources (64-bit)**.
-   
+
    > Note: You can also type **ODBC** in the search box of the Windows 10 **Start** menu and click **ODBC Data Sources (64-bit)** to open it.
 
 ### Adding the User DSN
@@ -74,7 +78,7 @@ Before an application uses the openLooKeng ODBC driver, the data source DSN must
 3. The openLooKeng ODBC Driver configuration page is displayed. On the welcome page, enter the name of the DSN to be created in the **Name** text box, enter the additional description of the DSN in the **Description** text box, and click **Next**.
 
 4. The second page contains the following six text boxes. The functions and usage are as follows:
-   
+
    | Text Box| Description|
    |----------|----------|
    | Connect URL| IP address and port number of the openLooKeng server to be connected.|
@@ -86,7 +90,7 @@ Before an application uses the openLooKeng ODBC driver, the data source DSN must
 
    Set the parameters on the second page, and then click **Test DSN**. After the system displays a message indicating that the operation is successful, click **Next**.
 
-5. In the **Statement(s)** text box on page 3, enter the initial statement sent after the connection to the openLooKeng server is established. After **Debug** is selected, the driver creates a debugging log file named **MAODBC.LOG** in **C:\\Users\\***current user***\\AppData\\Local\\Temp** to record openLooKeng ODBC driver debugging information. Click **Finish**.
+5. In the **Statement(s)** text box on page 3, enter the initial statement sent after the connection to the openLooKeng server is established. After **Debug** is selected, the driver creates a debugging log file named **MAODBC.LOG** in **%TMP%** to record openLooKeng ODBC driver debugging information. After you click **Test DSN** on page 2, user can configure the connection character set from the **Character Set** drop-down box. Select **Enable automatic reconnect**, when the system is sending messages, it automatically reconnects with the server upon a connection failure. (The automatic reconnection function does not ensure transaction consistency. Exercise caution when enabling this function). Click **Finish**.
 
 ### Configuring the ODBC Connection for the DSN
 
@@ -119,7 +123,7 @@ SSLTrustStorePath=F:/openLooKeng/hetuserver.jks
 # Java TrustStore password
 #SSLTrustStorePassword
 
-# Kerberos service name, fixed at "HTTP" 
+# Kerberos service name, fixed at "HTTP"
 KerberosRemoteServiceName=HTTP
 
 # Kerberos principal
@@ -156,5 +160,17 @@ The following table lists the data types supported by the driver, ODBC data type
 | `TIMESTAMP`| `SQL_TYPE_TIMESTAMP`|
 | `INTERVAL YEAR TO MONTH`| `SQL_VARCHAR`|
 | `INTERVAL DAY TO SECOND`| `SQL_VARCHAR`|
+| `ARRAY` | `SQL_VARCHAR` |
+| `MAP` | `SQL_VARCHAR` |
+| `ROW` | `SQL_VARCHAR` |
+| `JSON` | `SQL_VARCHAR` |
 
 You can obtain the details about data types by calling **SQLGetTypInfo** in **Catalog Functions**.
+
+## Character Set
+
+The openLooKeng ODBC driver supports **both ANSI and Unicode** applications. The default connection character set is the system default character set for ANSI applications and utf8 for Unicode applications. If the character set used by the application is different from the above-mentioned character set,  it may cause garbled characters. For this, the user should specify the connection character set to adapt to the character set required by the application. The corresponding configuration of the connection character set is described as follows.
+
+When calling the ODBC API to retrieve data, if bound to the SQL_C_WCHAR C data type buffer, the driver will return the Unicode encoded result for both ANSI and Unicode applications. When bound to the SQL_C_CHAR C data type buffer, by deafult, the driver will return to the ANSI application the result  encoded in system default character set, and for Unicode application the driver will return the result encoded in utf8. If the encoding character set used by the application does not match the default, the result may be garbled. To this end, the user should configure the connection character set to specify the encoding of the result. For example, if the application has garbled Chinese characters, you can try to configure the connection character set to GBK or GB2312.
+
+While configuring data source all connection character sets supported by the openLooKeng ODBC driver can be set in the **Character Set** drop-down box on the page 3 of the User interface. User can select the connection character from the drop-down box after the **Test DSN** is success.

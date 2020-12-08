@@ -1,4 +1,3 @@
-
 # openLooKeng ODBC用户手册
 
 ## 总览
@@ -9,13 +8,13 @@
 
 ODBC(Open Database Connectivity  开放数据连接)是微软提出的一个能让应用访问不同DBMS的互操作接口协议，其定义了一个通用的数据库访问机制并提供了一组访问数据库的应用程序编程接口(ODBC API)以简化客户端和不同DBMS间的互操作。
 
-ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKeng的ODBC驱动程序，符合ODBC 3.x的核心级（Core Level）一致性规范。
+ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKeng的ODBC驱动程序，符合ODBC 3.5的核心级（Core Level）一致性规范。
 
 ### 先决条件
 
 **使用本产品需要具备以下知识：**
 
-* ANSI结构化查询语言（SQL） 
+* ANSI结构化查询语言（SQL）
 
 * [ODBC程序员参考文档](https://docs.microsoft.com/en-us/sql/odbc/reference/odbc-programmer-s-reference?view=sql-server-ver15)
 
@@ -24,6 +23,8 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 **本产品支持以下版本:**
 
 - Winodows 10 64bit
+
+- Winodows Server 2016 64bit
 
 > 其他版本的Windows系统未经过严格测试，用户可以自己尝试，本产品不做任何质量保证
 
@@ -35,15 +36,19 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 ### 配置需求
 
-* 本驱动只提供64位安装包，请确保系统为Windows 10 64bit
+安装本驱动的系统，需要满足如下要求：
 
-* 请确保安装磁盘具有超过100MB的可用磁盘空间
+* 请确保系统为如下系统：
+  * Windows 10 (64 bit)
+  * Windows Server 2016 (64 bit)
+  
+* 请确保安装磁盘具有超过180MB的可用磁盘空间
 
 ### 安装步骤
 
 安装本驱动前请确认当前具有管理员权限。
 
-1. 双击hetu-odbc-win64 .msi安装包，出现安装的欢迎界面，单击“Next”。
+1. 双击msi安装包，出现安装的欢迎界面，单击“Next”。
 2. 第二页为用户协议，勾选接受后单击“Next”。
 3. 第三页选择安装方式，建议选择“Complete”完整安装。
 4. 第四页选择安装路径，配置后单击“Next”。
@@ -90,7 +95,7 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
    完成第2页各输入框的填写并单击“Test DSN”按钮显示成功信息后，单击“Next”按钮
 
-5. 第3页Statement(s)输入框中可以输入在建立到openLooKeng服务器的连接后发送的初始语句，勾选“Debug”后驱动会在“C:\Users\\*当前用户*\AppData\Local\Temp”路径下创建名为“MAODBC.LOG”的调试日志文件，记录openLooKeng ODBC Driver的调试信息。最后在本页单击“Finishi”按钮完成DSN的配置与添加。
+5. 第3页Statement(s)输入框中可以输入在建立到openLooKeng服务器的连接后发送的初始语句，勾选“Debug”后驱动会在%TMP%路径下创建名为“MAODBC.LOG”的调试日志文件，记录openLooKeng ODBC Driver的调试信息，在第二页单击“Test DSN”成功后可以从“Character Set”下拉框中选择需要配置的连接字符集。勾选“Enable automatic reconnect”，在发送消息时如果连接已失效，将会自动与server重建连接(本功能无法对事务一致性提供保障，使用须谨慎)。最后在本页单击“Finish”按钮完成DSN的配置与添加。
 
 ### DSN配置ODBC连接
 
@@ -123,13 +128,13 @@ SSLTrustStorePath=F:/openLooKeng/hetuserver.jks
 # Java TrustStore密码
 #SSLTrustStorePassword
 
-# Kerberos服务名称，固定为HTTP 
+# Kerberos服务名称，固定为HTTP
 KerberosRemoteServiceName=HTTP
 
 # Kerberos principal
 KerberosPrincipal=test
 
-# 访问数据源用户的krb5配置文件 
+# 访问数据源用户的krb5配置文件
 KerberosConfigPath=F:/openLooKeng/krb5.conf
 
 # 访问数据源用户的keytab配置文件
@@ -142,26 +147,37 @@ KerberosKeytabPath=F:/openLooKeng/user.keytab
 
 ## 驱动支持的数据类型
 
-本驱动支持的数据类型与对应的ODBC数据类型及openLooKeng数据类型如下：
+本驱动支持的数据类型与对应的ODBC数据类型如下：
 
-|   openLooKeng数据类型    |     ODBC数据类型     |
-| :----------------------: | :------------------: |
-|        `BOOLEAN`         |      `SQL_BIT`       |
-|        `TINYINT`         |    `SQL_TINYINT`     |
-|        `SMALLINT`        |    `SQL_SMALLINT`    |
-|        `INTEGER`         |    `SQL_INTEGER`     |
-|         `BIGINT`         |     `SQL_BIGINT`     |
-|          `REAL`          |      `SQL_REAL`      |
-|         `DOUBLE`         |     `SQL_DOUBLE`     |
-|        `DECIMAL`         |    `SQL_DECIMAL`     |
-|          `CHAR`          |      `SQL_CHAR`      |
-|        `VARCHAR`         |    `SQL_VARCHAR`     |
-|       `VARBINARY`        |   `SQL_VARBINARY`    |
-|          `DATE`          |   `SQL_TYPE_DATE`    |
-|          `TIME`          |   `SQL_TYPE_TIME`    |
-|       `TIMESTAMP`        | `SQL_TYPE_TIMESTAMP` |
-| `INTERVAL YEAR TO MONTH` |    `SQL_VARCHAR`     |
-| `INTERVAL DAY TO SECOND` |    `SQL_VARCHAR`     |
+| openLooKeng数据类型   |       ODBC数据类型         |
+| :------------------: | :----------------------: |
+|    `BOOLEAN`         |    `SQL_BIT`             |
+|    `TINYINT`         |    `SQL_TINYINT`         |
+|    `SMALLINT`        |    `SQL_SMALLINT`        |
+|    `INTEGER`         |    `SQL_INTEGER`         |
+|    `BIGINT`          |    `SQL_BIGINT`          |
+|    `REAL`            |    `SQL_REAL`            |
+|    `DOUBLE`          |    `SQL_DOUBLE`          |
+|    `DECIMAL`         |    `SQL_DECIMAL`         |
+|    `CHAR`            |    `SQL_CHAR`            |
+|    `VARCHAR`         |    `SQL_VARCHAR`         |
+|    `VARBINARY`       |    `SQL_VARBINARY`       |
+|    `DATE`            |    `SQL_TYPE_DATE`       |
+|    `TIME`            |    `SQL_TYPE_TIME`       |
+|    `TIMESTAMP`       |    `SQL_TYPE_TIMESTAMP`  |
+|`INTERVAL YEAR TO MONTH`|  `SQL_VARCHAR`         |
+|`INTERVAL DAY TO SECOND`|  `SQL_VARCHAR`         |
+|`ARRAY`| `SQL_VARCHAR` |
+|`MAP`| `SQL_VARCHAR` |
+|`ROW`| `SQL_VARCHAR` |
+|`JSON`| `SQL_VARCHAR` |
 
 数据类型的详细信息用户可以通过调用Catalog Functions中的SQLGetTypInfo获得
 
+## 字符集
+
+本驱动同时支持ANSI与Unicode应用，默认的连接字符集对于ANSI应用为系统默认字符集，对于Unicode应用为utf8编码。如果应用使用的字符集与上述默认字符集不同可能会出现乱码，对此用户应该指定连接字符集使之与应用所需的字符集相适应。下面对连接字符集的相应配置进行说明。
+
+在调用ODBC API获取数据时，若绑定到SQL_C_WCHAR类型的缓冲区，无论对ANSI还是Unicode应用驱动都会返回Unicode编码的结果，而绑定到SQL_C_CHAR类型的缓冲区时在默认情况下驱动会对ANSI应用返回按系统默认字符集编码的结果，对Unicode应用会返回按utf8编码的结果。若应用采用的编码与默认不符，可能会造成结果乱码，为此用户应通过配置连接字符集以指定结果的编码。例如若应用出现中文乱码的情况，可以尝试将连接字符集配置为GBK或者GB2312。
+
+当前本驱动所支持的所有连接字符集都可以在配置数据源的UI界面第三页中的“Character Set”下拉框中进行设置，用户可以在“Test DSN”成功后跟据自身需求从下拉框中选择连接字符集。
