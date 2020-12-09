@@ -140,7 +140,7 @@ public class SplitFiltering
 
                         if (splitIndices == null || splitIndices.size() == 0) {
                             // no index found, keep split
-                            return true;
+                            continue;
                         }
 
                         // Group each type of index together and make sure they are sorted in ascending order
@@ -168,6 +168,10 @@ public class SplitFiltering
                                 allIndices.put(col, indicesOfCol);
                             }
                         }
+                    }
+
+                    if (allIndices.isEmpty()) {
+                        return true;
                     }
 
                     return indexerManager.getIndexFilter(allIndices).matches(expression);

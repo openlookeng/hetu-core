@@ -777,6 +777,12 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitCreateIndex(CreateIndex node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
         protected Scope visitDropCache(DropCache node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);

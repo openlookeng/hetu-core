@@ -612,9 +612,6 @@ class QueryPlanner
             return subPlan;
         }
 
-        // in order to create index, we need page metadata from the connector
-        session.setPageMetadataEnabled(true);
-
         // rewrite sub queries
         CreateIndex createIndex = (CreateIndex) originalStatement;
         String tableName = MetadataUtil.createQualifiedObjectName(session, originalStatement, createIndex.getTableName()).toString();

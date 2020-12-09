@@ -89,7 +89,7 @@ public class IndexRecordManager
                 }
                 catch (Exception e) {
                     throw new IllegalArgumentException(
-                            "Error reading index record. Index record storage has been updated. Please delete old index directory and recreate the indices.");
+                            "Error reading index record. If you have recently updated server, please delete old index directory and recreate the indices.", e);
                 }
                 cache = records.build();
                 cacheLastModifiedTime = modifiedTime;

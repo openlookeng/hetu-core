@@ -126,6 +126,11 @@ public class CreateIndexOperator
 
         // only one operator needs to create the record
         if (!recordCreated.getAndSet(true)) {
+            if (levelWriter.isEmpty() && persistBy.isEmpty()) {
+                // table scan is empty. no data scanned from table. addInput() has never been called.
+                throw new IllegalStateException("The table is empty. No index will be created.");
+            }
+
             // update metadata
             IndexClient indexClient = heuristicIndexerManager.getIndexClient();
             try {
