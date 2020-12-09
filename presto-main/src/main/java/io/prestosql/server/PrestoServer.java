@@ -33,6 +33,7 @@ import io.airlift.tracetoken.TraceTokenModule;
 import io.prestosql.catalog.DynamicCatalogScanner;
 import io.prestosql.catalog.DynamicCatalogStore;
 import io.prestosql.discovery.HetuDiscoveryModule;
+import io.prestosql.dynamicfilter.CrossRegionDynamicFilterListener;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.dynamicfilter.DynamicFilterListener;
 import io.prestosql.eventlistener.EventListenerManager;
@@ -66,6 +67,7 @@ import java.nio.file.Paths;
 
 import static io.prestosql.server.PrestoSystemRequirements.verifyJvmRequirements;
 import static io.prestosql.server.PrestoSystemRequirements.verifySystemTimeIsReasonable;
+import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTERS;
 import static io.prestosql.utils.DynamicFilterUtils.MERGED_DYNAMIC_FILTERS;
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 import static java.util.Objects.requireNonNull;
@@ -210,5 +212,6 @@ public class PrestoServer
             return;
         }
         stateStoreListenerManager.addStateStoreListener(new DynamicFilterListener(dynamicFilterCacheManager), MERGED_DYNAMIC_FILTERS);
+        stateStoreListenerManager.addStateStoreListener(new CrossRegionDynamicFilterListener(dynamicFilterCacheManager), CROSS_REGION_DYNAMIC_FILTERS);
     }
 }

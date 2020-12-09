@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -91,6 +92,7 @@ public class TestDynamicFiltersCollector
         stateStoreListenerManager.addStateStoreListener(new DynamicFilterListener(dynamicFilterCacheManager), MERGED_DYNAMIC_FILTERS);
         LocalDynamicFiltersCollector collector = new LocalDynamicFiltersCollector(
                 taskContext,
+                Optional.empty(),
                 dynamicFilterCacheManager);
         TableScanNode tableScan = mock(TableScanNode.class);
         when(tableScan.getAssignments()).thenReturn(ImmutableMap.of(new Symbol(columnName), columnHandle));
@@ -107,6 +109,7 @@ public class TestDynamicFiltersCollector
         // get available dynamic filter and verify it
         Map<ColumnHandle, DynamicFilter> dynamicFilters = collector.getDynamicFilters(tableScan);
         assertEquals(dynamicFilters.size(), 1, "there should be a new dynamic filter");
+        assertEquals(dynamicFilters.size(), 1);
         DynamicFilter dynamicFilter = dynamicFilters.get(columnHandle);
         assertTrue(dynamicFilter instanceof HashSetDynamicFilter, "new dynamic filter should be hashset");
         assertEquals(dynamicFilter.getSize(), valueSet.size(), "new dynamic filter should have correct size");

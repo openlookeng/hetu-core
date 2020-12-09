@@ -15,12 +15,10 @@
 package io.prestosql.operator.dynamicfilter;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.statestore.StateCollection;
-import io.prestosql.spi.statestore.StateMap;
-import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
@@ -28,8 +26,6 @@ import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.statestore.MockStateMap;
-import io.prestosql.statestore.StateStoreProvider;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -38,38 +34,34 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
+import static io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter.convertBloomFilterToByteArray;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-public class TestDynamicFilterOperator
+public class TestCrossRegionDynamicFilterOperator
 {
     private AtomicInteger operatorId = new AtomicInteger();
     private PlanNodeId planNodeId = new PlanNodeId("123456");
-    private String queryId = "query-123456";
     private ScheduledExecutorService executor = newSingleThreadScheduledExecutor(daemonThreadsNamed("test-bloom-filter-operator-%s"));
 
     @Test
     public void testBloomFilterWithoutValue()
     {
         List<Type> types = ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR);
-        StateStoreProvider stateStoreProvider = createStateStore();
-        DynamicFilterOperator operator = createBloomFilterOperator(stateStoreProvider);
+        String queryId = "query-123456";
+        DynamicFilterCacheManager dynamicFilterCacheManager = new DynamicFilterCacheManager();
+        CrossRegionDynamicFilterOperator operator = createBloomFilterOperator(queryId, dynamicFilterCacheManager);
         assertFalse(operator.isFinished());
 
         List<Page> pages = rowPagesBuilder(types)
@@ -98,11 +90,11 @@ public class TestDynamicFilterOperator
     public void testBloomFilter()
     {
         List<Type> types = ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR);
-        StateStoreProvider stateStoreProvider = createStateStore();
-        DynamicFilterOperator operator = createBloomFilterOperator(stateStoreProvider);
+        String queryId = "query-123456-2";
+        DynamicFilterCacheManager dynamicFilterCacheManager = new DynamicFilterCacheManager();
+        CrossRegionDynamicFilterOperator operator = createBloomFilterOperator(queryId, dynamicFilterCacheManager);
 
-        StateMap<String, byte[]> mockStateMap = (StateMap<String, byte[]>) stateStoreProvider.getStateStore().createStateCollection(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION, StateCollection.Type.MAP);
-        addBloomFilter("orderId", ImmutableList.of("10001"), mockStateMap);
+        addBloomFilter("orderId", ImmutableList.of("10001"), dynamicFilterCacheManager, queryId);
 
         List<Page> pages = rowPagesBuilder(types)
                 .row("10001", "0001")
@@ -123,12 +115,12 @@ public class TestDynamicFilterOperator
     public void testMultipleFilters()
     {
         List<Type> types = ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR);
-        StateStoreProvider stateStoreProvider = createStateStore();
-        DynamicFilterOperator operator = createBloomFilterOperator(stateStoreProvider);
+        String queryId = "query-123456-3";
+        DynamicFilterCacheManager dynamicFilterCacheManager = new DynamicFilterCacheManager();
+        CrossRegionDynamicFilterOperator operator = createBloomFilterOperator(queryId, dynamicFilterCacheManager);
 
-        StateMap<String, byte[]> mockStateMap = (StateMap<String, byte[]>) stateStoreProvider.getStateStore().createStateCollection(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION, StateCollection.Type.MAP);
-        addBloomFilter("orderId", ImmutableList.of("10003", "10004"), mockStateMap);
-        addBloomFilter("custKey", ImmutableList.of("0001", "0002"), mockStateMap);
+        addBloomFilter("orderId", ImmutableList.of("10003", "10004"), dynamicFilterCacheManager, queryId);
+        addBloomFilter("custKey", ImmutableList.of("0001", "0002"), dynamicFilterCacheManager, queryId);
 
         List<Page> pages = rowPagesBuilder(types)
                 .row("10001", "0001")
@@ -142,33 +134,22 @@ public class TestDynamicFilterOperator
         assertEquals(page.getPositionCount(), 0);
     }
 
-    private DynamicFilterOperator createBloomFilterOperator(StateStoreProvider stateStoreProvider)
+    private CrossRegionDynamicFilterOperator createBloomFilterOperator(String queryId, DynamicFilterCacheManager dynamicFilterCacheManager)
     {
         int filterOperatorId = operatorId.getAndIncrement();
-        DynamicFilterOperator.DynamicFilterOperatorFactory factory = new DynamicFilterOperator.DynamicFilterOperatorFactory(
+        CrossRegionDynamicFilterOperator.CrossRegionDynamicFilterOperatorFactory factory = new CrossRegionDynamicFilterOperator.CrossRegionDynamicFilterOperatorFactory(
                 filterOperatorId,
                 planNodeId,
                 queryId,
                 createSymbolList(),
                 createTypeProvider(),
-                stateStoreProvider, Optional.empty());
+                dynamicFilterCacheManager,
+                new ArrayList<>());
         DriverContext driverContext = createTaskContext(executor, executor, TEST_SESSION)
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
 
-        return (DynamicFilterOperator) factory.createOperator(driverContext);
-    }
-
-    private StateStoreProvider createStateStore()
-    {
-        StateCollection mockStateMap = new MockStateMap<Integer, byte[]>("test", new HashMap<>());
-        StateStoreProvider stateStoreProvider = mock(StateStoreProvider.class);
-        StateStore stateStore = mock(StateStore.class);
-        when(stateStore.getStateCollection(anyString())).thenReturn(mockStateMap);
-        when(stateStore.createStateCollection(anyString(), any())).thenReturn(mockStateMap);
-        when(stateStoreProvider.getStateStore()).thenReturn(stateStore);
-
-        return stateStoreProvider;
+        return (CrossRegionDynamicFilterOperator) factory.createOperator(driverContext);
     }
 
     private static List<Symbol> createSymbolList()
@@ -192,14 +173,20 @@ public class TestDynamicFilterOperator
         return TypeProvider.viewOf(types);
     }
 
-    private static void addBloomFilter(String column, List<String> values, StateMap map)
+    private void addBloomFilter(String column, List<String> values, DynamicFilterCacheManager dynamicFilterCacheManager, String queryId)
     {
         BloomFilter bloomFilter = new BloomFilter(1024 * 1024, 0.005);
         values.forEach(value -> bloomFilter.add(value.getBytes()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             bloomFilter.writeTo(out);
-            map.put(column, out.toByteArray());
+            Map<String, byte[]> bloomFilters = dynamicFilterCacheManager.getBloomFitler(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION);
+            if (bloomFilters == null) {
+                bloomFilters = new HashMap<>();
+            }
+            bloomFilters.put(column, convertBloomFilterToByteArray(bloomFilter));
+
+            dynamicFilterCacheManager.cacheBloomFilters(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION, bloomFilters);
         }
         catch (IOException e) {
             throw new RuntimeException("error to write bloom filter into byte");

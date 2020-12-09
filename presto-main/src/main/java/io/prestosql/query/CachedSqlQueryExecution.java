@@ -77,6 +77,7 @@ import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.DefaultTraversalVisitor;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.transaction.TransactionId;
 import io.prestosql.utils.OptimizerUtils;
 
@@ -108,12 +109,12 @@ public class CachedSqlQueryExecution
                                    QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
                                    StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
                                    DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
-                                   HeuristicIndexerManager heuristicIndexerManager)
+                                   HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider)
     {
         super(preparedQuery, stateMachine, slug, metadata, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
-                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager);
+                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider);
         this.cache = cache;
         this.beginTableWrite = new BeginTableWrite(metadata);
     }

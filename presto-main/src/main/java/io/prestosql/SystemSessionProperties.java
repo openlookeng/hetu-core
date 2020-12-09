@@ -141,7 +141,7 @@ public final class SystemSessionProperties
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE = "dynamic_filtering_max_per_driver_size";
     public static final String DYNAMIC_FILTERING_BLOOM_FILTER_FPP = "dynamic_filtering_bloom_filter_fpp";
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
-    public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
+    public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross_region_dynamic_filter_enabled";
     public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
     public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
     public static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
