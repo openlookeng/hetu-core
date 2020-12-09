@@ -536,7 +536,11 @@ Heuristic index is external index module that which can be used to filter to out
  
 > -   **Type** `string` 
 >
-> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
+> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable). 
+> 
+> `LOCAL` filesystem type should only be used during testing or in single node clusters.
+> 
+> `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster. All nodes should be configured to use the same filesystem profile.
 
 ## Execution Plan Cache Properties
 

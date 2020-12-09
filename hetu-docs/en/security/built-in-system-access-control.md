@@ -182,3 +182,30 @@ For example, if you want to allow only the user `admin` and `alice` to update th
   ]
 }
 ```
+
+### Heuristic Index Rules
+
+The rules govern the Heuristic Index operations particular users can perform.
+
+Each rule is composed of the following fields:
+
+- `user` (required): regex to match against user name. Defaults to `.*`.
+- `privileges` (optional): list of privileges granted to user (`ALL`, `SHOW`, `CREATE`, `DROP`, `RENAME`, and `UPDATE`). Defaults to `ALL`.
+
+For example, here user `tom` can only execute `SHOW INDEX` or `CREATE INDEX` statements.
+But user `admin` can execute all statements `CREATE INDEX`, `SHOW INDEX`, `DROP INDEX`, etc.
+
+```json
+{
+  "indexAccess": [
+    {
+      "user": "tom",
+      "privileges": ["SHOW", "CREATE"]
+    },
+    {
+      "user": "admin",
+      "privileges": ["ALL"]
+    }
+  ]
+}
+```
