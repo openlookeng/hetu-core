@@ -402,12 +402,14 @@ public class GroupedTopNBuilder
         }
     }
 
-    private interface RowHeap
+    private abstract static class RowHeap
+            extends ObjectHeapPriorityQueue<Row>
     {
-        long DEFAULT_INSTANCE_SIZE = ClassLayout.parseClass(RowHeap.class).instanceSize();
-        long ROW_ENTRY_SIZE = ClassLayout.parseClass(Row.class).instanceSize();
+        static final long ROW_ENTRY_SIZE = ClassLayout.parseClass(Row.class).instanceSize();
 
-        class RowList
+        protected int topN;
+
+        static class RowList
         {
             List<Row> rows;
             int virtualSize;
@@ -430,48 +432,66 @@ public class GroupedTopNBuilder
             }
         }
 
-        void enqueue(Row row);
+        public RowHeap(Comparator<Row> comparator, int topN)
+        {
+            super(1, comparator);
+            this.topN = topN;
+        }
 
-        Row dequeue();
+        public void enqueue(Row row)
+        {
+            super.enqueue(row);
+        }
 
-        List<Row> tryRemoveFirst(boolean isEqual, Row newRow);
+        public Row dequeue()
+        {
+            return super.dequeue();
+        }
 
-        boolean isNotFull();
+        abstract List<Row> tryRemoveFirst(boolean isEqual, Row newRow);
 
-        boolean isEmpty();
+        public boolean isNotFull()
+        {
+            return super.size() < topN;
+        }
 
-        Row first();
+        public boolean isEmpty()
+        {
+            return super.isEmpty();
+        }
 
-        void clear();
+        public Row first()
+        {
+            return super.first();
+        }
 
-        int size();
+        public void clear()
+        {
+            super.clear();
+        }
 
-        long getEstimatedSizeInBytes();
+        public int size()
+        {
+            return size;
+        }
+
+        abstract long getEstimatedSizeInBytes();
     }
 
     private static class RowNumberRowHeap
-            extends ObjectHeapPriorityQueue<Row>
-            implements RowHeap
+            extends RowHeap
     {
         static final long INSTANCE_SIZE = ClassLayout.parseClass(RowNumberRowHeap.class).instanceSize();
-        private final int topN;
 
         private RowNumberRowHeap(Comparator<Row> comparator, int topN)
         {
-            super(1, Ordering.from(comparator).reversed());
-            this.topN = topN;
+            super(Ordering.from(comparator).reversed(), topN);
         }
 
         @Override
         public List<Row> tryRemoveFirst(boolean isEqual, Row newRow)
         {
             return ImmutableList.of(dequeue());
-        }
-
-        @Override
-        public boolean isNotFull()
-        {
-            return super.size() < topN;
         }
 
         @Override
@@ -482,18 +502,15 @@ public class GroupedTopNBuilder
     }
 
     private static class DenseRankRowHeap
-            extends ObjectHeapPriorityQueue<Row>
-            implements RowHeap
+            extends RowHeap
     {
         static final long INSTANCE_SIZE = ClassLayout.parseClass(DenseRankRowHeap.class).instanceSize();
         private final TreeMap<Row, List<Row>> rowMaps;
-        private final int topN;
 
         public DenseRankRowHeap(Comparator<Row> comparator, int topN)
         {
-            super(1, Ordering.from(comparator).reversed());
+            super(Ordering.from(comparator).reversed(), topN);
             this.rowMaps = new TreeMap<>(Ordering.from(comparator).reversed());
-            this.topN = topN;
         }
 
         @Override
@@ -537,24 +554,6 @@ public class GroupedTopNBuilder
         }
 
         @Override
-        public boolean isNotFull()
-        {
-            return super.size() < topN;
-        }
-
-        @Override
-        public boolean isEmpty()
-        {
-            return super.isEmpty();
-        }
-
-        @Override
-        public Row first()
-        {
-            return super.first();
-        }
-
-        @Override
         public void clear()
         {
             super.clear();
@@ -580,33 +579,25 @@ public class GroupedTopNBuilder
     }
 
     private static class RankRowHeap
-            extends ObjectHeapPriorityQueue<Row>
-            implements RowHeap
+            extends RowHeap
     {
         static final long INSTANCE_SIZE = ClassLayout.parseClass(RankRowHeap.class).instanceSize();
         private final TreeMap<Row, RowList> rowMaps;
-        private final int topN;
 
         public RankRowHeap(Comparator<Row> comparator, int topN)
         {
-            super(1, Ordering.from(comparator).reversed());
+            super(Ordering.from(comparator).reversed(), topN);
             rowMaps = new TreeMap<>(Ordering.from(comparator).reversed());
-            this.topN = topN;
         }
 
+        @Override
         public void enqueue(Row row)
         {
             if (!rowMaps.containsKey(row)) {
                 rowMaps.put(row, new RowList());
             }
             rowMaps.get(row).addRow(row);
-
             super.enqueue(row);
-        }
-
-        public Row dequeue()
-        {
-            return super.dequeue();
         }
 
         public List<Row> tryRemoveFirst(boolean isEqual, Row newRow)
@@ -627,36 +618,11 @@ public class GroupedTopNBuilder
             return null;
         }
 
-        public boolean isNotFull()
-        {
-            return super.size() < topN;
-        }
-
-        public boolean isEmpty()
-        {
-            return super.isEmpty();
-        }
-
-        public Row first()
-        {
-            return super.first();
-        }
-
-        public Row getLast()
-        {
-            return super.last();
-        }
-
+        @Override
         public void clear()
         {
-            rowMaps.clear();
             super.clear();
-        }
-
-        @Override
-        public int size()
-        {
-            return super.size();
+            rowMaps.clear();
         }
 
         @Override
