@@ -190,7 +190,7 @@ public class HiveConfig
 
     private boolean tableCreatesWithLocationAllowed = true;
 
-    private boolean dynamicFilterPartitionFilteringEnabled;
+    private boolean dynamicFilterPartitionFilteringEnabled = true;
     private int dynamicFilteringRowFilteringThreshold = 2000;
 
     private boolean orcCacheStatsMetricCollectionEnabled;

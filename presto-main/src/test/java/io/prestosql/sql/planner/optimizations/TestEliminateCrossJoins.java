@@ -59,7 +59,7 @@ public class TestEliminateCrossJoins
 
     public TestEliminateCrossJoins()
     {
-        super(ImmutableMap.of(SystemSessionProperties.JOIN_REORDERING_STRATEGY, "ELIMINATE_CROSS_JOINS"));
+        super(ImmutableMap.of(SystemSessionProperties.JOIN_REORDERING_STRATEGY, "ELIMINATE_CROSS_JOINS", SystemSessionProperties.ENABLE_DYNAMIC_FILTERING, "false"));
     }
 
     @Test
