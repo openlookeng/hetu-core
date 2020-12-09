@@ -25,14 +25,16 @@ public class PartitionIndexHolder
     private final String partition;
     private final long maxLastUpdate;
     private final Map<String, Long> lastUpdated;
+    private final Map<String, String> resultMap;
 
-    public PartitionIndexHolder(Index index, String partition, Map<String, String> symbolTable, Map<String, Long> lastUpdated, long maxLastUpdate)
+    public PartitionIndexHolder(Index index, String partition, Map<String, String> symbolTable, Map<String, Long> lastUpdated, Map<String, String> resultMap, long maxLastUpdate)
     {
         this.index = index;
         this.symbolTable = symbolTable;
         this.lastUpdated = lastUpdated;
         this.maxLastUpdate = maxLastUpdate;
         this.partition = partition;
+        this.resultMap = resultMap;
     }
 
     public Index getIndex()
@@ -58,5 +60,10 @@ public class PartitionIndexHolder
     public String getPartition()
     {
         return this.partition;
+    }
+
+    public Map<String, String> getResultMap()
+    {
+        return this.resultMap;
     }
 }

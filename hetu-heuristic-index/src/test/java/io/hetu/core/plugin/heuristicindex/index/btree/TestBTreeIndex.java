@@ -16,6 +16,7 @@ package io.hetu.core.plugin.heuristicindex.index.btree;
 
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.KeyValue;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.LongLiteral;
@@ -27,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
@@ -45,10 +47,15 @@ public class TestBTreeIndex
         String value = "001:3,002:3,003:3,004:3,005:3,006:3,007:3,008:3,009:3,002:3,010:3,002:3,011:3,012:3,101:3,102:3,103:3,104:3,105:3,106:3,107:3,108:3,109:3,102:3,110:3,102:3,111:3,112:3";
         List<KeyValue> keyValues = new ArrayList<>();
         keyValues.add(new KeyValue("key1", value));
-        index.addKeyValues(keyValues);
+        Pair pair = new Pair("dummyCol", keyValues);
+        index.addKeyValues(Collections.singletonList(pair));
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
         ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
                 new StringLiteral("column"), new StringLiteral("key1"));
-        assertTrue(index.matches(comparisonExpression), "Key should exists");
+        assertTrue(readIndex.matches(comparisonExpression), "Key should exists");
         index.close();
     }
 
@@ -61,10 +68,15 @@ public class TestBTreeIndex
         List<KeyValue> keyValues = new ArrayList<>();
         Long key = Long.valueOf(1211231231);
         keyValues.add(new KeyValue(key, value));
-        index.addKeyValues(keyValues);
+        Pair pair = new Pair("dummyCol", keyValues);
+        index.addKeyValues(Collections.singletonList(pair));
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
         ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
                 new StringLiteral("column"), new LongLiteral(key.toString()));
-        assertTrue(index.matches(comparisonExpression), "Key should exists");
+        assertTrue(readIndex.matches(comparisonExpression), "Key should exists");
     }
 
     @Test
@@ -77,10 +89,15 @@ public class TestBTreeIndex
             Long key = Long.valueOf(100 + i);
             String value = "value" + i;
             keyValues.add(new KeyValue(key, value));
-            index.addKeyValues(keyValues);
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
         }
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
         ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new StringLiteral("column"), new LongLiteral("101"));
-        Iterator result = index.lookUp(comparisonExpression);
+        Iterator result = readIndex.lookUp(comparisonExpression);
         assertNotNull(result, "Result shouldn't be null");
         assertTrue(result.hasNext());
         assertEquals("value1", result.next().toString());
@@ -97,10 +114,15 @@ public class TestBTreeIndex
             Long key = Long.valueOf(100 + i);
             String value = "value" + i;
             keyValues.add(new KeyValue(key, value));
-            index.addKeyValues(keyValues);
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
         }
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
         BetweenPredicate betweenPredicate = new BetweenPredicate(new StringLiteral("column"), new LongLiteral("101"), new LongLiteral("110"));
-        Iterator result = index.lookUp(betweenPredicate);
+        Iterator result = readIndex.lookUp(betweenPredicate);
         assertNotNull(result, "Result shouldn't be null");
         assertTrue(result.hasNext());
         assertEquals("value1", result.next().toString());
@@ -123,7 +145,8 @@ public class TestBTreeIndex
             List<KeyValue> keyValues = new ArrayList<>();
             Long key = Long.valueOf(100 + i);
             keyValues.add(new KeyValue(key, value));
-            index.addKeyValues(keyValues);
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
         }
         File file = File.createTempFile("test-serialize-", UUID.randomUUID().toString());
         index.serialize(new FileOutputStream(file));
@@ -141,7 +164,8 @@ public class TestBTreeIndex
             List<KeyValue> keyValues = new ArrayList<>();
             Long key = Long.valueOf(100 + i);
             keyValues.add(new KeyValue(key, value));
-            index.addKeyValues(keyValues);
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
         }
         File file = File.createTempFile("test-serialize-", UUID.randomUUID().toString());
         index.serialize(new FileOutputStream(file));
@@ -155,5 +179,11 @@ public class TestBTreeIndex
         assertTrue(result.hasNext());
         assertEquals(value, result.next().toString());
         index.close();
+    }
+
+    private File getFile()
+            throws IOException
+    {
+        return File.createTempFile("Btreetest-", String.valueOf(System.nanoTime()));
     }
 }

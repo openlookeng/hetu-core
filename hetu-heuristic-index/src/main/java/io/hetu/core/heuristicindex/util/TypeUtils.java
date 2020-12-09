@@ -31,6 +31,7 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.Comparator;
 
 public class TypeUtils
 {
@@ -111,5 +112,25 @@ public class TypeUtils
         else {
             throw new UnsupportedOperationException("Not a valid type to create index: " + object.getClass());
         }
+    }
+
+    public static Comparator getComparator(String type)
+    {
+        switch (type) {
+            case "long":
+            case "Long":
+            case "Slice":
+            case "String":
+            case "int":
+            case "Integer":
+                return new Comparator<kotlin.Pair>() {
+                    @Override
+                    public int compare(kotlin.Pair o, kotlin.Pair t1)
+                    {
+                        return ((Comparable) o.getFirst()).compareTo((Comparable) t1.getFirst());
+                    }
+                };
+        }
+        throw new RuntimeException("Type is not supported");
     }
 }

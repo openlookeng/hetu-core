@@ -124,7 +124,8 @@ public class BitmapIndex
     }
 
     @Override
-    public boolean addValues(Map<String, List<Object>> values)
+    public boolean addValues(List<io.prestosql.spi.heuristicindex.Pair<String, List<Object>>> values)
+            throws IOException
     {
         checkClosed();
 
@@ -140,8 +141,7 @@ public class BitmapIndex
         }
 
         try {
-            String columnName = values.keySet().iterator().next();
-            List<Object> columnValues = values.get(columnName);
+            List<Object> columnValues = values.get(0).getSecond();
 
             Map<Object, ArrayList<Integer>> positions = new HashMap<>();
 

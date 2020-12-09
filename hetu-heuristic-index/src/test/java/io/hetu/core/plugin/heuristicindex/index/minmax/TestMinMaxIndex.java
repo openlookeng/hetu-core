@@ -15,8 +15,8 @@
 package io.hetu.core.plugin.heuristicindex.index.minmax;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.Expression;
@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 
 import static io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL;
@@ -40,10 +41,11 @@ public class TestMinMaxIndex
 {
     @Test
     public void testMatches()
+            throws IOException
     {
         MinMaxIndex minMaxIndex = new MinMaxIndex();
         List<Object> minmaxValues = ImmutableList.of(1L, 10L, 100L, 1000L);
-        minMaxIndex.addValues(ImmutableMap.of("testColumn", minmaxValues));
+        minMaxIndex.addValues(Collections.singletonList(new Pair<>("testColumn", minmaxValues)));
 
         Expression expression1 = new SqlParser().createExpression("(testColumn < 0)", new ParsingOptions());
         Expression expression2 = new SqlParser().createExpression("(testColumn = 1)", new ParsingOptions());

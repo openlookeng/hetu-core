@@ -18,6 +18,7 @@ package io.hetu.core.plugin.heuristicindex.index.minmax;
 import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
@@ -26,7 +27,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -70,16 +70,11 @@ public class MinMaxIndex
     }
 
     @Override
-    public Set<Level> getSupportedIndexLevels()
-    {
-        return ImmutableSet.of(Level.STRIPE);
-    }
-
-    @Override
-    public synchronized boolean addValues(Map<String, List<Object>> values)
+    public boolean addValues(List<Pair<String, List<Object>>> values)
+            throws IOException
     {
         // Currently expecting only one column
-        List<Object> columnIdxValue = values.values().iterator().next();
+        List<Object> columnIdxValue = values.get(0).getSecond();
         for (Object v : columnIdxValue) {
             if (v == null) {
                 continue;
@@ -101,6 +96,12 @@ public class MinMaxIndex
             }
         }
         return true;
+    }
+
+    @Override
+    public Set<Level> getSupportedIndexLevels()
+    {
+        return ImmutableSet.of(Level.STRIPE);
     }
 
     @Override

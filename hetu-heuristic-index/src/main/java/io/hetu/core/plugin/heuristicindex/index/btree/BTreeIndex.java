@@ -24,6 +24,7 @@ import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.InListExpression;
 import io.prestosql.sql.tree.InPredicate;
+import kotlin.Pair;
 import org.apache.commons.compress.utils.IOUtils;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
@@ -47,11 +48,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
+import static io.hetu.core.heuristicindex.util.TypeUtils.getComparator;
 
 public class BTreeIndex
         implements Index
@@ -66,6 +69,9 @@ public class BTreeIndex
     protected BTreeMap<String, String> properties;
     protected DB db;
     protected File file;
+    protected Set<Pair> source;
+    protected String keyType;
+    protected String valueType;
 
     public BTreeIndex()
     {
@@ -115,13 +121,25 @@ public class BTreeIndex
         throw new RuntimeException("Index is not supported for type: (" + type + ")");
     }
 
+    private synchronized void createBatchWriteDBMap(String keyType, String valueType)
+    {
+        if (dataMap == null) {
+            dataMap = db.treeMap("dataMap")
+                    .keySerializer(getSerializer(keyType))
+                    .valueSerializer(new SnappyCompressionSerializer(getSerializer(valueType)))
+                    .createFrom(source.iterator());
+            properties.put(KEY_TYPE, keyType);
+            properties.put(VALUE_TYPE, valueType);
+        }
+    }
+
     private synchronized void createDBMap(String keyType, String valueType)
     {
         if (dataMap == null) {
             dataMap = db.treeMap("dataMap")
                     .keySerializer(getSerializer(keyType))
                     .valueSerializer(new SnappyCompressionSerializer(getSerializer(valueType)))
-                    .createOrOpen();
+                    .open();
             properties.put(KEY_TYPE, keyType);
             properties.put(VALUE_TYPE, valueType);
         }
@@ -140,22 +158,28 @@ public class BTreeIndex
     }
 
     @Override
-    public boolean addValues(Map values)
+    public boolean addValues(List<io.prestosql.spi.heuristicindex.Pair<String, List<Object>>> values)
+            throws IOException
     {
-        throw new UnsupportedOperationException("multiple values is not supported currently");
+        throw new UnsupportedOperationException("AddValues is not supported for BTree. Use addKeyValues()");
     }
 
     @Override
-    public boolean addKeyValues(List<KeyValue> input)
+    public boolean addKeyValues(List<io.prestosql.spi.heuristicindex.Pair<String, List<KeyValue>>> input)
+            throws IOException
     {
         if (!isDBCreated.get()) {
             setupDB();
         }
-        if (dataMap == null) {
-            createDBMap(TypeUtils.extractType(input.get(0).getKey()), TypeUtils.extractType(input.get(0).getValue()));
+        if (source == null) {
+            keyType = TypeUtils.extractType(input.get(0).getSecond().get(0).getKey());
+            valueType = TypeUtils.extractType(input.get(0).getSecond().get(0).getValue());
+            source = new TreeSet<>(getComparator(keyType));
         }
         if (input.size() == 1) {
-            dataMap.put(input.get(0).getKey(), input.get(0).getValue());
+            for (KeyValue keyValue : input.get(0).getSecond()) {
+                source.add(new Pair(keyValue.getKey(), keyValue.getValue()));
+            }
         }
         else {
             throw new UnsupportedOperationException("Composite B Tree index is not supported");
@@ -248,6 +272,8 @@ public class BTreeIndex
     public void serialize(OutputStream out)
             throws IOException
     {
+        createBatchWriteDBMap(keyType, valueType);
+
         if (!db.isClosed()) {
             db.commit();
             dataMap.close();

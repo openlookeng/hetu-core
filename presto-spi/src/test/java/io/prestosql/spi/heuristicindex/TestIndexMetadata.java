@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static org.testng.Assert.assertEquals;
@@ -46,7 +45,8 @@ public class TestIndexMetadata
             }
 
             @Override
-            public boolean addValues(Map<String, List<Object>> values)
+            public boolean addValues(List<Pair<String, List<Object>>> values)
+                    throws IOException
             {
                 return false;
             }

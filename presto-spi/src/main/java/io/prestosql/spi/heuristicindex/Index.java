@@ -21,7 +21,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -63,7 +62,8 @@ public interface Index
      * @param values a map of columnName-columnValues
      * @return whether the values are successfully added
      */
-    boolean addValues(Map<String, List<Object>> values) throws IOException;
+    //boolean addValues(Map<String, List<Object>> values) throws IOException;
+    boolean addValues(List<Pair<String, List<Object>>> values) throws IOException;
 
     /**
      * Add a list of Key-Value pairs to the index. Only map-like Indexes will support this operation.
@@ -74,7 +74,7 @@ public interface Index
      * @param keyValues an ordered list of KeyValues to add to index, sorted ascending on Keys
      * @return true if operation was successful
      */
-    default boolean addKeyValues(List<KeyValue> keyValues)
+    default boolean addKeyValues(List<Pair<String, List<KeyValue>>> keyValues) throws IOException
     {
         throw new UnsupportedOperationException("This index does not support adding Key-Value pairs.");
     }
