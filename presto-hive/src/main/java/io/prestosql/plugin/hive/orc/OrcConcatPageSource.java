@@ -49,7 +49,10 @@ public class OrcConcatPageSource
                 do {
                     nextPage = source.getNextPage();
                     if (nextPage == null) {
-                        return endOfData();
+                        if (source.isFinished()) {
+                            return endOfData();
+                        }
+                        return null;
                     }
                 }
                 while (nextPage.getPositionCount() == 0);
