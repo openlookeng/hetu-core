@@ -181,3 +181,30 @@ security.refresh-period=1s
   ]
 }
 ```
+
+### 启发式索引控制规则
+
+这些规则控制了允许的启发式索引操作。
+
+每条规则由以下部分组成:
+
+- `user` (必要): 匹配用户名称的正则表达式。默认值：`.*`.
+- `privileges` (可选): 授予用户的权限 (`ALL`, `SHOW`, `CREATE`, `DROP`, `RENAME`, and `UPDATE`). 默认值 `ALL`.
+
+在下面这个例子中，用户`tom`只能执行`SHOW INDEX`或`CREATE INDEX`指令。
+用户`admin`可以执行`CREATE INDEX`, `SHOW INDEX`, `DROP INDEX`等所有指令.
+
+```json
+{
+  "indexAccess": [
+    {
+      "user": "tom",
+      "privileges": ["SHOW", "CREATE"]
+    },
+    {
+      "user": "admin",
+      "privileges": ["ALL"]
+    }
+  ]
+}
+```
