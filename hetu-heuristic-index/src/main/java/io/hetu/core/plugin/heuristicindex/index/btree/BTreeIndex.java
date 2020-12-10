@@ -148,7 +148,7 @@ public class BTreeIndex
     @Override
     public Set<Level> getSupportedIndexLevels()
     {
-        return Sets.newHashSet(Level.PARTITION);
+        return Sets.newHashSet(Level.PARTITION, Level.TABLE);
     }
 
     @Override
