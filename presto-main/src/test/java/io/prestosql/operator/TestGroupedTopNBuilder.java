@@ -119,20 +119,19 @@ public class TestGroupedTopNBuilder
 
         // add 4 rows for the first page and created three heaps with 1, 1, 2 rows respectively
         assertTrue(groupedTopNBuilder.processPage(input.get(0)).process());
-        // todo:the value of actualSizeInBytes should get from groupedTopNBuilder.getEstimatedSizeInBytes()
-        assertBuilderSize(groupByHash, types, ImmutableList.of(4), ImmutableList.of(1, 1, 2), 50304);
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4), ImmutableList.of(1, 1, 2), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         // add 1 row for the second page and the three heaps become 2, 1, 2 rows respectively
         assertTrue(groupedTopNBuilder.processPage(input.get(1)).process());
-        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1), ImmutableList.of(2, 1, 2), 50656);
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1), ImmutableList.of(2, 1, 2), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         // add 2 new rows for the third page (which will be compacted into two rows only) and we have four heaps with 2, 2, 2, 1 rows respectively
         assertTrue(groupedTopNBuilder.processPage(input.get(2)).process());
-        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2), ImmutableList.of(2, 2, 2, 1), 51096);
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2), ImmutableList.of(2, 2, 2, 1), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         // the last page will be discarded
         assertTrue(groupedTopNBuilder.processPage(input.get(3)).process());
-        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2, 0), ImmutableList.of(2, 2, 2, 1), 51096);
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2, 0), ImmutableList.of(2, 2, 2, 1), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         List<Page> output = ImmutableList.copyOf(groupedTopNBuilder.buildResult());
         assertEquals(output.size(), 1);
@@ -193,20 +192,19 @@ public class TestGroupedTopNBuilder
 
         // add 4 rows for the first page and created a single heap with 4 rows
         assertTrue(groupedTopNBuilder.processPage(input.get(0)).process());
-        // todo:the value of actualSizeInBytes should get from groupedTopNBuilder.getEstimatedSizeInBytes()
-        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4), ImmutableList.of(4), 17192);
+        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4), ImmutableList.of(4), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         // add 1 row for the second page and the heap is with 5 rows
         assertTrue(groupedTopNBuilder.processPage(input.get(1)).process());
-        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4, 1), ImmutableList.of(5), 17556);
+        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4, 1), ImmutableList.of(5), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         // update 1 new row from the third page (which will be compacted into a single row only)
         assertTrue(groupedTopNBuilder.processPage(input.get(2)).process());
-        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4, 1, 1), ImmutableList.of(5), 17880);
+        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4, 1, 1), ImmutableList.of(5), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         // the last page will be discarded
         assertTrue(groupedTopNBuilder.processPage(input.get(3)).process());
-        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4, 1, 1), ImmutableList.of(5), 17880);
+        assertBuilderSize(new NoChannelGroupByHash(), types, ImmutableList.of(4, 1, 1), ImmutableList.of(5), groupedTopNBuilder.getEstimatedSizeInBytes());
 
         List<Page> output = ImmutableList.copyOf(groupedTopNBuilder.buildResult());
         assertEquals(output.size(), 1);
@@ -401,8 +399,7 @@ public class TestGroupedTopNBuilder
         // Assert memory usage gradually goes up
         for (int i = 0; i < pageCount; i++) {
             assertTrue(groupedTopNBuilder.processPage(input.get(i)).process());
-            // todo:should check memory usage
-            // assertBuilderSize(groupByHash, types, Collections.nCopies(i + 1, rowCount), Collections.nCopies(rowCount, i + 1), groupedTopNBuilder.getEstimatedSizeInBytes());
+            assertBuilderSize(groupByHash, types, Collections.nCopies(i + 1, rowCount), Collections.nCopies(rowCount, i + 1), groupedTopNBuilder.getEstimatedSizeInBytes());
         }
 
         // Assert memory usage gradually goes down (i.e., proportional to the number of rows/pages we have produced)
@@ -411,8 +408,6 @@ public class TestGroupedTopNBuilder
         Iterator<Page> output = groupedTopNBuilder.buildResult();
         while (output.hasNext()) {
             remainingRows -= output.next().getPositionCount();
-            // todo:should check memory usage
-            /*
             assertBuilderSize(
                     groupByHash,
                     types,
@@ -422,7 +417,6 @@ public class TestGroupedTopNBuilder
                             .addAll(Collections.nCopies(rowCount - (remainingRows + pageCount - 1) / pageCount, 0))
                             .build(),
                     groupedTopNBuilder.getEstimatedSizeInBytes());
-             */
             outputPageCount++;
         }
         assertEquals(remainingRows, 0);
@@ -508,6 +502,8 @@ public class TestGroupedTopNBuilder
         private static final long INSTANCE_SIZE = ClassLayout.parseClass(TestRowHeap.class).instanceSize();
         // each Row is with two integers
         private static final long ROW_ENTRY_SIZE = 2 * Integer.BYTES + OBJECT_OVERHEAD;
+
+        private int topN;
 
         private TestRowHeap(int count)
         {

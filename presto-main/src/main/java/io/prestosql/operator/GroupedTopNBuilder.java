@@ -402,12 +402,14 @@ public class GroupedTopNBuilder
         }
     }
 
-    private interface RowHeap
+    private abstract static class RowHeap
+            extends ObjectHeapPriorityQueue<Row>
     {
-        static final long INSTANCE_SIZE = ClassLayout.parseClass(RowHeap.class).instanceSize();
         static final long ROW_ENTRY_SIZE = ClassLayout.parseClass(Row.class).instanceSize();
 
-        class RowList
+        protected int topN;
+
+        static class RowList
         {
             List<Row> rows;
             int virtualSize;
@@ -430,47 +432,66 @@ public class GroupedTopNBuilder
             }
         }
 
-        void enqueue(Row row);
+        public RowHeap(Comparator<Row> comparator, int topN)
+        {
+            super(1, comparator);
+            this.topN = topN;
+        }
 
-        Row dequeue();
+        public void enqueue(Row row)
+        {
+            super.enqueue(row);
+        }
 
-        List<Row> tryRemoveFirst(boolean isEqual, Row newRow);
+        public Row dequeue()
+        {
+            return super.dequeue();
+        }
 
-        boolean isNotFull();
+        abstract List<Row> tryRemoveFirst(boolean isEqual, Row newRow);
 
-        boolean isEmpty();
+        public boolean isNotFull()
+        {
+            return super.size() < topN;
+        }
 
-        Row first();
+        public boolean isEmpty()
+        {
+            return super.isEmpty();
+        }
 
-        void clear();
+        public Row first()
+        {
+            return super.first();
+        }
 
-        int size();
+        public void clear()
+        {
+            super.clear();
+        }
 
-        long getEstimatedSizeInBytes();
+        public int size()
+        {
+            return size;
+        }
+
+        abstract long getEstimatedSizeInBytes();
     }
 
     private static class RowNumberRowHeap
-            extends ObjectHeapPriorityQueue<Row>
-            implements RowHeap
+            extends RowHeap
     {
-        int topN;
+        static final long INSTANCE_SIZE = ClassLayout.parseClass(RowNumberRowHeap.class).instanceSize();
 
         private RowNumberRowHeap(Comparator<Row> comparator, int topN)
         {
-            super(1, Ordering.from(comparator).reversed());
-            this.topN = topN;
+            super(Ordering.from(comparator).reversed(), topN);
         }
 
         @Override
         public List<Row> tryRemoveFirst(boolean isEqual, Row newRow)
         {
             return ImmutableList.of(dequeue());
-        }
-
-        @Override
-        public boolean isNotFull()
-        {
-            return super.size() < topN;
         }
 
         @Override
@@ -481,17 +502,15 @@ public class GroupedTopNBuilder
     }
 
     private static class DenseRankRowHeap
-            implements RowHeap
+            extends RowHeap
     {
+        static final long INSTANCE_SIZE = ClassLayout.parseClass(DenseRankRowHeap.class).instanceSize();
         private final TreeMap<Row, List<Row>> rowMaps;
-        private ObjectHeapPriorityQueue<Row> objectHeapPriorityQueue;
-        private int topN;
 
         public DenseRankRowHeap(Comparator<Row> comparator, int topN)
         {
+            super(Ordering.from(comparator).reversed(), topN);
             this.rowMaps = new TreeMap<>(Ordering.from(comparator).reversed());
-            objectHeapPriorityQueue = new ObjectHeapPriorityQueue<>(Ordering.from(comparator).reversed());
-            this.topN = topN;
         }
 
         @Override
@@ -501,7 +520,7 @@ public class GroupedTopNBuilder
                 rowMaps.get(row).add(row);
             }
             else {
-                objectHeapPriorityQueue.enqueue(row);
+                super.enqueue(row);
                 List<Row> rows = new ArrayList<>();
                 rows.add(row);
                 rowMaps.put(row, rows);
@@ -511,12 +530,12 @@ public class GroupedTopNBuilder
         @Override
         public Row dequeue()
         {
-            Row row = objectHeapPriorityQueue.first();
+            Row row = super.first();
             List<Row> rowList = rowMaps.get(row);
             Row dequeueRow = rowList.remove(0);
 
             if (rowList.size() == 0) {
-                objectHeapPriorityQueue.dequeue();
+                super.dequeue();
                 rowMaps.remove(row);
             }
             return dequeueRow;
@@ -529,33 +548,15 @@ public class GroupedTopNBuilder
                 return null;
             }
             else {
-                Row row = objectHeapPriorityQueue.dequeue();
+                Row row = super.dequeue();
                 return rowMaps.remove(row);
             }
         }
 
         @Override
-        public boolean isNotFull()
-        {
-            return objectHeapPriorityQueue.size() < topN;
-        }
-
-        @Override
-        public boolean isEmpty()
-        {
-            return objectHeapPriorityQueue.isEmpty();
-        }
-
-        @Override
-        public Row first()
-        {
-            return objectHeapPriorityQueue.first();
-        }
-
-        @Override
         public void clear()
         {
-            objectHeapPriorityQueue.clear();
+            super.clear();
             rowMaps.clear();
         }
 
@@ -572,49 +573,43 @@ public class GroupedTopNBuilder
         @Override
         public long getEstimatedSizeInBytes()
         {
-            return INSTANCE_SIZE + size() * ROW_ENTRY_SIZE;
+            // Inaccurate memory statistics, excluding TreeMap
+            return INSTANCE_SIZE + sizeOf(heap) + size() * ROW_ENTRY_SIZE;
         }
     }
 
     private static class RankRowHeap
-            implements RowHeap
+            extends RowHeap
     {
+        static final long INSTANCE_SIZE = ClassLayout.parseClass(RankRowHeap.class).instanceSize();
         private final TreeMap<Row, RowList> rowMaps;
-        private final ObjectHeapPriorityQueue<Row> rowObjectHeapPriorityQueue;
-        private final int topN;
 
         public RankRowHeap(Comparator<Row> comparator, int topN)
         {
+            super(Ordering.from(comparator).reversed(), topN);
             rowMaps = new TreeMap<>(Ordering.from(comparator).reversed());
-            rowObjectHeapPriorityQueue = new ObjectHeapPriorityQueue<>(Ordering.from(comparator).reversed());
-            this.topN = topN;
         }
 
+        @Override
         public void enqueue(Row row)
         {
             if (!rowMaps.containsKey(row)) {
                 rowMaps.put(row, new RowList());
             }
             rowMaps.get(row).addRow(row);
-
-            rowObjectHeapPriorityQueue.enqueue(row);
-        }
-
-        public Row dequeue()
-        {
-            return rowObjectHeapPriorityQueue.dequeue();
+            super.enqueue(row);
         }
 
         public List<Row> tryRemoveFirst(boolean isEqual, Row newRow)
         {
             if (!isEqual) {
-                Row first = rowObjectHeapPriorityQueue.first();
+                Row first = super.first();
                 RowList rowList = rowMaps.get(first);
                 if (rowList != null) {
                     if (rowList.virtualRemoveRow() == 0) {
                         RowList removedRows = rowMaps.remove(first);
                         for (int i = 0; i < removedRows.rows.size(); i++) {
-                            rowObjectHeapPriorityQueue.dequeue();
+                            super.dequeue();
                         }
                         return removedRows.rows;
                     }
@@ -623,42 +618,18 @@ public class GroupedTopNBuilder
             return null;
         }
 
-        public boolean isNotFull()
-        {
-            return rowObjectHeapPriorityQueue.size() < topN;
-        }
-
-        public boolean isEmpty()
-        {
-            return rowObjectHeapPriorityQueue.isEmpty();
-        }
-
-        public Row first()
-        {
-            return rowObjectHeapPriorityQueue.first();
-        }
-
-        public Row getLast()
-        {
-            return rowObjectHeapPriorityQueue.last();
-        }
-
+        @Override
         public void clear()
         {
+            super.clear();
             rowMaps.clear();
-            rowObjectHeapPriorityQueue.clear();
-        }
-
-        @Override
-        public int size()
-        {
-            return rowObjectHeapPriorityQueue.size();
         }
 
         @Override
         public long getEstimatedSizeInBytes()
         {
-            return INSTANCE_SIZE + size() * ROW_ENTRY_SIZE;
+            // Inaccurate memory statistics, excluding TreeMap
+            return INSTANCE_SIZE + sizeOf(heap) + size() * ROW_ENTRY_SIZE;
         }
     }
 
