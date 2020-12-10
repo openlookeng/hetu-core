@@ -183,12 +183,12 @@ public class TestingRangerAccessControl
     }
 
     @Override
-    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
     }
 
     @Override
-    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
     }
 
@@ -198,7 +198,7 @@ public class TestingRangerAccessControl
     }
 
     @Override
-    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
     }
 

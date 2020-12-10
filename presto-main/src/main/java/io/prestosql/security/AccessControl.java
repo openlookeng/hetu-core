@@ -214,14 +214,14 @@ public interface AccessControl
      *
      * @throws io.prestosql.spi.security.AccessDeniedException if not allowed
      */
-    void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName);
+    void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
 
     /**
      * Check if identity is allowed to drop the specified index.
      *
      * @throws io.prestosql.spi.security.AccessDeniedException if not allowed
      */
-    void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName);
+    void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
 
     /**
      * Check if identity is allowed to rename the specified index.
@@ -233,12 +233,12 @@ public interface AccessControl
     /**
      * Check if identity is allowed to update the specified index.
      */
-    default void checkCanUpdateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName) {}
+    default void checkCanUpdateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName) {}
 
     /**
      * Check if identity is allowed to show the specified index.
      */
-    void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName);
+    void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
 
     /**
      * Check if identity is allowed to create the specified view.

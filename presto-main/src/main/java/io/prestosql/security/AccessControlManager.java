@@ -520,34 +520,34 @@ public class AccessControlManager
     }
 
     @Override
-    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
         requireNonNull(identity, "identity is null");
-        requireNonNull(indexName, "indexName is null");
+        requireNonNull(tableName, "tableName is null");
 
-        authenticationCheck(() -> checkCanAccessCatalog(identity, indexName.getCatalogName()));
+        authenticationCheck(() -> checkCanAccessCatalog(identity, tableName.getCatalogName()));
 
-        authorizationCheck(() -> systemAccessControl.get().checkCanCreateIndex(identity, indexName.asCatalogSchemaTableName()));
+        authorizationCheck(() -> systemAccessControl.get().checkCanCreateIndex(identity, tableName.asCatalogSchemaTableName()));
 
-        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, indexName.getCatalogName());
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
         if (entry != null) {
-            authorizationCheck(() -> entry.getAccessControl().checkCanCreateIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(indexName.getCatalogName()), indexName.asSchemaTableName()));
+            authorizationCheck(() -> entry.getAccessControl().checkCanCreateIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), tableName.asSchemaTableName()));
         }
     }
 
     @Override
-    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
         requireNonNull(identity, "identity is null");
-        requireNonNull(indexName, "indexName is null");
+        requireNonNull(tableName, "tableName is null");
 
-        authenticationCheck(() -> checkCanAccessCatalog(identity, indexName.getCatalogName()));
+        authenticationCheck(() -> checkCanAccessCatalog(identity, tableName.getCatalogName()));
 
-        authorizationCheck(() -> systemAccessControl.get().checkCanDropIndex(identity, indexName.asCatalogSchemaTableName()));
+        authorizationCheck(() -> systemAccessControl.get().checkCanDropIndex(identity, tableName.asCatalogSchemaTableName()));
 
-        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, indexName.getCatalogName());
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
         if (entry != null) {
-            authorizationCheck(() -> entry.getAccessControl().checkCanDropIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(indexName.getCatalogName()), indexName.asSchemaTableName()));
+            authorizationCheck(() -> entry.getAccessControl().checkCanDropIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), tableName.asSchemaTableName()));
         }
     }
 
@@ -569,36 +569,36 @@ public class AccessControlManager
     }
 
     @Override
-    public void checkCanUpdateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanUpdateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
         requireNonNull(identity, "identity is null");
-        requireNonNull(indexName, "indexName is null");
+        requireNonNull(tableName, "tableName is null");
 
-        authenticationCheck(() -> checkCanAccessCatalog(identity, indexName.getCatalogName()));
+        authenticationCheck(() -> checkCanAccessCatalog(identity, tableName.getCatalogName()));
 
-        authorizationCheck(() -> systemAccessControl.get().checkCanUpdateIndex(identity, indexName.asCatalogSchemaTableName()));
-        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, indexName.getCatalogName());
+        authorizationCheck(() -> systemAccessControl.get().checkCanUpdateIndex(identity, tableName.asCatalogSchemaTableName()));
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
         if (entry != null) {
-            authorizationCheck(() -> entry.getAccessControl().checkCanUpdateIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(indexName.getCatalogName()), indexName.asSchemaTableName()));
+            authorizationCheck(() -> entry.getAccessControl().checkCanUpdateIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), tableName.asSchemaTableName()));
         }
     }
 
     @Override
-    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
         requireNonNull(identity, "identity is null");
 
-        if (indexName == null) {
+        if (tableName == null) {
             authenticationCheck(() -> systemAccessControl.get().checkCanShowIndex(identity, null));
             return;
         }
 
-        authenticationCheck(() -> checkCanAccessCatalog(identity, indexName.getCatalogName()));
+        authenticationCheck(() -> checkCanAccessCatalog(identity, tableName.getCatalogName()));
 
-        authenticationCheck(() -> systemAccessControl.get().checkCanShowIndex(identity, indexName.asCatalogSchemaTableName()));
-        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, indexName.getCatalogName());
+        authenticationCheck(() -> systemAccessControl.get().checkCanShowIndex(identity, tableName.asCatalogSchemaTableName()));
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
         if (entry != null) {
-            authenticationCheck(() -> entry.getAccessControl().checkCanShowIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(indexName.getCatalogName()), indexName.asSchemaTableName()));
+            authenticationCheck(() -> entry.getAccessControl().checkCanShowIndex(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), tableName.asSchemaTableName()));
         }
     }
 

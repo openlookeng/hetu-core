@@ -252,15 +252,15 @@ public abstract class ForwardingConnectorAccessControl
     }
 
     @Override
-    public void checkCanCreateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    public void checkCanCreateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
     {
-        delegate().checkCanCreateIndex(transactionHandle, identity, indexName);
+        delegate().checkCanCreateIndex(transactionHandle, identity, tableName);
     }
 
     @Override
-    public void checkCanDropIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
+    public void checkCanDropIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
     {
-        delegate().checkCanDropIndex(transactionHandle, identity, indexName);
+        delegate().checkCanDropIndex(transactionHandle, identity, tableName);
     }
 
     @Override

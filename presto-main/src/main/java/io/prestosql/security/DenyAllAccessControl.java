@@ -205,15 +205,15 @@ public class DenyAllAccessControl
     }
 
     @Override
-    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
-        denyCreateIndex(indexName.toString());
+        denyCreateIndex(tableName.toString());
     }
 
     @Override
-    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
-        denyDropIndex(indexName.toString());
+        denyDropIndex(tableName.toString());
     }
 
     @Override
@@ -223,9 +223,9 @@ public class DenyAllAccessControl
     }
 
     @Override
-    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
-        denyShowIndex(indexName.toString());
+        denyShowIndex(tableName.toString());
     }
 
     @Override
