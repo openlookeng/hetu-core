@@ -343,8 +343,13 @@ class AddCatalog extends React.Component {
         CatalogActions.addCatalog(formData).then((result) => {
             let newState = this.state;
             if (!result.result) {
-                newState.errors["submissionError"] = "Error while adding catalog: " + result.message.split('\n', 1)[0];
-                this.setState(newState)
+                if(result.message.indexOf('Not Found (code: 404)') !==-1) {
+                    newState.errors["submissionError"] = "Error while adding catalog: service is not available. probably because 'catalog.dynamic-enabled' in the config.properties is set to false.";
+                    this.setState(newState)
+                } else {
+                    newState.errors["submissionError"] = "Error while adding catalog: " + result.message.split('\n', 1)[0];
+                    this.setState(newState)
+                }
             }
             else {
                 newState.errors["submissionSuccess"] = "Add catalog successful; Server message: " + result.message

@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 import React from "react";
 import Header from '../queryeditor/components/Header';
 import Footer from "../queryeditor/components/Footer";
+import StatusFooter from "../queryeditor/components/StatusFooter";
 import { formatDataSizeBytes } from "../utils";
 import NavigationMenu from "../NavigationMenu";
 import OverviewStore from "../overview/OverviewStore";
@@ -105,6 +107,9 @@ class NodesMain extends React.Component {
                             </div>
                         </div>
                     </div>
+                </div>
+                <div className='flex flex-row flex-initial statusFooter'>
+                    <StatusFooter />
                 </div>
                 <div className='flex flex-row flex-initial footer'>
                     <Footer />
