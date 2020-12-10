@@ -17,6 +17,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import com.google.common.net.HostAndPort;
 import com.google.inject.Injector;
 import com.google.inject.Key;
@@ -41,6 +42,8 @@ import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.dispatcher.DispatchManager;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
+import io.prestosql.dynamicfilter.DynamicFilterListener;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.QueryInfo;
 import io.prestosql.execution.QueryManager;
@@ -48,6 +51,7 @@ import io.prestosql.execution.SqlQueryManager;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.TaskManager;
 import io.prestosql.execution.resourcegroups.InternalResourceGroupManager;
+import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.memory.LocalMemoryManager;
@@ -64,6 +68,7 @@ import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.PasswordSecurityModule;
 import io.prestosql.server.NodeStateChangeHandler;
 import io.prestosql.server.PluginManager;
+import io.prestosql.server.ServerConfig;
 import io.prestosql.server.ServerMainModule;
 import io.prestosql.server.ShutdownAction;
 import io.prestosql.server.security.ServerSecurityModule;
@@ -74,11 +79,16 @@ import io.prestosql.split.SplitManager;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.Plan;
+import io.prestosql.statestore.EmbeddedStateStoreLauncher;
+import io.prestosql.statestore.StateStoreLauncher;
+import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.testing.ProcedureTester;
 import io.prestosql.testing.TestingAccessControlManager;
 import io.prestosql.testing.TestingEventListenerManager;
 import io.prestosql.testing.TestingWarningCollectorModule;
 import io.prestosql.transaction.TransactionManager;
+import io.prestosql.utils.HetuConfig;
 import org.weakref.jmx.guice.MBeanModule;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -88,6 +98,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -104,6 +115,7 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.discovery.client.ServiceAnnouncement.serviceAnnouncement;
+import static io.prestosql.utils.DynamicFilterUtils.MERGED_DYNAMIC_FILTERS;
 import static java.lang.Integer.parseInt;
 import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.Files.isDirectory;
@@ -142,6 +154,7 @@ public class TestingPrestoServer
     private final NodeStateChangeHandler nodeStateChangeHandler;
     private final ShutdownAction shutdownAction;
     private final boolean coordinator;
+    private StateStoreProvider stateStoreProvider;
 
     public static class TestShutdownAction
             implements ShutdownAction
@@ -322,6 +335,52 @@ public class TestingPrestoServer
         announcer.forceAnnounce();
 
         refreshNodes();
+    }
+
+    public void loadStateSotre()
+    {
+        try {
+            launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
+            stateStoreProvider = injector.getInstance(StateStoreProvider.class);
+            stateStoreProvider.loadStateStore();
+            // register dynamic filter listener
+            registerStateStoreListeners(
+                    injector.getInstance(StateStoreListenerManager.class),
+                    injector.getInstance(DynamicFilterCacheManager.class),
+                    injector.getInstance(ServerConfig.class),
+                    injector.getInstance(NodeSchedulerConfig.class));
+        }
+        catch (Exception e) {
+            // ignore
+        }
+    }
+
+    private static void launchEmbeddedStateStore(HetuConfig config, StateStoreLauncher launcher)
+            throws Exception
+    {
+        // Only launch embedded state store when enabled
+        if (config.isEmbeddedStateStoreEnabled()) {
+            if (launcher instanceof EmbeddedStateStoreLauncher) {
+                Set<String> ips = Sets.newHashSet(Arrays.asList("127.0.0.1"));
+                Map<String, String> stateStoreProperties = new HashMap<>();
+                stateStoreProperties.put("hazelcast.discovery.port", "5701");
+                stateStoreProperties.putIfAbsent("hazelcast.discovery.mode", "tcp-ip");
+                ((EmbeddedStateStoreLauncher) launcher).launchStateStore(ips, stateStoreProperties);
+            }
+            launcher.launchStateStore();
+        }
+    }
+
+    private static void registerStateStoreListeners(
+            StateStoreListenerManager stateStoreListenerManager,
+            DynamicFilterCacheManager dynamicFilterCacheManager,
+            ServerConfig serverConfig,
+            NodeSchedulerConfig nodeSchedulerConfig)
+    {
+        if (serverConfig.isCoordinator() && !nodeSchedulerConfig.isIncludeCoordinator()) {
+            return;
+        }
+        stateStoreListenerManager.addStateStoreListener(new DynamicFilterListener(dynamicFilterCacheManager), MERGED_DYNAMIC_FILTERS);
     }
 
     @Override

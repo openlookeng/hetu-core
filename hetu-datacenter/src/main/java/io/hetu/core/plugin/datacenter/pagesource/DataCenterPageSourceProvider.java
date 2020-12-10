@@ -49,7 +49,8 @@ public class DataCenterPageSourceProvider
         implements ConnectorPageSourceProvider
 {
     private static final int STRING_CAPACITY = 16;
-    private static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
+    private static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross_region_dynamic_filter_enabled";
+    private static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
     private static final String EXCHANGE_COMPRESSION = "exchange_compression";
 
     private final DataCenterConfig config;
@@ -130,6 +131,7 @@ public class DataCenterPageSourceProvider
         // Only set the session if there is any dynamic filter for this page source
         if (dynamicFilterSupplier != null) {
             properties.put(ENABLE_CROSS_REGION_DYNAMIC_FILTER, "true");
+            properties.put(OPTIMIZE_DYNAMIC_FILTER_GENERATION, "false"); // close removeUnsupportedDynamicFilter optimizer
         }
         if (config.isCompressionEnabled()) {
             properties.put(EXCHANGE_COMPRESSION, "true");

@@ -44,6 +44,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.AggregationOperator.AggregationOperatorFactory;
 import io.prestosql.operator.AssignUniqueIdOperator;
+import io.prestosql.operator.BloomFilterUtils;
 import io.prestosql.operator.DeleteOperator.DeleteOperatorFactory;
 import io.prestosql.operator.DevNullOperator.DevNullOperatorFactory;
 import io.prestosql.operator.DriverFactory;
@@ -103,7 +104,7 @@ import io.prestosql.operator.WorkProcessorPipelineSourceOperator;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.operator.aggregation.LambdaProvider;
-import io.prestosql.operator.dynamicfilter.DynamicFilterOperator;
+import io.prestosql.operator.dynamicfilter.CrossRegionDynamicFilterOperator;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.operator.exchange.LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory;
 import io.prestosql.operator.exchange.LocalExchangeSourceOperator.LocalExchangeSourceOperatorFactory;
@@ -485,14 +486,9 @@ public class LocalExecutionPlanner
             OutputFactory outputOperatorFactory)
     {
         Session session = taskContext.getSession();
-        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, dynamicFilterCacheManager);
+        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, metadata, dynamicFilterCacheManager);
 
-        Optional<List<String>> columns = Optional.empty();
-        if (plan instanceof OutputNode) {
-            columns = Optional.of(((OutputNode) plan).getColumnNames());
-        }
-
-        PhysicalOperation physicalOperation = plan.accept(new Visitor(session, stageExecutionDescriptor, columns), context);
+        PhysicalOperation physicalOperation = plan.accept(new Visitor(session, stageExecutionDescriptor), context);
 
         Function<Page, Page> pagePreprocessor = enforceLayoutProcessor(outputLayout, physicalOperation.getLayout());
 
@@ -576,9 +572,9 @@ public class LocalExecutionPlanner
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
 
-        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, DynamicFilterCacheManager dynamicFilterCacheManager)
+        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, Metadata metadata, DynamicFilterCacheManager dynamicFilterCacheManager)
         {
-            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, dynamicFilterCacheManager), new AtomicInteger(0));
+            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, Optional.of(metadata), dynamicFilterCacheManager), new AtomicInteger(0));
         }
 
         private LocalExecutionPlanContext(
@@ -746,13 +742,11 @@ public class LocalExecutionPlanner
     {
         private final Session session;
         private final StageExecutionDescriptor stageExecutionDescriptor;
-        private final Optional<List<String>> outputColumns;  // save outputNode's column names
 
-        private Visitor(Session session, StageExecutionDescriptor stageExecutionDescriptor, Optional<List<String>> outputColumns)
+        private Visitor(Session session, StageExecutionDescriptor stageExecutionDescriptor)
         {
             this.session = session;
             this.stageExecutionDescriptor = stageExecutionDescriptor;
-            this.outputColumns = outputColumns;
         }
 
         @Override
@@ -835,7 +829,7 @@ public class LocalExecutionPlanner
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 String queryId = context.getSession().getQueryId().getId();
                 List<Symbol> inputSymbols = node.getSource().getOutputSymbols();
-                OperatorFactory operatorFactory = new DynamicFilterOperator.DynamicFilterOperatorFactory(context.getNextOperatorId(), node.getId(), queryId, inputSymbols, context.getTypes(), stateStoreProvider, outputColumns);
+                OperatorFactory operatorFactory = new CrossRegionDynamicFilterOperator.CrossRegionDynamicFilterOperatorFactory(context.getNextOperatorId(), node.getId(), queryId, inputSymbols, context.getTypes(), dynamicFilterCacheManager, node.getColumnNames());
                 return new PhysicalOperation(operatorFactory, makeLayout(node.getSource()), context, source);
             }
 
@@ -1333,9 +1327,10 @@ public class LocalExecutionPlanner
                     Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections, Optional.of(context.getStageId() + "_" + planNodeId));
 
                     SourceOperatorFactory operatorFactory = new ScanFilterAndProjectOperatorFactory(
+                            context.getSession(),
                             context.getNextOperatorId(),
                             planNodeId,
-                            sourceNode.getId(),
+                            sourceNode,
                             pageSourceProvider,
                             cursorProcessor,
                             pageProcessor,
@@ -1343,6 +1338,9 @@ public class LocalExecutionPlanner
                             columns,
                             dynamicFilter,
                             getTypes(projections, expressionTypes),
+                            stateStoreProvider,
+                            metadata,
+                            dynamicFilterCacheManager,
                             getFilterAndProjectMinOutputPageSize(session),
                             getFilterAndProjectMinOutputPageRowCount(session));
 
@@ -1380,6 +1378,15 @@ public class LocalExecutionPlanner
                     return () -> collector.getDynamicFilters(tableScanNode);
                 }
             }
+            else if (isCrossRegionDynamicFilterEnabled(context.getSession())) {
+                if (sourceNode instanceof TableScanNode) {
+                    LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
+                    if (collector.checkTableIsDcTable((TableScanNode) sourceNode)) {
+                        // if cross-region-dynamic-filter is enabled and the table is a dc table, should consider push down the cross region bloom filter to next cluster
+                        return BloomFilterUtils.getCrossRegionDynamicFilterSupplier(dynamicFilterCacheManager, context.getSession().getQueryId().getId(), (TableScanNode) sourceNode);
+                    }
+                }
+            }
             return null;
         }
 
@@ -1402,9 +1409,16 @@ public class LocalExecutionPlanner
                     context.getTypes(),
                     concat(assignments.getExpressions()));
 
-            OperatorFactory operatorFactory = new TableScanOperatorFactory(context.getNextOperatorId(), node.getId(),
-                    pageSourceProvider, node.getTable(), columns,
+            OperatorFactory operatorFactory = new TableScanOperatorFactory(context.getSession(),
+                    context.getNextOperatorId(),
+                    node,
+                    pageSourceProvider,
+                    node.getTable(),
+                    columns,
                     columnTypes.values().stream().collect(Collectors.toList()),
+                    stateStoreProvider,
+                    metadata,
+                    dynamicFilterCacheManager,
                     getFilterAndProjectMinOutputPageSize(session),
                     getFilterAndProjectMinOutputPageRowCount(session));
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
