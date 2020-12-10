@@ -129,7 +129,8 @@ public class TestFeaturesConfig
                 .setEnableExecutionPlanCache(true)
                 .setImplicitConversionEnabled(false)
                 .setPushTableThroughSubquery(false)
-                .setRewriteFilteringSemiJoinToInnerJoin(false));
+                .setRewriteFilteringSemiJoinToInnerJoin(false)
+                .setTransformSelfJoinToGroupby(false));
     }
 
     @Test
@@ -215,6 +216,7 @@ public class TestFeaturesConfig
                 .put("implicit-conversion", "true")
                 .put("optimizer.push-table-through-subquery", "true")
                 .put("optimizer.rewrite-filtering-semi-join-to-inner-join", "true")
+                .put("optimizer.transform-self-join-to-groupby", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -296,7 +298,8 @@ public class TestFeaturesConfig
                 .setDynamicFilteringWaitTime(new Duration(200, MILLISECONDS))
                 .setDynamicFilteringMaxSize(10000)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
-                .setDynamicFilteringBloomFilterFpp(0.001);
+                .setDynamicFilteringBloomFilterFpp(0.001)
+                .setTransformSelfJoinToGroupby(true);
         assertFullMapping(properties, expected);
     }
 
