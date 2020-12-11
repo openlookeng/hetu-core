@@ -136,6 +136,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoi
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
+import io.prestosql.sql.planner.optimizations.AddReuseExchange;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.CheckSubqueryNodesAreRewritten;
 import io.prestosql.sql.planner.optimizations.HashGenerationOptimizer;
@@ -631,6 +632,9 @@ public class PlanOptimizers
                 ImmutableSet.of(
                         new AddIntermediateAggregations(),
                         new RemoveRedundantIdentityProjections())));
+
+        builder.add(new AddReuseExchange(metadata));
+
         // DO NOT add optimizers that change the plan shape (computations) after this point
 
         // Precomputed hashes - this assumes that partitioning will not change

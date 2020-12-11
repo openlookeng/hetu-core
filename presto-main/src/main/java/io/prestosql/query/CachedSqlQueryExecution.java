@@ -38,6 +38,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -387,8 +388,7 @@ public class CachedSqlQueryExecution
             connectorTransactionHandleMap.put(tableHandle.getTransaction(), newTableHandle.getTransaction());
 
             // Return a new table handle with the ID, output symbols, assignments, and enforced constraints of the cached table handle
-            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(),
-                    node.getEnforcedConstraint(), node.getPredicate());
+            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         }
 
         @Override

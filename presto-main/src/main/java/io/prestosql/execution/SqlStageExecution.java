@@ -30,6 +30,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.QueryId;
 import io.prestosql.split.RemoteSplit;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.plan.JoinNode;
@@ -38,6 +39,7 @@ import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -67,6 +69,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
+import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -112,6 +115,9 @@ public final class SqlStageExecution
     private final DynamicFilterService dynamicFilterService;
 
     private final AtomicBoolean dynamicFilterSchedulingInfoPropagated = new AtomicBoolean();
+
+    @GuardedBy("SqlStageExecution.class")
+    public static Map<QueryId, List<Integer>> queryIdReuseTableScanMappingIdFinishedMap = new ConcurrentHashMap<>();
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -329,6 +335,11 @@ public final class SqlStageExecution
                 .collect(toImmutableList());
     }
 
+    public StageStateMachine getStateMachine()
+    {
+        return stateMachine;
+    }
+
     public synchronized void addExchangeLocations(PlanFragmentId fragmentId, Set<RemoteTask> sourceTasks, boolean noMoreExchangeLocations)
     {
         requireNonNull(fragmentId, "fragmentId is null");
@@ -544,6 +555,9 @@ public final class SqlStageExecution
                 }
                 if (finishedTasks.containsAll(allTasks)) {
                     stateMachine.transitionToFinished();
+                    if (isReuseTableScanEnabled(stateMachine.getSession())) {
+                        setReuseTableScanMappingIdStatus(stateMachine);
+                    }
                 }
             }
         }
@@ -551,6 +565,36 @@ public final class SqlStageExecution
             // after updating state, check if all tasks have final status information
             checkAllTaskFinal();
         }
+    }
+
+    //Assuming there will be only one table scan in one stage
+    private static synchronized void setReuseTableScanMappingIdStatus(StageStateMachine state)
+    {
+        if (state.getProducerScanNode() == null) {
+            return;
+        }
+
+        TableScanNode scanNode = state.getProducerScanNode();
+        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        if (reuseTableScanMappingIdList == null) {
+            reuseTableScanMappingIdList = new ArrayList<>();
+            reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
+            queryIdReuseTableScanMappingIdFinishedMap.put(state.getStageId().getQueryId(), reuseTableScanMappingIdList);
+        }
+        else if (!reuseTableScanMappingIdList.contains(scanNode.getReuseTableScanMappingId())) {
+            reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
+            queryIdReuseTableScanMappingIdFinishedMap.put(state.getStageId().getQueryId(), reuseTableScanMappingIdList);
+        }
+    }
+
+    public static synchronized Boolean getReuseTableScanMappingIdStatus(StageStateMachine state)
+    {
+        if (state.getConsumerScanNode() == null) {
+            return true;
+        }
+
+        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        return reuseTableScanMappingIdList != null && reuseTableScanMappingIdList.contains(state.getConsumerScanNode().getReuseTableScanMappingId());
     }
 
     private synchronized void updateFinalTaskInfo(TaskInfo finalTaskInfo)

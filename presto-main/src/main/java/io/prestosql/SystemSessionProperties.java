@@ -146,6 +146,9 @@ public final class SystemSessionProperties
     public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
     public static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
     public static final String TRANSFORM_SELF_JOIN_TO_GROUPBY = "transform_self_join_to_groupby";
+    public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
+    public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
+    public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -666,6 +669,21 @@ public final class SystemSessionProperties
                         PUSH_TABLE_THROUGH_SUBQUERY,
                         "Allow pushing outer tables into subqueries if there is a join between the two",
                         featuresConfig.isPushTableThroughSubquery(),
+                        false),
+                booleanProperty(
+                        REUSE_TABLE_SCAN,
+                        "Reuse data cached by similar table scan",
+                        featuresConfig.isReuseTableScanEnabled(),
+                        false),
+                booleanProperty(
+                        SPILL_REUSE_TABLESCAN,
+                        "Spill in TableScanOperator and WorkProcessorSourceOperatorAdapter if spill_enabled is also set",
+                        featuresConfig.isSpillReuseExchange(),
+                        false),
+                integerProperty(
+                        SPILL_THRESHOLD_REUSE_TABLESCAN,
+                        "Spiller Threshold (in MB) for TableScanOperator and WorkProcessorSourceOperatorAdapter for Reuse Exchange",
+                        featuresConfig.getSpillOperatorThresholdReuseExchange(),
                         false));
     }
 
@@ -1173,5 +1191,20 @@ public final class SystemSessionProperties
     public static boolean shouldEnableTablePushdown(Session session)
     {
         return session.getSystemProperty(PUSH_TABLE_THROUGH_SUBQUERY, Boolean.class);
+    }
+
+    public static boolean isReuseTableScanEnabled(Session session)
+    {
+        return session.getSystemProperty(REUSE_TABLE_SCAN, Boolean.class);
+    }
+
+    public static boolean isSpillReuseExchange(Session session)
+    {
+        return session.getSystemProperty(SPILL_REUSE_TABLESCAN, Boolean.class);
+    }
+
+    public static int getSpillOperatorThresholdReuseExchange(Session session)
+    {
+        return session.getSystemProperty(SPILL_THRESHOLD_REUSE_TABLESCAN, Integer.class);
     }
 }

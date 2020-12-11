@@ -53,6 +53,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.airlift.units.Duration.succinctDuration;
+import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
 import static io.prestosql.execution.StageState.ABORTED;
 import static io.prestosql.execution.StageState.CANCELED;
 import static io.prestosql.execution.StageState.FAILED;
@@ -63,6 +64,8 @@ import static io.prestosql.execution.StageState.SCHEDULED;
 import static io.prestosql.execution.StageState.SCHEDULING;
 import static io.prestosql.execution.StageState.SCHEDULING_SPLITS;
 import static io.prestosql.execution.StageState.TERMINAL_STAGE_STATES;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
@@ -94,6 +97,8 @@ public class StageStateMachine
     private final AtomicLong currentUserMemory = new AtomicLong();
     private final AtomicLong currentRevocableMemory = new AtomicLong();
     private final AtomicLong currentTotalMemory = new AtomicLong();
+    private final TableScanNode consumerScanNode;
+    private final TableScanNode producerScanNode;
 
     public StageStateMachine(
             StageId stageId,
@@ -115,6 +120,19 @@ public class StageStateMachine
         stageState.addStateChangeListener(state -> log.debug("Stage %s is %s", stageId, state));
 
         finalStageInfo = new StateMachine<>("final stage " + stageId, executor, Optional.empty());
+
+        if (isReuseTableScanEnabled(session)) {
+            consumerScanNode = fragment.getPartitionedSourceNodes().stream()
+                    .filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy()
+                            .equals(REUSE_STRATEGY_CONSUMER)).findAny().map(TableScanNode.class::cast).orElse(null);
+            producerScanNode = fragment.getPartitionedSourceNodes().stream()
+                    .filter(node -> node instanceof TableScanNode && ((TableScanNode) node).getStrategy()
+                            .equals(REUSE_STRATEGY_PRODUCER)).findAny().map(TableScanNode.class::cast).orElse(null);
+        }
+        else {
+            consumerScanNode = null;
+            producerScanNode = null;
+        }
     }
 
     public StageId getStageId()
@@ -140,6 +158,16 @@ public class StageStateMachine
     public PlanFragment getFragment()
     {
         return fragment;
+    }
+
+    public TableScanNode getConsumerScanNode()
+    {
+        return consumerScanNode;
+    }
+
+    public TableScanNode getProducerScanNode()
+    {
+        return producerScanNode;
     }
 
     /**

@@ -35,6 +35,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.LookupJoinOperators;
 import io.prestosql.operator.PagesIndex;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spiller.GenericSpillerFactory;
@@ -98,7 +99,10 @@ public final class TaskTestUtils
                     TABLE_SCAN_NODE_ID,
                     TEST_TABLE_HANDLE,
                     ImmutableList.of(SYMBOL),
-                    ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT))),
+                    ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT)),
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                    0,
+                    0),
             ImmutableMap.of(SYMBOL, VARCHAR),
             SOURCE_DISTRIBUTION,
             ImmutableList.of(TABLE_SCAN_NODE_ID),

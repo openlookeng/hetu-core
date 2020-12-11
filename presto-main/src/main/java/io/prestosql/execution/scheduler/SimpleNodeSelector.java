@@ -25,19 +25,28 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.RemoteTask;
+import io.prestosql.execution.SplitKey;
+import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.execution.TableInfo;
 import io.prestosql.execution.resourcegroups.IndexedPriorityQueue;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,6 +74,7 @@ public class SimpleNodeSelector
     private final int maxSplitsPerNode;
     private final int maxPendingSplitsPerTask;
     private final boolean optimizedLocalScheduling;
+    private TableSplitAssignmentInfo tableSplitAssignmentInfo;
 
     public SimpleNodeSelector(
             InternalNodeManager nodeManager,
@@ -84,6 +94,7 @@ public class SimpleNodeSelector
         this.maxSplitsPerNode = maxSplitsPerNode;
         this.maxPendingSplitsPerTask = maxPendingSplitsPerTask;
         this.optimizedLocalScheduling = optimizedLocalScheduling;
+        tableSplitAssignmentInfo = TableSplitAssignmentInfo.getInstance();
     }
 
     @Override
@@ -112,7 +123,7 @@ public class SimpleNodeSelector
     }
 
     @Override
-    public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks)
+    public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage)
     {
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
         NodeMap nodeMap = this.nodeMap.get().get();
@@ -125,76 +136,104 @@ public class SimpleNodeSelector
         boolean splitsToBeRedistributed = false;
         Set<Split> remainingSplits = new HashSet<>();
 
-        // optimizedLocalScheduling enables prioritized assignment of splits to local nodes when splits contain locality information
-        if (optimizedLocalScheduling) {
-            for (Split split : splits) {
-                if (split.isRemotelyAccessible() && !split.getAddresses().isEmpty()) {
-                    List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
-
-                    Optional<InternalNode> chosenNode = candidateNodes.stream()
-                            .filter(ownerNode -> assignmentStats.getTotalSplitCount(ownerNode) < maxSplitsPerNode)
-                            .min(comparingInt(assignmentStats::getTotalSplitCount));
-
-                    if (chosenNode.isPresent()) {
-                        assignment.put(chosenNode.get(), split);
-                        assignmentStats.addAssignedSplit(chosenNode.get());
-                        splitsToBeRedistributed = true;
-                        continue;
+        // Check if the current stage has a TableScanNode which is reading the table for the 2nd time or beyond
+        if (stage.isPresent() && stage.get().getStateMachine().getConsumerScanNode() != null) {
+            try {
+                // if node exists, get the TableScanNode and cast it as consumer
+                TableScanNode consumer = stage.get().getStateMachine().getConsumerScanNode();
+                Map<PlanNodeId, TableInfo> tables = stage.get().getStageInfo().getTables(); //all tables part of this stage
+                QualifiedObjectName tableName;
+                for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
+                    tableName = entry.getValue().getTableName();
+                    if (tableSplitAssignmentInfo.getReuseTableScanMappingIdSplitAssignmentMap().containsKey(consumer.getReuseTableScanMappingId())) {
+                        //compare splitkey using equals and then assign nodes accordingly.
+                        HashMap<SplitKey, InternalNode> splitKeyNodeAssignment = tableSplitAssignmentInfo.getSplitKeyNodeAssignment(consumer.getReuseTableScanMappingId());
+                        Set<SplitKey> splitKeySet = splitKeyNodeAssignment.keySet();
+                        assignment.putAll(createConsumerScanNodeAssignment(tableName, splits, splitKeySet, splitKeyNodeAssignment));
+                        for (Map.Entry<InternalNode, Split> nodeAssignmentEntry : assignment.entries()) {
+                            InternalNode node = nodeAssignmentEntry.getKey();
+                            assignmentStats.addAssignedSplit(node);
+                        }
                     }
                 }
-                remainingSplits.add(split);
+                log.debug("Consumer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+            }
+            catch (NotImplementedException e) {
+                log.error("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
+                throw new UnsupportedOperationException("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
             }
         }
         else {
-            remainingSplits = splits;
-        }
+            // optimizedLocalScheduling enables prioritized assignment of splits to local nodes when splits contain locality information
+            if (optimizedLocalScheduling) { //should not hit for consumer case
+                for (Split split : splits) {
+                    if (split.isRemotelyAccessible() && !split.getAddresses().isEmpty()) {
+                        List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
 
-        for (Split split : remainingSplits) {
-            randomCandidates.reset();
+                        Optional<InternalNode> chosenNode = candidateNodes.stream()
+                                .filter(ownerNode -> assignmentStats.getTotalSplitCount(ownerNode) < maxSplitsPerNode)
+                                .min(comparingInt(assignmentStats::getTotalSplitCount));
 
-            List<InternalNode> candidateNodes;
-            if (!split.isRemotelyAccessible()) {
-                candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
-            }
-            else {
-                candidateNodes = selectNodes(minCandidates, randomCandidates);
-            }
-            if (candidateNodes.isEmpty()) {
-                log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
-                throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
-            }
-
-            InternalNode chosenNode = null;
-            int min = Integer.MAX_VALUE;
-
-            for (InternalNode node : candidateNodes) {
-                int totalSplitCount = assignmentStats.getTotalSplitCount(node);
-                if (totalSplitCount < min && totalSplitCount < maxSplitsPerNode) {
-                    chosenNode = node;
-                    min = totalSplitCount;
+                        if (chosenNode.isPresent()) {
+                            assignment.put(chosenNode.get(), split);
+                            assignmentStats.addAssignedSplit(chosenNode.get()); //check later
+                            splitsToBeRedistributed = true;
+                            continue;
+                        }
+                    }
+                    remainingSplits.add(split);
                 }
             }
-            if (chosenNode == null) {
-                // min is guaranteed to be MAX_VALUE at this line
+            else {
+                remainingSplits = splits;
+            }
+            for (Split split : remainingSplits) {
+                randomCandidates.reset();
+
+                List<InternalNode> candidateNodes;
+                if (!split.isRemotelyAccessible()) {
+                    candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
+                }
+                else {
+                    candidateNodes = selectNodes(minCandidates, randomCandidates);
+                }
+                if (candidateNodes.isEmpty()) {
+                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
+                    throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
+                }
+
+                InternalNode chosenNode = null;
+                int min = Integer.MAX_VALUE;
+
                 for (InternalNode node : candidateNodes) {
-                    int totalSplitCount = assignmentStats.getQueuedSplitCountForStage(node);
-                    if (totalSplitCount < min && totalSplitCount < maxPendingSplitsPerTask) {
+                    int totalSplitCount = assignmentStats.getTotalSplitCount(node);
+                    if (totalSplitCount < min && totalSplitCount < maxSplitsPerNode) {
                         chosenNode = node;
                         min = totalSplitCount;
                     }
                 }
-            }
-            if (chosenNode != null) {
-                assignment.put(chosenNode, split);
-                assignmentStats.addAssignedSplit(chosenNode);
-            }
-            else {
-                if (split.isRemotelyAccessible()) {
-                    splitWaitingForAnyNode = true;
+                if (chosenNode == null) {
+                    // min is guaranteed to be MAX_VALUE at this line
+                    for (InternalNode node : candidateNodes) {
+                        int totalSplitCount = assignmentStats.getQueuedSplitCountForStage(node);
+                        if (totalSplitCount < min && totalSplitCount < maxPendingSplitsPerTask) {
+                            chosenNode = node;
+                            min = totalSplitCount;
+                        }
+                    }
                 }
-                // Exact node set won't matter, if a split is waiting for any node
-                else if (!splitWaitingForAnyNode) {
-                    blockedExactNodes.addAll(candidateNodes);
+                if (chosenNode != null) {
+                    assignment.put(chosenNode, split);
+                    assignmentStats.addAssignedSplit(chosenNode);
+                }
+                else {
+                    if (split.isRemotelyAccessible()) {
+                        splitWaitingForAnyNode = true;
+                    }
+                    // Exact node set won't matter, if a split is waiting for any node
+                    else if (!splitWaitingForAnyNode) {
+                        blockedExactNodes.addAll(candidateNodes);
+                    }
                 }
             }
         }
@@ -207,10 +246,70 @@ public class SimpleNodeSelector
             blocked = toWhenHasSplitQueueSpaceFuture(blockedExactNodes, existingTasks, calculateLowWatermark(maxPendingSplitsPerTask));
         }
 
-        if (splitsToBeRedistributed) {
-            equateDistribution(assignment, assignmentStats, nodeMap);
+        if (!stage.isPresent() || stage.get().getStateMachine().getConsumerScanNode() == null) {
+            if (splitsToBeRedistributed) { //skip for consumer
+                equateDistribution(assignment, assignmentStats, nodeMap);
+            }
+        }
+
+        // Check if the current stage has a TableScanNode which is reading the table for the 1st time
+        if (stage.isPresent() && stage.get().getStateMachine().getProducerScanNode() != null) {
+            // if node exists, get the TableScanNode and annotate it as producer
+            saveProducerScanNodeAssignment(stage, assignment, assignmentStats);
         }
         return new SplitPlacementResult(blocked, assignment);
+    }
+
+    private Multimap createConsumerScanNodeAssignment(QualifiedObjectName tableName, Set<Split> splits, Set<SplitKey> splitKeySet,
+                                                      HashMap<SplitKey, InternalNode> splitKeyNodeAssignment)
+    {
+        Multimap<InternalNode, Split> assignment = HashMultimap.create();
+        for (Split split : splits) {
+            if (split.getConnectorSplit().getSplitCount() > 1) {
+                boolean matched = false;
+                for (Split unwrappedSplit : split.getSplits()) {
+                    SplitKey splitKey = new SplitKey(unwrappedSplit, tableName.getCatalogName(),
+                            tableName.getSchemaName(), tableName.getObjectName());
+                    for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
+                        SplitKey producerSplitKey = it.next();
+                        if (splitKey.equals(producerSplitKey)) {
+                            InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
+                            assignment.put(node, split);
+                            matched = true;
+                            break;
+                        }
+                    }
+
+                    if (matched) {
+                        break;
+                    }
+                }
+            }
+            else {
+                SplitKey splitKey = new SplitKey(split, tableName.getCatalogName(),
+                        tableName.getSchemaName(), tableName.getObjectName());
+                for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
+                    SplitKey producerSplitKey = it.next();
+                    if (splitKey.equals(producerSplitKey)) {
+                        InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
+                        assignment.put(node, split);
+                        break;
+                    }
+                }
+            }
+        }
+        return assignment;
+    }
+
+    private void saveProducerScanNodeAssignment(Optional<SqlStageExecution> stage, Multimap<InternalNode, Split> assignment, NodeAssignmentStats assignmentStats)
+    {
+        TableScanNode producer = stage.get().getStateMachine().getProducerScanNode();
+        Map<PlanNodeId, TableInfo> tables = stage.get().getStageInfo().getTables();
+        for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
+            QualifiedObjectName qualifiedTableName = entry.getValue().getTableName();
+            tableSplitAssignmentInfo.setTableSplitAssignment(qualifiedTableName, producer.getReuseTableScanMappingId(), assignment); //also sets the splitkey info internally
+            log.debug("Producer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+        }
     }
 
     @Override

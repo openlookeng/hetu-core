@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,20 +12,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.execution.scheduler;
+package io.prestosql.sql.planner;
 
-import io.prestosql.execution.SqlStageExecution;
-import io.prestosql.metadata.InternalNode;
-import io.prestosql.metadata.Split;
-
-import java.util.List;
-import java.util.Set;
-
-public interface SplitPlacementPolicy
+public class ScanTableIdAllocator
 {
-    SplitPlacementResult computeAssignments(Set<Split> splits, SqlStageExecution stage);
+    private static int nextId;
 
-    void lockDownNodes();
+    private ScanTableIdAllocator(int value)
+    {
+        nextId = value;
+    }
 
-    List<InternalNode> allNodes();
+    public static synchronized Integer getNextId()
+    {
+        return nextId++;
+    }
 }

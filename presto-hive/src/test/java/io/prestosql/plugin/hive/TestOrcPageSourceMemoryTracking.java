@@ -25,6 +25,7 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.DriverContext;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
@@ -530,7 +531,7 @@ public class TestOrcPageSourceMemoryTracking
                     columns.stream().map(columnHandle -> (ColumnHandle) columnHandle).collect(toList()),
                     types,
                     DataSize.valueOf("462304B"),
-                    5);
+                    5, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
             SourceOperator operator = sourceOperatorFactory.createOperator(driverContext);
             operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
             return operator;
@@ -557,7 +558,8 @@ public class TestOrcPageSourceMemoryTracking
                     Optional.empty(),
                     types,
                     new DataSize(0, BYTE),
-                    0);
+                    0,
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
             SourceOperator operator = sourceOperatorFactory.createOperator(driverContext);
             operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
             operator.noMoreSplits();

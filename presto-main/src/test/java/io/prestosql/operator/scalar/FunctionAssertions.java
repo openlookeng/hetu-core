@@ -34,6 +34,7 @@ import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.FilterAndProjectOperator.FilterAndProjectOperatorFactory;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorFactory;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
@@ -878,7 +879,8 @@ public final class FunctionAssertions
                     null,
                     ImmutableList.of(projection.getType()),
                     new DataSize(0, BYTE),
-                    0);
+                    0,
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
         }
         catch (Throwable e) {
             if (e instanceof UncheckedExecutionException) {

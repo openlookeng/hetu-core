@@ -137,6 +137,9 @@ public class FeaturesConfig
     private boolean predicatePushdownUseTableProperties = true;
     private boolean pushTableThroughSubquery;
     private boolean rewriteFilteringSemiJoinToInnerJoin;
+    private boolean reuseTableScanEnabled;
+    private boolean spillReuseTableScan;
+    private int spillOperatorThresholdReuseExchange = 10;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering;
@@ -1175,6 +1178,42 @@ public class FeaturesConfig
     public FeaturesConfig setPushTableThroughSubquery(boolean value)
     {
         this.pushTableThroughSubquery = value;
+        return this;
+    }
+
+    public boolean isReuseTableScanEnabled()
+    {
+        return reuseTableScanEnabled;
+    }
+
+    @Config("optimizer.reuse-table-scan")
+    public FeaturesConfig setReuseTableScanEnabled(boolean reuseTableScanEnabled)
+    {
+        this.reuseTableScanEnabled = reuseTableScanEnabled;
+        return this;
+    }
+
+    public boolean isSpillReuseExchange()
+    {
+        return spillReuseTableScan;
+    }
+
+    @Config("experimental.spill-reuse-tablescan")
+    public FeaturesConfig setSpillReuseExchange(boolean spillReuseTableScan)
+    {
+        this.spillReuseTableScan = spillReuseTableScan;
+        return this;
+    }
+
+    public int getSpillOperatorThresholdReuseExchange()
+    {
+        return spillOperatorThresholdReuseExchange;
+    }
+
+    @Config("experimental.spill-threshold-reuse-tablescan")
+    public FeaturesConfig setSpillOperatorThresholdReuseExchange(int spillOperatorThresholdReuseExchange)
+    {
+        this.spillOperatorThresholdReuseExchange = spillOperatorThresholdReuseExchange;
         return this;
     }
 }

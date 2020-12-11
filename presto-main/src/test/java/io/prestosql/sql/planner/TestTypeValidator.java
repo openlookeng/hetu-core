@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ListMultimap;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
@@ -98,7 +99,10 @@ public class TestTypeValidator
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 TupleDomain.all(),
-                Optional.empty());
+                Optional.empty(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                0);
     }
 
     @Test

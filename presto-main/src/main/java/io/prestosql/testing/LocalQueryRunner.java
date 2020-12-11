@@ -103,6 +103,7 @@ import io.prestosql.operator.LookupJoinOperators;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OutputFactory;
 import io.prestosql.operator.PagesIndex;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.index.IndexJoinLookupStats;
@@ -791,7 +792,8 @@ public class LocalQueryRunner
                     table,
                     stageExecutionDescriptor.isScanGroupedExecution(tableScan.getId()) ? GROUPED_SCHEDULING : UNGROUPED_SCHEDULING,
                     null,
-                    Optional.empty(), Collections.emptyMap(), ImmutableSet.of());
+                    Optional.empty(), Collections.emptyMap(), ImmutableSet.of(),
+                    tableScan.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
 
             ImmutableSet.Builder<ScheduledSplit> scheduledSplits = ImmutableSet.builder();
             while (!splitSource.isFinished()) {

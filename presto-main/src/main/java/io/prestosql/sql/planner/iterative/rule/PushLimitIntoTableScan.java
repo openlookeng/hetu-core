@@ -62,7 +62,8 @@ public class PushLimitIntoTableScan
                             tableScan.getOutputSymbols(),
                             tableScan.getAssignments(),
                             tableScan.getEnforcedConstraint(),
-                            tableScan.getPredicate());
+                            tableScan.getPredicate(), tableScan.getStrategy(),
+                            tableScan.getReuseTableScanMappingId(), 0);
 
                     if (!result.isLimitGuaranteed()) {
                         node = new LimitNode(limit.getId(), node, limit.getCount(), limit.isPartial());

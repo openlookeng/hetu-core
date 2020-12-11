@@ -177,7 +177,13 @@ public class BenchmarkScanFilterAndProjectOperator
                     null,
                     types,
                     FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_SIZE,
-                    FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_ROW_COUNT);
+                    FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_ROW_COUNT,
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                    0,
+                    false,
+                    Optional.empty(),
+                    0,
+                    0);
         }
 
         public TaskContext createTaskContext()

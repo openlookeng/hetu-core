@@ -62,7 +62,10 @@ public class PushSampleIntoTableScan
                         tableScan.getOutputSymbols(),
                         tableScan.getAssignments(),
                         tableScan.getEnforcedConstraint(),
-                        tableScan.getPredicate())))
+                        tableScan.getPredicate(),
+                        tableScan.getStrategy(),
+                        tableScan.getReuseTableScanMappingId(),
+                        0)))
                 .orElseGet(Result::empty);
     }
 
