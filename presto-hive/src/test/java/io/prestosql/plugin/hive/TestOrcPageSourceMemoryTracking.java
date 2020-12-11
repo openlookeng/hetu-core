@@ -32,6 +32,7 @@ import io.prestosql.operator.TableScanOperator.TableScanOperatorFactory;
 import io.prestosql.operator.project.CursorProcessor;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.orc.OrcCacheStore;
+import io.prestosql.plugin.hive.orc.OrcConcatPageSource;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
@@ -39,6 +40,8 @@ import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.ExpressionCompiler;
@@ -81,14 +84,17 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -471,6 +477,11 @@ public class TestOrcPageSourceMemoryTracking
 
         public ConnectorPageSource newPageSource(FileFormatDataSourceStats stats, ConnectorSession session)
         {
+            return newPageSource(stats, session, Optional.empty());
+        }
+
+        public ConnectorPageSource newPageSource(FileFormatDataSourceStats stats, ConnectorSession session, Optional<DynamicFilterSupplier> dynamicFilterSupplier)
+        {
             OrcPageSourceFactory orcPageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, new HiveConfig().setUseOrcColumnNames(false), HDFS_ENVIRONMENT, stats, OrcCacheStore.builder().newCacheStore(
                     new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
                     new HiveConfig().getOrcStripeFooterCacheLimit(),
@@ -499,7 +510,7 @@ public class TestOrcPageSourceMemoryTracking
                     ImmutableMap.of(),
                     Optional.empty(),
                     false,
-                    Optional.empty(),
+                    dynamicFilterSupplier,
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
@@ -757,5 +768,45 @@ public class TestOrcPageSourceMemoryTracking
         {
             return maxSize;
         }
+    }
+
+    @Test
+    public void testOrcConcatPageSourceDynamicFilterBlocked()
+            throws InterruptedException
+    {
+        OrcConcatPageSource orcConcatPageSource = getOrcConcatPageSource(1000);
+
+        Page page = orcConcatPageSource.getNextPage();
+        assertNull(page);
+
+        TimeUnit.SECONDS.sleep(2);
+        page = orcConcatPageSource.getNextPage();
+        assertNotNull(page);
+    }
+
+    @Test
+    public void testOrcConcatPageSourceDynamicFilterNotBlocked()
+    {
+        OrcConcatPageSource orcConcatPageSource = getOrcConcatPageSource(0);
+        Page page = orcConcatPageSource.getNextPage();
+        assertNotNull(page);
+    }
+
+    private OrcConcatPageSource getOrcConcatPageSource(long waitTime)
+    {
+        HiveConfig config = new HiveConfig();
+        FileFormatDataSourceStats stats = new FileFormatDataSourceStats();
+        ConnectorSession session = new TestingConnectorSession(new HiveSessionProperties(config, new OrcFileWriterConfig(),
+                new ParquetFileWriterConfig()).getSessionProperties());
+        List<ConnectorPageSource> pageSources = new ArrayList<>();
+
+        Supplier<Map<ColumnHandle, DynamicFilter>> supplier = null;
+        DynamicFilterSupplier theSupplier = new DynamicFilterSupplier(supplier, System.currentTimeMillis(), waitTime);
+
+        Optional<DynamicFilterSupplier> dynamicFilterSupplier = Optional.of(theSupplier);
+        pageSources.add(testPreparer.newPageSource(stats, session, dynamicFilterSupplier));
+        OrcConcatPageSource orcConcatPageSource = new OrcConcatPageSource(pageSources);
+
+        return orcConcatPageSource;
     }
 }
