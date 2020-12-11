@@ -233,6 +233,7 @@ public interface Index
     enum Level
     {
         STRIPE,
-        PARTITION
+        PARTITION,
+        TABLE
     }
 }

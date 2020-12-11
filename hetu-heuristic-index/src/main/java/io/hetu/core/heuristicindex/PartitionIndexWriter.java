@@ -35,11 +35,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static io.hetu.core.heuristicindex.util.SerializationUtils.serializeMap;
 
 /**
  * Indexes which needs to be created at table or partition level
@@ -56,7 +57,6 @@ public class PartitionIndexWriter
 
     private Index partitionIndex;
     private String partition;
-    private Random rand = new Random();
     protected AtomicInteger counter = new AtomicInteger(0); // symbol table counter
     private CreateIndexMetadata createIndexMetadata;
     private Lock persistLock = new ReentrantLock();
@@ -78,9 +78,6 @@ public class PartitionIndexWriter
         symbolTable = new ConcurrentHashMap<>();
         dataMap = new ConcurrentHashMap<>();
         lastModifiedTable = new ConcurrentHashMap<>();
-        if (createIndexMetadata.getPartitions() != null && !createIndexMetadata.getPartitions().isEmpty()) {
-            partition = createIndexMetadata.getPartitions().get(0);
-        }
     }
 
     @Override
@@ -93,7 +90,9 @@ public class PartitionIndexWriter
         String fileName = path.getName(path.getNameCount() - 1).toString();
 
         if (Strings.isNullOrEmpty(partition)) {
-            partition = path.getName(path.getNameCount() - 2).toString();
+            if (!createIndexMetadata.getTableName().equalsIgnoreCase(path.getName(path.getNameCount() - 2).toString())) {
+                partition = path.getName(path.getNameCount() - 2).toString();
+            }
         }
 
         long lastModified = Long.parseLong((String) connectorMetadata.get(HetuConstant.DATASOURCE_FILE_MODIFICATION));
@@ -198,18 +197,6 @@ public class PartitionIndexWriter
             partitionIndex.close();
             persistLock.unlock();
         }
-    }
-
-    private String serializeMap(Map<String, ?> input)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-        input.forEach((key, value) -> {
-            stringBuilder.append(key);
-            stringBuilder.append(":");
-            stringBuilder.append(value);
-            stringBuilder.append(",");
-        });
-        return stringBuilder.toString();
     }
 
     @VisibleForTesting

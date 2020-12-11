@@ -198,6 +198,12 @@ public class CreateIndexOperator
                     levelWriter.get(partition).addData(values, connectorMetadata);
                     break;
                 }
+                case TABLE: {
+                    levelWriter.putIfAbsent(createIndexMetadata.getTableName(), heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    persistBy.putIfAbsent(levelWriter.get(createIndexMetadata.getTableName()), this);
+                    levelWriter.get(createIndexMetadata.getTableName()).addData(values, connectorMetadata);
+                    break;
+                }
                 default:
                     new IOException("Create level not supported");
                     break;

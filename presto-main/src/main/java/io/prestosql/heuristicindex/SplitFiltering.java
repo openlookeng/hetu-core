@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -109,15 +110,41 @@ public class SplitFiltering
             LOG.debug("Filtering can't be done because not able to read index records", e);
             return allSplits;
         }
-        // TODO: Currently we give partition index a priority for split filtering.
+        Set<String> referencedColumns = new HashSet<>();
+        getAllColumns(expression.get(), referencedColumns, assignments);
+        List<IndexRecord> partitionIndexRecords = new ArrayList<>();
+        List<IndexRecord> nonPartitionIndexRecords = new ArrayList<>();
         for (IndexRecord indexRecord : indexRecords) {
-            if (PARTITION_INDEX_TYPES.contains(indexRecord.indexType.toUpperCase())) {
-                return filterUsingPartitionIndex(expression.get(), allSplits, fullQualifiedTableName, assignments, heuristicIndexerManager);
+            if (indexRecord.table.equalsIgnoreCase(fullQualifiedTableName)) {
+                List<String> columnsInIndex = Arrays.asList(indexRecord.columns);
+                for (String column : referencedColumns) {
+                    if (columnsInIndex.contains(column)) {
+                        if (PARTITION_INDEX_TYPES.contains(indexRecord.indexType.toUpperCase())) {
+                            partitionIndexRecords.add(indexRecord);
+                        }
+                        else {
+                            nonPartitionIndexRecords.add(indexRecord);
+                        }
+                    }
+                }
             }
         }
-
-        // apply filtering use heuristic indexes
-        List<Split> splitsToReturn = splitFiltering(expression.get(), allSplits, fullQualifiedTableName, assignments, heuristicIndexerManager);
+        List<Split> splitsToReturn = new ArrayList<>();
+        if (partitionIndexRecords.isEmpty() && nonPartitionIndexRecords.isEmpty()) {
+            return allSplits;
+        }
+        else if (!partitionIndexRecords.isEmpty() && nonPartitionIndexRecords.isEmpty()) {
+            splitsToReturn = filterUsingPartitionIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+        }
+        else if (!nonPartitionIndexRecords.isEmpty() && partitionIndexRecords.isEmpty()) {
+            splitsToReturn = filterUsingStripeIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+        }
+        else {
+            // filter using both indexes and return the smallest set of splits.
+            List<Split> splitsToReturn1 = filterUsingPartitionIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            List<Split> splitsToReturn2 = filterUsingStripeIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            splitsToReturn = splitsToReturn1.size() < splitsToReturn2.size() ? splitsToReturn1 : splitsToReturn2;
+        }
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("totalSplitsProcessed: " + totalSplitsProcessed.addAndGet(initialSplitsSize));
@@ -127,10 +154,8 @@ public class SplitFiltering
         return splitsToReturn;
     }
 
-    private static List<Split> splitFiltering(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingStripeIndex(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
     {
-        Set<String> referencedColumns = new HashSet<>();
-        getAllColumns(expression, referencedColumns, assignments);
         return inputSplits.parallelStream()
                 .filter(split -> {
                     Map<String, List<IndexMetadata>> allIndices = new HashMap<>();
@@ -179,11 +204,9 @@ public class SplitFiltering
                 .collect(Collectors.toList());
     }
 
-    private static List<Split> filterUsingPartitionIndex(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Map<Symbol, ColumnHandle> assignments, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingPartitionIndex(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
     {
         try {
-            Set<String> referencedColumns = new HashSet<>();
-            getAllColumns(expression, referencedColumns, assignments);
             long maxLastUpdated = 0L;
             Map<String, List<Split>> partitionSplitMap = new HashMap<>();
             for (Split split : inputSplits) {

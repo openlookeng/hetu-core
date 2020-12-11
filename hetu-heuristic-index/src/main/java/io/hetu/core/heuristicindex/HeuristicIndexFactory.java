@@ -112,6 +112,7 @@ public class HeuristicIndexFactory
             case STRIPE:
                 return new FileIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
             case PARTITION:
+            case TABLE:
                 return new PartitionIndexWriter(createIndexMetadata, connectorMetadata, fs, root);
             default:
                 throw new IllegalArgumentException(indexType + " has no supported index writer");
