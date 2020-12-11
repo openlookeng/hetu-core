@@ -66,6 +66,10 @@ import static org.testng.Assert.assertTrue;
  */
 public class TestStateStoreLauncherAndProvider
 {
+    private static final String LOCALHOST = "127.0.0.1";
+    private static final String PORT1 = "7980";
+    private static final String PORT2 = "7981";
+    private static final String PORT3 = "5991";
     private static final String DISCOVERY_SERVICE_LOCK = "discovery-service-lock";
     private static final String DISCOVERY_SERVICE = "discovery-service";
     private static final long DISCOVERY_REGISTRY_LOCK_TIMEOUT = 3000L;
@@ -90,7 +94,7 @@ public class TestStateStoreLauncherAndProvider
                 "state-store.name=test\n" +
                 "state-store.cluster=test-cluster\n" +
                 "hazelcast.discovery.mode=tcp-ip\n" +
-                "hazelcast.discovery.port=7980\n");
+                "hazelcast.discovery.port=" + PORT1 + "\n");
         configWriter.close();
     }
 
@@ -107,7 +111,7 @@ public class TestStateStoreLauncherAndProvider
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
         when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
 
-        when(mockSeed.getLocation()).thenReturn("127.0.0.1:5991");
+        when(mockSeed.getLocation()).thenReturn(LOCALHOST + ":" + PORT3);
         when(mockSeedStore.get()).thenReturn(seeds);
 
         factory = new HazelcastStateStoreFactory();
@@ -127,18 +131,18 @@ public class TestStateStoreLauncherAndProvider
         Seed mockSeed2 = mock(Seed.class);
         seeds.add(mockSeed1);
         seeds.add(mockSeed2);
-        when(mockSeed1.getLocation()).thenReturn("127.0.0.1:7980");
-        when(mockSeed2.getLocation()).thenReturn("127.0.0.1:7981");
+        when(mockSeed1.getLocation()).thenReturn(LOCALHOST + ":" + PORT1);
+        when(mockSeed2.getLocation()).thenReturn(LOCALHOST + ":" + PORT2);
         when(mockSeedStore.get()).thenReturn(seeds);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
         when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
-        when(mockSeedStoreManager.addSeed("localhost", true)).thenReturn(seeds);
+        when(mockSeedStoreManager.addSeed(LOCALHOST, true)).thenReturn(seeds);
         when(mockSeedStoreManager.getFileSystemClient()).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/")));
 
         InternalCommunicationConfig mockInternalCommunicationConfig = mock(InternalCommunicationConfig.class);
         HttpServerInfo mockHttpServerInfo = mock(HttpServerInfo.class);
-        when(mockHttpServerInfo.getHttpsUri()).thenReturn(new URI("https://localhost:7980"));
+        when(mockHttpServerInfo.getHttpsUri()).thenReturn(new URI("https://" + LOCALHOST + ":" + PORT1));
         when(mockInternalCommunicationConfig.isHttpsRequired()).thenReturn(true);
 
         EmbeddedStateStoreLauncher launcher = new EmbeddedStateStoreLauncher(mockSeedStoreManager, mockInternalCommunicationConfig, mockHttpServerInfo, new HetuConfig());
@@ -152,8 +156,8 @@ public class TestStateStoreLauncherAndProvider
 
         // mock "remove" second instance from cluster (delete from seed store)
         seeds.remove(mockSeed2);
-        when(mockSeed1.getLocation()).thenReturn("127.0.0.1:7980");
-        when(mockSeedStoreManager.addSeed("localhost", true)).thenReturn(seeds);
+        when(mockSeed1.getLocation()).thenReturn(LOCALHOST + ":" + PORT1);
+        when(mockSeedStoreManager.addSeed(LOCALHOST, true)).thenReturn(seeds);
 
         ((HazelcastStateStore) second).shutdown();
         // Allow the first node to handle failure
@@ -167,10 +171,10 @@ public class TestStateStoreLauncherAndProvider
         Map<String, String> config = new HashMap<>();
         config.put("hazelcast.discovery.mode", "tcp-ip");
         config.put("state-store.cluster", "test-cluster");
-        config.put(DISCOVERY_PORT_CONFIG_NAME, "7981");
+        config.put(DISCOVERY_PORT_CONFIG_NAME, PORT2);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
-        return bootstrapper.bootstrap(ImmutableSet.of("127.0.0.1:7980", "127.0.0.1:7981"), config);
+        return bootstrapper.bootstrap(ImmutableSet.of(LOCALHOST + ":" + PORT1, LOCALHOST + ":" + PORT2), config);
     }
 
     @Test(timeOut = 5000, expectedExceptions = ThreadTimeoutException.class)
@@ -248,7 +252,7 @@ public class TestStateStoreLauncherAndProvider
             throws Exception
     {
         // stateStore should be empty at initialization
-        createStateStoreCluster("5991");
+        createStateStoreCluster(PORT3);
         StateStore stateStore = stateStoreProvider.getStateStore();
         assertNull(stateStore);
         stateStoreProvider.loadStateStore();
@@ -270,7 +274,7 @@ public class TestStateStoreLauncherAndProvider
         config.put(DISCOVERY_PORT_CONFIG_NAME, port);
 
         StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
-        return bootstrapper.bootstrap(ImmutableSet.of("127.0.0.1:" + port), config);
+        return bootstrapper.bootstrap(ImmutableSet.of(LOCALHOST + ":" + port), config);
     }
 
     @AfterTest
