@@ -25,6 +25,7 @@ import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
+import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.assertions.ExpressionMatcher;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
@@ -69,6 +70,7 @@ import static io.prestosql.SystemSessionProperties.DISTRIBUTED_SORT;
 import static io.prestosql.SystemSessionProperties.FILTERING_SEMI_JOIN_TO_INNER;
 import static io.prestosql.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
 import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
@@ -219,6 +221,7 @@ public class TestLogicalPlanner
                                                         .withExactOutputs(ImmutableList.of("O_ORDERKEY", "L_ORDERKEY")))))));
 
         assertPlan("SELECT DISTINCT o.orderkey FROM orders o JOIN lineitem l ON o.shippriority = l.linenumber AND o.orderkey < l.orderkey LIMIT 1",
+                noJoinReordering(),
                 anyTree(
                         node(DistinctLimitNode.class,
                                 anyTree(
@@ -263,6 +266,7 @@ public class TestLogicalPlanner
     public void testInnerInequalityJoinWithEquiJoinConjuncts()
     {
         assertPlan("SELECT 1 FROM orders o JOIN lineitem l ON o.shippriority = l.linenumber AND o.orderkey < l.orderkey",
+                noJoinReordering(),
                 anyTree(
                         anyNot(FilterNode.class,
                                 join(INNER,
@@ -293,6 +297,7 @@ public class TestLogicalPlanner
     public void testJoin()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 any(
@@ -305,6 +310,7 @@ public class TestLogicalPlanner
     public void testJoinWithOrderBySameKey()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey ORDER BY l.orderkey ASC, o.orderkey ASC",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 any(
@@ -333,16 +339,19 @@ public class TestLogicalPlanner
     public void testUncorrelatedSubqueries()
     {
         assertPlan("SELECT * FROM orders WHERE orderkey = (SELECT orderkey FROM lineitem ORDER BY orderkey LIMIT 1)",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("X", "Y")),
                                 project(
-                                        tableScan("orders", ImmutableMap.of("X", "orderkey"))),
+                                        node(FilterNode.class,
+                                                tableScan("orders", ImmutableMap.of("X", "orderkey")))),
                                 project(
                                         node(EnforceSingleRowNode.class,
                                                 anyTree(
                                                         tableScan("lineitem", ImmutableMap.of("Y", "orderkey"))))))));
 
         assertPlan("SELECT * FROM orders WHERE orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber % 4 = 0)",
+                noJoinReordering(),
                 anyTree(
                         filter("S",
                                 project(
@@ -514,6 +523,7 @@ public class TestLogicalPlanner
     public void testCorrelatedScalarSubqueryInSelect()
     {
         assertDistributedPlan("SELECT name, (SELECT name FROM region WHERE regionkey = nation.regionkey) FROM nation",
+                noJoinReordering(),
                 anyTree(
                         filter(format("CASE \"is_distinct\" WHEN true THEN true ELSE CAST(fail(%s, 'Scalar sub-query has returned multiple rows') AS boolean) END", SUBQUERY_MULTIPLE_ROWS.toErrorCode().getCode()),
                                 markDistinct("is_distinct", ImmutableList.of("unique"),
@@ -531,6 +541,7 @@ public class TestLogicalPlanner
         // Use equi-clause to trigger hash partitioning of the join sources
         assertDistributedPlan(
                 "SELECT name, (SELECT max(name) FROM region WHERE regionkey = nation.regionkey AND length(name) > length(nation.name)) FROM nation",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("n_name", "n_regionkey", "unique"),
@@ -574,6 +585,7 @@ public class TestLogicalPlanner
 
         // inner join -> streaming aggregation
         assertPlan("SELECT o.orderkey, count(*) FROM orders o, lineitem l WHERE o.orderkey=l.orderkey GROUP BY 1",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("o_orderkey"),
@@ -590,6 +602,7 @@ public class TestLogicalPlanner
 
         // left join -> streaming aggregation
         assertPlan("SELECT o.orderkey, count(*) FROM orders o LEFT JOIN lineitem l ON o.orderkey=l.orderkey GROUP BY 1",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("o_orderkey"),
@@ -606,6 +619,7 @@ public class TestLogicalPlanner
 
         // cross join - no streaming
         assertPlan("SELECT o.orderkey, count(*) FROM orders o, lineitem l GROUP BY 1",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("orderkey"),
@@ -892,7 +906,7 @@ public class TestLogicalPlanner
     @Test
     public void testFilteringSemiJoinRewriteToInnerJoin()
     {
-        assertDistributedPlan(
+        assertPlan(
                 "SELECT custkey FROM orders WHERE custkey IN (SELECT custkey FROM customer)",
                 Session.builder(getQueryRunner().getDefaultSession())
                         .setSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, "true")
@@ -1154,5 +1168,13 @@ public class TestLogicalPlanner
                                 node(AggregationNode.class,
                                         node(ProjectNode.class,
                                                 values(ImmutableList.of("x")))))));
+    }
+
+    private Session noJoinReordering()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
+                .build();
     }
 }

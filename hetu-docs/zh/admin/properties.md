@@ -8,7 +8,7 @@
 
 > - **类型：** `string`
 > - **允许值：** `AUTOMATIC`，`PARTITIONED`，`BROADCAST`
-> - **默认值：** `PARTITIONED`
+> - **默认值：** `AUTOMATIC`
 > 
 > 要使用的分布式联接的类型。  设置为`PARTITIONED`时，openLooKeng将使用哈希分布式联接。  当设置为`BROADCAST`时，将向集群中所有从左表获得数据的节点广播右表。分区联接要求使用联接键的哈希重分布这两个表。这可能比广播联接慢（有时极慢），但允许更大的联接。特别是如果右表比左表小得多，则广播联接将更快。  但是广播联接要求联接右侧过滤后的表适合每个节点的内存，而分布式联接只需要适合所有节点的分布式内存。当设置为`AUTOMATIC`时，openLooKeng将基于成本决定哪种分布类型是最优的。还将考虑将左右输入切换到联接。  在`AUTOMATIC`模式中，如果无法计算成本，例如表没有统计信息，openLooKeng将默认哈希分布式联接。也可以使用`join_distribution_type`会话属性在每个查询基础上指定。
 
@@ -399,7 +399,7 @@
 
 > - **类型：** `string`
 > - **允许值：** `AUTOMATIC`，`ELIMINATE_CROSS_JOINS`，`NONE`
-> - **默认值：** `ELIMINATE_CROSS_JOINS`
+> - **默认值：** `AUTOMATIC`
 > 
 > 要使用的联接重新排序策略。  `NONE`维持查询中列出的表的顺序。  `ELIMINATE_CROSS_JOINS`重新排序联接，以尽可能消除交叉联接，否则保持原始查询顺序。当重新排序连接时，该值还尽可能地保持原来的表顺序。`AUTOMATIC`枚举可能的顺序并使用基于统计的成本估计来确定最小成本顺序。如果统计数据不可用，或者由于任何原因无法计算成本，则使用`ELIMINATE_CROSS_JOINS`策略。也可以使用`join_reordering_strategy`会话属性在每个查询基础上指定。
 

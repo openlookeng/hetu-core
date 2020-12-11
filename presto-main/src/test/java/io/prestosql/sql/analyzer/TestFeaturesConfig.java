@@ -32,10 +32,11 @@ import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.HASHSET;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
-import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
-import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.NONE;
+import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_PATH;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILL_ENABLED;
@@ -55,15 +56,15 @@ public class TestFeaturesConfig
                 .setMemoryCostWeight(10)
                 .setNetworkCostWeight(15)
                 .setDistributedIndexJoinsEnabled(false)
-                .setJoinDistributionType(PARTITIONED)
-                .setJoinMaxBroadcastTableSize(null)
+                .setJoinDistributionType(JoinDistributionType.AUTOMATIC)
+                .setJoinMaxBroadcastTableSize(new DataSize(100, MEGABYTE))
                 .setGroupedExecutionEnabled(false)
                 .setDynamicScheduleForGroupedExecutionEnabled(false)
                 .setConcurrentLifespansPerTask(0)
                 .setFastInequalityJoins(true)
                 .setColocatedJoinsEnabled(false)
                 .setSpatialJoinsEnabled(true)
-                .setJoinReorderingStrategy(ELIMINATE_CROSS_JOINS)
+                .setJoinReorderingStrategy(JoinReorderingStrategy.AUTOMATIC)
                 .setMaxReorderedJoins(9)
                 .setRedistributeWrites(true)
                 // redistribute writes type config
@@ -114,7 +115,7 @@ public class TestFeaturesConfig
                 .setWorkProcessorPipelines(false)
                 .setSkipRedundantSort(true)
                 .setPredicatePushdownUseTableProperties(true)
-                .setEnableDynamicFiltering(false)
+                .setEnableDynamicFiltering(true)
                 .setDynamicFilteringMaxPerDriverRowCount(10000)
                 .setDynamicFilteringDataType(BLOOM_FILTER)
                 .setDynamicFilteringWaitTime(new Duration(1000, MILLISECONDS))
@@ -204,7 +205,7 @@ public class TestFeaturesConfig
                 .put("experimental.work-processor-pipelines", "true")
                 .put("optimizer.skip-redundant-sort", "false")
                 .put("optimizer.predicate-pushdown-use-table-properties", "false")
-                .put("enable-dynamic-filtering", "true")
+                .put("enable-dynamic-filtering", "false")
                 .put("experimental.enable-execution-plan-cache", "false")
                 .put("hetu.query-pushdown", "false")
                 .put("optimizer.push-limit-down", "false")
@@ -248,7 +249,7 @@ public class TestFeaturesConfig
                 .setMaxReorderedJoins(5)
                 .setRedistributeWrites(false)
                 // redistribute writes type config
-                .setRedistributeWritesType(FeaturesConfig.RedistributeWritesType.PARTITIONED)
+                .setRedistributeWritesType(RedistributeWritesType.PARTITIONED)
                 .setScaleWriters(true)
                 .setWriterMinSize(new DataSize(42, GIGABYTE))
                 .setOptimizeMetadataQueries(true)
@@ -291,7 +292,7 @@ public class TestFeaturesConfig
                 .setWorkProcessorPipelines(true)
                 .setSkipRedundantSort(false)
                 .setPredicatePushdownUseTableProperties(false)
-                .setEnableDynamicFiltering(true)
+                .setEnableDynamicFiltering(false)
                 .setQueryPushDown(false)
                 .setImplicitConversionEnabled(true)
                 .setPushLimitDown(false)

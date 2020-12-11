@@ -81,7 +81,7 @@ public class RemoveUnsupportedDynamicFilters
     private final Metadata metadata;
     private final StatsCalculator statsCalculator;
     private StatsProvider statsProvider;
-    private final Set<String> removedDynamicFilterIds = new HashSet<>();
+    private Set<String> removedDynamicFilterIds;
 
     public RemoveUnsupportedDynamicFilters(Metadata metadata, StatsCalculator statsCalculator)
     {
@@ -92,6 +92,7 @@ public class RemoveUnsupportedDynamicFilters
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
+        this.removedDynamicFilterIds = new HashSet<>();
         this.statsProvider = new CachingStatsProvider(statsCalculator, session, symbolAllocator.getTypes());
         PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(session, metadata, removedDynamicFilterIds), ImmutableSet.of());
         return SimplePlanRewriter.rewriteWith(new RemoveFilterVisitor(removedDynamicFilterIds), result.getNode(), null);
@@ -481,6 +482,31 @@ public class RemoveUnsupportedDynamicFilters
                         node.getRightHashSymbol(),
                         node.getDistributionType(),
                         node.isSpillable(),
+                        dynamicFilters);
+            }
+            return node;
+        }
+
+        @Override
+        public PlanNode visitSemiJoin(SemiJoinNode node, RewriteContext<Void> context)
+        {
+            PlanNode filteringSource = context.rewrite(node.getFilteringSource());
+            PlanNode source = context.rewrite(node.getSource());
+            Optional<String> dynamicFilters = node.getDynamicFilterId()
+                    .filter(entry -> !removedDynamicFilterIds.contains(entry));
+            if (filteringSource != node.getFilteringSource() ||
+                    source != node.getSource() ||
+                    !dynamicFilters.equals(node.getDynamicFilterId())) {
+                return new SemiJoinNode(
+                        node.getId(),
+                        node.getSource(),
+                        node.getFilteringSource(),
+                        node.getSourceJoinSymbol(),
+                        node.getFilteringSourceJoinSymbol(),
+                        node.getSemiJoinOutput(),
+                        node.getSourceHashSymbol(),
+                        node.getFilteringSourceHashSymbol(),
+                        node.getDistributionType(),
                         dynamicFilters);
             }
             return node;
