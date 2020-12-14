@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -136,8 +137,22 @@ public class CreateIndexOperator
             // update metadata
             IndexClient indexClient = heuristicIndexerManager.getIndexClient();
             try {
-                if (!indexClient.indexRecordExists(createIndexMetadata)) {
-                    indexClient.addIndexRecord(createIndexMetadata);
+                IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
+
+                switch (recordStatus) {
+                    case SAME_NAME:
+                    case IN_PROGRESS_SAME_NAME:
+                    case IN_PROGRESS_SAME_CONTENT:
+                    case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                    case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
+                        indexClient.deleteIndexRecord(createIndexMetadata.getIndexName(), Collections.emptyList());
+                        indexClient.addIndexRecord(createIndexMetadata);
+                        break;
+                    case NOT_FOUND:
+                    case SAME_INDEX_PART_CAN_MERGE:
+                        indexClient.addIndexRecord(createIndexMetadata);
+                        break;
+                    default:
                 }
             }
             catch (IOException e) {
