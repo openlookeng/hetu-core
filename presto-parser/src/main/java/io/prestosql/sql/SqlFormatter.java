@@ -114,6 +114,7 @@ import io.prestosql.sql.tree.TransactionMode;
 import io.prestosql.sql.tree.Union;
 import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
+import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Use;
 import io.prestosql.sql.tree.Values;
 import io.prestosql.sql.tree.With;
@@ -870,6 +871,13 @@ public final class SqlFormatter
             }
             builder.append(node.getIndexName());
 
+            return null;
+        }
+
+        @Override
+        protected Void visitUpdateIndex(UpdateIndex node, Integer context)
+        {
+            append(context, "UPDATE INDEX ");
             return null;
         }
 

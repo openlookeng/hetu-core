@@ -14,6 +14,7 @@
  */
 package io.prestosql.operator;
 
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.spi.HetuConstant;
@@ -52,6 +53,7 @@ public class CreateIndexOperator
     private final CreateIndexMetadata createIndexMetadata;
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final AtomicBoolean recordCreated;
+    private static final Logger LOG = Logger.get(CreateIndexOperator.class);
 
     public CreateIndexOperator(
             OperatorContext operatorContext,
@@ -205,8 +207,7 @@ public class CreateIndexOperator
                     break;
                 }
                 default:
-                    new IOException("Create level not supported");
-                    break;
+                    throw new IllegalArgumentException("Create level not supported");
             }
         }
         catch (IOException e) {

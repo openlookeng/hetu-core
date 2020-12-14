@@ -226,9 +226,9 @@ public class AccessDeniedException
         throw new AccessDeniedException("Cannot create index");
     }
 
-    public static void denyCreateIndex(String indexName)
+    public static void denyCreateIndex(String tableName)
     {
-        denyCreateIndex(indexName, null);
+        denyCreateIndex(tableName, null);
     }
 
     public static void denyCreateIndex(String indexName, String extraInfo)

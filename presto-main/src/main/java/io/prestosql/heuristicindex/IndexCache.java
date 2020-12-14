@@ -63,7 +63,7 @@ public class IndexCache
         if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
             loadDelay = PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY).toMillis();
             // in millisecond
-            long refreshRate = Math.min(loadDelay / 2, 5000L);
+            long refreshRate = Math.max(loadDelay / 2, 5000L);
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
             executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
             CacheBuilder<IndexCacheKey, List<IndexMetadata>> cacheBuilder = CacheBuilder.newBuilder()

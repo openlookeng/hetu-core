@@ -21,6 +21,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.Expression;
@@ -34,7 +35,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_INDEX;
 
 public class DropIndexTask
@@ -52,16 +52,17 @@ public class DropIndexTask
         IndexClient indexClient = heuristicIndexerManager.getIndexClient();
         String indexName = statement.getIndexName().toString();
 
-        Session session = stateMachine.getSession();
-        QualifiedObjectName fullObjectName = createQualifiedObjectName(session, statement, statement.getIndexName());
-
-        accessControl.checkCanDropIndex(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
-
         try {
+            IndexRecord record = indexClient.getIndexRecord(indexName);
             // check indexName exist, call heuristic index api to drop index
-            if (indexClient.getIndexRecord(indexName) == null) {
+            if (record == null) {
                 throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exists", indexName);
             }
+
+            QualifiedObjectName fullObjectName = QualifiedObjectName.valueOf(record.table);
+            Session session = stateMachine.getSession();
+            accessControl.checkCanDropIndex(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
+
             List<String> partitions = Collections.emptyList();
             if (statement.getPartitions().isPresent()) {
                 partitions = HeuristicIndexUtils.extractPartitions(statement.getPartitions().get());

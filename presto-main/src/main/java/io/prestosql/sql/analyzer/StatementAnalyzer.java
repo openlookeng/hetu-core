@@ -143,6 +143,7 @@ import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.TableSubquery;
 import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
+import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Use;
 import io.prestosql.sql.tree.VacuumTable;
 import io.prestosql.sql.tree.Values;
@@ -807,6 +808,12 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitUpdateIndex(UpdateIndex node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
         protected Scope visitComment(Comment node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
@@ -1034,11 +1041,8 @@ class StatementAnalyzer
         {
             if (analysis.getOriginalStatement() instanceof CreateIndex) {
                 CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
-                // check can create index
-                QualifiedObjectName indexFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getIndexName());
-                accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
-                // check index parameters validate
                 QualifiedObjectName tableFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getTableName());
+                accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), tableFullName);
                 String tableName = tableFullName.toString();
                 // check whether catalog support create index
                 if (!metadata.isHeuristicIndexSupported(session, tableFullName)) {

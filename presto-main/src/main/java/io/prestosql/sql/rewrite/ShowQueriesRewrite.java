@@ -27,7 +27,6 @@ import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager.SessionPropertyValue;
 import io.prestosql.metadata.TableHandle;
@@ -87,6 +86,7 @@ import io.prestosql.sql.tree.TableElement;
 import io.prestosql.sql.tree.Values;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -642,20 +642,23 @@ final class ShowQueriesRewrite
         @Override
         protected Node visitShowIndex(ShowIndex node, Void context)
         {
-            if (node.getIndexName() == null) {
-                accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), null);
-            }
-            else {
-                QualifiedObjectName indexFullName = MetadataUtil.createQualifiedObjectName(session, node, QualifiedName.of(node.getIndexName()));
-                accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
-            }
-
-            List<IndexRecord> indexRecords = null;
+            List<IndexRecord> indexRecords;
             try {
                 indexRecords = readIndexRecords(node.getIndexName());
             }
             catch (IOException e) {
-                e.printStackTrace();
+                throw new UncheckedIOException("Error reading index records, ", e);
+            }
+
+            // Access Control
+            if (node.getIndexName() == null) {
+                accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), null);
+            }
+            else {
+                for (IndexRecord record : indexRecords) {
+                    QualifiedObjectName indexFullName = QualifiedObjectName.valueOf(record.table);
+                    accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
+                }
             }
 
             ImmutableList.Builder<Expression> rows = ImmutableList.builder();
