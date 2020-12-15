@@ -129,7 +129,7 @@ public class IndexRecordManager
 
     /**
      * Add IndexRecord into record file. If the method is called with a name that already exists,
-     * it will OVERWRITE the existing entry but combine the note part
+     * it will OVERWRITE the existing entry but combine the partition column
      */
     public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
             throws IOException

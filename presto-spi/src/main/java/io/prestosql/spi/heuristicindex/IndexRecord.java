@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 public class IndexRecord
 {
     public static final String COLUMN_DELIMITER = ",";
+    public static final String INPROGRESS_PROPERTY_KEY = "CreationInProgress";
+
     public final String name;
     public final String user;
     public final String table;
@@ -65,6 +67,11 @@ public class IndexRecord
     {
         return String.format("%s|%s|%s|%s|%s|%s|%s|%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType,
                 String.join(",", properties), String.join(",", partitions), lastModifiedTime);
+    }
+
+    public boolean isInProgressRecord()
+    {
+        return this.properties.stream().anyMatch(property -> property.startsWith(INPROGRESS_PROPERTY_KEY));
     }
 
     @Override

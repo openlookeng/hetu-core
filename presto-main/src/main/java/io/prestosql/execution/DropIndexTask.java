@@ -53,7 +53,7 @@ public class DropIndexTask
         String indexName = statement.getIndexName().toString();
 
         try {
-            IndexRecord record = indexClient.getIndexRecord(indexName);
+            IndexRecord record = indexClient.lookUpIndexRecord(indexName);
             // check indexName exist, call heuristic index api to drop index
             if (record == null) {
                 throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exists", indexName);
@@ -68,7 +68,7 @@ public class DropIndexTask
                 partitions = HeuristicIndexUtils.extractPartitions(statement.getPartitions().get());
 
                 List<String> missingPartitions = new ArrayList<>(partitions);
-                missingPartitions.removeAll(indexClient.getIndexRecord(indexName).partitions);
+                missingPartitions.removeAll(indexClient.lookUpIndexRecord(indexName).partitions);
                 if (!missingPartitions.isEmpty()) {
                     throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not contain partitions: %s", indexName, missingPartitions);
                 }

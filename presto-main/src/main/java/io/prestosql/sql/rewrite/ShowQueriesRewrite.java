@@ -665,6 +665,18 @@ final class ShowQueriesRewrite
             for (IndexRecord v : indexRecords) {
                 String partitions = (v.partitions == null || v.partitions.isEmpty()) ? "all" : String.join(",", v.partitions);
                 StringBuilder partitionsStrToDisplay = new StringBuilder();
+
+                String inProgressHint = "";
+                if (v.isInProgressRecord()) {
+                    long timeElapsed = System.currentTimeMillis() - v.lastModifiedTime;
+                    long millis = timeElapsed % 1000;
+                    long second = (timeElapsed / 1000) % 60;
+                    long minute = (timeElapsed / (1000 * 60)) % 60;
+                    long hour = (timeElapsed / (1000 * 60 * 60)) % 24;
+
+                    inProgressHint = String.format(" (has been in progress for %02dh %02dm %02d.%ds)", hour, minute, second, millis);
+                }
+
                 for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
                     partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
                     if (i + COL_MAX_LENGTH < partitions.length()) {
@@ -680,7 +692,7 @@ final class ShowQueriesRewrite
                         new StringLiteral(String.join(",", v.columns)),
                         new StringLiteral(v.indexType),
                         new StringLiteral(partitionsStrToDisplay.toString()),
-                        new StringLiteral(String.join(",", v.properties)),
+                        new StringLiteral(String.join(",", v.properties) + inProgressHint),
                         TRUE_LITERAL));
             }
 
@@ -775,7 +787,7 @@ final class ShowQueriesRewrite
             }
             else {
                 List<IndexRecord> records = Collections.singletonList(
-                        heuristicIndexerManager.getIndexClient().getIndexRecord(indexName));
+                        heuristicIndexerManager.getIndexClient().lookUpIndexRecord(indexName));
                 if (records.get(0) == null) {
                     return Collections.emptyList();
                 }

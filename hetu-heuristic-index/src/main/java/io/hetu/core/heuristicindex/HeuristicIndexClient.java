@@ -84,7 +84,7 @@ public class HeuristicIndexClient
         Path indexKeyPath = Paths.get(path);
         try {
             if (indexRecordManager.lookUpIndexRecord(indexKeyPath.subpath(0, 1).toString(),
-                    new String[]{indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
+                    new String[] {indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
                 // Use index record file to pre-screen. If record does not contain the index, skip loading
                 return null;
             }
@@ -123,7 +123,7 @@ public class HeuristicIndexClient
             IndexMetadata index = new IndexMetadata(
                     entry.getValue(),
                     table.toString(),
-                    new String[]{column.toString()},
+                    new String[] {column.toString()},
                     root.toString(),
                     remainder.toString(),
                     splitStart,
@@ -163,7 +163,7 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
+    public RecordStatus lookUpIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
         IndexRecord sameNameRecord = indexRecordManager.lookUpIndexRecord(createIndexMetadata.getIndexName());
@@ -174,7 +174,7 @@ public class HeuristicIndexClient
         if (sameNameRecord == null) {
             if (sameIndexRecord != null) {
                 LOG.error("Index with same (table,column,indexType) already exists with name [%s]%n%n", sameIndexRecord.name);
-                return true;
+                return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_CONTENT : RecordStatus.SAME_CONTENT;
             }
         }
         else {
@@ -192,16 +192,19 @@ public class HeuristicIndexClient
 
                 if (!partitionMerge) {
                     LOG.error("Same entry already exists and partitions contain conflicts: [%s]. To update, please delete old index first.%n%n", conflict);
-                    return true;
+                    return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_INDEX_PART_CONFLICT : RecordStatus.SAME_INDEX_PART_CONFLICT;
+                }
+                else {
+                    return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE : RecordStatus.SAME_INDEX_PART_CAN_MERGE;
                 }
             }
             else {
                 LOG.error("Index with name [%s] already exists with different content: [%s]%n%n", createIndexMetadata.getIndexName(), sameNameRecord);
-                return true;
+                return sameNameRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_NAME : RecordStatus.SAME_NAME;
             }
         }
 
-        return false;
+        return RecordStatus.NOT_FOUND;
     }
 
     @Override
@@ -212,7 +215,7 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public IndexRecord getIndexRecord(String name)
+    public IndexRecord lookUpIndexRecord(String name)
             throws IOException
     {
         return indexRecordManager.lookUpIndexRecord(name);
@@ -234,6 +237,13 @@ public class HeuristicIndexClient
                 createIndexMetadata.getIndexType(),
                 properties,
                 createIndexMetadata.getPartitions());
+    }
+
+    @Override
+    public void deleteIndexRecord(String indexName, List<String> partitionsToDelete)
+            throws IOException
+    {
+        indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
     }
 
     @Override
@@ -282,11 +292,6 @@ public class HeuristicIndexClient
         indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
     }
 
-    private boolean notDirectory(Path path)
-    {
-        return !LOCAL_FS_CLIENT.isDirectory(path);
-    }
-
     /**
      * Reads all files at the specified path recursively.
      * <br>
@@ -295,7 +300,7 @@ public class HeuristicIndexClient
      * as a BloomIndex.
      *
      * @param path relative path to the index file or dir, if dir, it will be searched recursively (relative to the
-     *             root uri, if one was set)
+     * root uri, if one was set)
      * @return an immutable mapping from all index files read to the corresponding index that was loaded
      * @throws IOException
      */
@@ -360,7 +365,7 @@ public class HeuristicIndexClient
                 IndexMetadata indexMetadata = new IndexMetadata(
                         index,
                         tableName,
-                        new String[]{column},
+                        new String[] {column},
                         root.toString(),
                         filePath.toString(),
                         0L,

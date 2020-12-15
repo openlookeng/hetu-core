@@ -56,7 +56,14 @@ public class NoOpIndexClient
     }
 
     @Override
-    public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
+    public void deleteIndexRecord(String indexName, List<String> partitionsToDelete)
+            throws IOException
+    {
+        throw new UnsupportedOperationException(ERROR_MSG);
+    }
+
+    @Override
+    public RecordStatus lookUpIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
         throw new UnsupportedOperationException(ERROR_MSG);
@@ -77,7 +84,7 @@ public class NoOpIndexClient
     }
 
     @Override
-    public IndexRecord getIndexRecord(String name)
+    public IndexRecord lookUpIndexRecord(String name)
             throws IOException
     {
         throw new UnsupportedOperationException(ERROR_MSG);
