@@ -16,12 +16,14 @@ package io.prestosql.elasticsearch;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
+import io.prestosql.elasticsearch.decoders.ArrayDecoder;
 import io.prestosql.elasticsearch.decoders.BigintDecoder;
 import io.prestosql.elasticsearch.decoders.BooleanDecoder;
 import io.prestosql.elasticsearch.decoders.Decoder;
 import io.prestosql.elasticsearch.decoders.DoubleDecoder;
 import io.prestosql.elasticsearch.decoders.IdColumnDecoder;
 import io.prestosql.elasticsearch.decoders.IntegerDecoder;
+import io.prestosql.elasticsearch.decoders.IpAddressDecoder;
 import io.prestosql.elasticsearch.decoders.RealDecoder;
 import io.prestosql.elasticsearch.decoders.RowDecoder;
 import io.prestosql.elasticsearch.decoders.ScoreColumnDecoder;
@@ -37,6 +39,7 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import org.elasticsearch.action.search.SearchResponse;
@@ -61,6 +64,7 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.StandardTypes.IPADDRESS;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
@@ -272,34 +276,37 @@ public class ElasticsearchPageSource
     private Decoder createDecoder(ConnectorSession session, String path, Type type)
     {
         if (type.equals(VARCHAR)) {
-            return new VarcharDecoder();
+            return new VarcharDecoder(path);
         }
         else if (type.equals(VARBINARY)) {
-            return new VarbinaryDecoder();
+            return new VarbinaryDecoder(path);
         }
         else if (type.equals(TIMESTAMP)) {
             return new TimestampDecoder(session, path);
         }
         else if (type.equals(BOOLEAN)) {
-            return new BooleanDecoder();
+            return new BooleanDecoder(path);
         }
         else if (type.equals(DOUBLE)) {
-            return new DoubleDecoder();
+            return new DoubleDecoder(path);
         }
         else if (type.equals(REAL)) {
-            return new RealDecoder();
+            return new RealDecoder(path);
         }
         else if (type.equals(TINYINT)) {
-            return new TinyintDecoder();
+            return new TinyintDecoder(path);
         }
         else if (type.equals(SMALLINT)) {
-            return new SmallintDecoder();
+            return new SmallintDecoder(path);
         }
         else if (type.equals(INTEGER)) {
-            return new IntegerDecoder();
+            return new IntegerDecoder(path);
         }
         else if (type.equals(BIGINT)) {
-            return new BigintDecoder();
+            return new BigintDecoder(path);
+        }
+        else if (type.getTypeSignature().getBase().equals(IPADDRESS)) {
+            return new IpAddressDecoder(path, type);
         }
         else if (type instanceof RowType) {
             RowType rowType = (RowType) type;
@@ -313,7 +320,11 @@ public class ElasticsearchPageSource
                     .map(Optional::get)
                     .collect(toImmutableList());
 
-            return new RowDecoder(fieldNames, decoders);
+            return new RowDecoder(path, fieldNames, decoders);
+        }
+        if (type instanceof ArrayType) {
+            Type elementType = ((ArrayType) type).getElementType();
+            return new ArrayDecoder(path, createDecoder(session, path, elementType));
         }
 
         throw new UnsupportedOperationException("Type not supported: " + type);

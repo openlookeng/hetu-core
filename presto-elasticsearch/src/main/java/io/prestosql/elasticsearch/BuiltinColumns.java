@@ -13,6 +13,7 @@
  */
 package io.prestosql.elasticsearch;
 
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
 
@@ -55,5 +56,10 @@ enum BuiltinColumns
     public ColumnMetadata getMetadata()
     {
         return new ColumnMetadata(name, type, "", true);
+    }
+
+    public ColumnHandle getColumnHandle()
+    {
+        return new ElasticsearchColumnHandle(name, type);
     }
 }
