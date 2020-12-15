@@ -21,6 +21,7 @@ import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.StringLiteral;
+import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -132,6 +134,119 @@ public class TestBTreeIndex
         assertEquals("value5", result.next().toString());
         assertEquals("value6", result.next().toString());
         assertEquals("value7", result.next().toString());
+        index.close();
+    }
+
+    @Test
+    public void testGreaterThan()
+            throws IOException
+    {
+        BTreeIndex index = new BTreeIndex();
+        for (int i = 0; i < 25; i++) {
+            List<KeyValue> keyValues = new ArrayList<>();
+            Long key = Long.valueOf(100 + i);
+            String value = "value" + i;
+            keyValues.add(new KeyValue(key, value));
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
+        }
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
+        ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.GREATER_THAN, new SymbolReference("dummyCol"), new LongLiteral("120"));
+        Iterator result = readIndex.lookUp(comparisonExpression);
+        assertNotNull(result, "Result shouldn't be null");
+        System.out.println(result.hasNext());
+        for (int i = 21; i < 25; i++) {
+            Object data = result.next();
+            assertEquals("value" + i, data.toString());
+        }
+        index.close();
+    }
+
+    @Test
+    public void testGreaterThanEqualTo()
+            throws IOException
+    {
+        BTreeIndex index = new BTreeIndex();
+        for (int i = 0; i < 100; i++) {
+            List<KeyValue> keyValues = new ArrayList<>();
+            Long key = Long.valueOf(100 + i);
+            String value = "value" + i;
+            keyValues.add(new KeyValue(key, value));
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
+        }
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
+        ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL, new SymbolReference("dummyCol"), new LongLiteral("120"));
+        Iterator result = readIndex.lookUp(comparisonExpression);
+        assertNotNull(result, "Result shouldn't be null");
+        System.out.println(result.hasNext());
+        for (int i = 20; i < 100; i++) {
+            Object data = result.next();
+            assertEquals("value" + i, data.toString());
+        }
+        assertFalse(result.hasNext());
+        index.close();
+    }
+
+    @Test
+    public void testLessThan()
+            throws IOException
+    {
+        BTreeIndex index = new BTreeIndex();
+        for (int i = 0; i < 100; i++) {
+            List<KeyValue> keyValues = new ArrayList<>();
+            Long key = Long.valueOf(100 + i);
+            String value = "value" + i;
+            keyValues.add(new KeyValue(key, value));
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
+        }
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
+        ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN, new SymbolReference("dummyCol"), new LongLiteral("120"));
+        Iterator result = readIndex.lookUp(comparisonExpression);
+        assertNotNull(result, "Result shouldn't be null");
+        assertTrue(result.hasNext());
+        for (int i = 0; i < 20; i++) {
+            assertEquals("value" + i, result.next().toString());
+        }
+        assertFalse(result.hasNext());
+        index.close();
+    }
+
+    @Test
+    public void testLessThanEqualTo()
+            throws IOException
+    {
+        BTreeIndex index = new BTreeIndex();
+        for (int i = 0; i < 100; i++) {
+            List<KeyValue> keyValues = new ArrayList<>();
+            Long key = Long.valueOf(100 + i);
+            String value = "value" + i;
+            keyValues.add(new KeyValue(key, value));
+            Pair pair = new Pair("dummyCol", keyValues);
+            index.addKeyValues(Collections.singletonList(pair));
+        }
+        File file = getFile();
+        index.serialize(new FileOutputStream(file));
+        BTreeIndex readIndex = new BTreeIndex();
+        readIndex.deserialize(new FileInputStream(file));
+        ComparisonExpression comparisonExpression = new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN_OR_EQUAL, new SymbolReference("dummyCol"), new LongLiteral("120"));
+        Iterator result = readIndex.lookUp(comparisonExpression);
+        assertNotNull(result, "Result shouldn't be null");
+        assertTrue(result.hasNext());
+        for (int i = 0; i <= 20; i++) {
+            assertEquals("value" + i, result.next().toString());
+        }
+        assertFalse(result.hasNext());
         index.close();
     }
 

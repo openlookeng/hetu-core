@@ -133,4 +133,28 @@ public class TypeUtils
         }
         throw new RuntimeException("Type is not supported");
     }
+
+    /**
+     * Double is 8 bytes in java. This returns the 8 bytes of the decimal value of BigInteger
+     * @param value
+     * @return
+     */
+    public static byte[] getBytes(BigDecimal value)
+    {
+        byte[] bytes = new byte[8];
+        java.nio.ByteBuffer.wrap(bytes).putDouble(value.doubleValue());
+        return bytes;
+    }
+
+    /**
+     * Double is 8 bytes in java. This returns the 8 bytes of the decimal value of Double
+     * @param value
+     * @return
+     */
+    public static byte[] getBytes(Double value)
+    {
+        byte[] bytes = new byte[8];
+        java.nio.ByteBuffer.wrap(bytes).putDouble(value.doubleValue());
+        return bytes;
+    }
 }

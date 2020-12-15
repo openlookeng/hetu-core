@@ -240,7 +240,7 @@ public class BTreeIndex
                     result.addAll(concurrentNavigableMap.values());
                     break;
                 case GREATER_THAN_OR_EQUAL:
-                    concurrentNavigableMap = dataMap.subMap(key, false, dataMap.lastKey(), true);
+                    concurrentNavigableMap = dataMap.subMap(key, true, dataMap.lastKey(), true);
                     result.addAll(concurrentNavigableMap.values());
                     break;
             }

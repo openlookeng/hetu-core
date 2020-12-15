@@ -17,18 +17,22 @@ package io.hetu.core.plugin.heuristicindex.index.bloom;
 
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
+import io.hetu.core.heuristicindex.util.TypeUtils;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.tree.ComparisonExpression;
+import kotlin.text.Charsets;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Function;
 
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCompExpEqual;
 
@@ -46,6 +50,23 @@ public class BloomIndex
     private BloomFilter filter;
     private double fpp = DEFAULT_FPP;
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
+    Function<Object, Boolean> matchFunction = new Function<Object, Boolean>()
+    {
+        @Override
+        public Boolean apply(Object object)
+        {
+            if (object instanceof Double) {
+                return filter.test((Double) object);
+            }
+            else if (object instanceof BigDecimal) {
+                BigDecimal value = (BigDecimal) object;
+                return filter.test(TypeUtils.getBytes(value));
+            }
+            else {
+                return filter.test(object.toString().getBytes(Charsets.UTF_8));
+            }
+        }
+    };
 
     @Override
     public String getId()
@@ -66,7 +87,13 @@ public class BloomIndex
         List<Object> columnIdxValue = values.get(0).getSecond();
         for (Object value : columnIdxValue) {
             if (value != null) {
-                getFilter().add(value.toString().getBytes());
+                if (value instanceof Double) {
+                    Double doubleVal = (Double) value;
+                    getFilter().add(TypeUtils.getBytes(doubleVal));
+                }
+                else {
+                    getFilter().add(value.toString().getBytes());
+                }
             }
         }
         return true;
@@ -85,7 +112,7 @@ public class BloomIndex
         }
         else if (expression instanceof ComparisonExpression) {
             // test ComparisonExpression matching
-            return matchCompExpEqual(expression, value -> getFilter().test(value.toString().getBytes()));
+            return matchCompExpEqual(expression, matchFunction);
         }
 
         throw new UnsupportedOperationException("Expression not supported by " + ID + " index.");
