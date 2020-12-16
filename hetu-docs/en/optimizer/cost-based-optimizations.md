@@ -47,6 +47,16 @@ The valid values are:
 - `BROADCAST` - broadcast join distribution is used for all joins
 - `PARTITIONED` - partitioned join distribution is used for all join
 
+Dynamic Filter Creation
+-------------------------
+Dynamic filters are created for all `JoinNode` at the planning phase. However, due to the mechanism of dynamic filtering, under different scenarios, dynamic filters are harming the performance. The waiting for the build side of `JoinNode` that has high selectivity on the deep-subtrees' dynamic filtering does not help the performance, while dynamic filtering on low selectivity hurts the performance. To accommodate both cases, openLooKeng can optimize the dynamic filter creation based on this characteristic.
+
+The dynamic filter creation is governed by the `optimize_dynamic_filter_generation` session property.
+
+The valid values are:
+- `true` (default) - enable dynamic filter creation
+- `false` - disable dynamic filter creation
+
 Connector Implementations
 -------------------------
 

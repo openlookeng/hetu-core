@@ -43,6 +43,18 @@ join分发策略由`join_distribution_type`会话属性控制，其中`join-dist
 - `BROADCAST` -对所有join使用广播join分布
 - `PARTITIONED` -对所有join使用分区join分布
 
+动态过滤生成
+-------------------------
+根据构建测的`JoinNode`属性选择性的生成有效的动态过滤器。当其为高选择率时，仅生成主要的过滤器。其为低选择率时，则不生成过滤器。
+
+使用基于成本的动态过滤生成，openLooKeng将根据构建测的`JoinNode`选择率高低来选择性的生成动态过滤。
+
+动态过滤生成由`optimize_dynamic_filter_generation`会话属性控制启用。
+
+有效值如下：
+- `true` （默认值）- 启用动态过滤生成
+- `false` - 不启用动态过滤生成
+
 连接器实现
 -------------------------
 
