@@ -157,7 +157,8 @@ public class CachedSqlQueryExecution
                 isExecutionPlanCacheEnabled(session) &&
                 analysis.getParameters().isEmpty() &&
                 validateAndExtractTableAndColumns(analysis, metadata, session, tableNames, tableStatistics, columnTypes) &&
-                isCacheable(statement);
+                isCacheable(statement) &&
+                (!(analysis.getOriginalStatement() instanceof CreateIndex)); // create index should not be cached
 
         cacheable = cacheable && !tableNames.isEmpty();
         if (!cacheable) {

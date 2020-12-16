@@ -16,6 +16,7 @@ package io.prestosql.spi.heuristicindex;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -39,7 +40,7 @@ public class IndexRecord
         this.user = user == null ? "" : user;
         this.table = table;
         this.columns = columns;
-        this.indexType = indexType;
+        this.indexType = indexType.toUpperCase(Locale.ENGLISH);
         this.properties = properties;
         this.partitions = partitions;
         this.lastModifiedTime = System.currentTimeMillis();

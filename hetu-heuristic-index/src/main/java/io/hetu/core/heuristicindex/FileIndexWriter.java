@@ -39,7 +39,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -213,13 +212,13 @@ public class FileIndexWriter
         }
 
         // Create index and put values
-        try (Index index = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType().toLowerCase(Locale.ENGLISH))) {
+        try (Index index = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType())) {
             index.setProperties(createIndexMetadata.getProperties());
             index.setExpectedNumOfEntries(expectedNumEntries);
             index.addValues(stripeData);
 
             // Persist one index (e.g. 3.bloom)
-            String indexFileName = offset + "." + index.getId().toLowerCase(Locale.ENGLISH);
+            String indexFileName = offset + "." + index.getId();
             try (OutputStream os = LOCAL_FS_CLIENT.newOutputStream(tmpPath.resolve(indexFileName))) {
                 index.serialize(os);
             }

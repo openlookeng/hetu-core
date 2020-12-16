@@ -17,8 +17,6 @@ package io.hetu.core.heuristicindex;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.hetu.core.filesystem.HetuLocalFileSystemClient;
-import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.plugin.heuristicindex.index.btree.BTreeIndex;
 import io.prestosql.spi.connector.CreateIndexMetadata;
@@ -42,7 +40,6 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -58,8 +55,6 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexClient
         implements IndexClient
 {
-    private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
-            new LocalConfig(new Properties()), Paths.get("/"));
     private static final Logger LOG = Logger.get(HeuristicIndexClient.class);
 
     private HetuFileSystemClient fs;

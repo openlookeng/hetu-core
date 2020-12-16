@@ -216,12 +216,12 @@ public class TestIndexRecordManager
 
     @Test
     public void testAddAndLookUp()
-            throws IOException, IllegalAccessException
+            throws IOException
     {
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "minmax", Collections.emptyList(), Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("12"));
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), ImmutableList.of("12", "123"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "MINMAX", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "MINMAX", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "MINMAX", Collections.emptyList(), ImmutableList.of("12"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "MINMAX", Collections.emptyList(), ImmutableList.of("12", "123"));
     }
 
     private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
