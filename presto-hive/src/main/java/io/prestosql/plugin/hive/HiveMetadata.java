@@ -30,6 +30,7 @@ import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
+import io.prestosql.plugin.hive.metastore.BooleanStatistics;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
@@ -1658,6 +1659,7 @@ public class HiveMetadata
 
     private PartitionStatistics updateStatsForAcidOperation(HiveACIDWriteType hiveACIDWriteType, PartitionStatistics partitionStatistics)
     {
+        Map<String, HiveColumnStatistics> updatedColumnStatistics = new HashMap<>();
         if (hiveACIDWriteType == HiveACIDWriteType.UPDATE || hiveACIDWriteType == HiveACIDWriteType.VACUUM) {
             //No change in rowcount, so keep delta as empty for rowCount
             HiveBasicStatistics basicStatistics = partitionStatistics.getBasicStatistics();
@@ -1665,18 +1667,44 @@ public class HiveMetadata
                     OptionalLong.of(0L),
                     basicStatistics.getInMemoryDataSizeInBytes(),
                     basicStatistics.getOnDiskDataSizeInBytes());
-            return new PartitionStatistics(updatedBasicStatistics, partitionStatistics.getColumnStatistics());
+            updateBooleanStatisticsInColumnStatistics(hiveACIDWriteType, partitionStatistics, updatedColumnStatistics);
+            return new PartitionStatistics(updatedBasicStatistics, updatedColumnStatistics);
+            //return new PartitionStatistics(updatedBasicStatistics, partitionStatistics.getColumnStatistics());
         }
         else if (hiveACIDWriteType == HiveACIDWriteType.DELETE) {
             //rowCount should reduce for DELETE operation
             HiveBasicStatistics basicStatistics = partitionStatistics.getBasicStatistics();
             HiveBasicStatistics updatedBasicStatistics = new HiveBasicStatistics(basicStatistics.getFileCount(),
                     OptionalLong.of(Math.negateExact(basicStatistics.getRowCount().getAsLong())),
-                    basicStatistics.getInMemoryDataSizeInBytes(),
-                    basicStatistics.getOnDiskDataSizeInBytes());
-            return new PartitionStatistics(updatedBasicStatistics, partitionStatistics.getColumnStatistics());
+                    basicStatistics.getInMemoryDataSizeInBytes(), basicStatistics.getOnDiskDataSizeInBytes());
+            updateBooleanStatisticsInColumnStatistics(hiveACIDWriteType, partitionStatistics, updatedColumnStatistics);
+            return new PartitionStatistics(updatedBasicStatistics, updatedColumnStatistics);
         }
         return partitionStatistics;
+    }
+
+    private void updateBooleanStatisticsInColumnStatistics(HiveACIDWriteType hiveACIDWriteType, PartitionStatistics partitionStatistics,
+                                                           Map<String, HiveColumnStatistics> updatedColumnStatistics)
+    {
+        partitionStatistics.getColumnStatistics().forEach((k, v) -> {
+            BooleanStatistics booleanStatistics = null;
+            if (v.getBooleanStatistics().isPresent()) {
+                if (hiveACIDWriteType == HiveACIDWriteType.UPDATE || hiveACIDWriteType == HiveACIDWriteType.VACUUM) {
+                    booleanStatistics = new BooleanStatistics(OptionalLong.of(0), OptionalLong.of(0));
+                }
+                else if (hiveACIDWriteType == HiveACIDWriteType.DELETE) {
+                    booleanStatistics = new BooleanStatistics(OptionalLong.of(Math.negateExact(v.getBooleanStatistics().get().getTrueCount().getAsLong())),
+                            OptionalLong.of(Math.negateExact(v.getBooleanStatistics().get().getFalseCount().getAsLong())));
+                }
+                HiveColumnStatistics hiveColumnStatistics = new HiveColumnStatistics(v.getIntegerStatistics(), v.getDoubleStatistics(),
+                        v.getDecimalStatistics(), v.getDateStatistics(), Optional.of(booleanStatistics),
+                        v.getMaxValueSizeInBytes(), v.getTotalSizeInBytes(), v.getNullsCount(), v.getDistinctValuesCount());
+                updatedColumnStatistics.put(k, hiveColumnStatistics);
+            }
+            else {
+                updatedColumnStatistics.put(k, v);
+            }
+        });
     }
 
     @Override

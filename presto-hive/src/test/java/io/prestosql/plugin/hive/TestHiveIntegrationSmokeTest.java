@@ -5108,4 +5108,54 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate("DROP TABLE IF EXISTS inperftest");
         }
     }
+
+    @Test
+    public void testUpdateAndDeleteForBooleanColumn()
+    {
+        assertUpdate("DROP TABLE IF EXISTS tab_bkt_009");
+        assertUpdate(autoVacuumSession, "CREATE TABLE tab_bkt_009 (aa tinyint, bb smallint, cc int, " +
+                "dd bigint, ee boolean, ff real, gg double, hh varchar(10), ii varbinary, jj timestamp, kk decimal,ll decimal(10, 8),mm date,nn char(6)) " +
+                "with (bucket_count=2, bucketed_by=array ['dd'], format='orc', transactional=true)");
+
+        assertUpdate("insert into tab_bkt_009 values (tinyint'21', smallint'31', 810, 11111, boolean'0', 111.111," +
+                "111111111.111111, 'hello_111', varbinary'/', timestamp'2019-09-11 01:00:00'," +
+                "51, 11.11, date '2019-09-11', 'work_1')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'22', smallint'32', 820, 22222, boolean'0', 222.222," +
+                "222222222.222222, 'hello_222', varbinary'/', timestamp'2019-09-14 02:00:00', 52, 22.22," +
+                "date '2019-09-14', 'work_2')", 1);
+        assertUpdate("update tab_bkt_009 set bb=smallint'10' where ee=boolean'0'", 2);
+
+        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, " +
+                "3.03,'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, " +
+                "4.04,'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'26', smallint'36', 860, 999960, boolean'0', 6.6, " +
+                "6.06,'hello_6', varbinary'/', timestamp'2019-09-16 15:00:06', 56, 60.36, date '2019-09-16', 'work_6')", 1);
+        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-14'", 2);
+        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-16'", 1);
+
+        assertUpdate(String.format("DROP TABLE tab_bkt_009"));
+    }
+
+    @Test
+    public void testVacuumForBooleanColumn()
+    {
+        assertUpdate("DROP TABLE IF EXISTS tab_bkt_009");
+        assertUpdate(autoVacuumSession, "CREATE TABLE tab_bkt_009 (aa tinyint, bb smallint, cc int, " +
+                "dd bigint, ee boolean, ff real, gg double, hh varchar(10), ii varbinary, jj timestamp, kk decimal,ll decimal(10, 8),mm date,nn char(6)) " +
+                "with (bucket_count=2, bucketed_by=array ['dd'], format='orc', transactional=true)");
+
+        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
+                "'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
+                "'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
+                "'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
+                "'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
+        assertUpdate(String.format("VACUUM TABLE tab_bkt_009 AND WAIT"), 4);
+        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-14'", 2);
+
+        assertUpdate(String.format("DROP TABLE tab_bkt_009"));
+    }
 }
