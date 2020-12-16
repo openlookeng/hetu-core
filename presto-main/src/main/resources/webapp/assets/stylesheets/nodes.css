@@ -35,6 +35,8 @@ body{
 .nodes .line-right{
     flex: 1;
     padding: 0 20px;
+    max-height: calc(100vh - 110px);
+    overflow: auto;
 }
 .nodes .line-right>h2{
     margin-top: 0;

@@ -30,6 +30,20 @@ class SchemaActions {
         );
     }
 
+    deleteCatalog(catalogName) {
+        return xhr(`../v1/catalog/${catalogName}`).then(() => {
+            return {
+                result: true,
+                message: "Success"
+            }
+        }).catch((error) => {
+            return {
+                result: false,
+                message: error.message
+            }
+        })
+    }
+
     fetchSchemas(catalogs, refresh = false) {
         return xhr("../api/table/schemas?force=" + refresh).then((data) => {
             if (refresh) {
