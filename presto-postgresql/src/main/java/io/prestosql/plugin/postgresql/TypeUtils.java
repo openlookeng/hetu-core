@@ -34,6 +34,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.sql.Date;
+import java.sql.Timestamp;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -47,6 +50,7 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.TypeUtils.readNativeValue;
 import static io.prestosql.spi.type.TypeUtils.writeNativeValue;
@@ -64,7 +68,7 @@ public final class TypeUtils
 
     // PostgreSQL jdbc array element names understood by org.postgresql.jdbc2.TypeInfoCache#getPGArrayType
     // for multidimensional arrays, this should return the base type (e.g. array(array(integer)) returns 'integer')
-    public static String getArrayElementPgTypeName(ConnectorSession session, PostgreSqlClient client, Type elementType)
+    public static String getArrayElementPgTypeName(ConnectorSession session, BasePostgreSqlClient client, Type elementType)
     {
         if (DOUBLE.equals(elementType)) {
             return "float";
@@ -183,6 +187,15 @@ public final class TypeUtils
             long utcMillis = ISOChronology.getInstance().getZone().getMillisKeepLocal(UTC, localMillis);
             // convert to days
             return MILLISECONDS.toDays(utcMillis);
+        }
+
+        if (TIMESTAMP.equals(prestoType)) {
+            Timestamp timestamp = (Timestamp) jdbcObject;
+            if (session.isLegacyTimestamp()) {
+                ZoneId sessionZone = ZoneId.of(session.getTimeZoneKey().getId());
+                return timestamp.toLocalDateTime().atZone(sessionZone).toInstant().toEpochMilli();
+            }
+            return timestamp.toLocalDateTime().atZone(ZoneOffset.UTC).toInstant().toEpochMilli();
         }
 
         if (prestoType instanceof VarcharType) {

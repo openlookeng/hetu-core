@@ -134,6 +134,7 @@
         <module>hetu-hbase</module>
         <module>hetu-mongodb</module>
         <module>hetu-carbondata</module>
+        <module>hetu-opengauss</module>
         <module>hetu-filesystem-client</module>
         <module>hetu-metastore</module>
         <module>hetu-sql-migration-tool</module>

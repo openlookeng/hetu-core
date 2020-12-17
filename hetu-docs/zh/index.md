@@ -74,6 +74,7 @@ headless: true
     - [TPCDS]({{< relref "./docs/connector/tpcds.md" >}})
     - [TPCH]({{< relref "./docs/connector/tpch.md" >}})
     - [VDM]({{< relref "./docs/connector/vdm.md" >}})
+    - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
 
 - [函数和运算符]("#")
     - [逻辑运算符]({{< relref "./docs/functions/logical.md" >}})
