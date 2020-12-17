@@ -55,6 +55,7 @@ class NodesMain extends React.Component {
                 let obj = {};
                 obj.id = key.slice(0, key.indexOf(" "));
                 obj.ip = key.slice(key.indexOf("[") + 1, key.indexOf("]"))
+                obj.role = key.slice(key.indexOf("]") + 2) == 'true' ? 'Coordinator' : 'Worker'
                 obj.count = data.memoryData[key].availableProcessors;
                 let totalMemory = data.memoryData[key].totalNodeMemory.slice(0, -1);
                 obj.nodeMemory = totalMemory;
@@ -85,6 +86,7 @@ class NodesMain extends React.Component {
                                         <tr>
                                             <th>ID</th>
                                             <th>IP</th>
+                                            <th>Role</th>
                                             <th>CPU Count</th>
                                             <th>Usable Node Memory</th>
                                             <th>Used Memory</th>
@@ -96,6 +98,7 @@ class NodesMain extends React.Component {
                                             <tr key={index}>
                                                 <td>{ele.id}</td>
                                                 <td>{ele.ip}</td>
+                                                <td>{ele.role}</td>
                                                 <td>{ele.count}</td>
                                                 <td>{formatDataSizeBytes(ele.nodeMemory)}</td>
                                                 <td>{formatDataSizeBytes(ele.usedMemory)}</td>
