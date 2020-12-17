@@ -86,7 +86,7 @@ public class ClusterStatsResource
             if (query.getState() == QueryState.QUEUED) {
                 queuedQueries++;
             }
-            else if (query.getState() == QueryState.RUNNING) {
+            else if (query.getState() == QueryState.RUNNING || query.getState() == QueryState.FINISHING) {
                 if (query.getQueryStats().isFullyBlocked()) {
                     blockedQueries++;
                 }
