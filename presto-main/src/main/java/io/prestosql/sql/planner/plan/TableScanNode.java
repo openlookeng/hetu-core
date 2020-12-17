@@ -276,7 +276,7 @@ public class TableScanNode
         return true;
     }
 
-    private String getActualColName(String var)
+    public String getActualColName(String var)
     {
         // TODO: Instead of stripping off _, we can get corresponding name from assigments column mapping.
         int index = var.lastIndexOf("_");
@@ -309,26 +309,6 @@ public class TableScanNode
             return true;
         }
 
-        return false;
-    }
-
-    public boolean isNodeEquals(Object o)
-    {
-        TableScanNode curr = (TableScanNode) (o);
-        if (curr == this) {
-            return true;
-        }
-        if (!(curr instanceof TableScanNode)) {
-            return false;
-        }
-
-        if (curr.table.getCatalogName().equals(this.table.getCatalogName())
-                && curr.getTable().equalsTo(this.getTable())
-                && isSourcesEqual(curr.getSources(), this.getSources())
-                && isSymbolsEqual(curr.getOutputSymbols(), this.getOutputSymbols())
-                && isPredicateSame(curr)) {
-            return true;
-        }
         return false;
     }
 }

@@ -93,20 +93,4 @@ public final class TableHandle
     {
         return catalogName + ":" + connectorHandle;
     }
-
-    public boolean equalsTo(Object o)
-    {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof TableHandle)) {
-            return false;
-        }
-        TableHandle tableHandle = (TableHandle) (o);
-        if (tableHandle.getConnectorHandle().equals(this.getConnectorHandle())
-                && this.catalogName.equals(tableHandle.catalogName)) {
-            return true;
-        }
-        return false;
-    }
 }
