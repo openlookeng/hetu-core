@@ -20,6 +20,7 @@ import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -54,7 +55,7 @@ public class CreateIndexMetadata
     {
         this.indexName = checkNotEmpty(indexName, "indexName");
         this.tableName = requireNonNull(tableName, "tableName is null");
-        this.indexType = requireNonNull(indexType, "indexType is null");
+        this.indexType = requireNonNull(indexType, "indexType is null").toUpperCase(Locale.ENGLISH);
         this.indexColumns = indexColumns;
         this.partitions = partitions;
         this.properties = properties;
