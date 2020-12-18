@@ -22,7 +22,7 @@ import "echarts/lib/component/title";
 import OverviewActions from "./OverviewActions";
 import OverviewStore from "./OverviewStore";
 import MultiSelect from 'react-simple-multi-select';
-import {formatCount, formatDataSizeBytes} from "../utils";
+import {formatCount, formatDataSizeBytes, bubbleSort} from "../utils";
 import _ from "lodash";
 
 class EchartPart extends React.Component{
@@ -289,12 +289,14 @@ class EchartPart extends React.Component{
                     entry.value = Number((sum / dataset.length).toFixed(2));
                 }
             });
-            this.state.heatMapChart = heatMapData;
+
+            let heatMapDataSort = bubbleSort(heatMapData);
+            this.state.heatMapChart = heatMapDataSort.slice(0,10);
             let heatMapChart = echarts.init(this.refs.heatMapChart, "royal");
             let heatMapChartOption = heatMapChart.getOption();
             heatMapChartOption.series = [{
                 type: "treemap",
-                data: heatMapData,
+                data: heatMapDataSort.slice(0,10),
                 breadcrumb: {
                     show: false
                 }
@@ -333,12 +335,13 @@ class EchartPart extends React.Component{
                     entry.value = Number((sum / dataset.length).toFixed(2));
                 }
             });
-            this.state.heatMapMemoryChart = heatMapMemoryData;
+            let heatMapMemoryDataSort = bubbleSort(heatMapMemoryData);
+            this.state.heatMapMemoryChart = heatMapMemoryDataSort.slice(0,10);
             let heatMapMemoryChart = echarts.init(this.refs.heatMapMemoryChart, "royal");
             let heatMapMemoryChartOption = heatMapMemoryChart.getOption();
             heatMapMemoryChartOption.series = [{
                 type: "treemap",
-                data: heatMapMemoryData,
+                data: heatMapMemoryDataSort.slice(0,10),
                 breadcrumb: {
                     show: false
                 },
