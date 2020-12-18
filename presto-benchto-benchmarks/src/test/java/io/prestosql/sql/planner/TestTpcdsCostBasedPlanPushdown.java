@@ -19,6 +19,7 @@ import com.google.common.io.Files;
 import io.prestosql.Session;
 import io.prestosql.plugin.hive.HiveConnector;
 import io.prestosql.plugin.hive.HiveConnectorFactory;
+import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.tpcds.TpcdsConnectorFactory;
@@ -37,6 +38,7 @@ import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.plugin.hive.metastore.file.FileHiveMetastore.createTestingFileHiveMetastore;
+import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 
@@ -72,11 +74,13 @@ public class TestTpcdsCostBasedPlanPushdown
             // add hive
             File hiveDir = new File(Files.createTempDir(), "hive_data");
             HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
-            metastore.createDatabase(Database.builder()
-                    .setDatabaseName("default")
-                    .setOwnerName("public")
-                    .setOwnerType(PrincipalType.ROLE)
-                    .build());
+            metastore.createDatabase(
+                    new HiveIdentity(SESSION),
+                    Database.builder()
+                            .setDatabaseName("default")
+                            .setOwnerName("public")
+                            .setOwnerType(PrincipalType.ROLE)
+                            .build());
 
             HiveConnectorFactory hiveConnectorFactory = new HiveConnectorFactory(
                     "hive",

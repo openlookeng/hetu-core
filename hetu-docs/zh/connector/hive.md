@@ -121,6 +121,7 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.metastore.uri`| 使用Thrift协议连接Hive元存储的URI。如果提供了多个URI，则默认使用第一个URI，其余URI为回退元存储。该属性必选。示例：`thrift://192.0.2.3:9083`或`thrift://192.0.2.3:9083,thrift://192.0.2.4:9083`|
 | `hive.metastore.username`| openLooKeng用于访问Hive metastore的用户名。|
 | `hive.metastore.authentication.type`| Hive元存储身份验证类型。取值为`NONE`或`KERBEROS`（默认为`NONE`）。|
+| `hive.metastore.thrift.impersonation.enabled` |  启用Hive元存储用户模拟。|
 | `hive.metastore.thrift.client.ssl.enabled`| 连接元存储时使用SSL。默认为`false`。当为true时，表示需要keystore或truststore其中一个。keystore/truststore的路径和密码需要在`jvm.config`中设置。密钥列表如下：`-Djavax.net.ssl.keystoreType= e.g. jks` `-Djavax.net.ssl.keyStore=` `-Djavax.net.ssl.keyStorePassword=` `-Djavax.net.ssl.trustStore=` `-Djavax.net.ssl.trustStorePassword=`|
 | `hive.metastore.service.principal`| Hive元存储服务的Kerberos主体。|
 | `hive.metastore.client.principal`| openLooKeng在连接到Hive元存储服务时将使用的Kerberos主体。|
