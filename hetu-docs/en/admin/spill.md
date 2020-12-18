@@ -68,8 +68,12 @@ is enabled, if there is not enough memory, intermediate cumulated aggregation re
 
 ### Order By
 
-If your trying to sort a larger amount of data, a significant amount of memory may be needed. When spill to disk for order by is enabled, if there is not enough memory, intemediate sorted results are written to disk. They are loaded back and merged with a lower memory footprint.
+If you're trying to sort a larger amount of data, a significant amount of memory may be needed. When spill to disk for order by is enabled, if there is not enough memory, intemediate sorted results are written to disk. They are loaded back and merged with a lower memory footprint.
 
 ### Window functions
 
 Window Functions perform an operators over a window of rows and return one value for each row. If this window of rows is large, a significant amount of memory may be needed. When spill to disk for window functions is enabled, if there is not enough memory, intemediate sorted results are written to disk. They are loaded back and merged when memory is available. There is a current limitation that spill will not work in all cases such as when a single window is very large.
+
+### Reuse Exchange
+
+During Reuse Exchange optimization, data exceeding a certain threshold that is cached by one of the table reads may be spilled to disk temporarily and is read back by future table reads. This ensures that memory footprint of the query does not grow in an unbounded manner even if data is being cached. The spilled data is deleted when the query completes/fails/aborts.

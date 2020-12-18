@@ -155,6 +155,17 @@ This section describes the most important config properties that may be used to 
 >
 > This config property can be overridden by the `spill_window_operator` session property.
 
+### `experimental.spill-reuse-tablescan`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Try spilling memory to disk to avoid exceeding memory limits for the query when running Reuse Exchange; This property must be used in conjunction with the `experimental.spill-enabled` property.
+> 
+>  
+>
+> This config property can be overridden by the `spill_reuse_tablescan` session property.
+
 ### `experimental.spiller-spill-path`
 
 > -   **Type:** `string`
@@ -201,6 +212,13 @@ This section describes the most important config properties that may be used to 
 >
 > Limit for memory used for unspilling a single aggregation operator
 > instance.
+
+### `experimental.spill-threshold-reuse-tablescan`
+
+> -   **Type:** `int`
+> -   **Default value:** `10 (in MB)`
+>
+> Limit for memory used for caching pages in Reuse Exchange.
 
 ### `experimental.spill-compression-enabled`
 
@@ -448,6 +466,14 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > **Warning**
 > 
 > The number of possible join orders scales factorially with the number of relations, so increasing this value can cause serious performance issues.
+
+### `optimizer.reuse-table-scan`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Use Reuse Exchange to cache data in memory if the query contains tables or Common Table Expressions(CTE) which are present more than one time with the same projections and filters on them. Enabling this feature will reduce the time taken to execute the query by caching data in memory and avoiding reading from disk multiple times.
+> This can also be specified on a per-query basis using the `reuse_table_scan` session property. 
 
 ## Regular Expression Function Properties
 
