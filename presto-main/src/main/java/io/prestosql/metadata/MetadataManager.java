@@ -1062,6 +1062,27 @@ public final class MetadataManager
         return metadata.isExecutionPlanCacheSupported(session.toConnectorSession(), table.getConnectorHandle());
     }
 
+    /**
+     * Hetu can only create index for supported connectors.
+     *
+     * @param session Presto session
+     * @param tableName Connector specific tableName
+     */
+    @Override
+    public boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName)
+    {
+        Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, tableName.getCatalogName());
+        if (catalog.isPresent()) {
+            CatalogMetadata catalogMetadata = catalog.get();
+            CatalogName catalogName = catalogMetadata.getConnectorId(session, tableName);
+            ConnectorMetadata metadata = catalogMetadata.getMetadataFor(catalogName);
+
+            return metadata.isHeuristicIndexSupported();
+        }
+
+        return false;
+    }
+
     @Override
     public Optional<LimitApplicationResult<TableHandle>> applyLimit(Session session, TableHandle table, long limit)
     {

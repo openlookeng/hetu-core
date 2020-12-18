@@ -62,6 +62,9 @@ public class TestOrcCache
 
         assertUpdate("CREATE TABLE test_drop_cache_1(id INTEGER, p1 INTEGER, p2 INTEGER) WITH (partitioned_by = ARRAY['p1', 'p2'], format = 'ORC')");
         assertUpdate("CREATE TABLE test_drop_cache_2(id INTEGER, p3 INTEGER) WITH (partitioned_by = ARRAY['p3'], format = 'ORC')");
+
+        assertUpdate("CREATE TABLE test_drop_cache_3(id INTEGER, p1 INTEGER, p2 INTEGER) WITH (partitioned_by = ARRAY['p1', 'p2'], format = 'ORC')");
+        assertUpdate("CREATE TABLE test_drop_cache_4(id INTEGER, p3 INTEGER) WITH (partitioned_by = ARRAY['p3'], format = 'ORC')");
     }
 
     @Test
@@ -303,25 +306,25 @@ public class TestOrcCache
     {
         SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
-        assertQuerySucceeds("CACHE TABLE test_drop_cache_1 WHERE p1 = 1");
-        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_1").showPredicates().contains("(p1 = 1)"));
+        assertQuerySucceeds("CACHE TABLE test_drop_cache_3 WHERE p1 = 1");
+        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_3").showPredicates().contains("(p1 = 1)"));
 
-        assertQuerySucceeds("CACHE TABLE test_drop_cache_2 WHERE p3 = 3");
-        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_2").showPredicates().contains("(p3 = 3)"));
+        assertQuerySucceeds("CACHE TABLE test_drop_cache_4 WHERE p3 = 3");
+        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_4").showPredicates().contains("(p3 = 3)"));
 
-        assertQuerySucceeds("CACHE TABLE test_drop_cache_2 WHERE p3 = 4");
-        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_2").showPredicates().contains("(p3 = 4)"));
+        assertQuerySucceeds("CACHE TABLE test_drop_cache_4 WHERE p3 = 4");
+        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_4").showPredicates().contains("(p3 = 4)"));
 
-        assertQuerySucceeds("CACHE TABLE test_drop_cache_1 WHERE p2 = 2");
-        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_1").showPredicates().contains("(p2 = 2)"));
+        assertQuerySucceeds("CACHE TABLE test_drop_cache_3 WHERE p2 = 2");
+        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_3").showPredicates().contains("(p2 = 2)"));
 
-        assertQuerySucceeds("DROP CACHE test_drop_cache_1 WHERE p1 = 1");
-        assertFalse(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_1").showPredicates().contains("(p1 = 1)"));
-        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_1").showPredicates().contains("(p2 = 2)"));
+        assertQuerySucceeds("DROP CACHE test_drop_cache_3 WHERE p1 = 1");
+        assertFalse(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_3").showPredicates().contains("(p1 = 1)"));
+        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_3").showPredicates().contains("(p2 = 2)"));
 
-        assertQuerySucceeds("DROP CACHE test_drop_cache_2 WHERE p3 = 4");
-        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_2").showPredicates().contains("(p3 = 3)"));
-        assertFalse(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_2").showPredicates().contains("(p3 = 4)"));
+        assertQuerySucceeds("DROP CACHE test_drop_cache_4 WHERE p3 = 4");
+        assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_4").showPredicates().contains("(p3 = 3)"));
+        assertFalse(splitCacheMap.tableCacheInfoMap().get("hive.tpch.test_drop_cache_4").showPredicates().contains("(p3 = 4)"));
     }
 
     @Test

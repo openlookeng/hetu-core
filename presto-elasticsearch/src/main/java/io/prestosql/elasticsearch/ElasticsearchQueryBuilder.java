@@ -13,134 +13,63 @@
  */
 package io.prestosql.elasticsearch;
 
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.airlift.units.Duration;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
-import org.elasticsearch.action.search.SearchRequestBuilder;
-import org.elasticsearch.action.search.SearchScrollRequestBuilder;
-import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.common.transport.TransportAddress;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.ExistsQueryBuilder;
 import org.elasticsearch.index.query.MatchAllQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryStringQueryBuilder;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.index.query.TermQueryBuilder;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static io.prestosql.elasticsearch.ElasticsearchClient.createTransportClient;
-import static io.prestosql.elasticsearch.ElasticsearchErrorCode.ELASTICSEARCH_CONNECTION_ERROR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
-import static org.elasticsearch.action.search.SearchType.QUERY_THEN_FETCH;
 
 public class ElasticsearchQueryBuilder
 {
-    private static final Logger LOG = Logger.get(ElasticsearchQueryBuilder.class);
+    private ElasticsearchQueryBuilder() {}
 
-    private final Duration scrollTimeout;
-    private final int scrollSize;
-    private final TransportClient client;
-    private final int shard;
-    private final TupleDomain<ColumnHandle> tupleDomain;
-    private final List<ElasticsearchColumnHandle> columns;
-    private final String index;
-    private final String type;
-
-    public ElasticsearchQueryBuilder(List<ElasticsearchColumnHandle> columnHandles, ElasticsearchConnectorConfig config, ElasticsearchSplit split, ElasticsearchTableHandle table)
-    {
-        requireNonNull(columnHandles, "columnHandles is null");
-        requireNonNull(config, "config is null");
-        requireNonNull(split, "split is null");
-
-        columns = columnHandles;
-        tupleDomain = table.getConstraint();
-        index = split.getIndex();
-        shard = split.getShard();
-        type = split.getType();
-        InetAddress address;
-        try {
-            address = InetAddress.getByName(split.getSearchNode());
-        }
-        catch (UnknownHostException e) {
-            throw new PrestoException(ELASTICSEARCH_CONNECTION_ERROR, format("Failed to resolve search node (%s:%d)", split.getSearchNode(), split.getPort()), e);
-        }
-        client = createTransportClient(config, new TransportAddress(address, split.getPort()));
-        scrollTimeout = config.getScrollTimeout();
-        scrollSize = config.getScrollSize();
-    }
-
-    public void close()
-    {
-        client.close();
-    }
-
-    public SearchRequestBuilder buildScrollSearchRequest()
-    {
-        String indices = index != null && !index.isEmpty() ? index : "_all";
-        List<String> fields = columns.stream()
-                .map(ElasticsearchColumnHandle::getColumnName)
-                .collect(toList());
-        SearchRequestBuilder searchRequestBuilder = client.prepareSearch(indices)
-                .setTypes(type)
-                .setSearchType(QUERY_THEN_FETCH)
-                .setScroll(new TimeValue(scrollTimeout.toMillis()))
-                .setFetchSource(fields.toArray(new String[0]), null)
-                .setQuery(buildSearchQuery())
-                .setPreference("_shards:" + shard)
-                .setSize(scrollSize);
-        LOG.debug("Elasticsearch Request: %s", searchRequestBuilder);
-        return searchRequestBuilder;
-    }
-
-    public SearchScrollRequestBuilder prepareSearchScroll(String scrollId)
-    {
-        return client.prepareSearchScroll(scrollId)
-                .setScroll(new TimeValue(scrollTimeout.toMillis()));
-    }
-
-    private QueryBuilder buildSearchQuery()
+    public static QueryBuilder buildSearchQuery(TupleDomain<ColumnHandle> constraint, List<ElasticsearchColumnHandle> columns, Optional<String> query)
     {
         BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
         for (ElasticsearchColumnHandle column : columns) {
             BoolQueryBuilder columnQueryBuilder = new BoolQueryBuilder();
-            Type type = column.getColumnType();
-            if (tupleDomain.getDomains().isPresent()) {
-                Domain domain = tupleDomain.getDomains().get().get(column);
+            Type type = column.getType();
+            if (constraint.getDomains().isPresent()) {
+                Domain domain = constraint.getDomains().get().get(column);
                 if (domain != null) {
-                    columnQueryBuilder.should(buildPredicate(column.getColumnJsonPath(), domain, type));
+                    columnQueryBuilder.should(buildPredicate(column.getName(), domain, type));
                 }
             }
             boolQueryBuilder.must(columnQueryBuilder);
         }
+
+        query.map(QueryStringQueryBuilder::new)
+                .ifPresent(boolQueryBuilder::must);
+
         if (boolQueryBuilder.hasClauses()) {
             return boolQueryBuilder;
         }
         return new MatchAllQueryBuilder();
     }
 
-    private QueryBuilder buildPredicate(String columnName, Domain domain, Type type)
+    private static QueryBuilder buildPredicate(String columnName, Domain domain, Type type)
     {
         checkArgument(domain.getType().isOrderable(), "Domain type must be orderable");
         BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
@@ -158,7 +87,7 @@ public class ElasticsearchQueryBuilder
         return buildTermQuery(boolQueryBuilder, columnName, domain, type);
     }
 
-    private QueryBuilder buildTermQuery(BoolQueryBuilder queryBuilder, String columnName, Domain domain, Type type)
+    private static QueryBuilder buildTermQuery(BoolQueryBuilder queryBuilder, String columnName, Domain domain, Type type)
     {
         for (Range range : domain.getValues().getRanges().getOrderedRanges()) {
             BoolQueryBuilder rangeQueryBuilder = new BoolQueryBuilder();

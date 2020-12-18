@@ -69,7 +69,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
@@ -417,16 +417,17 @@ public class UnaliasSymbolReferences
         }
 
         @Override
-        public PlanNode visitTopNRowNumber(TopNRowNumberNode node, RewriteContext<Void> context)
+        public PlanNode visitTopNRankingNumber(TopNRankingNumberNode node, RewriteContext<Void> context)
         {
-            return new TopNRowNumberNode(
+            return new TopNRankingNumberNode(
                     node.getId(),
                     context.rewrite(node.getSource()),
                     canonicalizeAndDistinct(node.getSpecification()),
                     canonicalize(node.getRowNumberSymbol()),
                     node.getMaxRowCountPerPartition(),
                     node.isPartial(),
-                    canonicalize(node.getHashSymbol()));
+                    canonicalize(node.getHashSymbol()),
+                    node.getRankingFunction());
         }
 
         @Override
@@ -556,7 +557,8 @@ public class UnaliasSymbolReferences
                     canonicalize(node.getSemiJoinOutput()),
                     canonicalize(node.getSourceHashSymbol()),
                     canonicalize(node.getFilteringSourceHashSymbol()),
-                    node.getDistributionType());
+                    node.getDistributionType(),
+                    node.getDynamicFilterId());
         }
 
         @Override

@@ -767,6 +767,14 @@ public class ClassLoaderSafeConnectorMetadata
         return delegate.isExecutionPlanCacheSupported(session, handle);
     }
 
+    /**
+     * Hetu can only create index for supported connectors.
+     */
+    public boolean isHeuristicIndexSupported()
+    {
+        return delegate.isHeuristicIndexSupported();
+    }
+
     @Override
     public List<ConnectorVacuumTableInfo> getTablesForVacuum()
     {

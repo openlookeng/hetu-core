@@ -146,17 +146,22 @@ public class AllowAllAccessControl
     }
 
     @Override
-    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
     }
 
     @Override
-    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
     }
 
     @Override
     public void checkCanRenameIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName, QualifiedObjectName newIndexName)
+    {
+    }
+
+    @Override
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
     }
 

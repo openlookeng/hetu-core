@@ -76,6 +76,11 @@ public class GenericSpiller
                 .collect(toList());
     }
 
+    public SingleStreamSpillerFactory getSingleStreamSpillerFactory()
+    {
+        return singleStreamSpillerFactory;
+    }
+
     @Override
     public void close()
     {
@@ -90,5 +95,10 @@ public class GenericSpiller
     private void checkNoSpillInProgress()
     {
         checkState(previousSpill.isDone(), "previous spill still in progress");
+    }
+
+    public void deleteAllStreams()
+    {
+        singleStreamSpillers.stream().forEach(x -> x.deleteFile());
     }
 }

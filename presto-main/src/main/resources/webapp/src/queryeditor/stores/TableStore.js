@@ -114,10 +114,6 @@ class TableStore {
   }
 
   onAddTable(table) {
-    if (this.getByName(table.name) !== undefined) {
-      return;
-    }
-
     // Unmark the whole collection
     this.unmarkActiveTables();
 

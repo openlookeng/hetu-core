@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
@@ -35,7 +36,7 @@ import io.prestosql.sql.planner.plan.LimitNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Expression;
@@ -47,7 +48,7 @@ import java.util.OptionalInt;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static io.prestosql.SystemSessionProperties.isOptimizeTopNRowNumber;
+import static io.prestosql.SystemSessionProperties.isOptimizeTopNRankingNumber;
 import static io.prestosql.spi.function.FunctionKind.WINDOW;
 import static io.prestosql.spi.predicate.Marker.Bound.BELOW;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -141,25 +142,29 @@ public class WindowFilterPushDown
                 }
                 source = rowNumberNode;
             }
-            else if (source instanceof WindowNode && canOptimizeWindowFunction((WindowNode) source) && isOptimizeTopNRowNumber(session)) {
+            else if (source instanceof WindowNode && canOptimizeWindowFunction((WindowNode) source) && isOptimizeTopNRankingNumber(session)) {
                 WindowNode windowNode = (WindowNode) source;
-                // verify that unordered row_number window functions are replaced by RowNumberNode
-                verify(windowNode.getOrderingScheme().isPresent());
-                TopNRowNumberNode topNRowNumberNode = convertToTopNRowNumber(windowNode, limit);
-                if (windowNode.getPartitionBy().isEmpty()) {
-                    return topNRowNumberNode;
+                //TODO: need optimizer this case `select ranking() over() from (select * from t1) limit 10`
+                if (windowNode.getOrderingScheme().isPresent()) {
+                    TopNRankingNumberNode topNRankingNumberNode = convertToTopNRankingFunction(windowNode, limit);
+                    if (windowNode.getPartitionBy().isEmpty()) {
+                        return topNRankingNumberNode;
+                    }
+                    source = topNRankingNumberNode;
                 }
-                source = topNRowNumberNode;
+                else {
+                    return context.defaultRewrite(node);
+                }
             }
             return replaceChildren(node, ImmutableList.of(source));
         }
 
         @Override
-        public PlanNode visitFilter(FilterNode node, RewriteContext<Void> context)
+        public PlanNode visitFilter(FilterNode filterNode, RewriteContext<Void> context)
         {
-            PlanNode source = context.rewrite(node.getSource());
+            PlanNode source = context.rewrite(filterNode.getSource());
 
-            TupleDomain<Symbol> tupleDomain = fromPredicate(metadata, session, node.getPredicate(), types).getTupleDomain();
+            TupleDomain<Symbol> tupleDomain = fromPredicate(metadata, session, filterNode.getPredicate(), types).getTupleDomain();
 
             if (source instanceof RowNumberNode) {
                 Symbol rowNumberSymbol = ((RowNumberNode) source).getRowNumberSymbol();
@@ -167,34 +172,34 @@ public class WindowFilterPushDown
 
                 if (upperBound.isPresent()) {
                     source = mergeLimit(((RowNumberNode) source), upperBound.getAsInt());
-                    return rewriteFilterSource(node, source, rowNumberSymbol, upperBound.getAsInt());
+                    return rewriteFilterSource(filterNode, source, rowNumberSymbol, upperBound.getAsInt());
                 }
             }
-            else if (source instanceof WindowNode && canOptimizeWindowFunction((WindowNode) source) && isOptimizeTopNRowNumber(session)) {
+            else if (source instanceof WindowNode && canOptimizeWindowFunction((WindowNode) source) && isOptimizeTopNRankingNumber(session)) {
                 WindowNode windowNode = (WindowNode) source;
-                Symbol rowNumberSymbol = getOnlyElement(windowNode.getWindowFunctions().entrySet()).getKey();
-                OptionalInt upperBound = extractUpperBound(tupleDomain, rowNumberSymbol);
+                Symbol symbol = getOnlyElement(windowNode.getWindowFunctions().entrySet()).getKey();
+                OptionalInt upperBound = extractUpperBound(tupleDomain, symbol);
 
                 if (upperBound.isPresent()) {
-                    source = convertToTopNRowNumber(windowNode, upperBound.getAsInt());
-                    return rewriteFilterSource(node, source, rowNumberSymbol, upperBound.getAsInt());
+                    source = convertToTopNRankingFunction(windowNode, upperBound.getAsInt());
+                    return rewriteFilterSource(filterNode, source, symbol, upperBound.getAsInt());
                 }
             }
-            return replaceChildren(node, ImmutableList.of(source));
+            return replaceChildren(filterNode, ImmutableList.of(source));
         }
 
-        private PlanNode rewriteFilterSource(FilterNode filterNode, PlanNode source, Symbol rowNumberSymbol, int upperBound)
+        private PlanNode rewriteFilterSource(FilterNode filterNode, PlanNode source, Symbol symbol, int upperBound)
         {
             ExtractionResult extractionResult = fromPredicate(metadata, session, filterNode.getPredicate(), types);
             TupleDomain<Symbol> tupleDomain = extractionResult.getTupleDomain();
 
-            if (!isEqualRange(tupleDomain, rowNumberSymbol, upperBound)) {
+            if (!isEqualRange(tupleDomain, symbol, upperBound)) {
                 return new FilterNode(filterNode.getId(), source, filterNode.getPredicate());
             }
 
             // Remove the row number domain because it is absorbed into the node
             Map<Symbol, Domain> newDomains = tupleDomain.getDomains().get().entrySet().stream()
-                    .filter(entry -> !entry.getKey().equals(rowNumberSymbol))
+                    .filter(entry -> !entry.getKey().equals(symbol))
                     .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             // Construct a new predicate
@@ -259,20 +264,27 @@ public class WindowFilterPushDown
             return new RowNumberNode(node.getId(), node.getSource(), node.getPartitionBy(), node.getRowNumberSymbol(), Optional.of(newRowCountPerPartition), node.getHashSymbol());
         }
 
-        private TopNRowNumberNode convertToTopNRowNumber(WindowNode windowNode, int limit)
+        private TopNRankingNumberNode convertToTopNRankingFunction(WindowNode windowNode, int limit)
         {
-            return new TopNRowNumberNode(idAllocator.getNextId(),
+            return new TopNRankingNumberNode(idAllocator.getNextId(),
                     windowNode.getSource(),
                     windowNode.getSpecification(),
                     getOnlyElement(windowNode.getWindowFunctions().keySet()),
                     limit,
                     false,
-                    Optional.empty());
+                    Optional.empty(),
+                    getRankingFunction(windowNode));
         }
 
         private static boolean canReplaceWithRowNumber(WindowNode node)
         {
-            return canOptimizeWindowFunction(node) && !node.getOrderingScheme().isPresent();
+            if (node.getWindowFunctions().size() != 1) {
+                return false;
+            }
+
+            Symbol rowNumberSymbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
+            return node.getWindowFunctions().get(rowNumberSymbol).getSignature().equals(RankingFunction.ROW_NUMBER.getValue()) &&
+                    !node.getOrderingScheme().isPresent();
         }
 
         private static boolean canOptimizeWindowFunction(WindowNode node)
@@ -280,13 +292,33 @@ public class WindowFilterPushDown
             if (node.getWindowFunctions().size() != 1) {
                 return false;
             }
-            Symbol rowNumberSymbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
-            return isRowNumberSignature(node.getWindowFunctions().get(rowNumberSymbol).getSignature());
+            Symbol symbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
+            return canOptimizeRankingFunctionSignature(node.getWindowFunctions().get(symbol).getSignature());
         }
 
-        private static boolean isRowNumberSignature(Signature signature)
+        private static boolean canOptimizeRankingFunctionSignature(Signature signature)
         {
-            return signature.equals(ROW_NUMBER_SIGNATURE);
+            return signature.equals(RankingFunction.ROW_NUMBER.getValue()) ||
+                    signature.equals(RankingFunction.RANK.getValue()) ||
+                    signature.equals(RankingFunction.DENSE_RANK.getValue());
+        }
+
+        private static Optional<RankingFunction> getRankingFunction(WindowNode node)
+        {
+            Symbol rowNumberSymbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
+            Signature signature = node.getWindowFunctions().get(rowNumberSymbol).getSignature();
+            if (signature.equals(RankingFunction.ROW_NUMBER.getValue())) {
+                return Optional.of(RankingFunction.ROW_NUMBER);
+            }
+            else if (signature.equals(RankingFunction.RANK.getValue())) {
+                return Optional.of(RankingFunction.RANK);
+            }
+            else if (signature.equals(RankingFunction.DENSE_RANK.getValue())) {
+                return Optional.of(RankingFunction.DENSE_RANK);
+            }
+            else {
+                return Optional.empty();
+            }
         }
     }
 }

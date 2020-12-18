@@ -31,6 +31,7 @@ import io.prestosql.metadata.NewTableLayout;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -295,7 +296,7 @@ public class LogicalPlanner
                 idAllocator.getNextId(),
                 new AggregationNode(
                         idAllocator.getNextId(),
-                        TableScanNode.newInstance(idAllocator.getNextId(), targetTable, tableScanOutputs.build(), symbolToColumnHandle.build()),
+                        TableScanNode.newInstance(idAllocator.getNextId(), targetTable, tableScanOutputs.build(), symbolToColumnHandle.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0),
                         statisticAggregations.getAggregations(),
                         singleGroupingSet(groupingSymbols),
                         ImmutableList.of(),
@@ -540,20 +541,23 @@ public class LogicalPlanner
     {
         TableHandle handle = analysis.getTableHandle(node.getTable());
         if (handle.getConnectorHandle().isDeleteAsInsertSupported()) {
-            QueryPlanner.DeleteRelationPlan deletePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+            QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
                         .planDeleteRowAsInsert(node);
 
             RelationPlan plan = deletePlan.getPlan();
 
             Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, handle);
-
+            TableMetadata tableMetadata = metadata.getTableMetadata(session, handle);
+            String catalogName = handle.getCatalogName().getCatalogName();
+            TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session,
+                    catalogName, tableMetadata.getMetadata());
             return createTableWriterPlan(
                     analysis,
                     plan,
-                    new TableWriterNode.DeleteAsInsertReference(handle),
+                    new TableWriterNode.DeleteAsInsertReference(handle, deletePlan.getPredicate(), deletePlan.getColumnAssignments()),
                     deletePlan.getColumNames(),
                     newTableLayout,
-                    TableStatisticsMetadata.empty());
+                    statisticsMetadata);
         }
         else {
             DeleteNode deleteNode = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
@@ -566,7 +570,7 @@ public class LogicalPlanner
 
     private RelationPlan createUpdatePlan(Analysis analysis, Update updateStatement)
     {
-        QueryPlanner.UpdateRelationPlan updatePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
                 .plan(updateStatement);
         RelationPlan plan = updatePlan.getPlan();
         Analysis.Update update = analysis.getUpdate().get();
@@ -578,7 +582,7 @@ public class LogicalPlanner
         return createTableWriterPlan(
                 analysis,
                 plan,
-                new TableWriterNode.UpdateReference(update.getTarget()),
+                new TableWriterNode.UpdateReference(update.getTarget(), updatePlan.getPredicate(), updatePlan.getColumnAssignments()),
                 updatePlan.getColumNames(),
                 newTableLayout,
                 statisticsMetadata);

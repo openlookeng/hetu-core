@@ -131,7 +131,9 @@ public class PushProjectionIntoTableScan
                                 tableScan.getId(),
                                 result.get().getHandle(),
                                 newScanOutputs,
-                                newScanAssignments),
+                                newScanAssignments,
+                                tableScan.getStrategy(),
+                                tableScan.getReuseTableScanMappingId(), tableScan.getConsumerTableScanNodeCount()),
                         newProjectionAssignments.build()));
     }
 }

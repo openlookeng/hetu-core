@@ -48,12 +48,14 @@ public class TestOracleConfig
                 .put("oracle.number.default-scale", "2")
                 .put("oracle.number.rounding-mode", "DOWN")
                 .put("unsupported-type.handling-strategy", "CONVERT_TO_VARCHAR")
+                .put("oracle.synonyms.enabled", "true")
                 .build();
 
         OracleConfig expected = new OracleConfig().setQueryPushDownEnabled(false)
                 .setNumberDefaultScale(NUMBER_DEFAULT_SCALE)
                 .setRoundingMode(RoundingMode.DOWN)
-                .setUnsupportedTypeHandling(UnsupportedTypeHandling.CONVERT_TO_VARCHAR);
+                .setUnsupportedTypeHandling(UnsupportedTypeHandling.CONVERT_TO_VARCHAR)
+                .setSynonymsEnabled(true);
 
         assertFullMapping(properties, expected);
     }

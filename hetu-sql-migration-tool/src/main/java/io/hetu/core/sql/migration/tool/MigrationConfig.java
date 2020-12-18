@@ -32,8 +32,9 @@ public class MigrationConfig
     public MigrationConfig(String configFile) throws IOException
     {
         if (configFile != null) {
-            InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(configFile)));
-            properties.load(inputStream);
+            try (InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(configFile)))) {
+                properties.load(inputStream);
+            }
         }
     }
 

@@ -24,6 +24,9 @@ import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
+import java.util.Map;
+import java.util.Set;
+
 import static com.google.common.cache.CacheBuilder.newBuilder;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -39,6 +42,8 @@ public class DynamicFilterCacheManager
     private static final long EXPIRES_AFTER_ACCESS_MILLIS = 120_000L;
 
     private final Cache<String, DynamicFilter> cacheGlobalDynamicFilters;
+    private final Cache<String, Map<String, byte[]>> cacheBloomFilters;
+    private final Cache<String, Map<String, Set<String>>> cacheMapping;
     private final SetMultimap<String, TaskId> filterAppliedTasks = HashMultimap.create();
 
     @Inject
@@ -49,12 +54,24 @@ public class DynamicFilterCacheManager
                 .expireAfterWrite(EXPIRES_AFTER_WRITE_MILLIS, MILLISECONDS)
                 .maximumSize(CACHE_MAXIMUM_SIZE)
                 .build();
+        cacheBloomFilters = newBuilder()
+                .expireAfterAccess(EXPIRES_AFTER_ACCESS_MILLIS, MILLISECONDS)
+                .expireAfterWrite(EXPIRES_AFTER_WRITE_MILLIS, MILLISECONDS)
+                .maximumSize(CACHE_MAXIMUM_SIZE)
+                .build();
+        cacheMapping = newBuilder()
+                .expireAfterAccess(EXPIRES_AFTER_ACCESS_MILLIS, MILLISECONDS)
+                .expireAfterWrite(EXPIRES_AFTER_WRITE_MILLIS, MILLISECONDS)
+                .maximumSize(CACHE_MAXIMUM_SIZE)
+                .build();
     }
 
     @PreDestroy
     public void invalidateCache()
     {
         cacheGlobalDynamicFilters.invalidateAll();
+        cacheBloomFilters.invalidateAll();
+        cacheMapping.invalidateAll();
     }
 
     /**
@@ -69,6 +86,8 @@ public class DynamicFilterCacheManager
         LOG.debug("Removed task " + taskId + " for filter " + cacheKey);
         if (!filterAppliedTasks.containsKey(cacheKey)) {
             cacheGlobalDynamicFilters.asMap().remove(cacheKey);
+            cacheBloomFilters.asMap().remove(cacheKey);
+            cacheMapping.asMap().remove(cacheKey);
             LOG.debug("Removed cached DynamicFilter:" + cacheKey);
         }
     }
@@ -81,6 +100,26 @@ public class DynamicFilterCacheManager
     public void cacheDynamicFilter(String filterId, DynamicFilter dynamicFilter)
     {
         cacheGlobalDynamicFilters.put(filterId, dynamicFilter);
+    }
+
+    public Map<String, byte[]> getBloomFitler(String cacheKey)
+    {
+        return cacheBloomFilters.getIfPresent(cacheKey);
+    }
+
+    public Map<String, Set<String>> getMapping(String cacheKey)
+    {
+        return cacheMapping.getIfPresent(cacheKey);
+    }
+
+    public synchronized void cacheBloomFilters(String cacheKey, Map<String, byte[]> bloomFilters)
+    {
+        cacheBloomFilters.put(cacheKey, bloomFilters);
+    }
+
+    public synchronized void cacheMapping(String cacheKey, Map<String, Set<String>> mapping)
+    {
+        cacheMapping.put(cacheKey, mapping);
     }
 
     /**

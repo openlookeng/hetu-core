@@ -38,6 +38,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -69,6 +70,7 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.CurrentPath;
@@ -77,6 +79,7 @@ import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.DefaultTraversalVisitor;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.transaction.TransactionId;
 import io.prestosql.utils.OptimizerUtils;
 
@@ -108,12 +111,12 @@ public class CachedSqlQueryExecution
                                    QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
                                    StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
                                    DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
-                                   HeuristicIndexerManager heuristicIndexerManager)
+                                   HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider)
     {
         super(preparedQuery, stateMachine, slug, metadata, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
-                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager);
+                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider);
         this.cache = cache;
         this.beginTableWrite = new BeginTableWrite(metadata);
     }
@@ -130,6 +133,11 @@ public class CachedSqlQueryExecution
         SystemSessionProperties sessionProperties = new SystemSessionProperties();
         for (PropertyMetadata<?> property : sessionProperties.getSessionProperties()) {
             systemSessionProperties.put(property.getName(), session.getSystemProperty(property.getName(), property.getJavaType()));
+        }
+
+        // if the original statement before rewriting is CreateIndex, set session to let connector know that pageMetadata should be enabled
+        if (analysis.getOriginalStatement() instanceof CreateIndex) {
+            session.setPageMetadataEnabled(true);
         }
 
         // build list of fully qualified table names
@@ -149,7 +157,8 @@ public class CachedSqlQueryExecution
                 isExecutionPlanCacheEnabled(session) &&
                 analysis.getParameters().isEmpty() &&
                 validateAndExtractTableAndColumns(analysis, metadata, session, tableNames, tableStatistics, columnTypes) &&
-                isCacheable(statement);
+                isCacheable(statement) &&
+                (!(analysis.getOriginalStatement() instanceof CreateIndex)); // create index should not be cached
 
         cacheable = cacheable && !tableNames.isEmpty();
         if (!cacheable) {
@@ -380,8 +389,7 @@ public class CachedSqlQueryExecution
             connectorTransactionHandleMap.put(tableHandle.getTransaction(), newTableHandle.getTransaction());
 
             // Return a new table handle with the ID, output symbols, assignments, and enforced constraints of the cached table handle
-            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(),
-                    node.getEnforcedConstraint(), node.getPredicate());
+            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         }
 
         @Override

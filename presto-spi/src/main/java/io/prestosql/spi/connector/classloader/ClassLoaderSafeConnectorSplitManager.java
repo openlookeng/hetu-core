@@ -61,10 +61,10 @@ public final class ClassLoaderSafeConnectorSplitManager
     }
 
     @Override
-    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier, Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier, Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates, boolean partOfReuse)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.getSplits(transaction, session, table, splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates);
+            return delegate.getSplits(transaction, session, table, splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates, partOfReuse);
         }
     }
 }

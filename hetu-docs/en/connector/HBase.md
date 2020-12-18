@@ -8,7 +8,7 @@ The HBase Connector allows querying and creating tables on an external Apache HB
 
 The HBase Connector maintains a Metastore to persist HBase metadata, currently support Metastore: `openLooKeng Metastore`.
 
-**Note:** *We use Apache HBase 2.2.3 version in HBase connector*
+**Note:** *Apache HBase 2.2.3 version or ealier versions are supported in HBase connector*
 
 
 
@@ -51,7 +51,7 @@ hbase.krb5.conf.path=/xxx/krb5.conf
 
 hbase.kerberos.keytab=/xxx/user.keytab
 
-hbase.kerberos.principal=lk_username
+hbase.kerberos.principal=lk_username@HADOOP.COM
 
 hbase.authentication.type=KERBEROS
 ```
@@ -74,6 +74,7 @@ debug=true;
 | ----------------------------------- | ------------- | -------- | ------------------------------------------------------------ |
 | hbase.zookeeper.quorum              | (none)        | Yes      | Zookeeper cluster address                                    |
 | hbase.zookeeper.property.clientPort | (none)        | Yes      | Zookeeper client port                                        |
+| hbase.zookeeper.znode.parent        | /hbase        | No       | Zookeeper znode parent of hbase                                   |
 | hbase.client.retries.number         | 3             | No       | Retry times to connect to hbase client                       |
 | hbase.client.pause.time             | 100           | No       | HBase client disconnect time                                 |
 | hbase.rpc.protection.enable         | false         | No       | Communication privacy protection. You can get this from `hbase-site.xml`. |
@@ -145,6 +146,8 @@ HBase Connector supports two forms of table creation:
 
 Below is an example of how to create a table `schemaName.tableName` and link it to an existing table named `hbaseNamespace:hbaseTable` :
 
+Column mapping format: 'column_name:family:qualifier'
+
 ```sql
 CREATE TABLE schemaName.tableName (
     rowId		VARCHAR,
@@ -159,7 +162,7 @@ CREATE TABLE schemaName.tableName (
     qualifier9	TIMESTAMP
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier1:f1:q1, qualifier2:f1:q2, 
+    column_mapping = 'qualifier1:f1:q1, qualifier2:f1:q2, 
     qualifier3:f2:q3, qualifier4:f2:q4, qualifier5:f2:q5, qualifier6:f3:q1, 
     qualifier7:f3:q2, qualifier8:f3:q3, qualifier9:f3:q4',
     row_id = 'rowId',
@@ -180,7 +183,7 @@ CREATE TABLE default.typeMapping (
     qualifier1 	INTEGER
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier2:f1:q2',
+    column_mapping = 'qualifier2:f1:q2',
     row_id = 'rowId',
     hbase_table_name = 'hello:type4'
 );

@@ -26,14 +26,17 @@ import io.prestosql.metadata.OutputTableHandle;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.UpdateTableHandle;
 import io.prestosql.metadata.VacuumTableHandle;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.Expression;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -366,14 +369,18 @@ public class TableWriterNode
     }
 
     // only used during planning -- will not be serialized
-    public static class UpdateReference
+    public abstract static class UpdateDeleteReference
             extends WriterTarget
     {
-        private final TableHandle handle;
+        private TableHandle handle;
+        private Optional<Expression> constraint;
+        private Map<Symbol, ColumnHandle> columnAssignments;
 
-        public UpdateReference(TableHandle handle)
+        protected UpdateDeleteReference(TableHandle handle, Optional<Expression> constraint, Map<Symbol, ColumnHandle> columnAssignments)
         {
             this.handle = requireNonNull(handle, "handle is null");
+            this.constraint = constraint;
+            this.columnAssignments = columnAssignments;
         }
 
         public TableHandle getHandle()
@@ -381,10 +388,34 @@ public class TableWriterNode
             return handle;
         }
 
+        public void setHandle(TableHandle handle)
+        {
+            this.handle = handle;
+        }
+
+        public Optional<Expression> getConstraint()
+        {
+            return constraint;
+        }
+
+        public Map<Symbol, ColumnHandle> getColumnAssignments()
+        {
+            return columnAssignments;
+        }
+
         @Override
         public String toString()
         {
             return handle.toString();
+        }
+    }
+
+    public static class UpdateReference
+            extends UpdateDeleteReference
+    {
+        public UpdateReference(TableHandle handle, Optional<Expression> constraint, Map<Symbol, ColumnHandle> columnAssignments)
+        {
+            super(handle, constraint, columnAssignments);
         }
     }
 
@@ -424,24 +455,11 @@ public class TableWriterNode
 
     // only used during planning -- will not be serialized
     public static class DeleteAsInsertReference
-            extends WriterTarget
+            extends UpdateDeleteReference
     {
-        private final TableHandle handle;
-
-        public DeleteAsInsertReference(TableHandle handle)
+        public DeleteAsInsertReference(TableHandle handle, Optional<Expression> constraint, Map<Symbol, ColumnHandle> columnAssignments)
         {
-            this.handle = requireNonNull(handle, "handle is null");
-        }
-
-        public TableHandle getHandle()
-        {
-            return handle;
-        }
-
-        @Override
-        public String toString()
-        {
-            return handle.toString();
+            super(handle, constraint, columnAssignments);
         }
     }
 

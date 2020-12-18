@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.planner.iterative.rule;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.cost.CachingStatsProvider;
@@ -35,9 +36,14 @@ import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.ExpressionRewriter;
+import io.prestosql.sql.tree.ExpressionTreeRewriter;
+import io.prestosql.sql.tree.LogicalBinaryExpression;
+import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashSet;
 import java.util.List;
@@ -52,7 +58,9 @@ import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxSize;
 import static io.prestosql.SystemSessionProperties.isOptimizeDynamicFilterGeneration;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.DynamicFilters.getDescriptor;
+import static io.prestosql.sql.DynamicFilters.isDynamicFilter;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
+import static io.prestosql.sql.ExpressionUtils.combinePredicates;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
@@ -73,7 +81,7 @@ public class RemoveUnsupportedDynamicFilters
     private final Metadata metadata;
     private final StatsCalculator statsCalculator;
     private StatsProvider statsProvider;
-    private final Set<String> removedDynamicFilterIds = new HashSet<>();
+    private Set<String> removedDynamicFilterIds;
 
     public RemoveUnsupportedDynamicFilters(Metadata metadata, StatsCalculator statsCalculator)
     {
@@ -84,6 +92,7 @@ public class RemoveUnsupportedDynamicFilters
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
+        this.removedDynamicFilterIds = new HashSet<>();
         this.statsProvider = new CachingStatsProvider(statsCalculator, session, symbolAllocator.getTypes());
         PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(session, metadata, removedDynamicFilterIds), ImmutableSet.of());
         return SimplePlanRewriter.rewriteWith(new RemoveFilterVisitor(removedDynamicFilterIds), result.getNode(), null);
@@ -160,6 +169,54 @@ public class RemoveUnsupportedDynamicFilters
                         node.getDistributionType(),
                         node.isSpillable(),
                         dynamicFilters),
+                        ImmutableSet.copyOf(consumed));
+            }
+            return new PlanWithConsumedDynamicFilters(node, ImmutableSet.copyOf(consumed));
+        }
+
+        @Override
+        public PlanWithConsumedDynamicFilters visitSemiJoin(SemiJoinNode node, Set<String> allowedDynamicFilterIds)
+        {
+            if (!node.getDynamicFilterId().isPresent()) {
+                return visitPlan(node, allowedDynamicFilterIds);
+            }
+
+            String dynamicFilterId = node.getDynamicFilterId().get();
+
+            Set<String> allowedDynamicFilterIdsSourceSide = ImmutableSet.<String>builder()
+                    .add(dynamicFilterId)
+                    .addAll(allowedDynamicFilterIds)
+                    .build();
+            PlanWithConsumedDynamicFilters sourceResult = node.getSource().accept(this, allowedDynamicFilterIdsSourceSide);
+            PlanWithConsumedDynamicFilters filteringSourceResult = node.getFilteringSource().accept(this, allowedDynamicFilterIds);
+
+            Set<String> consumed = new HashSet<>(filteringSourceResult.getConsumedDynamicFilterIds());
+            consumed.addAll(sourceResult.getConsumedDynamicFilterIds());
+            Optional<String> newFilterId;
+            if (consumed.contains(dynamicFilterId)) {
+                consumed.remove(dynamicFilterId);
+                newFilterId = Optional.of(dynamicFilterId);
+            }
+            else {
+                newFilterId = Optional.empty();
+            }
+
+            PlanNode newSource = sourceResult.getNode();
+            PlanNode newFilteringSource = filteringSourceResult.getNode();
+            if (!newSource.equals(node.getSource())
+                    || !newFilteringSource.equals(node.getFilteringSource())
+                    || !newFilterId.equals(node.getDynamicFilterId())) {
+                return new PlanWithConsumedDynamicFilters(new SemiJoinNode(
+                        node.getId(),
+                        newSource,
+                        newFilteringSource,
+                        node.getSourceJoinSymbol(),
+                        node.getFilteringSourceJoinSymbol(),
+                        node.getSemiJoinOutput(),
+                        node.getSourceHashSymbol(),
+                        node.getFilteringSourceHashSymbol(),
+                        node.getDistributionType(),
+                        newFilterId),
                         ImmutableSet.copyOf(consumed));
             }
             return new PlanWithConsumedDynamicFilters(node, ImmutableSet.copyOf(consumed));
@@ -290,10 +347,12 @@ public class RemoveUnsupportedDynamicFilters
         {
             return combineConjuncts(extractConjuncts(expression)
                     .stream()
+                    .map(this::removeNestedDynamicFilters)
                     .filter(conjunct ->
                             getDescriptor(conjunct)
                                     .map(descriptor -> {
-                                        if (allowedDynamicFilterIds.contains(descriptor.getId())) {
+                                        if (descriptor.getInput() instanceof SymbolReference &&
+                                                allowedDynamicFilterIds.contains(descriptor.getId())) {
                                             consumedDynamicFilterIds.add(descriptor.getId());
                                             return true;
                                         }
@@ -304,11 +363,47 @@ public class RemoveUnsupportedDynamicFilters
 
         private Expression removeAllDynamicFilters(Expression expression)
         {
-            DynamicFilters.ExtractResult extractResult = extractDynamicFilters(expression);
+            Expression rewrittenExpression = removeNestedDynamicFilters(expression);
+            DynamicFilters.ExtractResult extractResult = extractDynamicFilters(rewrittenExpression);
             if (extractResult.getDynamicConjuncts().isEmpty()) {
-                return expression;
+                return rewrittenExpression;
             }
             return combineConjuncts(extractResult.getStaticConjuncts());
+        }
+
+        private Expression removeNestedDynamicFilters(Expression expression)
+        {
+            return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>()
+            {
+                @Override
+                public Expression rewriteLogicalBinaryExpression(LogicalBinaryExpression node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
+                {
+                    LogicalBinaryExpression rewrittenNode = treeRewriter.defaultRewrite(node, context);
+
+                    boolean modified = (node != rewrittenNode);
+                    ImmutableList.Builder<Expression> expressionBuilder = ImmutableList.builder();
+                    if (isDynamicFilter(rewrittenNode.getLeft())) {
+                        expressionBuilder.add(TRUE_LITERAL);
+                        modified = true;
+                    }
+                    else {
+                        expressionBuilder.add(rewrittenNode.getLeft());
+                    }
+
+                    if (isDynamicFilter(rewrittenNode.getRight())) {
+                        expressionBuilder.add(TRUE_LITERAL);
+                        modified = true;
+                    }
+                    else {
+                        expressionBuilder.add(rewrittenNode.getRight());
+                    }
+
+                    if (!modified) {
+                        return node;
+                    }
+                    return combinePredicates(node.getOperator(), expressionBuilder.build());
+                }
+            }, expression);
         }
     }
 
@@ -387,6 +482,31 @@ public class RemoveUnsupportedDynamicFilters
                         node.getRightHashSymbol(),
                         node.getDistributionType(),
                         node.isSpillable(),
+                        dynamicFilters);
+            }
+            return node;
+        }
+
+        @Override
+        public PlanNode visitSemiJoin(SemiJoinNode node, RewriteContext<Void> context)
+        {
+            PlanNode filteringSource = context.rewrite(node.getFilteringSource());
+            PlanNode source = context.rewrite(node.getSource());
+            Optional<String> dynamicFilters = node.getDynamicFilterId()
+                    .filter(entry -> !removedDynamicFilterIds.contains(entry));
+            if (filteringSource != node.getFilteringSource() ||
+                    source != node.getSource() ||
+                    !dynamicFilters.equals(node.getDynamicFilterId())) {
+                return new SemiJoinNode(
+                        node.getId(),
+                        node.getSource(),
+                        node.getFilteringSource(),
+                        node.getSourceJoinSymbol(),
+                        node.getFilteringSourceJoinSymbol(),
+                        node.getSemiJoinOutput(),
+                        node.getSourceHashSymbol(),
+                        node.getFilteringSourceHashSymbol(),
+                        node.getDistributionType(),
                         dynamicFilters);
             }
             return node;

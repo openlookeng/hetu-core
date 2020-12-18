@@ -63,4 +63,6 @@ public interface SingleStreamSpiller
      */
     @Override
     void close();
+
+    public void deleteFile();
 }

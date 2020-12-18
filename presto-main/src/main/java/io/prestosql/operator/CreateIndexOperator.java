@@ -14,6 +14,7 @@
  */
 package io.prestosql.operator;
 
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.spi.HetuConstant;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -52,6 +54,7 @@ public class CreateIndexOperator
     private final CreateIndexMetadata createIndexMetadata;
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final AtomicBoolean recordCreated;
+    private static final Logger LOG = Logger.get(CreateIndexOperator.class);
 
     public CreateIndexOperator(
             OperatorContext operatorContext,
@@ -126,11 +129,30 @@ public class CreateIndexOperator
 
         // only one operator needs to create the record
         if (!recordCreated.getAndSet(true)) {
+            if (levelWriter.isEmpty() && persistBy.isEmpty()) {
+                // table scan is empty. no data scanned from table. addInput() has never been called.
+                throw new IllegalStateException("The table is empty. No index will be created.");
+            }
+
             // update metadata
             IndexClient indexClient = heuristicIndexerManager.getIndexClient();
             try {
-                if (!indexClient.indexRecordExists(createIndexMetadata)) {
-                    indexClient.addIndexRecord(createIndexMetadata);
+                IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
+
+                switch (recordStatus) {
+                    case SAME_NAME:
+                    case IN_PROGRESS_SAME_NAME:
+                    case IN_PROGRESS_SAME_CONTENT:
+                    case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                    case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
+                        indexClient.deleteIndexRecord(createIndexMetadata.getIndexName(), Collections.emptyList());
+                        indexClient.addIndexRecord(createIndexMetadata);
+                        break;
+                    case NOT_FOUND:
+                    case SAME_INDEX_PART_CAN_MERGE:
+                        indexClient.addIndexRecord(createIndexMetadata);
+                        break;
+                    default:
                 }
             }
             catch (IOException e) {
@@ -180,26 +202,27 @@ public class CreateIndexOperator
             switch (createIndexMetadata.getCreateLevel()) {
                 case STRIPE: {
                     String filePath = page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH);
-                    IndexWriter indexWriter = levelWriter.computeIfAbsent(filePath,
-                            k -> {
-                                IndexWriter writer = heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata);
-                                persistBy.putIfAbsent(writer, this);
-                                return writer;
-                            });
-                    indexWriter.addData(values, connectorMetadata);
+                    levelWriter.computeIfAbsent(filePath, k -> heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    persistBy.putIfAbsent(levelWriter.get(filePath), this);
+                    levelWriter.get(filePath).addData(values, connectorMetadata);
                     break;
                 }
                 case PARTITION: {
                     String partition = getPartitionName(page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH),
                             createIndexMetadata.getTableName());
-                    levelWriter.computeIfAbsent(partition, k -> heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
-                    IndexWriter indexWriter = levelWriter.get(partition);
-                    // TODO: use partitioned index writer here
+                    levelWriter.putIfAbsent(partition, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    persistBy.putIfAbsent(levelWriter.get(partition), this);
+                    levelWriter.get(partition).addData(values, connectorMetadata);
+                    break;
+                }
+                case TABLE: {
+                    levelWriter.putIfAbsent(createIndexMetadata.getTableName(), heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    persistBy.putIfAbsent(levelWriter.get(createIndexMetadata.getTableName()), this);
+                    levelWriter.get(createIndexMetadata.getTableName()).addData(values, connectorMetadata);
                     break;
                 }
                 default:
-                    new IOException("Create level not supported");
-                    break;
+                    throw new IllegalArgumentException("Create level not supported");
             }
         }
         catch (IOException e) {
@@ -304,6 +327,6 @@ public class CreateIndexOperator
             }
         }
 
-        throw new IllegalStateException("Datasource path " + uri + " does not include a partition");
+        throw new IllegalStateException("Partition level is not supported for non partitioned table.");
     }
 }

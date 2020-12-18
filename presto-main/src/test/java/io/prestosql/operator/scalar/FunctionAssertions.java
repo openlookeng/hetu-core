@@ -34,6 +34,7 @@ import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.FilterAndProjectOperator.FilterAndProjectOperatorFactory;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorFactory;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
@@ -52,7 +53,7 @@ import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.connector.InMemoryRecordSet;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.connector.RecordSet;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.predicate.Utils;
 import io.prestosql.spi.type.RowType;
@@ -878,7 +879,8 @@ public final class FunctionAssertions
                     null,
                     ImmutableList.of(projection.getType()),
                     new DataSize(0, BYTE),
-                    0);
+                    0,
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
         }
         catch (Throwable e) {
             if (e instanceof UncheckedExecutionException) {
@@ -950,7 +952,7 @@ public final class FunctionAssertions
             implements PageSourceProvider
     {
         @Override
-        public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter)
+        public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, Optional<DynamicFilterSupplier> dynamicFilter)
         {
             assertInstanceOf(split.getConnectorSplit(), FunctionAssertions.TestSplit.class);
             FunctionAssertions.TestSplit testSplit = (FunctionAssertions.TestSplit) split.getConnectorSplit();

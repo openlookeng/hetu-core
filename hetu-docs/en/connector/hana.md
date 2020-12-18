@@ -137,7 +137,7 @@ openLooKeng support creating tables with the following type into a SAP HANA Data
 
 The openLooKeng functions which can be mapped to SAP HANA function is listed in the following table. Note: The \"\$n\" is placeholder to present an argument in a function.
 
-> | openLooKeng function                \|               HANA function | notes                                                        |                                                              |
+> | openLooKeng function                |               HANA function | notes                                                        |
 > | ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 > | DATE_ADD(Unit, $1, $2)                                      | ADD_SECONDS($2, $1) or ADD_DAYS($2, $1) or ADD_MONTHS($2, $1) or ADD_YEARS($2, $1) | When unit is ‘second’,’minute’ or ‘hour’, mapping to ADD_SECONDS. When unit is ‘day’ or ‘week’, mapping to ADD_DAYS. When unit is ‘month’ or ‘quarter’, mapping to ADD_MONTHS. When unit is ‘year’, mapping to ADD_YEARS. |
 > | CORR($1,$2)                                                 | CORR($1, $2)                                                 |                                                              |
@@ -189,10 +189,6 @@ The openLooKeng functions which can be mapped to SAP HANA function is listed in 
 > | MINUTE($1)                                                  | EXTRACT(MINUTE FROM $1)                                      |                                                              |
 > | SECOND($1)                                                  | EXTRACT(SECOND FROM $1)                                      |                                                              |
 > | DAY_OF_WEEK($1)                                             | WEEKDAY($1)                                                  |                                                              |
-
-**Note**
-
-DATE\_ADD(Unit, \$1, \$2): When unit is \'second\',\'minute\' or \'hour\', mapping to ADD\_SECONDS. When unit is \'day\' or \'week\', mapping to ADD\_DAYS. When unit is \'month\' or \'quarter\', mapping to ADD\_MONTHS. When unit is \'year\', mapping to ADD\_YEARS.
 
 
 Hana sql migrate to openLooKeng sql guide

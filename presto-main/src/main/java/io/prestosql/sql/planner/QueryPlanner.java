@@ -23,10 +23,12 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Field;
@@ -54,6 +56,7 @@ import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FetchFirst;
@@ -74,6 +77,7 @@ import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.SortItem;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.Window;
@@ -224,7 +228,7 @@ class QueryPlanner
                 computeOutputs(builder, outputs));
     }
 
-    public DeleteRelationPlan planDeleteRowAsInsert(Delete node)
+    public UpdateDeleteRelationPlan planDeleteRowAsInsert(Delete node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());
         TableHandle handle = analysis.getTableHandle(node.getTable());
@@ -253,15 +257,19 @@ class QueryPlanner
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
         TranslationMap translations = new TranslationMap(relationPlan, analysis, lambdaDeclarationToSymbolMap);
         translations.setFieldMappings(relationPlan.getFieldMappings());
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
+        Optional<Expression> predicate = Optional.empty();
         if (node.getWhere().isPresent()) {
             builder = filter(builder, node.getWhere().get(), node);
+            if (builder.getRoot() instanceof FilterNode) {
+                predicate = Optional.of(((FilterNode) builder.getRoot()).getPredicate());
+            }
         }
 
         Assignments.Builder assignments = Assignments.builder();
@@ -316,7 +324,7 @@ class QueryPlanner
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
-        return new DeleteRelationPlan(plan, visibleTableColumnNames, sortSymbol);
+        return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
     public DeleteNode plan(Delete node)
@@ -345,7 +353,7 @@ class QueryPlanner
         fields.add(rowIdField);
 
         // create table scan
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build());
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -367,7 +375,7 @@ class QueryPlanner
         return new DeleteNode(idAllocator.getNextId(), builder.getRoot(), new DeleteTarget(handle, metadata.getTableMetadata(session, handle).getTable()), rowId, outputs);
     }
 
-    public UpdateRelationPlan plan(Update node)
+    public UpdateDeleteRelationPlan plan(Update node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());
         TableHandle handle = analysis.getTableHandle(node.getTable());
@@ -395,7 +403,7 @@ class QueryPlanner
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -404,8 +412,12 @@ class QueryPlanner
 
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
 
+        Optional<Expression> predicate = Optional.empty();
         if (node.getWhere().isPresent()) {
             builder = filter(builder, node.getWhere().get(), node);
+            if (builder.getRoot() instanceof FilterNode) {
+                predicate = Optional.of(((FilterNode) builder.getRoot()).getPredicate());
+            }
         }
 
         List<AssignmentItem> assignmentItems = node.getAssignmentItems();
@@ -476,7 +488,7 @@ class QueryPlanner
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
-        return new UpdateRelationPlan(plan, visibleTableColumnNames);
+        return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
     private static List<Symbol> computeOutputs(PlanBuilder builder, List<Expression> outputExpressions)
@@ -601,9 +613,6 @@ class QueryPlanner
             return subPlan;
         }
 
-        // in order to create index, we need page metadata from the connector
-        session.setPageMetadataEnabled(true);
-
         // rewrite sub queries
         CreateIndex createIndex = (CreateIndex) originalStatement;
         String tableName = MetadataUtil.createQualifiedObjectName(session, originalStatement, createIndex.getTableName()).toString();
@@ -616,14 +625,14 @@ class QueryPlanner
                 .stream().map(Field::getType).toArray(Type[]::new)).iterator();
 
         Properties indexProperties = new Properties();
-        CreateIndexMetadata.Level indexCreationLevel = LEVEL_DEFAULT;
+        Index.Level indexCreationLevel = LEVEL_DEFAULT;
+        indexProperties.setProperty(LEVEL_PROP_KEY, String.valueOf(LEVEL_DEFAULT));
 
         for (Property property : createIndex.getProperties()) {
-            String key = property.getName().toString().replaceAll("\"", "");
-            String val = property.getValue().toString().replaceAll("\"", "").toUpperCase(Locale.ENGLISH);
+            String key = extractPropertyValue(property.getName());
+            String val = extractPropertyValue(property.getValue()).toUpperCase(Locale.ENGLISH);
             if (key.equals(LEVEL_PROP_KEY)) {
-                indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
-                continue;
+                indexCreationLevel = Index.Level.valueOf(val);
             }
             indexProperties.setProperty(key, val);
         }
@@ -639,6 +648,20 @@ class QueryPlanner
                         indexProperties,
                         session.getUser(),
                         indexCreationLevel)));
+    }
+
+    private String extractPropertyValue(Expression expression)
+    {
+        if (expression instanceof Identifier) {
+            return ((Identifier) expression).getValue();
+        }
+        else if (expression instanceof DecimalLiteral) {
+            return ((DecimalLiteral) expression).getValue();
+        }
+        else if (expression instanceof StringLiteral) {
+            return ((StringLiteral) expression).getValue();
+        }
+        return expression.toString().replaceAll("\"", "");
     }
 
     private Map<Symbol, Expression> coerce(Iterable<? extends Expression> expressions, PlanBuilder subPlan, TranslationMap translations)
@@ -1235,15 +1258,21 @@ class QueryPlanner
                 .collect(toImmutableMap(expression -> expression, builder::translate));
     }
 
-    static class UpdateRelationPlan
+    static class UpdateDeleteRelationPlan
     {
         private final RelationPlan plan;
         private final List<String> columNames;
+        private final Map<Symbol, ColumnHandle> columnAssignments;
+        private final Optional<Expression> predicate;
 
-        UpdateRelationPlan(RelationPlan plan, List<String> columNames)
+        UpdateDeleteRelationPlan(RelationPlan plan, List<String> columNames,
+                Map<Symbol, ColumnHandle> columnAssignments,
+                Optional<Expression> predicate)
         {
             this.plan = plan;
             this.columNames = columNames;
+            this.columnAssignments = columnAssignments;
+            this.predicate = predicate;
         }
 
         public List<String> getColumNames()
@@ -1251,38 +1280,19 @@ class QueryPlanner
             return columNames;
         }
 
-        public RelationPlan getPlan()
+        public Map<Symbol, ColumnHandle> getColumnAssignments()
         {
-            return plan;
-        }
-    }
-
-    static class DeleteRelationPlan
-    {
-        private final RelationPlan plan;
-        private final List<String> columNames;
-        private final Symbol rowIdSymbol;
-
-        DeleteRelationPlan(RelationPlan plan, List<String> columNames, Symbol rowIdSymbol)
-        {
-            this.plan = plan;
-            this.columNames = columNames;
-            this.rowIdSymbol = rowIdSymbol;
+            return columnAssignments;
         }
 
-        public List<String> getColumNames()
+        public Optional<Expression> getPredicate()
         {
-            return columNames;
+            return predicate;
         }
 
         public RelationPlan getPlan()
         {
             return plan;
-        }
-
-        public Symbol getRowIdSymbol()
-        {
-            return rowIdSymbol;
         }
     }
 }

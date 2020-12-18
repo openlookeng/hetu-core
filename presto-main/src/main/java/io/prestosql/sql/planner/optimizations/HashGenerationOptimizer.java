@@ -41,6 +41,7 @@ import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode.EquiJoinClause;
@@ -53,7 +54,8 @@ import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.WindowNode;
@@ -65,7 +67,9 @@ import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -81,6 +85,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.mangleOperatorName;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -133,6 +138,9 @@ public class HashGenerationOptimizer
         private final PlanNodeIdAllocator idAllocator;
         private final SymbolAllocator symbolAllocator;
         private final TypeProvider types;
+        private final Set<Integer> removedReuseTableScanMappingIds;
+        private final Map<Integer, List> reuseTableScanMappingIdSymbols;
+        private final Map<Integer, List> reuseTableScanMappingIdNodes;
 
         private Rewriter(Metadata metadata, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, TypeProvider types)
         {
@@ -140,6 +148,9 @@ public class HashGenerationOptimizer
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
             this.types = requireNonNull(types, "types is null");
+            removedReuseTableScanMappingIds = new HashSet<>();
+            reuseTableScanMappingIdSymbols = new HashMap<>();
+            reuseTableScanMappingIdNodes = new HashMap<>();
         }
 
         @Override
@@ -283,7 +294,7 @@ public class HashGenerationOptimizer
         }
 
         @Override
-        public PlanWithProperties visitTopNRowNumber(TopNRowNumberNode node, HashComputationSet parentPreference)
+        public PlanWithProperties visitTopNRankingNumber(TopNRankingNumberNode node, HashComputationSet parentPreference)
         {
             if (node.getPartitionBy().isEmpty()) {
                 return planSimpleNodeWithProperties(node, parentPreference);
@@ -298,14 +309,15 @@ public class HashGenerationOptimizer
             Symbol hashSymbol = child.getRequiredHashSymbol(hashComputation.get());
 
             return new PlanWithProperties(
-                    new TopNRowNumberNode(
+                    new TopNRankingNumberNode(
                             node.getId(),
                             child.getNode(),
                             node.getSpecification(),
                             node.getRowNumberSymbol(),
                             node.getMaxRowCountPerPartition(),
                             node.isPartial(),
-                            Optional.of(hashSymbol)),
+                            Optional.of(hashSymbol),
+                            node.getRankingFunction()),
                     child.getHashSymbols());
         }
 
@@ -411,7 +423,8 @@ public class HashGenerationOptimizer
                             node.getSemiJoinOutput(),
                             Optional.of(sourceHashSymbol),
                             Optional.of(filteringSourceHashSymbol),
-                            node.getDistributionType()),
+                            node.getDistributionType(),
+                            node.getDynamicFilterId()),
                     source.getHashSymbols());
         }
 
@@ -719,6 +732,7 @@ public class HashGenerationOptimizer
             }
 
             if (preferenceSatisfied) {
+                checkIfTableScanNodeStrategyChangeRequired(result, preferredHashes);
                 return result;
             }
 
@@ -754,8 +768,71 @@ public class HashGenerationOptimizer
                 }
             }
 
+            checkIfTableScanNodeStrategyChangeRequired(planWithProperties, requiredHashes);
             ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), planWithProperties.getNode(), assignments.build());
             return new PlanWithProperties(projectNode, outputHashSymbols);
+        }
+
+        private void checkIfTableScanNodeStrategyChangeRequired(PlanWithProperties planWithProperties, HashComputationSet requiredHashes)
+        {
+            if (planWithProperties.getNode() instanceof TableScanNode) {
+                changeTableScanNodeStrategy((TableScanNode) planWithProperties.getNode(), requiredHashes);
+            }
+            else if (planWithProperties.getNode() instanceof FilterNode && ((FilterNode) planWithProperties.getNode()).getSource() instanceof TableScanNode) {
+                changeTableScanNodeStrategy((TableScanNode) (((FilterNode) planWithProperties.getNode()).getSource()), requiredHashes);
+            }
+            else if (planWithProperties.getNode() instanceof ProjectNode) {
+                ProjectNode projectNode = (ProjectNode) planWithProperties.getNode();
+                if (projectNode.getSource() instanceof TableScanNode) {
+                    changeTableScanNodeStrategy((TableScanNode) projectNode.getSource(), requiredHashes);
+                }
+                else if (projectNode.getSource() instanceof FilterNode && ((FilterNode) projectNode.getSource()).getSource() instanceof TableScanNode) {
+                    changeTableScanNodeStrategy((TableScanNode) ((FilterNode) projectNode.getSource()).getSource(), requiredHashes);
+                }
+            }
+        }
+
+        private void changeTableScanNodeStrategy(TableScanNode node, HashComputationSet requiredHashes)
+        {
+            if (!node.getStrategy().equals(REUSE_STRATEGY_DEFAULT)) {
+                List<Symbol> fields = new ArrayList<>();
+                boolean isDerivedExpr = false;
+                for (HashComputation hashComputation : requiredHashes.getHashes()) {
+                    fields.addAll(hashComputation.getFields());
+                    isDerivedExpr = !fields.stream().filter(field -> node.getAssignments().get(field) == null).findAny().equals(Optional.empty());
+                }
+
+                Integer reuseTableScanMappingId = node.getReuseTableScanMappingId();
+                if (reuseTableScanMappingIdNodes.get(reuseTableScanMappingId) == null) {
+                    reuseTableScanMappingIdSymbols.put(reuseTableScanMappingId, fields);
+                    List<TableScanNode> nodes = new ArrayList<>();
+                    nodes.add(node);
+                    reuseTableScanMappingIdNodes.put(reuseTableScanMappingId, nodes);
+                }
+                else {
+                    // compare already saved field list.
+                    List<Symbol> nodeFields = reuseTableScanMappingIdSymbols.get(reuseTableScanMappingId);
+                    if (removedReuseTableScanMappingIds.contains(reuseTableScanMappingId)) {
+                        node.setStrategy(REUSE_STRATEGY_DEFAULT);
+                        node.setReuseTableScanMappingId(-1);
+                    }
+                    else if (!node.isSymbolsEqual(nodeFields, fields) || isDerivedExpr) {
+                        // means two symbol fields are not same.
+                        node.setStrategy(REUSE_STRATEGY_DEFAULT);
+                        node.setReuseTableScanMappingId(-1);
+                        removedReuseTableScanMappingIds.add(reuseTableScanMappingId);
+                        List<TableScanNode> scanNodes = reuseTableScanMappingIdNodes.get(reuseTableScanMappingId);
+                        scanNodes.forEach(x -> {
+                            x.setStrategy(REUSE_STRATEGY_DEFAULT);
+                            x.setReuseTableScanMappingId(-1); });
+                    }
+                    else {
+                        List<TableScanNode> nodes = reuseTableScanMappingIdNodes.get(reuseTableScanMappingId);
+                        nodes.add(node);
+                        reuseTableScanMappingIdNodes.put(reuseTableScanMappingId, nodes);
+                    }
+                }
+            }
         }
 
         private PlanWithProperties plan(PlanNode node, HashComputationSet parentPreference)

@@ -16,6 +16,7 @@ package io.prestosql.heuristicindex;
 
 import com.google.common.cache.CacheLoader;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
@@ -42,6 +43,19 @@ public class IndexCacheLoader
     {
         requireNonNull(key);
         requireNonNull(indexClient);
+        if (Index.Level.PARTITION.name().equals(key.getIndexLevel())) {
+            return loadPartitionIndex(key);
+        }
+        else {
+            return loadSplitIndex(key);
+        }
+    }
+
+    private List<IndexMetadata> loadSplitIndex(IndexCacheKey key)
+            throws Exception
+    {
+        requireNonNull(key);
+        requireNonNull(indexClient);
 
         // only load index files if index lastModified matches key lastModified
         long lastModified;
@@ -51,7 +65,7 @@ public class IndexCacheLoader
         }
         catch (Exception e) {
             // no lastModified file found, i.e. index doesn't exist
-            throw new Exception("No index file found for key " + key, e);
+            throw new IndexNotCreatedException();
         }
 
         if (lastModified != key.getLastModifiedTime()) {
@@ -79,6 +93,32 @@ public class IndexCacheLoader
         // Sort the indices based on split starting position
         return indices.stream()
                 .sorted(comparingLong(IndexMetadata::getSplitStart))
+                .collect(Collectors.toList());
+    }
+
+    private List<IndexMetadata> loadPartitionIndex(IndexCacheKey key)
+            throws Exception
+    {
+        List<IndexMetadata> indices;
+        try {
+            indices = indexClient.readPartitionIndex(key.getPath());
+        }
+        catch (Exception e) {
+            throw new Exception("No valid index file found for key " + key, e);
+        }
+
+        // null indicates that the index is not registered in index records
+        if (indices == null) {
+            throw new IndexNotCreatedException();
+        }
+
+        // lastModified file was valid, but no index files for the given types
+        if (indices.isEmpty()) {
+            throw new Exception("No index files found for key " + key);
+        }
+
+        // Sort the indices based on split starting position
+        return indices.stream()
                 .collect(Collectors.toList());
     }
 }

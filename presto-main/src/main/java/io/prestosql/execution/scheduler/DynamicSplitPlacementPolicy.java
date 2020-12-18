@@ -16,12 +16,14 @@ package io.prestosql.execution.scheduler;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.execution.RemoteTask;
+import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.service.PropertyService;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -47,10 +49,10 @@ public class DynamicSplitPlacementPolicy
     }
 
     @Override
-    public SplitPlacementResult computeAssignments(Set<Split> splits)
+    public SplitPlacementResult computeAssignments(Set<Split> splits, SqlStageExecution stage)
     {
         ensureClusterReady();
-        return nodeSelector.computeAssignments(splits, remoteTasks.get());
+        return nodeSelector.computeAssignments(splits, remoteTasks.get(), Optional.of(stage));
     }
 
     private void ensureClusterReady()

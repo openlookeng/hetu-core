@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -117,6 +118,14 @@ function renderItem(tree, item) {
                             <i className="icon fa fa-star valign-middle contextmenu-icons favorite"/><span>Add to Favorites</span>
                         </MenuItem>
                     }
+                    {item.type == dataType.CATALOG ?
+                        <MenuItem data={{item: item, tree: tree}} onClick={(e, data) => {
+                            tree.deleteCatalog(item);
+                        }}>
+                            <i className="icon fa fa-trash-o valign-middle contextmenu-icons remove-favorite"/><span>Delete Catalog</span>
+                        </MenuItem>
+                        : null
+                    }
                     {(item.type == dataType.SCHEMA) ?
                         <MenuItem data={{item: item, tree: tree}} onClick={(e, data) => {
                             QueryActions.setSessionContext({
@@ -188,6 +197,7 @@ class SchemaTree extends React.Component {
         this.removeFromFavorites = this.removeFromFavorites.bind(this);
         this.isFavorite = this.isFavorite.bind(this);
         this.refreshItem = this.refreshItem.bind(this);
+        this.deleteCatalog = this.deleteCatalog.bind(this);
     }
 
     updateTree(refresh = false) {
@@ -244,6 +254,23 @@ class SchemaTree extends React.Component {
             return;
         }
         element.style.color = "#222222";
+    }
+
+    deleteCatalog(item) {
+        if(confirm('Are you sure you want to deletet he catalog?')) {
+            SchemaActions.deleteCatalog(item.name).then((res) => {
+                if(!res.result) {
+                    if(res.message.indexOf('Not Found (code: 404)') !==-1){
+                        alert("Error while delete catalog: service is not available. Maybe the catalog is not manually added.");
+                    } else {
+                        alert("Error while delete catalog:" + res.message.split('\n', 1)[0]);
+                    }
+
+                } else {
+                    this.refresh();
+                }
+            })
+        }
     }
 
     addToFavorites(item) {

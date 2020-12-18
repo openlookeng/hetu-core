@@ -877,7 +877,6 @@ public class HiveAstBuilder
     public Node visitAlterTablePartitionTouch(HiveSqlParser.AlterTablePartitionTouchContext context)
     {
         addDiff(DiffType.UNSUPPORTED, context.TOUCH().getText(), "[TOUCH PARTITION] is not supported");
-        addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Touch Partition", context);
     }
 
@@ -2570,14 +2569,8 @@ public class HiveAstBuilder
         switch (token.getType()) {
             case HiveSqlLexer.CURRENT_DATE:
                 return CurrentTime.Function.DATE;
-            case HiveSqlLexer.CURRENT_TIME:
-                return CurrentTime.Function.TIME;
             case HiveSqlLexer.CURRENT_TIMESTAMP:
                 return CurrentTime.Function.TIMESTAMP;
-            case HiveSqlLexer.LOCALTIME:
-                return CurrentTime.Function.LOCALTIME;
-            case HiveSqlLexer.LOCALTIMESTAMP:
-                return CurrentTime.Function.LOCALTIMESTAMP;
         }
 
         throw new IllegalArgumentException("Unsupported special function: " + token.getText());

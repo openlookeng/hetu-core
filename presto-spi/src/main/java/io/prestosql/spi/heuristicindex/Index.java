@@ -15,13 +15,14 @@
 
 package io.prestosql.spi.heuristicindex;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Interface implemented by all types of indexes (ie, Bloom, minmax etc)
@@ -29,7 +30,17 @@ import java.util.Properties;
  * @since 2019-08-18
  */
 public interface Index
+        extends Closeable
 {
+    /**
+     * The data unit on which the index should be applied on.
+     * <p>
+     * The index should be self-contained on the data unit specified and can work independently.
+     *
+     * @return data level on which the index should be applied on.
+     */
+    Set<Level> getSupportedIndexLevels();
+
     /**
      * Gets the id of the IndexStore.
      * <p>
@@ -40,13 +51,33 @@ public interface Index
      */
     String getId();
 
+    default boolean supportMultiColumn()
+    {
+        return false;
+    }
+
     /**
      * Adds the given values to the index.
      *
      * @param values a map of columnName-columnValues
      * @return whether the values are successfully added
      */
-    boolean addValues(Map<String, List<Object>> values);
+    //boolean addValues(Map<String, List<Object>> values) throws IOException;
+    boolean addValues(List<Pair<String, List<Object>>> values) throws IOException;
+
+    /**
+     * Add a list of Key-Value pairs to the index. Only map-like Indexes will support this operation.
+     * For example Bloom Index just requires a list of values, whereas a Btree Index requires Key-Value pairs
+     * to be added.
+     *
+     * If the list contains duplicate keys, the value of the first occurrence is used.
+     * @param keyValues an ordered list of KeyValues to add to index, sorted ascending on Keys
+     * @return true if operation was successful
+     */
+    default boolean addKeyValues(List<Pair<String, List<KeyValue>>> keyValues) throws IOException
+    {
+        throw new UnsupportedOperationException("This index does not support adding Key-Value pairs.");
+    }
 
     /**
      * The Index will apply the provided Expression but only return a
@@ -55,7 +86,7 @@ public interface Index
      * @param expression the expression to apply
      * @return whether the expression result contains
      */
-    boolean matches(Object expression);
+    boolean matches(Object expression) throws UnsupportedOperationException;
 
     /**
      * Given an Expression, the Index should apply it and return the matching positions.
@@ -67,7 +98,7 @@ public interface Index
      * @param expression the expression to apply
      * @return the Iterator of positions that matches the expression result
      */
-    default <I> Iterator<I> lookUp(Object expression)
+    default <I> Iterator<I> lookUp(Object expression) throws UnsupportedOperationException
     {
         throw new UnsupportedOperationException(String.format("The current index type %s does not support lookUp() operation.", getId()));
     }
@@ -83,8 +114,7 @@ public interface Index
      * @param out OutputStream to write index to
      * @throws IOException In the case that an error with the filesystem occurs
      */
-    void serialize(OutputStream out)
-            throws IOException;
+    void serialize(OutputStream out) throws IOException;
 
     /**
      * <pre>
@@ -97,8 +127,7 @@ public interface Index
      * @param in InputStream to read index from
      * @throws IOException In the case that an error with the filesystem occurs
      */
-    Index deserialize(InputStream in)
-            throws IOException;
+    Index deserialize(InputStream in) throws IOException;
 
     /**
      * Intersect this index with another index and return the intersection index object.
@@ -106,7 +135,7 @@ public interface Index
      * @param another another index to intersect with
      * @return the intersect index
      */
-    default Index intersect(Index another)
+    default Index intersect(Index another) throws UnsupportedOperationException
     {
         throw new UnsupportedOperationException(String.format("Intersect operation on %s index is not currently supported", getId()));
     }
@@ -117,7 +146,7 @@ public interface Index
      * @param another another index to union with
      * @return the union index
      */
-    default Index union(Index another)
+    default Index union(Index another) throws UnsupportedOperationException
     {
         throw new UnsupportedOperationException(String.format("Union operation on %s index is not currently supported", getId()));
     }
@@ -153,40 +182,58 @@ public interface Index
     {
     }
 
-    int getExpectedNumOfEntries();
-
-    void setExpectedNumOfEntries(int expectedNumOfEntries);
+    /**
+     * Sets the expected number of entries that will be written to this index.
+     * <p>
+     * This value can help some index types to be better optimized.
+     *
+     * @return
+     */
+    default void setExpectedNumOfEntries(int expectedNumOfEntries)
+    {
+    }
 
     /**
      * <pre>
-     * Returns the memorySize of the Index.
+     * Returns the estimated memory consumed by this index.
      *
-     * The memorySize may be used to estimate the memory usage for index.
-     * Index cache can evict entries according to all indices memory size.
-     * The unit is Byte.
+     * This memory usage can help with memory usage based cache eviction.
+     *
+     * The unit is Bytes.
      * </pre>
      *
-     * @return long returns memorySize of the index
+     * @return long returns estimated bytes of memory consumed by this index
      */
-    default long getMemorySize()
+    default long getMemoryUsage()
     {
         return 0;
     }
 
     /**
      * <pre>
-     * Sets the memorySize of the Index.
+     * Returns the estimated disk consumed by this index.
      *
-     * The memorySize may be used to estimate the memory usage for index.
-     * Index cache can evict entries according to all indices memory size.
-     * The unit is Byte.
+     * This disk usage can help with disk usage based cache eviction.
+     *
+     * The unit is Bytes.
      * </pre>
      *
-     * @param memorySize Properties being set
+     * @return long returns estimated bytes of disk consumed by this index
      */
-    default void setMemorySize(long memorySize)
+    default long getDiskUsage()
     {
+        return 0;
     }
 
-    boolean supportMultiColumn();
+    default void close() throws IOException
+    {
+        return;
+    }
+
+    enum Level
+    {
+        STRIPE,
+        PARTITION,
+        TABLE
+    }
 }

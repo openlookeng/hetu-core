@@ -141,7 +141,8 @@ public class CarbondataSplitManager
             ConnectorSession session, ConnectorTableHandle tableHandle,
             SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Optional<QueryType> queryType, Map<String, Object> queryProperties,
-            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+            boolean partOfReuse)
     {
         HiveTableHandle hiveTable = (HiveTableHandle) tableHandle;
         SchemaTableName schemaTableName = hiveTable.getSchemaTableName();

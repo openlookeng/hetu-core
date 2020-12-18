@@ -697,4 +697,15 @@ public abstract class AbstractMockMetadata
     {
         return true;
     }
+
+    /**
+     * Hetu can only create index for supported connectors.
+     *
+     * @param session Presto session
+     * @param tableName Connector specific tableName
+     */
+    public boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName)
+    {
+        return true;
+    }
 }

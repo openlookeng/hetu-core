@@ -1,59 +1,185 @@
-
 # 数据中心连接器
 
-数据中心连接器允许查询远程openLooKeng数据中心。这可用于连接来自本地openLooKeng环境的不同openLooKeng集群之间的数据。
+数据中心连接器允许查询远程openLooKeng数据中心。可实现来自本地openLooKeng环境的不同openLooKeng集群之间的数据融合分析。
 
-## 配置
+## 本端连接器配置
 
-要配置数据中心连接器，在`etc/catalog`中创建一个目录属性文件，例如`dc.properties`，将数据中心连接器挂载为`dc`目录。使用以下内容创建文件，并根据设置替换连接属性：
+配置数据中心连接器时，在`etc/catalog`中创建一个属性文件，例如`<dc-name>.properties`，即将数据中心连接器挂载到`<dc-name>` 目录。使用以下内容创建配置文件，并根据实际的远端openLooKeng替换`connection`属性：
+
+### 基本配置
 
 ```{.none}
 connector.name=dc
 connection-url=http://example.net:8080
-connection-user=root
-connection-password=password
+connection-user=<远端openLooKeng用户名>
+connection-password=<远端openLooKeng密码>
 ```
 
-下表列出了数据中心连接器支持的所有属性。
+| 属性名称              | 说明                          | 是否必选 | 默认值 |
+| --------------------- | ----------------------------- | :------- | ------ |
+| `connection-url`      | 需要连接的openLooKeng的URL    | 必选     |        |
+| `connection-user`     | 需要连接的openLooKeng的用户名 | 可选     |        |
+| `connection-password` | 需要连接的openLooKeng的密码   | 可选     |        |
 
-| 属性名称| 说明| 默认值|
-|----------|----------|----------|
-| `connection-url`| 连接URL| |
-| `connection-user`| 用户名| |
-| `connection-password`| 密码| |
-| `dc.accesstoken`| 基于令牌身份验证的访问令牌| |
-| `dc.application.name.prefix`| 添加到任何指定的ApplicationName客户端信息属性的前缀，该前缀用于设置openLooKeng查询的源名称。如果没有设置此属性或ApplicationName，则查询的源将是hetu-dc。| `hetu-dc`|
-| `dc.extra.credentials`| 连接外部服务的额外凭证。ExtraCredentials是一个键值对列表。示例：**foo:bar;abc:xyz**将创建凭证**abc=xyz**和**foo=bar**。| |
-| `dc.http-client-timeout`| 客户端持续重试取数据的时间，默认值为10分钟| `10.00m`|
-| `dc.http-compression`| 是否使用gzip压缩响应体，默认值为false| `false`|
-| `dc.http-request-connectTimeout`| HTTP请求连接超时，默认值为30秒| `30.00s`|
-| `dc.http-request-readTimeout`| HTTP请求读取超时，默认为30秒| `30.00s`|
-| `dc.httpclient.maximum.idle.connections`| HTTP客户端保持打开的最大空闲连接| `20`|
-| `dc.httpproxy`| HTTP代理主机和端口。示例：**localhost:8888**| |
-| `dc.kerberos.config.path`| Kerberos配置文件| |
-| `dc.kerberos.credential.cachepath`| Kerberos凭证缓存| |
-| `dc.kerberos.keytab.path`| Kerberos keytab文件| |
-| `dc.kerberos.principal`| 向openLooKeng协调节点进行身份验证时使用的主体| |
-| `dc.kerberos.remote.service.name`| openLooKeng协调节点Kerberos服务的名称。Kerberos身份验证时，需要配置该参数| |
-| `dc.kerberos.service.principal.pattern`| openLooKeng协调节点Kerberos服务主体模式。| `${SERVICE}@${HOST}`|
-| `dc.kerberos.use.canonical.hostname`| 通过首先将主机名解析为IP地址，然后对该IP地址执行反向DNS查找，从而使用Kerberos服务主体的openLooKeng协调节点的规范主机名。| `false`|
-| `dc.max.anticipated.delay`| 集群中两个查询请求之间的最大预期时延。如果远程dc没有收到超过此延迟的请求，则可能会取消查询。| `10.00m`|
-| `dc.metadata.cache.enabled`| 启用元数据缓存| `true`|
-| `dc.metadata.cache.maximum.size`| 元数据缓存最大值| `10000`|
-| `dc.metadata.cache.ttl`| 元数据缓存Ttl| `1.00s`|
-| `dc.query.pushdown.enabled`| 启用子查询下推到此数据中心。如果未设置此属性，默认情况下，子查询将向下推。| `true`|
-| `dc.remote-http-server.max-request-header-size`| 此属性应等效于远程服务器中**http-server.max-request-header-size**的值| `4kB`|
-| `dc.remote.cluster.id`| 远程集群的唯一ID。| |
-| `dc.socksproxy`| SOCKS代理主机和端口。示例：**localhost:1080**| |
-| `dc.ssl`| 使用HTTPS连接。| `false`|
-| `dc.ssl.keystore.password`| keystore密码| |
-| `dc.ssl.keystore.path`| 包含用于身份验证的证书和私钥的JavaKeyStore文件的位置| |
-| `dc.ssl.truststore.password`| truststore密码| |
-| `dc.ssl.truststore.path`| 用于验证HTTPS服务器证书的Java TrustStore文件的位置| |
+### 安全配置
 
-### 多openLooKeng集群
+当远端openLooKeng开启了安全认证或TLS/SSL通道加密时，则需要在`<dc-name>.properties`进行相应的安全配置。
+
+#### Kerberos认证方式
+
+| 属性名称                                | 说明                                                         | 默认值               |
+| --------------------------------------- | ------------------------------------------------------------ | -------------------- |
+| `dc.kerberos.config.path`               | Kerberos配置文件                                             |                      |
+| `dc.kerberos.credential.cachepath`      | Kerberos凭证缓存                                             |                      |
+| `dc.kerberos.keytab.path`               | Kerberos keytab文件                                          |                      |
+| `dc.kerberos.principal`                 | 向openLooKeng协调节点进行身份验证时使用的主体                |                      |
+| `dc.kerberos.remote.service.name`       | openLooKeng协调节点Kerberos服务的名称。Kerberos身份验证时，需要配置该参数 |                      |
+| `dc.kerberos.service.principal.pattern` | openLooKeng协调节点Kerberos服务主体模式                      | `${SERVICE}@${HOST}` |
+| `dc.kerberos.use.canonical.hostname`    | 通过首先将主机名解析为IP地址，然后对该IP地址执行反向DNS查找，从而使用Kerberos服务主体的openLooKeng协调节点的规范主机名 | `false`              |
+
+#### 令牌认证方式
+
+| 属性名称         | 说明                       | 默认值 |
+| ---------------- | -------------------------- | ------ |
+| `dc.accesstoken` | 基于令牌身份验证的访问令牌 |        |
+
+#### 外部证书认证方式
+| 属性名称               | 说明                                                         | 默认值 |
+| ---------------------- | ------------------------------------------------------------ | ------ |
+| `dc.extra.credentials` | 连接外部服务的额外凭证。ExtraCredentials是一个键值对列表。示例：**foo:bar;abc:xyz**将创建凭证**abc=xyz**和**foo=bar**。 |        |
+
+#### SSL/TLS
+
+| 属性名称                     | 说明                                                 | 默认值  |
+| ---------------------------- | ---------------------------------------------------- | ------- |
+| `dc.ssl`                     | 使用HTTPS连接                                        | `false` |
+| `dc.ssl.keystore.password`   | keystore密码                                         |         |
+| `dc.ssl.keystore.path`       | 包含用于身份验证的证书和私钥的JavaKeyStore文件的位置 |         |
+| `dc.ssl.truststore.password` | truststore密码                                       |         |
+| `dc.ssl.truststore.path`     | 用于验证HTTPS服务器证书的Java TrustStore文件的位置   |         |
+
+### 代理配置
+
+| 属性名称        | 说明                                          | 默认值 |
+| --------------- | --------------------------------------------- | ------ |
+| `dc.socksproxy` | SOCKS代理主机和端口。示例：**localhost:1080** |        |
+| `dc.httpproxy`  | HTTP代理主机和端口。示例：**localhost:8888**  |        |
+
+### 性能优化配置
+
+| 属性名称                         | 说明                                                         | 默认值  |
+| -------------------------------- | ------------------------------------------------------------ | ------- |
+| `dc.metadata.cache.enabled`      | 启用元数据缓存，缓存远端openLooKeng的元数据信息              | `true`  |
+| `dc.metadata.cache.maximum.size` | 元数据缓存最大值，可缓存的远端openLooKeng元数据条数          | `10000` |
+| `dc.metadata.cache.ttl`          | 元数据缓存TTL，TTL到期，则需要重新从远端openLooKeng获取元数据 | `1.00s` |
+| `dc.query.pushdown.enabled`      | 启用子查询下推到远端openLooKeng                              | `true`  |
+| `dc.http-compression`            | 启用zstd压缩数据                                             | `false` |
+
+### 其他配置
+
+| 属性名称                                        | 说明                                                         | 默认值    |
+| ----------------------------------------------- | ------------------------------------------------------------ | --------- |
+| `dc.http-request-connectTimeout`                | HTTP请求连接超时，默认值为30秒                               | `30.00s`  |
+| `dc.http-request-readTimeout`                   | HTTP请求读取超时，默认为30秒                                 | `30.00s`  |
+| `dc.httpclient.maximum.idle.connections`        | HTTP客户端保持打开的最大空闲连接                             | `20`      |
+| `dc.http-client-timeout`                        | 客户端持续重试取数据的时间，默认值为10分钟                   | `10.00m`  |
+| `dc.max.anticipated.delay`                      | 集群中两个查询请求之间的最大预期时延。如果远程dc没有收到超过此延迟的请求，则可能会取消查询 | `10.00m`  |
+| `dc.application.name.prefix`                    | 添加到任何指定的ApplicationName客户端信息属性的前缀，该前缀用于设置openLooKeng查询的源名称。如果没有设置此属性或ApplicationName，则查询的源将是hetu-dc | `hetu-dc` |
+| `dc.remote-http-server.max-request-header-size` | 此属性应等效于远程服务器中**http-server.max-request-header-size**的值 |           |
+| `dc.remote.cluster.id`                          | 远程集群的唯一ID                                             |           |
+
+## 远端openLooKeng配置
+
+### 远端openLooKeng配置
+
+可以在`etc/config.properties`中设置以下属性：
+
+| 属性名称                            | 说明                                       | 默认值  |
+| ----------------------------------- | ------------------------------------------ | ------- |
+| `hetu.data.center.split.count`      | 每个查询允许的最大Split个数                | `5`     |
+| `hetu.data.center.consumer.timeout` | 执行查询获取到数据后，等待被取走的最大时延 | `10min` |
+
+### 远端Nginx配置
+
+在远端开启AA，同时使用Nginx作为代理时，需要对Nginx的配置进行一定修改：
+
+```nginx
+http {
+    upstream for_aa {
+        ip_hash;
+        server 192.168.0.101:8090;   #coordinator-1 的IP和PORT；
+        server 192.168.0.102:8090;   #coordinator-2 的IP和PORT；
+        check interval=3000 rise=2 fall=5 timeout=1000 type=http;
+    }
+
+    upstream for_cross_region {
+        hash $hashKey consistent;
+        server 192.168.0.101:8090;   #coordinator-1 的IP和PORT；
+        server 192.168.0.102:8090;   #coordinator-2 的IP和PORT；
+        check interval=3000 rise=2 fall=5 timeout=1000 type=http;
+    }
+    
+    server {
+        listen nginx_ip:8888;
+        
+        location / {
+            proxy_pass http://for_aa;
+            proxy_redirect off;
+            proxy_set_header Host $host:$server_port;
+        }
+        
+        location ^~/v1/dc/(.*)/(.*) {
+            set $hashKey $2;
+            proxy_redirect off;
+            proxy_pass http://for_cross_region;
+		    proxy_set_header Host $host:$server_port;
+        }
+        
+        location ^~/v1/dc/statement/(.*)/(.*)/(.*) {
+            set $hashKey $3;
+            proxy_redirect off;
+            proxy_pass http://for_cross_region;
+		    proxy_set_header Host $host:$server_port;
+        }
+    }
+}
+```
+
+## 多openLooKeng集群
 
 可以根据需要创建任意多的目录，因此，如果有额外的数据中心，只需添加另一个不同的名称的属性文件到`etc/catalog`中（确保它以`.properties`结尾）。例如，如果将属性文件命名为`sales.properties`，openLooKeng将使用配置的连接器创建一个名为`sales`的目录。
+
+## 使用跨域动态过滤
+
+启用跨域动态过滤，在执行跨openLooKeng查询时，在本端生成过滤器，并将过滤器发送到远端openLooKeng进行数据过滤，减少从远端openLooKeng拉取的数据量。需要先确保openLooKeng环境中有启用state-store（相关配置可参考state-store的配置文档）。启用跨域动态过滤有两种方式：
+
+**方式一**： 可以在`etc/config.properties`中设置以下属性：
+
+| 属性名称                                     | 说明                                                         | 默认值  |
+| -------------------------------------------- | ------------------------------------------------------------ | ------- |
+| `enable-dynamic-filtering`                   | 是否启用动态过滤特性                                         | `false` |
+| `dynamic-filtering-max-per-driver-row-count` | 每个driver最大允许处理的行数，超过该行数，则该查询的动态过滤特性会自动取消 | `100`   |
+| `dynamic-filtering-max-per-driver-size`      | 每个driver最大允许处理的数据量大小，超过该值，则该查询的动态过滤特性会自动取消 | `10KB`  |
+
+**方式二**：通过设置session：
+
+例1（通过CLI链接openLooKeng）：
+
+   ` java -jar hetu-cli-*-execute.jar --server ip:port --session enable-dynamic-filter=ture --session dynamic-filtering-max-per-driver-row-count=10000 --session dynamic-filtering-max-per-driver-size=1MB`
+
+例2（通过JDBC链接openLooKeng）:
+
+```java
+Properties properties = new Properties();
+properites.setProperties("enable-dynamic-filter", "true");
+properites.setProperties("dynamic-filtering-max-per-driver-row-count", "10000");
+properites.setProperties("dynamic-filtering-max-per-driver-size", "1MB");
+
+String url = "jdbc:lk://127.0.0.0:8090/hive/default";
+Connection connection = DriverManager.getConnection(url, properties);
+
+```
+
 
 ## 查询远程数据中心
 
@@ -79,6 +205,7 @@ connection-password=password
     SELECT * FROM dc.mysql.web.clicks;
 
 如果对目录属性文件使用不同的名称，请使用该目录名称，而不要在上述示例中使用`dc`。
+
 
 ## 数据中心连接器限制
 

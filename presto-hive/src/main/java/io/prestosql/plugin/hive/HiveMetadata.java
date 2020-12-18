@@ -31,6 +31,7 @@ import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.plugin.hive.metastore.BooleanStatistics;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
@@ -585,6 +586,12 @@ public class HiveMetadata
                                 .map(HivePartition::getPartitionId)
                                 .collect(toImmutableList()),
                         false));
+    }
+
+    @Override
+    public boolean isHeuristicIndexSupported()
+    {
+        return true;
     }
 
     @Override
@@ -1530,7 +1537,7 @@ public class HiveMetadata
                                                           Collection<Slice> fragments,
                                                           Collection<ComputedStatistics> computedStatistics)
     {
-        return finishInsertInternal(session, insertHandle, fragments, computedStatistics, null, false);
+        return finishInsertInternal(session, insertHandle, fragments, computedStatistics, null, HiveACIDWriteType.INSERT);
     }
 
     public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session,
@@ -1539,7 +1546,7 @@ public class HiveMetadata
                                                           Collection<ComputedStatistics> computedStatistics,
                                                           List<PartitionUpdate> partitions)
     {
-        return finishInsertInternal(session, insertHandle, fragments, computedStatistics, partitions, false);
+        return finishInsertInternal(session, insertHandle, fragments, computedStatistics, partitions, HiveACIDWriteType.INSERT);
     }
 
     private Optional<ConnectorOutputMetadata> finishInsertInternal(ConnectorSession session,
@@ -1547,7 +1554,7 @@ public class HiveMetadata
             Collection<Slice> fragments,
             Collection<ComputedStatistics> computedStatistics,
             List<PartitionUpdate> partitions,
-            boolean isVacuum)
+            HiveACIDWriteType hiveACIDWriteType)
     {
         HiveInsertTableHandle handle = (HiveInsertTableHandle) insertHandle;
 
@@ -1583,6 +1590,7 @@ public class HiveMetadata
                 .collect(toImmutableMap(HiveColumnHandle::getName, column -> column.getHiveType().getType(typeManager)));
         Map<List<String>, ComputedStatistics> partitionComputedStatistics = Statistics.createComputedStatisticsToPartitionMap(computedStatistics, partitionedBy, columnTypes);
 
+        boolean isVacuum = hiveACIDWriteType == HiveACIDWriteType.VACUUM;
         for (PartitionUpdate partitionUpdate : partitionUpdates) {
             if (partitionUpdate.getName().isEmpty()) {
                 // insert into unpartitioned table
@@ -1600,6 +1608,7 @@ public class HiveMetadata
                     finishInsertOverwrite(session, handle, table, partitionUpdate, partitionStatistics);
                 }
                 else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.NEW || partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.APPEND) {
+                    partitionStatistics = updateStatsForAcidOperation(hiveACIDWriteType, partitionStatistics);
                     // insert into unpartitioned table
                     metastore.finishInsertIntoExistingTable(
                             session,
@@ -1622,6 +1631,7 @@ public class HiveMetadata
                         partitionUpdate.getStatistics(),
                         columnTypes,
                         getColumnStatistics(partitionComputedStatistics, partitionValues));
+                partitionStatistics = updateStatsForAcidOperation(hiveACIDWriteType, partitionStatistics);
                 metastore.finishInsertIntoExistingPartition(
                         session,
                         handle.getSchemaName(),
@@ -1648,6 +1658,56 @@ public class HiveMetadata
                 partitionUpdates.stream()
                         .map(PartitionUpdate::getName)
                         .collect(toList())));
+    }
+
+    private PartitionStatistics updateStatsForAcidOperation(HiveACIDWriteType hiveACIDWriteType, PartitionStatistics partitionStatistics)
+    {
+        Map<String, HiveColumnStatistics> updatedColumnStatistics = new HashMap<>();
+        if (hiveACIDWriteType == HiveACIDWriteType.UPDATE || hiveACIDWriteType == HiveACIDWriteType.VACUUM) {
+            //No change in rowcount, so keep delta as empty for rowCount
+            HiveBasicStatistics basicStatistics = partitionStatistics.getBasicStatistics();
+            HiveBasicStatistics updatedBasicStatistics = new HiveBasicStatistics(basicStatistics.getFileCount(),
+                    OptionalLong.of(0L),
+                    basicStatistics.getInMemoryDataSizeInBytes(),
+                    basicStatistics.getOnDiskDataSizeInBytes());
+            updateBooleanStatisticsInColumnStatistics(hiveACIDWriteType, partitionStatistics, updatedColumnStatistics);
+            return new PartitionStatistics(updatedBasicStatistics, updatedColumnStatistics);
+            //return new PartitionStatistics(updatedBasicStatistics, partitionStatistics.getColumnStatistics());
+        }
+        else if (hiveACIDWriteType == HiveACIDWriteType.DELETE) {
+            //rowCount should reduce for DELETE operation
+            HiveBasicStatistics basicStatistics = partitionStatistics.getBasicStatistics();
+            HiveBasicStatistics updatedBasicStatistics = new HiveBasicStatistics(basicStatistics.getFileCount(),
+                    OptionalLong.of(Math.negateExact(basicStatistics.getRowCount().getAsLong())),
+                    basicStatistics.getInMemoryDataSizeInBytes(), basicStatistics.getOnDiskDataSizeInBytes());
+            updateBooleanStatisticsInColumnStatistics(hiveACIDWriteType, partitionStatistics, updatedColumnStatistics);
+            return new PartitionStatistics(updatedBasicStatistics, updatedColumnStatistics);
+        }
+        return partitionStatistics;
+    }
+
+    private void updateBooleanStatisticsInColumnStatistics(HiveACIDWriteType hiveACIDWriteType, PartitionStatistics partitionStatistics,
+                                                           Map<String, HiveColumnStatistics> updatedColumnStatistics)
+    {
+        partitionStatistics.getColumnStatistics().forEach((k, v) -> {
+            BooleanStatistics booleanStatistics = null;
+            if (v.getBooleanStatistics().isPresent()) {
+                if (hiveACIDWriteType == HiveACIDWriteType.UPDATE || hiveACIDWriteType == HiveACIDWriteType.VACUUM) {
+                    booleanStatistics = new BooleanStatistics(OptionalLong.of(0), OptionalLong.of(0));
+                }
+                else if (hiveACIDWriteType == HiveACIDWriteType.DELETE) {
+                    booleanStatistics = new BooleanStatistics(OptionalLong.of(Math.negateExact(v.getBooleanStatistics().get().getTrueCount().getAsLong())),
+                            OptionalLong.of(Math.negateExact(v.getBooleanStatistics().get().getFalseCount().getAsLong())));
+                }
+                HiveColumnStatistics hiveColumnStatistics = new HiveColumnStatistics(v.getIntegerStatistics(), v.getDoubleStatistics(),
+                        v.getDecimalStatistics(), v.getDateStatistics(), Optional.of(booleanStatistics),
+                        v.getMaxValueSizeInBytes(), v.getTotalSizeInBytes(), v.getNullsCount(), v.getDistinctValuesCount());
+                updatedColumnStatistics.put(k, hiveColumnStatistics);
+            }
+            else {
+                updatedColumnStatistics.put(k, v);
+            }
+        });
     }
 
     @Override
@@ -1677,7 +1737,7 @@ public class HiveMetadata
                 updateTableHandle.getInputColumns(), updateTableHandle.getPageSinkMetadata(),
                 updateTableHandle.getLocationHandle(), updateTableHandle.getBucketProperty(),
                 updateTableHandle.getTableStorageFormat(), updateTableHandle.getPartitionStorageFormat(), false);
-        return finishInsert(session, insertTableHandle, fragments, computedStatistics);
+        return finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, null, HiveACIDWriteType.UPDATE);
     }
 
     @Override
@@ -1688,7 +1748,7 @@ public class HiveMetadata
                 deleteTableHandle.getInputColumns(), deleteTableHandle.getPageSinkMetadata(),
                 deleteTableHandle.getLocationHandle(), deleteTableHandle.getBucketProperty(),
                 deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false);
-        return finishInsert(session, insertTableHandle, fragments, computedStatistics);
+        return finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, null, HiveACIDWriteType.DELETE);
     }
 
     @Override
@@ -1715,7 +1775,7 @@ public class HiveMetadata
                 vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false);
         List<PartitionUpdate> partitionUpdates = new ArrayList<>();
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
-                finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates, true);
+                finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates, HiveACIDWriteType.VACUUM);
 
         metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
         return connectorOutputMetadata;
@@ -2547,7 +2607,7 @@ public class HiveMetadata
         }
     }
 
-    private static HiveStorageFormat extractHiveStorageFormat(Table table)
+    public static HiveStorageFormat extractHiveStorageFormat(Table table)
     {
         StorageFormat storageFormat = table.getStorage().getStorageFormat();
         String outputFormat = storageFormat.getOutputFormat();

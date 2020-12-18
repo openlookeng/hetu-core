@@ -10,7 +10,7 @@ HBase连接支持在外部Apache HBase实例上查询和创建表。用户可以
 
 HBase连接器维护着一个元存储，用于持久化HBase元数据，目前元存储只支持以下存储格式：`openLooKeng Metastore`。
 
-**注意：** *Hbase连接器使用Apache HBase 2.2.3版本。*
+**注意：** *Hbase连接器仅支持连接Apache HBase 2.2.3及以下的版本。*
 
 ## 连接器配置
 
@@ -51,7 +51,7 @@ hbase.krb5.conf.path=/xxx/krb5.conf
 
 hbase.kerberos.keytab=/xxx/user.keytab
 
-hbase.kerberos.principal=lk_username
+hbase.kerberos.principal=lk_username@HADOOP.COM
 
 hbase.authentication.type=KERBEROS
 ```
@@ -74,10 +74,11 @@ debug=true;
 | 属性名称| 默认值| 是否必填| 说明|
 |----------|----------|----------|----------|
 | hbase.zookeeper.quorum| （无）| 是| ZooKeeper集群地址|
-| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口。|
+| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口|
+| hbase.zookeeper.znode.parent| /hbase| 否| HBase的Zookeeper根节点路径|
 | hbase.client.retries.number| 3| 否| HBase客户端连接重试次数|
 | hbase.client.pause.time| 100| 否| HBase客户端断连时间|
-| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值。|
+| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值|
 | hbase.default.value| NULL| 否| 表中数据的默认值|
 | hbase.metastore.type| hetuMetastore| 否| HBase元数据的存储，`hetuMetastore`|
 | hbase.authentication.type| （无）| 否| HDFS/HBase组件访问安全身份验证方式|
@@ -119,7 +120,7 @@ CREATE SCHEMA schemaName;
 
 ### 删除模式
 
-只支持删除空模式。
+只支持删除空的模式。
 
 ```sql
 DROP SCHEMA schemaName;
@@ -135,6 +136,8 @@ HBase连接器支持两种建表形式：
 
 以下示例创建表`schemaName.tableName`并链接到一个名为`hbaseNamespace:hbaseTable`的现有表：
 
+映射关系的格式为：'column_name:family:qualifier'
+
 ```sql
 CREATE TABLE schemaName.tableName (
     rowId		VARCHAR,
@@ -149,7 +152,7 @@ CREATE TABLE schemaName.tableName (
     qualifier9	TIMESTAMP
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier1:f1:q1, qualifier2:f1:q2, 
+    column_mapping = 'qualifier1:f1:q1, qualifier2:f1:q2, 
     qualifier3:f2:q3, qualifier4:f2:q4, qualifier5:f2:q5, qualifier6:f3:q1, 
     qualifier7:f3:q2, qualifier8:f3:q3, qualifier9:f3:q4',
     row_id = 'rowId',
@@ -170,7 +173,7 @@ CREATE TABLE default.typeMapping (
     qualifier1 	INTEGER
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier2:f1:q2',
+    column_mapping = 'qualifier1:f1:q2',
     row_id = 'rowId',
     hbase_table_name = 'hello:type4'
 );

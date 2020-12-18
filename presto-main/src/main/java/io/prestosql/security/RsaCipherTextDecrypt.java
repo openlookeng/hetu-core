@@ -29,8 +29,8 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.security.KeyFactory;
 import java.security.Security;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.X509EncodedKeySpec;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 
 import static java.lang.String.format;
@@ -58,20 +58,20 @@ public final class RsaCipherTextDecrypt
     {
         try {
             KeyFactory factory = KeyFactory.getInstance(RSA);
-            // decode base64 of public key
+            // decode base64 of private key
             char[] secretKey = keyManager.getKey(keyName);
             if (secretKey == null) {
                 throw new RuntimeException(format("%s not exist.", keyName));
             }
             byte[] key = Base64.getDecoder().decode(new String(secretKey));
-            // generate the public key
-            X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
-            RSAPublicKey publicKey = (RSAPublicKey) factory.generatePublic(spec);
+            // generate the private key
+            PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(key);
+            RSAPrivateKey privateKey = (RSAPrivateKey) factory.generatePrivate(pkcs8EncodedKeySpec);
             Cipher cipher = Cipher.getInstance(config.getRsaPadding(), BC_PROVIDER);
-            cipher.init(Cipher.DECRYPT_MODE, publicKey);
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
             // decode base64 of cipher text
             byte[] content = Base64.getDecoder().decode(cipherText);
-            int keySize = publicKey.getModulus().bitLength();
+            int keySize = privateKey.getModulus().bitLength();
             // decrypt cipher text
             return new String(rsaSplitCodec(cipher, content, keySize), CHARSET);
         }

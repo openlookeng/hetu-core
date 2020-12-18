@@ -45,6 +45,8 @@ public class OracleConfig
 
     private int numberDefaultScale = DEFAULT_SCALE;
 
+    private boolean synonymsEnabled;
+
     public boolean isQueryPushDownEnabled()
     {
         return isQueryPushDownEnabled;
@@ -122,6 +124,24 @@ public class OracleConfig
     public OracleConfig setNumberDefaultScale(Integer numberDefaultScale)
     {
         this.numberDefaultScale = numberDefaultScale;
+        return this;
+    }
+
+    public boolean isSynonymsEnabled()
+    {
+        return synonymsEnabled;
+    }
+
+    /**
+     * set oracle synonyms enabled
+     *
+     * @param enabled config from properties
+     * @return oracle config object
+     */
+    @Config("oracle.synonyms.enabled")
+    public OracleConfig setSynonymsEnabled(boolean enabled)
+    {
+        this.synonymsEnabled = enabled;
         return this;
     }
 }

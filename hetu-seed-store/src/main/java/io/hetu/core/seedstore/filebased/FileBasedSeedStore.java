@@ -22,8 +22,9 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -168,6 +169,7 @@ public class FileBasedSeedStore
     @Override
     public void setName(String name)
     {
+        checkArgument(name.matches("[\\p{Alnum}_\\-]+"), "Invalid cluster name");
         this.name = name;
         this.seedFilePath = seedDir.resolve(name).resolve(FileBasedSeedConstants.SEED_FILE_NAME);
     }
@@ -179,10 +181,8 @@ public class FileBasedSeedStore
 
         StringBuilder content = new StringBuilder(0);
         if (fs.exists(seedFilePath)) {
-            try (InputStream in = fs.newInputStream(seedFilePath)) {
-                while (in.available() > 0) {
-                    content.append((char) in.read());
-                }
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.newInputStream(seedFilePath)))) {
+                br.lines().forEach(content::append);
             }
         }
 

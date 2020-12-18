@@ -108,4 +108,16 @@ public interface ConnectorTableHandle
     {
         return false;
     }
+
+    /* This method checks if heuristic index can be created with the table format */
+    default boolean isHeuristicIndexSupported()
+    {
+        return false;
+    }
+
+    /* This method checks if the predicate columns are partition columns */
+    default boolean isPartitionColumn(String column)
+    {
+        return false;
+    }
 }

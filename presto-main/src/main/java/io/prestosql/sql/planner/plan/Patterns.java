@@ -182,6 +182,11 @@ public class Patterns
         return typeOf(ExceptNode.class);
     }
 
+    public static Pattern<GroupIdNode> groupId()
+    {
+        return typeOf(GroupIdNode.class);
+    }
+
     public static Property<PlanNode, Lookup, PlanNode> source()
     {
         return optionalProperty(
@@ -222,6 +227,18 @@ public class Patterns
         public static Property<ApplyNode, Lookup, List<Symbol>> correlation()
         {
             return property("correlation", ApplyNode::getCorrelation);
+        }
+
+        public static Property<ApplyNode, Lookup, PlanNode> subQuery()
+        {
+            return property("subquery",
+                    (node, lookup) -> lookup.resolve(node.getSubquery()));
+        }
+
+        public static Property<ApplyNode, Lookup, PlanNode> input()
+        {
+            return property("input",
+                    (node, lookup) -> lookup.resolve(node.getInput()));
         }
     }
 

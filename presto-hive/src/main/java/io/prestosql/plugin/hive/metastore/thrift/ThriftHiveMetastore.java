@@ -1423,6 +1423,7 @@ public class ThriftHiveMetastore
         try {
             retry()
                     .stopOnIllegalExceptions()
+                    .stopOn(TxnAbortedException.class)
                     .run("commitTransaction", stats.getCommitTransaction().wrap(() -> {
                         try (ThriftMetastoreClient metastoreClient = clientProvider.createMetastoreClient()) {
                             metastoreClient.commitTransaction(transactionId);

@@ -401,7 +401,10 @@ class AstBuilder
     @Override
     public Node visitDropIndex(SqlBaseParser.DropIndexContext context)
     {
-        return new DropIndex(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
+        return new DropIndex(getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                context.EXISTS() != null,
+                visitIfPresent(context.expression(), Expression.class));
     }
 
     @Override

@@ -52,9 +52,10 @@ public class OracleClientModule
      */
     @Provides
     @Singleton
-    public static ConnectionFactory getConnectionFactory(BaseJdbcConfig config)
+    public static ConnectionFactory getConnectionFactory(BaseJdbcConfig config, OracleConfig oracleConfig)
     {
         Properties connectionProperties = basicConnectionProperties(config);
+        connectionProperties.setProperty(Constants.ORACLE_PROPERTY_INCLUDE_SYNONYMS, String.valueOf(oracleConfig.isSynonymsEnabled()));
         Driver driver;
         try {
             driver = (Driver) Class.forName(Constants.ORACLE_JDBC_DRIVER_CLASS_NAME).getConstructor(((Class<?>[]) null)).newInstance();

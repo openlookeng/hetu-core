@@ -11,6 +11,7 @@
 .header .menu {
     margin-right: 10px;
     font-weight: 900;
+    flex-grow: 2;
 }
 
 .header h4 {
@@ -104,4 +105,19 @@
 .justify-flex-end {
     -webkit-justify-content: flex-end;
     justify-content: flex-end;
+}
+
+.version-cluster-info {
+   display: block;
+   box-sizing: border-box;
+   position: relative;
+   color: #000;
+   font-size: 11px;
+}
+.version {
+    margin-right: 15px;
+}
+.version-inner {
+    margin-right: 10px;
+    font-weight: normal !important;
 }

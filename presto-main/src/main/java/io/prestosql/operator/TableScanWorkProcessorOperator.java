@@ -17,27 +17,38 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.connector.DataCenterUtility;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.UpdatablePageSource;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.EmptySplitPageSource;
 import io.prestosql.split.PageSourceProvider;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.statestore.StateStoreProvider;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -64,7 +75,12 @@ public class TableScanWorkProcessorOperator
             Iterable<ColumnHandle> columns,
             Iterable<Type> types,
             DataSize minOutputPageSize,
-            int minOutputPageRowCount)
+            int minOutputPageRowCount,
+            Optional<TableScanNode> tableScanNodeOptional,
+            Optional<StateStoreProvider> stateStoreProviderOptional,
+            Optional<Metadata> metadataOptional,
+            Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
+            Optional<QueryId> queryIdOptional)
     {
         this.splitToPages = new SplitToPages(
                 session,
@@ -74,7 +90,12 @@ public class TableScanWorkProcessorOperator
                 types,
                 memoryTrackingContext.aggregateSystemMemoryContext(),
                 minOutputPageSize,
-                minOutputPageRowCount);
+                minOutputPageRowCount,
+                tableScanNodeOptional,
+                stateStoreProviderOptional,
+                metadataOptional,
+                dynamicFilterCacheManagerOptional,
+                queryIdOptional);
         this.pages = splits.flatTransform(splitToPages);
     }
 
@@ -140,6 +161,11 @@ public class TableScanWorkProcessorOperator
         final int minOutputPageRowCount;
         private final AggregatedMemoryContext localAggregatedMemoryContext;
         private final LocalMemoryContext memoryContext;
+        final Optional<TableScanNode> tableScanNodeOptional;
+        final Optional<StateStoreProvider> stateStoreProviderOptional;
+        final Optional<QueryId> queryIdOptional;
+        final Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional;
+        boolean isDcTable;
 
         long processedBytes;
         long processedPositions;
@@ -154,7 +180,12 @@ public class TableScanWorkProcessorOperator
                 Iterable<Type> types,
                 AggregatedMemoryContext aggregatedMemoryContext,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                Optional<TableScanNode> tableScanNodeOptional,
+                Optional<StateStoreProvider> stateStoreProviderOptional,
+                Optional<Metadata> metadataOptional,
+                Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
+                Optional<QueryId> queryIdOptional)
         {
             this.session = requireNonNull(session, "session is null");
             this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -166,6 +197,16 @@ public class TableScanWorkProcessorOperator
             this.minOutputPageRowCount = minOutputPageRowCount;
             this.memoryContext = aggregatedMemoryContext.newLocalMemoryContext(TableScanWorkProcessorOperator.class.getSimpleName());
             this.localAggregatedMemoryContext = newSimpleAggregatedMemoryContext();
+            this.tableScanNodeOptional = tableScanNodeOptional;
+            this.stateStoreProviderOptional = stateStoreProviderOptional;
+            this.queryIdOptional = queryIdOptional;
+            this.dynamicFilterCacheManagerOptional = dynamicFilterCacheManagerOptional;
+
+            if (metadataOptional.isPresent() && tableScanNodeOptional.isPresent()) {
+                if (DataCenterUtility.isDCCatalog(metadataOptional.get(), tableScanNodeOptional.get().getTable().getCatalogName().getCatalogName())) {
+                    isDcTable = true;
+                }
+            }
         }
 
         @Override
@@ -181,11 +222,20 @@ public class TableScanWorkProcessorOperator
                 source = new EmptySplitPageSource();
             }
             else {
-                source = pageSourceProvider.createPageSource(session, split, table, columns, null);
+                if (isDcTable) {
+                    source = pageSourceProvider.createPageSource(session,
+                            split,
+                            table,
+                            columns,
+                            Optional.of(new DynamicFilterSupplier(BloomFilterUtils.getCrossRegionDynamicFilterSupplier(dynamicFilterCacheManagerOptional.get(), queryIdOptional.get().getId(), tableScanNodeOptional.get()), System.currentTimeMillis(), 0L)));
+                }
+                else {
+                    source = pageSourceProvider.createPageSource(session, split, table, columns, Optional.empty());
+                }
             }
             if (source.needMergingForPages()) {
                 return TransformationState.ofResult(
-                        WorkProcessor.create(new ConnectorPageSourceToPages(aggregatedMemoryContext, source))
+                        WorkProcessor.create(new ConnectorPageSourceToPages(aggregatedMemoryContext, source, tableScanNodeOptional, stateStoreProviderOptional, dynamicFilterCacheManagerOptional, queryIdOptional, isDcTable))
                                 .map(page -> {
                                     processedPositions += page.getPositionCount();
                                     return recordMaterializedBytes(page, sizeInBytes -> processedBytes += sizeInBytes);
@@ -195,7 +245,7 @@ public class TableScanWorkProcessorOperator
             }
 
             return TransformationState.ofResult(
-                    WorkProcessor.create(new ConnectorPageSourceToPages(aggregatedMemoryContext, source))
+                    WorkProcessor.create(new ConnectorPageSourceToPages(aggregatedMemoryContext, source, tableScanNodeOptional, stateStoreProviderOptional, dynamicFilterCacheManagerOptional, queryIdOptional, isDcTable))
                             .map(page -> {
                                 processedPositions += page.getPositionCount();
                                 return recordMaterializedBytes(page, sizeInBytes -> processedBytes += sizeInBytes);
@@ -263,12 +313,28 @@ public class TableScanWorkProcessorOperator
     {
         final ConnectorPageSource pageSource;
         final LocalMemoryContext pageSourceMemoryContext;
+        final Optional<TableScanNode> tableScanNodeOptional;
+        final Optional<StateStoreProvider> stateStoreProviderOptional;
+        final Optional<QueryId> queryIdOptional;
+        final Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional;
+        Map<String, byte[]> bloomFiltersBackup = new HashMap<>();
+        Map<Integer, BloomFilter> bloomFilters = new ConcurrentHashMap<>();
+        boolean existsCrossFilter;
+        boolean isDcTable;
 
-        ConnectorPageSourceToPages(AggregatedMemoryContext aggregatedMemoryContext, ConnectorPageSource pageSource)
+        ConnectorPageSourceToPages(AggregatedMemoryContext aggregatedMemoryContext, ConnectorPageSource pageSource, Optional<TableScanNode> tableScanNodeOptional, Optional<StateStoreProvider> stateStoreProviderOptional, Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional, Optional<QueryId> queryIdOptional, boolean isDcTable)
         {
             this.pageSource = pageSource;
             this.pageSourceMemoryContext = aggregatedMemoryContext
                     .newLocalMemoryContext(TableScanWorkProcessorOperator.class.getSimpleName());
+            this.tableScanNodeOptional = tableScanNodeOptional;
+            this.stateStoreProviderOptional = stateStoreProviderOptional;
+            this.queryIdOptional = queryIdOptional;
+            this.isDcTable = isDcTable;
+            this.dynamicFilterCacheManagerOptional = dynamicFilterCacheManagerOptional;
+            if (queryIdOptional.isPresent() && dynamicFilterCacheManagerOptional.isPresent()) {
+                existsCrossFilter = true;
+            }
         }
 
         @Override
@@ -297,8 +363,29 @@ public class TableScanWorkProcessorOperator
                 }
             }
 
+            // pull bloomFilter from stateStore and filter page
+            if (existsCrossFilter) {
+                try {
+                    page = filter(page);
+                }
+                catch (Throwable e) {
+                    // ignore
+                }
+            }
+
             // TODO: report operator stats
             return ProcessState.ofResult(page);
+        }
+
+        private Page filter(Page page)
+        {
+            if (bloomFilters.isEmpty()) {
+                BloomFilterUtils.updateBloomFilter(queryIdOptional, isDcTable, stateStoreProviderOptional, tableScanNodeOptional, dynamicFilterCacheManagerOptional, bloomFiltersBackup, bloomFilters);
+            }
+            if (!bloomFilters.isEmpty()) {
+                page = BloomFilterUtils.filter(page, bloomFilters);
+            }
+            return page;
         }
     }
 }

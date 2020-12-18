@@ -922,4 +922,12 @@ public interface ConnectorMetadata
     {
         return false;
     }
+
+    /**
+     * Hetu can only create index for supported connectors.
+     */
+    default boolean isHeuristicIndexSupported()
+    {
+        return false;
+    }
 }

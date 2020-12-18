@@ -22,6 +22,7 @@ import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.plugin.tpch.TpchTableHandle;
@@ -798,7 +799,10 @@ public class TestCostCalculator
                 symbolsList,
                 assignments.build(),
                 TupleDomain.all(),
-                Optional.empty());
+                Optional.empty(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                0);
     }
 
     private PlanNode project(String id, PlanNode source, String symbol, Expression expression)

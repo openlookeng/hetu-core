@@ -50,6 +50,7 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.lang.Boolean.TRUE;
 import static java.util.Objects.requireNonNull;
@@ -558,7 +559,21 @@ public class Driver
                             driverContext.getTaskId());
                 }
                 try {
-                    operator.getOperatorContext().destroy();
+                    if (operator instanceof WorkProcessorSourceOperatorAdapter) {
+                        if (!((WorkProcessorSourceOperatorAdapter) operator).getStrategy().equals(REUSE_STRATEGY_PRODUCER)
+                                || ((WorkProcessorSourceOperatorAdapter) operator).isNotSpilled()) {
+                            operator.getOperatorContext().destroy();
+                        }
+                    }
+                    else if (operator instanceof TableScanOperator) {
+                        if (!((TableScanOperator) operator).getStrategy().equals(REUSE_STRATEGY_PRODUCER)
+                                || ((TableScanOperator) operator).isNotSpilled()) {
+                            operator.getOperatorContext().destroy();
+                        }
+                    }
+                    else {
+                        operator.getOperatorContext().destroy();
+                    }
                 }
                 catch (Throwable t) {
                     inFlightException = addSuppressedException(

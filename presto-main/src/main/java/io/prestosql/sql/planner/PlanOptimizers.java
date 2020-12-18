@@ -94,6 +94,7 @@ import io.prestosql.sql.planner.iterative.rule.PushOffsetThroughProject;
 import io.prestosql.sql.planner.iterative.rule.PushPartialAggregationThroughExchange;
 import io.prestosql.sql.planner.iterative.rule.PushPartialAggregationThroughJoin;
 import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
+import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoUpdateDelete;
 import io.prestosql.sql.planner.iterative.rule.PushProjectionIntoTableScan;
 import io.prestosql.sql.planner.iterative.rule.PushProjectionThroughExchange;
 import io.prestosql.sql.planner.iterative.rule.PushProjectionThroughUnion;
@@ -128,12 +129,14 @@ import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedScalarAggregat
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedScalarSubquery;
 import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedSingleRowSubqueryToProject;
 import io.prestosql.sql.planner.iterative.rule.TransformExistsApplyToLateralNode;
-import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToJoin;
+import io.prestosql.sql.planner.iterative.rule.TransformFilteringSemiJoinToInnerJoin;
+import io.prestosql.sql.planner.iterative.rule.TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoin;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
+import io.prestosql.sql.planner.optimizations.AddReuseExchange;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.CheckSubqueryNodesAreRewritten;
 import io.prestosql.sql.planner.optimizations.HashGenerationOptimizer;
@@ -385,8 +388,8 @@ public class PlanOptimizers
                         ImmutableSet.of(
                                 new RemoveUnreferencedScalarLateralNodes(),
                                 new TransformUncorrelatedLateralToJoin(),
+                                new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(),
                                 new TransformUncorrelatedInPredicateSubqueryToSemiJoin(),
-                                new TransformUncorrelatedInPredicateSubqueryToJoin(),
                                 new TransformCorrelatedScalarAggregationToJoin(metadata),
                                 new TransformCorrelatedLateralJoinToJoin())),
                 new IterativeOptimizer(
@@ -412,6 +415,11 @@ public class PlanOptimizers
                 new StatsRecordingPlanOptimizer(
                         optimizerStats,
                         new PredicatePushDown(metadata, typeAnalyzer, false, false)),
+                new IterativeOptimizer(
+                        ruleStats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new TransformFilteringSemiJoinToInnerJoin())), // must run after PredicatePushDown
                 new PruneUnreferencedOutputs(), // Prune unreferenced outputs to make the sub-query simple
                 inlineProjections,              // Remove redundant projects to make the sub-query simple
                 new SubQueryPushDown(metadata), // SubQueryPushDown is introduced in Hetu. It must run before AddExchanges
@@ -423,6 +431,7 @@ public class PlanOptimizers
                                 .addAll(projectionPushdownRules)
                                 .add(new PushLimitIntoTableScan(metadata))
                                 .add(new PushPredicateIntoTableScan(metadata, typeAnalyzer, true))
+                                .add(new PushPredicateIntoUpdateDelete(metadata))
                                 .add(new PushSampleIntoTableScan(metadata))
                                 .build()),
                 new IterativeOptimizer(
@@ -623,6 +632,9 @@ public class PlanOptimizers
                 ImmutableSet.of(
                         new AddIntermediateAggregations(),
                         new RemoveRedundantIdentityProjections())));
+
+        builder.add(new AddReuseExchange(metadata));
+
         // DO NOT add optimizers that change the plan shape (computations) after this point
 
         // Precomputed hashes - this assumes that partitioning will not change

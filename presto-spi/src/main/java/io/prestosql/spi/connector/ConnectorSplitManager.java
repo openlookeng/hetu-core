@@ -51,7 +51,8 @@ public interface ConnectorSplitManager
             Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
             Optional<QueryType> queryType,
             Map<String, Object> queryInfo,
-            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+            Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+            boolean partOfReuse)
     {
         return getSplits(transaction, session, table, splitSchedulingStrategy);
     }

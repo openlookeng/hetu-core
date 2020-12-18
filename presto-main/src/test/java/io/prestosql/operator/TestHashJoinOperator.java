@@ -1584,6 +1584,11 @@ public class TestHashJoinOperator
                 {
                     writing = false;
                 }
+
+                @Override
+                public void deleteFile()
+                {
+                }
             };
         }
     }

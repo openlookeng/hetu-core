@@ -110,7 +110,7 @@ class QueryInformation
       <div ref={this.QueryInformationRef} className="flex flex-column query-information">
         <Tabs className='flex' onSelect={this.onTabSelect} selectedIndex={this.state.selectedTab}>
           <TabList>
-            <Tab>My saved queries</Tab>
+            <Tab>Sample queries</Tab>
             <Tab>All queries</Tab>
             <Tab>Results</Tab>
             <Tab>Data Preview</Tab>

@@ -25,6 +25,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.metadata.TableProperties;
+import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -70,7 +71,7 @@ import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTarget;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
@@ -188,7 +189,8 @@ public class DistributedExecutionPlanner
         @Override
         public Map<PlanNodeId, SplitSource> visitTableScan(TableScanNode node, Void context)
         {
-            return visitScanAndFilter(node.getId(), node.getTable(), Optional.empty(), node.getAssignments(), Optional.empty(), Collections.emptyMap());
+            return visitScanAndFilter(node.getId(), node.getTable(), Optional.empty(), node.getAssignments(), Optional.empty(), Collections.emptyMap(),
+                    node.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
         }
 
         @Override
@@ -200,7 +202,7 @@ public class DistributedExecutionPlanner
                     "partition", node.getPartition(),
                     "vacuumHandle", connectorVacuumTableHandle);
             return visitScanAndFilter(node.getId(), node.getTable(), Optional.empty(), ImmutableMap.of(), Optional.of(QueryType.VACUUM),
-                    queryInfo);
+                    queryInfo, false);
         }
 
         private Map<PlanNodeId, SplitSource> visitScanAndFilter(PlanNodeId nodeId,
@@ -208,7 +210,8 @@ public class DistributedExecutionPlanner
                                                                 Optional<FilterNode> filter,
                                                                 Map<Symbol, ColumnHandle> assignments,
                                                                 Optional<QueryType> queryType,
-                                                                Map<String, Object> queryInfo)
+                                                                Map<String, Object> queryInfo,
+                                                                boolean partOfReuse)
         {
             List<DynamicFilters.Descriptor> dynamicFilters = filter
                     .map(FilterNode::getPredicate)
@@ -245,7 +248,8 @@ public class DistributedExecutionPlanner
                     dynamicFilterSupplier,
                     queryType,
                     queryInfo,
-                    userDefinedCachePredicates);
+                    userDefinedCachePredicates,
+                    partOfReuse);
 
             splitSources.add(splitSource);
 
@@ -310,7 +314,8 @@ public class DistributedExecutionPlanner
         {
             if (node.getSource() instanceof TableScanNode) {
                 TableScanNode scan = (TableScanNode) node.getSource();
-                return visitScanAndFilter(scan.getId(), scan.getTable(), Optional.of(node), scan.getAssignments(), Optional.empty(), Collections.emptyMap());
+                return visitScanAndFilter(scan.getId(), scan.getTable(), Optional.of(node), scan.getAssignments(), Optional.empty(), Collections.emptyMap(),
+                        scan.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
             }
 
             return node.getSource().accept(this, context);
@@ -369,7 +374,7 @@ public class DistributedExecutionPlanner
         }
 
         @Override
-        public Map<PlanNodeId, SplitSource> visitTopNRowNumber(TopNRowNumberNode node, Void context)
+        public Map<PlanNodeId, SplitSource> visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             return node.getSource().accept(this, context);
         }

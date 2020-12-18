@@ -43,6 +43,8 @@ import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
+import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.planprinter.IoPlanPrinter.ColumnConstraint;
@@ -93,8 +95,10 @@ import static io.airlift.tpch.TpchTable.ORDERS;
 import static io.prestosql.SystemSessionProperties.COLOCATED_JOIN;
 import static io.prestosql.SystemSessionProperties.CONCURRENT_LIFESPANS_PER_NODE;
 import static io.prestosql.SystemSessionProperties.DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION;
+import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
 import static io.prestosql.SystemSessionProperties.GROUPED_EXECUTION;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.plugin.hive.HiveColumnHandle.BUCKET_COLUMN_NAME;
 import static io.prestosql.plugin.hive.HiveColumnHandle.PATH_COLUMN_NAME;
 import static io.prestosql.plugin.hive.HiveQueryRunner.TPCH_SCHEMA;
@@ -624,7 +628,7 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
 
         assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
-                        schema, table));
+                schema, table));
 
         assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
         assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
@@ -915,7 +919,8 @@ public class TestHiveIntegrationSmokeTest
             catch (InterruptedException e) {
                 // Ignore
             }
-            otherDirectories = new File(tablePath).list(new FilenameFilter() {
+            otherDirectories = new File(tablePath).list(new FilenameFilter()
+            {
                 @Override
                 public boolean accept(File file, String s)
                 {
@@ -930,7 +935,8 @@ public class TestHiveIntegrationSmokeTest
             catch (AssertionError e) {
                 // Ignore
             }
-        } while (loopNumber-- > 0);
+        }
+        while (loopNumber-- > 0);
 
         if (loopNumber < 1) {
             assertEquals(otherDirectories.length, expectedNumberOfDirectories,
@@ -1034,8 +1040,8 @@ public class TestHiveIntegrationSmokeTest
 
         Long count = (Long) computeActual("SELECT count(*) from orders").getOnlyValue();
         assertUpdate(Session.builder(getSession())
-                .setSystemProperty("redistribute_writes_type", "PARTITIONED")
-                .build(),
+                        .setSystemProperty("redistribute_writes_type", "PARTITIONED")
+                        .build(),
                 createTable, count, assertRemotePartitionedExchange("orderstatus"));
 
         TableMetadata tableMetadata = getTableMetadata(catalog, TPCH_SCHEMA, "test_create_partitioned_table_as");
@@ -3231,10 +3237,16 @@ public class TestHiveIntegrationSmokeTest
 
             Session withMismatchOptimization = Session.builder(getSession())
                     .setSystemProperty(COLOCATED_JOIN, "true")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
+                    .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
+                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
                     .setCatalogSessionProperty(catalog, "optimize_mismatched_bucket_count", "true")
                     .build();
             Session withoutMismatchOptimization = Session.builder(getSession())
                     .setSystemProperty(COLOCATED_JOIN, "true")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
+                    .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
+                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
                     .setCatalogSessionProperty(catalog, "optimize_mismatched_bucket_count", "false")
                     .build();
 
@@ -3325,6 +3337,7 @@ public class TestHiveIntegrationSmokeTest
             Session notColocated = Session.builder(getSession())
                     .setSystemProperty(COLOCATED_JOIN, "false")
                     .setSystemProperty(GROUPED_EXECUTION, "false")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
             // Co-located JOIN with all groups at once, fixed schedule
             Session colocatedAllGroupsAtOnce = Session.builder(getSession())
@@ -3332,6 +3345,7 @@ public class TestHiveIntegrationSmokeTest
                     .setSystemProperty(GROUPED_EXECUTION, "true")
                     .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "0")
                     .setSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, "false")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
             // Co-located JOIN, 1 group per worker at a time, fixed schedule
             Session colocatedOneGroupAtATime = Session.builder(getSession())
@@ -3339,6 +3353,7 @@ public class TestHiveIntegrationSmokeTest
                     .setSystemProperty(GROUPED_EXECUTION, "true")
                     .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
                     .setSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, "false")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
             // Co-located JOIN with all groups at once, dynamic schedule
             Session colocatedAllGroupsAtOnceDynamic = Session.builder(getSession())
@@ -3346,6 +3361,7 @@ public class TestHiveIntegrationSmokeTest
                     .setSystemProperty(GROUPED_EXECUTION, "true")
                     .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "0")
                     .setSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, "true")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
             // Co-located JOIN, 1 group per worker at a time, dynamic schedule
             Session colocatedOneGroupAtATimeDynamic = Session.builder(getSession())
@@ -3353,6 +3369,7 @@ public class TestHiveIntegrationSmokeTest
                     .setSystemProperty(GROUPED_EXECUTION, "true")
                     .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
                     .setSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, "true")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
             // Broadcast JOIN, 1 group per worker at a time
             Session broadcastOneGroupAtATime = Session.builder(getSession())
@@ -3360,6 +3377,7 @@ public class TestHiveIntegrationSmokeTest
                     .setSystemProperty(COLOCATED_JOIN, "true")
                     .setSystemProperty(GROUPED_EXECUTION, "true")
                     .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
 
             // Broadcast JOIN, 1 group per worker at a time, dynamic schedule
@@ -3369,6 +3387,7 @@ public class TestHiveIntegrationSmokeTest
                     .setSystemProperty(GROUPED_EXECUTION, "true")
                     .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
                     .setSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, "true")
+                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
                     .build();
 
             //
@@ -5019,7 +5038,8 @@ public class TestHiveIntegrationSmokeTest
         if (path.startsWith("file:")) {
             path = path.replace("file:", "");
         }
-        String[] actualDirectoryList = new File(path).list(new FilenameFilter() {
+        String[] actualDirectoryList = new File(path).list(new FilenameFilter()
+        {
             @Override
             public boolean accept(File file, String s)
             {
@@ -5087,5 +5107,55 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate("DROP TABLE IF EXISTS multiin");
             assertUpdate("DROP TABLE IF EXISTS inperftest");
         }
+    }
+
+    @Test
+    public void testUpdateAndDeleteForBooleanColumn()
+    {
+        assertUpdate("DROP TABLE IF EXISTS tab_bkt_009");
+        assertUpdate(autoVacuumSession, "CREATE TABLE tab_bkt_009 (aa tinyint, bb smallint, cc int, " +
+                "dd bigint, ee boolean, ff real, gg double, hh varchar(10), ii varbinary, jj timestamp, kk decimal,ll decimal(10, 8),mm date,nn char(6)) " +
+                "with (bucket_count=2, bucketed_by=array ['dd'], format='orc', transactional=true)");
+
+        assertUpdate("insert into tab_bkt_009 values (tinyint'21', smallint'31', 810, 11111, boolean'0', 111.111," +
+                "111111111.111111, 'hello_111', varbinary'/', timestamp'2019-09-11 01:00:00'," +
+                "51, 11.11, date '2019-09-11', 'work_1')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'22', smallint'32', 820, 22222, boolean'0', 222.222," +
+                "222222222.222222, 'hello_222', varbinary'/', timestamp'2019-09-14 02:00:00', 52, 22.22," +
+                "date '2019-09-14', 'work_2')", 1);
+        assertUpdate("update tab_bkt_009 set bb=smallint'10' where ee=boolean'0'", 2);
+
+        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, " +
+                "3.03,'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, " +
+                "4.04,'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'26', smallint'36', 860, 999960, boolean'0', 6.6, " +
+                "6.06,'hello_6', varbinary'/', timestamp'2019-09-16 15:00:06', 56, 60.36, date '2019-09-16', 'work_6')", 1);
+        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-14'", 2);
+        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-16'", 1);
+
+        assertUpdate(String.format("DROP TABLE tab_bkt_009"));
+    }
+
+    @Test
+    public void testVacuumForBooleanColumn()
+    {
+        assertUpdate("DROP TABLE IF EXISTS tab_bkt_009");
+        assertUpdate(autoVacuumSession, "CREATE TABLE tab_bkt_009 (aa tinyint, bb smallint, cc int, " +
+                "dd bigint, ee boolean, ff real, gg double, hh varchar(10), ii varbinary, jj timestamp, kk decimal,ll decimal(10, 8),mm date,nn char(6)) " +
+                "with (bucket_count=2, bucketed_by=array ['dd'], format='orc', transactional=true)");
+
+        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
+                "'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
+                "'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
+                "'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
+        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
+                "'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
+        assertUpdate(String.format("VACUUM TABLE tab_bkt_009 AND WAIT"), 4);
+        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-14'", 2);
+
+        assertUpdate(String.format("DROP TABLE tab_bkt_009"));
     }
 }

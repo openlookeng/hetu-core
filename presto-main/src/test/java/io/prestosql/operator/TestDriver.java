@@ -42,7 +42,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.Closeable;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -173,7 +175,14 @@ public class TestDriver
                         .addSequencePage(10, 20, 30, 40)
                         .build()),
                 TEST_TABLE_HANDLE,
-                ImmutableList.of());
+                ImmutableList.of(),
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                types,
+                false,
+                Optional.empty(),
+                0,
+                0);
 
         PageConsumerOperator sink = createSinkOperator(types);
         Driver driver = Driver.createDriver(driverContext, source, sink);
@@ -467,7 +476,7 @@ public class TestDriver
                 TableHandle table,
                 Iterable<ColumnHandle> columns)
         {
-            super(operatorContext, planNodeId, pageSourceProvider, table, columns);
+            super(operatorContext, planNodeId, pageSourceProvider, table, columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, new ArrayList<Type>(), false, Optional.empty(), 0, 0);
         }
 
         @Override
@@ -492,7 +501,7 @@ public class TestDriver
                 TableHandle table,
                 Iterable<ColumnHandle> columns)
         {
-            super(operatorContext, planNodeId, pageSourceProvider, table, columns);
+            super(operatorContext, planNodeId, pageSourceProvider, table, columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, new ArrayList<Type>(), false, Optional.empty(), 0, 0);
         }
 
         @Override

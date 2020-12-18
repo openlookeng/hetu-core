@@ -193,6 +193,11 @@ public class OracleClient
     private final boolean isQueryPushDownEnabled;
 
     /**
+     * enable to user oracle synonyms
+     */
+    private final boolean synonymsEnabled;
+
+    /**
      * Create Oracle client using the configurations.
      *
      * @param config config
@@ -210,6 +215,7 @@ public class OracleClient
         this.roundingMode = requireNonNull(oracleConfig.getRoundingMode(), "oracle rounding mode cannot be null");
         this.unsupportedTypeHandling = requireNonNull(oracleConfig.getUnsupportedTypeHandling(),
                 "oracle unsupported type handling cannot be null");
+        this.synonymsEnabled = oracleConfig.isSynonymsEnabled();
     }
 
     private static ColumnMapping charColumnMapping(CharType charType)
@@ -325,13 +331,21 @@ public class OracleClient
         }
     }
 
+    private String[] getTableTypes()
+    {
+        if (synonymsEnabled) {
+            return new String[] {"TABLE", "SYNONYM", "VIEW"};
+        }
+        return new String[] {"TABLE", "VIEW"};
+    }
+
     @Override
     protected ResultSet getTables(Connection connection, Optional<String> schemaName, Optional<String> tableName)
             throws SQLException
     {
         return connection.getMetaData()
                 .getTables(connection.getCatalog(), schemaName.orElse(null), tableName.orElse(null),
-                        new String[] {"TABLE", "SYNONYM", "VIEW"});
+                        getTableTypes());
     }
 
     @Nullable

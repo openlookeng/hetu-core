@@ -123,6 +123,9 @@ public class DataCenterUtility
      */
     public static boolean isDCCatalog(Metadata metadata, String catalogName)
     {
+        if (catalogName != null && catalogName.contains(".")) {
+            catalogName = catalogName.substring(0, catalogName.indexOf("."));
+        }
         MetadataManager metadataManager = (MetadataManager) metadata;
         DataCenterConnectorManager dataCenterConnectorManager = metadataManager.getDataCenterConnectorManager();
         if (dataCenterConnectorManager != null) {

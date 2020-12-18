@@ -48,7 +48,7 @@ import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.planner.plan.WindowNode;
@@ -309,7 +309,6 @@ public class PlanFragmenter
                     .getTablePartitioning()
                     .map(TablePartitioning::getPartitioningHandle)
                     .orElse(SOURCE_DISTRIBUTION);
-
             context.get().addSourceDistribution(node.getId(), partitioning, metadata, session);
             return context.defaultRewrite(node, context.get());
         }
@@ -658,7 +657,7 @@ public class PlanFragmenter
         }
 
         @Override
-        public GroupedExecutionProperties visitTopNRowNumber(TopNRowNumberNode node, Void context)
+        public GroupedExecutionProperties visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             return processWindowFunction(node);
         }
@@ -796,7 +795,8 @@ public class PlanFragmenter
                     node.getOutputSymbols(),
                     node.getAssignments(),
                     node.getEnforcedConstraint(),
-                    node.getPredicate());
+                    node.getPredicate(), node.getStrategy(),
+                    node.getReuseTableScanMappingId(), 0);
         }
     }
 }

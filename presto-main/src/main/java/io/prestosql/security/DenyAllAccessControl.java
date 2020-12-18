@@ -63,6 +63,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denySetSystemSessi
 import static io.prestosql.spi.security.AccessDeniedException.denySetUser;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowCurrentRoles;
+import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowRoleGrants;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowRoles;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowSchemas;
@@ -204,21 +205,27 @@ public class DenyAllAccessControl
     }
 
     @Override
-    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanCreateIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
-        denyCreateIndex(indexName.toString());
+        denyCreateIndex(tableName.toString());
     }
 
     @Override
-    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName)
+    public void checkCanDropIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
-        denyDropIndex(indexName.toString());
+        denyDropIndex(tableName.toString());
     }
 
     @Override
     public void checkCanRenameIndex(TransactionId transactionId, Identity identity, QualifiedObjectName indexName, QualifiedObjectName newIndexName)
     {
         denyRenameIndex(indexName.toString(), newIndexName.toString());
+    }
+
+    @Override
+    public void checkCanShowIndex(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+        denyShowIndex(tableName.toString());
     }
 
     @Override

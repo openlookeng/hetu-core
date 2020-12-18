@@ -33,7 +33,7 @@ state-store.type=hazelcast
 state-store.name=query
 state-store.cluster=cluster1
 
-hazelcast.discovery.mode=tcp-ip   
+hazelcast.discovery.mode=tcp-ip
 hazelcast.discovery.port=5701
 #configure either hazelcast.discovery.tcp-ip.seeds OR hazelcast.discovery.tcp-ip.profile
 hazelcast.discovery.tcp-ip.seeds=<member1_ip:member1_hazelcast.discovery.port>,<member2_ip:member2_hazelcast.discovery.port>,...

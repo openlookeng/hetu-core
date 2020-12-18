@@ -93,7 +93,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
@@ -124,6 +124,8 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.execution.StageInfo.getAllStages;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
@@ -444,6 +446,7 @@ public class PlanPrinter
                             node.getFilteringSourceJoinSymbol(),
                             formatHash(node.getSourceHashSymbol(), node.getFilteringSourceHashSymbol())));
             node.getDistributionType().ifPresent(distributionType -> nodeOutput.appendDetailsLine("Distribution: %s", distributionType));
+            node.getDynamicFilterId().ifPresent(dynamicFilterId -> nodeOutput.appendDetailsLine("dynamicFilterId: %s", dynamicFilterId));
             node.getSource().accept(this, context);
             node.getFilteringSource().accept(this, context);
 
@@ -621,7 +624,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitTopNRowNumber(TopNRowNumberNode node, Void context)
+        public Void visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             List<String> partitionBy = node.getPartitionBy().stream()
                     .map(Functions.toStringFunction())
@@ -636,7 +639,7 @@ public class PlanPrinter
             args.add(format("order by (%s)", Joiner.on(", ").join(orderBy)));
 
             NodeRepresentation nodeOutput = addNode(node,
-                    "TopNRowNumber",
+                    "TopNRankingNumber",
                     format("[%s limit %s]%s", Joiner.on(", ").join(args), node.getMaxRowCountPerPartition(), formatHash(node.getHashSymbol())));
 
             nodeOutput.appendDetailsLine("%s := %s", node.getRowNumberSymbol(), "row_number()");
@@ -685,6 +688,22 @@ public class PlanPrinter
         {
             TableHandle table = node.getTable();
             NodeRepresentation nodeOutput;
+            String operatorName = "";
+            String reuseTypeName = "";
+            if (node.getStrategy().equals(REUSE_STRATEGY_PRODUCER)) {
+                operatorName = "ReuseTableScan";
+                reuseTypeName = "(Producer [ID: " + node.getId().toString() + "])";
+            }
+            else if (node.getStrategy().equals(REUSE_STRATEGY_CONSUMER)) {
+                operatorName = "ReuseTableScan";
+                reuseTypeName = "(Consumer)";
+            }
+            else {
+                operatorName += "TableScan";
+            }
+
+            operatorName = operatorName + reuseTypeName;
+
             {
                 String formatString = "[";
                 List<Object> arguments = new LinkedList<>();
@@ -705,7 +724,7 @@ public class PlanPrinter
                 formatString += "]";
                 nodeOutput = addNode(
                         node,
-                        "TableScan",
+                        operatorName,
                         format(formatString, arguments.toArray()));
             }
             printTableScanInfo(nodeOutput, node);
@@ -770,10 +789,22 @@ public class PlanPrinter
 
             String formatString = "[";
             String operatorName = "";
+            String reuseTypeName = "";
             List<Object> arguments = new LinkedList<>();
 
             if (scanNode.isPresent()) {
-                operatorName += "Scan";
+                if (scanNode.get().getStrategy() == REUSE_STRATEGY_PRODUCER) {
+                    operatorName = "ReuseScan";
+                    reuseTypeName = "(Producer)";
+                }
+                else if (scanNode.get().getStrategy() == REUSE_STRATEGY_CONSUMER) {
+                    operatorName = "ReuseScan";
+                    reuseTypeName = "(Consumer)";
+                }
+                else {
+                    operatorName += "Scan";
+                }
+
                 formatString += "table = %s, ";
                 TableHandle table = scanNode.get().getTable();
                 arguments.add(table);
@@ -818,7 +849,7 @@ public class PlanPrinter
 
             NodeRepresentation nodeOutput = addNode(
                     node,
-                    operatorName,
+                    operatorName + reuseTypeName,
                     format(formatString, arguments.toArray()),
                     allNodes,
                     ImmutableList.of(sourceNode),

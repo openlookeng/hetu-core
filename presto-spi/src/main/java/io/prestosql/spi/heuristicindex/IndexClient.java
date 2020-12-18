@@ -41,12 +41,21 @@ public interface IndexClient
             throws IOException;
 
     /**
+     * Reads the partition index file from the specified path.
+     *
+     * @param path
+     */
+    List<IndexMetadata> readPartitionIndex(String path)
+            throws IOException;
+
+    /**
      * Delete the indexes for the table, according to the index name.
      *
      * @param indexName index name
+     * @param partitionsToDelete partitionsToDelete. Delete all partitions if empty list provided
      * @throws IOException any IOException thrown by filesystem client during file deletion
      */
-    void deleteIndex(String indexName)
+    void deleteIndex(String indexName, List<String> partitionsToDelete)
             throws IOException;
 
     /**
@@ -59,12 +68,14 @@ public interface IndexClient
             throws IOException;
 
     /**
-     * Check indexes record exist before create new index
+     * Delete the index record only according to the index name.
      *
-     * @param createIndexMetadata metadata of the index
-     * @throws IOException any IOException thrown by filesystem client during file read
+     * @param indexName index name
+     * * @param partitionsToDelete partitionsToDelete. Delete all partitions if empty list provided
+     * @param partitionsToDelete partitionsToDelete. Delete all partitions if empty list provided
+     * @throws IOException any IOException thrown by filesystem client during file deletion
      */
-    boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
+    void deleteIndexRecord(String indexName, List<String> partitionsToDelete)
             throws IOException;
 
     /**
@@ -76,11 +87,34 @@ public interface IndexClient
             throws IOException;
 
     /**
-     * look up index record
+     * Look up index record by name
      *
      * @param name index name
      * @throws IOException any IOException thrown by filesystem client during file read
      */
-    IndexRecord getIndexRecord(String name)
+    IndexRecord lookUpIndexRecord(String name)
             throws IOException;
+
+    /**
+     * Look up index record by contents
+     *
+     * @param createIndexMetadata metadata of the index
+     * @return null if not found, or the index record matching createIndexMetaData.
+     * @throws IOException any IOException thrown by filesystem client during file read
+     */
+    RecordStatus lookUpIndexRecord(CreateIndexMetadata createIndexMetadata)
+            throws IOException;
+
+    enum RecordStatus
+    {
+        NOT_FOUND,
+        SAME_NAME,
+        SAME_CONTENT,
+        SAME_INDEX_PART_CAN_MERGE,
+        SAME_INDEX_PART_CONFLICT,
+        IN_PROGRESS_SAME_NAME,
+        IN_PROGRESS_SAME_CONTENT,
+        IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE,
+        IN_PROGRESS_SAME_INDEX_PART_CONFLICT
+    }
 }
