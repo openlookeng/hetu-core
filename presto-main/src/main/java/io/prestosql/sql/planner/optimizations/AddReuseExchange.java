@@ -39,10 +39,11 @@ import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
 
-import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.WeakHashMap;
 import java.util.stream.Collectors;
 
@@ -111,10 +112,10 @@ public class AddReuseExchange
 
         private Boolean isNodeAlreadyVisited;
 
-        private Map<PlanNode, Integer> planNodeListHashMap;
-        private final Map<PlanNode, TableHandle> nodeToTempHandleMapping = new TreeMap<>(new ScanNodeComparator());
-        private final Map<PlanNode, Integer> track = new TreeMap<>(new ScanNodeComparator());
-        private final Map<PlanNode, Integer> reuseTableScanMappingIdConsumerTableScanNodeCount = new TreeMap<>(new ScanNodeComparator());
+        private Map<WrapperScanNode, Integer> planNodeListHashMap = new HashMap<>();
+        private final Map<WrapperScanNode, TableHandle> nodeToTempHandleMapping = new HashMap<>();
+        private final Map<WrapperScanNode, Integer> track = new HashMap<>();
+        private final Map<WrapperScanNode, Integer> reuseTableScanMappingIdConsumerTableScanNodeCount = new HashMap<>();
 
         private OptimizedPlanRewriter(Session session, Metadata metadata, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator,
                 TypeProvider typeProvider, Boolean isNodeAlreadyVisited)
@@ -126,7 +127,6 @@ public class AddReuseExchange
             this.idAllocator = idAllocator;
             this.typeProvider = typeProvider;
             this.isNodeAlreadyVisited = isNodeAlreadyVisited;
-            this.planNodeListHashMap = new TreeMap<>(new ScanNodeComparator());
         }
 
         @Override
@@ -200,10 +200,11 @@ public class AddReuseExchange
             // verify right side
             TableScanNode left = (TableScanNode) getTableScanNode(node.getLeft());
             TableScanNode right = (TableScanNode) getTableScanNode(node.getRight());
-            if (left != null && right != null && left.isNodeEquals(right)) {
-                if (planNodeListHashMap.get(left) != null) {
+            if (left != null && right != null && WrapperScanNode.of(left).equals(right)) {
+                WrapperScanNode leftNode = WrapperScanNode.of(left);
+                if (planNodeListHashMap.get(leftNode) != null) {
                     // These nodes are part of reuse exchange, adjust them.
-                    planNodeListHashMap.remove(left);
+                    planNodeListHashMap.remove(leftNode);
                 }
             }
 
@@ -223,7 +224,7 @@ public class AddReuseExchange
             if (!isNodeAlreadyVisited) {
                 TableStatistics stats = metadata.getTableStatistics(session, node.getTable(), (newDomain != null) ? new Constraint(newDomain) : Constraint.alwaysTrue());
                 if (isMaxTableSizeGreaterThanSpillThreshold(node, stats)) {
-                    planNodeListHashMap.remove(node);
+                    planNodeListHashMap.remove(WrapperScanNode.of(node));
                 }
             }
         }
@@ -237,9 +238,10 @@ public class AddReuseExchange
         }
 
         @Override
-        public PlanNode visitTableScan(TableScanNode node, RewriteContext<Void> context)
+        public PlanNode visitTableScan(TableScanNode tableScanNode, RewriteContext<Void> context)
         {
-            TableScanNode rewrittenNode = node;
+            TableScanNode rewrittenNode = tableScanNode;
+            WrapperScanNode node = WrapperScanNode.of(tableScanNode);
             if (!isNodeAlreadyVisited) {
                 Integer pos = planNodeListHashMap.get(node);
                 if (pos == null) {
@@ -255,19 +257,19 @@ public class AddReuseExchange
                     Integer reuseTableScanMappingId = track.get(node);
                     if (pos > 1) {
                         if (nodeToTempHandleMapping.get(node) == null) {
-                            nodeToTempHandleMapping.put(node, node.getTable());
+                            nodeToTempHandleMapping.put(node, tableScanNode.getTable());
                             track.put(node, ScanTableIdAllocator.getNextId());
                             reuseTableScanMappingIdConsumerTableScanNodeCount.put(node, pos - 1);
                         }
 
-                        rewrittenNode = new TableScanNode(node.getId(), nodeToTempHandleMapping.get(node), node.getOutputSymbols(),
-                                node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), REUSE_STRATEGY_CONSUMER, track.get(node), 0);
+                        rewrittenNode = new TableScanNode(tableScanNode.getId(), nodeToTempHandleMapping.get(node), tableScanNode.getOutputSymbols(),
+                                tableScanNode.getAssignments(), tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), REUSE_STRATEGY_CONSUMER, track.get(node), 0);
                         planNodeListHashMap.put(node, --pos);
                         return rewrittenNode;
                     }
                     else if (reuseTableScanMappingId != null) {
-                        rewrittenNode = new TableScanNode(node.getId(), nodeToTempHandleMapping.get(node), node.getOutputSymbols(),
-                                node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), REUSE_STRATEGY_PRODUCER, reuseTableScanMappingId, reuseTableScanMappingIdConsumerTableScanNodeCount.get(node));
+                        rewrittenNode = new TableScanNode(tableScanNode.getId(), nodeToTempHandleMapping.get(node), tableScanNode.getOutputSymbols(),
+                                tableScanNode.getAssignments(), tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), REUSE_STRATEGY_PRODUCER, reuseTableScanMappingId, reuseTableScanMappingIdConsumerTableScanNodeCount.get(node));
                     }
 
                     planNodeListHashMap.remove(node);
@@ -320,15 +322,78 @@ public class AddReuseExchange
         }
     }
 
-    static class ScanNodeComparator
-            implements Comparator<PlanNode>
+    static class WrapperScanNode
     {
-        @Override
-        public int compare(PlanNode planNode, PlanNode t1)
+        private final TableScanNode node;
+
+        private WrapperScanNode(TableScanNode node)
         {
-            TableScanNode curr = (TableScanNode) (planNode);
-            TableScanNode other = (TableScanNode) (t1);
-            return curr.isNodeEquals(other) ? 0 : 1;
+            this.node = node;
+        }
+
+        public static WrapperScanNode of(TableScanNode node)
+        {
+            return new WrapperScanNode(node);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            TableHandle tableHandle = node.getTable();
+            List<String> columnNames = node.getOutputSymbols().stream().map(x -> node.getActualColName(x.getName())).collect(Collectors.toList());
+            return Objects.hash(tableHandle.getConnectorHandle(), tableHandle.getCatalogName().toString(), columnNames);
+        }
+
+        private TableScanNode getNode()
+        {
+            return node;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            WrapperScanNode curr = (WrapperScanNode) (o);
+            if (curr == this) {
+                return true;
+            }
+
+            TableScanNode tableScanNode = curr.getNode();
+
+            if (tableScanNode == this.node) {
+                return true;
+            }
+
+            if (!(tableScanNode instanceof TableScanNode)) {
+                return false;
+            }
+
+            if (tableScanNode.getTable().getCatalogName().equals(this.node.getTable().getCatalogName())
+                    && tableEqualsTo(tableScanNode.getTable(), this.node.getTable())
+                    && this.node.isSourcesEqual(tableScanNode.getSources(), this.node.getSources())
+                    && this.node.isSymbolsEqual(tableScanNode.getOutputSymbols(), this.node.getOutputSymbols())
+                    && this.node.isPredicateSame(tableScanNode)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        private boolean tableEqualsTo(Object o1, Object o2)
+        {
+            if (o1 == o2) {
+                return true;
+            }
+            if (!(o2 instanceof TableHandle)) {
+                return false;
+            }
+            TableHandle thisTableHandle = (TableHandle) o1;
+            TableHandle otherTableHandle = (TableHandle) (o2);
+
+            if (otherTableHandle.getConnectorHandle().equals(thisTableHandle.getConnectorHandle())
+                    && thisTableHandle.getCatalogName().equals(otherTableHandle.getCatalogName())) {
+                return true;
+            }
+            return false;
         }
     }
 }
