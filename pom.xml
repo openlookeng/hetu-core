@@ -132,6 +132,7 @@
         <module>hetu-seed-store</module>
         <module>hetu-state-store</module>
         <module>hetu-hbase</module>
+        <module>hetu-mongodb</module>
         <module>hetu-carbondata</module>
         <module>hetu-filesystem-client</module>
         <module>hetu-metastore</module>
