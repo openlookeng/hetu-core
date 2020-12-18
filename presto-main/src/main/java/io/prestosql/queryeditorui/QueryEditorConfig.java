@@ -23,6 +23,7 @@ import javax.validation.constraints.NotNull;
 import java.util.Optional;
 
 import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class QueryEditorConfig
 {
@@ -35,6 +36,7 @@ public class QueryEditorConfig
     private DataSize maxResultSize = new DataSize(1, DataSize.Unit.GIGABYTE);
     private Optional<String> sharedSecret = Optional.empty();
     private Duration sessionTimeout = new Duration(1, DAYS);
+    private Duration executionTimeout = new Duration(15, MINUTES);
     private int schemaCacheExpiryMin = 5;
     private int previewTableCacheExpiryMin = 20;
     private boolean populateSchemaCacheOnStartup = true;
@@ -145,6 +147,17 @@ public class QueryEditorConfig
     {
         this.sessionTimeout = sessionTimeout;
         return this;
+    }
+
+    public Duration getExecutionTimeout()
+    {
+        return executionTimeout;
+    }
+
+    @Config("hetu.queryeditor-ui.execution-timeout")
+    public void setExecutionTimeout(Duration executionTimeout)
+    {
+        this.executionTimeout = executionTimeout;
     }
 
     @Config("hetu.queryeditor-ui.schema-cache.expiry.min")
