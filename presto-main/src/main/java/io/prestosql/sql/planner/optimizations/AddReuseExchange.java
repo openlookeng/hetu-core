@@ -200,7 +200,7 @@ public class AddReuseExchange
             // verify right side
             TableScanNode left = (TableScanNode) getTableScanNode(node.getLeft());
             TableScanNode right = (TableScanNode) getTableScanNode(node.getRight());
-            if (left != null && right != null && WrapperScanNode.of(left).equals(right)) {
+            if (left != null && right != null && WrapperScanNode.of(left).equals(WrapperScanNode.of(right))) {
                 WrapperScanNode leftNode = WrapperScanNode.of(left);
                 if (planNodeListHashMap.get(leftNode) != null) {
                     // These nodes are part of reuse exchange, adjust them.
