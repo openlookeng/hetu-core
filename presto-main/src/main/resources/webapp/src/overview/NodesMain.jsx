@@ -55,7 +55,7 @@ class NodesMain extends React.Component {
                 let obj = {};
                 obj.id = key.slice(0, key.indexOf(" "));
                 obj.ip = key.slice(key.indexOf("[") + 1, key.indexOf("]"))
-                obj.role = key.slice(key.indexOf("]") + 2) == 'true' ? 'Coordinator' : 'Worker'
+                obj.role = key.slice(key.indexOf("]") + 2);
                 obj.count = data.memoryData[key].availableProcessors;
                 let totalMemory = data.memoryData[key].totalNodeMemory.slice(0, -1);
                 obj.nodeMemory = totalMemory;
