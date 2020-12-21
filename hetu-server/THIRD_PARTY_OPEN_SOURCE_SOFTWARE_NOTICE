@@ -365,7 +365,24 @@ License: Apache License V2.0
 Please see above.
 
 
+Software: MapDB 3.0.8
+Copyright notice:
+Copyright 2012-2020 the Snappy author.
 
+
+License: Apache License V2.0
+Please see above.
+
+
+Software: Snappy 1.1.7
+
+Copyright notice:
+Copyright (c) 2011 Taro L. Saito
+Copyright 2011-2017 the Snappy author.
+
+
+License: Apache License V2.0
+Please see above.
 
 
 Software: bcprov-jdk15on 1.64
@@ -447,7 +464,13 @@ License: Apache License V2.0
 Please see above.
 
 
+Software: Apache Commons Lang 2.6
+Copyright notice:
+Copyright 2001-2020 The Apache Software Foundation.
 
+
+License: Apache License V2.0
+Please see above.
 
 
 Software: Apache Commons pool 2.8.0
@@ -457,109 +480,6 @@ Copyright 2001-2019 The Apache Software Foundation.
 
 License: Apache License V2.0
 Please see above.
-
-
-
-
-
-Software: Apache Druid 0.19.0
-Copyright notice:
-Copyright 2018-2020 The Apache Software Foundation.
-Copyright (c) 2010-2018, Michael Bostock.
-Copyright (c) 2013-present, Facebook, Inc.
-Copyright (c) 2014-present Matt Zabriskie.
-Copyright (C) 1988 by Leslie Lamport.
-Copyright (c) 2014 International Business Machines Corporation.
-Copyright (c) 2017 CoderPuppy.
-Copyright (c) 2004-2011 Paul R. Holser, Jr.
-Copyright (c) 2014, Font Awesome (http://fontawesome.io),
-Copyright (c) 2007, Eclipse Foundation, Inc. and its licensors.
-Copyright (c) Facebook, Inc. and its affiliates.
-Copyright (c) 2014 Blake Embrey (hello@blakeembrey.com).
-Copyright (c) 2011-  Lightbend, Inc.
-copyright (c) 2006-2018 Paul Hammant & ThoughtWorks Inc.
-Copyright (c) 2015-2016  TIBCO Software Inc.
-Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org). Verbatim copying.
-Copyright (c) Microsoft Corporation. All rights reserved.
-Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
-Copyright (c) 2015, Yahoo! Inc. All rights reserved.
-Copyright (c) 2002-  EPFL.
-Copyright (c) 2014 James Hrisho.
-Copyright (c) 2017 sudodoki <smd.deluzion@gmail.com>.
-Copyright (c) 2004, Ernst Hairer.
-Copyright (c) 2019-present StringEpsilon <StringEpsilon@gmail.com>.
-Copyright (c) 2000-2011 INRIA, France Telecom.
-Copyright (c) 2004-2014 QOS.ch.
-Copyright (c) 2016 Denis Rul.
-Copyright (c) 2017 Artur Kenzhaev.
-Copyright (c) 2016 Yang Liu <hi@zesik.com>.
-Copyright (c) 2001-2016, Arno Unkrig.
-Copyright (c) 2005 Brian Goetz and Tim Peierls Released under the Creative.
-Copyright (C) 2013 Brian Eugene Wilson, Robert Martin Campbell.
-Copyright (c) 2016 Tanner Linsley.
-Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org).
-Copyright (c) 2015 Félix Girault.
-Copyright (c) 2017-2019 James Kyle <me@thejameskyle.com>.
-Copyright (c) 2016 Adam Draper.
-Copyright (c) 2015 Jason Quense.
-Copyright (c) 2014-2019 Giampaolo Bellavite.
-Copyright (c) 2015-2016, Luben Karavelov/ All rights reserved.
-Copyright (c) 2017 JRuby Team.
-Copyright (c) 2018, React Community.
-Copyright (C) 1989, 1991 Free Software Foundation, Inc.
-Copyright (c) 2007, The OWASP Foundation.
-Copyright (C) 2013-2015 by Andrea Giammarchi - @WebReflection.
-Copyright (C) 2006-2008, Google Inc.
-Copyright (c) 1999 Computer Systems and Communication Lab.
-Copyright (c) 2016-present, Facebook, Inc. All rights reserved.
-Copyright (c) Microsoft Corporation. All rights reserved.
-Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
-Copyright (c) Feross Aboukhadijeh.
-Copyright (c) 2015 Andres Suarez <zertosh@gmail.com>.
-Copyright (c) 2013 Roman Shtylman <shtylman@gmail.com>.
-Copyright (c) 2018 React Popper authors.
-Copyright (c) 2012 Terence Parr and Sam Harwell.
-Copyright (c) 2011 FuseSource Corp. All rights reserved.
-Copyright (c) 2004-2011 VMware, Inc.
-Copyright (c) 2014-2017 HubSpot, Inc.
-Copyright (c) OSGi Alliance (2000, 2007).
-Copyright (c) 2003-2008 Terence Parr.
-Copyright (c) 2016 Zeit, Inc.
-Copyright (c) 2002-2006, Marc Prud'hommeaux <mwp1@cornell.edu>.
-Copyright (c) 2017-present James Kyle <me@thejameskyle.com>.
-Copyright (c) React Training 2016-2018.
-Copyright (c) 2013, LeRoy Benjamin Sharon.
-Copyright (c) 2002-2015 Atsuhiko Yamanaka, JCraft,Inc.
-Copyright (c) 2014-present, Facebook, Inc.
-Copyright (c) 2002,2003, Stefan Haustein, Oberhausen, Rhld., Germany.
-Copyright (c) 2014-present Sebastian McKenzie and other contributors.
-Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
-Copyright (c) 2013 International Business Machines Corporation.
-Copyright (c) 2011-2014 Twitter, Inc.
-Copyright (C) 2000-2007 The Apache Software Foundation.
-Copyright (c) 2014 Metamarkets.
-Copyright (c) 1999 Pai-Hsiang Hsiao.
-Copyright (c) Michael Jackson 2016-2018.
-Copyright (c) 2014-2017 Christian Zangl.
-Copyright (c) 1997, PostgreSQL Global Development Group.
-Copyright (c) 2004-2008 QOS.ch.
-Copyright (C) 1991, 1992 by Chris Thewalt (thewalt@ce.berkeley.edu).
-Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura.
-Copyright (c) 2014-2019 Denis Pushkarev.
-Copyright (c) 2014 TJ Holowaychuk <tj@vision-media.ca>.
-Copyright (c) 2013 Julian Gruber <julian@juliangruber.com>.
-Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com).
-Copyright (c) 2019 Alexander Reardon.
-Copyright (c) 2017 Jed Watson.
-Copyright (c) 1995-2014 International Business Machines Corporation and others.
-Copyright (c) 2014, 2015, 2016, 2017, 2018 Simon Lydell.
-
-
-License: Apache License V2.0
-Please see above.
-
-
-
 
 
 Software: Hazelcast 4.0.4
