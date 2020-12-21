@@ -101,18 +101,20 @@ class Header
           <div className='flex flex-initial version'>
             <div className="version-inner">
               Version :
-              <span className="uppercase">{info? info.nodeVersion.version : 'null'}</span>
+              {info? info.nodeVersion.version : 'null'}
             </div>
             <div className="version-inner">
               Environment :
-              <span className="uppercase">{info ? info.environment : 'null'}</span>
+              {info ? info.environment : 'null'}
             </div>
             <div className="version-inner">
-              <span>Uptime</span>
+              Uptime
+              : {info ? info.uptime : '0s'}
+            </div>
+            <div className="version-inner">
               <span data-toggle="tooltip" data-placement="bottom" title="Connection status">
                 {this.renderStatusLight()}
               </span>
-              <span className="uppercase">: {info ? info.uptime : '0s'}</span>
             </div>
           </div>
           <div className='flex flex-initial'>

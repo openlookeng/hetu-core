@@ -257,7 +257,7 @@ class SchemaTree extends React.Component {
     }
 
     deleteCatalog(item) {
-        if(confirm('Are you sure you want to deletet he catalog?')) {
+        if(confirm('Are you sure you want to delete the catalog?')) {
             SchemaActions.deleteCatalog(item.name).then((res) => {
                 if(!res.result) {
                     if(res.message.indexOf('Not Found (code: 404)') !==-1){
