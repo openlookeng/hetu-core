@@ -111,7 +111,7 @@ public class TestBTreeIndex
             throws IOException
     {
         BTreeIndex index = new BTreeIndex();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 20; i++) {
             List<KeyValue> keyValues = new ArrayList<>();
             Long key = Long.valueOf(100 + i);
             String value = "value" + i;
@@ -123,17 +123,14 @@ public class TestBTreeIndex
         index.serialize(new FileOutputStream(file));
         BTreeIndex readIndex = new BTreeIndex();
         readIndex.deserialize(new FileInputStream(file));
-        BetweenPredicate betweenPredicate = new BetweenPredicate(new StringLiteral("column"), new LongLiteral("101"), new LongLiteral("110"));
+        BetweenPredicate betweenPredicate = new BetweenPredicate(new StringLiteral("column"), new LongLiteral("111"), new LongLiteral("114"));
         Iterator result = readIndex.lookUp(betweenPredicate);
         assertNotNull(result, "Result shouldn't be null");
         assertTrue(result.hasNext());
-        assertEquals("value1", result.next().toString());
-        assertEquals("value2", result.next().toString());
-        assertEquals("value3", result.next().toString());
-        assertEquals("value4", result.next().toString());
-        assertEquals("value5", result.next().toString());
-        assertEquals("value6", result.next().toString());
-        assertEquals("value7", result.next().toString());
+        for (int i = 11; i <= 14; i++) {
+            assertEquals("value" + i, result.next().toString());
+        }
+        assertFalse(result.hasNext());
         index.close();
     }
 
@@ -162,6 +159,7 @@ public class TestBTreeIndex
             Object data = result.next();
             assertEquals("value" + i, data.toString());
         }
+        assertFalse(result.hasNext());
         index.close();
     }
 

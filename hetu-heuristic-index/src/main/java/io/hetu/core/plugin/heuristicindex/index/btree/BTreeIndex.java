@@ -249,7 +249,7 @@ public class BTreeIndex
             BetweenPredicate betweenPredicate = (BetweenPredicate) expression;
             Object left = extractSingleValue(betweenPredicate.getMin());
             Object right = extractSingleValue(betweenPredicate.getMax());
-            ConcurrentNavigableMap concurrentNavigableMap = dataMap.subMap(left, right);
+            ConcurrentNavigableMap concurrentNavigableMap = dataMap.subMap(left, true, right, true);
             result.addAll(concurrentNavigableMap.values());
         }
         else if (expression instanceof InPredicate) {
