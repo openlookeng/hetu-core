@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 
 public class SessionPropertyDefaults
 {
@@ -67,7 +67,7 @@ public class SessionPropertyDefaults
             return;
         }
 
-        Map<String, String> propertyMap = new HashMap<>(loadProperties(SESSION_PROPERTY_CONFIGURATION));
+        Map<String, String> propertyMap = new HashMap<>(loadPropertiesFrom(SESSION_PROPERTY_CONFIGURATION.getPath()));
 
         log.info("-- Loading session property configuration manager --");
 

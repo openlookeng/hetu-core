@@ -54,8 +54,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.SERVER_STARTING_UP;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -113,7 +113,7 @@ public class AccessControlManager
             throws Exception
     {
         if (ACCESS_CONTROL_CONFIGURATION.exists()) {
-            Map<String, String> properties = new HashMap<>(loadProperties(ACCESS_CONTROL_CONFIGURATION));
+            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(ACCESS_CONTROL_CONFIGURATION.getPath()));
 
             String accessControlName = properties.remove(ACCESS_CONTROL_PROPERTY_NAME);
             checkArgument(!isNullOrEmpty(accessControlName),

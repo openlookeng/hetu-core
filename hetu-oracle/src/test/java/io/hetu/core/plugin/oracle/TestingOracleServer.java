@@ -29,8 +29,8 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.hetu.core.plugin.oracle.TestOracleConstants.ORACLE_UT_CONFIG_FILE_PATH;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 
 /**
@@ -57,7 +57,7 @@ public class TestingOracleServer
         File file = new File(ORACLE_UT_CONFIG_FILE_PATH);
 
         try {
-            Map<String, String> properties = new HashMap<>(loadProperties(file));
+            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(file.getPath()));
             connectionUrl = properties.get("connection.url");
             user = properties.get("connection.user");
             passWd = properties.get("connection.password");

@@ -49,9 +49,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
@@ -146,7 +146,7 @@ public class DynamicCatalogStore
             // create connection, will load catalog from local disk to catalog manager.
             CatalogFilePath catalogPath = new CatalogFilePath(dynamicCatalogConfig.getCatalogConfigurationDir(), catalogName);
             File propertiesFile = catalogPath.getPropertiesPath().toFile();
-            Map<String, String> properties = new HashMap<>(loadProperties(propertiesFile));
+            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(propertiesFile.getPath()));
             catalogStoreUtil.decryptEncryptedProperties(catalogName, properties);
             properties.remove(CATALOG_NAME);
             connectorManager.createConnection(catalogName, catalogInfo.getConnectorName(), ImmutableMap.copyOf(properties));
