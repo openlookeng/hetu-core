@@ -138,6 +138,7 @@ public class TestHBase
         HBaseErrorCode.ZOOKEEPER_ERROR.toErrorCode();
         HBaseErrorCode.IO_ERROR.toErrorCode();
         HBaseErrorCode.MINI_HBASE.toErrorCode();
+        HBaseErrorCode.HBASE_CREATE_ERROR.toErrorCode();
     }
 
     /**

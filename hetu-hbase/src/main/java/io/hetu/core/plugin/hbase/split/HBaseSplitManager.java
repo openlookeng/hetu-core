@@ -167,15 +167,14 @@ public class HBaseSplitManager
         }
 
         List<HostAddress> hostAddresses = new ArrayList<>();
-
         int rangeSize = rowIds.size();
         int currentIndex = 0;
         while (currentIndex < rangeSize) {
-            int endIndex = rangeSize - currentIndex > maxSplitSize ? (currentIndex + currentIndex) : rangeSize;
+            int endIndex = rangeSize - currentIndex > maxSplitSize ? (currentIndex + maxSplitSize) : rangeSize;
             Map<Integer, List<Range>> splitRange = new HashMap<>();
             splitRange.put(table.getRowIdOrdinal(), rowIds.subList(currentIndex, endIndex));
             splits.add(new HBaseSplit(table.getRowId(), table, hostAddresses, null, null, splitRange, null, false));
-            currentIndex += endIndex - currentIndex;
+            currentIndex = endIndex;
         }
 
         for (HBaseSplit split : splits) {
