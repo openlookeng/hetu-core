@@ -20,9 +20,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.hetu.core.plugin.hbase.conf.HBaseTableProperties;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
+import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
@@ -55,6 +58,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkState;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -174,6 +178,11 @@ public class HBaseConnectorMetadata
         checkNoRollback();
         SchemaTableName tableName = tableMetadata.getTable();
         HBaseTable table = hbaseConn.createTable(tableMetadata);
+        if (HBaseTableProperties.isExternal(tableMetadata.getProperties())) {
+            throw new PrestoException(
+                    HBaseErrorCode.HBASE_CREATE_ERROR,
+                    format("Use lk creating new HBase table [%s], we must specify 'with(external=false)'. ", tableName.toString()));
+        }
 
         // support create table xxx as select * from yyy
         HBaseTableHandle handle =

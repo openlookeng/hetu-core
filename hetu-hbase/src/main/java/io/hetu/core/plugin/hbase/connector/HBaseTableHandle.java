@@ -209,6 +209,12 @@ public class HBaseTableHandle
         return external;
     }
 
+    @JsonProperty
+    public String getIndexColumns()
+    {
+        return indexColumns;
+    }
+
     /**
      * toSchemaTableName
      *
@@ -246,7 +252,17 @@ public class HBaseTableHandle
     @Override
     public ConnectorTableHandle createFrom(ConnectorTableHandle oldConnectorTableHandle)
     {
-        return this;
+        HBaseTableHandle oldHBaseConnectorTableHandle = (HBaseTableHandle) oldConnectorTableHandle;
+        return new HBaseTableHandle(oldHBaseConnectorTableHandle.getSchema(),
+                oldHBaseConnectorTableHandle.getTable(),
+                oldHBaseConnectorTableHandle.getRowId(),
+                oldHBaseConnectorTableHandle.isExternal(),
+                oldHBaseConnectorTableHandle.getSerializerClassName(),
+                oldHBaseConnectorTableHandle.getHbaseTableName(),
+                oldHBaseConnectorTableHandle.getIndexColumns(),
+                oldHBaseConnectorTableHandle.getConstraint(),
+                oldHBaseConnectorTableHandle.getColumns(),
+                oldHBaseConnectorTableHandle.getRowIdOrdinal());
     }
 
     @Override
