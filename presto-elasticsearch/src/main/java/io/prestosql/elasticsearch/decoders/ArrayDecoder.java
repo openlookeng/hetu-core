@@ -17,35 +17,40 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.search.SearchHit;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 import static io.prestosql.spi.StandardErrorCode.TYPE_MISMATCH;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class BooleanDecoder
+public class ArrayDecoder
         implements Decoder
 {
     private final String path;
+    private final Decoder elementDecoder;
 
-    public BooleanDecoder(String path)
+    public ArrayDecoder(String path, Decoder elementDecoder)
     {
         this.path = requireNonNull(path, "path is null");
+        this.elementDecoder = elementDecoder;
     }
 
     @Override
     public void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output)
     {
-        Object value = getter.get();
-        if (value == null) {
+        Object data = getter.get();
+
+        if (data == null) {
             output.appendNull();
         }
-        else if (value instanceof Boolean) {
-            BOOLEAN.writeBoolean(output, (Boolean) value);
+        else if (data instanceof List) {
+            BlockBuilder array = output.beginBlockEntry();
+            ((List<?>) data).forEach(element -> elementDecoder.decode(hit, () -> element, array));
+            output.closeEntry();
         }
         else {
-            throw new PrestoException(TYPE_MISMATCH, format("Expected a boolean value for field %s of type BOOLEAN: %s [%s]", path, value, value.getClass().getSimpleName()));
+            throw new PrestoException(TYPE_MISMATCH, format("Expected list of elements for field '%s' of type ARRAY: %s [%s]", path, data, data.getClass().getSimpleName()));
         }
     }
 }

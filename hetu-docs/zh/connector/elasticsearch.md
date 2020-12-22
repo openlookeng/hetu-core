@@ -133,5 +133,48 @@ Data Types
 | `long`| BIGINT|
 | `keyword`| VARCHAR|
 | `text`| VARCHAR|
+| `date`| TIMESTAMP|
+| `ip`| IPADDRESS|
 | `(all others)`| (unsupported)|
 
+Array Type
+--------
+Elasticsearch中的字段可以包含单个或多个值，但没有数组类型。要说明字段中包含数组，可以在索引映射的_meta中用Presto特定的结构对其进行注释。
+
+例如，有一个包含以下结构的文档的索引:
+### 
+    {
+         "array_string_field": ["presto","is","the","besto"],
+         "long_field": 314159265359,
+         "id_field": "564e6982-88ee-4498-aa98-df9e3f6b6109",
+         "timestamp_field": "1987-09-17T06:22:48.000Z",
+         "object_field": {
+             "array_int_field": [86,75,309],
+             "int_field": 2
+         }
+     }
+
+可以使用以下命令定义该结构的数组字段，将字段属性定义添加到目标索引映射的_meta.presto属性中。
+### 
+    curl --request PUT \
+        --url localhost:9200/doc/_mapping \
+        --header 'content-type: application/json' \
+        --data '
+    {
+        "_meta": {
+            "presto":{
+                "array_string_field":{
+                    "isArray":true
+                },
+                "object_field":{
+                    "array_int_field":{
+                        "isArray":true
+                    }
+                },
+            }
+        }
+    }'
+
+## 限制
+1. openLooKeng不支持查询Elasticsticsearch中有重复列名的表，如：列名为“name”和“NAME”；
+2. openLooKeng不支持Elasticsticsearch表名含有特殊字符，如‘-’，‘.’等。

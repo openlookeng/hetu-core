@@ -21,10 +21,19 @@ import java.util.function.Supplier;
 
 import static io.prestosql.spi.StandardErrorCode.TYPE_MISMATCH;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 public class SmallintDecoder
         implements Decoder
 {
+    private final String path;
+
+    public SmallintDecoder(String path)
+    {
+        this.path = requireNonNull(path, "path is null");
+    }
+
     @Override
     public void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output)
     {
@@ -42,7 +51,7 @@ public class SmallintDecoder
             SMALLINT.writeLong(output, decoded);
         }
         else {
-            throw new PrestoException(TYPE_MISMATCH, "Expected a numeric value for SMALLINT field");
+            throw new PrestoException(TYPE_MISMATCH, format("Expected a numeric value for field '%s' of type SMALLINT: %s [%s]", path, value, value.getClass().getSimpleName()));
         }
     }
 }

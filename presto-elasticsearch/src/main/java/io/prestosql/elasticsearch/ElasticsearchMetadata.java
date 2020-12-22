@@ -31,14 +31,19 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.RowType;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 
 import javax.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -52,19 +57,21 @@ import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
 public class ElasticsearchMetadata
         implements ConnectorMetadata
 {
+    private final Type ipAddressType;
     private final ElasticsearchClient client;
     private final String schemaName;
 
     @Inject
-    public ElasticsearchMetadata(ElasticsearchClient client, ElasticsearchConfig config)
+    public ElasticsearchMetadata(TypeManager typeManager, ElasticsearchClient client, ElasticsearchConfig config)
     {
-        requireNonNull(config, "config is null");
-
+        requireNonNull(typeManager, "typeManager is null");
+        this.ipAddressType = typeManager.getType(new TypeSignature(StandardTypes.IPADDRESS));
         this.client = requireNonNull(client, "client is null");
         this.schemaName = config.getDefaultSchema();
     }
@@ -105,35 +112,52 @@ public class ElasticsearchMetadata
 
     private ConnectorTableMetadata getTableMetadata(String schemaName, String tableName)
     {
-        IndexMetadata metadata = client.getIndexMetadata(tableName);
-
-        return new ConnectorTableMetadata(
-                new SchemaTableName(schemaName, tableName),
-                toColumnMetadata(metadata));
+        InternalTableMetadata internalTableMetadata = makeInternalTableMetadata(schemaName, tableName);
+        return new ConnectorTableMetadata(new SchemaTableName(schemaName, tableName), internalTableMetadata.getColumnMetadata());
     }
 
-    private List<ColumnMetadata> toColumnMetadata(IndexMetadata metadata)
+    private InternalTableMetadata makeInternalTableMetadata(ConnectorTableHandle table)
     {
-        ImmutableList.Builder<ColumnMetadata> result = ImmutableList.builder();
+        ElasticsearchTableHandle handle = (ElasticsearchTableHandle) table;
+        return makeInternalTableMetadata(handle.getSchema(), handle.getIndex());
+    }
 
-        result.add(BuiltinColumns.ID.getMetadata());
-        result.add(BuiltinColumns.SOURCE.getMetadata());
-        result.add(BuiltinColumns.SCORE.getMetadata());
+    private InternalTableMetadata makeInternalTableMetadata(String schema, String tableName)
+    {
+        IndexMetadata metadata = client.getIndexMetadata(tableName);
+        List<IndexMetadata.Field> fields = getColumnFields(metadata);
+        return new InternalTableMetadata(new SchemaTableName(schema, tableName), makeColumnMetadata(fields), makeColumnHandles(fields));
+    }
+
+    private List<IndexMetadata.Field> getColumnFields(IndexMetadata metadata)
+    {
+        ImmutableList.Builder<IndexMetadata.Field> result = ImmutableList.builder();
+        Map<String, Long> counts = metadata.getSchema()
+                .getFields().stream()
+                .collect(Collectors.groupingBy(f -> f.getName().toLowerCase(ENGLISH), Collectors.counting()));
 
         for (IndexMetadata.Field field : metadata.getSchema().getFields()) {
-            Type type = toPrestoType(field.getType());
-            if (type == null) {
+            Type type = toPrestoType(field);
+            if (type == null || counts.get(field.getName().toLowerCase(ENGLISH)) > 1) {
                 continue;
             }
-
-            result.add(new ColumnMetadata(field.getName(), type));
+            result.add(field);
         }
-
         return result.build();
     }
 
-    private Type toPrestoType(IndexMetadata.Type type)
+    private Type toPrestoType(IndexMetadata.Field metaDataField)
     {
+        return toPrestoType(metaDataField, metaDataField.isArray());
+    }
+
+    private Type toPrestoType(IndexMetadata.Field metaDataField, boolean isArray)
+    {
+        IndexMetadata.Type type = metaDataField.getType();
+        if (isArray) {
+            Type elementType = toPrestoType(metaDataField, false);
+            return new ArrayType(elementType);
+        }
         if (type instanceof PrimitiveType) {
             switch (((PrimitiveType) type).getName()) {
                 case "float":
@@ -152,6 +176,8 @@ public class ElasticsearchMetadata
                 case "text":
                 case "keyword":
                     return VARCHAR;
+                case "ip":
+                    return ipAddressType;
                 case "boolean":
                     return BOOLEAN;
                 case "binary":
@@ -168,7 +194,7 @@ public class ElasticsearchMetadata
             ObjectType objectType = (ObjectType) type;
 
             List<RowType.Field> fields = objectType.getFields().stream()
-                    .map(field -> RowType.field(field.getName(), toPrestoType(field.getType())))
+                    .map(field -> RowType.field(field.getName(), toPrestoType(field)))
                     .collect(toImmutableList());
 
             return RowType.from(fields);
@@ -192,14 +218,8 @@ public class ElasticsearchMetadata
     @Override
     public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        ImmutableMap.Builder<String, ColumnHandle> results = ImmutableMap.builder();
-
-        ConnectorTableMetadata tableMetadata = getTableMetadata(session, tableHandle);
-        for (ColumnMetadata column : tableMetadata.getColumns()) {
-            results.put(column.getName(), new ElasticsearchColumnHandle(column.getName(), column.getType()));
-        }
-
-        return results.build();
+        InternalTableMetadata tableMetadata = makeInternalTableMetadata(tableHandle);
+        return tableMetadata.getColumnHandles();
     }
 
     @Override
@@ -256,5 +276,68 @@ public class ElasticsearchMetadata
                 handle.getQuery());
 
         return Optional.of(new ConstraintApplicationResult<>(handle, constraint.getSummary()));
+    }
+
+    private List<ColumnMetadata> makeColumnMetadata(List<IndexMetadata.Field> fields)
+    {
+        ImmutableList.Builder<ColumnMetadata> result = ImmutableList.builder();
+
+        for (BuiltinColumns builtinColumn : BuiltinColumns.values()) {
+            result.add(builtinColumn.getMetadata());
+        }
+
+        for (IndexMetadata.Field field : fields) {
+            result.add(new ColumnMetadata(field.getName(), toPrestoType(field)));
+        }
+        return result.build();
+    }
+
+    private Map<String, ColumnHandle> makeColumnHandles(List<IndexMetadata.Field> fields)
+    {
+        ImmutableMap.Builder<String, ColumnHandle> result = ImmutableMap.builder();
+
+        for (BuiltinColumns builtinColumn : BuiltinColumns.values()) {
+            result.put(builtinColumn.getName(), builtinColumn.getColumnHandle());
+        }
+
+        for (IndexMetadata.Field field : fields) {
+            result.put(field.getName(), new ElasticsearchColumnHandle(
+                    field.getName(),
+                    toPrestoType(field)));
+        }
+
+        return result.build();
+    }
+
+    private static class InternalTableMetadata
+    {
+        private final SchemaTableName tableName;
+        private final List<ColumnMetadata> columnMetadata;
+        private final Map<String, ColumnHandle> columnHandles;
+
+        public InternalTableMetadata(
+                SchemaTableName tableName,
+                List<ColumnMetadata> columnMetadata,
+                Map<String, ColumnHandle> columnHandles)
+        {
+            this.tableName = tableName;
+            this.columnMetadata = columnMetadata;
+            this.columnHandles = columnHandles;
+        }
+
+        public SchemaTableName getTableName()
+        {
+            return tableName;
+        }
+
+        public List<ColumnMetadata> getColumnMetadata()
+        {
+            return columnMetadata;
+        }
+
+        public Map<String, ColumnHandle> getColumnHandles()
+        {
+            return columnHandles;
+        }
     }
 }

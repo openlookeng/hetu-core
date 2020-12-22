@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 
 import static io.prestosql.spi.StandardErrorCode.TYPE_MISMATCH;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
+import static java.lang.String.format;
 import static java.time.format.DateTimeFormatter.ISO_DATE_TIME;
 
 public class TimestampDecoder
@@ -47,7 +48,7 @@ public class TimestampDecoder
             output.appendNull();
         }
         else if (documentField.getValues().size() > 1) {
-            throw new PrestoException(TYPE_MISMATCH, "Expected single value for column: " + path);
+            throw new PrestoException(TYPE_MISMATCH, format("Expected single value for column '%s', found: %s", path, documentField.getValues().size()));
         }
         else {
             TIMESTAMP.writeLong(output,
