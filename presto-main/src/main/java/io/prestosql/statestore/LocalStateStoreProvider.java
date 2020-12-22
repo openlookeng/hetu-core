@@ -30,11 +30,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_NAME_PROPERTY_NAME;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_TYPE_PROPERTY_NAME;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -74,7 +74,7 @@ public class LocalStateStoreProvider
             throws Exception
     {
         if (STATE_STORE_CONFIGURATION.exists()) {
-            Map<String, String> properties = new HashMap<>(loadProperties(STATE_STORE_CONFIGURATION));
+            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(STATE_STORE_CONFIGURATION.getPath()));
             String stateStoreType = properties.remove(STATE_STORE_TYPE_PROPERTY_NAME);
             setStateStore(stateStoreType, properties);
             createStateCollections();
