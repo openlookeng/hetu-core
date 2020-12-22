@@ -1102,35 +1102,37 @@ class StatementAnalyzer
                             session.getUser(),
                             null);
 
-                    IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);
-                    switch (recordStatus) {
-                        case SAME_NAME:
-                            throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                    "Index '%s' already exists", createIndex.getIndexName().toString());
-                        case SAME_CONTENT:
-                            throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                    "Index with same (table,column,indexType) already exists");
-                        case SAME_INDEX_PART_CONFLICT:
-                            throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                    "Index with same (table,column,indexType) already exists and partition(s) contain conflicts");
-                        case IN_PROGRESS_SAME_NAME:
-                            throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                    "Index '%s' is being created by another user. Check running queries for details",
-                                    createIndex.getIndexName().toString());
-                        case IN_PROGRESS_SAME_CONTENT:
-                            throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                    "Index with same (table,column,indexType) is being created by another user. Check running queries for details");
-                        case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
-                            if (partitions.isEmpty()) {
+                    synchronized (StatementAnalyzer.class) {
+                        IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);
+                        switch (recordStatus) {
+                            case SAME_NAME:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index '%s' already exists", createIndex.getIndexName().toString());
+                            case SAME_CONTENT:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index with same (table,column,indexType) already exists");
+                            case SAME_INDEX_PART_CONFLICT:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index with same (table,column,indexType) already exists and partition(s) contain conflicts");
+                            case IN_PROGRESS_SAME_NAME:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index '%s' is being created by another user. Check running queries for details",
+                                        createIndex.getIndexName().toString());
+                            case IN_PROGRESS_SAME_CONTENT:
                                 throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
                                         "Index with same (table,column,indexType) is being created by another user. Check running queries for details");
-                            }
-                            // allow different queries to run with explicitly same partitions
-                        case SAME_INDEX_PART_CAN_MERGE:
-                        case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
-                            break;
-                        case NOT_FOUND:
-                            heuristicIndexerManager.getIndexClient().addIndexRecord(placeHolder);
+                            case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                                if (partitions.isEmpty()) {
+                                    throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                            "Index with same (table,column,indexType) is being created by another user. Check running queries for details");
+                                }
+                                // allow different queries to run with explicitly same partitions
+                            case SAME_INDEX_PART_CAN_MERGE:
+                            case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
+                                break;
+                            case NOT_FOUND:
+                                heuristicIndexerManager.getIndexClient().addIndexRecord(placeHolder);
+                        }
                     }
                 }
                 catch (IOException e) {
