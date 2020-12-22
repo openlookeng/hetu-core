@@ -273,6 +273,9 @@ Those files are obtained from airlift version 200, the author of JsonKeySerde.ja
 Copyright 2012 Proofpoint, Inc.
 Copyright 2010 Proofpoint, Inc.
 
+Software: TransformFilteringSemiJoinToInnerJoin.java, TestTransformFilteringSemiJoinToInnerJoin.java
+Copyright notice:
+Those files are obtained from presto version 346. Author - kasiafi
 
 Software: EvictingDeque.java, ForQueryInfoClient.java, BackgroundCacheLoader.java, ClientSessionFactory.java,
  ExecutionClient.java, Execution.java, InvalidQueryException.java, QueryClient.java, QueryExecutionAuthorizer.java,
