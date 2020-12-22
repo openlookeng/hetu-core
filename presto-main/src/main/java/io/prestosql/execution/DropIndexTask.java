@@ -67,8 +67,13 @@ public class DropIndexTask
             if (statement.getPartitions().isPresent()) {
                 partitions = HeuristicIndexUtils.extractPartitions(statement.getPartitions().get());
 
+                List<String> partitionsInindex = indexClient.lookUpIndexRecord(indexName).partitions;
+                if (partitionsInindex.isEmpty()) {
+                    throw new SemanticException(MISSING_INDEX, statement, "Index '%s' was not created with explicit partitions. Partial drop by partition is not supported.", indexName);
+                }
+
                 List<String> missingPartitions = new ArrayList<>(partitions);
-                missingPartitions.removeAll(indexClient.lookUpIndexRecord(indexName).partitions);
+                missingPartitions.removeAll(partitionsInindex);
                 if (!missingPartitions.isEmpty()) {
                     throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not contain partitions: %s", indexName, missingPartitions);
                 }

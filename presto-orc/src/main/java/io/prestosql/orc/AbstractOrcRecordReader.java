@@ -374,7 +374,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                 }
                 catch (UnsupportedOperationException uoe) {
                     try {
-                        if (!e.getKey().matches(e.getValue())) {
+                        if (e.getKey().matches(e.getValue())) {
                             return false;
                         }
                     }
