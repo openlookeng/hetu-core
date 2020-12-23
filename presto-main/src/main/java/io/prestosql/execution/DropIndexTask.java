@@ -56,7 +56,7 @@ public class DropIndexTask
             IndexRecord record = indexClient.lookUpIndexRecord(indexName);
             // check indexName exist, call heuristic index api to drop index
             if (record == null) {
-                throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exists", indexName);
+                throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exist", indexName);
             }
 
             QualifiedObjectName fullObjectName = QualifiedObjectName.valueOf(record.table);
