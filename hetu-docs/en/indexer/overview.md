@@ -102,6 +102,7 @@ To create index run the following statement:
 
     CREATE INDEX index_name USING bloom ON table1 (column);
     
+**Note:**   Index for decimal type columns is not supported currently. For more details follow the [issue](https://gitee.com/openlookeng/hetu-core/issues/I2AMH0?from=project-issue)
 ### 4. Run query
 
 After index is created, run the query; index will start loading in the background. 

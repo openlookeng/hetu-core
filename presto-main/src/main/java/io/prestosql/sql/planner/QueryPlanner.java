@@ -87,7 +87,6 @@ import io.prestosql.utils.HeuristicIndexUtils;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -621,8 +620,13 @@ class QueryPlanner
             partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
         }
 
-        Iterator<Type> types = Arrays.stream(analysis.getRootScope().getRelationType().getAllFields()
-                .stream().map(Field::getType).toArray(Type[]::new)).iterator();
+        Map<String, Type> columnTypes = new HashMap<>();
+        for (Field field : analysis.getRootScope().getRelationType().getAllFields()) {
+            if (field.getType().getDisplayName().contains("decimal")) {
+                throw new UnsupportedOperationException("Index creation on decimal column is not supported");
+            }
+            columnTypes.put(field.getOriginColumnName().get(), field.getType());
+        }
 
         Properties indexProperties = new Properties();
         Index.Level indexCreationLevel = LEVEL_DEFAULT;
@@ -643,7 +647,7 @@ class QueryPlanner
                 new CreateIndexMetadata(createIndex.getIndexName().toString(),
                         tableName,
                         createIndex.getIndexType(),
-                        createIndex.getColumnAliases().stream().map(identifier -> new AbstractMap.SimpleEntry<>(identifier.toString(), types.next())).collect(Collectors.toList()),
+                        createIndex.getColumnAliases().stream().map(identifier -> new AbstractMap.SimpleEntry<>(identifier.toString(), columnTypes.get(identifier.toString()))).collect(Collectors.toList()),
                         partitions,
                         indexProperties,
                         session.getUser(),
