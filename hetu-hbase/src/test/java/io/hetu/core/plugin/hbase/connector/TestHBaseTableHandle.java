@@ -17,6 +17,7 @@ package io.hetu.core.plugin.hbase.connector;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import static org.testng.Assert.assertEquals;
 
@@ -47,7 +48,8 @@ public class TestHBaseTableHandle
                         false,
                         serializerClassName,
                         Optional.of(table),
-                        "");
+                        "",
+                        OptionalLong.empty());
         assertEquals(
                 "HBaseTableHandle{schema=hbase, table=table-1, rowId=rowkey, internal=false, "
                         + "serializerClassName=io.hetu.core.plugin.hbase."
@@ -88,7 +90,8 @@ public class TestHBaseTableHandle
                         false,
                         serializerClassName,
                         Optional.of(table),
-                        "");
+                        "",
+                        OptionalLong.empty());
 
         assertEquals(true, hBaseTableHandle.equals(hBaseTableHandle2));
     }

@@ -44,18 +44,14 @@ public class TestHBaseSplit
                         "startrow",
                         "endrow",
                         new HashMap<>(),
-                        null,
                         true);
 
         assertEquals(0, split.getRanges().size());
         assertEquals(TestUtils.createHBaseTableHandle(), split.getTableHandle());
-        String className = "io.hetu.core.plugin.hbase.split.HBaseSplit";
-        assertEquals(className, split.getInfo().toString().substring(0, className.length()));
         assertEquals(true, split.isRemotelyAccessible());
         assertEquals("rowKey", split.getRowKeyName());
         assertEquals("endrow", split.getEndRow());
         assertEquals(true, split.isRandomSplit());
-        assertEquals(null, split.getRegionInfo());
         assertEquals(0, split.getAddresses().size());
     }
 }

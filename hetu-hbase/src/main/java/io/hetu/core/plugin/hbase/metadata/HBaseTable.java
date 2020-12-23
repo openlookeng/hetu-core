@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.log.Logger;
+import io.hetu.core.plugin.hbase.conf.HBaseTableProperties;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.utils.Constants;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -28,6 +29,7 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +57,7 @@ public class HBaseTable
     private final SchemaTableName schemaTableName;
     private String indexColumns;
     private Optional<String> hbaseTableName;
+    private Optional<String> splitByChar;
     private Map<String, ColumnHandle> columnsMap;
 
     /**
@@ -68,6 +71,7 @@ public class HBaseTable
      * @param serializerClassName serializerClassName
      * @param indexColumns indexColumns
      * @param hbaseTableName hbaseTableName
+     * @param splitByChar splitByChar
      */
     @JsonCreator
     public HBaseTable(
@@ -78,7 +82,8 @@ public class HBaseTable
             @JsonProperty("external") boolean external,
             @JsonProperty("serializerClassName") Optional<String> serializerClassName,
             @JsonProperty("indexColumns") Optional<String> indexColumns,
-            @JsonProperty("hbaseTableName") Optional<String> hbaseTableName)
+            @JsonProperty("hbaseTableName") Optional<String> hbaseTableName,
+            @JsonProperty("splitByChar") Optional<String> splitByChar)
     {
         this.external = external;
         this.rowId = requireNonNull(rowId, "rowId is null");
@@ -88,6 +93,7 @@ public class HBaseTable
         this.serializerClassName = serializerClassName.orElse("");
         this.indexColumns = indexColumns.orElse("");
         this.hbaseTableName = hbaseTableName;
+        this.splitByChar = splitByChar;
 
         boolean flag = false;
         int rowIdOrdinal0 = 0;
@@ -173,6 +179,35 @@ public class HBaseTable
     public Map<String, ColumnHandle> getColumnsMap()
     {
         return this.columnsMap;
+    }
+
+    /**
+     * getSplitByChar
+     *
+     * @return all chars range
+     */
+    @JsonProperty
+    public Optional<String> getSplitByChar()
+    {
+        return splitByChar;
+    }
+
+    /**
+     * get table properties
+     *
+     * @return all table properties
+     */
+    @JsonProperty
+    public Map<String, Object> getTableProperties()
+    {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(HBaseTableProperties.EXTERNAL, isExternal());
+        properties.put(HBaseTableProperties.INDEX_COLUMNS, getIndexColumns());
+        properties.put(HBaseTableProperties.SPLIT_BY_CHAR, getSplitByChar().orElse(""));
+        properties.put(HBaseTableProperties.HBASE_TABLE_NAME, getHbaseTableName().orElse(""));
+        properties.put(HBaseTableProperties.ROW_ID, getRowId());
+        properties.put(HBaseTableProperties.SERIALIZER, getSerializerClassName());
+        return properties;
     }
 
     /**
@@ -290,6 +325,7 @@ public class HBaseTable
                 .add("external", external)
                 .add("serializerClassName", serializerClassName)
                 .add("hbaseTableName", hbaseTableName)
+                .add("splitByChar", splitByChar)
                 .toString();
     }
 
@@ -312,6 +348,7 @@ public class HBaseTable
         jo.put("table", table);
         jo.put("indexColumns", indexColumns);
         jo.put("hbaseTableName", hbaseTableName.orElse(""));
+        jo.put("splitByChar", splitByChar.orElse(""));
 
         JSONArray jac = new JSONArray();
         JSONObject joc;

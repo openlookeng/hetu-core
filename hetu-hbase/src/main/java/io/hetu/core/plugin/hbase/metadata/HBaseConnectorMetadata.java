@@ -20,12 +20,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.hetu.core.plugin.hbase.conf.HBaseTableProperties;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
-import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
@@ -40,6 +37,7 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
+import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.TableNotFoundException;
@@ -58,7 +56,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkState;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -112,7 +109,8 @@ public class HBaseConnectorMetadata
                 table.isExternal(),
                 table.getSerializerClassName(),
                 table.getHbaseTableName(),
-                table.getIndexColumns());
+                table.getIndexColumns(),
+                OptionalLong.empty());
     }
 
     @Override
@@ -168,7 +166,7 @@ public class HBaseConnectorMetadata
             return Optional.ofNullable(tableMetadata).orElse(tableMetadata);
         }
 
-        return new ConnectorTableMetadata(tableName, table.getColumnMetadatas());
+        return new ConnectorTableMetadata(tableName, table.getColumnMetadatas(), table.getTableProperties());
     }
 
     @Override
@@ -177,12 +175,6 @@ public class HBaseConnectorMetadata
     {
         checkNoRollback();
         SchemaTableName tableName = tableMetadata.getTable();
-        if (HBaseTableProperties.isExternal(tableMetadata.getProperties())) {
-            throw new PrestoException(
-                    HBaseErrorCode.HBASE_CREATE_ERROR,
-                    format("Use lk creating new HBase table [%s], we must specify 'with(external=false)'. ", tableName.toString()));
-        }
-
         HBaseTable table = hbaseConn.createTable(tableMetadata);
         // support create table xxx as select * from yyy
         HBaseTableHandle handle =
@@ -196,7 +188,8 @@ public class HBaseConnectorMetadata
                         table.getIndexColumns(),
                         TupleDomain.all(),
                         table.getColumns(),
-                        table.getRowIdOrdinal());
+                        table.getRowIdOrdinal(),
+                        OptionalLong.empty());
         setRollback(() -> rollbackCreateTable(table));
 
         return handle;
@@ -227,7 +220,8 @@ public class HBaseConnectorMetadata
                         table.getRowIdOrdinal(),
                         table.getColumns(),
                         table.getSerializerClassName(),
-                        table.getHbaseTableName());
+                        table.getHbaseTableName(),
+                        OptionalLong.empty());
 
         return handle;
     }
@@ -406,8 +400,43 @@ public class HBaseConnectorMetadata
                         tableHandle.getFullTableName(),
                         newDomain,
                         tableHandle.getColumns(),
-                        tableHandle.getRowIdOrdinal());
+                        tableHandle.getRowIdOrdinal(),
+                        tableHandle.getLimit());
         return Optional.of(new ConstraintApplicationResult<>(newTableHandle, constraint.getSummary()));
+    }
+
+    @Override
+    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(
+            ConnectorSession session, ConnectorTableHandle connectorTableHandle, long limit)
+    {
+        HBaseTableHandle tableHandle;
+
+        if (connectorTableHandle instanceof HBaseTableHandle) {
+            tableHandle = (HBaseTableHandle) connectorTableHandle;
+        }
+        else {
+            return Optional.empty();
+        }
+
+        if (tableHandle.getLimit().isPresent() && tableHandle.getLimit().getAsLong() <= limit) {
+            return Optional.empty();
+        }
+
+        HBaseTableHandle newTableHandle =
+                new HBaseTableHandle(
+                        tableHandle.getSchema(),
+                        tableHandle.getTable(),
+                        tableHandle.getRowId(),
+                        tableHandle.isExternal(),
+                        tableHandle.getSerializerClassName(),
+                        tableHandle.getHbaseTableName(),
+                        tableHandle.getFullTableName(),
+                        tableHandle.getConstraint(),
+                        tableHandle.getColumns(),
+                        tableHandle.getRowIdOrdinal(),
+                        OptionalLong.of(limit));
+
+        return Optional.of(new LimitApplicationResult<>(newTableHandle, false));
     }
 
     @Override

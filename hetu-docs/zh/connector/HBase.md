@@ -97,6 +97,7 @@ debug=true;
 | row\_id| String| 第一个列名| 否| row\_id为HBase表中RowKey对应的列名|
 | hbase\_table\_name| String| NULL| 否| hbase\_table\_name指定要链接的HBase数据源上的表空间和表名，使用“:”连接表空间和表名，默认表空间为“default”。|
 | external| Boolean| true| 否| 如果external为true，表示该表是HBase数据源中表的映射表。不支持删除HBase数据源上原有的表。当external为false时，删除本地HBase表的同时也会删除HBase数据源上的表。|
+| split\_by\_char| String| 0~9,a~z,A~Z| 否| split\_by\_char为分片切割的依据，若RowKey的第一个字符由数字构成，则可以根据不同的数字进行分片切割，提高查询并发度。不同类型的符号用逗号隔开。如果设置不当，会导致查询数据结果不完整，请根据RowKey的实际情况进行配置。|
 
 ## 数据说明
 
