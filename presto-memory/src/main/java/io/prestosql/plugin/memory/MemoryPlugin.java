@@ -16,12 +16,31 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.util.Arrays;
+import java.util.Optional;
+
+@ConnectorConfig(connectorLabel = "Memory : Stores all data and metadata in RAM on workers",
+        propertiesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/memory.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/memory.html#configuration")
 public final class MemoryPlugin
         implements Plugin
 {
+    @Override
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new MemoryConnectorFactory());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = MemoryPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(MemoryConfig.class.getDeclaredMethods()));
     }
 }

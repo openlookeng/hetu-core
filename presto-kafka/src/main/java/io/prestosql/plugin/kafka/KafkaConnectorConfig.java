@@ -21,6 +21,7 @@ import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
@@ -88,6 +89,10 @@ public class KafkaConnectorConfig
         return tableNames;
     }
 
+    @Mandatory(name = "kafka.table-names",
+            description = "List of all tables provided by the catalog",
+            defaultValue = "table1,table2",
+            required = true)
     @Config("kafka.table-names")
     public KafkaConnectorConfig setTableNames(String tableNames)
     {
@@ -101,6 +106,9 @@ public class KafkaConnectorConfig
         return defaultSchema;
     }
 
+    @Mandatory(name = "kafka.default-schema",
+            description = "Default schema name to use",
+            defaultValue = "default")
     @Config("kafka.default-schema")
     public KafkaConnectorConfig setDefaultSchema(String defaultSchema)
     {
@@ -114,6 +122,10 @@ public class KafkaConnectorConfig
         return nodes;
     }
 
+    @Mandatory(name = "kafka.nodes",
+            description = "List of nodes in the Kafka cluster ",
+            defaultValue = "host1:port,host2:port",
+            required = true)
     @Config("kafka.nodes")
     public KafkaConnectorConfig setNodes(String nodes)
     {

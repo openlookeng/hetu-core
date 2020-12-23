@@ -15,6 +15,7 @@
 package io.hetu.core.plugin.hbase.conf;
 
 import io.airlift.configuration.Config;
+import io.prestosql.spi.function.Mandatory;
 
 /**
  * hbase.properties
@@ -133,6 +134,10 @@ public class HBaseConfig
         return zkQuorum;
     }
 
+    @Mandatory(name = "hbase.zookeeper.quorum",
+            description = "Zookeeper cluster address",
+            defaultValue = "host1,host2",
+            required = true)
     @Config("hbase.zookeeper.quorum")
     public void setZkQuorum(String zkQuorum)
     {
@@ -144,6 +149,10 @@ public class HBaseConfig
         return zkClientPort;
     }
 
+    @Mandatory(name = "hbase.zookeeper.property.clientPort",
+            description = "Zookeeper client port",
+            defaultValue = "2181",
+            required = true)
     @Config("hbase.zookeeper.property.clientPort")
     public void setZkClientPort(String zkClientPort)
     {
@@ -155,6 +164,9 @@ public class HBaseConfig
         return zkZnodeParent;
     }
 
+    @Mandatory(name = "hbase.zookeeper.znode.parent",
+            description = "Zookeeper znode parent of hbase",
+            defaultValue = "/hbase")
     @Config("hbase.zookeeper.znode.parent")
     public void setZkZnodeParent(String zkZnodeParent)
     {
@@ -166,6 +178,9 @@ public class HBaseConfig
         return metastoreType;
     }
 
+    @Mandatory(name = "hbase.metastore.type",
+            description = "The storage of hbase metadata",
+            defaultValue = "hetuMetastore")
     @Config("hbase.metastore.type")
     public void setMetastoreType(String metastoreType)
     {

@@ -31,7 +31,6 @@ public class QueryEditorConfig
     private String coordinatorUri;
     private String featuredQueriesPath = "etc/featured_queries.json";
     private String userQueriesPath = "etc/user_queries.json";
-    private String connectorsListPath = "etc/connector_properties.json";
     private int maxResultCount = 1000;
     private DataSize maxResultSize = new DataSize(1, DataSize.Unit.GIGABYTE);
     private Optional<String> sharedSecret = Optional.empty();
@@ -106,21 +105,9 @@ public class QueryEditorConfig
         return this;
     }
 
-    @Config("hetu.queryeditor-ui.server.connector-properties-json")
-    public QueryEditorConfig setConnectorsListPath(String connectorsListPath)
-    {
-        this.connectorsListPath = connectorsListPath;
-        return this;
-    }
-
     public String getUserQueriesPath()
     {
         return userQueriesPath;
-    }
-
-    public String getConnectorsListPath()
-    {
-        return connectorsListPath;
     }
 
     @NotNull

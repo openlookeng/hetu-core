@@ -16,6 +16,7 @@
 package io.prestosql.queryeditorui.protocol;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
 import java.util.UUID;
 
@@ -27,9 +28,6 @@ public class Connector
     private ConnectorWithProperties connectorWithProperties;
 
     @JsonProperty
-    private String user;
-
-    @JsonProperty
     private UUID uuid;
 
     @JsonProperty
@@ -37,12 +35,6 @@ public class Connector
 
     @JsonProperty
     private String configLink;
-
-    @JsonProperty
-    public String getUser()
-    {
-        return user;
-    }
 
     @JsonProperty
     public UUID getUuid()
@@ -72,13 +64,11 @@ public class Connector
     {
     }
 
-    public Connector(@JsonProperty("user") String userName,
-            @JsonProperty("uuid") UUID uuid,
+    public Connector(@JsonProperty("uuid") UUID uuid,
             @JsonProperty("docLink") String docLink,
             @JsonProperty("configLink") String configLink,
             @JsonProperty("connectorWithProperties") ConnectorWithProperties connectorWithProperties)
     {
-        this.user = requireNonNull(userName, "userName is null");
         this.connectorWithProperties = requireNonNull(connectorWithProperties, "Properties is null");
         this.uuid = requireNonNull(uuid, "uuid is null");
         this.docLink = requireNonNull(docLink, "docLink is null");

@@ -17,6 +17,7 @@ import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
@@ -37,6 +38,9 @@ public class JdbcMetadataConfig
         return allowDropTable;
     }
 
+    @Mandatory(name = "allow-drop-table",
+            description = "Allow connector to drop tables",
+            defaultValue = "true")
     @Config("allow-drop-table")
     @ConfigDescription("Allow connector to drop tables")
     public JdbcMetadataConfig setAllowDropTable(boolean allowDropTable)

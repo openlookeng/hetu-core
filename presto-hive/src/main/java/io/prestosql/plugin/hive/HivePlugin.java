@@ -15,15 +15,28 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.plugin.hive.metastore.thrift.StaticMetastoreConfig;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.Objects.requireNonNull;
 
+@ConnectorConfig(connectorLabel = "Hive: Query data stored in a Hive data warehouse",
+        propertiesEnabled = true,
+        catalogConfigFilesEnabled = true,
+        globalConfigFilesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/hive.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/hive.html#configuration")
 public class HivePlugin
         implements Plugin
 {
@@ -46,5 +59,15 @@ public class HivePlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new HiveConnectorFactory(name, HivePlugin.class.getClassLoader(), metastore));
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = HivePlugin.class.getAnnotation(ConnectorConfig.class);
+        ArrayList<Method> methods = new ArrayList<>();
+        methods.addAll(Arrays.asList(StaticMetastoreConfig.class.getDeclaredMethods()));
+        methods.addAll(Arrays.asList(HiveConfig.class.getDeclaredMethods()));
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig, methods);
     }
 }
