@@ -168,25 +168,21 @@ public class HeuristicIndexClient
 
         if (sameNameRecord == null) {
             if (sameIndexRecord != null) {
-                LOG.error("Index with same (table,column,indexType) already exists with name [%s]%n%n", sameIndexRecord.name);
                 return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_CONTENT : RecordStatus.SAME_CONTENT;
             }
         }
         else {
             if (sameIndexRecord != null) {
                 boolean partitionMerge = createIndexMetadata.getPartitions().size() != 0;
-                String conflict = String.join(",", sameIndexRecord.partitions);
 
                 for (String partition : createIndexMetadata.getPartitions()) {
                     if (sameIndexRecord.partitions.isEmpty() || sameIndexRecord.partitions.contains(partition)) {
                         partitionMerge = false;
-                        conflict = partition;
                         break;
                     }
                 }
 
                 if (!partitionMerge) {
-                    LOG.error("Same entry already exists and partitions contain conflicts: [%s]. To update, please delete old index first.%n%n", conflict);
                     return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_INDEX_PART_CONFLICT : RecordStatus.SAME_INDEX_PART_CONFLICT;
                 }
                 else {
@@ -194,7 +190,6 @@ public class HeuristicIndexClient
                 }
             }
             else {
-                LOG.error("Index with name [%s] already exists with different content: [%s]%n%n", createIndexMetadata.getIndexName(), sameNameRecord);
                 return sameNameRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_NAME : RecordStatus.SAME_NAME;
             }
         }

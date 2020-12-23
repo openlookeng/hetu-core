@@ -1116,15 +1116,19 @@ class StatementAnalyzer
                                         "Index with same (table,column,indexType) already exists and partition(s) contain conflicts");
                             case IN_PROGRESS_SAME_NAME:
                                 throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index '%s' is being created by another user. Check running queries for details",
-                                        createIndex.getIndexName().toString());
+                                        "Index '%s' is being created by another user. Check running queries for details. If there is no running query for this index, " +
+                                                "the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                        createIndex.getIndexName().toString(), createIndex.getIndexName().toString());
                             case IN_PROGRESS_SAME_CONTENT:
                                 throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index with same (table,column,indexType) is being created by another user. Check running queries for details");
+                                        "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                                "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX'");
                             case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
                                 if (partitions.isEmpty()) {
                                     throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                            "Index with same (table,column,indexType) is being created by another user. Check running queries for details");
+                                            "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                                    "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                            createIndex.getIndexName().toString());
                                 }
                                 // allow different queries to run with explicitly same partitions
                             case SAME_INDEX_PART_CAN_MERGE:

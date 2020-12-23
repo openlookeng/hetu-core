@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -53,7 +52,6 @@ public class CreateIndexOperator
     private final OperatorContext operatorContext;
     private final CreateIndexMetadata createIndexMetadata;
     private final HeuristicIndexerManager heuristicIndexerManager;
-    private final AtomicBoolean recordCreated;
     private static final Logger LOG = Logger.get(CreateIndexOperator.class);
 
     public CreateIndexOperator(
@@ -62,8 +60,7 @@ public class CreateIndexOperator
             HeuristicIndexerManager heuristicIndexerManager,
             Map<String, IndexWriter> levelWriter,
             Map<IndexWriter, CreateIndexOperator> persistBy,
-            Map<CreateIndexOperator, Boolean> finished,
-            AtomicBoolean recordCreated)
+            Map<CreateIndexOperator, Boolean> finished)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.createIndexMetadata = requireNonNull(createIndexMetadata, "createIndexMetadata is null");
@@ -71,7 +68,6 @@ public class CreateIndexOperator
         this.levelWriter = requireNonNull(levelWriter, "levelWriter is null");
         this.persistBy = requireNonNull(persistBy, "persisted is null");
         this.finished = requireNonNull(finished, "finished is null");
-        this.recordCreated = requireNonNull(recordCreated, "recordCreated is null");
     }
 
     private State state = State.NEEDS_INPUT;
@@ -118,8 +114,10 @@ public class CreateIndexOperator
             while (iterator.hasNext()) {
                 Map.Entry<String, IndexWriter> entry = iterator.next();
                 if (persistBy.get(entry.getValue()) == this) {
+                    String writerKey = entry.getKey();
                     entry.getValue().persist();
                     iterator.remove(); // remove reference to writer once persisted so it can be GCed
+                    LOG.debug("Writer for %s has finished persisting. Remaining: %d", writerKey, levelWriter.size());
                 }
             }
         }
@@ -127,36 +125,40 @@ public class CreateIndexOperator
             throw new UncheckedIOException("Persisting index failed: ", e);
         }
 
-        // only one operator needs to create the record
-        if (!recordCreated.getAndSet(true)) {
-            if (levelWriter.isEmpty() && persistBy.isEmpty()) {
-                // table scan is empty. no data scanned from table. addInput() has never been called.
-                throw new IllegalStateException("The table is empty. No index will be created.");
-            }
-
-            // update metadata
-            IndexClient indexClient = heuristicIndexerManager.getIndexClient();
-            try {
-                IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
-
-                switch (recordStatus) {
-                    case SAME_NAME:
-                    case IN_PROGRESS_SAME_NAME:
-                    case IN_PROGRESS_SAME_CONTENT:
-                    case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
-                    case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
-                        indexClient.deleteIndexRecord(createIndexMetadata.getIndexName(), Collections.emptyList());
-                        indexClient.addIndexRecord(createIndexMetadata);
-                        break;
-                    case NOT_FOUND:
-                    case SAME_INDEX_PART_CAN_MERGE:
-                        indexClient.addIndexRecord(createIndexMetadata);
-                        break;
-                    default:
+        synchronized (levelWriter) {
+            // All writers have finished persisting
+            if (levelWriter.isEmpty()) {
+                LOG.debug("Writing index record by %s", this);
+                if (persistBy.isEmpty()) {
+                    // table scan is empty. no data scanned from table. addInput() has never been called.
+                    throw new IllegalStateException("The table is empty. No index will be created.");
                 }
-            }
-            catch (IOException e) {
-                throw new UncheckedIOException("Unable to update index records: ", e);
+
+                // update metadata
+                IndexClient indexClient = heuristicIndexerManager.getIndexClient();
+                try {
+                    IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
+                    LOG.debug("Current record status: %s", recordStatus);
+
+                    switch (recordStatus) {
+                        case SAME_NAME:
+                        case IN_PROGRESS_SAME_NAME:
+                        case IN_PROGRESS_SAME_CONTENT:
+                        case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                        case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
+                            indexClient.deleteIndexRecord(createIndexMetadata.getIndexName(), Collections.emptyList());
+                            indexClient.addIndexRecord(createIndexMetadata);
+                            break;
+                        case NOT_FOUND:
+                        case SAME_INDEX_PART_CAN_MERGE:
+                            indexClient.addIndexRecord(createIndexMetadata);
+                            break;
+                        default:
+                    }
+                }
+                catch (IOException e) {
+                    throw new UncheckedIOException("Unable to update index records: ", e);
+                }
             }
         }
 
@@ -263,7 +265,6 @@ public class CreateIndexOperator
         private final Map<String, IndexWriter> levelWriter;
         private final Map<IndexWriter, CreateIndexOperator> persistBy;
         private final Map<CreateIndexOperator, Boolean> finished;
-        private final AtomicBoolean recordCreated;
         private boolean closed;
 
         public CreateIndexOperatorFactory(
@@ -279,7 +280,6 @@ public class CreateIndexOperator
             this.levelWriter = new ConcurrentHashMap<>();
             this.persistBy = new ConcurrentHashMap<>();
             this.finished = new ConcurrentHashMap<>();
-            this.recordCreated = new AtomicBoolean();
         }
 
         @Override
@@ -287,7 +287,7 @@ public class CreateIndexOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CreateIndexOperator.class.getSimpleName());
-            return new CreateIndexOperator(operatorContext, createIndexMetadata, heuristicIndexerManager, levelWriter, persistBy, finished, recordCreated);
+            return new CreateIndexOperator(operatorContext, createIndexMetadata, heuristicIndexerManager, levelWriter, persistBy, finished);
         }
 
         @Override
