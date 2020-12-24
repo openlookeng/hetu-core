@@ -29,7 +29,8 @@ import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -317,8 +318,8 @@ public class CreateIndexOperator
 
     private static String getPartitionName(String uri, String tableName)
     {
-        URI uriObj = URI.create(uri);
-        String[] dataPathElements = uriObj.getPath().split("/");
+        Path path = Paths.get(uri);
+        String[] dataPathElements = path.toString().split("/");
         String[] fullTableName = tableName.split("\\.");
         String simpleTableName = fullTableName[fullTableName.length - 1];
         for (int i = 0; i < dataPathElements.length; i++) {
