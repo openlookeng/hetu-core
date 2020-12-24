@@ -121,7 +121,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.vacuum-delta-percent-threshold`     | Maximum percent of delta directories to allow without compacting it. Value should be in range 0.1 to 1.0      | 0.1   |
 | `hive.vacuum-cleanup-recheck-interval`    | Interval after which vacuum cleanup task will be resubmitted. Minimum value is 5 minutes.    | `5 Minutes`    |
 | `hive.vacuum-collector-interval`    | Interval after which vacuum collector task will be resubmitted.     | `5 Minutes`    |
-| `hive.max-splits-to-group`    | Max number of splits can be grouped. If value is 1 it will not group. Minimum value is 1     | `10`    |
+| `hive.max-splits-to-group`    | Max number of splits can be grouped. If value is 1 it will not group. Minimum value is 1     | `1`    |
 
 
 ## Hive Thrift Metastore Configuration Properties
