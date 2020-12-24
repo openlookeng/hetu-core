@@ -28,7 +28,6 @@ import io.prestosql.spi.heuristicindex.Pair;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,7 +81,7 @@ public class FileIndexWriter
     public FileIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root)
     {
         this.createIndexMetadata = createIndexMetadata;
-        this.dataSourceFileName = URI.create(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH)).getPath();
+        this.dataSourceFileName = Paths.get(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH)).toString();
         this.dataSourceFileLastModifiedTime = connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION);
         this.fs = requireNonNull(fs);
         this.root = root;
