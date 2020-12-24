@@ -226,21 +226,22 @@ public class TablePushdown
         TableHandle tableHandle = tableNode.getTable();
         TableStatistics tableStatistics = metadata.getTableStatistics(ruleContext.getSession(), tableHandle, Constraint.alwaysTrue());
 
-        if (tableStatistics != null) {
-            /*
-             * We check here if tablestats is null or not.
-             * If not null then proceed as follows.
-             * */
-            return isTableWithUniqueColumnTableStatistics(tableStatistics, tableHandle);
+        /*
+         * We check here if tablestats is null or not.
+         * If not null then check if the stats match as per requirement.
+         * */
+        if (tableStatistics != null && isTableWithUniqueColumnTableStatistics(tableStatistics, tableHandle)) {
+            return true;
         }
         else {
             /*
-            * if table statistics are not available, check if user hint is available. If not, return false as nothing can be tested at this point.
-            * If user hint is available, check-
-            * If table name of the current table doesn't match with user hint, then return false;
-            * If it matches, then check if the user supplied column name is present in the join criteria. If it does, return true;
-            * Else, return false.
-            * */
+             * if table statistics are not available or due to approx stats doesn't match, check if user hint is available.
+             * If not, return false as nothing can be tested at this point.
+             * If user hint is available, check-
+             * If table name of the current table doesn't match with user hint, then return false;
+             * If it matches, then check if the user supplied column name is present in the join criteria. If it does, return true;
+             * Else, return false.
+             * */
             if (uniqueColumnsPerTable.isEmpty()) {
                 return false;
             }
