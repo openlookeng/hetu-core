@@ -147,7 +147,13 @@ public class BitmapIndex
 
             for (int i = 0; i < columnValues.size(); i++) {
                 Object value = columnValues.get(i);
-                positions.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
+                if (value != null) {
+                    positions.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
+                }
+            }
+
+            if (positions.isEmpty()) {
+                return true;
             }
 
             List<Pair> bitmaps = new ArrayList<>(positions.size());
