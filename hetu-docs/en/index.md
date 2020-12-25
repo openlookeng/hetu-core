@@ -24,6 +24,7 @@ headless: true
     - [LDAP Authentication]({{< relref "./docs/security/ldap.md" >}})
     - [Java Keystores and Truststores]({{< relref "./docs/security/tls.md" >}})
     - [Built-in System Access Control]({{< relref "./docs/security/built-in-system-access-control.md" >}})
+    - [Ranger Access Control]({{< relref "./docs/security/ranger-access-control.md" >}})
     - [Secure Internal Communication]({{< relref "./docs/security/internal-communication.md" >}})
     - [Password Encryption]({{< relref "./docs/security/password-encryption.md" >}})
     - [HAZELCAST Authentication]({{< relref "./docs/security/hazelcast.md" >}})

@@ -24,6 +24,7 @@ headless: true
     - [LDAP认证]({{< relref "./docs/security/ldap.md" >}})
     - [Java密钥库和信任库]({{< relref "./docs/security/tls.md" >}})
     - [内置系统访问控制]({{< relref "./docs/security/built-in-system-access-control.md" >}})
+    - [Ranger访问控制]({{< relref "./docs/security/ranger-access-control.md" >}})
     - [内部通信安全]({{< relref "./docs/security/internal-communication.md" >}})
     - [密码加密]({{< relref "./docs/security/password-encryption.md" >}})
     - [HAZELCAST认证]({{< relref "./docs/security/hazelcast.md" >}})
