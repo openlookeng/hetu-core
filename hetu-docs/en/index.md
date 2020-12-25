@@ -75,6 +75,8 @@ headless: true
     - [TPCDS]({{< relref "./docs/connector/tpcds.md" >}})
     - [TPCH]({{< relref "./docs/connector/tpch.md" >}})
     - [VDM]({{< relref "./docs/connector/vdm.md" >}})
+    - [Oracle]({{< relref "./docs/connector/oracle.md" >}})
+    - [MongoDB]({{< relref "./docs/connector/mongodb.md" >}})
     - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
 
 - [Functions and Operators]("#")
