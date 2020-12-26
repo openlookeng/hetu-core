@@ -138,7 +138,7 @@ public class IndexCache
         List<IndexMetadata> indices = new LinkedList<>();
 
         for (String indexType : INDEX_TYPES) {
-            String filterKeyPath = table + "/" + column + "/" + indexType + splitUri.getPath();
+            String filterKeyPath = table + "/" + column + "/" + indexType + splitUri.getRawPath();
             IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime);
             //it is possible to return multiple SplitIndexMetadata due to the range mismatch, especially in the case
             //where the split has a wider range than the original splits used for index creation

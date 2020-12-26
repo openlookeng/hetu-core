@@ -106,6 +106,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.isSkipRedundantSort;
+import static io.prestosql.spi.connector.CreateIndexMetadata.INDEX_SUPPORTED_TYPES;
 import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_DEFAULT;
 import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_PROP_KEY;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -622,8 +623,9 @@ class QueryPlanner
 
         Map<String, Type> columnTypes = new HashMap<>();
         for (Field field : analysis.getRootScope().getRelationType().getAllFields()) {
-            if (field.getType().getDisplayName().contains("decimal")) {
-                throw new UnsupportedOperationException("Index creation on decimal column is not supported");
+            if (INDEX_SUPPORTED_TYPES.get(createIndex.getIndexType().toLowerCase(Locale.ENGLISH))
+                    .stream().noneMatch(supportType -> field.getType().getDisplayName().contains(supportType))) {
+                throw new UnsupportedOperationException("Index creation on " + field.getType().getDisplayName() + " column is not supported");
             }
             columnTypes.put(field.getOriginColumnName().get(), field.getType());
         }
