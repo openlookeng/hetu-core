@@ -44,6 +44,7 @@ import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -172,7 +173,8 @@ public class HivePageSourceProvider
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
 
-        SplitMetadata splitMetadata = new SplitMetadata(hiveSplit.getPath(), hiveSplit.getLastModifiedTime());
+        URI splitUri = URI.create(hiveSplit.getPath().replaceAll(" ", "%20"));
+        SplitMetadata splitMetadata = new SplitMetadata(splitUri.getRawPath(), hiveSplit.getLastModifiedTime());
 
         /**
          * This is main logical division point to process filter pushdown enabled case (aka as selective read flow).

@@ -67,31 +67,6 @@ public class TestBloomIndex
     }
 
     @Test
-    public void testDecimalMatches()
-    {
-        BloomIndex bloomIndex = new BloomIndex();
-        List<Object> bloomValues = ImmutableList.of(11.00000001, 22.00000002, 33.00000003, 44.00000000, 55.00000000, 66.00000000, 1.1, 2.22, 2.20);
-        bloomIndex.setExpectedNumOfEntries(bloomValues.size());
-        bloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", bloomValues)));
-
-        Expression expression1 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '66.00000000' AS decimal(10,8)))", new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));
-        Expression expression2 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '11.00000001' AS decimal(10,8)))", new ParsingOptions());
-        Expression expression3 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '11.00000002' AS decimal(10,8)))", new ParsingOptions());
-        Expression expression4 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '1.1' AS decimal(10,8)))", new ParsingOptions());
-        Expression expression5 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '2.20' AS decimal(10,8)))", new ParsingOptions());
-        Expression expression6 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '2.2' AS decimal(10,8)))", new ParsingOptions());
-        Expression expression7 = new SqlParser().createExpression("(testColumn = CAST(DECIMAL '44.0' AS decimal(10,8)))", new ParsingOptions());
-
-        assertTrue(bloomIndex.matches(expression1));
-        assertTrue(bloomIndex.matches(expression2));
-        assertTrue(bloomIndex.matches(expression4));
-        assertTrue(bloomIndex.matches(expression5));
-        assertTrue(bloomIndex.matches(expression6));
-        assertTrue(bloomIndex.matches(expression7));
-        assertFalse(bloomIndex.matches(expression3));
-    }
-
-    @Test
     public void testDomainMatching()
     {
         BloomIndex stringBloomIndex = new BloomIndex();

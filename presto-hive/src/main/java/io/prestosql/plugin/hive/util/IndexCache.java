@@ -171,7 +171,7 @@ public class IndexCache
                     }
 
                     for (String indexType : INDEX_TYPES) {
-                        String indexCacheKeyPath = Paths.get(tableFqn, column, indexType, pathUri.getPath()).toString();
+                        String indexCacheKeyPath = Paths.get(tableFqn, column, indexType, pathUri.getRawPath()).toString();
                         IndexCacheKey indexCacheKey = new IndexCacheKey(indexCacheKeyPath, lastModifiedTime);
                         // check if cache contains the key
                         List<IndexMetadata> predicateIndexes = cache.getIfPresent(indexCacheKey);

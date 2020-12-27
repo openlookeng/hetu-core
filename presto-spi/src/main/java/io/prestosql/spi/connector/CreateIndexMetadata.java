@@ -16,6 +16,8 @@ package io.prestosql.spi.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 
@@ -32,6 +34,16 @@ public class CreateIndexMetadata
 {
     public static final String LEVEL_PROP_KEY = "level";
     public static final Index.Level LEVEL_DEFAULT = Index.Level.STRIPE;
+    public static final Map<String, List<String>> INDEX_SUPPORTED_TYPES = ImmutableMap.<String, List<String>>builder()
+            .put("bloom", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "varbinary"))
+            .put("btree", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "double", "real", "date", "varbinary"))
+            .put("bitmap", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "boolean", "double", "real", "date", "varbinary"))
+            .put("minmax", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "boolean", "double", "real", "date", "varbinary"))
+            .build();
 
     private final String indexName;
     private final String tableName;

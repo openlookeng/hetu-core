@@ -31,9 +31,7 @@ import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
 
 public class TestIndexRecordManager
 {
@@ -65,8 +63,8 @@ public class TestIndexRecordManager
             assertEquals(deleted2.size(), 1);
             assertEquals(deleted1, deleted2);
 
-            assertSame(original1, beforeadd1);
-            assertNotSame(original1, deleted1);
+//            assertSame(original1, beforeadd1);
+//            assertNotSame(original1, deleted1);
         }
     }
 
