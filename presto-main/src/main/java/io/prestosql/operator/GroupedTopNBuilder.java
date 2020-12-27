@@ -781,13 +781,18 @@ public class GroupedTopNBuilder
                 }
 
                 Row row = currentRows.get(currentGroupPosition);
+                if (produceRankingNumber) {
+                    long rankingNumber = rankingNumberBuilder.generateRankingNumber(row, currentGroupPosition == 0);
+                    if (rankingNumber > topN) {
+                        currentGroupPosition++;
+                        continue;
+                    }
+                    BIGINT.writeLong(pageBuilder.getBlockBuilder(sourceTypes.size()), rankingNumber);
+                }
                 for (int i = 0; i < sourceTypes.size(); i++) {
                     sourceTypes.get(i).appendTo(pageReferences.get(row.getPageId()).getPage().getBlock(i), row.getPosition(), pageBuilder.getBlockBuilder(i));
                 }
 
-                if (produceRankingNumber) {
-                    BIGINT.writeLong(pageBuilder.getBlockBuilder(sourceTypes.size()), rankingNumberBuilder.generateRankingNumber(row, currentGroupPosition == 0));
-                }
                 pageBuilder.declarePosition();
                 currentGroupPosition++;
             }
