@@ -43,11 +43,15 @@ openGauss连接器为每个openGauss模式提供一个模式。可通过执行`S
 
 **注意**
 
-> - openGuass数据库兼容类型为O（即DBCOMPATIBILITY = A）时不支持Date数据类型。
+> - openGuass数据库兼容类型为O（即DBCOMPATIBILITY = A）时不支持`Date`数据类型。
 
-> - 不支持使用 `create-table-as` 可以创建含数据的表。
+> - openGuass驱动暂不支持将数据库连接设置为只读模式以启用数据库的查询优化。
+
+> - openGuass的`Character`数据类型单位是字节（例如：`VARCHAR(n)`数据类型中`n`是指字节长度），openLooKeng的`Character`数据类型单位是字符（例如：`VARCHAR(n)`数据类型中`n`是指字符长度），openGuass连接器不支持直接使用`create-table-as`方式创建含`Character`数据类型数据的表，需要手动指定`Character`数据类型的字节长度。
 
 > - 不支持配置`use-connection-pool`。
+
+*openGauss后续版本如果支持上诉限制，我们会进行相应的适配。*
 
 ## openGauss连接器限制
 

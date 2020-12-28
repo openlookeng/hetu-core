@@ -47,11 +47,15 @@ If you used a different name for your catalog properties file, use that catalog 
 
 ****Note:****
 
-> - When the compatibility type of the OpenGuass database is O (DBCOMPATIBILITY = A), the Date data type is not supported.
+> - When the compatibility type of the openGuass database is O (DBCOMPATIBILITY = A), the `Date` data type is not supported.
 
-> - The `create-table-as` command cannot be used to create a table with a string data type.
+> - The openGuass driver does not support put the connection in read-only mode to enable database optimization at present.
+
+> - The unit of openGauss's `Character` data type is byte (e.g. `n` indicates to the byte length of `VARCHAR(n)` data type), the unit of openLooKeng's `Character` data type is character (e.g. `n` indicates to the character length of `VARCHAR(n)` data type). openGauss connector does not support use `create-table-as` method to create a table containing `Character` data type directly, the byte length of `Character` data type needs to manually specified.
 
 > - The `use-connection-pool` configuration is not supported.
+
+*If the subsequent version of openGuass supports the above restriction, we will make corresponding adaptation.*
 
 openGauss Connector Limitations
 --------------------------------
