@@ -154,7 +154,7 @@ public class FeaturesConfig
     private int filterAndProjectMinOutputPageRowCount = 256;
     private int maxGroupingSets = 2048;
     //transform selfjoin to aggregates if applicable
-    private boolean transformSelfJoinToGroupby;
+    private boolean transformSelfJoinToGroupby = true;
 
     public enum JoinReorderingStrategy
     {
