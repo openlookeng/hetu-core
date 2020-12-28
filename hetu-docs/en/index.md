@@ -172,7 +172,8 @@ headless: true
 - [Migration]("#")
     - [Migrating From Hive]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL Migration Tool]({{< relref "./docs/migration/sql-migration-tool.md" >}})
-
+    - [Support Hive Functions]({{< relref "./docs/migration/hetu-hive-functions.md" >}})
+  
 - [Developer Guide]({{< relref "./docs/develop/_index.md" >}})
     - [Getting Started]({{< relref "./docs/develop/getting-started.md" >}})
     - [SPI Overview]({{< relref "./docs/develop/spi-overview.md" >}})

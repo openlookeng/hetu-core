@@ -172,6 +172,7 @@ headless: true
 - [迁移]("#")
     - [从Hive迁移]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL迁移工具]({{< relref "./docs/migration/sql-migration-tool.md" >}})
+    - [支持Hive UDF]({{< relref "./docs/migration/hetu-hive-functions.md" >}})
 
 - [开发者指南]({{< relref "./docs/develop/_index.md" >}})
     - [入门指南]({{< relref "./docs/develop/getting-started.md" >}})
