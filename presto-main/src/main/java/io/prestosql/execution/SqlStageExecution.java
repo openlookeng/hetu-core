@@ -555,9 +555,6 @@ public final class SqlStageExecution
                 }
                 if (finishedTasks.containsAll(allTasks)) {
                     stateMachine.transitionToFinished();
-                    if (isReuseTableScanEnabled(stateMachine.getSession())) {
-                        setReuseTableScanMappingIdStatus(stateMachine);
-                    }
                 }
             }
         }
@@ -568,9 +565,9 @@ public final class SqlStageExecution
     }
 
     //Assuming there will be only one table scan in one stage
-    private static synchronized void setReuseTableScanMappingIdStatus(StageStateMachine state)
+    public static synchronized void setReuseTableScanMappingIdStatus(StageStateMachine state)
     {
-        if (state.getProducerScanNode() == null) {
+        if (!isReuseTableScanEnabled(state.getSession()) || state.getProducerScanNode() == null) {
             return;
         }
 
