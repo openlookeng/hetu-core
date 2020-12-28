@@ -203,23 +203,26 @@ public class StageStateMachine
 
     public boolean transitionToFinished()
     {
+        SqlStageExecution.setReuseTableScanMappingIdStatus(this);
         return stageState.setIf(FINISHED, currentState -> !currentState.isDone());
     }
 
     public boolean transitionToCanceled()
     {
+        SqlStageExecution.setReuseTableScanMappingIdStatus(this);
         return stageState.setIf(CANCELED, currentState -> !currentState.isDone());
     }
 
     public boolean transitionToAborted()
     {
+        SqlStageExecution.setReuseTableScanMappingIdStatus(this);
         return stageState.setIf(ABORTED, currentState -> !currentState.isDone());
     }
 
     public boolean transitionToFailed(Throwable throwable)
     {
         requireNonNull(throwable, "throwable is null");
-
+        SqlStageExecution.setReuseTableScanMappingIdStatus(this);
         failureCause.compareAndSet(null, Failures.toFailure(throwable));
         boolean failed = stageState.setIf(FAILED, currentState -> !currentState.isDone());
         if (failed) {
