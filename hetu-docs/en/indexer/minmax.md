@@ -23,6 +23,9 @@ For example, ID or age.
     <       Less than
     <=      Less than or equal
 
+## Supported column types
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
 ## Examples
 
 Creating index:

@@ -16,6 +16,9 @@ Bloom索引实用布隆过滤器来过滤数据。索引体积非常小。
 
     =       Equality
 
+## 支持的列类型
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
 ## 配置参数
 
 ### `bloom.fpp`

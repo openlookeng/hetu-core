@@ -20,6 +20,9 @@ MinMax索引仅仅能被用于已经排序的数据列。例如，ID或年龄.
     <       Less than
     <=      Less than or equal
 
+## 支持的列类型
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
 ## 用例
 
 创建索引:

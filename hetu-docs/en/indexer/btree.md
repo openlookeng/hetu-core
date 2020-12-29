@@ -30,6 +30,9 @@ When selecting between BTree Index, the following should be considered:
     BETWEEN Between range
     IN      IN set
 
+## Supported column types
+    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"
+
 ## Examples
 
 Creating index:

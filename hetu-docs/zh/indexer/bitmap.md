@@ -20,6 +20,9 @@ BitMap索引在拥有较少不同值数量的列上比较适用，例如：性�
 
     =   Equality
     
+## 支持的列类型
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
 ## 用例
 
 创建：
