@@ -36,13 +36,13 @@ public class CreateIndexMetadata
     public static final Index.Level LEVEL_DEFAULT = Index.Level.STRIPE;
     public static final Map<String, List<String>> INDEX_SUPPORTED_TYPES = ImmutableMap.<String, List<String>>builder()
             .put("bloom", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "varbinary"))
-            .put("btree", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "double", "real", "date", "varbinary"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
             .put("bitmap", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "boolean", "double", "real", "date", "varbinary"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
             .put("minmax", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "boolean", "double", "real", "date", "varbinary"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+            .put("btree", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"))
             .build();
 
     private final String indexName;

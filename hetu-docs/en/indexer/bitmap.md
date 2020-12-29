@@ -25,6 +25,9 @@ such as a Gender column.
 
     =       Equality
 
+## Supported column types
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
 ## Examples
 
 Creating index:

@@ -26,6 +26,9 @@ BTree索引使用二叉树数据结构存储。索引的大小随着索引列中
     BETWEEN Between range
     IN      IN set
 
+## 支持的列类型
+    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"
+
 ## 用例
 
 创建索引:
