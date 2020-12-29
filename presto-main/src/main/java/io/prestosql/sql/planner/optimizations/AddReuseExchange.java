@@ -22,7 +22,6 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.TableStatistics;
-import io.prestosql.sql.builder.SqlQueryBuilder;
 import io.prestosql.sql.planner.DomainTranslator;
 import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.ScanTableIdAllocator;
@@ -44,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.WeakHashMap;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
@@ -62,9 +60,6 @@ public class AddReuseExchange
         implements PlanOptimizer
 {
     private final Metadata metadata;
-
-    private SqlQueryBuilder sqlQueryBuilder;
-    private OptimizedPlanRewriter optimizedPlanRewriter;
 
     public AddReuseExchange(Metadata metadata)
     {
@@ -85,7 +80,7 @@ public class AddReuseExchange
             return plan;
         }
         else {
-            optimizedPlanRewriter = new OptimizedPlanRewriter(session, metadata, symbolAllocator, idAllocator, types, false);
+            OptimizedPlanRewriter optimizedPlanRewriter = new OptimizedPlanRewriter(session, metadata, types, false);
             PlanNode newNode = SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, plan);
             optimizedPlanRewriter.setSecondVisit();
 
@@ -100,14 +95,6 @@ public class AddReuseExchange
 
         private final Metadata metadata;
 
-        private final SqlQueryBuilder sqlQueryBuilder;
-
-        private final Map<PlanNode, PlanNode> cache = new WeakHashMap<>();
-
-        private final SymbolAllocator symbolAllocator;
-
-        private final PlanNodeIdAllocator idAllocator;
-
         private final TypeProvider typeProvider;
 
         private Boolean isNodeAlreadyVisited;
@@ -117,14 +104,10 @@ public class AddReuseExchange
         private final Map<WrapperScanNode, Integer> track = new HashMap<>();
         private final Map<WrapperScanNode, Integer> reuseTableScanMappingIdConsumerTableScanNodeCount = new HashMap<>();
 
-        private OptimizedPlanRewriter(Session session, Metadata metadata, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator,
-                TypeProvider typeProvider, Boolean isNodeAlreadyVisited)
+        private OptimizedPlanRewriter(Session session, Metadata metadata, TypeProvider typeProvider, Boolean isNodeAlreadyVisited)
         {
             this.session = session;
             this.metadata = metadata;
-            this.sqlQueryBuilder = new SqlQueryBuilder(metadata, session);
-            this.symbolAllocator = symbolAllocator;
-            this.idAllocator = idAllocator;
             this.typeProvider = typeProvider;
             this.isNodeAlreadyVisited = isNodeAlreadyVisited;
         }
