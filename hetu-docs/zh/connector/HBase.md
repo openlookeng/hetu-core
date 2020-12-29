@@ -132,7 +132,7 @@ HBase连接器支持两种建表形式：
 
 1. 创建表并直接链接到HBase数据源中已存在的表。
 
-2. 创建HBase数据源中不存在的新表。
+2. 创建HBase数据源中不存在的新表。我们必须指定‘external = false’。
 
 以下示例创建表`schemaName.tableName`并链接到一个名为`hbaseNamespace:hbaseTable`的现有表：
 

@@ -141,7 +141,7 @@ HBase Connector supports two forms of table creation:
 
 1. Create a table and directly link to a existing table in the HBase data source.
 
-2. Create a new table that does not exist in the HBase data source.
+2. Create a new table that does not exist in the HBase data source. We must specify 'external = false'.
 
 
 Below is an example of how to create a table `schemaName.tableName` and link it to an existing table named `hbaseNamespace:hbaseTable` :
