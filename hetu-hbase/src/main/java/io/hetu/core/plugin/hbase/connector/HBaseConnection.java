@@ -564,6 +564,12 @@ public class HBaseConnection
                 }
             }
             else {
+                if (table.isExternal()) {
+                    throw new PrestoException(
+                            HBaseErrorCode.HBASE_CREATE_ERROR,
+                            format("Use lk creating new HBase table [%s], we must specify 'with(external=false)'. ", table.getTable()));
+                }
+
                 // create namespace if not exist
                 createNamespaceIfNotExist(this.getHbaseAdmin(), table.getSchema());
 
