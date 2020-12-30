@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.hetu.core</groupId>
@@ -187,7 +185,7 @@
                                 <echo message="unjar" />
                                 <unzip src="${project.build.directory}/${project.artifactId}-${project.version}/presto-postgresql-${project.version}.jar" dest="${project.build.directory}/unpacked/" />
                                 <echo message="delete spi file" />
-                                <delete dir="${project.build.directory}/unpacked/META-INF/services"/>
+                                <delete dir="${project.build.directory}/unpacked/META-INF/services" />
                                 <echo message="Redo jar" />
                                 <jar destfile="${project.build.directory}/${project.artifactId}-${project.version}/presto-postgresql-${project.version}.jar" basedir="${project.build.directory}/unpacked" />
                                 <zip basedir="${project.build.directory}/${project.artifactId}-${project.version}" destfile="${project.build.directory}/${project.artifactId}-${project.version}.zip" />

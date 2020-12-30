@@ -1706,4 +1706,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.1</tag>
+  </scm>
 </project>
