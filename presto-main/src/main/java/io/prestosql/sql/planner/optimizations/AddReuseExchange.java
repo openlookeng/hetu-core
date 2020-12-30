@@ -116,7 +116,8 @@ public class AddReuseExchange
         public PlanNode visitFilter(FilterNode node, RewriteContext<Void> context)
         {
             Optional<Expression> filterExpression;
-            if (node.getSource() instanceof TableScanNode) {
+            if (node.getSource() instanceof TableScanNode
+                    && ((TableScanNode) node.getSource()).getTable().getConnectorHandle().isReuseTableScanSupported()) {
                 filterExpression = Optional.of(node.getPredicate());
                 if (!filterExpression.equals(Optional.empty())) {
                     TableScanNode scanNode = (TableScanNode) node.getSource();
@@ -125,7 +126,8 @@ public class AddReuseExchange
             }
 
             PlanNode planNode = context.defaultRewrite(node, context.get());
-            if (node.getSource() instanceof TableScanNode) {
+            if (node.getSource() instanceof TableScanNode
+                    && ((TableScanNode) node.getSource()).getTable().getConnectorHandle().isReuseTableScanSupported()) {
                 TableScanNode scanNode = (TableScanNode) node.getSource();
                 DomainTranslator.ExtractionResult decomposedPredicate = DomainTranslator.fromPredicate(
                         metadata,
@@ -204,7 +206,7 @@ public class AddReuseExchange
 
         private void visitTableScanInternal(TableScanNode node, TupleDomain<ColumnHandle> newDomain)
         {
-            if (!isNodeAlreadyVisited) {
+            if (!isNodeAlreadyVisited && node.getTable().getConnectorHandle().isReuseTableScanSupported()) {
                 TableStatistics stats = metadata.getTableStatistics(session, node.getTable(), (newDomain != null) ? new Constraint(newDomain) : Constraint.alwaysTrue());
                 if (isMaxTableSizeGreaterThanSpillThreshold(node, stats)) {
                     planNodeListHashMap.remove(WrapperScanNode.of(node));
@@ -223,6 +225,10 @@ public class AddReuseExchange
         @Override
         public PlanNode visitTableScan(TableScanNode tableScanNode, RewriteContext<Void> context)
         {
+            if (!tableScanNode.getTable().getConnectorHandle().isReuseTableScanSupported()) {
+                return tableScanNode;
+            }
+
             TableScanNode rewrittenNode = tableScanNode;
             WrapperScanNode node = WrapperScanNode.of(tableScanNode);
             if (!isNodeAlreadyVisited) {
@@ -280,15 +286,13 @@ public class AddReuseExchange
                 visitTableScanInternal(scanNode, null);
             }
 
-            // Store projection in the same order.
+            // Store projection in the same order for reuse case.
             if (scanNode != null && scanNode.getStrategy() != REUSE_STRATEGY_DEFAULT) {
                 newAssignments.putAllSorted(node.getAssignments());
-            }
-            else {
-                newAssignments.putAll(node.getAssignments());
+                return new ProjectNode(node.getId(), node.getSource(), newAssignments.build());
             }
 
-            return new ProjectNode(node.getId(), node.getSource(), newAssignments.build());
+            return node;
         }
 
         @Override

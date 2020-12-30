@@ -380,4 +380,11 @@ public class HiveTableHandle
     {
         return partitionColumns.stream().map(HiveColumnHandle::getColumnName).collect(Collectors.toSet()).contains(column);
     }
+
+    /* This method checks if reuse table scan can be used*/
+    @Override
+    public boolean isReuseTableScanSupported()
+    {
+        return true;
+    }
 }

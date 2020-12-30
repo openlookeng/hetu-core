@@ -127,8 +127,8 @@ public class TableSplitAssignmentInfo
             perTableReuseTableScanMappingIdSplitKeyNodeAssignment.put(reuseTableScanMappingId, splitKeyNodeAssignment);
         }
         catch (NotImplementedException e) {
-            log.error("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
-            throw new UnsupportedOperationException("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
+            log.error("Unsupported split type: " + e);
+            throw new UnsupportedOperationException("Unsupported split type: " + e);
         }
     }
 }

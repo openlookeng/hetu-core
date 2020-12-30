@@ -120,4 +120,10 @@ public interface ConnectorTableHandle
     {
         return false;
     }
+
+    /* This method checks if reuse table scan can be used*/
+    default boolean isReuseTableScanSupported()
+    {
+        return false;
+    }
 }
