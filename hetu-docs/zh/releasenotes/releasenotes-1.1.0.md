@@ -28,4 +28,6 @@
 |            | 对事务分区表创建BTree索引后，不能过滤Split。                 | [I2BB6M](https://gitee.com/openlookeng/hetu-core/issues/I2BB6M) |
 | WEB UI     | 点击刷新按钮后需要元数据树的相应时间很长。                   | [I2BB2B](https://gitee.com/openlookeng/hetu-core/issues/I2BB2B) |
 |            | 如果有很多计划信息，文字会溢出文字区域。                     | [I2BB4E](https://gitee.com/openlookeng/hetu-core/issues/I2BB4E) |
-| 安装       | 使用自动部署脚本，系统会使用旧的配置，没有任何提示，这样会误导用户。 | [I2BB52](https://gitee.com/openlookeng/hetu-core/issues/I2BB52) |
+| 安装        | 使用自动部署脚本，系统会使用旧的配置，没有任何提示，这样会误导用户。 | [I2BB52](https://gitee.com/openlookeng/hetu-core/issues/I2BB52) |
+| Vacuum     | 如果对已执行删除/更新操作的表多次运行vacuum操作，则统计信息可能会被损坏，并导致查询将失败。为了避免这种情况，请在运行vaccum命令前将会话标志hive.collect_column_statistics_on_write设置为false (`set session hive.collect_column_statistics_on_write=false`)。如果在运行该命令时没有设置上述参数flag，执行ANALYZE <表名>命令进行统计信息修正。PR 517已修改，未合入1.1.0版本 | [I2BFH9](https://gitee.com/openlookeng/hetu-core/issues/I2BFH9) |
+| Reuse Exchange        | 当在config.properties中启用Reuse Exchange特性（reuse_table_scan=true）时，查询非hive catalog会失败。建议在查询hive catalog时使用（设置session reuse_table_scan=true;），其他catalog时禁用。PR 516已修改，未合入1.1.0版本。 | [I2BEWV](https://gitee.com/openlookeng/hetu-core/issues/I2BEWV) |
