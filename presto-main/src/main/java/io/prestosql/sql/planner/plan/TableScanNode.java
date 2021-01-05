@@ -302,13 +302,22 @@ public class TableScanNode
 
     public boolean isPredicateSame(TableScanNode curr)
     {
+        boolean returnValue = false;
         if (filterExpr != null) {
-            return filterExpr.absEquals(curr.getFilterExpr());
+            returnValue = filterExpr.absEquals(curr.getFilterExpr());
         }
         else if (curr.getFilterExpr() == null) {
-            return true;
+            returnValue = true;
         }
 
+        if (returnValue == true) {
+            if (predicate != null) {
+                return predicate.get().absEquals(curr.getPredicate().get());
+            }
+            else if (curr.getPredicate() == null) {
+                return true;
+            }
+        }
         return false;
     }
 }
