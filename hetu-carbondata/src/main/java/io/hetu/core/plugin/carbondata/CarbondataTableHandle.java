@@ -35,4 +35,11 @@ public class CarbondataTableHandle
     {
         return true;
     }
+
+    /* This method checks if reuse table scan can be used*/
+    @Override
+    public boolean isReuseTableScanSupported()
+    {
+        return false;
+    }
 }
