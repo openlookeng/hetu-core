@@ -20,10 +20,8 @@ import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.utils.Constants;
-import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
 import io.hetu.core.plugin.hbase.utils.Utils;
 import io.prestosql.spi.HostAddress;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitManager;
@@ -35,18 +33,14 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.TableNotFoundException;
-import org.apache.hadoop.hbase.client.RegionLocator;
-import org.apache.hadoop.hbase.util.Pair;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static java.lang.String.format;
+import java.util.stream.Collectors;
 
 /**
  * HBaseSplitManager
@@ -58,12 +52,12 @@ public class HBaseSplitManager
 {
     private static final Logger LOG = Logger.get(HBaseSplitManager.class);
 
-    private final HBaseConnection hBaseConnection;
+    private final HBaseConnection hbaseConnection;
 
     @Inject
-    public HBaseSplitManager(HBaseConnection hBaseConnection)
+    public HBaseSplitManager(HBaseConnection hbaseConnection)
     {
-        this.hBaseConnection = hBaseConnection;
+        this.hbaseConnection = hbaseConnection;
     }
 
     @Override
@@ -89,59 +83,100 @@ public class HBaseSplitManager
         return new FixedSplitSource(splits);
     }
 
+    /**
+     * Get splits by slicing the rowKeys, according to the first character of rowKey (user can specify it when create
+     * table, the default value is "0~9,a~z,A~Z"), generate many startAndEndKey pairs.
+     *
+     * @param tupleDomain tupleDomain
+     * @param tableHandle tableHandle
+     * @return splits
+     */
     private List<HBaseSplit> getSplitsForScan(TupleDomain<ColumnHandle> tupleDomain, HBaseTableHandle tableHandle)
     {
         List<HBaseSplit> splits = new ArrayList<>();
-        Pair<byte[][], byte[][]> startEndKeys = null;
         TableName hbaseTableName = TableName.valueOf(tableHandle.getHbaseTableName().get());
-
-        try {
-            if (hBaseConnection.getHbaseAdmin().getTableDescriptor(hbaseTableName) != null) {
-                RegionLocator regionLocator =
-                        hBaseConnection.getConn().getRegionLocator(hbaseTableName);
-                startEndKeys = regionLocator.getStartEndKeys();
-            }
-        }
-        catch (TableNotFoundException e) {
-            throw new PrestoException(
-                    HBaseErrorCode.HBASE_TABLE_DNE,
-                    format(
-                            "table %s not found, maybe deleted by other user", tableHandle.getHbaseTableName().get()));
-        }
-        catch (IOException e) {
-            LOG.error(e.getMessage());
-        }
-
         Map<Integer, List<Range>> ranges = new HashMap<>();
         Map<ColumnHandle, Domain> predicates = tupleDomain.getDomains().get();
-        predicates
-                .entrySet()
-                .forEach(
-                        entry -> {
-                            ColumnHandle handle = entry.getKey();
-                            if (handle instanceof HBaseColumnHandle) {
-                                ranges.put(
-                                        ((HBaseColumnHandle) handle).getOrdinal(),
-                                        entry.getValue().getValues().getRanges().getOrderedRanges());
-                            }
-                        });
+        predicates.entrySet().forEach(
+                entry -> {
+                    ColumnHandle handle = entry.getKey();
+                    if (handle instanceof HBaseColumnHandle) {
+                        ranges.put(
+                                ((HBaseColumnHandle) handle).getOrdinal(),
+                                entry.getValue().getValues().getRanges().getOrderedRanges());
+                    }
+                });
 
         List<HostAddress> hostAddresses = new ArrayList<>();
-        if (startEndKeys == null) {
-            throw new NullPointerException("null pointer found when getting splits for scan");
-        }
-        for (int i = 0; i < startEndKeys.getFirst().length; i++) {
-            String startRow = new String(startEndKeys.getFirst()[i]);
-            String endRow = new String(startEndKeys.getSecond()[i]);
+        // splitByChar read from hetu metastore, the default value is "0~9"
+        String splitByChar = hbaseConnection.getTable(tableHandle.getTableName()).getSplitByChar().get();
+        LOG.info("Create multi-splits by the first char of rowKey, table is " + hbaseTableName.getName() +
+                ", the range of first char is : " + splitByChar);
+
+        List<StartAndEndKey> startAndEndRowKeys =
+                getStartAndEndKeys(splitByChar, Constants.START_END_KEYS_COUNT);
+        for (StartAndEndKey startAndEndRowKey : startAndEndRowKeys) {
             splits.add(
                     new HBaseSplit(
-                            tableHandle.getRowId(), tableHandle, hostAddresses, startRow, endRow, ranges, null, false));
+                            tableHandle.getRowId(),
+                            tableHandle,
+                            hostAddresses,
+                            String.valueOf(startAndEndRowKey.start),
+                            startAndEndRowKey.end + Constants.ROWKEY_TAIL,
+                            ranges,
+                            false));
         }
 
+        printSplits("Scan", splits);
         return splits;
     }
 
-    private List<HBaseSplit> getSplitsForBatchGet(TupleDomain<ColumnHandle> tupleDomain, HBaseTableHandle table)
+    /**
+     * In order to get more splits to improve concurrency of tableScan, we slice the split by different character.
+     * HBase server support to use startRow and EndRow to get scanner.
+     * for example, splitByChar is 0~2, we will generate multi-pairs
+     * the size of pairs will less than startEndKeysCount, so we will calculate the pair gap first.
+     * (startKey = 0, endKey = 0),(startKey = 1, endKey = 1),(startKey = 2, endKey = 2)
+     * splitByChar is 0~9, a~z
+     * (startKey = 0, endKey = 1),(startKey = 2, endKey = 3)……(startKey = y, endKey = z)
+     *
+     * @param splitByChar range of the rowKey, value is like 0~9,A~Z,a~z or a~z,0~9 ..
+     * @param startEndKeysCount max number of key pairs
+     * @return start and end rowKeys
+     */
+    private List<StartAndEndKey> getStartAndEndKeys(String splitByChar, int startEndKeysCount)
+    {
+        List<StartAndEndKey> allRanges = Arrays.stream(splitByChar.split(","))
+                .map(StartAndEndKey::new).collect(Collectors.toList());
+        int rangeLength = 0;
+        for (StartAndEndKey range : allRanges) {
+            rangeLength += (Math.abs(range.end - range.start) + 1);
+        }
+
+        List<StartAndEndKey> startAndEndKeys = new ArrayList<>();
+        // rounding step value
+        int gap = (int) Math.rint((rangeLength + 0.0) / startEndKeysCount);
+        // generate start and end keys
+        allRanges.forEach(range -> {
+            int realGap = gap == 0 ? 1 : gap;
+            for (char index = range.start; index <= range.end; index += realGap) {
+                char end = (index + realGap > range.end) ? range.end : (char) (index + realGap - 1);
+                startAndEndKeys.add(new StartAndEndKey(index, end));
+            }
+        });
+
+        return startAndEndKeys;
+    }
+
+    /**
+     * If the predicate of sql includes "rowKey='xxx'" or "rowKey in ('xxx','xxx')",
+     * we can specify rowkey values in each split, then performance will be good.
+     *
+     * @param tupleDomain tupleDomain
+     * @param tableHandle tableHandle
+     * @return splits
+     */
+    private List<HBaseSplit> getSplitsForBatchGet(TupleDomain<ColumnHandle> tupleDomain, HBaseTableHandle tableHandle)
     {
         List<HBaseSplit> splits = new ArrayList<>();
         Domain rowIdDomain = null;
@@ -150,13 +185,13 @@ public class HBaseSplitManager
             ColumnHandle handle = entry.getKey();
             if (handle instanceof HBaseColumnHandle) {
                 HBaseColumnHandle columnHandle = (HBaseColumnHandle) handle;
-                if (columnHandle.getOrdinal() == table.getRowIdOrdinal()) {
+                if (columnHandle.getOrdinal() == tableHandle.getRowIdOrdinal()) {
                     rowIdDomain = entry.getValue();
                 }
             }
         }
-        List<Range> rowIds = rowIdDomain != null ? rowIdDomain.getValues().getRanges().getOrderedRanges() : new ArrayList<>();
 
+        List<Range> rowIds = rowIdDomain != null ? rowIdDomain.getValues().getRanges().getOrderedRanges() : new ArrayList<>();
         int maxSplitSize;
         // Each split has at least 20 pieces of data, and the maximum number of splits is 30.
         if (rowIds.size() / Constants.BATCHGET_SPLIT_RECORD_COUNT > Constants.BATCHGET_SPLIT_MAX_COUNT) {
@@ -172,17 +207,48 @@ public class HBaseSplitManager
         while (currentIndex < rangeSize) {
             int endIndex = rangeSize - currentIndex > maxSplitSize ? (currentIndex + maxSplitSize) : rangeSize;
             Map<Integer, List<Range>> splitRange = new HashMap<>();
-            splitRange.put(table.getRowIdOrdinal(), rowIds.subList(currentIndex, endIndex));
-            splits.add(new HBaseSplit(table.getRowId(), table, hostAddresses, null, null, splitRange, null, false));
+            splitRange.put(tableHandle.getRowIdOrdinal(), rowIds.subList(currentIndex, endIndex));
+            splits.add(new HBaseSplit(tableHandle.getRowId(), tableHandle, hostAddresses, null, null, splitRange, false));
             currentIndex = endIndex;
         }
 
+        printSplits("Batch Get", splits);
+        return splits;
+    }
+
+    private void printSplits(String scanType, List<HBaseSplit> splits)
+    {
+        LOG.info("The final split count is " + splits.size() + ".");
         for (HBaseSplit split : splits) {
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Print Split: " + split.toString());
-            }
+            LOG.info(scanType + ", Print Split: " + split.toString());
+        }
+    }
+
+    class StartAndEndKey
+    {
+        private final char start;
+        private final char end;
+
+        StartAndEndKey(char start, char end)
+        {
+            this.start = start;
+            this.end = end;
         }
 
-        return splits;
+        StartAndEndKey(String startAndEnd)
+        {
+            String[] pairs = startAndEnd.split(Constants.SEPARATOR_START_END_KEY);
+            this.start = pairs[0].charAt(0);
+            this.end = pairs[1].charAt(0);
+        }
+
+        @Override
+        public String toString()
+        {
+            return "StartAndEndKey{" +
+                    "start=" + start +
+                    ", end=" + end +
+                    '}';
+        }
     }
 }

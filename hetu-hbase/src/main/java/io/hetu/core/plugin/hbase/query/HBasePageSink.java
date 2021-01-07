@@ -20,6 +20,7 @@ import io.airlift.slice.Slice;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
+import io.hetu.core.plugin.hbase.utils.Constants;
 import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
 import io.hetu.core.plugin.hbase.utils.serializers.HBaseRowSerializer;
 import io.prestosql.spi.Page;
@@ -86,13 +87,19 @@ public class HBasePageSink
         // For each position within the page
         List<Put> puts = new ArrayList<>();
 
-        for (int position = 0; position < page.getPositionCount(); ++position) {
-            // Convert Page to a Put, writing and indexing it
-            Put put = pageToPut(page, position);
-            puts.add(put);
-        }
         try {
-            hbaseConn.getConn().getTable(TableName.valueOf(tablename)).put(puts);
+            for (int position = 0; position < page.getPositionCount(); ++position) {
+                // Convert Page to a Put, writing and indexing it
+                Put put = pageToPut(page, position);
+                puts.add(put);
+                if (puts.size() >= Constants.PUT_BATCH_SIZE) {
+                    hbaseConn.getConn().getTable(TableName.valueOf(tablename)).put(puts);
+                    puts.clear();
+                }
+            }
+            if (!puts.isEmpty()) {
+                hbaseConn.getConn().getTable(TableName.valueOf(tablename)).put(puts);
+            }
         }
         catch (IOException e) {
             LOG.error("appendPage PUT rejected by server... cause by %s", e.getMessage());

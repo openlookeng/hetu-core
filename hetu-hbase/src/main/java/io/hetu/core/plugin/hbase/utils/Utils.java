@@ -94,10 +94,7 @@ public class Utils
                 }
             }
         }
-        catch (ClassNotFoundException e) {
-            LOG.error("createTypeByName failed... cause by : %s", e);
-        }
-        catch (IllegalAccessException e) {
+        catch (ClassNotFoundException | IllegalAccessException e) {
             LOG.error("createTypeByName failed... cause by : %s", e);
         }
 

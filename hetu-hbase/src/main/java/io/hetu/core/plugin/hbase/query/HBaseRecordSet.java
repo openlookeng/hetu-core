@@ -107,7 +107,6 @@ public class HBaseRecordSet
             List<HBaseColumnHandle> columnHandles)
     {
         requireNonNull(session, "session is null");
-
         rowIdName = table.getRowId();
         this.split = split;
         this.conn = hbaseConn;
@@ -135,6 +134,10 @@ public class HBaseRecordSet
                 this.serializer.setMapping(hc.getName(), hc.getFamily().get(), hc.getQualifier().get());
             }
         }
+        if (table.getLimit().isPresent() && table.getLimit().getAsLong() <= Integer.MAX_VALUE) {
+            scan.setLimit((int) table.getLimit().getAsLong());
+        }
+        LOG.info("Worker handle split：" + split.toString());
     }
 
     @Override
@@ -177,14 +180,16 @@ public class HBaseRecordSet
                 if (filters.getFilters().size() != 0) {
                     scan.setFilter(filters);
                 }
-
                 if (split.getStartRow() != null && !split.getStartRow().isEmpty()) {
-                    scan.setStartRow(Bytes.toBytes(split.getStartRow()));
+                    scan.withStartRow(Bytes.toBytes(split.getStartRow()));
+                }
+                if (split.getEndRow() != null && !split.getEndRow().isEmpty()) {
+                    scan.withStopRow(Bytes.toBytes(split.getEndRow()));
                 }
 
-                if (split.getEndRow() != null && !split.getEndRow().isEmpty()) {
-                    scan.setStopRow(Bytes.toBytes(split.getEndRow()));
-                }
+                scan.setCaching(Constants.SCAN_CACHING_SIZE);
+                scan.setLoadColumnFamiliesOnDemand(true);
+                scan.setCacheBlocks(true);
                 scanner = conn.getConn().getTable(TableName.valueOf(table.getHbaseTableName().get())).getScanner(scan);
             }
             catch (IOException e) {
@@ -225,11 +230,10 @@ public class HBaseRecordSet
     {
         FilterList andFilters = new FilterList(FilterList.Operator.MUST_PASS_ALL);
 
-        // select count(rowKey) / rowKey from table_xxx;
-        if (this.columnHandles.size() == 1
-                && this.columnHandles.get(0).getColumnName().equals(this.split.getRowKeyName())) {
-            scan.setCaching(Constants.SCAN_CACHING_SIZE);
-            scan.setCacheBlocks(false);
+        // select count(*) / count(rowKey) / rowKey from table_xxx;
+        if ((this.columnHandles.size() == 1
+                && this.columnHandles.get(0).getColumnName().equals(this.split.getRowKeyName()))
+                || this.columnHandles.size() == 0) {
             andFilters.addFilter(new FirstKeyOnlyFilter());
             andFilters.addFilter(new KeyOnlyFilter());
         }
@@ -398,11 +402,13 @@ public class HBaseRecordSet
             return new RowFilter(operator, new BinaryComparator(values));
         }
         else {
-            return new SingleColumnValueFilter(
+            SingleColumnValueFilter filter = new SingleColumnValueFilter(
                     Bytes.toBytes(columnHandle.getFamily().get()),
                     Bytes.toBytes(columnHandle.getQualifier().get()),
                     operator,
                     values);
+            filter.setFilterIfMissing(true);
+            return filter;
         }
     }
 

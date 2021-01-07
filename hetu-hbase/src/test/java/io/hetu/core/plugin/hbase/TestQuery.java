@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -90,8 +91,7 @@ public class TestQuery
                         "startrow",
                         "endrow",
                         new HashMap<>(),
-                        null,
-                        true);
+                        false);
         recordSet =
                 new HBaseRecordSet(
                         hconn, session, split, TestUtils.createHBaseTableHandle(), TestUtils.createColumnList());
@@ -123,7 +123,8 @@ public class TestQuery
                         "",
                         TestUtils.createTupleDomain(1),
                         TestUtils.createColumnList(),
-                        0);
+                        0,
+                        OptionalLong.empty());
         HBaseSplit hBasesplit =
                 new HBaseSplit(
                         "rowKey",
@@ -132,8 +133,7 @@ public class TestQuery
                         "startrow",
                         "endrow",
                         new HashMap<>(),
-                        null,
-                        true);
+                        false);
         HBaseRecordSet rSet = new HBaseRecordSet(hconn, session, hBasesplit, tableHandle, TestUtils.createColumnList());
         rSet.cursor();
     }
@@ -157,7 +157,8 @@ public class TestQuery
                         "",
                         null,
                         list,
-                        0);
+                        0,
+                        OptionalLong.empty());
 
         // case ABOVE
         Map<Integer, List<Range>> ranges = new HashMap<>();
@@ -168,7 +169,7 @@ public class TestQuery
         ranges.put(0, range);
         HBaseSplit hBasesplit =
                 new HBaseSplit(
-                        "rowkey", tableHandle, new ArrayList<HostAddress>(1), "1", "12345678", ranges, null, true);
+                        "rowkey", tableHandle, new ArrayList<HostAddress>(1), "1", "12345678", ranges, false);
         HBaseRecordSet rSet = new HBaseRecordSet(hconn, session, hBasesplit, tableHandle, list);
         rSet.getFiltersFromDomains(ranges);
 

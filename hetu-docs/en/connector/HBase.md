@@ -96,7 +96,7 @@ debug=true;
 | row_id           | String  | The first column name          | No       | row_id is the column name corresponding to rowkey in the hbase table |
 | hbase_table_name | String  | null                           | No       | hbase_table_name specifies the tablespace and table name on the hbase data source to be linked, use ":" connect tablespace and table name, the default tablespace is "default". |
 | external         | Boolean | true                           | No       | If external is true, it means that the table is a mapping table of the table in the hbase data source. It does not support deleting the original table on the hbase data source; if external is false, the table on hbase data source will be deleted at the same time as the local hbase table is deleted. |
-
+| split\_by\_char| String| 0~9,a~z,A~Z| No| split\_by\_char is the basis for sharding, if the first character of rowkey consists of digits, sharding can be performed based on different digits to improve concurrency. Different types of symbols are separated by commas. If this parameter is set incorrectly, the query result may be incomplete. Set it based on the actual rowkey.|
 
 
 ## Data Types
