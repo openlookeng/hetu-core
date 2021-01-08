@@ -14,6 +14,7 @@
  */
 package io.hetu.core.filesystem;
 
+import io.prestosql.spi.filesystem.SupportedFileAttributes;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

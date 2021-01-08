@@ -122,6 +122,7 @@ public class OrcPageSourceFactory
     public static final String ACID_COLUMN_ROW_ID = "rowId";
     public static final String ACID_COLUMN_CURRENT_TRANSACTION = "currentTransaction";
     public static final String ACID_COLUMN_ROW_STRUCT = "row";
+    public static final List<String> EAGER_LOAD_INDEX_ID = ImmutableList.of("BITMAP");
 
     private static final Pattern DEFAULT_HIVE_COLUMN_NAME_PATTERN = Pattern.compile("_col\\d+");
     private static final Logger log = Logger.get(OrcPageSourceFactory.class);
@@ -408,12 +409,17 @@ public class OrcPageSourceFactory
                     hdfsEnvironment,
                     startRowOffsetOfFile);
 
+            boolean eagerload = false;
+            if (indexes.isPresent()) {
+                eagerload = indexes.get().stream().anyMatch(indexMetadata -> EAGER_LOAD_INDEX_ID.contains(indexMetadata.getIndex().getId()));
+            }
+
             return new OrcPageSource(
                     recordReader,
                     columnAdaptations,
                     orcDataSource,
                     deletedRows,
-                    indexes.isPresent(),
+                    eagerload,
                     systemMemoryUsage,
                     stats);
         }

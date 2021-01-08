@@ -14,6 +14,8 @@
  */
 package io.hetu.core.filesystem;
 
+import io.prestosql.spi.filesystem.SupportedFileAttributes;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;

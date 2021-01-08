@@ -14,6 +14,7 @@
  */
 package io.prestosql.heuristicindex;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.prestosql.filesystem.FileSystemClientManager;
@@ -30,6 +31,8 @@ import io.prestosql.testing.NoOpIndexClient;
 import io.prestosql.testing.NoOpIndexWriter;
 
 import java.io.IOException;
+import java.nio.file.FileSystemException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -63,21 +66,14 @@ public class HeuristicIndexerManager
         HeuristicIndexerManager.factory = indexFactory;
     }
 
-    public void buildIndexClient()
-            throws IOException
+    @VisibleForTesting
+    protected static void checkFilesystemTimePrecision(String timeStamp)
+            throws FileSystemException
     {
-        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
-            String fsProfile = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE);
-            String indexStoreRoot = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI);
-
-            root = Paths.get(indexStoreRoot);
-            fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
-            if (!fileSystemClientManager.isFileSystemShared(fsProfile)) {
-                LOG.warn("Profile %s is not a shared filesystem. It may not work properly if the cluster has more than 1 nodes.");
-            }
-            if (factory != null) {
-                indexClient = factory.getIndexClient(fs, root);
-            }
+        if (!timeStamp.matches(".*?:\\d+:\\d+\\.\\d{3,}Z")) {
+            throw new FileSystemException(String.format("The filesystem specified by hetu.heuristicindex.indexstore.filesystem.profile is not " +
+                    "supported by Heuristic Index because the precision for Files.getLastModifiedTime(): %s is too low. " +
+                    "Precision must at least be milliseconds.", timeStamp));
         }
     }
 
@@ -100,5 +96,25 @@ public class HeuristicIndexerManager
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         return factory.getIndexFilter(indices);
+    }
+
+    public void buildIndexClient()
+            throws IOException
+    {
+        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
+            String fsProfile = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE);
+            String indexStoreRoot = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI);
+
+            root = Paths.get(indexStoreRoot);
+            fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
+            if (fileSystemClientManager.isFileSystemLocal(fsProfile)) {
+                LOG.warn("Profile %s is not a shared filesystem. It may not work properly if the cluster has more than 1 nodes.");
+                String fileLastModifiedTimeSample = Files.getLastModifiedTime(Paths.get(System.getProperty("user.dir"))).toString();
+                checkFilesystemTimePrecision(fileLastModifiedTimeSample);
+            }
+            if (factory != null) {
+                indexClient = factory.getIndexClient(fs, root);
+            }
+        }
     }
 }
