@@ -80,22 +80,42 @@
             font-size: 15px;
             font-weight: bold;
         }
+
+        .login-form .radio-Group {
+            min-height: 38px;
+            border-radius: 2px;
+        }
+
+        .login-form .radio-Group label{
+            padding: 7px;
+            font-size: 15px;
+            font-weight: normal;
+        }
+
+
     </style>
 </head>
 
 <body>
 
+<div class="loader">Loading...</div>
+
 <div class="login-form">
     <form id="login" action="../ui/api/login" method="post" style="display: none">
         <div>
             <img src="assets/lk-logos.svg" width="140px" height="40px"/>
-            <h2 class="text-center">Log In</h2>
         </div>
+        <br/>
         <div class="form-group">
             <input id="username" name="username" type="text" class="form-control" placeholder="Username" required="required">
         </div>
         <div class="form-group">
             <input id="password" name="password" type="password" class="form-control" placeholder="Password" required="required">
+        </div>
+        <div class="radio-Group">
+            <input type="radio" name="loginOptions" id="basicRadio" autocomplete="off" onclick="basicAuthentication()" checked /><label for="basicRadio" >Basic</label>
+            <input type="radio" name="loginOptions" id="kerberosRadio" autocomplete="off" onclick="kerberosAuthentication()" /><label for="kerberosRadio" >Kerberos</label>
+            <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="When Kerberos authentication is selected, it is recommended to configure Kerberos authentication with Firefox browser."></span>
         </div>
         <input id="redirectPath" name="redirectPath" type="hidden">
         <div class="form-group">
@@ -120,7 +140,19 @@
             .prop('readonly', true);
     }
     $("#login").show();
+    $(".loader").hide();
     $("#username").focus().val("");
+
+    function basicAuthentication(){
+        $(".login-form").show();
+        $(".loader").hide();
+    }
+
+    function kerberosAuthentication(){
+        $(".login-form").hide();
+        $(".loader").show();
+        window.location.href='/ui';
+    }
 </script>
 <!-- Fonts -->
 <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700" rel="stylesheet">

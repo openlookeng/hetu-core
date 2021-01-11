@@ -101,12 +101,21 @@ public class AuthenticationFilter
                 nextFilter.doFilter(withPrincipal(request, new BasicPrincipal(authenticatedUser.get())), response);
                 return;
             }
+
+            // skip authentication for login/logout page
+            if (isSkipAuth(request)) {
+                nextFilter.doFilter(request, response);
+                return;
+            }
+
+            if (needRedirect(request, authenticators)) {
+                // redirect to login page
+                URI redirectUri = UiAuthenticator.buildLoginFormURI(URI.create(request.getRequestURI()));
+                response.sendRedirect(redirectUri.toString());
+                return;
+            }
         }
-        // skip authentication for login/logout page
-        if (isSkipAuth(request)) {
-            nextFilter.doFilter(request, response);
-            return;
-        }
+
         // try to authenticate, collecting errors and authentication headers
         Set<String> messages = new LinkedHashSet<>();
         Set<String> authenticateHeaders = new LinkedHashSet<>();
@@ -132,22 +141,46 @@ public class AuthenticationFilter
         // authentication failed
         skipRequestBody(request);
 
-        // skip authentication if non-secure or not configured
-        if (isWebUi(request)) {
-            URI redirectUri = UiAuthenticator.buildLoginFormURI(URI.create(request.getRequestURI()));
-            response.sendRedirect(redirectUri.toString());
-            return;
-        }
-        else {
-            for (String value : authenticateHeaders) {
-                response.addHeader(WWW_AUTHENTICATE, value);
-            }
+        for (String value : authenticateHeaders) {
+            response.addHeader(WWW_AUTHENTICATE, value);
         }
 
         if (messages.isEmpty()) {
             messages.add("Unauthorized");
         }
         response.sendError(SC_UNAUTHORIZED, Joiner.on(" | ").join(messages));
+    }
+
+    public static boolean needRedirect(HttpServletRequest request, final List<Authenticator> authenticators)
+    {
+        boolean pwdAuthentication = false;
+        boolean kerberosAuthentication = false;
+
+        for (Authenticator authenticator : authenticators) {
+            if (authenticator instanceof PasswordAuthenticator) {
+                pwdAuthentication = true;
+            }
+            else if (authenticator instanceof KerberosAuthenticator) {
+                kerberosAuthentication = true;
+            }
+        }
+
+        // Only use PasswordAuthenticator, all pages needs to redirect to login page
+        if (pwdAuthentication && !kerberosAuthentication) {
+            return true;
+        }
+
+        // If request path is web uri : "/" and enable kerberos or ldap authenticator, request path "/" needs to redirect to login page
+        if (isWebUri(request) && (pwdAuthentication || kerberosAuthentication)) {
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean isWebUri(HttpServletRequest request)
+    {
+        String pathInfo = request.getPathInfo();
+        return pathInfo.equals("/");
     }
 
     public static boolean isWebUi(HttpServletRequest request)
