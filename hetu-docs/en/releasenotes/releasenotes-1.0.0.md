@@ -24,7 +24,7 @@
 | DC Connector            | Improved the performance of DC connector by supporting Metadata & plan cache. | 128                                                          |
 | ORC Data Cache          | Capture ORC cache metrics via JMX.                           | 33, 142                                                      |
 |                         | CACHE sql command usability enhancements to provide more flexibility as to what partitions can be cached. | 90, 99                                                       |
-
+| Documentation                   | Update the documentation to reflect the latest code : https://gitee.com/openlookeng/hetu-core/tree/1.0.0/hetu-docs/en             |  |
 
 
 This release focused on making improvements in 3 main areas: Performance, Security, and Usability.  

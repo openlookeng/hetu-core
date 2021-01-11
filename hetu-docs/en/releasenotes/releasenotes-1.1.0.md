@@ -17,6 +17,8 @@
 | User experience  | Provide a brand new admin web UI with SQL editor and system monitor | 163,368,404                     |
 |                  | Simplify the configurations                                  | 397,369,449                     |
 | Security         | Support integration with Apache Ranger for unified permission control | 491                             |
+| Documentation                   | Update the documentation to reflect the latest code : https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/en              |  |
+
 
 **Known Issues**
 

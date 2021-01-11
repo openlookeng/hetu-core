@@ -6,4 +6,4 @@ This release is mainly for fixing version number issue and index-cli issues. Bes
 | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Index                | Merge the index-cli into hetu-cli, and introduce the basic access control to index command                                               | 283, 298                                                          |
 | Security | Handle CVEs | 289,287,295,288,285,292，297,249,302                                                           |
-| Documentation                   | Update the documentation to reflect the latest code                  | 273,293,303                                                           |
+| Documentation                   | Update the documentation to reflect the latest code : https://gitee.com/openlookeng/hetu-core/tree/1.0.1/hetu-docs/en               | 273,293,303 |

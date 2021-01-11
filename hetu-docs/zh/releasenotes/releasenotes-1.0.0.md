@@ -24,7 +24,7 @@
 | DC Connector | 支持元数据和执行计划缓存，以提升DC Connector的性能。         | 128                                                          |
 | ORC数据缓存  | 通过JMX监控ORC缓存的各项指标。                               | 33、142                                                      |
 |              | CACHE sql命令的可用性增强，为选择缓存哪些分区提供了更大的灵活性。 | 90、99                                                       |
-
+| 文档 |更新文档以匹配最新的代码：https://gitee.com/openlookeng/hetu-core/tree/1.0.0/hetu-docs/zh | |
 
 此版本主要在三个主要领域进行了改进：性能、安全性和可用性。
 

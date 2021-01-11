@@ -17,6 +17,7 @@
 | 用户体验   | 提供全新的WEB UI， 包含在线SQL编辑器和系统状态监控           | 163,368,404                     |
 |            | 简化配置项                                                   | 397,369,449                     |
 | 安全       | 支持与Apache Ranger 集成以实现统一的权限控制                 | 491                             |
+| 文档 |更新文档以匹配最新的代码：https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/zh| |
 
 **已知问题**
 
