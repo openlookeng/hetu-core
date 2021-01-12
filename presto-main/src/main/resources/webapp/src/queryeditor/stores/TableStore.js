@@ -120,7 +120,7 @@ class TableStore {
     // Enrich the table with some extra data (active status and url)
     table = _.extend(table, {
       active: true,
-      url: `/api/table/${FQN.schema(table.name)}/${FQN.table(table.name)}`,
+      url: `../api/table/${FQN.schema(table.name)}/${FQN.table(table.name)}`,
       partitions: [],
     });
 
