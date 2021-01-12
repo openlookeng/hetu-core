@@ -12,10 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.filesystem;
+package io.prestosql.spi.filesystem;
 
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.nio.file.Path;
 import java.util.Set;

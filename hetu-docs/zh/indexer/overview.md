@@ -60,7 +60,7 @@
 避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；如果没有配置，那么当前工作目录为openlookeng server的目录
 
 **注意**：
-- `LOCAL` 本地文件系统只应该被用于本地测试，或单节点部署情形。（否则索引文件将无法在机器之间共享）
+- `LOCAL` 本地文件系统将*不再*被支持
 - `HDFS` 应用于生产环境来在集群中共享数据。
 - 所有节点必须有相同的文件系统配置。
 - 在服务器运行中可以通过`set session heuristicindex_filter_enabled=false;`关闭启发式索引。

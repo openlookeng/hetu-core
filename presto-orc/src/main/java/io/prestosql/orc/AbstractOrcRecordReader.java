@@ -301,7 +301,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     }
 
     private boolean filterStripeUsingIndex(StripeInformation stripe, Map<Long, List<IndexMetadata>> stripeOffsetToIndex,
-                                           Map<String, Domain> and, Map<String, List<Domain>> or)
+            Map<String, Domain> and, Map<String, List<Domain>> or)
     {
         if (stripeOffsetToIndex.isEmpty()) {
             return false;
@@ -342,10 +342,11 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         if (!andDomainMap.isEmpty()) {
             List<Iterator<Integer>> matchings = new ArrayList<>(andDomainMap.size());
             for (Map.Entry<Index, Domain> e : andDomainMap.entrySet()) {
-                try {
-                    matchings.add(e.getKey().lookUp(e.getValue()));
+                Iterator<Integer> lookUpRes = e.getKey().lookUp(e.getValue());
+                if (lookUpRes != null) {
+                    matchings.add(lookUpRes);
                 }
-                catch (UnsupportedOperationException uoe) {
+                else {
                     try {
                         if (!e.getKey().matches(e.getValue())) {
                             return true;
@@ -365,14 +366,14 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
         if (!orDomainMap.isEmpty()) {
             for (Map.Entry<Index, Domain> e : orDomainMap.entrySet()) {
-                try {
-                    Iterator<Integer> thisStripeMatchingRows = e.getKey().lookUp(e.getValue());
+                Iterator<Integer> thisStripeMatchingRows = e.getKey().lookUp(e.getValue());
+                if (thisStripeMatchingRows != null) {
                     if (thisStripeMatchingRows.hasNext()) {
                         /* any one matched; then include the stripe */
                         return false;
                     }
                 }
-                catch (UnsupportedOperationException uoe) {
+                else {
                     try {
                         if (e.getKey().matches(e.getValue())) {
                             return false;

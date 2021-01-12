@@ -15,6 +15,7 @@
 package io.hetu.core.filesystem;
 
 import io.hetu.core.filesystem.utils.DockerizedHive;
+import io.prestosql.spi.filesystem.SupportedFileAttributes;
 import org.apache.hadoop.conf.Configuration;
 import org.testng.SkipException;
 import org.testng.annotations.AfterTest;
