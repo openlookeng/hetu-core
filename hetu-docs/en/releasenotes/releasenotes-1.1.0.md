@@ -1,5 +1,7 @@
 # Release 1.1.0
 
+## Key Features
+
 | Area             | Feature                                                      | PR #s                           |
 | ---------------- | ------------------------------------------------------------ | ------------------------------- |
 | Heuristic Index  | Btree index – BTree index is used for split filtering, and is used only by the coordinator nodes. If an index is created on a column which is part of a predicate in the query, then openLooKeng may be able to improve the performance of the query by filtering out splits during scheduling time. | 392,437,452,457                 |
@@ -17,12 +19,11 @@
 | User experience  | Provide a brand new admin web UI with SQL editor and system monitor | 163,368,404                     |
 |                  | Simplify the configurations                                  | 397,369,449                     |
 | Security         | Support integration with Apache Ranger for unified permission control | 491                             |
-| Documentation                   | Update the documentation to reflect the latest code : https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/en              |  |
 
 
-**Known Issues**
+## Known Issues
 
-| **Category**          | Description                                                  | Gitee issue                                                  |
+| Category          | Description                                                  | Gitee issue                                                  |
 | --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Data Center Connector | If the Data center has many more than 3 tiers, and when the Join condition is on a small value, enabling dynamic filtering takes longer time than disabling dynamic filtering. This is because the column data is not high-cardinality, we need a better filter. | [I2BAZZ](https://gitee.com/openlookeng/hetu-core/issues/I2BAZZ) |
 | Heuristic Index       | After drop index ,the index files folders would not be removed from HDFS. However the files inside them are removed | [I2BB1N](https://gitee.com/openlookeng/hetu-core/issues/I2BB1N) |
@@ -33,3 +34,7 @@
 | Installation          | By using the auto deploy script, the system reused the old configuration file without any prompt messages, this will mislead user. | [I2BB52](https://gitee.com/openlookeng/hetu-core/issues/I2BB52) |
 | Vacuum                | When a vacuum is run more than once on a table which had delete/update operations performed on it, the hive statistics might get corrupted and the queries would fail. To avoid this, set the session flag hive.collect_column_statistics_on_write to false (`set session hive.collect_column_statistics_on_write=false`) before running VACUUM command. In case the command was run without setting the above flag, run ANALYZE `table name` command to rectify the statistics. This issue is rectified in PR 517, but not merged into 1.1.0 release. | [I2BFH9](https://gitee.com/openlookeng/hetu-core/issues/I2BFH9) |
 | Reuse Exchange        | When reuse exchange feature is enabled in config.properties (reuse_table_scan=true), querying non hive catalogs would fail. It is recommended use (set session reuse_table_scan=true;) when querying hive catalogs and disable it for other catalogs. This issue is rectified in PR 516, but not merged into 1.1.0 release. | [I2BEWV](https://gitee.com/openlookeng/hetu-core/issues/I2BEWV) |
+
+## Obtaining the Document 
+
+For details, see [https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/en](https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/en)

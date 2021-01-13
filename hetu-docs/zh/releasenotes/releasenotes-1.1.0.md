@@ -1,5 +1,7 @@
 # Release 1.1.0
 
+## 关键特性
+
 | 分类       | 特性                                                         | PR #s                           |
 | ---------- | ------------------------------------------------------------ | ------------------------------- |
 | 启发式索引 | Btree索引-BTree索用于Split过滤，并且只能使用在Coordinator节点上，如果对作为查询谓词一部分的某一列创建索引，那么openLooKeng可以在执行的过程中通过索引来过滤掉Split，从而提高查询性能。 | 392,437,452,457                 |
@@ -17,11 +19,10 @@
 | 用户体验   | 提供全新的WEB UI， 包含在线SQL编辑器和系统状态监控           | 163,368,404                     |
 |            | 简化配置项                                                   | 397,369,449                     |
 | 安全       | 支持与Apache Ranger 集成以实现统一的权限控制                 | 491                             |
-| 文档 |更新文档以匹配最新的代码：https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/zh| |
 
-**已知问题**
+## 已知问题
 
-| **分类**   | 描述                                                         | Gitee问题                                                    |
+| 分类   | 描述                                                         | Gitee问题                                                    |
 | ---------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | DC连接器   | 分层的数据中心模型中，分层大于3层，开启动态过滤的耗时可能会比关闭动态过滤的耗时更长，由于过滤的列不是高基数的，会导致过滤效果变差，所以需要引入更高效的过滤器。 | [I2BAZZ](https://gitee.com/openlookeng/hetu-core/issues/I2BAZZ) |
 | 启发式索引 | 当删除index的时候，原HDFS上的文件夹并没有被删除，但里面的文件被删除。 | [I2BB1N](https://gitee.com/openlookeng/hetu-core/issues/I2BB1N) |
@@ -32,3 +33,7 @@
 | 安装        | 使用自动部署脚本，系统会使用旧的配置，没有任何提示，这样会误导用户。 | [I2BB52](https://gitee.com/openlookeng/hetu-core/issues/I2BB52) |
 | Vacuum     | 如果对已执行删除/更新操作的表多次运行vacuum操作，则统计信息可能会被损坏，并导致查询将失败。为了避免这种情况，请在运行vaccum命令前将会话标志hive.collect_column_statistics_on_write设置为false (`set session hive.collect_column_statistics_on_write=false`)。如果在运行该命令时没有设置上述参数flag，执行ANALYZE <表名>命令进行统计信息修正。PR 517已修改，未合入1.1.0版本 | [I2BFH9](https://gitee.com/openlookeng/hetu-core/issues/I2BFH9) |
 | Reuse Exchange        | 当在config.properties中启用Reuse Exchange特性（reuse_table_scan=true）时，查询非hive catalog会失败。建议在查询hive catalog时使用（设置session reuse_table_scan=true;），其他catalog时禁用。PR 516已修改，未合入1.1.0版本。 | [I2BEWV](https://gitee.com/openlookeng/hetu-core/issues/I2BEWV) |
+
+## 获取文档
+
+请参考：[https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/zh](https://gitee.com/openlookeng/hetu-core/tree/1.1.0/hetu-docs/zh )
