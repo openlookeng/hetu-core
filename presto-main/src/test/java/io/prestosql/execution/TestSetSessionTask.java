@@ -21,6 +21,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.PrestoException;
@@ -187,7 +188,7 @@ public class TestSetSessionTask
                 executor,
                 metadata,
                 WarningCollector.NOOP);
-        getFutureValue(new SetSessionTask().execute(new SetSession(qualifiedPropName, expression), transactionManager, metadata, accessControl, stateMachine, parameters, new HeuristicIndexerManager(new FileSystemClientManager())));
+        getFutureValue(new SetSessionTask().execute(new SetSession(qualifiedPropName, expression), transactionManager, metadata, accessControl, stateMachine, parameters, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
 
         Map<String, String> sessionProperties = stateMachine.getSetSessionProperties();
         assertEquals(sessionProperties, ImmutableMap.of(qualifiedPropName.toString(), expectedValue));

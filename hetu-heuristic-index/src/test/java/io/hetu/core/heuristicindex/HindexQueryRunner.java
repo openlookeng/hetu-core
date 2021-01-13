@@ -14,10 +14,10 @@
  */
 package io.hetu.core.heuristicindex;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
+import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
 import io.prestosql.plugin.hive.HiveHadoop2Plugin;
 import io.prestosql.plugin.hive.HivePlugin;
@@ -28,8 +28,7 @@ import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.tests.DistributedQueryRunner;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -45,45 +44,47 @@ public final class HindexQueryRunner
     public static DistributedQueryRunner createQueryRunner()
             throws Exception
     {
-        try (TempFolder folder = new TempFolder()) {
-            DistributedQueryRunner queryRunner = null; // Use this to return if no exceptions
+        TempFolder folder = new TempFolder();
+        Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
 
-            // Try to get a free port and start up the host
-            for (int port = 8080; port <= 65535; port++) {
-                // Use starting host at port 8080, max 2^16-1
-                try {
-                    folder.create();
-                    Map<String, String> queryRunnerMap = new HashMap<>();
+        DistributedQueryRunner queryRunner = null; // Use this to return if no exceptions
 
-                    queryRunnerMap.put("http-server.http.port", Integer.toString(port));
-                    queryRunnerMap.put("hetu.heuristicindex.filter.enabled", "true");
-                    queryRunnerMap.put("hetu.heuristicindex.filter.cache.max-memory", "1GB");
-                    queryRunnerMap.put("hetu.heuristicindex.filter.cache.loading-delay", "100ms");
-                    queryRunnerMap.put("hetu.heuristicindex.indexstore.uri", folder.getRoot().getAbsolutePath().toString());
-                    queryRunnerMap.put("hetu.heuristicindex.indexstore.filesystem.profile", "default");
-                    queryRunner = createQueryRunner(queryRunnerMap);
-                    break;
-                }
-                catch (Exception portException) {
-                    if (port >= 65535) {
-                        // No free ports
-                        throw new Exception("No more free ports for hosting server.");
-                    }
-                    continue;
-                }
+        // Try to get a free port and start up the host
+        for (int port = 8080; port <= 65535; port++) {
+            // Use starting host at port 8080, max 2^16-1
+            try {
+                folder.create();
+                Map<String, String> configs = new HashMap<>();
+                configs.put("http-server.http.port", Integer.toString(port));
+                configs.put("hetu.heuristicindex.filter.enabled", "true");
+                configs.put("hetu.heuristicindex.filter.cache.max-memory", "1GB");
+                configs.put("hetu.heuristicindex.filter.cache.loading-delay", "100ms");
+                configs.put("hetu.heuristicindex.indexstore.uri", folder.getRoot().getAbsolutePath());
+                configs.put("hetu.heuristicindex.indexstore.filesystem.profile", "default");
+
+                File subFolder = folder.newFolder();
+                Map<String, String> metastoreConfig = new HashMap<>();
+                metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
+                metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
+                metastoreConfig.put("hetu.metastore.hetufilesystem.path", subFolder.getAbsolutePath());
+
+                queryRunner = createQueryRunner(configs, metastoreConfig, Collections.emptyMap());
+                break;
             }
-            return queryRunner;
+            catch (Exception portException) {
+                if (port >= 65535) {
+                    // No free ports
+                    throw new Exception("No more free ports for hosting server.");
+                }
+                continue;
+            }
         }
-    }
-
-    public static DistributedQueryRunner createQueryRunner(Map<String, String> extraProperties)
-            throws Exception
-    {
-        return createQueryRunner(extraProperties, ImmutableMap.of());
+        return queryRunner;
     }
 
     public static DistributedQueryRunner createQueryRunner(Map<String, String> extraProperties,
-                                                           Map<String, String> coordinatorProperties)
+            Map<String, String> metastoreProperties,
+            Map<String, String> coordinatorProperties)
             throws Exception
     {
         Session session = testSessionBuilder()
@@ -111,15 +112,17 @@ public final class HindexQueryRunner
                             .build());
 
             queryRunner.installPlugin(new HetuFileSystemClientPlugin());
+            queryRunner.installPlugin(new HetuMetastorePlugin());
             queryRunner.installPlugin(new HiveHadoop2Plugin());
             queryRunner.installPlugin(new HeuristicIndexPlugin());
             queryRunner.installPlugin(new HivePlugin("Hive", Optional.of(metastore)));
             queryRunner.getServers().forEach(server -> {
                 try {
+                    server.loadMetastore(metastoreProperties);
                     server.getHeuristicIndexerManager().buildIndexClient();
                 }
-                catch (IOException e) {
-                    throw new UncheckedIOException(e);
+                catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
             });
             queryRunner.createCatalog("hive", "Hive");

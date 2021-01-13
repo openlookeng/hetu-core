@@ -19,6 +19,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
@@ -112,7 +113,7 @@ public class TestPrepareTask
                 metadata,
                 WarningCollector.NOOP);
         Prepare prepare = new Prepare(identifier(statementName), statement);
-        new PrepareTask(new SqlParser()).execute(prepare, transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()));
+        new PrepareTask(new SqlParser()).execute(prepare, transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()));
         return stateMachine.getAddedPreparedStatements();
     }
 }

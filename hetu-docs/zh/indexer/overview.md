@@ -107,6 +107,7 @@
 | hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | 否    | 所有索引文件存储的目录|
 | hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
 
+索引功能现使用Hetu Metastore管理元数据。请参阅 [vdm](../connector/vdm.md) 获取关于如何配置的更多信息。
 
 ## 索引语句
 
