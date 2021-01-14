@@ -1,6 +1,8 @@
 
 # Release 0.1.0
 
+## Key Features
+
 | Feature                                      | Description                                                  |
 | -------------------------------------------- | ------------------------------------------------------------ |
 | Adaptive Dynamic Filter                      | The dynamic feature is enhanced so that in addition to bloom filter, hashsets can be used to store the build side values to filter out the probe side. The filters are stored in a distributed memory store so that they can be reused by subsequent queries without having to be rebuilt. |
@@ -21,3 +23,7 @@
 | High Availability (Active-Active)            | Supports HA AA mode by storing runtime state information into a distributed cache like Hazelcast. Hazelcast cluster formation is done using a seed file. Discovery Service, OOM, & CPU Usage uses a distributed lock to ensure only one coordinator starts these services. |
 | Sql Migration Tool                           | Supplementary tool to assist in migrating the Hive SQL to openLooKeng Compatible SQLs |
 | Code Enhancement                             | RawSlice Optimization: This optimization reduces the memory footprint of openLooKeng by reusing the RawSlice object instead of constructing new Slice objects; Implicit Conversion: This feature supports data type implicit conversion. For example: If the query type does not match the table type in the Insert statement, it can convert the query type to the table type implicitly.|
+
+## Obtaining the Document 
+
+For details, see [https://gitee.com/openlookeng/hetu-core/tree/010/hetu-docs/en](https://gitee.com/openlookeng/hetu-core/tree/010/hetu-docs/en)

@@ -1,5 +1,22 @@
 # Release 1.0.0
 
+## Key Features
+
+This release focused on making improvements in 3 main areas: Performance, Security, and Usability.  
+
+* Performance
+
+    New enhancements were made to the engine to further improve the performance of ad-hoc interactive queries. These enhancements include changes to the dynamic filter feature to use a more efficient implementation of bloom filters, as well as optimizing the dynamic filter source operator so that dynamic filters can be collected and used as soon as possible.  Other performance optimizations include the introduction of  predicate pushdown to allow OR predicates to be pushed to the ORC reader, as well as supporting OR predicates during split filtering with the heuristic index feature. Finally, auto compaction was introduced for ORC files to reduce the number of ORC files after insert and update operations.
+
+* Security
+
+    In this release the community focused on further securing the query engine. Several vulnerabilities were addressed in the code, and an audit log was introduced. Furthermore, a new feature was introduced to allow administrators to encrypt sensitive information like data source credentials found in catalog property files.
+
+* Usability
+
+    Usability was another area of main focus for this release. In order to provide a database-like user experience, the community introduced a migration tool that helps migrate SQL queries from other engines to work in openLooKeng. Other usability enhancements include capturing ORC cache metrics via JMX to allow administrators to view cache hits and misses, and also improving the CACHE sql command to provide more flexibility as to what can be cached. Furthermore, changes were made to installation and deployment scripts to support deployments that contain a mix of ARM and x86 nodes. New scripts are introduced to allow administrators to deploy openLooKeng service based on containers.
+
+
 | Area                    | Feature                                                      | PR #s                                                        |
 | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Security                | Audit Logging                                                | 160                                                          |
@@ -26,17 +43,8 @@
 |                         | CACHE sql command usability enhancements to provide more flexibility as to what partitions can be cached. | 90, 99                                                       |
 
 
+## Obtaining the Document 
 
-This release focused on making improvements in 3 main areas: Performance, Security, and Usability.  
+For details, see [https://gitee.com/openlookeng/hetu-core/tree/1.0.0/hetu-docs/en](https://gitee.com/openlookeng/hetu-core/tree/1.0.0/hetu-docs/en)
 
-**Performance**
 
-New enhancements were made to the engine to further improve the performance of ad-hoc interactive queries. These enhancements include changes to the dynamic filter feature to use a more efficient implementation of bloom filters, as well as optimizing the dynamic filter source operator so that dynamic filters can be collected and used as soon as possible.  Other performance optimizations include the introduction of  predicate pushdown to allow OR predicates to be pushed to the ORC reader, as well as supporting OR predicates during split filtering with the heuristic index feature. Finally, auto compaction was introduced for ORC files to reduce the number of ORC files after insert and update operations.
-
-**Security**
-
-In this release the community focused on further securing the query engine. Several vulnerabilities were addressed in the code, and an audit log was introduced. Furthermore, a new feature was introduced to allow administrators to encrypt sensitive information like data source credentials found in catalog property files.
-
-**Usability**
-
-Usability was another area of main focus for this release. In order to provide a database-like user experience, the community introduced a migration tool that helps migrate SQL queries from other engines to work in openLooKeng. Other usability enhancements include capturing ORC cache metrics via JMX to allow administrators to view cache hits and misses, and also improving the CACHE sql command to provide more flexibility as to what can be cached. Furthermore, changes were made to installation and deployment scripts to support deployments that contain a mix of ARM and x86 nodes. New scripts are introduced to allow administrators to deploy openLooKeng service based on containers.

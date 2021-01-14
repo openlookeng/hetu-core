@@ -1,6 +1,8 @@
 
 # Release 0.1.0
 
+## 关键特性
+
 |特性|描述|
 | -------------------------------------------- | ------------------------------------------------------------ |
 | Adaptive Dynamic Filter |动态特性增强，除了bloom filter外，还可以使用hashsets存储build侧值，用于过滤探针侧。筛选器存储在分布式内存存储中，以便后续查询可以重用它们，而不必重新构建。|
@@ -20,4 +22,8 @@
 | Cross DC Connector |新的连接器被引入，以支持跨广域网的响应查询，允许客户端查询位于物理上遥远的另一个数据中心的数据源。|
 | High Availability (Active-Active) |支持HA AA模式，将运行时状态信息存储在Hazelcast等分布式缓存中。黑兹尔卡斯特集群的形成是使用种子文件完成的。发现服务、OOM、CPU使用率使用分布式锁，以确保只有一个协调器启动这些服务。|
 | Sql Migration Tool |协助Hive SQL迁移到openLooKeng兼容SQL的补充工具|
-| 代码增强 |RawSlice Optimization:通过重用RawSlice对象，而不是构造新的Slice对象，减少openLooKeng的内存占用。Implicit Conversion ：支持数据类型隐式转换。例如：如果Insert语句中的查询类型与表类型不匹配，则可以将查询类型隐式转换为表类型。||
+| 代码增强 |RawSlice Optimization:通过重用RawSlice对象，而不是构造新的Slice对象，减少openLooKeng的内存占用。Implicit Conversion ：支持数据类型隐式转换。例如：如果Insert语句中的查询类型与表类型不匹配，则可以将查询类型隐式转换为表类型。|
+
+## 获取文档
+
+请参考：[https://gitee.com/openlookeng/hetu-core/tree/010/hetu-docs/zh](https://gitee.com/openlookeng/hetu-core/tree/010/hetu-docs/zh)
