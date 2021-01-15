@@ -69,7 +69,7 @@ In `etc/config.properties`, add these lines:
 Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
 **Note**：
-- `LOCAL` filesystem type should only be used in testing or single node clusters.
+- `LOCAL` filesystem type is NOT supported anymore.
 - `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster.
 - All nodes should be configured to use the same filesystem profile.
 - Heuristic Index can be disabled while the engine is running by setting: `set session heuristicindex_filter_enabled=false;`

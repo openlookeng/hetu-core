@@ -16,9 +16,9 @@ package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.util.SecurePathWhiteList;
-import io.hetu.core.filesystem.SupportedFileAttributes;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.filesystem.SupportedFileAttributes;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 
 import java.io.BufferedReader;
@@ -39,8 +39,6 @@ public class IndexRecordManager
     private final HetuFileSystemClient fs;
     private final Path root;
 
-    private final Object cacheLock = new Object();
-    private final boolean useCache;
     private List<IndexRecord> cache;
     private long cacheLastModifiedTime;
 
@@ -48,7 +46,6 @@ public class IndexRecordManager
     {
         this.fs = fs;
         this.root = root;
-        this.useCache = false;
         try {
             checkArgument(!root.toString().contains("../"), "Index store directory path must be absolute");
             checkArgument(SecurePathWhiteList.isSecurePath(root.toString()),
@@ -63,52 +60,42 @@ public class IndexRecordManager
             throws IOException
     {
         Path recordFile = root.resolve(RECORD_FILE_NAME);
-        if (!useCache) {
-            return loadIndexRecords(recordFile);
-        }
-        else {
-            ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
-            if (!fs.exists(recordFile)) {
-                synchronized (cacheLock) {
-                    // invalidate cache
-                    cache = records.build();
-                    cacheLastModifiedTime = 0;
-                }
-                return cache;
-            }
-            long modifiedTime = (long) fs.getAttribute(recordFile, SupportedFileAttributes.LAST_MODIFIED_TIME);
-            if (modifiedTime != cacheLastModifiedTime) {
-                synchronized (cacheLock) {
-                    if (modifiedTime == cacheLastModifiedTime) {
-                        // already updated by another call
-                        return cache;
-                    }
-                    // invalidate cache
-                    cache = loadIndexRecords(recordFile);
-                    cacheLastModifiedTime = modifiedTime;
-                }
+        ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
+
+        if (!fs.exists(recordFile)) {
+            synchronized (this) {
+                // invalidate cache
+                cache = records.build();
+                cacheLastModifiedTime = 0;
             }
             return cache;
         }
-    }
 
-    private List<IndexRecord> loadIndexRecords(Path recordFile)
-    {
-        ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
-        if (fs.exists(recordFile)) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.newInputStream(recordFile)))) {
-                reader.readLine(); // skip header
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    records.add(new IndexRecord(line));
+        long modifiedTime = (long) fs.getAttribute(recordFile, SupportedFileAttributes.LAST_MODIFIED_TIME);
+        if (modifiedTime != cacheLastModifiedTime) {
+            synchronized (this) {
+                if (modifiedTime == cacheLastModifiedTime) {
+                    // already updated by another call
+                    return cache;
                 }
-            }
-            catch (Exception e) {
-                throw new IllegalArgumentException(
-                        "Error reading index record. If you have recently updated server, please delete old index directory and recreate the indices.", e);
+                // invalidate cache
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.newInputStream(recordFile)))) {
+                    reader.readLine(); // skip header
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        records.add(new IndexRecord(line));
+                    }
+                }
+                catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            "Error reading index record. If you have recently updated server, please delete old index directory and recreate the indices.", e);
+                }
+                cache = records.build();
+                cacheLastModifiedTime = modifiedTime;
             }
         }
-        return records.build();
+
+        return cache;
     }
 
     public IndexRecord lookUpIndexRecord(String name)

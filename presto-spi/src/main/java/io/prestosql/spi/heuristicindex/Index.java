@@ -97,10 +97,11 @@ public interface Index
      *
      * @param expression the expression to apply
      * @return the Iterator of positions that matches the expression result
+     *         {@code null} if the index does not support lookUp operation
      */
     default <I> Iterator<I> lookUp(Object expression) throws UnsupportedOperationException
     {
-        throw new UnsupportedOperationException(String.format("The current index type %s does not support lookUp() operation.", getId()));
+        return null;
     }
 
     /**

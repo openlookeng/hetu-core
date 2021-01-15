@@ -191,12 +191,12 @@ public class FileSystemClientManager
      * or the default profile name (same as {@link FileSystemClientManager#getFileSystemClient(Path)} if provide default name)
      * @return if the filesystem client linked to this name can be used as a shared filesystem across the cluster
      */
-    public boolean isFileSystemShared(String name)
+    public boolean isFileSystemLocal(String name)
     {
         if (!DEFAULT_CONFIG_NAME.equals(name) && !availableFileSystemConfigs.containsKey(name)) {
             throw new IllegalArgumentException(String.format("Profile %s is not available. Please check the name provided.", name));
         }
         Properties fsConfig = DEFAULT_CONFIG_NAME.equals(name) ? defaultProfile : availableFileSystemConfigs.get(name);
-        return !fsConfig.getProperty(FS_CLIENT_TYPE).equals("local");
+        return fsConfig.getProperty(FS_CLIENT_TYPE).equals("local");
     }
 }
