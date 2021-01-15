@@ -184,7 +184,7 @@ oracle.synonyms.enabled=true
 
 ## Restrictions on the Oracle Connector
 
-The openLooKeng can connect to Oracle Database 11c and Oracle Database 12g.
+The openLooKeng can connect to Oracle Database 11g and Oracle Database 12c.
 
 ### Oracle Number Type
 

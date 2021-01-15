@@ -134,7 +134,7 @@ Ranger策略管理
 
 ###  策略配置参考
 
-- 基本策略：必须给相应的 catalog 授权 `use` 和 `select` 权限。catalog 的 `show` 和 `create` 权限作为可作为选项以确定是否启用 show catalogs 和创建 schema 的权限。
+- 基本策略：必须给相应的 catalog 授权 `use` 和 `select` 权限。catalog 的 `show` 和 `create` 权限作为可选项以确定是否启用 show catalogs 和创建 schema 的权限。
 
 | 标签                 | 描述                                                  |
 | :-------------------------- | :----------------------------------------------------------- |
