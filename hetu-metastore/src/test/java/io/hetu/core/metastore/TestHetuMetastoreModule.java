@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
-import io.hetu.core.metastore.jdbc.JdbcHetuMetastore;
 import io.hetu.core.metastore.jdbc.JdbcMetastoreModule;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
 import io.prestosql.spi.PrestoException;
@@ -92,7 +91,7 @@ public class TestHetuMetastoreModule
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(properties)
                     .initialize();
-            assertTrue(injector.getInstance(HetuMetastore.class) instanceof JdbcHetuMetastore);
+            assertTrue(injector.getInstance(HetuMetastore.class) instanceof HetuMetastoreCache);
         }
         catch (Exception ex) {
             throwIfUnchecked(ex);
