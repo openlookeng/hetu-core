@@ -96,12 +96,12 @@ Data type projection table:
 > | DATE                   | DATE                                                   |                          |
 > | TIME                   | TIME                                                   |                          |
 > | TIMESTAMP              | TIMESTAMP                                              |                          |
-> | SECONDDATE             | NA                                                     |                          |
-> | BLOB                   | NA                                                     |                          |
-> | CLOB                   | NA                                                     |                          |
-> | NCLOB                  | NA                                                     |                          |
-> | TEXT                   | NA                                                     |                          |
-> | BINTEXT                | NA                                                     |                          |
+> | SECONDDATE             | NA                                                     |      Not Available       |
+> | BLOB                   | NA                                                     |      Not Available       |
+> | CLOB                   | NA                                                     |      Not Available       |
+> | NCLOB                  | NA                                                     |      Not Available       |
+> | TEXT                   | NA                                                     |      Not Available       |
+> | BINTEXT                | NA                                                     |      Not Available       |
 
 **Note**
 
@@ -126,12 +126,12 @@ openLooKeng support creating tables with the following type into a SAP HANA Data
 > | VARCHAR                  | VARCHAR                |       |
 > | CHAR                     | CHAR                   |       |
 > | VARBINARY                | VARBINARY              |       |
-> | JSON                     | NA                     |       |
+> | JSON                     | NA                     |   Not Available    |
 > | DATE                     | DATE                   |       |
-> | TIME                     | TIME                   |       |
-> | TIME WITH TIME ZONE      | NA                     |       |
-> | TIMESTAMP                | TIMESTAMP              |       |
-> | TIMESTAMP WITH TIME ZONE | NA                     |       |
+> | TIME                     | NA                   |  Not Available     |
+> | TIME WITH TIME ZONE      | NA                     |  Not Available     |
+> | TIMESTAMP                | NA              |   Not Available    |
+> | TIMESTAMP WITH TIME ZONE | NA                     |  Not Available     |
 
 ### openLooKeng-to-Hana function Mapping
 
