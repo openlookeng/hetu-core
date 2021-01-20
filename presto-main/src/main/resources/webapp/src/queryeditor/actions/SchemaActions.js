@@ -52,11 +52,9 @@ class SchemaActions {
         })
     }
 
-    fetchSchemas(catalogs, refresh = false) {
-        return xhr("../api/table/schemas?force=" + refresh).then((data) => {
-            if (refresh) {
-                catalogs = [];
-            }
+    fetchSchemas(catalogs) {
+        return xhr("../api/metadata/schemas").then((data) => {
+            catalogs = [];
             for (const [index, entry] of data.entries()) {
                 let catalog = _.find(catalogs, {name: entry.catalogName});
                 if (_.isUndefined(catalog)) {
@@ -77,37 +75,29 @@ class SchemaActions {
                             type: dataType.SCHEMA,
                             catalog: catalog.name,
                             fqn: "schematree-schema." + catalog.name + "." + schemaName,
-                            children: []
+                            children: () => {
+                                return new Promise((resolve, reject) => {
+                                    var schemaTables = xhr("../api/metadata/tables/" + catalog.name + "/" + schemaName).then((data) => {
+                                       var tables = [];
+                                       for (const [index, entry] of data.entries()) {
+                                           var table = {
+                                               name: entry.table,
+                                               type: dataType.TABLE,
+                                               catalog: entry.connectorId,
+                                               schema: entry.schema,
+                                               fqn: entry.fqn
+                                           };
+                                           tables.push(table);
+                                       }
+                                       return tables;
+                                    });
+                                    // resolves into the children model
+                                    resolve(schemaTables);
+                                });
+                            }
                         };
                         schemas.push(schema);
                     }
-                }
-                if (!refresh) {
-                    //Remove deleted schemas
-                    //Reverse iterate and mutate array by index.
-                    let existingSchemas = catalog.children;
-                    let schemaIndex = existingSchemas.length - 1;
-                    while (schemaIndex >= 0) {
-                        let currentSchema = existingSchemas[schemaIndex];
-                        let fetchedSchema = entry.schemas.indexOf(currentSchema.name);
-                        if (_.isUndefined(fetchedSchema) || fetchedSchema < 0) {
-                            existingSchemas.splice(schemaIndex, 1);
-                        }
-                        schemaIndex -= 1;
-                    }
-                }
-            }
-            if (!refresh) {
-                //Remove removed catalogs
-                //Reverse iterate and mutate array by index.
-                let index = catalogs.length - 1;
-                while (index >= 0) {
-                    let currentCatalog = catalogs[index];
-                    let fetchedCatalog = _.find(data, {catalogName: currentCatalog.name});
-                    if (_.isUndefined(fetchedCatalog)) {
-                        catalogs.splice(index, 1);
-                    }
-                    index -= 1;
                 }
             }
             return catalogs;
@@ -117,65 +107,76 @@ class SchemaActions {
         });
     }
 
-    fetchTables(catalogs) {
-        return xhr("../api/table").then((data) => {
-            for (const [index, entry] of data.entries()) {
-                let catalog = _.find(catalogs, {name: entry.connectorId});
-                if (_.isUndefined(catalog)) {
-                    catalog = {
-                        name: entry.connectorId,
-                        type: dataType.CATALOG,
-                        fqn: "schematree-catalog." + entry.catalogName,
-                        children: []
-                    };
-                    catalogs.push(catalog);
-                }
-                let schemas = catalog.children;
-                let schema = _.find(schemas, {name: entry.schema});
-                if (_.isUndefined(schema)) {
-                    schema = {
-                        name: entry.schema,
-                        type: dataType.SCHEMA,
-                        catalog: entry.connectorId,
-                        fqn: "schematree-schema." + catalog.name + "." + schemaName,
-                        children: []
-                    };
-                    schemas.push(schema);
-                }
-                let tables = schema.children;
-                let table = _.find(tables, {name: entry.table});
-                if (_.isUndefined(table)) {
-                    table = {
-                        name: entry.table,
-                        type: dataType.TABLE,
-                        catalog: entry.connectorId,
-                        schema: entry.schema,
-                        fqn: entry.fqn
-                    };
-                    tables.push(table);
-                }
-            }
-            catalogs.forEach(function (catalog, index, catalogsArray) {
-                catalog.children.forEach(function (schema, schemaIndex, schemasArray) {
-                    //Remove deleted tables
-                    //Reverse iterate and mutate array by index.
-                    let existingTables = schema.children;
-                    let tableIndex = existingTables.length - 1;
-                    while (tableIndex >= 0) {
-                        let currentTable = existingTables[tableIndex];
-                        let fetchedTable = _.find(data, {connectorId: catalog.name, schema: schema.name, table: currentTable.name});
-                        if (_.isUndefined(fetchedTable)) {
-                            existingTables.splice(tableIndex, 1);
-                        }
-                        tableIndex -= 1;
+    fetchChildren(catalogs, item) {
+        if (item.type == dataType.CATALOG) {
+            return xhr("../api/metadata/schemas/" + item.name).then((data) => {
+                let catalog = _.find(catalogs, {name: item.name});
+                if (!_.isUndefined(catalog)) {
+                    let schemas = [];
+                    for (const [index, schemaName] of data.schemas.entries()) {
+                        let schema = {
+                            name: schemaName,
+                            type: dataType.SCHEMA,
+                            catalog: catalog.name,
+                            fqn: "schematree-schema." + catalog.name + "." + schemaName,
+                            children: () => {
+                                return new Promise((resolve, reject) => {
+                                    var schemaTables = xhr("../api/metadata/tables/" + catalog.name + "/" + schemaName).then((data) => {
+                                       var tables = [];
+                                       for (const [index, entry] of data.entries()) {
+                                           var table = {
+                                               name: entry.table,
+                                               type: dataType.TABLE,
+                                               catalog: entry.connectorId,
+                                               schema: entry.schema,
+                                               fqn: entry.fqn
+                                           };
+                                           tables.push(table);
+                                       }
+                                       return tables;
+                                    });
+                                    // resolves into the children model
+                                    resolve(schemaTables);
+                                });
+                            }
+                        };
+                        schemas.push(schema);
                     }
-                })
-            })
-            return catalogs;
-        }).then((catalogs) => {
-            this.actions.updateTables(catalogs);
-            return catalogs;
-        });
+                    catalog.children = schemas;
+                }
+                return catalogs;
+            }).then((catalogs) => {
+                this.actions.updateSchemas(catalogs);
+                return catalogs;
+            });
+        }
+        else if (item.type == dataType.SCHEMA) {
+            return xhr("../api/metadata/tables/" + item.catalog + "/" + item.name).then((data) => {
+                let catalog = _.find(catalogs, {name: item.catalog});
+                if (!_.isUndefined(catalog))  {
+                    let schema = _.find(catalog.children, {name: item.name});
+                    if (!_.isUndefined(schema)) {
+                        var tables = [];
+                        for (const [index, entry] of data.entries()) {
+                            var table = {
+                                name: entry.table,
+                                type: dataType.TABLE,
+                                catalog: entry.connectorId,
+                                schema: entry.schema,
+                                fqn: entry.fqn
+                            };
+                            tables.push(table);
+                        }
+                        schema.children = tables;
+                    }
+                }
+                catalog.children = [...catalog.children];
+                return catalogs;
+            }).then((catalogs) => {
+                this.actions.updateTables(catalogs);
+                return catalogs;
+            });
+        }
     }
 }
 

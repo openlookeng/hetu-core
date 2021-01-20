@@ -298,7 +298,7 @@ let CellRenderers = {
     let run = rowData._run;
     let link = (run.infoUri != null && run.infoUri != "") ? run.infoUri : "#";
     if (run.state === RunStateConstants.FAILED) {
-      return (<span><span className="label label-danger" style={{minWidth:"61px"}}><a href={link} target="_blank">FAILED</a></span><a href="javascript:void(0)" title="Queries may fail or be cancelled if they exceed configured resources limits.This includes limits on memory consumption and result file size"><i className="fa fa-info" style={{top:'3px',color:'#d5534f',marginLeft:'5px'}}></i></a></span>);
+      return (<span><span className="label label-danger" style={{minWidth:"61px"}}><a href={link} target="_blank">FAILED</a></span><a href="#" title="Queries may fail or be cancelled if they exceed configured resources limits.This includes limits on memory consumption and result file size"><i className="fa fa-info" style={{top:'3px',color:'#d5534f',marginLeft:'5px'}}></i></a></span>);
     } else if (run.state === RunStateConstants.FINISHED) {
       return (<span className="label label-success" style={{minWidth:"61px"}}><a href={link} target="_blank">{run.state}</a></span>);
     } else if (run.state === RunStateConstants.QUEUED) {
