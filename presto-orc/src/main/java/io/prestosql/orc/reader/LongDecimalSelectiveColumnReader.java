@@ -134,6 +134,7 @@ public class LongDecimalSelectiveColumnReader
         outputPositionCount = 0;
         long[] data = new long[2];
         Slice rescaledDecimal = UnscaledDecimal128Arithmetic.unscaledDecimal();
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             if (position > streamPosition) {
@@ -147,7 +148,7 @@ public class LongDecimalSelectiveColumnReader
                         nulls[outputPositionCount] = true;
                     }
 
-                    if (accumulator != null) {
+                    if (accumulator != null && checkNulls) {
                         accumulator.set(position);
                     }
 
@@ -163,7 +164,7 @@ public class LongDecimalSelectiveColumnReader
                 long low = UnsafeSlice.getLongUnchecked(rescaledDecimal, 0);
                 long high = UnsafeSlice.getLongUnchecked(rescaledDecimal, Long.BYTES);
                 if ((accumulator != null && accumulator.get(position))
-                        || filters == null || filters.get(0).testDecimal(low, high)) {
+                        || filters == null || filters.stream().anyMatch(f -> f.testDecimal(low, high))) {
                     if (accumulator != null) {
                         accumulator.set(position);
                     }

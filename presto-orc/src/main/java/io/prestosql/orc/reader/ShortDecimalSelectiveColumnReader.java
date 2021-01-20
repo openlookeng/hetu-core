@@ -119,6 +119,7 @@ public class ShortDecimalSelectiveColumnReader
         int streamPosition = 0;
         outputPositionCount = 0;
         long[] data = new long[1];
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             if (position > streamPosition) {
@@ -131,7 +132,7 @@ public class ShortDecimalSelectiveColumnReader
                     if (outputRequired) {
                         nulls[outputPositionCount] = true;
                     }
-                    if (accumulator != null) {
+                    if (accumulator != null && checkNulls) {
                         accumulator.set(position);
                     }
                     outputPositions[outputPositionCount] = position;
@@ -142,7 +143,7 @@ public class ShortDecimalSelectiveColumnReader
                 dataStream.nextShortDecimal(data, 1);
                 long rescale = Decimals.rescale(data[0], (int) scaleStream.next(), this.scale);
                 if ((accumulator != null && accumulator.get(position))
-                        || filters == null || filters.get(0).testLong(rescale)) {
+                        || filters == null || filters.stream().anyMatch(f -> f.testLong(rescale))) {
                     if (accumulator != null) {
                         accumulator.set(position);
                     }

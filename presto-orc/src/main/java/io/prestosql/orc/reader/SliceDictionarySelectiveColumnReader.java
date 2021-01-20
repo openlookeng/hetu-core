@@ -252,6 +252,7 @@ public class SliceDictionarySelectiveColumnReader
             throws IOException
     {
         int streamPosition = 0;
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             if (position > streamPosition) {
@@ -264,7 +265,7 @@ public class SliceDictionarySelectiveColumnReader
                     if (outputRequired) {
                         values[outputPositionCount] = dictionaryBlock.getPositionCount() - 1;
                     }
-                    if (accumulator != null) {
+                    if (accumulator != null && checkNulls) {
                         accumulator.set(position);
                     }
                     outputPositions[outputPositionCount] = position;
@@ -277,7 +278,7 @@ public class SliceDictionarySelectiveColumnReader
                 if (filters.get(0).testLength(currentPosLength)) {
                     Slice data = dictionaryBlock.getSlice(index, 0, currentPosLength);
                     if ((accumulator != null && accumulator.get(position))
-                            || filters == null || filters.get(0).testBytes(data.getBytes(), 0, currentPosLength)) {
+                            || filters == null || filters.stream().anyMatch(f -> f.testBytes(data.getBytes(), 0, currentPosLength))) {
                         if (accumulator != null) {
                             accumulator.set(position);
                         }
