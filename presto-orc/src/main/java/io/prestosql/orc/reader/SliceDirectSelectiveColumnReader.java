@@ -214,6 +214,7 @@ public class SliceDirectSelectiveColumnReader
         allNulls = false;
         int streamPosition = 0;
         int dataToSkip = 0;
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
 
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
@@ -231,7 +232,7 @@ public class SliceDirectSelectiveColumnReader
                         offsets[outputPositionCount + 1] = offset;
                         nulls[outputPositionCount] = true;
                     }
-                    if (accumulator != null) {
+                    if (accumulator != null && checkNulls) {
                         accumulator.set(position);
                     }
                     outputPositions[outputPositionCount] = position;
@@ -247,7 +248,7 @@ public class SliceDirectSelectiveColumnReader
                         dataToSkip = 0;
                         dataStream.next(data, dataOffset, dataOffset + length);
                         if ((accumulator != null && accumulator.get(position))
-                                || filters == null || filters.get(0).testBytes(data, dataOffset, length)) {
+                                || filters == null || filters.stream().anyMatch(f -> f.testBytes(data, dataOffset, length))) {
                             if (accumulator != null) {
                                 accumulator.set(position);
                             }
@@ -255,7 +256,7 @@ public class SliceDirectSelectiveColumnReader
                     }
                     else {
                         if ((accumulator != null && accumulator.get(position))
-                                || filters == null || filters.get(0).testBytes("".getBytes(), 0, 0)) {
+                                || filters == null || filters.stream().anyMatch(f -> f.testBytes("".getBytes(), 0, 0))) {
                             if (accumulator != null) {
                                 accumulator.set(position);
                             }

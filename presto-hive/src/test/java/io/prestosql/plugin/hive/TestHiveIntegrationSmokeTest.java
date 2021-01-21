@@ -66,6 +66,7 @@ import java.io.FilenameFilter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -5106,6 +5107,81 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate("DROP TABLE IF EXISTS array_test");
             assertUpdate("DROP TABLE IF EXISTS multiin");
             assertUpdate("DROP TABLE IF EXISTS inperftest");
+        }
+    }
+
+    @Test
+    public void testPushdownWithNullRows()
+    {
+        Session session = getSession();
+        Session session1 = Session.builder(session)
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                .build();
+        Session session2 = Session.builder(session)
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_disjunct_predicate_pushdown_enabled", "false")
+                .build();
+
+        String[] types = {"double", "decimal(7,2)", "decimal(38,7)", "integer", "bigint", "string", "boolean"};
+        for (String type : types) {
+            testPushdownNullForType(session1, session2, type);
+        }
+    }
+
+    private void testPushdownNullForType(Session sessionWithOr, Session sessionWithoutOR, String type)
+    {
+        try {
+            assertUpdate(sessionWithOr, "CREATE TABLE test_predicate_or_NULL (a " + type + ", b " + type + ", c int) with (transactional=true, format='orc')");
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL VALUES " +
+                    "(cast(0 as " + type + "), cast(0 as " + type + "),0)," +
+                    "(cast(1 as " + type + "), NULL, 1)," +
+                    "(NULL,cast(2 as " + type + "), 2)," +
+                    "(NULL,NULL,3)," +
+                    "(cast(4 as " + type + "), cast(4 as " + type + "),4)", 5);
+
+            List<String> queries = new ArrayList<>();
+            queries.add("SELECT * FROM test_predicate_or_NULL WHERE " +
+                    "c BETWEEN 0 AND 5 AND (a BETWEEN cast(0 as " + type + ") AND cast(5 as " + type + ") or b BETWEEN cast(0 as " + type + ") AND cast(5 as " + type + ")) " +
+                    "ORDER BY a,b,c");
+            queries.add("SELECT * FROM test_predicate_or_NULL WHERE " +
+                    "c BETWEEN 0 AND 5 " +
+                    "AND (" +
+                        "a BETWEEN cast(0 as " + type + ") and cast(5 as " + type + ") " +
+                        "OR b BETWEEN cast(0 as " + type + ") and cast(5 as " + type + ") " +
+                        "OR a IS NULL) " +
+                    "ORDER BY a,b,c");
+            queries.add("SELECT * FROM test_predicate_or_NULL WHERE " +
+                    "c BETWEEN 0 AND 5 " +
+                    "AND (" +
+                        "a BETWEEN cast(0 as " + type + ") and cast(5 as " + type + ") " +
+                        "OR b BETWEEN cast(0 as " + type + ") and cast(5 as " + type + ") " +
+                        "OR a IS NULL " +
+                        "OR b IS NULL" +
+                    ") ORDER BY a,b,c");
+            queries.add("SELECT * FROM test_predicate_or_NULL WHERE " +
+                    "c BETWEEN 0 AND 5 " +
+                    "AND (" +
+                        "a BETWEEN cast(0 as " + type + ") and cast(5 as " + type + ") " +
+                        "OR b BETWEEN cast(0 as " + type + ") and cast(1 as " + type + ") " +
+                        "OR a IS NOT NULL " +
+                        "OR a BETWEEN cast(3 as " + type + ") and cast(5 as " + type + ") " +
+                    ") ORDER BY a,b,c");
+
+            MaterializedResult expected;
+            MaterializedResult resultPushdownOr;
+            MaterializedResult resultPushdown;
+            for (String query : queries) {
+                expected = computeActual(query);
+                resultPushdownOr = computeActual(sessionWithOr, query);
+                resultPushdown = computeActual(sessionWithoutOR, query);
+
+                assertEquals(expected.getMaterializedRows(), resultPushdown.getMaterializedRows());
+                assertEquals(expected.getMaterializedRows(), resultPushdownOr.getMaterializedRows());
+                System.out.println("Type(" + type + ")\n-------------\n" + resultPushdown.getMaterializedRows());
+            }
+        }
+        finally {
+            assertUpdate("DROP TABLE IF EXISTS test_predicate_or_NULL");
         }
     }
 

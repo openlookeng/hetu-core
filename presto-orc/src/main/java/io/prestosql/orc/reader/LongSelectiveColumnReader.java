@@ -201,9 +201,10 @@ public class LongSelectiveColumnReader
 
         outputPositionCount = 0;
         int streamPosition = 0;
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         if (dataStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
-            if (filters != null && filters.get(0).testNull() && accumulator != null) {
+            if (checkNulls && accumulator != null) {
                 accumulator.set(positions[0], streamPosition);
             }
         }
@@ -224,7 +225,7 @@ public class LongSelectiveColumnReader
                         if (filters != null) {
                             outputPositions[outputPositionCount] = position;
                         }
-                        if (accumulator != null) {
+                        if (accumulator != null && checkNulls) {
                             accumulator.set(position);
                         }
                         outputPositionCount++;
@@ -233,7 +234,7 @@ public class LongSelectiveColumnReader
                 else {
                     long value = dataStream.next();
                     if ((accumulator != null && accumulator.get(position))
-                            || filters == null || filters.size() <= 0 || filters.get(0).testLong(value)) {
+                            || filters == null || filters.size() <= 0 || filters.stream().anyMatch(f -> f.testLong(value))) {
                         if (accumulator != null) {
                             accumulator.set(position);
                         }

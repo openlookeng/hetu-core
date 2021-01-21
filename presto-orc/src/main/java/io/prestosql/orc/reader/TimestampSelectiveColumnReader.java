@@ -206,6 +206,7 @@ public class TimestampSelectiveColumnReader
     {
         int streamPosition = 0;
         outputPositionCount = 0;
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             if (position > streamPosition) {
@@ -217,6 +218,9 @@ public class TimestampSelectiveColumnReader
                 if (nullsAllowed) {
                     if (outputRequired) {
                         nulls[outputPositionCount] = true;
+                    }
+                    if (accumulator != null && checkNulls) {
+                        accumulator.set(position);
                     }
                     outputPositions[outputPositionCount] = position;
                     outputPositionCount++;
