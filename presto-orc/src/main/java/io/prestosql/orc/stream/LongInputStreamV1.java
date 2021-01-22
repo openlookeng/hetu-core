@@ -16,6 +16,7 @@ package io.prestosql.orc.stream;
 import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.checkpoint.LongStreamCheckpoint;
 import io.prestosql.orc.checkpoint.LongStreamV1Checkpoint;
+import nova.hetu.omnicache.vector.LongVec;
 
 import java.io.IOException;
 
@@ -115,6 +116,35 @@ public class LongInputStreamV1
             }
             else {
                 System.arraycopy(literals, used, values, offset, chunkSize);
+            }
+            used += chunkSize;
+            offset += chunkSize;
+            items -= chunkSize;
+        }
+    }
+
+    @Override
+    public void next(LongVec values, int items)
+            throws IOException
+    {
+        int offset = 0;
+        while (items > 0) {
+            if (used == numLiterals) {
+                numLiterals = 0;
+                used = 0;
+                readValues();
+            }
+
+            int chunkSize = min(numLiterals - used, items);
+            if (repeat) {
+                for (int i = 0; i < chunkSize; i++) {
+                    values.set(offset + i, literals[0] + ((used + i) * delta));
+                }
+            }
+            else {
+                for (int i = 0; i < chunkSize; i++) {
+                    values.set(offset + i, literals[used + i]);
+                }
             }
             used += chunkSize;
             offset += chunkSize;

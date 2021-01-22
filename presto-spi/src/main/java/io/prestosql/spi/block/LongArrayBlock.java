@@ -14,6 +14,7 @@
 package io.prestosql.spi.block;
 
 import io.prestosql.spi.util.BloomFilter;
+import nova.hetu.omnicache.vector.LongVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -42,6 +43,7 @@ public class LongArrayBlock
     @Nullable
     private final boolean[] valueIsNull;
     private final long[] values; //change to use offheap --> accessible by RDMA
+    private final LongVec valuesVec;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
@@ -49,6 +51,11 @@ public class LongArrayBlock
     public LongArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, long[] values)
     {
         this(0, positionCount, valueIsNull.orElse(null), values);
+    }
+
+    public LongArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, LongVec longVec)
+    {
+        this(0, positionCount, valueIsNull.orElse(null), longVec);
     }
 
     LongArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, long[] values)
@@ -66,6 +73,7 @@ public class LongArrayBlock
             throw new IllegalArgumentException("values length is less than positionCount");
         }
         this.values = values;
+        this.valuesVec = null;
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("isNull length is less than positionCount");
@@ -74,6 +82,32 @@ public class LongArrayBlock
 
         sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
         retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values);
+    }
+
+    public LongArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, LongVec longVec)
+    {
+        if (arrayOffset < 0) {
+            throw new IllegalArgumentException("arrayOffset is negative");
+        }
+        this.arrayOffset = arrayOffset;
+        if (positionCount < 0) {
+            throw new IllegalArgumentException("positionCount is negative");
+        }
+        this.positionCount = positionCount;
+
+        if (longVec.size() - arrayOffset < positionCount) {
+            throw new IllegalArgumentException("values length is less than positionCount");
+        }
+        this.valuesVec = longVec;
+        this.values = null;
+
+        if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
+            throw new IllegalArgumentException("isNull length is less than positionCount");
+        }
+        this.valueIsNull = valueIsNull;
+
+        sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + Long.BYTES * valuesVec.size();
     }
 
     @Override

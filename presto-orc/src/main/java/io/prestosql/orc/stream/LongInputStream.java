@@ -14,6 +14,7 @@
 package io.prestosql.orc.stream;
 
 import io.prestosql.orc.checkpoint.LongStreamCheckpoint;
+import nova.hetu.omnicache.vector.LongVec;
 
 import java.io.IOException;
 
@@ -24,6 +25,9 @@ public interface LongInputStream
         extends ValueInputStream<LongStreamCheckpoint>
 {
     long next()
+            throws IOException;
+
+    void next(LongVec longVec, int items)
             throws IOException;
 
     void next(long[] values, int items)

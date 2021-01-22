@@ -22,6 +22,7 @@ import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
+import nova.hetu.omnicache.vector.LongVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -30,7 +31,7 @@ import java.util.Optional;
 import static com.google.common.base.Verify.verify;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.orc.reader.ReaderUtils.minNonNullValueSize;
-import static io.prestosql.orc.reader.ReaderUtils.unpackLongNulls;
+import static io.prestosql.orc.reader.ReaderUtils.unpackLongNullsVec;
 
 public class LongColumnReader
         extends AbstractNumericColumnReader<Long>
@@ -107,9 +108,10 @@ public class LongColumnReader
             throws IOException
     {
         verify(dataStream != null);
-        long[] values = new long[nextBatchSize];
-        dataStream.next(values, nextBatchSize);
-        return new LongArrayBlock(nextBatchSize, Optional.empty(), values);
+//        long[] values = new long[nextBatchSize];
+        LongVec longVec = new LongVec(nextBatchSize);
+        dataStream.next(longVec, nextBatchSize);
+        return new LongArrayBlock(nextBatchSize, Optional.empty(), longVec);
     }
 
     private Block readNullBlock(boolean[] isNull, int nonNullCount)
@@ -130,7 +132,7 @@ public class LongColumnReader
 
         dataStream.next(longNonNullValueTemp, nonNullCount);
 
-        long[] result = unpackLongNulls(longNonNullValueTemp, isNull);
+        LongVec result = unpackLongNullsVec(longNonNullValueTemp, isNull);
 
         return new LongArrayBlock(nextBatchSize, Optional.of(isNull), result);
     }
