@@ -23,7 +23,6 @@ import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexWriter;
-import io.prestosql.spi.heuristicindex.KeyValue;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.type.Type;
 
@@ -39,8 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
-import static io.hetu.core.heuristicindex.util.SerializationUtils.serializeMap;
+import static io.prestosql.spi.heuristicindex.SerializationUtils.serializeMap;
+import static io.prestosql.spi.heuristicindex.SerializationUtils.serializeStripeSymbol;
 
 /**
  * Indexes which needs to be created at table or partition level
@@ -49,86 +50,82 @@ import static io.hetu.core.heuristicindex.util.SerializationUtils.serializeMap;
 public class PartitionIndexWriter
         implements IndexWriter
 {
+    public static final String SYMBOL_TABLE_KEY_NAME = "__hetu__symboltable";
+    public static final String PREFIX_KEY_NAME = "__hetu__pathprefix";
+    public static final String MAX_MODIFIED_TIME = "__hetu__maxmodifiedtime";
+
     private static final Logger LOG = Logger.get(PartitionIndexWriter.class);
-    private static final String SYMBOL_TABLE_KEY_NAME = "__hetu__symboltable";
-    private static final String PREFIX_KEY_NAME = "__hetu__partitionprefix";
-    private static final String LAST_MODIFIED_KEY_NAME = "__hetu__lastmodified";
-    private static final String MAX_MODIFIED_TIME = "__hetu__maxmodifiedtime";
+
+    private final CreateIndexMetadata createIndexMetadata;
+    private final Lock persistLock = new ReentrantLock();
+    private final Properties properties;
+    private final HetuFileSystemClient fs;
+    private final Path root;
+    private final AtomicInteger counter = new AtomicInteger(0); // symbol table counter
+    private final Map<String, String> symbolToIdMap;
+    private final Map<Comparable<? extends Comparable<?>>, String> dataMap;
 
     private Index partitionIndex;
     private String partition;
-    protected AtomicInteger counter = new AtomicInteger(0); // symbol table counter
-    private CreateIndexMetadata createIndexMetadata;
-    private Lock persistLock = new ReentrantLock();
-    protected Map<String, String> symbolTable;
-    protected Map<Object, String> dataMap;
-    protected Map<String, Long> lastModifiedTable;
     private Long maxLastModifiedTime = 0L;
-    private Properties properties;
-    private String pathPrefix;
-    private HetuFileSystemClient fs;
-    private Path root;
 
-    public PartitionIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root)
+    public PartitionIndexWriter(CreateIndexMetadata createIndexMetadata, HetuFileSystemClient fs, Path root)
     {
         this.createIndexMetadata = createIndexMetadata;
         this.fs = fs;
         this.root = root;
         properties = new Properties();
-        symbolTable = new ConcurrentHashMap<>();
+        symbolToIdMap = new ConcurrentHashMap<>();
         dataMap = new ConcurrentHashMap<>();
-        lastModifiedTable = new ConcurrentHashMap<>();
     }
 
     @Override
     public void addData(Map<String, List<Object>> values, Properties connectorMetadata)
             throws IOException
     {
-        String filePath = connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH);
-        Path path = Paths.get(filePath);
-        pathPrefix = path.getParent().toString();
-        String fileName = path.getName(path.getNameCount() - 1).toString();
+        Path path = Paths.get(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH));
 
         if (Strings.isNullOrEmpty(partition)) {
-            if (!createIndexMetadata.getTableName().equalsIgnoreCase(path.getName(path.getNameCount() - 2).toString())) {
+            if (createIndexMetadata.getCreateLevel() == Index.Level.PARTITION) {
                 partition = path.getName(path.getNameCount() - 2).toString();
             }
         }
 
-        long lastModified = Long.parseLong((String) connectorMetadata.get(HetuConstant.DATASOURCE_FILE_MODIFICATION));
-        String offset = String.valueOf(connectorMetadata.getProperty(HetuConstant.DATASOURCE_STRIPE_OFFSET));
-        lastModifiedTable.put(fileName, lastModified);
+        long lastModified = Long.parseLong(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION));
+        long offset = Long.parseLong(connectorMetadata.getProperty(HetuConstant.DATASOURCE_STRIPE_OFFSET));
+        long stripeLength = Long.parseLong(connectorMetadata.getProperty(HetuConstant.DATASOURCE_STRIPE_LENGTH));
+
         if (lastModified > maxLastModifiedTime) {
             maxLastModifiedTime = lastModified;
         }
-        //TODO: Currently we only support index on single column. The order is not deterministic in current
-        // IndexMetadata hence we cannot rely on it.
-        fillDataMap(values, fileName, offset);
-        LOG.debug("Symbol Table: " + symbolTable);
+        fillDataMap(values, serializeStripeSymbol(path.toString(), offset, offset + stripeLength));
+        LOG.debug("Symbol Table: " + symbolToIdMap);
     }
 
-    private void fillDataMap(Map<String, List<Object>> values, String fileName, String offset)
+    private void fillDataMap(Map<String, List<Object>> values, String symbol)
     {
         Map.Entry<String, List<Object>> valueEntry = values.entrySet().iterator().next();
-        String code = null;
-        if (this.symbolTable.containsKey(fileName)) {
-            code = symbolTable.get(fileName);
+
+        String code;
+        if (this.symbolToIdMap.containsKey(symbol)) {
+            code = symbolToIdMap.get(symbol);
         }
         else {
             code = String.valueOf(counter.incrementAndGet());
-            this.symbolTable.put(fileName, code);
+            this.symbolToIdMap.put(symbol, code);
         }
-        String splitData = code + ":" + offset;
         for (Object key : valueEntry.getValue()) {
             if (key != null) {
-                String existing = dataMap.putIfAbsent(key, splitData);
+                // key must be a Comparable<T extends Comparable<T>> to be inserted into btree
+                Comparable<? extends Comparable<?>> comparableKey = (Comparable<? extends Comparable<?>>) key;
+                String existing = dataMap.putIfAbsent(comparableKey, code);
                 if (existing != null) {
-                    String newData = getNewData(key, splitData);
-                    boolean done = dataMap.replace(key, existing, newData);
+                    String newData = getNewData(key, code);
+                    boolean done = dataMap.replace(comparableKey, existing, newData);
                     while (!done) {
                         existing = dataMap.get(key);
-                        newData = getNewData(key, splitData);
-                        done = dataMap.replace(key, existing, newData);
+                        newData = getNewData(key, code);
+                        done = dataMap.replace(comparableKey, existing, newData);
                     }
                 }
             }
@@ -138,10 +135,7 @@ public class PartitionIndexWriter
     private String getNewData(Object key, String splitData)
     {
         String output = dataMap.get(key);
-        StringBuilder sb = new StringBuilder(output);
-        sb.append(",");
-        sb.append(splitData);
-        return sb.toString();
+        return output + "," + splitData;
     }
 
     @Override
@@ -150,12 +144,15 @@ public class PartitionIndexWriter
     {
         persistLock.lock();
         try {
-            String serializedSymbolTable = serializeMap(symbolTable);
+            // inverse map from symbol -> id to id -> symbol for better lookup performance
+            Map<String, String> idToSymbolMap = symbolToIdMap.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+
+            String serializedSymbolTable = serializeMap(idToSymbolMap);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Symbol table size: " + symbolTable.size());
+                LOG.debug("Symbol table size: " + idToSymbolMap.size());
                 LOG.debug("Output map size: " + dataMap.size());
                 LOG.debug("symbol table: " + serializedSymbolTable);
-                LOG.debug("path prefix: " + pathPrefix);
             }
 
             String dbPath = "";
@@ -164,22 +161,20 @@ public class PartitionIndexWriter
                     dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey() + "/" + createIndexMetadata.getIndexType().toUpperCase() + "/" + partition;
                 }
                 else {
-                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + createIndexMetadata.getIndexType().toUpperCase() + "/" + entry.getKey();
+                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey() + "/" + createIndexMetadata.getIndexType().toUpperCase();
                 }
                 partitionIndex = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType());
             }
 
-            List<KeyValue> values = new ArrayList<>(dataMap.size());
-            for (Map.Entry<Object, String> entry : dataMap.entrySet()) {
-                values.add(new KeyValue(entry.getKey(), entry.getValue()));
+            List<Pair<Comparable<? extends Comparable<?>>, String>> values = new ArrayList<>(dataMap.size());
+            for (Map.Entry<Comparable<? extends Comparable<?>>, String> entry : dataMap.entrySet()) {
+                values.add(new Pair<>(entry.getKey(), entry.getValue()));
             }
             String columnName = createIndexMetadata.getIndexColumns().get(0).getKey();
             partitionIndex.addKeyValues(Collections.singletonList(new Pair<>(columnName, values)));
 
             properties.put(SYMBOL_TABLE_KEY_NAME, serializedSymbolTable);
-            properties.put(LAST_MODIFIED_KEY_NAME, serializeMap(lastModifiedTable));
             properties.put(MAX_MODIFIED_TIME, String.valueOf(maxLastModifiedTime));
-            properties.put(PREFIX_KEY_NAME, pathPrefix);
             partitionIndex.setProperties(properties);
             Path filePath = Paths.get(dbPath + "/" + BTreeIndex.FILE_NAME);
 
@@ -200,7 +195,7 @@ public class PartitionIndexWriter
     }
 
     @VisibleForTesting
-    protected Map<Object, String> getDataMap()
+    protected Map<Comparable<? extends Comparable<?>>, String> getDataMap()
     {
         return this.dataMap;
     }
@@ -208,6 +203,6 @@ public class PartitionIndexWriter
     @VisibleForTesting
     protected Map<String, String> getSymbolTable()
     {
-        return this.symbolTable;
+        return this.symbolToIdMap;
     }
 }

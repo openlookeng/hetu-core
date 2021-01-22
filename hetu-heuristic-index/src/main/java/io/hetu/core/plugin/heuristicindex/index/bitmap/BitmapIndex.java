@@ -16,10 +16,10 @@ package io.hetu.core.plugin.heuristicindex.index.bitmap;
 
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.SortedRangeSet;
-import kotlin.Pair;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.mapdb.BTreeMap;
@@ -124,7 +124,7 @@ public class BitmapIndex
     }
 
     @Override
-    public boolean addValues(List<io.prestosql.spi.heuristicindex.Pair<String, List<Object>>> values)
+    public boolean addValues(List<Pair<String, List<Object>>> values)
             throws IOException
     {
         checkClosed();
@@ -156,7 +156,7 @@ public class BitmapIndex
                 return true;
             }
 
-            List<Pair> bitmaps = new ArrayList<>(positions.size());
+            List<kotlin.Pair> bitmaps = new ArrayList<>(positions.size());
             for (Map.Entry<Object, ArrayList<Integer>> e : positions.entrySet()) {
                 int[] valuePositions = ArrayUtils.toPrimitive(e.getValue().toArray(new Integer[0]));
                 RoaringBitmap rr = RoaringBitmap.bitmapOf(valuePositions);
@@ -167,7 +167,7 @@ public class BitmapIndex
                 dos.close();
                 Object value = convertToSupportedType(e.getKey());
 
-                bitmaps.add(new Pair(value, bos.toByteArray()));
+                bitmaps.add(new kotlin.Pair(value, bos.toByteArray()));
             }
             Collections.sort(bitmaps, (o1, o2) -> ((Comparable) o1.component1()).compareTo(o2.component1()));
             getBtreeWriteOptimized(bitmaps.iterator().next().component1(), bitmaps.iterator());
@@ -185,7 +185,7 @@ public class BitmapIndex
     }
 
     @Override
-    public <I> Iterator<I> lookUp(Object expression)
+    public Iterator<Integer> lookUp(Object expression)
     {
         checkClosed();
 
@@ -227,7 +227,7 @@ public class BitmapIndex
                     return Collections.emptyIterator();
                 }
 
-                Iterator result = new Iterator<Integer>()
+                return new Iterator<Integer>()
                 {
                     @Override
                     public boolean hasNext()
@@ -241,7 +241,6 @@ public class BitmapIndex
                         return iterator.next();
                     }
                 };
-                return result;
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
@@ -354,7 +353,8 @@ public class BitmapIndex
         return db;
     }
 
-    private BTreeMap getBtreeWriteOptimized(Object key, Iterator<Pair> entries) throws IOException
+    private BTreeMap getBtreeWriteOptimized(Object key, Iterator<kotlin.Pair> entries)
+            throws IOException
     {
         if (btree == null) {
             // store the btree's key serializer type in the db, this will be required during reading

@@ -15,7 +15,9 @@
 
 package io.hetu.core.heuristicindex.filter;
 
+import io.hetu.core.common.algorithm.SequenceUtils;
 import io.prestosql.spi.heuristicindex.IndexFilter;
+import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.Cast;
@@ -26,7 +28,7 @@ import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.SymbolReference;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +63,7 @@ public class HeuristicIndexFilter
 
         if (expression instanceof LogicalBinaryExpression) {
             LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) expression;
-            final LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
+            LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
             if (operator == LogicalBinaryExpression.Operator.AND) {
                 return matches(lbExpression.getLeft()) && matches(lbExpression.getRight());
             }
@@ -94,9 +96,44 @@ public class HeuristicIndexFilter
     }
 
     @Override
-    public <I> Iterator<I> lookUp(Object expression)
+    public <I extends Comparable<I>> Iterator<I> lookUp(Object expression)
+            throws IndexLookUpException
     {
-        return Collections.emptyIterator();
+        if (expression instanceof ComparisonExpression || expression instanceof InPredicate || expression instanceof BetweenPredicate) {
+            return lookUpAll((Expression) expression);
+        }
+
+        if (expression instanceof LogicalBinaryExpression) {
+            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) expression;
+            LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
+            if (operator == LogicalBinaryExpression.Operator.AND) {
+                Iterator<I> iterator1 = lookUp(lbExpression.getLeft());
+                Iterator<I> iterator2 = lookUp(lbExpression.getRight());
+
+                if (iterator1 == null && iterator2 == null) {
+                    return null;
+                }
+                else if (iterator1 == null) {
+                    return iterator2;
+                }
+                else if (iterator2 == null) {
+                    return iterator1;
+                }
+                else {
+                    return SequenceUtils.intersect(iterator1, iterator2);
+                }
+            }
+            else if (operator == LogicalBinaryExpression.Operator.OR) {
+                Iterator<I> iterator1 = lookUp(lbExpression.getLeft());
+                Iterator<I> iterator2 = lookUp(lbExpression.getRight());
+                if (iterator1 == null || iterator2 == null) {
+                    throw new IndexLookUpException();
+                }
+                return SequenceUtils.union(iterator1, iterator2);
+            }
+        }
+
+        throw new IndexLookUpException();
     }
 
     private static Expression extractExpression(Expression expression)
@@ -114,7 +151,6 @@ public class HeuristicIndexFilter
     private boolean matchAny(ComparisonExpression compExp)
     {
         Expression left = extractExpression(compExp.getLeft());
-        Expression right = extractExpression(compExp.getRight());
 
         if (!(left instanceof SymbolReference)) {
             return true;
@@ -146,5 +182,40 @@ public class HeuristicIndexFilter
 
         // None of the index matches the expression
         return false;
+    }
+
+    private <T extends Comparable<T>> Iterator<T> lookUpAll(Expression expression)
+    {
+        Expression left = null;
+
+        if (expression instanceof ComparisonExpression) {
+            left = extractExpression(((ComparisonExpression) expression).getLeft());
+        }
+
+        if (expression instanceof BetweenPredicate) {
+            left = extractExpression(((BetweenPredicate) expression).getValue());
+        }
+
+        if (expression instanceof InPredicate) {
+            left = extractExpression(((InPredicate) expression).getValue());
+        }
+
+        if (!(left instanceof SymbolReference)) {
+            return null;
+        }
+
+        List<IndexMetadata> selectedIndex = HeuristicIndexSelector.select(expression, indices.get(((SymbolReference) left).getName()));
+
+        if (selectedIndex.isEmpty()) {
+            return null;
+        }
+
+        List<Iterator<T>> iterators = new ArrayList<>(selectedIndex.size());
+
+        for (IndexMetadata indexMetadata : selectedIndex) {
+            iterators.add((indexMetadata.getIndex()).lookUp(expression));
+        }
+
+        return SequenceUtils.union(iterators);
     }
 }

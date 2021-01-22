@@ -18,6 +18,7 @@ package io.hetu.core.common.algorithm;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -46,6 +47,14 @@ public class SequenceUtils
         return merge(iterators, false);
     }
 
+    public static <T extends Comparable<T>> Iterator<T> union(Iterator<T> iterator1, Iterator<T> iterator2)
+    {
+        List<Iterator<T>> iterators = new ArrayList<>(2);
+        iterators.add(iterator1);
+        iterators.add(iterator2);
+        return union(iterators);
+    }
+
     /**
      * Merge k sorted iterators into one by keeping the order and only one copy of each element.
      *
@@ -68,32 +77,57 @@ public class SequenceUtils
 
         return new Iterator<T>()
         {
-            T prev;
+            T next;
 
             public boolean hasNext()
             {
-                return !pq.isEmpty();
+                if (pq.isEmpty()) {
+                    return false;
+                }
+                else if (keepDuplication) {
+                    PeekingIterator<T> curr = pq.poll();
+                    next = curr.next();
+                    if (curr.hasNext()) {
+                        pq.add(curr);
+                    }
+                    return true;
+                }
+                else {
+                    PeekingIterator<T> curr = pq.poll();
+                    next = curr.next();
+                    if (curr.hasNext()) {
+                        pq.add(curr);
+                    }
+                    while (!pq.isEmpty()) {
+                        PeekingIterator<T> it = pq.poll();
+                        if (it.peek().equals(next)) {
+                            it.next();
+                            if (it.hasNext()) {
+                                pq.add(it);
+                            }
+                        }
+                        else {
+                            pq.add(it);
+                            return true;
+                        }
+                    }
+                    return true;
+                }
             }
 
             public T next()
             {
-                PeekingIterator<T> curr = pq.poll();
-                T val = curr.hasNext() ? curr.next() : null;
-                if (curr.hasNext()) {
-                    pq.add(curr);
-                }
-                if (keepDuplication) {
-                    return val;
-                }
-                else {
-                    if (prev == null || !prev.equals(val)) {
-                        prev = val;
-                        return val;
-                    }
-                    return next();
-                }
+                return next;
             }
         };
+    }
+
+    public static <T extends Comparable<T>> Iterator<T> merge(Iterator<T> iterator1, Iterator<T> iterator2, boolean keepDuplication)
+    {
+        List<Iterator<T>> iterators = new ArrayList<>(2);
+        iterators.add(iterator1);
+        iterators.add(iterator2);
+        return merge(iterators, keepDuplication);
     }
 
     /**
@@ -169,6 +203,14 @@ public class SequenceUtils
                 search();
             }
         };
+    }
+
+    public static <T extends Comparable<T>> Iterator<T> intersect(Iterator<T> iterator1, Iterator<T> iterator2)
+    {
+        List<Iterator<T>> iterators = new ArrayList<>(2);
+        iterators.add(iterator1);
+        iterators.add(iterator2);
+        return intersect(iterators);
     }
 
     private static <T> T allEquals(T[] arr)

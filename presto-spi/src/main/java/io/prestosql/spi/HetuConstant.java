@@ -41,12 +41,12 @@ public class HetuConstant
     public static final String TRACE_STACK_VISIBLE = "stack-trace-visible";
     public static final long KILOBYTE = 1024L;
     public static final String DATASOURCE_CATALOG = "connector.name";
-    public static final String DATASOURCE_TYPE = "datasource_type";
     public static final String DATASOURCE_FILE_PATH = "datasource_file_path";
     public static final String DATASOURCE_FILE_MODIFICATION = "datasource_file_modification";
     public static final String DATASOURCE_INDEX_LEVEL = "datasource_index_level";
     public static final String DATASOURCE_STRIPE_NUMBER = "datasource_stripe_number";
     public static final String DATASOURCE_STRIPE_OFFSET = "datasource_stripe_offset";
+    public static final String DATASOURCE_STRIPE_LENGTH = "datasource_stripe_length";
     public static final String DATASOURCE_TOTAL_PAGES = "datasource_total_pages";
     public static final String DATASOURCE_PAGE_NUMBER = "datasource_page_number";
 }

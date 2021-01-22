@@ -55,6 +55,7 @@ import static io.prestosql.spi.HetuConstant.DATASOURCE_FILE_MODIFICATION;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_FILE_PATH;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_INDEX_LEVEL;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_PAGE_NUMBER;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_LENGTH;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_NUMBER;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_OFFSET;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_TOTAL_PAGES;
@@ -185,7 +186,8 @@ public class OrcRecordReader
                 pageCount = 0;
             }
             pageMetadata.setProperty(DATASOURCE_STRIPE_NUMBER, String.valueOf(currentStripe));
-            pageMetadata.setProperty(DATASOURCE_STRIPE_OFFSET, Long.valueOf(stripes.get(currentStripe).getOffset()).toString());
+            pageMetadata.setProperty(DATASOURCE_STRIPE_OFFSET, String.valueOf(stripes.get(currentStripe).getOffset()));
+            pageMetadata.setProperty(DATASOURCE_STRIPE_LENGTH, String.valueOf(stripes.get(currentStripe).getTotalLength()));
             if (splitMetadata != null) {
                 // Skip setting for testing (splitMetadata set as null)
                 pageMetadata.setProperty(DATASOURCE_FILE_PATH, splitMetadata.getSplitIdentity());

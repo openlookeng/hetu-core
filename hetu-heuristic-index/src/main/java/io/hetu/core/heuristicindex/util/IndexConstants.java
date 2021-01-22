@@ -30,18 +30,6 @@ public class IndexConstants
      */
     public static final String LAST_MODIFIED_FILE_PREFIX = "lastModified=";
 
-    public static final String CONFIG_FILE = "config.properties";
-
-    public static final String CATALOG_CONFIGS_DIR = "catalog";
-
-    public static final String DATASTORE_TYPE_KEY = "connector.name";
-
-    public static final String INDEX_KEYS_PREFIX = "hetu.heuristicindex.index.";
-
-    public static final String INDEXSTORE_URI_KEY = "hetu.heuristicindex.indexstore.uri";
-
-    public static final String INDEXSTORE_FILESYSTEM_PROFILE_KEY = "hetu.heuristicindex.indexstore.filesystem.profile";
-
     // The canonical names of Java type classes that the supported Presto types link to
     public static final String[] TYPES_WHITELIST = ImmutableList.of(
             Number.class,

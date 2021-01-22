@@ -31,6 +31,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.SplitSource;
 import io.prestosql.split.SplitSource.SplitBatch;
@@ -255,9 +256,9 @@ public class SourcePartitionedScheduler
                     scheduleGroup.nextSplitBatchFuture = null;
 
                     // add split filter to filter out split has no valid rows
-                    SplitFiltering.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
-                    List<Split> filteredSplit = applyFilter ? SplitFiltering.getFilteredSplit(pair.first,
-                            SplitFiltering.getFullyQualifiedName(stage), pair.second, nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
+                    Pair<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
+                    List<Split> filteredSplit = applyFilter ? SplitFiltering.getFilteredSplit(pair.getFirst(),
+                            SplitFiltering.getFullyQualifiedName(stage), pair.getSecond(), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
                     //In case of ORC small size files/splits are grouped
                     List<Split> groupedSmallFilesList = splitSource.groupSmallSplits(filteredSplit, lifespan);
