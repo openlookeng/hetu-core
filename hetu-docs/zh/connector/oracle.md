@@ -183,7 +183,7 @@ oracle.synonyms.enabled=true
 
 ## Oracle连接器的限制
 
-openLooKeng支持连接Oracle 11c和Oracle 12g。
+openLooKeng支持连接Oracle 11g和Oracle 12c。
 
 ### Oralce的number数据类型
 
