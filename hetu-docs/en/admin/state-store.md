@@ -24,7 +24,7 @@ State store is currently used by HA and dynamic filters features.
 
 - Multicast mechanism is not recommended for production since UDP is often blocked in production environments.
 
-### Configuring State Store Properties with TCP-IP
+#### Configuring State Store Properties with TCP-IP
 
 Create an `etc\state-store.properties` property file inside both state store members and clients installation directories.
 
@@ -53,14 +53,14 @@ Note: Please configure `hazelcast.discovery.tcp-ip.seeds` if state store members
 If state store members' ips are dynamic, user can configure `hazelcast.discovery.tcp-ip.profile` where members will store its ip:port in the profile, and discover each other automatically. 
 If both are configured, `hazelcast.discovery.tcp-ip.seeds` will be used.
 
-### Filesystem Properties
+#### Filesystem Properties
 
 Create an `etc\filesystem\hdfs-config-default.properties` property file inside both state store members and clients installation directories.
 
 Filesystem is required to be distributed filesystem so that all state store members and clients can access (ie. HDFS).
 ```
 fs.client.type=hdfs
-hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
+hdfs.config.resources=<hdfs_config_dir>/core-site.xml,<hdfs_config_dir>/hdfs-site.xml
 hdfs.authentication.type=NONE
 fs.hdfs.impl.disable.cache=true
 ```
@@ -77,3 +77,57 @@ state-store.cluster=cluster1
 hazelcast.discovery.mode=multicast 
 hazelcast.discovery.port=5701       
 ```
+The above properties are described the section `Configuring State Store Properties with TCP-IP`.
+
+## Configuring State Store Example
+This example describes how to configure state store cluster of 2 coordinators + 2 workers using `TCP-IP` discovery mode. Coordinators are configured as state store members and workers are configured as state store client.
+
+## Prerequisite and Assumption
+- coordinator1'ip=10.100.100.01, coordinator2's ip=10.100.100.02.
+- worker1'ip=10.100.100.03, worker2'ip=10.100.100.04.
+- HDFS is installed, core-site.xml and hdfs-site.xml are located in `/opt/hdfs` directory.
+
+#### Configuring Steps
+- Coordinators configuring steps
+   1. Open `etc/config.properties` and add following properties.
+      ```
+      hetu.embedded-state-store.enabled=true
+      ```
+   2. Create `etc\state-store.properties` property file and add following properties.
+      ```
+       state-store.type=hazelcast
+       state-store.name=query
+       state-store.cluster=cluster1
+      
+       hazelcast.discovery.mode=tcp-ip
+       hazelcast.discovery.port=5701
+       hazelcast.discovery.tcp-ip.seeds=10.100.100.01:5701,10.100.100.02:5701
+       hazelcast.discovery.tcp-ip.profile=hdfs-config-default
+      ```
+   3. Create an `etc\filesystem\hdfs-config-default.properties` property file and add following properties.
+      ```
+      fs.client.type=hdfs
+      hdfs.config.resources=/opt/hdfs/core-site.xml,/opt/hdfs/hdfs-site.xml
+      hdfs.authentication.type=NONE
+      fs.hdfs.impl.disable.cache=true
+      ```
+- Workers configuring steps
+   1. Create `etc\state-store.properties` property file and add following properties.
+      ```
+       state-store.type=hazelcast
+       state-store.name=query
+       state-store.cluster=cluster1
+      
+       hazelcast.discovery.mode=tcp-ip
+       hazelcast.discovery.tcp-ip.seeds=10.100.100.01:5701,10.100.100.02:5701
+       hazelcast.discovery.tcp-ip.profile=hdfs-config-default
+      ```
+   2. Create an `etc\filesystem\hdfs-config-default.properties` property file and add following properties.
+      ```
+      fs.client.type=hdfs
+      #Assume core-site.xml and hdfs-site.xml are located in /opt/hdfs directory
+      hdfs.config.resources=/opt/hdfs/core-site.xml,/opt/hdfs/hdfs-site.xml
+      hdfs.authentication.type=NONE
+      fs.hdfs.impl.disable.cache=true
+      ```
+
