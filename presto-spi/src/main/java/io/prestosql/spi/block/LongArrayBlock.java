@@ -143,11 +143,11 @@ public class LongArrayBlock
     @Override
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
-        consumer.accept(values, sizeOf(values));
+        /*consumer.accept(values, );
         if (valueIsNull != null) {
             consumer.accept(valueIsNull, sizeOf(valueIsNull));
         }
-        consumer.accept(this, (long) INSTANCE_SIZE);
+        consumer.accept(this, (long) INSTANCE_SIZE);*/
     }
 
     @Override
@@ -163,7 +163,7 @@ public class LongArrayBlock
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
-        return values[position + arrayOffset];
+        return valuesVec.get(position + arrayOffset);
     }
 
     public Long get(int position)
@@ -171,7 +171,7 @@ public class LongArrayBlock
         if (valueIsNull != null && valueIsNull[position + arrayOffset]) {
             return null;
         }
-        return values[position + arrayOffset];
+        return valuesVec.get(position + arrayOffset);
     }
 
     @Override
@@ -183,42 +183,9 @@ public class LongArrayBlock
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
-        return toIntExact(values[position + arrayOffset]);
+        return toIntExact(valuesVec.get(position + arrayOffset));
     }
 
-    @Override
-    @Deprecated
-    // TODO: Remove when we fix intermediate types on aggregations.
-    public short getShort(int position, int offset)
-    {
-        checkReadablePosition(position);
-        if (offset != 0) {
-            throw new IllegalArgumentException("offset must be zero");
-        }
-
-        short value = (short) (values[position + arrayOffset]);
-        if (value != values[position + arrayOffset]) {
-            throw new ArithmeticException("short overflow");
-        }
-        return value;
-    }
-
-    @Override
-    @Deprecated
-    // TODO: Remove when we fix intermediate types on aggregations.
-    public byte getByte(int position, int offset)
-    {
-        checkReadablePosition(position);
-        if (offset != 0) {
-            throw new IllegalArgumentException("offset must be zero");
-        }
-
-        byte value = (byte) (values[position + arrayOffset]);
-        if (value != values[position + arrayOffset]) {
-            throw new ArithmeticException("byte overflow");
-        }
-        return value;
-    }
 
     @Override
     public boolean mayHaveNull()
@@ -237,7 +204,7 @@ public class LongArrayBlock
     public void writePositionTo(int position, BlockBuilder blockBuilder)
     {
         checkReadablePosition(position);
-        blockBuilder.writeLong(values[position + arrayOffset]);
+        blockBuilder.writeLong(valuesVec.get(position + arrayOffset));
         blockBuilder.closeEntry();
     }
 
@@ -249,7 +216,7 @@ public class LongArrayBlock
                 0,
                 1,
                 isNull(position) ? new boolean[] {true} : null,
-                new long[] {values[position + arrayOffset]});
+                new long[] {valuesVec.get(position + arrayOffset)});
     }
 
     @Override
@@ -268,7 +235,7 @@ public class LongArrayBlock
             if (valueIsNull != null) {
                 newValueIsNull[i] = valueIsNull[position + arrayOffset];
             }
-            newValues[i] = values[position + arrayOffset];
+            newValues[i] = valuesVec.get(position + arrayOffset);
         }
         return new LongArrayBlock(0, length, newValueIsNull, newValues);
     }
@@ -277,7 +244,10 @@ public class LongArrayBlock
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-
+        long []values = new long[valuesVec.size()];
+        for (int i=0; i<valuesVec.size(); i++) {
+            values[i] = valuesVec.get(i);
+        }
         return new LongArrayBlock(positionOffset + arrayOffset, length, valueIsNull, values);
     }
 
@@ -285,7 +255,10 @@ public class LongArrayBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-
+        long []values = new long[valuesVec.size()];
+        for (int i=0; i<valuesVec.size(); i++) {
+            values[i] = valuesVec.get(i);
+        }
         positionOffset += arrayOffset;
         boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
         long[] newValues = compactArray(values, positionOffset, length);
@@ -321,9 +294,10 @@ public class LongArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = arrayOffset; i < positionCount; i++) {
-            validPositions[i] = validPositions[i] && filter.test(values[i]);
+        for (int i=0; i<valuesVec.size(); i++) {
+            validPositions[i] = validPositions[i] && filter.test(longVec.get(i));
         }
+
         return validPositions;
     }
 
@@ -337,7 +311,7 @@ public class LongArrayBlock
                     matchedPositions[matchCount++] = positions[i];
                 }
             }
-            else if (test.apply(values[positions[i] + arrayOffset])) {
+            else if (test.apply(valuesVec.get(positions[i] + arrayOffset))) {
                 matchedPositions[matchCount++] = positions[i];
             }
         }
