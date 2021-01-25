@@ -42,7 +42,6 @@ public class LongArrayBlock
     private final int positionCount;
     @Nullable
     private final boolean[] valueIsNull;
-    private final long[] values; //change to use offheap --> accessible by RDMA
     private final LongVec valuesVec;
 
     private final long sizeInBytes;
@@ -72,8 +71,10 @@ public class LongArrayBlock
         if (values.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("values length is less than positionCount");
         }
-        this.values = values;
-        this.valuesVec = null;
+        this.valuesVec = new LongVec(values.length);
+        for (int idx = 0; idx < values.length; idx++) {
+            valuesVec.set(idx, values[idx]);
+        }
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("isNull length is less than positionCount");
@@ -99,7 +100,6 @@ public class LongArrayBlock
             throw new IllegalArgumentException("values length is less than positionCount");
         }
         this.valuesVec = longVec;
-        this.values = null;
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("isNull length is less than positionCount");
@@ -143,11 +143,16 @@ public class LongArrayBlock
     @Override
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
-        /*consumer.accept(values, );
+        // TODO: try to avoid copy here
+        long[] valuesArray = new long[valuesVec.size()];
+        for (int i = 0; i < valuesVec.size(); i++) {
+            valuesArray[i] = valuesVec.get(i);
+        }
+        consumer.accept(valuesArray, sizeOf(valuesArray));
         if (valueIsNull != null) {
             consumer.accept(valueIsNull, sizeOf(valueIsNull));
         }
-        consumer.accept(this, (long) INSTANCE_SIZE);*/
+        consumer.accept(this, (long) INSTANCE_SIZE);
     }
 
     @Override
@@ -185,7 +190,6 @@ public class LongArrayBlock
         }
         return toIntExact(valuesVec.get(position + arrayOffset));
     }
-
 
     @Override
     public boolean mayHaveNull()
@@ -244,8 +248,8 @@ public class LongArrayBlock
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        long []values = new long[valuesVec.size()];
-        for (int i=0; i<valuesVec.size(); i++) {
+        long[] values = new long[valuesVec.size()];
+        for (int i = 0; i < valuesVec.size(); i++) {
             values[i] = valuesVec.get(i);
         }
         return new LongArrayBlock(positionOffset + arrayOffset, length, valueIsNull, values);
@@ -255,8 +259,8 @@ public class LongArrayBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        long []values = new long[valuesVec.size()];
-        for (int i=0; i<valuesVec.size(); i++) {
+        long[] values = new long[valuesVec.size()];
+        for (int i = 0; i < valuesVec.size(); i++) {
             values[i] = valuesVec.get(i);
         }
         positionOffset += arrayOffset;
@@ -294,8 +298,8 @@ public class LongArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i=0; i<valuesVec.size(); i++) {
-            validPositions[i] = validPositions[i] && filter.test(longVec.get(i));
+        for (int i = 0; i < valuesVec.size(); i++) {
+            validPositions[i] = validPositions[i] && filter.test(valuesVec.get(i));
         }
 
         return validPositions;
