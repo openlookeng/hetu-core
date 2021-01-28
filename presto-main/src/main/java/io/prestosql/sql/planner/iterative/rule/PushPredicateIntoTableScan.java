@@ -266,7 +266,8 @@ public class PushPredicateIntoTableScan
                 Optional.of(deterministicPredicate),
                 node.getStrategy(),
                 node.getReuseTableScanMappingId(),
-                0);
+                0,
+                node.isForDelete());
 
         // The order of the arguments to combineConjuncts matters:
         // * Unenforced constraints go first because they can only be simple column references,

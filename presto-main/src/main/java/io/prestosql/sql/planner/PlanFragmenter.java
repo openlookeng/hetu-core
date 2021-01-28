@@ -796,7 +796,7 @@ public class PlanFragmenter
                     node.getAssignments(),
                     node.getEnforcedConstraint(),
                     node.getPredicate(), node.getStrategy(),
-                    node.getReuseTableScanMappingId(), 0);
+                    node.getReuseTableScanMappingId(), 0, node.isForDelete());
         }
     }
 }

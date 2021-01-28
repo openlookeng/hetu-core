@@ -125,7 +125,8 @@ public class TestUtil
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
                 0,
-                0);
+                0,
+                false);
         PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());
         FilterNode filterNode = planBuilder.filter(expr, tableScanNode);
 

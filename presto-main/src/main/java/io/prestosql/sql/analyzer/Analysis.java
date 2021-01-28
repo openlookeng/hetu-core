@@ -18,6 +18,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
+import io.prestosql.connector.CatalogName;
+import io.prestosql.execution.Output;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.security.AccessControl;
@@ -79,6 +81,7 @@ public class Analysis
     private final Statement root;
     private final List<Expression> parameters;
     private String updateType;
+    private Optional<QualifiedObjectName> target = Optional.empty();
 
     private final Map<NodeRef<Table>, Query> namedQueries = new LinkedHashMap<>();
 
@@ -179,9 +182,26 @@ public class Analysis
         return updateType;
     }
 
-    public void setUpdateType(String updateType)
+    public Optional<Output> getTarget()
+    {
+        return target.map(table -> new Output(new CatalogName(table.getCatalogName()), table.getSchemaName(), table.getObjectName()));
+    }
+
+    public void setUpdateType(String updateType, QualifiedObjectName target)
     {
         this.updateType = updateType;
+        this.target = Optional.of(target);
+    }
+
+    public void resetUpdateType()
+    {
+        this.updateType = null;
+        this.target = Optional.empty();
+    }
+
+    public boolean isDeleteTarget(QualifiedObjectName name)
+    {
+        return "DELETE".equals(updateType) && Optional.of(name).equals(target);
     }
 
     public boolean isCreateTableAsSelectWithData()

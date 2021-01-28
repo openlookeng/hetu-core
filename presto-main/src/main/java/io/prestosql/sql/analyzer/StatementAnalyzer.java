@@ -357,11 +357,11 @@ class StatementAnalyzer
 
             if (insert.getOverwrite()) {
                 // set the insert as insert overwrite
-                analysis.setUpdateType("INSERT OVERWRITE");
+                analysis.setUpdateType("INSERT OVERWRITE", targetTable);
                 analysis.setIsInsertOverwrite(true);
             }
             else {
-                analysis.setUpdateType("INSERT");
+                analysis.setUpdateType("INSERT", targetTable);
             }
 
             // verify the insert destination columns match the query
@@ -492,7 +492,7 @@ class StatementAnalyzer
             Scope tableScope = analyzer.analyze(table, scope);
             node.getWhere().ifPresent(where -> analyzeWhere(node, tableScope, where));
 
-            analysis.setUpdateType("DELETE");
+            analysis.setUpdateType("DELETE", tableName);
 
             accessControl.checkCanDeleteFromTable(session.getRequiredTransactionId(), session.getIdentity(), tableName);
 
@@ -579,7 +579,7 @@ class StatementAnalyzer
 
             node.getWhere().ifPresent(where -> analyzeWhere(node, tableScope, where));
 
-            analysis.setUpdateType("UPDATE");
+            analysis.setUpdateType("UPDATE", tableName);
 
             // check access right
             accessControl.checkCanUpdateTable(session.getRequiredTransactionId(), session.getIdentity(), tableName);
@@ -590,8 +590,8 @@ class StatementAnalyzer
         @Override
         protected Scope visitAnalyze(Analyze node, Optional<Scope> scope)
         {
-            analysis.setUpdateType("ANALYZE");
             QualifiedObjectName tableName = createQualifiedObjectName(session, node, node.getTableName());
+            analysis.setUpdateType("ANALYZE", tableName);
 
             // verify the target table exists and it's not a view
             if (metadata.getView(session, tableName).isPresent()) {
@@ -633,11 +633,10 @@ class StatementAnalyzer
         @Override
         protected Scope visitCreateTableAsSelect(CreateTableAsSelect node, Optional<Scope> scope)
         {
-            analysis.setUpdateType("CREATE TABLE");
-
             // turn this into a query that has a new table writer node on top.
             QualifiedObjectName targetTable = createQualifiedObjectName(session, node, node.getName());
             analysis.setCreateTableDestination(targetTable);
+            analysis.setUpdateType("CREATE TABLE", targetTable);
 
             Optional<TableHandle> targetTableHandle = metadata.getTableHandle(session, targetTable);
             if (targetTableHandle.isPresent()) {
@@ -681,9 +680,8 @@ class StatementAnalyzer
         @Override
         protected Scope visitCreateView(CreateView node, Optional<Scope> scope)
         {
-            analysis.setUpdateType("CREATE VIEW");
-
             QualifiedObjectName viewName = createQualifiedObjectName(session, node, node.getName());
+            analysis.setUpdateType("CREATE VIEW", viewName);
 
             // analyze the query that creates the view
             StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector);
@@ -725,7 +723,7 @@ class StatementAnalyzer
             }
 
             process(table, scope);
-            analysis.setUpdateType("VACUUM");
+            analysis.setUpdateType("VACUUM", tableName);
 
             analysis.setAsyncQuery(node.isAsync());
             // check access right
@@ -954,7 +952,7 @@ class StatementAnalyzer
                 throw new SemanticException(NOT_SUPPORTED, node, "EXPLAIN ANALYZE only supports TYPE DISTRIBUTED option");
             }
             process(node.getStatement(), scope);
-            analysis.setUpdateType(null);
+            analysis.resetUpdateType();
             return createAndAssignScope(node, scope, Field.newUnqualified("Query Plan", VARCHAR));
         }
 
