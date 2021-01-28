@@ -14,6 +14,7 @@
 package io.prestosql.spi.block;
 
 import io.prestosql.spi.util.BloomFilter;
+import nova.hetu.omnicache.vector.IntVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -37,12 +38,17 @@ public class IntArrayBlock
     private final int positionCount;
     @Nullable
     private final boolean[] valueIsNull;
-    private final int[] values;
+    private final IntVec values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
 
     public IntArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, int[] values)
+    {
+        this(0, positionCount, valueIsNull.orElse(null), values);
+    }
+
+    public IntArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, IntVec values)
     {
         this(0, positionCount, valueIsNull.orElse(null), values);
     }
@@ -61,7 +67,10 @@ public class IntArrayBlock
         if (values.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("values length is less than positionCount");
         }
-        this.values = values;
+        this.values = new IntVec(values.length);
+        for (int i = 0; i < values.length; i++) {
+            this.values.set(i, values[i]);
+        }
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("isNull length is less than positionCount");
@@ -70,6 +79,31 @@ public class IntArrayBlock
 
         sizeInBytes = (Integer.BYTES + Byte.BYTES) * (long) positionCount;
         retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values);
+    }
+
+    IntArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, IntVec values)
+    {
+        if (arrayOffset < 0) {
+            throw new IllegalArgumentException("arrayOffset is negative");
+        }
+        this.arrayOffset = arrayOffset;
+        if (positionCount < 0) {
+            throw new IllegalArgumentException("positionCount is negative");
+        }
+        this.positionCount = positionCount;
+
+        if (values.size() - arrayOffset < positionCount) {
+            throw new IllegalArgumentException("values length is less than positionCount");
+        }
+        this.values = values;
+
+        if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
+            throw new IllegalArgumentException("isNull length is less than positionCount");
+        }
+        this.valueIsNull = valueIsNull;
+
+        sizeInBytes = (Integer.BYTES + Byte.BYTES) * (long) positionCount;
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + Integer.BYTES * values.size();
     }
 
     @Override
@@ -105,7 +139,12 @@ public class IntArrayBlock
     @Override
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
-        consumer.accept(values, sizeOf(values));
+        // TODO: try to avoid copy here
+        int[] valuesArray = new int[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            valuesArray[i] = values.get(i);
+        }
+        consumer.accept(valuesArray, sizeOf(valuesArray));
         if (valueIsNull != null) {
             consumer.accept(valueIsNull, sizeOf(valueIsNull));
         }
@@ -125,7 +164,7 @@ public class IntArrayBlock
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
-        return values[position + arrayOffset];
+        return values.get(position + arrayOffset);
     }
 
     @Override
@@ -151,7 +190,7 @@ public class IntArrayBlock
     public void writePositionTo(int position, BlockBuilder blockBuilder)
     {
         checkReadablePosition(position);
-        blockBuilder.writeInt(values[position + arrayOffset]);
+        blockBuilder.writeInt(values.get(position + arrayOffset));
         blockBuilder.closeEntry();
     }
 
@@ -163,7 +202,7 @@ public class IntArrayBlock
                 0,
                 1,
                 isNull(position) ? new boolean[] {true} : null,
-                new int[] {values[position + arrayOffset]});
+                new int[] {values.get(position + arrayOffset)});
     }
 
     @Override
@@ -182,7 +221,7 @@ public class IntArrayBlock
             if (valueIsNull != null) {
                 newValueIsNull[i] = valueIsNull[position + arrayOffset];
             }
-            newValues[i] = values[position + arrayOffset];
+            newValues[i] = values.get(position + arrayOffset);
         }
         return new IntArrayBlock(0, length, newValueIsNull, newValues);
     }
@@ -202,11 +241,11 @@ public class IntArrayBlock
 
         positionOffset += arrayOffset;
         boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
-        int[] newValues = compactArray(values, positionOffset, length);
+        IntVec newValues = values.slice(positionOffset, positionOffset + length);
 
-        if (newValueIsNull == valueIsNull && newValues == values) {
-            return this;
-        }
+//        if (newValueIsNull == valueIsNull && newValues == values) {
+//            return this;
+//        }
         return new IntArrayBlock(0, length, newValueIsNull, newValues);
     }
 
@@ -235,8 +274,8 @@ public class IntArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = 0; i < values.length; i++) {
-            validPositions[i] = validPositions[i] && filter.test(values[i]);
+        for (int i = 0; i < values.size(); i++) {
+            validPositions[i] = validPositions[i] && filter.test(values.get(i));
         }
         return validPositions;
     }
@@ -251,7 +290,7 @@ public class IntArrayBlock
                     matchedPositions[matchCount++] = positions[i];
                 }
             }
-            else if (test.apply(values[positions[i] + arrayOffset])) {
+            else if (test.apply(values.get(positions[i] + arrayOffset))) {
                 matchedPositions[matchCount++] = positions[i];
             }
         }
@@ -266,6 +305,6 @@ public class IntArrayBlock
             return null;
         }
 
-        return values[position + arrayOffset];
+        return values.get(position + arrayOffset);
     }
 }

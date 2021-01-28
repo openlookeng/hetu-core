@@ -16,6 +16,7 @@ package io.prestosql.orc.stream;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.orc.checkpoint.FloatStreamCheckpoint;
+import nova.hetu.omnicache.vector.IntVec;
 
 import java.io.IOException;
 
@@ -66,5 +67,15 @@ public class FloatInputStream
             throws IOException
     {
         input.readFully(Slices.wrappedIntArray(values), 0, items * SIZE_OF_FLOAT);
+    }
+
+    public void next(IntVec values, int items)
+            throws IOException
+    {
+        int[] buffer = new int[values.size()];
+        input.readFully(Slices.wrappedIntArray(buffer), 0, items * SIZE_OF_FLOAT);
+        for (int i = 0; i < values.size(); i++) {
+            values.set(i, buffer[i]);
+        }
     }
 }

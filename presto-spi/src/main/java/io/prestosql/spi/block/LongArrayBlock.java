@@ -42,7 +42,7 @@ public class LongArrayBlock
     private final int positionCount;
     @Nullable
     private final boolean[] valueIsNull;
-    private final LongVec valuesVec;
+    private final LongVec values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
@@ -71,9 +71,9 @@ public class LongArrayBlock
         if (values.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("values length is less than positionCount");
         }
-        this.valuesVec = new LongVec(values.length);
+        this.values = new LongVec(values.length);
         for (int idx = 0; idx < values.length; idx++) {
-            valuesVec.set(idx, values[idx]);
+            this.values.set(idx, values[idx]);
         }
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
@@ -99,7 +99,7 @@ public class LongArrayBlock
         if (longVec.size() - arrayOffset < positionCount) {
             throw new IllegalArgumentException("values length is less than positionCount");
         }
-        this.valuesVec = longVec;
+        this.values = longVec;
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("isNull length is less than positionCount");
@@ -107,7 +107,7 @@ public class LongArrayBlock
         this.valueIsNull = valueIsNull;
 
         sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + Long.BYTES * valuesVec.size();
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + Long.BYTES * values.size();
     }
 
     @Override
@@ -144,9 +144,9 @@ public class LongArrayBlock
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
         // TODO: try to avoid copy here
-        long[] valuesArray = new long[valuesVec.size()];
-        for (int i = 0; i < valuesVec.size(); i++) {
-            valuesArray[i] = valuesVec.get(i);
+        long[] valuesArray = new long[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            valuesArray[i] = values.get(i);
         }
         consumer.accept(valuesArray, sizeOf(valuesArray));
         if (valueIsNull != null) {
@@ -168,7 +168,7 @@ public class LongArrayBlock
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
-        return valuesVec.get(position + arrayOffset);
+        return values.get(position + arrayOffset);
     }
 
     public Long get(int position)
@@ -176,7 +176,7 @@ public class LongArrayBlock
         if (valueIsNull != null && valueIsNull[position + arrayOffset]) {
             return null;
         }
-        return valuesVec.get(position + arrayOffset);
+        return values.get(position + arrayOffset);
     }
 
     @Override
@@ -188,7 +188,7 @@ public class LongArrayBlock
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
-        return toIntExact(valuesVec.get(position + arrayOffset));
+        return toIntExact(values.get(position + arrayOffset));
     }
 
     @Override
@@ -208,7 +208,7 @@ public class LongArrayBlock
     public void writePositionTo(int position, BlockBuilder blockBuilder)
     {
         checkReadablePosition(position);
-        blockBuilder.writeLong(valuesVec.get(position + arrayOffset));
+        blockBuilder.writeLong(values.get(position + arrayOffset));
         blockBuilder.closeEntry();
     }
 
@@ -220,7 +220,7 @@ public class LongArrayBlock
                 0,
                 1,
                 isNull(position) ? new boolean[] {true} : null,
-                new long[] {valuesVec.get(position + arrayOffset)});
+                new long[] {values.get(position + arrayOffset)});
     }
 
     @Override
@@ -239,7 +239,7 @@ public class LongArrayBlock
             if (valueIsNull != null) {
                 newValueIsNull[i] = valueIsNull[position + arrayOffset];
             }
-            newValues[i] = valuesVec.get(position + arrayOffset);
+            newValues[i] = values.get(position + arrayOffset);
         }
         return new LongArrayBlock(0, length, newValueIsNull, newValues);
     }
@@ -248,10 +248,6 @@ public class LongArrayBlock
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        long[] values = new long[valuesVec.size()];
-        for (int i = 0; i < valuesVec.size(); i++) {
-            values[i] = valuesVec.get(i);
-        }
         return new LongArrayBlock(positionOffset + arrayOffset, length, valueIsNull, values);
     }
 
@@ -259,9 +255,9 @@ public class LongArrayBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        long[] values = new long[valuesVec.size()];
-        for (int i = 0; i < valuesVec.size(); i++) {
-            values[i] = valuesVec.get(i);
+        long[] values = new long[this.values.size()];
+        for (int i = 0; i < this.values.size(); i++) {
+            values[i] = this.values.get(i);
         }
         positionOffset += arrayOffset;
         boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
@@ -298,8 +294,8 @@ public class LongArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = 0; i < valuesVec.size(); i++) {
-            validPositions[i] = validPositions[i] && filter.test(valuesVec.get(i));
+        for (int i = 0; i < values.size(); i++) {
+            validPositions[i] = validPositions[i] && filter.test(values.get(i));
         }
 
         return validPositions;
@@ -315,7 +311,7 @@ public class LongArrayBlock
                     matchedPositions[matchCount++] = positions[i];
                 }
             }
-            else if (test.apply(valuesVec.get(positions[i] + arrayOffset))) {
+            else if (test.apply(values.get(positions[i] + arrayOffset))) {
                 matchedPositions[matchCount++] = positions[i];
             }
         }

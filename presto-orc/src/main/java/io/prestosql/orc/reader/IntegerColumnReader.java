@@ -22,6 +22,7 @@ import io.prestosql.spi.block.IntArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.Type;
+import nova.hetu.omnicache.vector.IntVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -41,6 +42,7 @@ public class IntegerColumnReader
 
     /**
      * FIXME: KEN: why do we need to pass in type? isn't it implied already?
+     *
      * @param column
      * @param systemMemoryContext
      * @throws OrcCorruptionException
@@ -108,9 +110,9 @@ public class IntegerColumnReader
             throws IOException
     {
         verify(dataStream != null);
-        int[] values = new int[nextBatchSize];
-        dataStream.next(values, nextBatchSize);
-        return new IntArrayBlock(nextBatchSize, Optional.empty(), values);
+        IntVec intVec = new IntVec(nextBatchSize);
+        dataStream.next(intVec, nextBatchSize);
+        return new IntArrayBlock(nextBatchSize, Optional.empty(), intVec);
     }
 
     protected Block readNullBlock(boolean[] isNull, int nonNullCount)
@@ -131,7 +133,7 @@ public class IntegerColumnReader
 
         dataStream.next(intNonNullValueTemp, nonNullCount);
 
-        int[] result = unpackIntNulls(intNonNullValueTemp, isNull);
+        IntVec result = unpackIntNulls(intNonNullValueTemp, isNull);
 
         return new IntArrayBlock(nextBatchSize, Optional.of(isNull), result);
     }

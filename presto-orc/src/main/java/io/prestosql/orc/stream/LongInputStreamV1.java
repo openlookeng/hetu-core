@@ -16,6 +16,7 @@ package io.prestosql.orc.stream;
 import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.checkpoint.LongStreamCheckpoint;
 import io.prestosql.orc.checkpoint.LongStreamV1Checkpoint;
+import nova.hetu.omnicache.vector.IntVec;
 import nova.hetu.omnicache.vector.LongVec;
 
 import java.io.IOException;
@@ -183,6 +184,45 @@ public class LongInputStreamV1
                         throw new OrcCorruptionException(input.getOrcDataSourceId(), "Decoded value out of range for a 32bit number");
                     }
                     values[offset + i] = value;
+                }
+            }
+            used += chunkSize;
+            offset += chunkSize;
+            items -= chunkSize;
+        }
+    }
+
+    @Override
+    public void next(IntVec values, int items)
+            throws IOException
+    {
+        int offset = 0;
+        while (items > 0) {
+            if (used == numLiterals) {
+                numLiterals = 0;
+                used = 0;
+                readValues();
+            }
+
+            int chunkSize = min(numLiterals - used, items);
+            if (repeat) {
+                for (int i = 0; i < chunkSize; i++) {
+                    long literal = literals[0] + ((used + i) * delta);
+                    int value = (int) literal;
+                    if (literal != value) {
+                        throw new OrcCorruptionException(input.getOrcDataSourceId(), "Decoded value out of range for a 32bit number");
+                    }
+                    values.set(offset + i, value);
+                }
+            }
+            else {
+                for (int i = 0; i < chunkSize; i++) {
+                    long literal = literals[used + i];
+                    int value = (int) literal;
+                    if (literal != value) {
+                        throw new OrcCorruptionException(input.getOrcDataSourceId(), "Decoded value out of range for a 32bit number");
+                    }
+                    values.set(offset + i, value);
                 }
             }
             used += chunkSize;

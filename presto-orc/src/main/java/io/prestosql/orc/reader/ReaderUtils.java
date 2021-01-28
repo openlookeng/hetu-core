@@ -16,6 +16,7 @@ package io.prestosql.orc.reader;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.spi.type.Type;
+import nova.hetu.omnicache.vector.IntVec;
 import nova.hetu.omnicache.vector.LongVec;
 
 import java.util.function.Predicate;
@@ -74,13 +75,13 @@ final class ReaderUtils
         return result;
     }
 
-    public static int[] unpackIntNulls(int[] values, boolean[] isNull)
+    public static IntVec unpackIntNulls(int[] values, boolean[] isNull)
     {
-        int[] result = new int[isNull.length];
+        IntVec result = new IntVec(isNull.length);
 
         int position = 0;
         for (int i = 0; i < isNull.length; i++) {
-            result[i] = values[position];
+            result.set(i, values[position]);
             if (!isNull[i]) {
                 position++;
             }
