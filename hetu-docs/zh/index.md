@@ -40,6 +40,7 @@ headless: true
     - [水平伸缩]({{< relref "./docs/admin/horizontal-scaling.md" >}})
     - [动态过滤]({{< relref "./docs/admin/dynamic-filters.md" >}})
     - [State Store]({{< relref "./docs/admin/state-store.md" >}})
+    - [元数据存储]({{< relref "./docs/admin/meta-store.md" >}})
     - [审计日志]({{< relref "./docs/admin/audit-log.md" >}})
 
 - [查询优化器]("#")

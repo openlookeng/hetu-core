@@ -18,6 +18,9 @@ import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
+import io.hetu.core.metastore.ForHetuMetastoreCache;
+import io.hetu.core.metastore.HetuMetastoreCache;
+import io.hetu.core.metastore.HetuMetastoreCacheConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.metastore.HetuMetastore;
 
@@ -38,8 +41,12 @@ public class HetuFsMetastoreModule
     public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(HetuFsMetastoreConfig.class);
-        binder.bind(HetuMetastore.class).to(HetuFsMetastore.class).in(Scopes.SINGLETON);
-        newExporter(binder).export(HetuMetastore.class).as(generator -> generator.generatedNameOf(HetuMetastore.class));
+        configBinder(binder).bindConfig(HetuMetastoreCacheConfig.class);
+        binder.bind(HetuMetastore.class).annotatedWith(ForHetuMetastoreCache.class)
+                .to(HetuFsMetastore.class).in(Scopes.SINGLETON);
+        binder.bind(HetuMetastore.class).to(HetuMetastoreCache.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(HetuMetastore.class)
+                .as(generator -> generator.generatedNameOf(HetuMetastoreCache.class));
     }
 
     @Provides
