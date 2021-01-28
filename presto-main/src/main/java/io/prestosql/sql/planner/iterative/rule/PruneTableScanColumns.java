@@ -46,6 +46,7 @@ public class PruneTableScanColumns
                         tableScanNode.getPredicate(),
                         tableScanNode.getStrategy(),
                         tableScanNode.getReuseTableScanMappingId(),
-                        0));
+                        0,
+                        tableScanNode.isForDelete()));
     }
 }

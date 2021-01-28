@@ -446,7 +446,8 @@ public class PruneUnreferencedOutputs
                     node.getEnforcedConstraint(),
                     node.getPredicate(), node.getStrategy(),
                     node.getReuseTableScanMappingId(),
-                    0);
+                    0,
+                    node.isForDelete());
         }
 
         @Override

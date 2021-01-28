@@ -263,13 +263,13 @@ public class AddReuseExchange
                         }
 
                         rewrittenNode = new TableScanNode(tableScanNode.getId(), nodeToTempHandleMapping.get(node), tableScanNode.getOutputSymbols(),
-                                tableScanNode.getAssignments(), tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), REUSE_STRATEGY_CONSUMER, track.get(node), 0);
+                                tableScanNode.getAssignments(), tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), REUSE_STRATEGY_CONSUMER, track.get(node), 0, false);
                         planNodeListHashMap.put(node, --pos);
                         return rewrittenNode;
                     }
                     else if (reuseTableScanMappingId != null) {
                         rewrittenNode = new TableScanNode(tableScanNode.getId(), nodeToTempHandleMapping.get(node), tableScanNode.getOutputSymbols(),
-                                tableScanNode.getAssignments(), tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), REUSE_STRATEGY_PRODUCER, reuseTableScanMappingId, reuseTableScanMappingIdConsumerTableScanNodeCount.get(node));
+                                tableScanNode.getAssignments(), tableScanNode.getEnforcedConstraint(), tableScanNode.getPredicate(), REUSE_STRATEGY_PRODUCER, reuseTableScanMappingId, reuseTableScanMappingIdConsumerTableScanNodeCount.get(node), false);
                     }
 
                     planNodeListHashMap.remove(node);

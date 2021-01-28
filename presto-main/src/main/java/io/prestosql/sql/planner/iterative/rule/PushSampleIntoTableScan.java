@@ -65,7 +65,8 @@ public class PushSampleIntoTableScan
                         tableScan.getPredicate(),
                         tableScan.getStrategy(),
                         tableScan.getReuseTableScanMappingId(),
-                        0)))
+                        0,
+                        tableScan.isForDelete())))
                 .orElseGet(Result::empty);
     }
 

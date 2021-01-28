@@ -47,6 +47,7 @@ public class TableScanNode
 
     private final TupleDomain<ColumnHandle> enforcedConstraint;
     private final Optional<Expression> predicate;
+    private final boolean forDelete;
 
     private ReuseExchangeOperator.STRATEGY strategy;
     private Integer reuseTableScanMappingId;
@@ -62,9 +63,9 @@ public class TableScanNode
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer reuseTableScanMappingId, Integer consumerTableScanNodeCount)
+            Integer reuseTableScanMappingId, Integer consumerTableScanNodeCount, boolean forDelete)
     {
-        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, reuseTableScanMappingId, consumerTableScanNodeCount);
+        return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, reuseTableScanMappingId, consumerTableScanNodeCount, forDelete);
     }
 
     @JsonCreator
@@ -76,7 +77,8 @@ public class TableScanNode
             @JsonProperty("predicate") Optional<Expression> predicate,
             @JsonProperty("strategy") ReuseExchangeOperator.STRATEGY strategy,
             @JsonProperty("reuseTableScanMappingId") Integer reuseTableScanMappingId,
-            @JsonProperty("consumerTableScanNodeCount") Integer consumerTableScanNodeCount)
+            @JsonProperty("consumerTableScanNodeCount") Integer consumerTableScanNodeCount,
+            @JsonProperty("forDelete") boolean forDelete)
     {
         // This constructor is for JSON deserialization only. Do not use.
         super(id);
@@ -90,6 +92,7 @@ public class TableScanNode
         this.reuseTableScanMappingId = reuseTableScanMappingId;
         this.filterExpr = null;
         this.consumerTableScanNodeCount = consumerTableScanNodeCount;
+        this.forDelete = forDelete;
     }
 
     public TableScanNode(
@@ -101,7 +104,8 @@ public class TableScanNode
             Optional<Expression> predicate,
             ReuseExchangeOperator.STRATEGY strategy,
             Integer reuseTableScanMappingId,
-            Integer consumerTableScanNodeCount)
+            Integer consumerTableScanNodeCount,
+            boolean forDelete)
     {
         super(id);
         this.table = requireNonNull(table, "table is null");
@@ -114,6 +118,7 @@ public class TableScanNode
         this.reuseTableScanMappingId = reuseTableScanMappingId;
         this.filterExpr = null;
         this.consumerTableScanNodeCount = consumerTableScanNodeCount;
+        this.forDelete = forDelete;
     }
 
     public Expression getFilterExpr()
@@ -140,6 +145,12 @@ public class TableScanNode
     public TableHandle getTable()
     {
         return table;
+    }
+
+    @JsonProperty("forDelete")
+    public boolean isForDelete()
+    {
+        return forDelete;
     }
 
     @Override
@@ -222,6 +233,7 @@ public class TableScanNode
                 .add("strategy", strategy)
                 .add("reuseTableScanMappingId", reuseTableScanMappingId)
                 .add("consumerTableScanNodeCount", consumerTableScanNodeCount)
+                .add("forDelete", forDelete)
                 .toString();
     }
 

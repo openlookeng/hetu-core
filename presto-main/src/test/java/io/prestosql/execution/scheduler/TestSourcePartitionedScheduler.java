@@ -466,7 +466,7 @@ public class TestSourcePartitionedScheduler
                 tableScanNodeId,
                 TEST_TABLE_HANDLE,
                 ImmutableList.of(symbol),
-                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
+                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false);
 
         RemoteSourceNode remote = new RemoteSourceNode(new PlanNodeId("remote_id"), new PlanFragmentId("plan_fragment_id"), ImmutableList.of(), Optional.empty(), GATHER);
         PlanFragment testFragment = new PlanFragment(

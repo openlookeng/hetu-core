@@ -318,7 +318,7 @@ public class SubQueryPushDown
                                 symbolsBuilder.build(),
                                 columnHandleBuilder.build(),
                                 TupleDomain.all(),
-                                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0),
+                                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false),
                         new Assignments(assignmentsBuilder.build()));
 
                 return Optional.of(output);
