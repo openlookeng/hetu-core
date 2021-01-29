@@ -28,6 +28,7 @@ import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.Type;
+import nova.hetu.omnicache.vector.LongVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -42,7 +43,7 @@ import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
 import static io.prestosql.orc.metadata.Stream.StreamKind.PRESENT;
 import static io.prestosql.orc.reader.ReaderUtils.minNonNullValueSize;
-import static io.prestosql.orc.reader.ReaderUtils.unpackLongNulls;
+import static io.prestosql.orc.reader.ReaderUtils.unpackLongNullsVec;
 import static io.prestosql.orc.reader.ReaderUtils.verifyStreamType;
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -147,9 +148,9 @@ public class DoubleColumnReader
             throws IOException
     {
         verify(dataStream != null);
-        long[] values = new long[nextBatchSize];
-        dataStream.next(values, nextBatchSize);
-        return new LongArrayBlock(nextBatchSize, Optional.empty(), values);
+        LongVec longVec = new LongVec(nextBatchSize);
+        dataStream.next(longVec, nextBatchSize);
+        return new LongArrayBlock(nextBatchSize, Optional.empty(), longVec);
     }
 
     private Block readNullBlock(boolean[] isNull, int nonNullCount)
@@ -164,7 +165,7 @@ public class DoubleColumnReader
 
         dataStream.next(nonNullValueTemp, nonNullCount);
 
-        long[] result = unpackLongNulls(nonNullValueTemp, isNull);
+        LongVec result = unpackLongNullsVec(nonNullValueTemp, isNull);
 
         return new LongArrayBlock(isNull.length, Optional.of(isNull), result);
     }

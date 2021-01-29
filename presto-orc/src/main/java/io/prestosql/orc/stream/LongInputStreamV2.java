@@ -16,6 +16,7 @@ package io.prestosql.orc.stream;
 import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.checkpoint.LongStreamCheckpoint;
 import io.prestosql.orc.checkpoint.LongStreamV2Checkpoint;
+import nova.hetu.omnicache.vector.IntVec;
 import nova.hetu.omnicache.vector.LongVec;
 
 import java.io.IOException;
@@ -372,6 +373,33 @@ public class LongInputStreamV2
 
             int chunkSize = min(numLiterals - used, items);
             System.arraycopy(literals, used, values, offset, chunkSize);
+            used += chunkSize;
+            offset += chunkSize;
+            items -= chunkSize;
+        }
+    }
+
+    @Override
+    public void next(IntVec values, int items)
+            throws IOException
+    {
+        int offset = 0;
+        while (items > 0) {
+            if (used == numLiterals) {
+                numLiterals = 0;
+                used = 0;
+                readValues();
+            }
+
+            int chunkSize = min(numLiterals - used, items);
+            for (int i = 0; i < chunkSize; i++) {
+                long literal = literals[used + i];
+                int value = (int) literal;
+                if (literal != value) {
+                    throw new OrcCorruptionException(input.getOrcDataSourceId(), "Decoded value out of range for a 32bit number");
+                }
+                values.set(offset + i, value);
+            }
             used += chunkSize;
             offset += chunkSize;
             items -= chunkSize;

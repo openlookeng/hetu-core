@@ -28,6 +28,7 @@ import io.prestosql.spi.block.IntArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.RealType;
 import io.prestosql.spi.type.Type;
+import nova.hetu.omnicache.vector.IntVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -146,9 +147,9 @@ public class FloatColumnReader
             throws IOException
     {
         verify(dataStream != null);
-        int[] values = new int[nextBatchSize];
-        dataStream.next(values, nextBatchSize);
-        return new IntArrayBlock(nextBatchSize, Optional.empty(), values);
+        IntVec intVec = new IntVec(nextBatchSize);
+        dataStream.next(intVec, nextBatchSize);
+        return new IntArrayBlock(nextBatchSize, Optional.empty(), intVec);
     }
 
     private Block readNullBlock(boolean[] isNull, int nonNullCount)
@@ -163,7 +164,7 @@ public class FloatColumnReader
 
         dataStream.next(nonNullValueTemp, nonNullCount);
 
-        int[] result = ReaderUtils.unpackIntNulls(nonNullValueTemp, isNull);
+        IntVec result = ReaderUtils.unpackIntNulls(nonNullValueTemp, isNull);
 
         return new IntArrayBlock(isNull.length, Optional.of(isNull), result);
     }
