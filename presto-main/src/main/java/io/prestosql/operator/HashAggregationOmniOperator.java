@@ -285,7 +285,7 @@ public class HashAggregationOmniOperator
         if (finished) {
             return null;
         }
-        if (!finishing) {
+        if (finishing) {
             finished = true;
             if(omniPageContainer != null) {
                 VecType[] outTypes = {VecType.LONG, VecType.LONG};
