@@ -36,6 +36,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
+
 public class HetuHBaseMetastore
         implements HBaseMetastore
 {
@@ -51,7 +53,7 @@ public class HetuHBaseMetastore
 
     public HetuHBaseMetastore(HetuMetastore hetuMetastore)
     {
-        this.hetuMetastore = hetuMetastore;
+        this.hetuMetastore = requireNonNull(hetuMetastore, "hetuMetastore is null, please config 'etc/hetu-metastore.properties'.");
         this.catalogName = CATALOG_NAME + HBaseConnectorId.getConnectorId();
     }
 

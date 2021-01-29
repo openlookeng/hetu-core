@@ -17,6 +17,7 @@ package io.hetu.core.plugin.hbase.query;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
@@ -31,9 +32,15 @@ import io.prestosql.spi.predicate.Marker;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.ClientSideRegionScanner;
+import org.apache.hadoop.hbase.client.RegionInfo;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.Filter;
@@ -42,6 +49,9 @@ import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.RowFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.SnapshotProtos;
+import org.apache.hadoop.hbase.snapshot.SnapshotDescriptionUtils;
+import org.apache.hadoop.hbase.snapshot.SnapshotManifest;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
@@ -161,35 +171,34 @@ public class HBaseRecordSet
                     fieldToColumnName,
                     this.defaultValue);
         }
+        else if (conn.getHbaseConfig().isClientSideEnable()) {
+            try {
+                HBaseConfig hbaseConfig = conn.getHbaseConfig();
+                String hbaseRoot = hbaseConfig.getZkZnodeParent();
+                Configuration conf = Utils.generateHBaseConfig(hbaseConfig);
+                Path root = new Path(hbaseRoot);
+                FileSystem fs = FileSystem.get(conf);
+                Path snapshotDir = SnapshotDescriptionUtils.getCompletedSnapshotDir(split.getSnapshotName(), root);
+                SnapshotProtos.SnapshotDescription snapshotDesc = SnapshotDescriptionUtils.readSnapshotInfo(fs, snapshotDir);
+                SnapshotManifest manifest = SnapshotManifest.open(conf, fs, snapshotDir, snapshotDesc);
+                TableDescriptor htd = manifest.getTableDescriptor();
+                List<RegionInfo> regionInfos = Utils.getRegionInfoFromManifest(manifest);
+
+                ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+                setAttributeToScan();
+                scanner = new ClientSideRegionScanner(conf, fs, root, htd, regionInfos.get(split.getRegionIndex()), scan, null);
+                Thread.currentThread().setContextClassLoader(classLoader);
+            }
+            catch (IOException e) {
+                LOG.error("HBaseRecordSet : getClientSideScanner failed... cause by %s", e.getMessage());
+            }
+            return new HBaseRecordCursor(
+                    columnHandles, columnTypes, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
+        }
         else {
             try {
-                columnHandles.stream()
-                        .forEach(
-                                columnHandle -> {
-                                    HBaseColumnHandle hBaseColumnHandle = columnHandle;
-                                    if (this.rowIdName == null
-                                            || !this.rowIdName.equals(hBaseColumnHandle.getColumnName())) {
-                                        scan.addColumn(
-                                                Bytes.toBytes(hBaseColumnHandle.getFamily().get()),
-                                                Bytes.toBytes(hBaseColumnHandle.getQualifier().get()));
-                                    }
-                                });
-                Map<Integer, List<Range>> domainMap = this.split.getRanges();
-                FilterList filters = getFiltersFromDomains(domainMap);
-
-                if (filters.getFilters().size() != 0) {
-                    scan.setFilter(filters);
-                }
-                if (split.getStartRow() != null && !split.getStartRow().isEmpty()) {
-                    scan.withStartRow(Bytes.toBytes(split.getStartRow()));
-                }
-                if (split.getEndRow() != null && !split.getEndRow().isEmpty()) {
-                    scan.withStopRow(Bytes.toBytes(split.getEndRow()));
-                }
-
-                scan.setCaching(Constants.SCAN_CACHING_SIZE);
-                scan.setLoadColumnFamiliesOnDemand(true);
-                scan.setCacheBlocks(true);
+                setAttributeToScan();
                 scanner = conn.getConn().getTable(TableName.valueOf(table.getHbaseTableName().get())).getScanner(scan);
             }
             catch (IOException e) {
@@ -218,6 +227,39 @@ public class HBaseRecordSet
     public HBaseTableHandle getHBaseTableHandle()
     {
         return this.table;
+    }
+
+    /**
+     * set column/filters/attributes to scan
+     */
+    public void setAttributeToScan()
+    {
+        columnHandles.stream()
+                .forEach(
+                        columnHandle -> {
+                            if (this.rowIdName == null
+                                    || !this.rowIdName.equals(columnHandle.getColumnName())) {
+                                scan.addColumn(
+                                        Bytes.toBytes(columnHandle.getFamily().get()),
+                                        Bytes.toBytes(columnHandle.getQualifier().get()));
+                            }
+                        });
+        Map<Integer, List<Range>> domainMap = this.split.getRanges();
+        FilterList filters = getFiltersFromDomains(domainMap);
+
+        if (filters.getFilters().size() != 0) {
+            scan.setFilter(filters);
+        }
+        if (split.getStartRow() != null && !split.getStartRow().isEmpty()) {
+            scan.withStartRow(Bytes.toBytes(split.getStartRow()));
+        }
+        if (split.getEndRow() != null && !split.getEndRow().isEmpty()) {
+            scan.withStopRow(Bytes.toBytes(split.getEndRow()));
+        }
+
+        scan.setCaching(Constants.SCAN_CACHING_SIZE);
+        scan.setLoadColumnFamiliesOnDemand(true);
+        scan.setCacheBlocks(true);
     }
 
     /**
@@ -277,12 +319,6 @@ public class HBaseRecordSet
                             if (ranges.size() <= 1 && filters.size() != 0) {
                                 FilterList andFilter = new FilterList(filters);
                                 andFilters.addFilter(andFilter);
-                            }
-                            // operate IS NULL
-                            if (ranges.isEmpty()) {
-                                boolean isKey = (this.split.getRowKeyName().equals(columnHandle.getName()));
-                                andFilters.addFilter(
-                                        columnOrKeyFilter(columnHandle, null, CompareFilter.CompareOp.EQUAL, isKey));
                             }
                         });
 
@@ -367,11 +403,6 @@ public class HBaseRecordSet
                     addFilterByHigherBound(range.getHigh().getBound(), columnValueHigher, isKey, columnHandle, filters);
                     count++;
                 }
-                // is not null
-                if (columnValueLower == null && columnValueHigher == null) {
-                    andFilters.addFilter(
-                            columnOrKeyFilter(columnHandle, null, CompareFilter.CompareOp.NOT_EQUAL, isKey));
-                }
                 if (count == filterSize) {
                     Filter left = filters.remove(filters.size() - 1);
                     Filter right = filters.remove(filters.size() - 1);
@@ -407,7 +438,6 @@ public class HBaseRecordSet
                     Bytes.toBytes(columnHandle.getQualifier().get()),
                     operator,
                     values);
-            filter.setFilterIfMissing(true);
             return filter;
         }
     }

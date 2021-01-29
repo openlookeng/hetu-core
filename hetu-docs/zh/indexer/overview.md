@@ -94,6 +94,20 @@
 
 完成上面的操作后，再次在Hetu服务器运行这个语句，服务器将在后台自动加载索引。接下来的语句将会从中获得性能提升。
 
+## 索引配置属性
+
+| 属性名称                                            | 默认值               | 是否必填| 说明|
+|---------------------------------------------------|---------------------|-------|----------|
+| hetu.heuristicindex.filter.enabled                | false               | 否    | 启用启发式索引|
+| hetu.heuristicindex.filter.cache.max-memory       | 10GB                | 否    | 索引缓存大小|
+| hetu.heuristicindex.filter.cache.soft-reference   | true                | 否    | 允许GC在内存不足时从缓存中清除内容来释放内存|
+| hetu.heuristicindex.filter.cache.ttl              | 24h                 | 否    | 索引缓存的有效时间|
+| hetu.heuristicindex.filter.cache.load-threads     | 10                  | 否    | 从存储文件系统并行加载索引文件使用的线程数|
+| hetu.heuristicindex.filter.cache.loading-delay    | 10s                 | 否    | 在异步加载索引到缓存前等待的时长|
+| hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | 否    | 所有索引文件存储的目录|
+| hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
+
+
 ## 索引语句
 
 参见 [Heuristic Index Statements](./hindex-statements.md).
