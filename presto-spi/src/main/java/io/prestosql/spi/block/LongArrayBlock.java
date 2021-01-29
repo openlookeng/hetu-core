@@ -111,6 +111,12 @@ public class LongArrayBlock
     }
 
     @Override
+    public LongVec getValuesVec()
+    {
+        return valuesVec;
+    }
+
+    @Override
     public long getSizeInBytes()
     {
         return sizeInBytes;

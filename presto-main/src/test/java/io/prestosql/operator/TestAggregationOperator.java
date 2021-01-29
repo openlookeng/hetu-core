@@ -127,6 +127,37 @@ public class TestAggregationOperator
     }
 
     @Test
+    public void testAggregation1()
+    {
+        List<Page> input = rowPagesBuilder(VARCHAR, BIGINT, VARCHAR, BIGINT, REAL, DOUBLE, VARCHAR)
+                .addSequencePage(100000000, 0, 0, 300, 500, 400, 500, 500)
+                .build();
+        long start = System.currentTimeMillis();
+        OperatorFactory operatorFactory = new AggregationOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                Step.SINGLE,
+                ImmutableList.of(
+                        LONG_SUM.bind(ImmutableList.of(1), Optional.empty())
+                ),
+                false);
+
+        DriverContext driverContext = createTaskContext(executor, scheduledExecutor, TEST_SESSION)
+                .addPipelineContext(0, true, true, false)
+                .addDriverContext();
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
+                .row(4999999950000000L)
+                .build();
+
+        assertOperatorEquals(operatorFactory, driverContext, input, expected);
+        long end = System.currentTimeMillis() - start;
+        System.out.println("presto takes: " + end + " ms");
+        assertEquals(driverContext.getSystemMemoryUsage(), 0);
+        assertEquals(driverContext.getMemoryUsage(), 0);
+    }
+
+    @Test
     public void testMemoryTracking()
             throws Exception
     {

@@ -98,6 +98,7 @@ public abstract class AbstractBenchmark
             }
             for (int i = 0; i < measuredIterations; i++) {
                 Map<String, Long> results = runOnce();
+                System.out.println("output_rows: " + results.get("output_rows") + " | output_bytes: " + results.get("output_bytes"));
                 if (benchmarkResultHook != null) {
                     benchmarkResultHook.addResults(results);
                 }

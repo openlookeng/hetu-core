@@ -166,6 +166,11 @@ public final class SystemSessionProperties
             HetuConfig hetuConfig)
     {
         sessionProperties = ImmutableList.of(
+                booleanProperty(
+                        "omni",
+                        "omnicache enable",
+                        true,
+                        false),
                 stringProperty(
                         EXECUTION_POLICY,
                         "Policy used for scheduling query tasks",
@@ -687,11 +692,6 @@ public final class SystemSessionProperties
                         false));
     }
 
-    public List<PropertyMetadata<?>> getSessionProperties()
-    {
-        return sessionProperties;
-    }
-
     public static boolean isCrossRegionDynamicFilterEnabled(Session session)
     {
         return session.getSystemProperty(ENABLE_CROSS_REGION_DYNAMIC_FILTER, Boolean.class);
@@ -1206,5 +1206,10 @@ public final class SystemSessionProperties
     public static int getSpillOperatorThresholdReuseExchange(Session session)
     {
         return session.getSystemProperty(SPILL_THRESHOLD_REUSE_TABLESCAN, Integer.class);
+    }
+
+    public List<PropertyMetadata<?>> getSessionProperties()
+    {
+        return sessionProperties;
     }
 }

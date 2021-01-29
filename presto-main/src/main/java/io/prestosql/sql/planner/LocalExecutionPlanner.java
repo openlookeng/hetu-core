@@ -55,6 +55,7 @@ import io.prestosql.operator.ExchangeOperator.ExchangeOperatorFactory;
 import io.prestosql.operator.ExplainAnalyzeOperator.ExplainAnalyzeOperatorFactory;
 import io.prestosql.operator.FilterAndProjectOperator;
 import io.prestosql.operator.GroupIdOperator;
+import io.prestosql.operator.HashAggregationOmniOperator;
 import io.prestosql.operator.HashAggregationOperator.HashAggregationOperatorFactory;
 import io.prestosql.operator.HashBuilderOperator.HashBuilderOperatorFactory;
 import io.prestosql.operator.HashSemiJoinOperator.HashSemiJoinOperatorFactory;
@@ -206,6 +207,7 @@ import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.type.FunctionType;
+import nova.hetu.omnicache.runtime.OmniRuntime;
 
 import javax.inject.Inject;
 
@@ -2969,6 +2971,22 @@ public class LocalExecutionPlanner
                 Optional<DataSize> maxPartialAggregationMemorySize,
                 boolean useSystemMemory)
         {
+            Optional<Object> omniExecuteResult;
+            String compileID;
+            OmniRuntime omniRuntime;
+            //omni
+            long start = System.currentTimeMillis();
+            omniRuntime = new OmniRuntime();
+            String code = "|k:vec[i64],v:vec[i64]|" +
+                    "let rs = tovec(result(for(zip(k,v),dictmerger[i64,i64,+],|b,i,n| merge(b,{n.$0,n.$1}))));" +
+                    "let k = result(for(rs,appender[i64],|b,i,n| merge(b,n.$0)));" +
+                    "let v = result(for(rs,appender[i64],|b,i,n| merge(b,n.$1)));" +
+                    "{k,v}";
+
+            compileID = omniRuntime.compile(code);
+            long end = System.currentTimeMillis();
+            System.out.println("omni compile time: " + (end - start));
+
             List<Symbol> aggregationOutputSymbols = new ArrayList<>();
             List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();
             for (Map.Entry<Symbol, Aggregation> entry : aggregations.entrySet()) {
@@ -3019,6 +3037,28 @@ public class LocalExecutionPlanner
             }
             else {
                 Optional<Integer> hashChannel = hashSymbol.map(channelGetter(source));
+                if (session.getSystemProperties().get("omni").equals("true")) {
+                    return new HashAggregationOmniOperator.HashAggregationOmniOperatorFactory(
+                            omniRuntime,
+                            compileID,
+                            context.getNextOperatorId(),
+                            planNodeId,
+                            groupByTypes,
+                            groupByChannels,
+                            ImmutableList.copyOf(globalGroupingSets),
+                            step,
+                            hasDefaultOutput,
+                            accumulatorFactories,
+                            hashChannel,
+                            groupIdChannel,
+                            expectedGroups,
+                            maxPartialAggregationMemorySize,
+                            spillEnabled,
+                            unspillMemoryLimit,
+                            spillerFactory,
+                            joinCompiler,
+                            useSystemMemory);
+                }
                 return new HashAggregationOperatorFactory(
                         context.getNextOperatorId(),
                         planNodeId,

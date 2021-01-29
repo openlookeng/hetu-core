@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -28,7 +28,7 @@
 
     <properties>
         <air.main.basedir>${project.basedir}</air.main.basedir>
-
+        <air.check.skip-all>true</air.check.skip-all>
         <air.check.skip-spotbugs>true</air.check.skip-spotbugs>
         <air.check.skip-pmd>true</air.check.skip-pmd>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
@@ -140,7 +140,7 @@
         <module>hetu-sql-migration-tool</module>
         <module>hetu-transport</module>
         <module>hetu-server</module>
-        <module>hetu-server-rpm</module>
+        <!--        <module>hetu-server-rpm</module>-->
         <module>hetu-common</module>
         <module>hetu-hazelcast</module>
     </modules>

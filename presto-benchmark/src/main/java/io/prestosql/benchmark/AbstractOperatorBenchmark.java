@@ -128,6 +128,11 @@ public abstract class AbstractOperatorBenchmark
                 new AllowAllAccessControl());
     }
 
+    private static List<Split> getNextBatch(SplitSource splitSource)
+    {
+        return getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, Lifespan.taskWide(), 1000)).getSplits();
+    }
+
     @Override
     protected void tearDown()
     {
@@ -200,7 +205,7 @@ public abstract class AbstractOperatorBenchmark
         };
     }
 
-    private Split getLocalQuerySplit(Session session, TableHandle handle)
+    Split getLocalQuerySplit(Session session, TableHandle handle)
     {
         SplitSource splitSource = localQueryRunner.getSplitManager().getSplits(session, handle, UNGROUPED_SCHEDULING, null, Optional.empty(), Collections.emptyMap(), ImmutableSet.of(), false);
         List<Split> splits = new ArrayList<>();
@@ -209,11 +214,6 @@ public abstract class AbstractOperatorBenchmark
         }
         checkArgument(splits.size() == 1, "Expected only one split for a local query, but got %s splits", splits.size());
         return splits.get(0);
-    }
-
-    private static List<Split> getNextBatch(SplitSource splitSource)
-    {
-        return getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, Lifespan.taskWide(), 1000)).getSplits();
     }
 
     protected final OperatorFactory createHashProjectOperator(int operatorId, PlanNodeId planNodeId, List<Type> types)
@@ -255,15 +255,20 @@ public abstract class AbstractOperatorBenchmark
 
     protected Map<String, Long> execute(TaskContext taskContext)
     {
+        long start = System.currentTimeMillis();
         List<Driver> drivers = createDrivers(taskContext);
-
+        System.out.println("create driver execute time: " + (System.currentTimeMillis() - start));
         long peakMemory = 0;
         boolean done = false;
+
         while (!done) {
             boolean processed = false;
             for (Driver driver : drivers) {
                 if (!driver.isFinished()) {
+                    long start1 = System.currentTimeMillis();
                     driver.process();
+                    long end1 = System.currentTimeMillis();
+                    System.out.println("driver execute time: " + (end1 - start1));
                     long lastPeakMemory = peakMemory;
                     peakMemory = (long) taskContext.getTaskStats().getUserMemoryReservation().getValue(BYTE);
                     if (peakMemory <= lastPeakMemory) {
@@ -274,6 +279,7 @@ public abstract class AbstractOperatorBenchmark
             }
             done = !processed;
         }
+
         return ImmutableMap.of("peak_memory", peakMemory);
     }
 
@@ -303,7 +309,10 @@ public abstract class AbstractOperatorBenchmark
                         OptionalInt.empty());
 
         CpuTimer cpuTimer = new CpuTimer();
+        long start1 = System.currentTimeMillis();
         Map<String, Long> executionStats = execute(taskContext);
+        long end1 = System.currentTimeMillis();
+        System.out.println("task execute time: " + (end1 - start1));
         CpuDuration executionTime = cpuTimer.elapsedTime();
 
         TaskStats taskStats = taskContext.getTaskStats();

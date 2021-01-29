@@ -68,7 +68,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 @ThreadSafe
-class StatementClientV1
+public class StatementClientV1
         implements StatementClient
 {
     private static final MediaType MEDIA_TYPE_TEXT = MediaType.parse("text/plain; charset=utf-8");
@@ -121,6 +121,26 @@ class StatementClientV1
         }
 
         processResponse(response.getHeaders(), response.getValue());
+    }
+
+    private static String urlEncode(String value)
+    {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        }
+        catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static String urlDecode(String value)
+    {
+        try {
+            return URLDecoder.decode(value, "UTF-8");
+        }
+        catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private Request buildQueryRequest(ClientSession session, String query)
@@ -512,26 +532,6 @@ class StatementClientV1
         }
         catch (IOException ignored) {
             // callers expect this method not to throw
-        }
-    }
-
-    private static String urlEncode(String value)
-    {
-        try {
-            return URLEncoder.encode(value, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new AssertionError(e);
-        }
-    }
-
-    private static String urlDecode(String value)
-    {
-        try {
-            return URLDecoder.decode(value, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new AssertionError(e);
         }
     }
 

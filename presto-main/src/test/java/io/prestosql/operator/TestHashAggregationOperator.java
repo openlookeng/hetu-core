@@ -108,16 +108,8 @@ public class TestHashAggregationOperator
 
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
-    private JoinCompiler joinCompiler = new JoinCompiler(createTestMetadataManager());
+    private final JoinCompiler joinCompiler = new JoinCompiler(createTestMetadataManager());
     private DummySpillerFactory spillerFactory;
-
-    @BeforeMethod
-    public void setUp()
-    {
-        executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
-        scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
-        spillerFactory = new DummySpillerFactory();
-    }
 
     @DataProvider(name = "hashEnabled")
     public static Object[][] hashEnabled()
@@ -140,6 +132,21 @@ public class TestHashAggregationOperator
                 {false, true, false, 8, Integer.MAX_VALUE}};
     }
 
+    @DataProvider(name = "hashEnabledAndMemoryLimitForMergeValues1")
+    public static Object[][] hashEnabledAndMemoryLimitForMergeValuesProvider1()
+    {
+        return new Object[][] {
+                {true, true, true, 8, Integer.MAX_VALUE}};
+    }
+
+    @BeforeMethod
+    public void setUp()
+    {
+        executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
+        scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
+        spillerFactory = new DummySpillerFactory();
+    }
+
     @DataProvider
     public Object[][] dataType()
     {
@@ -158,7 +165,7 @@ public class TestHashAggregationOperator
     public void testHashAggregation(boolean hashEnabled, boolean spillEnabled, boolean revokeMemoryWhenAddingPages, long memoryLimitForMerge, long memoryLimitForMergeWithMemory)
     {
         // make operator produce multiple pages during finish phase
-        int numberOfRows = 40_000;
+        int numberOfRows = 10;
         Metadata metadata = createTestMetadataManager();
         InternalAggregationFunction countVarcharColumn = metadata.getAggregateFunctionImplementation(
                 new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
@@ -170,8 +177,8 @@ public class TestHashAggregationOperator
         RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, hashChannels, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN);
         List<Page> input = rowPagesBuilder
                 .addSequencePage(numberOfRows, 100, 0, 100_000, 0, 500)
-                .addSequencePage(numberOfRows, 100, 0, 200_000, 0, 500)
-                .addSequencePage(numberOfRows, 100, 0, 300_000, 0, 500)
+//                .addSequencePage(numberOfRows, 100, 0, 200_000, 0, 500)
+//                .addSequencePage(numberOfRows, 100, 0, 300_000, 0, 500)
                 .build();
 
         HashAggregationOperatorFactory operatorFactory = new HashAggregationOperatorFactory(
@@ -190,7 +197,7 @@ public class TestHashAggregationOperator
                         countBooleanColumn.bind(ImmutableList.of(4), Optional.empty())),
                 rowPagesBuilder.getHashChannel(),
                 Optional.empty(),
-                100_000,
+                2,
                 Optional.of(new DataSize(16, MEGABYTE)),
                 spillEnabled,
                 succinctBytes(memoryLimitForMerge),
@@ -208,10 +215,62 @@ public class TestHashAggregationOperator
         MaterializedResult expected = expectedBuilder.build();
 
         List<Page> pages = toPages(operatorFactory, driverContext, input, revokeMemoryWhenAddingPages);
-        assertGreaterThan(pages.size(), 1, "Expected more than one output page");
+//        assertGreaterThan(pages.size(), 1, "Expected more than one output page");
         assertPagesEqualIgnoreOrder(driverContext, pages, expected, hashEnabled, Optional.of(hashChannels.size()));
 
         assertTrue(spillEnabled == (spillerFactory.getSpillsCount() > 0), format("Spill state mismatch. Expected spill: %s, spill count: %s", spillEnabled, spillerFactory.getSpillsCount()));
+    }
+
+    @Test(dataProvider = "hashEnabledAndMemoryLimitForMergeValues1")
+    public void testHashAggregation1(boolean hashEnabled, boolean spillEnabled, boolean revokeMemoryWhenAddingPages, long memoryLimitForMerge, long memoryLimitForMergeWithMemory)
+    {
+        // make operator produce multiple pages during finish phase
+        int numberOfRows = 100000000;
+        Metadata metadata = createTestMetadataManager();
+        List<Integer> hashChannels = Ints.asList(0);
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, hashChannels, VARCHAR, BIGINT);
+        List<Page> input = rowPagesBuilder
+                .addSequencePage(numberOfRows, 0, 0)
+//                .addSequencePage(numberOfRows, 0)
+//                .addSequencePage(numberOfRows, 0)
+                .build();
+        DriverContext driverContext = createDriverContext(memoryLimitForMerge);
+        MaterializedResult.Builder expectedBuilder = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT);
+
+        for (int i = 0; i < numberOfRows; ++i) {
+            expectedBuilder.row(Integer.toString(i), (long) i);
+        }
+        MaterializedResult expected = expectedBuilder.build();
+        long start = System.currentTimeMillis();
+        HashAggregationOperatorFactory operatorFactory = new HashAggregationOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR),
+                hashChannels,
+                ImmutableList.of(),
+                Step.SINGLE,
+                false,
+                ImmutableList.of(
+                        LONG_SUM.bind(ImmutableList.of(1), Optional.empty())
+                ),
+                rowPagesBuilder.getHashChannel(),
+                Optional.empty(),
+                1,
+                Optional.of(new DataSize(16, MEGABYTE)),
+                spillEnabled,
+                succinctBytes(memoryLimitForMerge),
+                succinctBytes(memoryLimitForMergeWithMemory),
+                spillerFactory,
+                joinCompiler,
+                false);
+
+        List<Page> pages = toPages(operatorFactory, driverContext, input, revokeMemoryWhenAddingPages);
+        long end = System.currentTimeMillis() - start;
+        System.out.println("presto takes: " + end + " ms");
+//        assertGreaterThan(pages.size(), 1, "Expected more than one output page");
+        assertPagesEqualIgnoreOrder(driverContext, pages, expected, hashEnabled, Optional.of(hashChannels.size()));
+
+//        assertTrue(spillEnabled == (spillerFactory.getSpillsCount() > 0), format("Spill state mismatch. Expected spill: %s, spill count: %s", spillEnabled, spillerFactory.getSpillsCount()));
     }
 
     @Test(dataProvider = "hashEnabledAndMemoryLimitForMergeValues")

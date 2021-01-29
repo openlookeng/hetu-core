@@ -19,6 +19,8 @@ import io.prestosql.operator.Work;
 import io.prestosql.operator.WorkProcessor;
 import io.prestosql.spi.Page;
 
+import java.util.Optional;
+
 public interface HashAggregationBuilder
         extends AutoCloseable
 {
@@ -38,4 +40,8 @@ public interface HashAggregationBuilder
     ListenableFuture<?> startMemoryRevoke();
 
     void finishMemoryRevoke();
+
+    default WorkProcessor<Page> getOmniExecuteResult() {return null;}
+
+    default void setOmniExecuteResult(Optional<Object> o) {}
 }
