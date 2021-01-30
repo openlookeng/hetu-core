@@ -17,9 +17,13 @@ VDM uses openLooKeng metastore to store its database information. It can be stor
 Therefore metastore must be configured first. 
 * Here is an example of using RDBMS as metastore, create `etc/hetu-metastore.properties`:
 ```
+# the type of metastore storage
 hetu.metastore.type=jdbc
+# jdbc connection address of database
 hetu.metastore.db.url=jdbc:mysql://....
+# the user name of the database
 hetu.metastore.db.user=root
+# the password of database 
 hetu.metastore.db.password=123456
 ```
 * Here is an example of using HDFS as metastore，create `etc/hetu-metastore.properties`：
@@ -34,7 +38,7 @@ hetu.metastore.db.password=123456
 hetu.metastore.type=hetufilesystem
 # profile name of hetu file system
 hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
-#the path of metastore storage in the hetu file system
+# the path of metastore storage in the hetu file system
 hetu.metastore.hetufilesystem.path=/etc/openlookeng/metastore
 ```    
 Check [filesystem](../develop/filesystem.md) for more information.
@@ -75,7 +79,7 @@ VDM datasource can also be managed through dynamic catalog API. See [Dynamic Cat
 | Query all views in the schema   | `show tables`                    |
 | Create/Update View              | `create [or replace] view`       |
 | Delete view                     | `drop view`                      |
-| Query data by view              | `select * from view`             |
+| Query data by view              | `select`             |
 | Query view creation information | `show create view`               |
-| Query view column information   | `desc view`                      |
-
+| Query view column information   | `describe`                      |
+See [SQL Statement Syntax](../sql/_index.md) topic for more information.
