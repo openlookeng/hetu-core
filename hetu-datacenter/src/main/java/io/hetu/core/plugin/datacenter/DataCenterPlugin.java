@@ -18,12 +18,24 @@ package io.hetu.core.plugin.datacenter;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
+
+import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * Data center plugin.
  *
  * @since 2020-02-11
  */
+@ConnectorConfig(connectorLabel = "DataCenter: Query data on remote OpenLooKeng data center",
+        propertiesEnabled = true,
+        catalogConfigFilesEnabled = true,
+        globalConfigFilesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/datacenter.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/datacenter.html#configuration")
 public class DataCenterPlugin
         implements Plugin
 {
@@ -31,5 +43,13 @@ public class DataCenterPlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new DataCenterConnectorFactory());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = DataCenterPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(DataCenterConfig.class.getDeclaredMethods()));
     }
 }

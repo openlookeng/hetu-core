@@ -18,7 +18,11 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -28,6 +32,12 @@ import static java.util.Objects.requireNonNull;
 /**
  * Presto plugin to use Apache Kafka as a data source.
  */
+@ConnectorConfig(connectorLabel = "Kafka: Allow the use of Apache Kafka topics as tables in openLooKeng",
+        propertiesEnabled = true,
+        catalogConfigFilesEnabled = true,
+        globalConfigFilesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/kafka.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/kafka.html#configuration")
 public class KafkaPlugin
         implements Plugin
 {
@@ -43,5 +53,13 @@ public class KafkaPlugin
     public synchronized Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new KafkaConnectorFactory(tableDescriptionSupplier));
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = KafkaPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(KafkaConnectorConfig.class.getDeclaredMethods()));
     }
 }

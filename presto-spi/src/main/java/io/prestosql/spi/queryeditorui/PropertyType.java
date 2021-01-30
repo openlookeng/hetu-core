@@ -12,25 +12,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.queryeditorui.resources;
+package io.prestosql.spi.queryeditorui;
 
-import io.prestosql.queryeditorui.store.connectors.ConnectorCache;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-@Path("/api/connectors")
-public class ConnectorResource
+public enum PropertyType
 {
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getConnectors(@Context HttpServletRequest servletRequest)
+    STRING("string"),
+
+    FILES("files");
+
+    String propertyType;
+
+    PropertyType(String propertyType)
     {
-        return Response.ok(ConnectorCache.getConnectors()).build();
+        this.propertyType = propertyType;
+    }
+
+    public String stringValue()
+    {
+        return propertyType;
     }
 }

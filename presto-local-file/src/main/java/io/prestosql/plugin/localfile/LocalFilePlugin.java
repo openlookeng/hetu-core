@@ -16,7 +16,17 @@ package io.prestosql.plugin.localfile;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.util.Arrays;
+import java.util.Optional;
+
+@ConnectorConfig(connectorLabel = "LocalFile: Query data stored on the local file system of each worker",
+        propertiesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/localfile.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/localfile.html#configuration")
 public class LocalFilePlugin
         implements Plugin
 {
@@ -24,5 +34,13 @@ public class LocalFilePlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new LocalFileConnectorFactory());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = LocalFilePlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(LocalFileConfig.class.getDeclaredMethods()));
     }
 }

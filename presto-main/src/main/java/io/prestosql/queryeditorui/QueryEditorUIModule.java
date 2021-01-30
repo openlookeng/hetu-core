@@ -50,7 +50,6 @@ import io.prestosql.queryeditorui.resources.TablesResource;
 import io.prestosql.queryeditorui.resources.UIExecuteResource;
 import io.prestosql.queryeditorui.resources.UserResource;
 import io.prestosql.queryeditorui.security.UiAuthenticator;
-import io.prestosql.queryeditorui.store.connectors.ConnectorCache;
 import io.prestosql.queryeditorui.store.files.ExpiringFileStore;
 import io.prestosql.queryeditorui.store.history.JobHistoryStore;
 import io.prestosql.queryeditorui.store.history.LocalJobHistoryStore;
@@ -279,11 +278,5 @@ public class QueryEditorUIModule
     public QueryStore provideQueryStore(QueryEditorConfig queryEditorConfig) throws IOException
     {
         return new InMemoryQueryStore(new File(queryEditorConfig.getFeaturedQueriesPath()), new File(queryEditorConfig.getUserQueriesPath()));
-    }
-
-    @Provides
-    public ConnectorCache provideConnectorCache(QueryEditorConfig queryEditorConfig) throws IOException
-    {
-        return new ConnectorCache(new File(queryEditorConfig.getConnectorsListPath()));
     }
 }

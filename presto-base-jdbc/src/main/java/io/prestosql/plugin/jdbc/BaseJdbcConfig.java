@@ -18,6 +18,7 @@ import io.airlift.configuration.ConfigDescription;
 import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.Min;
@@ -267,6 +268,10 @@ public class BaseJdbcConfig
         return connectionUser;
     }
 
+    @Mandatory(name = "connection-user",
+            description = "User to connect to remote database",
+            defaultValue = "root",
+            required = true)
     @Config("connection-user")
     public BaseJdbcConfig setConnectionUser(String connectionUser)
     {
@@ -280,6 +285,10 @@ public class BaseJdbcConfig
         return connectionPassword;
     }
 
+    @Mandatory(name = "connection-password",
+            description = "Password of user to connect to remote database",
+            defaultValue = "secret",
+            required = true)
     @Config("connection-password")
     @ConfigSecuritySensitive
     public BaseJdbcConfig setConnectionPassword(String connectionPassword)

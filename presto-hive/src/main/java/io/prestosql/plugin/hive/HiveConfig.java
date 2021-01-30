@@ -26,6 +26,8 @@ import io.airlift.units.MinDataSize;
 import io.airlift.units.MinDuration;
 import io.prestosql.orc.OrcWriteValidation.OrcWriteValidationMode;
 import io.prestosql.plugin.hive.s3.S3FileSystemType;
+import io.prestosql.spi.function.Mandatory;
+import io.prestosql.spi.queryeditorui.PropertyType;
 import org.joda.time.DateTimeZone;
 
 import javax.annotation.Nullable;
@@ -551,6 +553,11 @@ public class HiveConfig
         return resourceConfigFiles;
     }
 
+    @Mandatory(name = "hive.config.resources",
+            description = "An optional comma-separated list of HDFS configuration files. These files must exist on the machines running openLooKeng. Only specify this if absolutely necessary to access HDFS. Ensure to upload these files.",
+            defaultValue = "core-site.xml,hdfs-site.xml",
+            readOnly = true,
+            type = PropertyType.FILES)
     @Config("hive.config.resources")
     public HiveConfig setResourceConfigFiles(String files)
     {
