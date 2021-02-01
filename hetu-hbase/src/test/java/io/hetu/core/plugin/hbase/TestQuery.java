@@ -91,7 +91,9 @@ public class TestQuery
                         "startrow",
                         "endrow",
                         new HashMap<>(),
-                        false);
+                        -1,
+                        false,
+                        null);
         recordSet =
                 new HBaseRecordSet(
                         hconn, session, split, TestUtils.createHBaseTableHandle(), TestUtils.createColumnList());
@@ -133,7 +135,9 @@ public class TestQuery
                         "startrow",
                         "endrow",
                         new HashMap<>(),
-                        false);
+                        -1,
+                        false,
+                        null);
         HBaseRecordSet rSet = new HBaseRecordSet(hconn, session, hBasesplit, tableHandle, TestUtils.createColumnList());
         rSet.cursor();
     }
@@ -169,7 +173,7 @@ public class TestQuery
         ranges.put(0, range);
         HBaseSplit hBasesplit =
                 new HBaseSplit(
-                        "rowkey", tableHandle, new ArrayList<HostAddress>(1), "1", "12345678", ranges, false);
+                        "rowkey", tableHandle, new ArrayList<HostAddress>(1), "1", "12345678", ranges, -1, false, null);
         HBaseRecordSet rSet = new HBaseRecordSet(hconn, session, hBasesplit, tableHandle, list);
         rSet.getFiltersFromDomains(ranges);
 

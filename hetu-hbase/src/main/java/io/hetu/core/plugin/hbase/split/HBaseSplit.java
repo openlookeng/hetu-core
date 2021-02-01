@@ -46,6 +46,10 @@ public class HBaseSplit
 
     private final boolean randomSplit;
 
+    private final int regionIndex;
+
+    private final String snapshotName;
+
     /**
      * constructor
      *
@@ -55,7 +59,9 @@ public class HBaseSplit
      * @param startRow startRow
      * @param endRow endRow
      * @param ranges search ranges
+     * @param regionIndex regionIndex
      * @param randomSplit randomSplit
+     * @param snapshotName snapshotName
      */
     @JsonCreator
     public HBaseSplit(
@@ -65,7 +71,9 @@ public class HBaseSplit
             @JsonProperty("startRow") String startRow,
             @JsonProperty("endRow") String endRow,
             @JsonProperty("ranges") Map<Integer, List<Range>> ranges,
-            @JsonProperty("randomSplit") boolean randomSplit)
+            @JsonProperty("regionIndex") int regionIndex,
+            @JsonProperty("randomSplit") boolean randomSplit,
+            @JsonProperty("snapshotName") String snapshotName)
     {
         this.rowKeyName = rowKeyName;
         this.tableHandle = tableHandle;
@@ -73,7 +81,9 @@ public class HBaseSplit
         this.startRow = startRow;
         this.endRow = endRow;
         this.ranges = ranges;
+        this.regionIndex = regionIndex;
         this.randomSplit = randomSplit;
+        this.snapshotName = snapshotName;
     }
 
     @Override
@@ -125,6 +135,18 @@ public class HBaseSplit
     }
 
     @JsonProperty
+    public String getSnapshotName()
+    {
+        return snapshotName;
+    }
+
+    @JsonProperty
+    public int getRegionIndex()
+    {
+        return regionIndex;
+    }
+
+    @JsonProperty
     public boolean isRandomSplit()
     {
         return randomSplit;
@@ -134,12 +156,11 @@ public class HBaseSplit
     public String toString()
     {
         return "HBaseSplit{" +
-                "addresses='" + addresses + '\'' +
                 ", rowKeyName='" + rowKeyName + '\'' +
                 ", startRow='" + startRow + '\'' +
                 ", endRow='" + endRow + '\'' +
-                ", ranges='" + ranges + '\'' +
-                ", randomSplit='" + randomSplit + '\'' +
+                ", regionIndex='" + regionIndex + '\'' +
+                ", snapshotName=" + snapshotName + '\'' +
                 '}';
     }
 }

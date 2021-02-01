@@ -33,7 +33,7 @@ CACHE TABLE table_name WHERE condition;
 
 ## 限制
 
-- 目前只有Hive连接器支持此功能。 有关更多详细信息，请参见连接器文档。
+- 目前只有Hive连接器(ORC格式)支持此功能。 有关更多详细信息，请参见连接器文档。
 - 目前 `WHERE` 中不支持 `LIKE` 字段。
 - 目前不支持 `WHERE` 中的 `OR` 运算符。
 
