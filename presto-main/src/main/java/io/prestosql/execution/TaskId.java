@@ -50,6 +50,10 @@ public class TaskId
         this.fullId = fullId;
     }
 
+    public String getFullId(){
+        return fullId;
+    }
+
     public QueryId getQueryId()
     {
         return new QueryId(QueryId.parseDottedId(fullId, 3, "taskId").get(0));

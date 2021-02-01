@@ -21,35 +21,35 @@ import nova.hetu.omnicache.vector.VecType;
 
 import static com.google.common.base.Preconditions.checkState;
 
-public final class OmniWork<I, O>
-        implements Work<O>
+public final class HashAggregationOmniWork<O>
+        implements Work<Vec<?>[]>
 {
 
     OmniRuntime omniRuntime;
     String compileID;
     private boolean finished;
-    private O result;
-    private final Page page;
-    Page tempHashPage;
+    private Vec<?>[] result;
+    private Page page;
+    String omniKey;
 
-    public OmniWork(Page page, OmniRuntime omniRuntime, String compileID, Page tempHashPage)
+    public HashAggregationOmniWork(Page page, OmniRuntime omniRuntime, String compileID, String omniKey)
     {
-        this.page = page;
+        this.page=page;
         this.omniRuntime = omniRuntime;
         this.compileID = compileID;
-        this.tempHashPage=tempHashPage;
+        this.omniKey=omniKey;
     }
 
     @Override
     public boolean process()
     {
         Vec[] inputData = new Vec[2];
-//        inputData[0] = (LongVec) page.getBlock(0).getValuesVec();
-//        inputData[1] = (LongVec) page.getBlock(1).getValuesVec();
+        inputData[0] = (LongVec) page.getBlock(0).getValuesVec();
+        inputData[1] = (LongVec) page.getBlock(1).getValuesVec();
 
+        System.out.println("before omni execute-------");
         for (int i = 0; i < inputData[0].size(); i++) {
-            System.out.println("block0 before omni:" + inputData[0].get(i));
-            System.out.println("block1 before omni:" + inputData[1].get(i));
+            System.out.println(inputData[0].get(i)+" " + inputData[1].get(i));
         }
 
         int rowNum = page.getPositionCount();
@@ -57,12 +57,12 @@ public final class OmniWork<I, O>
         VecType[] outTypes = {VecType.LONG, VecType.LONG};
         long start1 = System.currentTimeMillis();
 
-        result = (O) omniRuntime.execute(compileID, inputData, rowNum, outTypes);
+        result =  omniRuntime.execute(compileID, inputData, rowNum, outTypes);
         Vec<?>[] vecs = (Vec<?>[]) result;
 
+        System.out.println("after omni execute-------");
         for (int i = 0; i < vecs[0].size(); i++) {
-            System.out.println("block0 after omni:" + vecs[0].get(i));
-            System.out.println("block1 after omni:" + vecs[1].get(i));
+            System.out.println(vecs[0].get(i)+" " + vecs[1].get(i));
         }
 
         long end1 = System.currentTimeMillis();
@@ -72,9 +72,18 @@ public final class OmniWork<I, O>
     }
 
     @Override
-    public O getResult()
+    public Vec<?>[] getResult()
     {
         checkState(finished, "process has not finished");
         return result;
+    }
+
+    public  boolean isFinished(){
+        return  finished;
+    }
+
+    public void updatePages(Page page)
+    {
+        this.page=page;
     }
 }

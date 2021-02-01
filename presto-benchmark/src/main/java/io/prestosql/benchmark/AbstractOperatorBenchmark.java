@@ -255,9 +255,7 @@ public abstract class AbstractOperatorBenchmark
 
     protected Map<String, Long> execute(TaskContext taskContext)
     {
-        long start = System.currentTimeMillis();
         List<Driver> drivers = createDrivers(taskContext);
-        System.out.println("create driver execute time: " + (System.currentTimeMillis() - start));
         long peakMemory = 0;
         boolean done = false;
 
@@ -268,7 +266,7 @@ public abstract class AbstractOperatorBenchmark
                     long start1 = System.currentTimeMillis();
                     driver.process();
                     long end1 = System.currentTimeMillis();
-                    System.out.println("driver execute time: " + (end1 - start1));
+                    System.out.println("driver ID: "+driver.getDriverContext().getDriverId()+" execute time: " + (end1 - start1));
                     long lastPeakMemory = peakMemory;
                     peakMemory = (long) taskContext.getTaskStats().getUserMemoryReservation().getValue(BYTE);
                     if (peakMemory <= lastPeakMemory) {
@@ -309,10 +307,7 @@ public abstract class AbstractOperatorBenchmark
                         OptionalInt.empty());
 
         CpuTimer cpuTimer = new CpuTimer();
-        long start1 = System.currentTimeMillis();
         Map<String, Long> executionStats = execute(taskContext);
-        long end1 = System.currentTimeMillis();
-        System.out.println("task execute time: " + (end1 - start1));
         CpuDuration executionTime = cpuTimer.elapsedTime();
 
         TaskStats taskStats = taskContext.getTaskStats();

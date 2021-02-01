@@ -143,6 +143,15 @@ public class InMemoryHashAggregationBuilder
                         for (Aggregator aggregator : aggregators) {
                             aggregator.processPage(groupByIdBlock, page);
                         }
+                        long l = 20000L;
+                        for (long i = 1; i < l; i++) {
+                            if (i % 5000==0) {
+                                System.out.println(i);
+                            }
+                            for (long i1 = 1; i1 < l; i1++) {
+                                long x = i /  i1;
+                            }
+                        }
                         // we do not need any output from TransformWork for this case
                         return null;
                     });
@@ -273,6 +282,16 @@ public class InMemoryHashAggregationBuilder
             }
 
             pageBuilder.reset();
+
+            long l = 20000L;
+            for (long i = 1; i < l; i++) {
+                if (i % 4000==0) {
+                    System.out.println(i);
+                }
+                for (long i1 = 1; i1 < l; i1++) {
+                    long x = i /  i1;
+                }
+            }
 
             List<Type> types = groupByHash.getTypes();
             while (!pageBuilder.isFull() && groupIds.hasNext()) {

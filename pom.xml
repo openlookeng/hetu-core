@@ -140,7 +140,7 @@
         <module>hetu-sql-migration-tool</module>
         <module>hetu-transport</module>
         <module>hetu-server</module>
-        <!--        <module>hetu-server-rpm</module>-->
+        <module>hetu-server-rpm</module>
         <module>hetu-common</module>
         <module>hetu-hazelcast</module>
     </modules>
