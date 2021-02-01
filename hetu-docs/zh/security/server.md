@@ -115,8 +115,12 @@ http-server.https.keystore.key=keystore_password
 | `http-server.https.port` | HTTPS服务器的端口号。                                           |
 | `http-server.https.keystore.path` | 用于TLS安全连接的Java密钥库文件的位置。|
 | `http-server.https.keystore.key` |密钥库的密码。必须与创建密钥库时设置的密码一致。|
+| `http-server.authentication.krb5.user-mapping.pattern` | 用于认证用户匹配的正则表达式。如果匹配，认证用户映射到正则表达式中的第一个匹配组；如果不匹配，则拒绝认证。默认值是`(.*)`。 |
+| `http-server.authentication.krb5.user-mapping.file`    | 包含用户映射规则的JSON文件。详见 [认证用户映射](./user-mapping.md)。 |
 
 注意
+
+`http-server.authentication.krb5.user-mapping.pattern`和`http-server.authentication.krb5.user-mapping.file`属性不能同时设置。
 
 开启HTTPS后，监控openLooKeng协调节点的CPU使用率。如果您允许Java从大的列表中选择，那么它更喜欢CPU密集型的加密套件。启用HTTPS后，如果CPU占用率过高，可以通过设置`http-server.https.included-cipher`属性只允许廉价的密码，使Java使用指定的加密套件。非前向保密密码默认关闭。因此，如果您想选择非前向保密密码，您需要将`http-server.https.excluded-cipher`属性设置为空列表，以覆盖默认的排除。
 

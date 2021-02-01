@@ -18,6 +18,7 @@ import io.airlift.configuration.Config;
 import javax.validation.constraints.NotNull;
 
 import java.io.File;
+import java.util.Optional;
 
 import static io.prestosql.server.security.KerberosNameType.HOSTBASED_SERVICE;
 
@@ -30,6 +31,8 @@ public class KerberosConfig
     private File keytab;
     private String principalHostname;
     private KerberosNameType nameType = HOSTBASED_SERVICE;
+    private Optional<String> userMappingPattern = Optional.empty();
+    private Optional<File> userMappingFile = Optional.empty();
 
     @NotNull
     public File getKerberosConfig()
@@ -91,6 +94,30 @@ public class KerberosConfig
     public KerberosConfig setNameType(KerberosNameType nameType)
     {
         this.nameType = nameType;
+        return this;
+    }
+
+    public Optional<String> getUserMappingPattern()
+    {
+        return userMappingPattern;
+    }
+
+    @Config("http-server.authentication.krb5.user-mapping.pattern")
+    public KerberosConfig setUserMappingPattern(String userMappingPattern)
+    {
+        this.userMappingPattern = Optional.ofNullable(userMappingPattern);
+        return this;
+    }
+
+    public Optional<File> getUserMappingFile()
+    {
+        return userMappingFile;
+    }
+
+    @Config("http-server.authentication.krb5.user-mapping.file")
+    public KerberosConfig setUserMappingFile(File userMappingFile)
+    {
+        this.userMappingFile = Optional.ofNullable(userMappingFile);
         return this;
     }
 }

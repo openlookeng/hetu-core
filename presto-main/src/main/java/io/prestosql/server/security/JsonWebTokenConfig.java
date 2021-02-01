@@ -17,11 +17,16 @@ import io.airlift.configuration.Config;
 
 import javax.validation.constraints.NotNull;
 
+import java.io.File;
+import java.util.Optional;
+
 public class JsonWebTokenConfig
 {
     private String keyFile;
     private String requiredIssuer;
     private String requiredAudience;
+    private Optional<String> userMappingPattern = Optional.empty();
+    private Optional<File> userMappingFile = Optional.empty();
 
     @NotNull
     public String getKeyFile()
@@ -57,6 +62,30 @@ public class JsonWebTokenConfig
     public JsonWebTokenConfig setRequiredAudience(String requiredAudience)
     {
         this.requiredAudience = requiredAudience;
+        return this;
+    }
+
+    public Optional<String> getUserMappingPattern()
+    {
+        return userMappingPattern;
+    }
+
+    @Config("http-server.authentication.jwt.user-mapping.pattern")
+    public JsonWebTokenConfig setUserMappingPattern(String userMappingPattern)
+    {
+        this.userMappingPattern = Optional.ofNullable(userMappingPattern);
+        return this;
+    }
+
+    public Optional<File> getUserMappingFile()
+    {
+        return userMappingFile;
+    }
+
+    @Config("http-server.authentication.jwt.user-mapping.file")
+    public JsonWebTokenConfig setUserMappingFile(File userMappingFile)
+    {
+        this.userMappingFile = Optional.ofNullable(userMappingFile);
         return this;
     }
 }

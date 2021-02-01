@@ -41,6 +41,7 @@ import java.util.function.Function;
 
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -131,6 +132,15 @@ public class UiAuthenticator
 
     public static String getUser(HttpServletRequest servletRequest)
     {
+        String user = servletRequest.getHeader(PRESTO_USER);
+        if (user != null) {
+            return user.trim();
+        }
+
+        user = (String) servletRequest.getAttribute(PRESTO_USER);
+        if (user != null) {
+            return user;
+        }
         return servletRequest.getUserPrincipal() != null ? servletRequest.getUserPrincipal().getName() : "lk";
     }
 

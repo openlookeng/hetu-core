@@ -104,21 +104,25 @@ http-server.https.keystore.path=/etc/openlookeng_keystore.jks
 http-server.https.keystore.key=keystore_password
 ```
 
-| Property                                             | Description                                                  |
-| :--------------------------------------------------- | :----------------------------------------------------------- |
-| `http-server.authentication.type`                    | Authentication type for the openLooKeng  coordinator. Must be set to `KERBEROS`. |
-| `http.server.authentication.krb5.service-name`       | The Kerberos service name for the openLooKeng  coordinator. Must match the Kerberos principal. |
-| `http.server.authentication.krb5.principal-hostname` | The Kerberos hostname for the openLooKeng  coordinator. Must match the Kerberos principal. This parameter is optional. If included, openLooKeng  will use this value in the host part of the Kerberos principal instead of the machine’s hostname. |
-| `http.server.authentication.krb5.keytab`             | The location of the keytab that can be used to authenticate the Kerberos principal. |
-| `http.authentication.krb5.config`                    | The location of the Kerberos configuration file.             |
-| `http-server.https.enabled`                          | Enables HTTPS access for the openLooKeng  coordinator. Should be set to `true`. |
-| `http-server.https.port`                             | HTTPS server port.                                           |
-| `http-server.https.keystore.path`                    | The location of the Java Keystore file that will be used to secure TLS. |
-| `http-server.https.keystore.key`                     | The password for the keystore. This must match the password you specified when creating the keystore. |
+| Property                                               | Description                                                  |
+| :----------------------------------------------------- | :----------------------------------------------------------- |
+| `http-server.authentication.type`                      | Authentication type for the openLooKeng  coordinator. Must be set to `KERBEROS`. |
+| `http.server.authentication.krb5.service-name`         | The Kerberos service name for the openLooKeng  coordinator. Must match the Kerberos principal. |
+| `http.server.authentication.krb5.principal-hostname`   | The Kerberos hostname for the openLooKeng  coordinator. Must match the Kerberos principal. This parameter is optional. If included, openLooKeng  will use this value in the host part of the Kerberos principal instead of the machine’s hostname. |
+| `http.server.authentication.krb5.keytab`               | The location of the keytab that can be used to authenticate the Kerberos principal. |
+| `http.authentication.krb5.config`                      | The location of the Kerberos configuration file.          |
+| `http-server.https.enabled`                            | Enables HTTPS access for the openLooKeng  coordinator. Should be set to `true`. |
+| `http-server.https.port`                               | HTTPS server port.                                         |
+| `http-server.https.keystore.path`                      | The location of the Java Keystore file that will be used to secure TLS. |
+| `http-server.https.keystore.key`                       | The password for the keystore. This must match the password you specified when creating the keystore. |
+| `http-server.authentication.krb5.user-mapping.pattern` | Regex to match against user. If matched, user will be replaced with first regex group. If not matched, authentication is denied. Default is `(.*)`. |
+| `http-server.authentication.krb5.user-mapping.file`    | JSON file containing rules for mapping user. See [Authentication User Mapping](./user-mapping.md) for more information. |
 
 Note
 
-Monitor CPU usage on the openLooKeng  coordinator after enabling HTTPS. Java prefers the more CPU-intensive cipher suites if you allow it to choose from a big list. If the CPU usage is unacceptably high after enabling HTTPS, you can configure Java to use specific cipher suites by setting the `http-server.https.included-cipher` property to only allow cheap ciphers. Non forward secrecy (FS) ciphers are disabled by default. As a result, if you want to choose non FS ciphers, you need to set the `http-server.https.excluded-cipher` property to an empty list in order to override the default exclusions.
+`http-server.authentication.krb5.user-mapping.pattern` and `http-server.authentication.krb5.user-mapping.file` can not both be set.
+
+Monitor CPU usage on the openLooKeng coordinator after enabling HTTPS. Java prefers the more CPU-intensive cipher suites if you allow it to choose from a big list. If the CPU usage is unacceptably high after enabling HTTPS, you can configure Java to use specific cipher suites by setting the `http-server.https.included-cipher` property to only allow cheap ciphers. Non forward secrecy (FS) ciphers are disabled by default. As a result, if you want to choose non FS ciphers, you need to set the `http-server.https.excluded-cipher` property to an empty list in order to override the default exclusions.
 
 ```properties
 http-server.https.included-cipher=TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA256
@@ -129,11 +133,7 @@ The Java documentation lists the [supported cipher suites](http://docs.oracle.co
 
 ### access-controls.properties
 
-At a minimum, an `access-control.properties` file must contain an `access-control.name` property.  All other configuration is specific for the implementation being configured. See System Access Control for details.
-
- 
-
-
+At a minimum, an `access-control.properties` file must contain an `access-control.name` property. All other configuration is specific for the implementation being configured. See System Access Control for details.
 
 ## Troubleshooting
 

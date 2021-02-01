@@ -129,7 +129,7 @@ public class Console
                 Optional.ofNullable(clientOptions.truststorePath),
                 Optional.ofNullable(clientOptions.truststorePassword),
                 Optional.ofNullable(clientOptions.accessToken),
-                Optional.ofNullable(clientOptions.user),
+                Optional.ofNullable(getUser()),
                 clientOptions.password ? Optional.of(getPassword()) : Optional.empty(),
                 Optional.ofNullable(clientOptions.krb5Principal),
                 Optional.ofNullable(clientOptions.krb5ServicePrincipalPattern),
@@ -155,6 +155,17 @@ public class Console
             exited.countDown();
             interruptor.close();
         }
+    }
+
+    private String getUser()
+    {
+        if (clientOptions.user != null) {
+            return clientOptions.user;
+        }
+        if (clientOptions.krb5Principal != null) {
+            return "";
+        }
+        return System.getProperty("user.name");
     }
 
     private String getPassword()

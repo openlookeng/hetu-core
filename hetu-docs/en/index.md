@@ -22,6 +22,7 @@ headless: true
     - [Coordinator Kerberos Authentication]({{< relref "./docs/security/server.md" >}})
     - [CLI Kerberos Authentication]({{< relref "./docs/security/cli.md" >}})
     - [LDAP Authentication]({{< relref "./docs/security/ldap.md" >}})
+    - [Authentication User Mapping]({{< relref "./docs/security/user-mapping.md" >}})
     - [Java Keystores and Truststores]({{< relref "./docs/security/tls.md" >}})
     - [Built-in System Access Control]({{< relref "./docs/security/built-in-system-access-control.md" >}})
     - [Ranger Access Control]({{< relref "./docs/security/ranger-access-control.md" >}})
