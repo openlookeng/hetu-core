@@ -13,20 +13,27 @@
  */
 package io.prestosql.testing;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllSystemAccessControl;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.security.Identity;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 import io.prestosql.transaction.TransactionId;
 import io.prestosql.transaction.TransactionManager;
 
 import javax.inject.Inject;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -75,6 +82,8 @@ public class TestingAccessControlManager
         extends AccessControlManager
 {
     private final Set<TestingPrivilege> denyPrivileges = new HashSet<>();
+    private final Map<RowFilterKey, List<ViewExpression>> rowFilters = new HashMap<>();
+    private final Map<ColumnMaskKey, List<ViewExpression>> columnMasks = new HashMap<>();
 
     @Inject
     public TestingAccessControlManager(TransactionManager transactionManager)
@@ -98,9 +107,21 @@ public class TestingAccessControlManager
         Collections.addAll(this.denyPrivileges, deniedPrivileges);
     }
 
+    public void rowFilter(QualifiedObjectName table, String identity, ViewExpression filter)
+    {
+        rowFilters.computeIfAbsent(new RowFilterKey(identity, table), key -> new ArrayList<>()).add(filter);
+    }
+
+    public void columnMask(QualifiedObjectName table, String column, String identity, ViewExpression mask)
+    {
+        columnMasks.computeIfAbsent(new ColumnMaskKey(identity, table, column), key -> new ArrayList<>()).add(mask);
+    }
+
     public void reset()
     {
         denyPrivileges.clear();
+        rowFilters.clear();
+        columnMasks.clear();
     }
 
     @Override
@@ -311,6 +332,18 @@ public class TestingAccessControlManager
         }
     }
 
+    @Override
+    public List<ViewExpression> getRowFilters(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+        return rowFilters.getOrDefault(new RowFilterKey(identity.getUser(), tableName), ImmutableList.of());
+    }
+
+    @Override
+    public List<ViewExpression> getColumnMasks(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, String column, Type type)
+    {
+        return columnMasks.getOrDefault(new ColumnMaskKey(identity.getUser(), tableName, column), ImmutableList.of());
+    }
+
     private boolean shouldDenyPrivilege(String userName, String entityName, TestingPrivilegeType type)
     {
         TestingPrivilege testPrivilege = privilege(userName, entityName, type);
@@ -380,6 +413,73 @@ public class TestingAccessControlManager
                     .add("entityName", entityName)
                     .add("type", type)
                     .toString();
+        }
+    }
+
+    private static class RowFilterKey
+    {
+        private final String identity;
+        private final QualifiedObjectName table;
+
+        public RowFilterKey(String identity, QualifiedObjectName table)
+        {
+            this.identity = requireNonNull(identity, "identity is null");
+            this.table = requireNonNull(table, "table is null");
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            RowFilterKey that = (RowFilterKey) o;
+            return identity.equals(that.identity) &&
+                    table.equals(that.table);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(identity, table);
+        }
+    }
+
+    private static class ColumnMaskKey
+    {
+        private final String identity;
+        private final QualifiedObjectName table;
+        private final String column;
+
+        public ColumnMaskKey(String identity, QualifiedObjectName table, String column)
+        {
+            this.identity = identity;
+            this.table = table;
+            this.column = column;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ColumnMaskKey that = (ColumnMaskKey) o;
+            return identity.equals(that.identity) &&
+                    table.equals(that.table) &&
+                    column.equals(that.column);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(identity, table, column);
         }
     }
 }

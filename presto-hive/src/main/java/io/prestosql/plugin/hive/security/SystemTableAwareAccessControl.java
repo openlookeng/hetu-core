@@ -21,6 +21,9 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.ConnectorIdentity;
+import io.prestosql.spi.security.Identity;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.util.List;
 import java.util.Optional;
@@ -89,5 +92,17 @@ public class SystemTableAwareAccessControl
         }
 
         delegate.checkCanSelectFromColumns(transactionHandle, identity, tableName, columnNames);
+    }
+
+    @Override
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
+    {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ViewExpression> getColumnMask(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName, String columnName, Type type)
+    {
+        return Optional.empty();
     }
 }

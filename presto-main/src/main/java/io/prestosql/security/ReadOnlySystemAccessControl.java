@@ -20,6 +20,8 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.SystemAccessControl;
 import io.prestosql.spi.security.SystemAccessControlFactory;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.security.Principal;
 import java.util.List;
@@ -130,15 +132,15 @@ public class ReadOnlySystemAccessControl
     }
 
     @Override
-    public String applyRowLevelFiltering(Identity identity, CatalogSchemaTableName table)
+    public Optional<ViewExpression> getRowFilter(Identity identity, CatalogSchemaTableName tableName)
     {
-        return null;
+        return Optional.empty();
     }
 
     @Override
-    public String applyColumnMasking(Identity identity, CatalogSchemaTableName asCatalogSchemaTableName, String columnName)
+    public Optional<ViewExpression> getColumnMask(Identity identity, CatalogSchemaTableName tableName, String columnName, Type type)
     {
-        return null;
+        return Optional.empty();
     }
 
     @Override
