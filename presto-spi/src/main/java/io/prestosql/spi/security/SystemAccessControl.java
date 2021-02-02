@@ -41,6 +41,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyDropSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropView;
 import static io.prestosql.spi.security.AccessDeniedException.denyGrantTablePrivilege;
+import static io.prestosql.spi.security.AccessDeniedException.denyImpersonateUser;
 import static io.prestosql.spi.security.AccessDeniedException.denyInsertTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameIndex;
@@ -49,6 +50,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyRenameTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
 import static io.prestosql.spi.security.AccessDeniedException.denySelectColumns;
 import static io.prestosql.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
+import static io.prestosql.spi.security.AccessDeniedException.denySetUser;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowRoles;
@@ -62,8 +64,23 @@ public interface SystemAccessControl
      * Check if the principal is allowed to be the specified user.
      *
      * @throws AccessDeniedException if not allowed
+     * @deprecated use user mapping and {@link #checkCanImpersonateUser} instead
      */
-    void checkCanSetUser(Optional<Principal> principal, String userName);
+    @Deprecated
+    default void checkCanSetUser(Optional<Principal> principal, String userName)
+    {
+        denySetUser(principal, userName);
+    }
+
+    /**
+     * Check if the identity is allowed impersonate the specified user.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanImpersonateUser(Identity identity, String userName)
+    {
+        denyImpersonateUser(identity.getUser(), userName);
+    }
 
     /**
      * Check if identity is allowed to set the specified system property.

@@ -47,6 +47,11 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
+    public void checkCanImpersonateUser(Identity identity, String userName)
+    {
+    }
+
+    @Override
     public void checkCanSetSystemSessionProperty(Identity identity, String propertyName)
     {
     }

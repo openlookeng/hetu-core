@@ -57,6 +57,12 @@ public abstract class ForwardingSystemAccessControl
     }
 
     @Override
+    public void checkCanImpersonateUser(Identity identity, String userName)
+    {
+        delegate().checkCanImpersonateUser(identity, userName);
+    }
+
+    @Override
     public void checkCanSetSystemSessionProperty(Identity identity, String propertyName)
     {
         delegate().checkCanSetSystemSessionProperty(identity, propertyName);

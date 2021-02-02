@@ -87,7 +87,50 @@ For example, if you want to allow only the user `admin` to access the `mysql` an
 }
 ```
 
+### Impersonation Rules
+
+These rules control the ability of a user to impersonate another user. In some environments it is desirable for an administrator (or managed system) to run queries on behalf of other users. In these cases, the administrator authenticates using their credentials, and then submits a query as a different user. When the user context is changed, openLooKeng will verify the administrator is authorized to run queries as the target user.
+
+When these rules are present, the authorization is based on the first matching rule, processed from top to bottom. If no rules match, the authorization is denied. If impersonation rules are not present but the legacy principal rules are specified, it is assumed impersonation access control is being handled by the principal rules, so impersonation is allowed. If neither impersonation nor principal rules are defined, impersonation is not allowed.
+
+Each impersonation rule is composed of the following fields:
+
+* `original_user` (required): regex to match against the user requesting the impersonation.
+* `new_user` (required): regex to match against the user that will be impersonated.
+* `allow` (optional): boolean indicating if the authentication should be allowed.
+
+The following example allows the two admins, `alice` and `bob`, to impersonate any user, except they may not impersonate each other. It also allows any user to impersonate the `test` user:
+
+```json
+{
+    "impersonation": [
+        {
+            "original_user": "alice",
+            "new_user": "bob",
+            "allow": false
+        },
+        {
+            "original_user": "bob",
+            "new_user": "alice",
+            "allow": false
+        },
+        {
+            "original_user": "alice|bob",
+            "new_user": ".*"
+        },
+        {
+            "original_user": ".*",
+            "new_user": "test"
+        }
+    ]
+}
+```
+
 ### Principal Rules
+
+**Warning**
+
+* Principal rules are deprecated and will be removed in a future release. These rules have been replaced with [Authentication User Mapping](./user-mapping.md), which specifies how a complex authentication user name is mapped to a simple user name for openLooKeng, and impersonation rules defined above.
 
 These rules serve to enforce a specific matching between a principal and a specified user name. The principal is granted authorization as a user
 based on the first matching rule read from top to bottom. If no rules are specified, no checks will be performed. If no rule matches, user authorization is denied. Each rule is composed of the following fields:

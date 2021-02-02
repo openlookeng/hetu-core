@@ -157,6 +157,15 @@ public class AccessControlManager
     }
 
     @Override
+    public void checkCanImpersonateUser(Identity identity, String userName)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(userName, "userName is null");
+
+        authenticationCheck(() -> systemAccessControl.get().checkCanImpersonateUser(identity, userName));
+    }
+
+    @Override
     public Set<String> filterCatalogs(Identity identity, Set<String> catalogs)
     {
         requireNonNull(identity, "identity is null");
@@ -961,6 +970,12 @@ public class AccessControlManager
     {
         @Override
         public void checkCanSetUser(Optional<Principal> principal, String userName)
+        {
+            throw new PrestoException(SERVER_STARTING_UP, "Presto server is still initializing");
+        }
+
+        @Override
+        public void checkCanImpersonateUser(Identity identity, String userName)
         {
             throw new PrestoException(SERVER_STARTING_UP, "Presto server is still initializing");
         }
