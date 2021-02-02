@@ -14,6 +14,7 @@
 package io.prestosql.operator;
 
 import io.prestosql.spi.Page;
+import nova.hetu.omnicache.runtime.OmniOpStep;
 import nova.hetu.omnicache.runtime.OmniRuntime;
 import nova.hetu.omnicache.vector.LongVec;
 import nova.hetu.omnicache.vector.Vec;
@@ -31,13 +32,14 @@ public final class HashAggregationOmniWork<O>
     private Vec<?>[] result;
     private Page page;
     String omniKey;
+    VecType[] outTypes;
 
     public HashAggregationOmniWork(Page page, OmniRuntime omniRuntime, String compileID, String omniKey)
     {
-        this.page=page;
+        this.page = page;
         this.omniRuntime = omniRuntime;
         this.compileID = compileID;
-        this.omniKey=omniKey;
+        this.omniKey = omniKey;
     }
 
     @Override
@@ -49,24 +51,15 @@ public final class HashAggregationOmniWork<O>
 
         System.out.println("before omni execute-------");
         for (int i = 0; i < inputData[0].size(); i++) {
-            System.out.println(inputData[0].get(i)+" " + inputData[1].get(i));
+            System.out.println(inputData[0].get(i) + " " + inputData[1].get(i));
         }
 
         int rowNum = page.getPositionCount();
 
-        VecType[] outTypes = {VecType.LONG, VecType.LONG};
-        long start1 = System.currentTimeMillis();
+        outTypes = new VecType[] {VecType.LONG, VecType.LONG};
 
-        result =  omniRuntime.execute(compileID, inputData, rowNum, outTypes);
-        Vec<?>[] vecs = (Vec<?>[]) result;
+        omniRuntime.execute(compileID, omniKey, inputData, rowNum, outTypes, OmniOpStep.INTERMEDIATE);
 
-        System.out.println("after omni execute-------");
-        for (int i = 0; i < vecs[0].size(); i++) {
-            System.out.println(vecs[0].get(i)+" " + vecs[1].get(i));
-        }
-
-        long end1 = System.currentTimeMillis();
-        System.out.println("omni execute time: " + (end1 - start1));
         finished = true;
         return true;
     }
@@ -75,15 +68,26 @@ public final class HashAggregationOmniWork<O>
     public Vec<?>[] getResult()
     {
         checkState(finished, "process has not finished");
+        long start = System.currentTimeMillis();
+
+        result = (Vec<?>[]) omniRuntime.execute(compileID, omniKey, null, 0, outTypes, OmniOpStep.FINAL);
+        Vec<?>[] vecs = result;
+
+        System.out.println("after omni execute-------");
+        for (int i = 0; i < vecs[0].size(); i++) {
+            System.out.println(vecs[0].get(i) + " " + vecs[1].get(i));
+        }
+        System.out.println("omni runtime final execute:"+ (System.currentTimeMillis() - start));
         return result;
     }
 
-    public  boolean isFinished(){
-        return  finished;
+    public boolean isFinished()
+    {
+        return finished;
     }
 
     public void updatePages(Page page)
     {
-        this.page=page;
+        this.page = page;
     }
 }

@@ -124,6 +124,9 @@ public class HashAggregationOmniOperator
         if (finishing) {
             return false;
         }
+        if (omniWork != null && !omniWork.isFinished()) {
+            return false;
+        }
         return true;
     }
 
@@ -132,10 +135,6 @@ public class HashAggregationOmniOperator
     {
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
-//        if (omniPageContainer == null) {
-//            omniPageContainer = new OmniPageContainer(page.getChannelCount());
-//        }
-//        omniPageContainer.appendPage(page);
 
         if (omniWork == null) {
             omniWork = new HashAggregationOmniWork(page, omniRuntime, compileID, omniKey);
@@ -179,20 +178,10 @@ public class HashAggregationOmniOperator
             return null;
         }
         if (finishing && omniWork.isFinished()) {
-//            finished = true;
-//            if (omniPageContainer != null) {
-//                VecType[] outTypes = {VecType.LONG, VecType.LONG};
-//                long start = System.currentTimeMillis();
-//                Vec<?>[] executeResult = omniRuntime.execute(compileID, omniPageContainer.getBuffers(), omniPageContainer.totalRowCount, outTypes);
-//                System.out.println("omni execute time: " + (System.currentTimeMillis() - start));
-//                return toResult(executeResult);
-//            }
-//            else {
-//                return null;
-//            }
-            finished=true;
+            finished = true;
             Vec<?>[] result = omniWork.getResult();
             return toResult(result);
+
         }
 
         return null;

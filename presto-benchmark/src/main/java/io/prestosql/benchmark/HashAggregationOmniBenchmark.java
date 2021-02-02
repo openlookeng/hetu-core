@@ -72,7 +72,7 @@ public class HashAggregationOmniBenchmark
         inputPage = pb.build();
 
         List<Page> inputPages = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 1; i++) {
             inputPages.add(inputPage);
         }
         inputPagesIterator = inputPages.iterator();
