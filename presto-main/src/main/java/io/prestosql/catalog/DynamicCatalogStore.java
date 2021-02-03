@@ -299,6 +299,7 @@ public class DynamicCatalogStore
     {
         try {
             shareCatalogStore.deleteCatalog(catalogName, false);
+            connectorManager.dropConnection(catalogName);
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Delete catalog failed.", e);

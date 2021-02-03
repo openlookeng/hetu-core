@@ -36,9 +36,6 @@ public class QueryEditorConfig
     private Optional<String> sharedSecret = Optional.empty();
     private Duration sessionTimeout = new Duration(1, DAYS);
     private Duration executionTimeout = new Duration(15, MINUTES);
-    private int schemaCacheExpiryMin = 5;
-    private int previewTableCacheExpiryMin = 20;
-    private boolean populateSchemaCacheOnStartup = true;
 
     public int getMaxResultCount()
     {
@@ -145,38 +142,5 @@ public class QueryEditorConfig
     public void setExecutionTimeout(Duration executionTimeout)
     {
         this.executionTimeout = executionTimeout;
-    }
-
-    @Config("hetu.queryeditor-ui.schema-cache.expiry.min")
-    public void setSchemaCacheExpiryMin(int schemaCacheExpiryMin)
-    {
-        this.schemaCacheExpiryMin = schemaCacheExpiryMin;
-    }
-
-    public int getSchemaCacheExpiryMin()
-    {
-        return schemaCacheExpiryMin;
-    }
-
-    @Config("hetu.queryeditor-ui.previewtable-cache.expiry.min")
-    public void setPreviewTableCacheExpiryMin(int previewTableCacheExpiryMin)
-    {
-        this.previewTableCacheExpiryMin = previewTableCacheExpiryMin;
-    }
-
-    public int getPreviewTableCacheExpiryMin()
-    {
-        return previewTableCacheExpiryMin;
-    }
-
-    @Config("hetu.queryeditor-ui.schema-cache.prepopulate.enabled")
-    public void setPopulateSchemaCacheOnStartup(boolean populateSchemaCacheOnStartup)
-    {
-        this.populateSchemaCacheOnStartup = populateSchemaCacheOnStartup;
-    }
-
-    public boolean isPopulateSchemaCacheOnStartup()
-    {
-        return populateSchemaCacheOnStartup;
     }
 }

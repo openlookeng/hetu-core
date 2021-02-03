@@ -233,10 +233,6 @@ public class TestingPrestoServer
         if (coordinator) {
             // TODO: enable failure detector
             serverProperties.put("failure-detector.enabled", "false");
-            // Disable UI related background activities to ease the pressure on tests
-            serverProperties.put("hetu.queryeditor-ui.schema-cache.expiry.min", "60");
-            serverProperties.put("hetu.queryeditor-ui.schema-cache.prepopulate.enabled", "false");
-            serverProperties.put("hetu.queryeditor-ui.previewtable-cache.expiry.min", "60");
         }
 
         ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
