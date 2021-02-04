@@ -123,7 +123,7 @@ Subsequent queries will utilize the index to reduce the amount of data read
 | hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | No      | Directory under which all index files are stored|
 | hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| No      | This property defines the filesystem profile used to read and write index|
 
-Heuristic indexer now uses Hetu Metastore to manage its metadata. Please check [vdm](../connector/vdm.md) for more information.
+Heuristic indexer now uses Hetu Metastore to manage its metadata. Please check [Hetu Metastore](../admin/meta-store.md) for more information.
 
 ## Index Statements
 
