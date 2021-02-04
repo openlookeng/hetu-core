@@ -107,7 +107,7 @@ public class LongArrayBlock
         this.valueIsNull = valueIsNull;
 
         sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + Long.BYTES * values.size();
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + values.capacity();
     }
 
     @Override
@@ -261,13 +261,13 @@ public class LongArrayBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        long[] values = new long[this.values.size()];
-        for (int i = 0; i < this.values.size(); i++) {
-            values[i] = this.values.get(i);
-        }
         positionOffset += arrayOffset;
+
+        LongVec newValues = new LongVec(length);
+        for (int i = 0; i < length; i++) {
+            newValues.set(i, this.values.get(positionOffset + i));
+        }
         boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
-        long[] newValues = compactArray(values, positionOffset, length);
 
         if (newValueIsNull == valueIsNull && newValues == values) {
             return this;

@@ -16,6 +16,7 @@ package io.prestosql.spi.block;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.spi.util.BloomFilter;
+import nova.hetu.omnicache.vector.LongVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -40,12 +41,17 @@ public class Int128ArrayBlock
     private final int positionCount;
     @Nullable
     private final boolean[] valueIsNull;
-    private final long[] values;
+    private final LongVec values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
 
     public Int128ArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, long[] values)
+    {
+        this(0, positionCount, valueIsNull.orElse(null), values);
+    }
+
+    public Int128ArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, LongVec values)
     {
         this(0, positionCount, valueIsNull.orElse(null), values);
     }
@@ -64,6 +70,34 @@ public class Int128ArrayBlock
         if (values.length - (positionOffset * 2) < positionCount * 2) {
             throw new IllegalArgumentException("values length is less than positionCount");
         }
+        this.values = new LongVec(values.length);
+        for (int i = 0; i < values.length; i++) {
+            this.values.set(i, values[i]);
+        }
+
+        if (valueIsNull != null && valueIsNull.length - positionOffset < positionCount) {
+            throw new IllegalArgumentException("isNull length is less than positionCount");
+        }
+        this.valueIsNull = valueIsNull;
+
+        sizeInBytes = (INT128_BYTES + Byte.BYTES) * (long) positionCount;
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + this.values.capacity();
+    }
+
+    Int128ArrayBlock(int positionOffset, int positionCount, boolean[] valueIsNull, LongVec values)
+    {
+        if (positionOffset < 0) {
+            throw new IllegalArgumentException("positionOffset is negative");
+        }
+        this.positionOffset = positionOffset;
+        if (positionCount < 0) {
+            throw new IllegalArgumentException("positionCount is negative");
+        }
+        this.positionCount = positionCount;
+
+        if (values.size() - (positionOffset * 2) < positionCount * 2) {
+            throw new IllegalArgumentException("values length is less than positionCount");
+        }
         this.values = values;
 
         if (valueIsNull != null && valueIsNull.length - positionOffset < positionCount) {
@@ -72,7 +106,7 @@ public class Int128ArrayBlock
         this.valueIsNull = valueIsNull;
 
         sizeInBytes = (INT128_BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values);
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + this.values.capacity();
     }
 
     @Override
@@ -108,7 +142,12 @@ public class Int128ArrayBlock
     @Override
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
-        consumer.accept(values, sizeOf(values));
+        // TODO: try to avoid copy here
+        long[] valuesArray = new long[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            valuesArray[i] = values.get(i);
+        }
+        consumer.accept(valuesArray, sizeOf(valuesArray));
         if (valueIsNull != null) {
             consumer.accept(valueIsNull, sizeOf(valueIsNull));
         }
@@ -126,10 +165,10 @@ public class Int128ArrayBlock
     {
         checkReadablePosition(position);
         if (offset == 0) {
-            return values[(position + positionOffset) * 2];
+            return values.get((position + positionOffset) * 2);
         }
         if (offset == 8) {
-            return values[((position + positionOffset) * 2) + 1];
+            return values.get(((position + positionOffset) * 2) + 1);
         }
         throw new IllegalArgumentException("offset must be 0 or 8");
     }
@@ -151,8 +190,8 @@ public class Int128ArrayBlock
     public void writePositionTo(int position, BlockBuilder blockBuilder)
     {
         checkReadablePosition(position);
-        blockBuilder.writeLong(values[(position + positionOffset) * 2]);
-        blockBuilder.writeLong(values[((position + positionOffset) * 2) + 1]);
+        blockBuilder.writeLong(values.get((position + positionOffset) * 2));
+        blockBuilder.writeLong(values.get(((position + positionOffset) * 2) + 1));
         blockBuilder.closeEntry();
     }
 
@@ -165,8 +204,8 @@ public class Int128ArrayBlock
                 1,
                 isNull(position) ? new boolean[] {true} : null,
                 new long[] {
-                        values[(position + positionOffset) * 2],
-                        values[((position + positionOffset) * 2) + 1]});
+                        values.get((position + positionOffset) * 2),
+                        values.get(((position + positionOffset) * 2) + 1)});
     }
 
     @Override
@@ -185,8 +224,8 @@ public class Int128ArrayBlock
             if (valueIsNull != null) {
                 newValueIsNull[i] = valueIsNull[position + positionOffset];
             }
-            newValues[i * 2] = values[(position + positionOffset) * 2];
-            newValues[(i * 2) + 1] = values[((position + positionOffset) * 2) + 1];
+            newValues[i * 2] = values.get((position + positionOffset) * 2);
+            newValues[(i * 2) + 1] = values.get(((position + positionOffset) * 2) + 1);
         }
         return new Int128ArrayBlock(0, length, newValueIsNull, newValues);
     }
@@ -203,10 +242,13 @@ public class Int128ArrayBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-
         positionOffset += this.positionOffset;
+
+        LongVec newValues = new LongVec(length * 2);
+        for (int i = 0; i < length * 2; i++) {
+            newValues.set(i, this.values.get(positionOffset * 2 + i));
+        }
         boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
-        long[] newValues = compactArray(values, positionOffset * 2, length * 2);
 
         if (newValueIsNull == valueIsNull && newValues == values) {
             return this;
@@ -239,8 +281,8 @@ public class Int128ArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = 0; i < values.length / 2; i++) {
-            Slice value = Slices.wrappedLongArray(values[i * 2], values[i * 2 + 1]);
+        for (int i = 0; i < values.size() / 2; i++) {
+            Slice value = Slices.wrappedLongArray(values.get(i * 2), values.get(i * 2 + 1));
             validPositions[i] = validPositions[i] && filter.test(value);
         }
         return validPositions;
@@ -258,8 +300,8 @@ public class Int128ArrayBlock
                 }
             }
             else {
-                val[0] = values[(positions[i] + positionOffset) * 2];
-                val[1] = values[((positions[i] + positionOffset) * 2) + 1];
+                val[0] = values.get((positions[i] + positionOffset) * 2);
+                val[1] = values.get(((positions[i] + positionOffset) * 2) + 1);
                 if (test.apply(val)) {
                     matchedPositions[matchCount++] = positions[i];
                 }
@@ -276,8 +318,8 @@ public class Int128ArrayBlock
         if (valueIsNull != null && valueIsNull[position + positionOffset]) {
             return null;
         }
-        val[0] = values[(position + positionOffset) * 2];
-        val[1] = values[((position + positionOffset) * 2) + 1];
+        val[0] = values.get((position + positionOffset) * 2);
+        val[1] = values.get(((position + positionOffset) * 2) + 1);
 
         return val;
     }

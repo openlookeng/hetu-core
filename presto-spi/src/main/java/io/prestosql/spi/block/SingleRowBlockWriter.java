@@ -122,6 +122,14 @@ public class SingleRowBlockWriter<T>
     }
 
     @Override
+    public BlockBuilder writeDouble(double value)
+    {
+        checkFieldIndexToWrite();
+        fieldBlockBuilders[currentFieldIndexToWrite].writeDouble(value);
+        return this;
+    }
+
+    @Override
     public BlockBuilder writeLong(long value)
     {
         checkFieldIndexToWrite();

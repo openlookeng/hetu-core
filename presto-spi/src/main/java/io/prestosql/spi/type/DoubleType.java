@@ -16,7 +16,7 @@ package io.prestosql.spi.type;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockBuilderStatus;
-import io.prestosql.spi.block.LongArrayBlockBuilder;
+import io.prestosql.spi.block.DoubleArrayBlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
 
@@ -24,7 +24,6 @@ import java.util.Optional;
 
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.lang.Double.doubleToLongBits;
-import static java.lang.Double.longBitsToDouble;
 
 public final class DoubleType
         extends AbstractType
@@ -61,14 +60,14 @@ public final class DoubleType
         if (block.isNull(position)) {
             return null;
         }
-        return longBitsToDouble(block.getLong(position, 0));
+        return block.getDouble(position, 0);
     }
 
     @Override
     public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
     {
-        double leftValue = longBitsToDouble(leftBlock.getLong(leftPosition, 0));
-        double rightValue = longBitsToDouble(rightBlock.getLong(rightPosition, 0));
+        double leftValue = leftBlock.getDouble(leftPosition, 0);
+        double rightValue = rightBlock.getDouble(rightPosition, 0);
 
         // direct equality is correct here
         // noinspection FloatingPointEquality
@@ -79,14 +78,14 @@ public final class DoubleType
     public long hash(Block block, int position)
     {
         // convert to canonical NaN if necessary
-        return AbstractLongType.hash(doubleToLongBits(longBitsToDouble(block.getLong(position, 0))));
+        return AbstractLongType.hash(doubleToLongBits(block.getDouble(position, 0)));
     }
 
     @Override
     public int compareTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
     {
-        double leftValue = longBitsToDouble(leftBlock.getLong(leftPosition, 0));
-        double rightValue = longBitsToDouble(rightBlock.getLong(rightPosition, 0));
+        double leftValue = leftBlock.getDouble(leftPosition, 0);
+        double rightValue = rightBlock.getDouble(rightPosition, 0);
         return Double.compare(leftValue, rightValue);
     }
 
@@ -97,20 +96,20 @@ public final class DoubleType
             blockBuilder.appendNull();
         }
         else {
-            blockBuilder.writeLong(block.getLong(position, 0)).closeEntry();
+            blockBuilder.writeDouble(block.getDouble(position, 0)).closeEntry();
         }
     }
 
     @Override
     public double getDouble(Block block, int position)
     {
-        return longBitsToDouble(block.getLong(position, 0));
+        return block.getDouble(position, 0);
     }
 
     @Override
     public void writeDouble(BlockBuilder blockBuilder, double value)
     {
-        blockBuilder.writeLong(doubleToLongBits(value)).closeEntry();
+        blockBuilder.writeDouble(value).closeEntry();
     }
 
     @Override
@@ -123,7 +122,7 @@ public final class DoubleType
         else {
             maxBlockSizeInBytes = blockBuilderStatus.getMaxPageSizeInBytes();
         }
-        return new LongArrayBlockBuilder(
+        return new DoubleArrayBlockBuilder(
                 blockBuilderStatus,
                 Math.min(expectedEntries, maxBlockSizeInBytes / Double.BYTES));
     }
@@ -137,7 +136,7 @@ public final class DoubleType
     @Override
     public final BlockBuilder createFixedSizeBlockBuilder(int positionCount)
     {
-        return new LongArrayBlockBuilder(null, positionCount);
+        return new DoubleArrayBlockBuilder(null, positionCount);
     }
 
     @Override

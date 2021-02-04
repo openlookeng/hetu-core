@@ -34,6 +34,7 @@ import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.ByteArrayBlockEncoding;
 import io.prestosql.spi.block.DictionaryBlockEncoding;
+import io.prestosql.spi.block.DoubleArrayBlockEncoding;
 import io.prestosql.spi.block.Int128ArrayBlockEncoding;
 import io.prestosql.spi.block.IntArrayBlockEncoding;
 import io.prestosql.spi.block.LazyBlockEncoding;
@@ -189,6 +190,7 @@ public final class MetadataManager
         addBlockEncoding(new ByteArrayBlockEncoding());
         addBlockEncoding(new ShortArrayBlockEncoding());
         addBlockEncoding(new IntArrayBlockEncoding());
+        addBlockEncoding(new DoubleArrayBlockEncoding());
         addBlockEncoding(new LongArrayBlockEncoding());
         addBlockEncoding(new Int128ArrayBlockEncoding());
         addBlockEncoding(new DictionaryBlockEncoding());

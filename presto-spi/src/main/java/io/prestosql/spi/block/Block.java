@@ -69,6 +69,14 @@ public interface Block<T>
     }
 
     /**
+     * Gets a little endian double at {@code offset} in the value at {@code position}.
+     */
+    default double getDouble(int position, int offset)
+    {
+        throw new UnsupportedOperationException(getClass().getName());
+    }
+
+    /**
      * Gets a little endian long at {@code offset} in the value at {@code position}.
      * <p>
      * FIXME: KEN: the only place used a offset other than 0 is the

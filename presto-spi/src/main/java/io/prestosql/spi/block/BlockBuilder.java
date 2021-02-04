@@ -43,6 +43,14 @@ public interface BlockBuilder<T>
     }
 
     /**
+     * Write a double to the current entry;
+     */
+    default BlockBuilder writeDouble(double value)
+    {
+        throw new UnsupportedOperationException(getClass().getName());
+    }
+
+    /**
      * Write a long to the current entry;
      */
     default BlockBuilder writeLong(long value)

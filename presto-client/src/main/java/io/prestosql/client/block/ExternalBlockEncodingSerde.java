@@ -23,6 +23,7 @@ import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.ByteArrayBlockEncoding;
 import io.prestosql.spi.block.DictionaryBlockEncoding;
+import io.prestosql.spi.block.DoubleArrayBlockEncoding;
 import io.prestosql.spi.block.Int128ArrayBlockEncoding;
 import io.prestosql.spi.block.IntArrayBlockEncoding;
 import io.prestosql.spi.block.LazyBlockEncoding;
@@ -53,6 +54,7 @@ public final class ExternalBlockEncodingSerde
                 .put(ByteArrayBlockEncoding.NAME, new ByteArrayBlockEncoding())
                 .put(ShortArrayBlockEncoding.NAME, new ShortArrayBlockEncoding())
                 .put(IntArrayBlockEncoding.NAME, new IntArrayBlockEncoding())
+                .put(DoubleArrayBlockEncoding.NAME, new DoubleArrayBlockEncoding())
                 .put(LongArrayBlockEncoding.NAME, new LongArrayBlockEncoding())
                 .put(Int128ArrayBlockEncoding.NAME, new Int128ArrayBlockEncoding())
                 .put(DictionaryBlockEncoding.NAME, new DictionaryBlockEncoding())

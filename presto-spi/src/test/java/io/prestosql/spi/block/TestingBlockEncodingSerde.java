@@ -35,6 +35,7 @@ public final class TestingBlockEncodingSerde
         addBlockEncoding(new ByteArrayBlockEncoding());
         addBlockEncoding(new ShortArrayBlockEncoding());
         addBlockEncoding(new IntArrayBlockEncoding());
+        addBlockEncoding(new DoubleArrayBlockEncoding());
         addBlockEncoding(new LongArrayBlockEncoding());
         addBlockEncoding(new Int128ArrayBlockEncoding());
         addBlockEncoding(new DictionaryBlockEncoding());

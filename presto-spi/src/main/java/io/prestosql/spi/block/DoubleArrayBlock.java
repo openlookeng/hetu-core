@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,15 +14,13 @@
  */
 package io.prestosql.spi.block;
 
-import io.prestosql.spi.util.BloomFilter;
-import nova.hetu.omnicache.vector.IntVec;
+import nova.hetu.omnicache.vector.DoubleVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -29,31 +28,31 @@ import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 
-public class IntArrayBlock
-        implements Block<Integer>
+public class DoubleArrayBlock
+        implements Block<Double>
 {
-    private static final int INSTANCE_SIZE = ClassLayout.parseClass(IntArrayBlock.class).instanceSize();
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(DoubleArrayBlock.class).instanceSize();
 
     private final int arrayOffset;
     private final int positionCount;
     @Nullable
     private final boolean[] valueIsNull;
-    private final IntVec values;
+    private final DoubleVec values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
 
-    public IntArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, int[] values)
+    public DoubleArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, double[] values)
     {
         this(0, positionCount, valueIsNull.orElse(null), values);
     }
 
-    public IntArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, IntVec values)
+    public DoubleArrayBlock(int positionCount, Optional<boolean[]> valueIsNull, DoubleVec values)
     {
         this(0, positionCount, valueIsNull.orElse(null), values);
     }
 
-    IntArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, int[] values)
+    DoubleArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, double[] values)
     {
         if (arrayOffset < 0) {
             throw new IllegalArgumentException("arrayOffset is negative");
@@ -67,7 +66,7 @@ public class IntArrayBlock
         if (values.length - arrayOffset < positionCount) {
             throw new IllegalArgumentException("values length is less than positionCount");
         }
-        this.values = new IntVec(values.length);
+        this.values = new DoubleVec(values.length);
         for (int i = 0; i < values.length; i++) {
             this.values.set(i, values[i]);
         }
@@ -77,11 +76,11 @@ public class IntArrayBlock
         }
         this.valueIsNull = valueIsNull;
 
-        sizeInBytes = (Integer.BYTES + Byte.BYTES) * (long) positionCount;
+        sizeInBytes = (Double.BYTES + Byte.BYTES) * (long) positionCount;
         retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values);
     }
 
-    IntArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, IntVec values)
+    DoubleArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, DoubleVec values)
     {
         if (arrayOffset < 0) {
             throw new IllegalArgumentException("arrayOffset is negative");
@@ -102,7 +101,7 @@ public class IntArrayBlock
         }
         this.valueIsNull = valueIsNull;
 
-        sizeInBytes = (Integer.BYTES + Byte.BYTES) * (long) positionCount;
+        sizeInBytes = (Double.BYTES + Byte.BYTES) * (long) positionCount;
         retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + values.capacity();
     }
 
@@ -115,13 +114,13 @@ public class IntArrayBlock
     @Override
     public long getRegionSizeInBytes(int position, int length)
     {
-        return (Integer.BYTES + Byte.BYTES) * (long) length;
+        return (Double.BYTES + Byte.BYTES) * (long) length;
     }
 
     @Override
     public long getPositionsSizeInBytes(boolean[] positions)
     {
-        return (Integer.BYTES + Byte.BYTES) * (long) countUsedPositions(positions);
+        return (Double.BYTES + Byte.BYTES) * (long) countUsedPositions(positions);
     }
 
     @Override
@@ -133,14 +132,14 @@ public class IntArrayBlock
     @Override
     public long getEstimatedDataSizeForStats(int position)
     {
-        return isNull(position) ? 0 : Integer.BYTES;
+        return isNull(position) ? 0 : Double.BYTES;
     }
 
     @Override
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
         // TODO: try to avoid copy here
-        int[] valuesArray = new int[values.size()];
+        double[] valuesArray = new double[values.size()];
         for (int i = 0; i < values.size(); i++) {
             valuesArray[i] = values.get(i);
         }
@@ -158,19 +157,13 @@ public class IntArrayBlock
     }
 
     @Override
-    public int getInt(int position, int offset)
+    public double getDouble(int position, int offset)
     {
         checkReadablePosition(position);
         if (offset != 0) {
             throw new IllegalArgumentException("offset must be zero");
         }
         return values.get(position + arrayOffset);
-    }
-
-    @Override
-    public long getLong(int position, int offset)
-    {
-        return getInt(position, offset);
     }
 
     @Override
@@ -190,7 +183,7 @@ public class IntArrayBlock
     public void writePositionTo(int position, BlockBuilder blockBuilder)
     {
         checkReadablePosition(position);
-        blockBuilder.writeInt(values.get(position + arrayOffset));
+        blockBuilder.writeDouble(values.get(position + arrayOffset));
         blockBuilder.closeEntry();
     }
 
@@ -198,11 +191,11 @@ public class IntArrayBlock
     public Block getSingleValueBlock(int position)
     {
         checkReadablePosition(position);
-        return new IntArrayBlock(
+        return new DoubleArrayBlock(
                 0,
                 1,
                 isNull(position) ? new boolean[] {true} : null,
-                new int[] {values.get(position + arrayOffset)});
+                new double[] {values.get(position + arrayOffset)});
     }
 
     @Override
@@ -214,7 +207,7 @@ public class IntArrayBlock
         if (valueIsNull != null) {
             newValueIsNull = new boolean[length];
         }
-        int[] newValues = new int[length];
+        double[] newValues = new double[length];
         for (int i = 0; i < length; i++) {
             int position = positions[offset + i];
             checkReadablePosition(position);
@@ -223,24 +216,24 @@ public class IntArrayBlock
             }
             newValues[i] = values.get(position + arrayOffset);
         }
-        return new IntArrayBlock(0, length, newValueIsNull, newValues);
+        return new DoubleArrayBlock(0, length, newValueIsNull, newValues);
     }
 
     @Override
-    public Block getRegion(int positionOffset, int length)
+    public Block<Double> getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        return new IntArrayBlock(positionOffset + arrayOffset, length, valueIsNull, values);
+        return new DoubleArrayBlock(positionOffset + arrayOffset, length, valueIsNull, values);
     }
 
     @Override
-    public Block copyRegion(int positionOffset, int length)
+    public Block<Double> copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
         positionOffset += arrayOffset;
 
-        IntVec newValues = new IntVec(length);
+        DoubleVec newValues = new DoubleVec(length);
         for (int i = 0; i < length; i++) {
             newValues.set(i, this.values.get(positionOffset + i));
         }
@@ -249,19 +242,19 @@ public class IntArrayBlock
         if (newValueIsNull == valueIsNull && newValues == values) {
             return this;
         }
-        return new IntArrayBlock(0, length, newValueIsNull, newValues);
+        return new DoubleArrayBlock(0, length, newValueIsNull, newValues);
     }
 
     @Override
     public String getEncodingName()
     {
-        return IntArrayBlockEncoding.NAME;
+        return DoubleArrayBlockEncoding.NAME;
     }
 
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder("IntArrayBlock{");
+        StringBuilder sb = new StringBuilder("DoubleArrayBlock{");
         sb.append("positionCount=").append(getPositionCount());
         sb.append('}');
         return sb.toString();
@@ -275,34 +268,7 @@ public class IntArrayBlock
     }
 
     @Override
-    public boolean[] filter(BloomFilter filter, boolean[] validPositions)
-    {
-        for (int i = 0; i < values.size(); i++) {
-            validPositions[i] = validPositions[i] && filter.test(values.get(i));
-        }
-        return validPositions;
-    }
-
-    @Override
-    public int filter(int[] positions, int positionCount, int[] matchedPositions, Function<Object, Boolean> test)
-    {
-        int matchCount = 0;
-        for (int i = 0; i < positionCount; i++) {
-            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset]) {
-                if (test.apply(null)) {
-                    matchedPositions[matchCount++] = positions[i];
-                }
-            }
-            else if (test.apply(values.get(positions[i] + arrayOffset))) {
-                matchedPositions[matchCount++] = positions[i];
-            }
-        }
-
-        return matchCount;
-    }
-
-    @Override
-    public Integer get(int position)
+    public Double get(int position)
     {
         if (valueIsNull != null && valueIsNull[position + arrayOffset]) {
             return null;

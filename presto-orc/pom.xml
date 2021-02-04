@@ -193,6 +193,12 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>omni-cache</artifactId>
             <version>1.2.0-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

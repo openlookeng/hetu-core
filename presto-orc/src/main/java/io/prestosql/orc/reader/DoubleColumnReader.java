@@ -24,11 +24,11 @@ import io.prestosql.orc.stream.DoubleInputStream;
 import io.prestosql.orc.stream.InputStreamSource;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.block.LongArrayBlock;
+import io.prestosql.spi.block.DoubleArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.Type;
-import nova.hetu.omnicache.vector.LongVec;
+import nova.hetu.omnicache.vector.DoubleVec;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -43,14 +43,14 @@ import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
 import static io.prestosql.orc.metadata.Stream.StreamKind.PRESENT;
 import static io.prestosql.orc.reader.ReaderUtils.minNonNullValueSize;
-import static io.prestosql.orc.reader.ReaderUtils.unpackLongNullsVec;
+import static io.prestosql.orc.reader.ReaderUtils.unpackDoubleNulls;
 import static io.prestosql.orc.reader.ReaderUtils.verifyStreamType;
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static java.util.Objects.requireNonNull;
 
 public class DoubleColumnReader
-        implements ColumnReader<Long>
+        implements ColumnReader<Double>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(DoubleColumnReader.class).instanceSize();
 
@@ -70,7 +70,7 @@ public class DoubleColumnReader
 
     private boolean rowGroupOpen;
 
-    private long[] nonNullValueTemp = new long[0];
+    private double[] nonNullValueTemp = new double[0];
 
     private final LocalMemoryContext systemMemoryContext;
 
@@ -148,9 +148,9 @@ public class DoubleColumnReader
             throws IOException
     {
         verify(dataStream != null);
-        LongVec longVec = new LongVec(nextBatchSize);
-        dataStream.next(longVec, nextBatchSize);
-        return new LongArrayBlock(nextBatchSize, Optional.empty(), longVec);
+        DoubleVec doubleVec = new DoubleVec(nextBatchSize);
+        dataStream.next(doubleVec, nextBatchSize);
+        return new DoubleArrayBlock(nextBatchSize, Optional.empty(), doubleVec);
     }
 
     private Block readNullBlock(boolean[] isNull, int nonNullCount)
@@ -159,15 +159,15 @@ public class DoubleColumnReader
         verify(dataStream != null);
         int minNonNullValueSize = minNonNullValueSize(nonNullCount);
         if (nonNullValueTemp.length < minNonNullValueSize) {
-            nonNullValueTemp = new long[minNonNullValueSize];
+            nonNullValueTemp = new double[minNonNullValueSize];
             systemMemoryContext.setBytes(sizeOf(nonNullValueTemp));
         }
 
         dataStream.next(nonNullValueTemp, nonNullCount);
 
-        LongVec result = unpackLongNullsVec(nonNullValueTemp, isNull);
+        DoubleVec result = unpackDoubleNulls(nonNullValueTemp, isNull);
 
-        return new LongArrayBlock(isNull.length, Optional.of(isNull), result);
+        return new DoubleArrayBlock(isNull.length, Optional.of(isNull), result);
     }
 
     private void openRowGroup()
@@ -231,12 +231,12 @@ public class DoubleColumnReader
     }
 
     @Override
-    public boolean filterTest(TupleDomainFilter filter, Long value)
+    public boolean filterTest(TupleDomainFilter filter, Double value)
     {
         if (value == null) {
             return filter.testNull();
         }
 
-        return filter.testDouble(Double.longBitsToDouble(value));
+        return filter.testDouble(value);
     }
 }
