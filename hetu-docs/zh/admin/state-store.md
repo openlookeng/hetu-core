@@ -22,9 +22,9 @@
     2. Multicast : 状态存储成员在同一网络下相互发现。
 - 不建议在生产环境中使用Multicast机制，因为UDP通常在生产环境中被阻止。
 
-### TCP-IP方法配置状态存储属性
+#### TCP-IP方法配置状态存储属性
 
-在状态存储成员和态存储客户端安装目录中创建文件`etc\state-store.properties`。
+在状态存储成员和状态存储客户端安装目录中创建文件`etc\state-store.properties`。
 
 ``` properties
 state-store.type=hazelcast
@@ -52,20 +52,20 @@ hazelcast.discovery.tcp-ip.profile=hdfs-config-default
 如果状态存储成员的ip地址是动态变化的，则用户可以配置“ hazelcast.discovery.tcp-ip.profile”，其中状态存储成员会自动将其ip：port存储在共享存储中，发现彼此。
 如果两者同时被配置，“ hazelcast.discovery.tcp-ip.seeds”将会被使用。
 
-### 文件系统属性
+#### 文件系统属性
 
 在状态存储成员和状态存储客户端安装目录中创建文件`etc\filesystem\hdfs-config-default.properties`。
 
 文件系统必须是分布式文件系统，以便所有状态存储成员和状态存储客户端都可以访问（例如HDFS）。
 ```
 fs.client.type=hdfs
-hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
+hdfs.config.resources=<hdfs_config_dir>/core-site.xml,<hdfs_config_dir>/hdfs-site.xml
 hdfs.authentication.type=NONE
 fs.hdfs.impl.disable.cache=true
 ```
 上述属性说明请参考[文件系统访问实用程序](../develop/filesystem.md)。 
 
-## Multicast方法配置状态存储属性
+### Multicast方法配置状态存储属性
 
 在状态存储成员和状态存储客户端安装目录中创建文件`etc\state-store.properties`。
 
@@ -77,3 +77,57 @@ state-store.cluster=cluster1
 hazelcast.discovery.mode=multicast
 hazelcast.discovery.port=5701       
 ```
+上述属性说明请参考`TCP-IP方法配置状态存储属性`中的属性说明。
+
+## 配置状态存储示例
+
+此示例描述如何使用`TCP-IP`发现模式配置状态存储集群。该集群包含2个协调节点和2个工作节点。协调节点配置为状态存储成员，工作节点配置为状态存储客户端。
+
+## 前提及假设条件
+- 协调节点1'ip=10.100.100.01, 协调节点2's ip=10.100.100.02。
+- 工作节点1'ip=10.100.100.03, 工作节点2'ip=10.100.100.04。
+- 已安装HDFS, core-site.xml和hdfs-site.xml配置文件存在`/opt/hdfs`文件夹。
+
+#### 配置步骤
+- 配置协调节点步骤
+   1. 打开`etc/config.properties`并添加以下属性。
+      ```
+      hetu.embedded-state-store.enabled=true
+      ```
+   2. 创建文件`etc\state-store.properties`并添加以下属性。
+      ```
+       state-store.type=hazelcast
+       state-store.name=query
+       state-store.cluster=cluster1
+      
+       hazelcast.discovery.mode=tcp-ip
+       hazelcast.discovery.port=5701
+       hazelcast.discovery.tcp-ip.seeds=10.100.100.01:5701,10.100.100.02:5701
+       hazelcast.discovery.tcp-ip.profile=hdfs-config-default
+      ```
+   3. 创建文件`etc\filesystem\hdfs-config-default.properties` 并添加以下属性。
+      ```
+      fs.client.type=hdfs
+      hdfs.config.resources=/opt/hdfs/core-site.xml,/opt/hdfs/hdfs-site.xml
+      hdfs.authentication.type=NONE
+      fs.hdfs.impl.disable.cache=true
+      ```
+- 配置工作节点步骤
+   1. 创建文件`etc\state-store.properties`并添加以下属性。
+      ```
+       state-store.type=hazelcast
+       state-store.name=query
+       state-store.cluster=cluster1
+      
+       hazelcast.discovery.mode=tcp-ip
+       hazelcast.discovery.tcp-ip.seeds=10.100.100.01:5701,10.100.100.02:5701
+       hazelcast.discovery.tcp-ip.profile=hdfs-config-default
+      ```
+   2. 创建文件`etc\filesystem\hdfs-config-default.properties`并添加以下属性。
+      ```
+      fs.client.type=hdfs
+      #Assume core-site.xml and hdfs-site.xml are located in /opt/hdfs directory
+      hdfs.config.resources=/opt/hdfs/core-site.xml,/opt/hdfs/hdfs-site.xml
+      hdfs.authentication.type=NONE
+      fs.hdfs.impl.disable.cache=true
+      ```
