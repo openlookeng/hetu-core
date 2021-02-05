@@ -18,10 +18,10 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.SampleType;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SampleNode.Type;
-import io.prestosql.sql.planner.plan.TableScanNode;
 
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.Patterns.Sample.sampleType;

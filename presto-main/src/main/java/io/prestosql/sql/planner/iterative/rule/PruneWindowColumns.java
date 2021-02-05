@@ -15,11 +15,11 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.SymbolsExtractor;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 
 import java.util.Map;
 import java.util.Optional;

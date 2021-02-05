@@ -35,6 +35,7 @@ import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalParseResult;
 import io.prestosql.spi.type.Decimals;
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
@@ -42,7 +43,6 @@ import io.prestosql.spi.type.TypeNotFoundException;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.ArithmeticUnaryExpression;
@@ -104,7 +104,6 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import io.prestosql.sql.tree.TryExpression;
 import io.prestosql.sql.tree.WhenClause;
 import io.prestosql.sql.tree.WindowFrame;
-import io.prestosql.type.FunctionType;
 import io.prestosql.type.TypeCoercion;
 
 import javax.annotation.Nullable;
@@ -141,6 +140,9 @@ import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
+import static io.prestosql.spi.util.DateTimeUtils.parseTimestampLiteral;
+import static io.prestosql.spi.util.DateTimeUtils.timeHasTimeZone;
+import static io.prestosql.spi.util.DateTimeUtils.timestampHasTimeZone;
 import static io.prestosql.sql.NodeUtils.getSortItemsFromOrderBy;
 import static io.prestosql.sql.analyzer.Analyzer.verifyNoAggregateWindowOrGroupingFunctions;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.EXPRESSION_NOT_CONSTANT;
@@ -153,15 +155,13 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.STANDALONE_LAMBDA;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_ARGUMENTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TYPE_MISMATCH;
 import static io.prestosql.sql.analyzer.SemanticExceptions.missingAttributeException;
+import static io.prestosql.sql.planner.SymbolUtils.from;
 import static io.prestosql.sql.tree.ArrayConstructor.ARRAY_CONSTRUCTOR;
 import static io.prestosql.sql.tree.Extract.Field.TIMEZONE_HOUR;
 import static io.prestosql.sql.tree.Extract.Field.TIMEZONE_MINUTE;
 import static io.prestosql.type.IntervalDayTimeType.INTERVAL_DAY_TIME;
 import static io.prestosql.type.IntervalYearMonthType.INTERVAL_YEAR_MONTH;
 import static io.prestosql.type.JsonType.JSON;
-import static io.prestosql.util.DateTimeUtils.parseTimestampLiteral;
-import static io.prestosql.util.DateTimeUtils.timeHasTimeZone;
-import static io.prestosql.util.DateTimeUtils.timestampHasTimeZone;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableMap;
@@ -390,7 +390,7 @@ public class ExpressionAnalyzer
                     return setExpressionType(node, resolvedField.get().getType());
                 }
             }
-            Type type = symbolTypes.get(Symbol.from(node));
+            Type type = symbolTypes.get(from(node));
             return setExpressionType(node, type);
         }
 

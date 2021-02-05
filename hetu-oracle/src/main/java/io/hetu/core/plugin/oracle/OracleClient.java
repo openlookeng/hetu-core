@@ -22,6 +22,7 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.hetu.core.plugin.oracle.config.RoundingMode;
 import io.hetu.core.plugin.oracle.config.UnsupportedTypeHandling;
+import io.hetu.core.plugin.oracle.optimization.OracleQueryGenerator;
 import io.prestosql.plugin.jdbc.BaseJdbcClient;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ColumnMapping;
@@ -34,12 +35,16 @@ import io.prestosql.plugin.jdbc.LongWriteFunction;
 import io.prestosql.plugin.jdbc.SliceWriteFunction;
 import io.prestosql.plugin.jdbc.StatsCollecting;
 import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
+import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
+import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.SuppressFBWarnings;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.sql.SqlQueryWriter;
+import io.prestosql.spi.relation.RowExpressionService;
+import io.prestosql.spi.sql.QueryGenerator;
 import io.prestosql.spi.type.AbstractType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DateTimeEncoding;
@@ -190,7 +195,7 @@ public class OracleClient
     /**
      * If disabled, do not accept sub-query push down.
      */
-    private final boolean isQueryPushDownEnabled;
+    private final JdbcPushDownModule pushDownModule;
 
     /**
      * enable to user oracle synonyms
@@ -210,7 +215,7 @@ public class OracleClient
     {
         // the empty "" is to not use a quote to create queries
         super(config, "\"", connectionFactory);
-        this.isQueryPushDownEnabled = oracleConfig.isQueryPushDownEnabled();
+        this.pushDownModule = config.getPushDownModule();
         this.numberDefaultScale = oracleConfig.getNumberDefaultScale();
         this.roundingMode = requireNonNull(oracleConfig.getRoundingMode(), "oracle rounding mode cannot be null");
         this.unsupportedTypeHandling = requireNonNull(oracleConfig.getUnsupportedTypeHandling(),
@@ -385,22 +390,10 @@ public class OracleClient
         }
     }
 
-    @Override
-    public Optional<SqlQueryWriter> getSqlQueryWriter()
-    {
-        if (!isQueryPushDownEnabled) {
-            return Optional.empty();
-        }
-        return Optional.of(new OracleSqlQueryWriter());
-    }
-
     @SuppressFBWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")
     @Override
     public Map<String, ColumnHandle> getColumns(ConnectorSession session, String sql, Map<String, Type> types)
     {
-        if (!isQueryPushDownEnabled) {
-            return Collections.emptyMap();
-        }
         try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session));
                 PreparedStatement statement = connection.prepareStatement(sql)) {
             ResultSetMetaData metadata = statement.getMetaData();
@@ -695,6 +688,13 @@ public class OracleClient
         else {
             throw new PrestoException(NOT_SUPPORTED, "Unsupported column type: " + type.getDisplayName());
         }
+    }
+
+    @Override
+    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
+    {
+        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, pushDownModule);
+        return Optional.of(new OracleQueryGenerator(rowExpressionService, pushDownParameter));
     }
 
     private ColumnMapping decimalColumnMapping(DecimalType decimalType)

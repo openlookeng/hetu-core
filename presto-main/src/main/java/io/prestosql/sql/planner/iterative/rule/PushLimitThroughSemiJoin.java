@@ -16,8 +16,8 @@ package io.prestosql.sql.planner.iterative.rule;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.LimitNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import static io.prestosql.matching.Capture.newCapture;

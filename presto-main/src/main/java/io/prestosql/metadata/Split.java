@@ -15,9 +15,9 @@ package io.prestosql.metadata;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSplit;
 
 import java.util.List;

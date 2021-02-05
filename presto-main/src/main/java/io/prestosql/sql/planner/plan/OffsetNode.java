@@ -17,7 +17,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -28,7 +30,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class OffsetNode
-        extends PlanNode
+        extends InternalPlanNode
 {
     private final PlanNode source;
     private final long count;
@@ -73,7 +75,7 @@ public class OffsetNode
     }
 
     @Override
-    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitOffset(this, context);
     }

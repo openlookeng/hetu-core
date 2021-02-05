@@ -27,11 +27,10 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.AggregationNode.Step;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.plan.AggregationNode.Step;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.LocalQueryRunner;
-import io.prestosql.util.DateTimeUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +43,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.spi.util.DateTimeUtils.parseDate;
 import static java.util.Objects.requireNonNull;
 
 public class HandTpchQuery1
@@ -235,7 +235,7 @@ public class HandTpchQuery1
             return null;
         }
 
-        private static final int MAX_SHIP_DATE = DateTimeUtils.parseDate("1998-09-02");
+        private static final int MAX_SHIP_DATE = parseDate("1998-09-02");
 
         private static void filterAndProjectRowOriented(PageBuilder pageBuilder,
                 Block returnFlagBlock,

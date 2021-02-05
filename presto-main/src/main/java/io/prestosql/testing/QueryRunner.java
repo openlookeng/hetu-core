@@ -21,6 +21,7 @@ import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.spi.Plugin;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
+import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.transaction.TransactionManager;
@@ -50,6 +51,8 @@ public interface QueryRunner
     PageSourceManager getPageSourceManager();
 
     NodePartitioningManager getNodePartitioningManager();
+
+    ConnectorPlanOptimizerManager getPlanOptimizerManager();
 
     StatsCalculator getStatsCalculator();
 

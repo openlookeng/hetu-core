@@ -21,27 +21,24 @@ import io.airlift.log.Logger;
 import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSplit;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.InPredicate;
-import io.prestosql.sql.tree.LogicalBinaryExpression;
-import io.prestosql.sql.tree.NotExpression;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.utils.RangeUtil;
 
 import java.io.IOException;
@@ -62,6 +59,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
 
 public class SplitFiltering
 {
@@ -87,7 +86,7 @@ public class SplitFiltering
         }
     }
 
-    public static List<Split> getFilteredSplit(Optional<Expression> expression, Optional<String> tableName, Map<Symbol, ColumnHandle> assignments,
+    public static List<Split> getFilteredSplit(Optional<RowExpression> expression, Optional<String> tableName, Map<Symbol, ColumnHandle> assignments,
             SplitSource.SplitBatch nextSplits, HeuristicIndexerManager heuristicIndexerManager)
     {
         if (!expression.isPresent() || !tableName.isPresent()) {
@@ -154,7 +153,7 @@ public class SplitFiltering
         return splitsToReturn;
     }
 
-    private static List<Split> filterUsingStripeIndex(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingStripeIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
     {
         return inputSplits.parallelStream()
                 .filter(split -> {
@@ -204,7 +203,7 @@ public class SplitFiltering
                 .collect(Collectors.toList());
     }
 
-    private static List<Split> filterUsingPartitionIndex(Expression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingPartitionIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
     {
         try {
             long maxLastUpdated = 0L;
@@ -445,38 +444,36 @@ public class SplitFiltering
         return true;
     }
 
-    private static boolean isSupportedExpression(Expression predicate)
+    private static boolean isSupportedExpression(RowExpression predicate)
     {
-        if (predicate instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) predicate;
-            if ((lbExpression.getOperator() == LogicalBinaryExpression.Operator.AND) ||
-                    (lbExpression.getOperator() == LogicalBinaryExpression.Operator.OR)) {
-                return isSupportedExpression(lbExpression.getRight()) && isSupportedExpression(lbExpression.getLeft());
-            }
-        }
-        if (predicate instanceof ComparisonExpression) {
-            ComparisonExpression comparisonExpression = (ComparisonExpression) predicate;
-            switch (comparisonExpression.getOperator()) {
-                case EQUAL:
-                case GREATER_THAN:
-                case LESS_THAN:
-                case LESS_THAN_OR_EQUAL:
-                case GREATER_THAN_OR_EQUAL:
+        if (predicate instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) predicate;
+            switch (specialForm.getForm()) {
+                case BETWEEN:
+                case IN:
                     return true;
+                case AND:
+                case OR:
+                    return isSupportedExpression(specialForm.getArguments().get(0)) && isSupportedExpression(specialForm.getArguments().get(1));
                 default:
                     return false;
             }
         }
-        if (predicate instanceof InPredicate) {
-            return true;
-        }
-
-        if (predicate instanceof NotExpression) {
-            return true;
-        }
-
-        if (predicate instanceof BetweenPredicate) {
-            return true;
+        if (predicate instanceof CallExpression) {
+            CallExpression call = (CallExpression) predicate;
+            if (call.getSignature().getName().equals("not")) {
+                return true;
+            }
+            try {
+                OperatorType operatorType = call.getSignature().unmangleOperator(call.getSignature().getName());
+                if (operatorType.isComparisonOperator() && operatorType != IS_DISTINCT_FROM) {
+                    return true;
+                }
+                return false;
+            }
+            catch (IllegalArgumentException e) {
+                return false;
+            }
         }
 
         return false;
@@ -489,7 +486,7 @@ public class SplitFiltering
      * @param stage stage object
      * @return Pair of: Expression and a column name assignment map
      */
-    public static Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> getExpression(SqlStageExecution stage)
+    public static Tuple<Optional<RowExpression>, Map<Symbol, ColumnHandle>> getExpression(SqlStageExecution stage)
     {
         List<PlanNode> filterNodeOptional = getFilterNode(stage);
 
@@ -544,26 +541,29 @@ public class SplitFiltering
         return Optional.of(fullQualifiedTableName);
     }
 
-    public static void getAllColumns(Expression expression, Set<String> columns, Map<Symbol, ColumnHandle> assignments)
+    public static void getAllColumns(RowExpression expression, Set<String> columns, Map<Symbol, ColumnHandle> assignments)
     {
-        if (expression instanceof ComparisonExpression || expression instanceof BetweenPredicate || expression instanceof InPredicate) {
-            Expression leftExpression;
-            if (expression instanceof ComparisonExpression) {
-                leftExpression = extractExpression(((ComparisonExpression) expression).getLeft());
+        if (expression instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) expression;
+            RowExpression left;
+            switch (specialForm.getForm()) {
+                case BETWEEN:
+                case IN:
+                    left = extractExpression(specialForm.getArguments().get(0));
+                    break;
+                case AND:
+                case OR:
+                    getAllColumns(specialForm.getArguments().get(0), columns, assignments);
+                    getAllColumns(specialForm.getArguments().get(1), columns, assignments);
+                    return;
+                default:
+                    return;
             }
-            else if (expression instanceof BetweenPredicate) {
-                leftExpression = extractExpression(((BetweenPredicate) expression).getValue());
-            }
-            else {
-                // InPredicate
-                leftExpression = extractExpression(((InPredicate) expression).getValue());
-            }
-
-            if (!(leftExpression instanceof SymbolReference)) {
-                LOG.warn("Invalid Left of expression %s, should be an SymbolReference", leftExpression.toString());
+            if (!(left instanceof VariableReferenceExpression)) {
+                LOG.warn("Invalid Left of expression %s, should be an VariableReferenceExpression", left.toString());
                 return;
             }
-            String columnName = ((SymbolReference) leftExpression).getName();
+            String columnName = ((VariableReferenceExpression) left).getName();
             Symbol columnSymbol = new Symbol(columnName);
             if (assignments.containsKey(columnSymbol)) {
                 columnName = assignments.get(columnSymbol).getColumnName();
@@ -571,19 +571,38 @@ public class SplitFiltering
             columns.add(columnName);
             return;
         }
-
-        if (expression instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression lbe = (LogicalBinaryExpression) expression;
-            getAllColumns(lbe.getLeft(), columns, assignments);
-            getAllColumns(lbe.getRight(), columns, assignments);
+        if (expression instanceof CallExpression) {
+            CallExpression call = (CallExpression) expression;
+            try {
+                OperatorType operatorType = call.getSignature().unmangleOperator(call.getSignature().getName());
+                if (!operatorType.isComparisonOperator()) {
+                    return;
+                }
+                RowExpression left = extractExpression(call.getArguments().get(0));
+                if (!(left instanceof VariableReferenceExpression)) {
+                    LOG.warn("Invalid Left of expression %s, should be an VariableReferenceExpression", left.toString());
+                    return;
+                }
+                String columnName = ((VariableReferenceExpression) left).getName();
+                Symbol columnSymbol = new Symbol(columnName);
+                if (assignments.containsKey(columnSymbol)) {
+                    columnName = assignments.get(columnSymbol).getColumnName();
+                }
+                columns.add(columnName);
+                return;
+            }
+            catch (IllegalArgumentException e) {
+                return;
+            }
         }
+        return;
     }
 
-    private static Expression extractExpression(Expression expression)
+    private static RowExpression extractExpression(RowExpression expression)
     {
-        if (expression instanceof Cast) {
+        if (expression instanceof CallExpression && ((CallExpression) expression).getSignature().getName().contains("CAST")) {
             // extract the inner expression for CAST expressions
-            return extractExpression(((Cast) expression).getExpression());
+            return extractExpression(((CallExpression) expression).getArguments().get(0));
         }
         else {
             return expression;

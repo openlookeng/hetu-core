@@ -26,38 +26,45 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.GroupingProperty;
 import io.prestosql.spi.connector.LocalProperty;
 import io.prestosql.spi.connector.SortingProperty;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
-import io.prestosql.sql.planner.DomainTranslator;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.ChildReplacer;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
@@ -65,17 +72,10 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.utils.WriteExchangePartitioner;
 
 import java.util.ArrayList;
@@ -93,6 +93,8 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.SystemSessionProperties.isColocatedJoinEnabled;
 import static io.prestosql.SystemSessionProperties.isDistributedSortEnabled;
 import static io.prestosql.SystemSessionProperties.isForceSingleNodeOutput;
+import static io.prestosql.operator.aggregation.AggregationUtils.hasSingleNodeExecutionPreference;
+import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
 import static io.prestosql.sql.planner.FragmentTableScanCounter.countSources;
 import static io.prestosql.sql.planner.FragmentTableScanCounter.hasMultipleSources;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
@@ -110,7 +112,6 @@ import static io.prestosql.sql.planner.plan.ExchangeNode.mergingExchange;
 import static io.prestosql.sql.planner.plan.ExchangeNode.partitionedExchange;
 import static io.prestosql.sql.planner.plan.ExchangeNode.replicatedExchange;
 import static io.prestosql.sql.planner.plan.ExchangeNode.roundRobinExchange;
-import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 
@@ -119,29 +120,29 @@ public class AddExchanges
 {
     private final TypeAnalyzer typeAnalyzer;
     private final Metadata metadata;
-    private final DomainTranslator domainTranslator;
+    private final ExpressionDomainTranslator domainTranslator;
     private final boolean pushdownPartitionsOnly;
 
     public AddExchanges(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pushdownPartitionsOnly)
     {
         this.metadata = metadata;
-        this.domainTranslator = new DomainTranslator(new LiteralEncoder(metadata));
+        this.domainTranslator = new ExpressionDomainTranslator(new LiteralEncoder(metadata));
         this.typeAnalyzer = typeAnalyzer;
         this.pushdownPartitionsOnly = pushdownPartitionsOnly;
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        PlanWithProperties result = plan.accept(new Rewriter(idAllocator, symbolAllocator, session), PreferredProperties.any());
+        PlanWithProperties result = plan.accept(new Rewriter(idAllocator, planSymbolAllocator, session), PreferredProperties.any());
         return result.getNode();
     }
 
     private class Rewriter
-            extends PlanVisitor<PlanWithProperties, PreferredProperties>
+            extends InternalPlanVisitor<PlanWithProperties, PreferredProperties>
     {
         private final PlanNodeIdAllocator idAllocator;
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
         private final TypeProvider types;
         private final Session session;
         private final boolean distributedIndexJoins;
@@ -151,11 +152,11 @@ public class AddExchanges
         private final RedistributeWritesType redistributeWritesType;
         private final boolean scaleWriters;
 
-        public Rewriter(PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session)
+        public Rewriter(PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator, Session session)
         {
             this.idAllocator = idAllocator;
-            this.symbolAllocator = symbolAllocator;
-            this.types = symbolAllocator.getTypes();
+            this.planSymbolAllocator = planSymbolAllocator;
+            this.types = planSymbolAllocator.getTypes();
             this.session = session;
             this.distributedIndexJoins = SystemSessionProperties.isDistributedIndexJoinEnabled(session);
             this.redistributeWrites = SystemSessionProperties.isRedistributeWrites(session);
@@ -166,7 +167,7 @@ public class AddExchanges
         }
 
         @Override
-        protected PlanWithProperties visitPlan(PlanNode node, PreferredProperties preferredProperties)
+        public PlanWithProperties visitPlan(PlanNode node, PreferredProperties preferredProperties)
         {
             return rebaseAndDeriveProperties(node, planChild(node, preferredProperties));
         }
@@ -174,9 +175,8 @@ public class AddExchanges
         @Override
         public PlanWithProperties visitProject(ProjectNode node, PreferredProperties preferredProperties)
         {
-            Map<Symbol, Symbol> identities = computeIdentityTranslations(node.getAssignments());
-            PreferredProperties translatedPreferred = preferredProperties.translate(symbol -> Optional.ofNullable(identities.get(symbol)));
-
+            Map<Symbol, VariableReferenceExpression> identities = computeIdentityTranslations(node.getAssignments());
+            PreferredProperties translatedPreferred = preferredProperties.translate(symbol -> Optional.ofNullable(identities.containsKey(symbol) ? new Symbol(identities.get(symbol).getName()) : null));
             return rebaseAndDeriveProperties(node, planChild(node, translatedPreferred));
         }
 
@@ -213,7 +213,7 @@ public class AddExchanges
         {
             Set<Symbol> partitioningRequirement = ImmutableSet.copyOf(node.getGroupingKeys());
 
-            boolean preferSingleNode = node.hasSingleNodeExecutionPreference(metadata);
+            boolean preferSingleNode = hasSingleNodeExecutionPreference(node, metadata);
             PreferredProperties preferredProperties = preferSingleNode ? PreferredProperties.undistributed() : PreferredProperties.any();
 
             if (!node.getGroupingKeys().isEmpty()) {
@@ -521,7 +521,7 @@ public class AddExchanges
         @Override
         public PlanWithProperties visitTableScan(TableScanNode node, PreferredProperties preferredProperties)
         {
-            return planTableScan(node, TRUE_LITERAL)
+            return planTableScan(node, TRUE_CONSTANT)
                     .orElseGet(() -> new PlanWithProperties(node, deriveProperties(node, ImmutableList.of())));
         }
 
@@ -573,9 +573,9 @@ public class AddExchanges
             return rebaseAndDeriveProperties(node, source);
         }
 
-        private Optional<PlanWithProperties> planTableScan(TableScanNode node, Expression predicate)
+        private Optional<PlanWithProperties> planTableScan(TableScanNode node, RowExpression predicate)
         {
-            return PushPredicateIntoTableScan.pushFilterIntoTableScan(node, predicate, true, session, types, idAllocator, metadata, typeAnalyzer, domainTranslator, pushdownPartitionsOnly)
+            return PushPredicateIntoTableScan.pushPredicateIntoTableScan(node, predicate, true, session, types, idAllocator, planSymbolAllocator, metadata, typeAnalyzer, domainTranslator, pushdownPartitionsOnly)
                     .map(plan -> new PlanWithProperties(plan, derivePropertiesRecursively(plan)));
         }
 
@@ -1134,7 +1134,7 @@ public class AddExchanges
                     // NOTE: new symbols for ExchangeNode output are required in order to keep plan logically correct with new local union below
 
                     List<Symbol> exchangeOutputLayout = node.getOutputSymbols().stream()
-                            .map(outputSymbol -> symbolAllocator.newSymbol(outputSymbol.getName(), types.get(outputSymbol)))
+                            .map(outputSymbol -> planSymbolAllocator.newSymbol(outputSymbol.getName(), types.get(outputSymbol)))
                             .collect(toImmutableList());
 
                     result = new ExchangeNode(
@@ -1256,12 +1256,12 @@ public class AddExchanges
         }
     }
 
-    private static Map<Symbol, Symbol> computeIdentityTranslations(Assignments assignments)
+    private static Map<Symbol, VariableReferenceExpression> computeIdentityTranslations(Assignments assignments)
     {
-        Map<Symbol, Symbol> outputToInput = new HashMap<>();
-        for (Map.Entry<Symbol, Expression> assignment : assignments.getMap().entrySet()) {
-            if (assignment.getValue() instanceof SymbolReference) {
-                outputToInput.put(assignment.getKey(), Symbol.from(assignment.getValue()));
+        Map<Symbol, VariableReferenceExpression> outputToInput = new HashMap<>();
+        for (Map.Entry<Symbol, RowExpression> assignment : assignments.getMap().entrySet()) {
+            if (assignment.getValue() instanceof VariableReferenceExpression) {
+                outputToInput.put(assignment.getKey(), (VariableReferenceExpression) assignment.getValue());
             }
         }
         return outputToInput;

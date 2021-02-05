@@ -17,6 +17,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.sql.expression.Types.FrameBoundType;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.sql.planner.RuleStatsRecorder;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
@@ -25,8 +29,6 @@ import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.iterative.rule.GatherAndMergeWindows;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.WindowFrame;
 import org.intellij.lang.annotations.Language;
@@ -82,9 +84,9 @@ public class TestMergeWindows
                     EXTENDEDPRICE_ALIAS, "extendedprice"));
 
     private static final Optional<WindowFrame> COMMON_FRAME = Optional.of(new WindowFrame(
-            WindowFrame.Type.ROWS,
-            new FrameBound(FrameBound.Type.UNBOUNDED_PRECEDING),
-            Optional.of(new FrameBound(FrameBound.Type.CURRENT_ROW))));
+            WindowFrameType.ROWS,
+            new FrameBound(FrameBoundType.UNBOUNDED_PRECEDING),
+            Optional.of(new FrameBound(FrameBoundType.CURRENT_ROW))));
 
     private static final Optional<WindowFrame> UNSPECIFIED_FRAME = Optional.empty();
 
@@ -322,9 +324,9 @@ public class TestMergeWindows
     public void testMergeDifferentFrames()
     {
         Optional<WindowFrame> frameC = Optional.of(new WindowFrame(
-                WindowFrame.Type.ROWS,
-                new FrameBound(FrameBound.Type.UNBOUNDED_PRECEDING),
-                Optional.of(new FrameBound(FrameBound.Type.CURRENT_ROW))));
+                WindowFrameType.ROWS,
+                new FrameBound(FrameBoundType.UNBOUNDED_PRECEDING),
+                Optional.of(new FrameBound(FrameBoundType.CURRENT_ROW))));
 
         ExpectedValueProvider<WindowNode.Specification> specificationC = specification(
                 ImmutableList.of(SUPPKEY_ALIAS),
@@ -332,9 +334,9 @@ public class TestMergeWindows
                 ImmutableMap.of(ORDERKEY_ALIAS, SortOrder.ASC_NULLS_LAST));
 
         Optional<WindowFrame> frameD = Optional.of(new WindowFrame(
-                WindowFrame.Type.ROWS,
-                new FrameBound(FrameBound.Type.CURRENT_ROW),
-                Optional.of(new FrameBound(FrameBound.Type.UNBOUNDED_FOLLOWING))));
+                WindowFrameType.ROWS,
+                new FrameBound(FrameBoundType.CURRENT_ROW),
+                Optional.of(new FrameBound(FrameBoundType.UNBOUNDED_FOLLOWING))));
 
         @Language("SQL") String sql = "SELECT " +
                 "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C, " +
@@ -356,9 +358,9 @@ public class TestMergeWindows
     public void testMergeDifferentFramesWithDefault()
     {
         Optional<WindowFrame> frameD = Optional.of(new WindowFrame(
-                WindowFrame.Type.ROWS,
-                new FrameBound(FrameBound.Type.CURRENT_ROW),
-                Optional.of(new FrameBound(FrameBound.Type.UNBOUNDED_FOLLOWING))));
+                WindowFrameType.ROWS,
+                new FrameBound(FrameBoundType.CURRENT_ROW),
+                Optional.of(new FrameBound(FrameBoundType.UNBOUNDED_FOLLOWING))));
 
         ExpectedValueProvider<WindowNode.Specification> specificationD = specification(
                 ImmutableList.of(SUPPKEY_ALIAS),
@@ -553,7 +555,7 @@ public class TestMergeWindows
     private void assertUnitPlan(@Language("SQL") String sql, PlanMatchPattern pattern)
     {
         List<PlanOptimizer> optimizers = ImmutableList.of(
-                new UnaliasSymbolReferences(),
+                new UnaliasSymbolReferences(getQueryRunner().getMetadata()),
                 new IterativeOptimizer(
                         new RuleStatsRecorder(),
                         getQueryRunner().getStatsCalculator(),

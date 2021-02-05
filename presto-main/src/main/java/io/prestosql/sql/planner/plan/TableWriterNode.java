@@ -23,14 +23,16 @@ import io.prestosql.metadata.DeletesAsInsertTableHandle;
 import io.prestosql.metadata.InsertTableHandle;
 import io.prestosql.metadata.NewTableLayout;
 import io.prestosql.metadata.OutputTableHandle;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.UpdateTableHandle;
 import io.prestosql.metadata.VacuumTableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.tree.Expression;
 
 import javax.annotation.concurrent.Immutable;
@@ -44,7 +46,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class TableWriterNode
-        extends PlanNode
+        extends InternalPlanNode
 {
     private final PlanNode source;
     private final WriterTarget target;
@@ -164,7 +166,7 @@ public class TableWriterNode
     }
 
     @Override
-    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitTableWriter(this, context);
     }

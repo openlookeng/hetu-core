@@ -34,7 +34,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 
 public final class TypeUtils
 {
-    public static final int NULL_HASH_CODE = 0;
+    public static final long NULL_HASH_CODE = 0;
 
     private TypeUtils()
     {

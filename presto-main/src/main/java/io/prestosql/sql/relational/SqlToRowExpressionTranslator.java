@@ -19,8 +19,15 @@ import com.google.common.collect.Lists;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.SpecialForm.Form;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalParseResult;
 import io.prestosql.spi.type.Decimals;
@@ -31,8 +38,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.UnknownType;
 import io.prestosql.spi.type.VarcharType;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.relational.SpecialForm.Form;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.relational.optimizer.ExpressionOptimizer;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.ArithmeticUnaryExpression;
@@ -88,16 +94,35 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.slice.SliceUtf8.countCodePoints;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.prestosql.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
+import static io.prestosql.spi.relation.SpecialForm.Form.AND;
+import static io.prestosql.spi.relation.SpecialForm.Form.BETWEEN;
+import static io.prestosql.spi.relation.SpecialForm.Form.BIND;
+import static io.prestosql.spi.relation.SpecialForm.Form.COALESCE;
+import static io.prestosql.spi.relation.SpecialForm.Form.DEREFERENCE;
+import static io.prestosql.spi.relation.SpecialForm.Form.IF;
+import static io.prestosql.spi.relation.SpecialForm.Form.IN;
+import static io.prestosql.spi.relation.SpecialForm.Form.IS_NULL;
+import static io.prestosql.spi.relation.SpecialForm.Form.NULL_IF;
+import static io.prestosql.spi.relation.SpecialForm.Form.OR;
+import static io.prestosql.spi.relation.SpecialForm.Form.ROW_CONSTRUCTOR;
+import static io.prestosql.spi.relation.SpecialForm.Form.SWITCH;
+import static io.prestosql.spi.relation.SpecialForm.Form.WHEN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.CharType.createCharType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
+import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
+import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
+import static io.prestosql.spi.util.DateTimeUtils.parseTimeWithTimeZone;
+import static io.prestosql.spi.util.DateTimeUtils.parseTimeWithoutTimeZone;
+import static io.prestosql.spi.util.DateTimeUtils.parseTimestampLiteral;
 import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.constantNull;
@@ -112,26 +137,11 @@ import static io.prestosql.sql.relational.Signatures.likePatternSignature;
 import static io.prestosql.sql.relational.Signatures.likeVarcharSignature;
 import static io.prestosql.sql.relational.Signatures.subscriptSignature;
 import static io.prestosql.sql.relational.Signatures.tryCastSignature;
-import static io.prestosql.sql.relational.SpecialForm.Form.AND;
-import static io.prestosql.sql.relational.SpecialForm.Form.BETWEEN;
-import static io.prestosql.sql.relational.SpecialForm.Form.BIND;
-import static io.prestosql.sql.relational.SpecialForm.Form.COALESCE;
-import static io.prestosql.sql.relational.SpecialForm.Form.DEREFERENCE;
-import static io.prestosql.sql.relational.SpecialForm.Form.IF;
-import static io.prestosql.sql.relational.SpecialForm.Form.IN;
-import static io.prestosql.sql.relational.SpecialForm.Form.IS_NULL;
-import static io.prestosql.sql.relational.SpecialForm.Form.NULL_IF;
-import static io.prestosql.sql.relational.SpecialForm.Form.OR;
-import static io.prestosql.sql.relational.SpecialForm.Form.ROW_CONSTRUCTOR;
-import static io.prestosql.sql.relational.SpecialForm.Form.SWITCH;
-import static io.prestosql.sql.relational.SpecialForm.Form.WHEN;
 import static io.prestosql.type.JsonType.JSON;
 import static io.prestosql.type.LikePatternType.LIKE_PATTERN;
-import static io.prestosql.util.DateTimeUtils.parseDayTimeInterval;
-import static io.prestosql.util.DateTimeUtils.parseTimeWithTimeZone;
-import static io.prestosql.util.DateTimeUtils.parseTimeWithoutTimeZone;
-import static io.prestosql.util.DateTimeUtils.parseTimestampLiteral;
-import static io.prestosql.util.DateTimeUtils.parseYearMonthInterval;
+import static io.prestosql.util.DateTimePeriodUtils.parseDayTimeInterval;
+import static io.prestosql.util.DateTimePeriodUtils.parseYearMonthInterval;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public final class SqlToRowExpressionTranslator
@@ -200,6 +210,13 @@ public final class SqlToRowExpressionTranslator
         }
 
         @Override
+        protected RowExpression visitIdentifier(Identifier node, Void context)
+        {
+            // identifier should never be reachable with the exception of lambda within VALUES (#9711)
+            return new VariableReferenceExpression(node.getValue(), getType(node));
+        }
+
+        @Override
         protected RowExpression visitFieldReference(FieldReference node, Void context)
         {
             return field(node.getFieldIndex(), getType(node));
@@ -261,6 +278,20 @@ public final class SqlToRowExpressionTranslator
         protected RowExpression visitGenericLiteral(GenericLiteral node, Void context)
         {
             Type type = getType(node);
+            try {
+                if (TINYINT.equals(type)) {
+                    return constant((long) Byte.parseByte(node.getValue()), TINYINT);
+                }
+                else if (SMALLINT.equals(type)) {
+                    return constant((long) Short.parseShort(node.getValue()), SMALLINT);
+                }
+                else if (BIGINT.equals(type)) {
+                    return constant(Long.parseLong(node.getValue()), BIGINT);
+                }
+            }
+            catch (NumberFormatException e) {
+                throw new PrestoException(INVALID_CAST_ARGUMENT, format("Invalid formatted generic %s literal: %s", type, node));
+            }
 
             if (JSON.equals(type)) {
                 return call(
@@ -353,7 +384,7 @@ public final class SqlToRowExpressionTranslator
         @Override
         protected RowExpression visitSymbolReference(SymbolReference node, Void context)
         {
-            Integer field = layout.get(Symbol.from(node));
+            Integer field = layout.get(SymbolUtils.from(node));
             if (field != null) {
                 return field(field, getType(node));
             }
@@ -450,68 +481,11 @@ public final class SqlToRowExpressionTranslator
         {
             RowExpression value = process(node.getExpression(), context);
 
-            if (node.isTypeOnly()) {
-                return changeType(value, getType(node));
-            }
-
             if (node.isSafe()) {
                 return call(tryCastSignature(getType(node), value.getType()), getType(node), value);
             }
 
             return call(castSignature(getType(node), value.getType()), getType(node), value);
-        }
-
-        private static RowExpression changeType(RowExpression value, Type targetType)
-        {
-            ChangeTypeVisitor visitor = new ChangeTypeVisitor(targetType);
-            return value.accept(visitor, null);
-        }
-
-        private static class ChangeTypeVisitor
-                implements RowExpressionVisitor<RowExpression, Void>
-        {
-            private final Type targetType;
-
-            private ChangeTypeVisitor(Type targetType)
-            {
-                this.targetType = targetType;
-            }
-
-            @Override
-            public RowExpression visitCall(CallExpression call, Void context)
-            {
-                return new CallExpression(call.getSignature(), targetType, call.getArguments());
-            }
-
-            @Override
-            public RowExpression visitSpecialForm(SpecialForm specialForm, Void context)
-            {
-                return new SpecialForm(specialForm.getForm(), targetType, specialForm.getArguments());
-            }
-
-            @Override
-            public RowExpression visitInputReference(InputReferenceExpression reference, Void context)
-            {
-                return field(reference.getField(), targetType);
-            }
-
-            @Override
-            public RowExpression visitConstant(ConstantExpression literal, Void context)
-            {
-                return constant(literal.getValue(), targetType);
-            }
-
-            @Override
-            public RowExpression visitLambda(LambdaDefinitionExpression lambda, Void context)
-            {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public RowExpression visitVariableReference(VariableReferenceExpression reference, Void context)
-            {
-                return new VariableReferenceExpression(reference.getName(), targetType);
-            }
         }
 
         @Override
@@ -635,7 +609,13 @@ public final class SqlToRowExpressionTranslator
         {
             ImmutableList.Builder<RowExpression> arguments = ImmutableList.builder();
             arguments.add(process(node.getValue(), context));
-            InListExpression values = (InListExpression) node.getValueList();
+            InListExpression values;
+            if (node.getValueList() instanceof InListExpression) {
+                values = (InListExpression) node.getValueList();
+            }
+            else {
+                values = new InListExpression(ImmutableList.of(node.getValueList()));
+            }
             for (Expression value : values.getValues()) {
                 arguments.add(process(value, context));
             }

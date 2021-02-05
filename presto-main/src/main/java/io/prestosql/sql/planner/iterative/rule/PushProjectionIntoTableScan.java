@@ -17,18 +17,18 @@ import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.ConnectorExpressionTranslator;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.ArrayList;
@@ -43,6 +43,8 @@ import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 public class PushProjectionIntoTableScan
         implements Rule<ProjectNode>
@@ -77,7 +79,7 @@ public class PushProjectionIntoTableScan
                     .getExpressions().stream()
                     .map(expression -> ConnectorExpressionTranslator.translate(
                             context.getSession(),
-                            expression,
+                            castToExpression(expression),
                             typeAnalyzer,
                             context.getSymbolAllocator().getTypes()))
                     .collect(toImmutableList());
@@ -121,7 +123,7 @@ public class PushProjectionIntoTableScan
 
         Assignments.Builder newProjectionAssignments = Assignments.builder();
         for (int i = 0; i < project.getOutputSymbols().size(); i++) {
-            newProjectionAssignments.put(project.getOutputSymbols().get(i), newProjections.get(i));
+            newProjectionAssignments.put(project.getOutputSymbols().get(i), castToRowExpression(newProjections.get(i)));
         }
 
         return Result.ofPlanNode(

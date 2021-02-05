@@ -27,10 +27,10 @@ import io.airlift.http.client.HttpClient;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.prestosql.client.NodeVersion;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.system.GlobalSystemConnector;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.server.InternalCommunicationConfig;
+import io.prestosql.spi.connector.CatalogName;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.PostConstruct;

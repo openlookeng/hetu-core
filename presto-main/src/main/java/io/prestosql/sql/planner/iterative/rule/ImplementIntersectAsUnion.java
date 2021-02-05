@@ -15,14 +15,15 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.IntersectNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.planner.plan.Patterns.intersect;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 /**
  * Converts INTERSECT queries into UNION ALL..GROUP BY...WHERE
@@ -73,7 +74,9 @@ public class ImplementIntersectAsUnion
         return Result.ofPlanNode(
                 new ProjectNode(
                         context.getIdAllocator().getNextId(),
-                        new FilterNode(context.getIdAllocator().getNextId(), result.getPlanNode(), and(result.getPresentExpressions())),
-                        Assignments.identity(node.getOutputSymbols())));
+                        new FilterNode(context.getIdAllocator().getNextId(),
+                                result.getPlanNode(),
+                                castToRowExpression(and(result.getPresentExpressions()))),
+                        AssignmentUtils.identityAsSymbolReferences(node.getOutputSymbols())));
     }
 }

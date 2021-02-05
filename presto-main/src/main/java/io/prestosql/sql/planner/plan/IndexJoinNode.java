@@ -16,7 +16,9 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -28,7 +30,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class IndexJoinNode
-        extends PlanNode
+        extends InternalPlanNode
 {
     private final Type type;
     private final PlanNode probeSource;
@@ -126,7 +128,7 @@ public class IndexJoinNode
     }
 
     @Override
-    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitIndexJoin(this, context);
     }

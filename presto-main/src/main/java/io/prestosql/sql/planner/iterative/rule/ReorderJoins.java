@@ -28,18 +28,21 @@ import io.prestosql.cost.CostProvider;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinNode.DistributionType;
+import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.planner.EqualityInference;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.JoinNode.DistributionType;
-import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
@@ -68,22 +71,23 @@ import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.getJoinDistributionType;
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
 import static io.prestosql.SystemSessionProperties.getMaxReorderedJoins;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.AUTOMATIC;
-import static io.prestosql.sql.planner.DeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.EqualityInference.createEqualityInference;
 import static io.prestosql.sql.planner.EqualityInference.nonInferrableConjuncts;
+import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.iterative.rule.DetermineJoinDistributionType.canReplicate;
 import static io.prestosql.sql.planner.iterative.rule.ReorderJoins.JoinEnumerationResult.INFINITE_COST_RESULT;
 import static io.prestosql.sql.planner.iterative.rule.ReorderJoins.JoinEnumerationResult.UNKNOWN_COST_RESULT;
 import static io.prestosql.sql.planner.iterative.rule.ReorderJoins.MultiJoinNode.toMultiJoinNode;
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.plan.Patterns.join;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static java.util.Objects.requireNonNull;
@@ -99,7 +103,7 @@ public class ReorderJoins
     private static final Pattern<JoinNode> PATTERN = join().matching(
             joinNode -> !joinNode.getDistributionType().isPresent()
                     && joinNode.getType() == INNER
-                    && isDeterministic(joinNode.getFilter().orElse(TRUE_LITERAL)));
+                    && isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL)));
 
     private final CostComparator costComparator;
 
@@ -299,7 +303,7 @@ public class ReorderJoins
                     right,
                     joinConditions,
                     sortedOutputSymbols,
-                    joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)),
+                    joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)).map(OriginalExpressionUtils::castToRowExpression),
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
@@ -343,7 +347,7 @@ public class ReorderJoins
                         .forEach(predicates::add);
                 Expression filter = combineConjuncts(predicates.build());
                 if (!TRUE_LITERAL.equals(filter)) {
-                    planNode = new FilterNode(idAllocator.getNextId(), planNode, filter);
+                    planNode = new FilterNode(idAllocator.getNextId(), planNode, castToRowExpression(filter));
                 }
                 return createJoinEnumerationResult(planNode);
             }
@@ -360,8 +364,8 @@ public class ReorderJoins
 
         private static EquiJoinClause toEquiJoinClause(ComparisonExpression equality, Set<Symbol> leftSymbols)
         {
-            Symbol leftSymbol = Symbol.from(equality.getLeft());
-            Symbol rightSymbol = Symbol.from(equality.getRight());
+            Symbol leftSymbol = SymbolUtils.from(equality.getLeft());
+            Symbol rightSymbol = SymbolUtils.from(equality.getRight());
             EquiJoinClause equiJoinClause = new EquiJoinClause(leftSymbol, rightSymbol);
             return leftSymbols.contains(leftSymbol) ? equiJoinClause : equiJoinClause.flip();
         }
@@ -523,7 +527,9 @@ public class ReorderJoins
                 }
 
                 JoinNode joinNode = (JoinNode) resolved;
-                if (joinNode.getType() != INNER || !isDeterministic(joinNode.getFilter().orElse(TRUE_LITERAL)) || joinNode.getDistributionType().isPresent()) {
+                if (joinNode.getType() != INNER
+                        || !isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL))
+                        || joinNode.getDistributionType().isPresent()) {
                     sources.add(node);
                     return;
                 }
@@ -532,9 +538,9 @@ public class ReorderJoins
                 flattenNode(joinNode.getLeft(), limit - 1);
                 flattenNode(joinNode.getRight(), limit);
                 joinNode.getCriteria().stream()
-                        .map(EquiJoinClause::toExpression)
+                        .map(JoinNodeUtils::toExpression)
                         .forEach(filters::add);
-                joinNode.getFilter().ifPresent(filters::add);
+                joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).ifPresent(filters::add);
             }
 
             MultiJoinNode toMultiJoinNode()

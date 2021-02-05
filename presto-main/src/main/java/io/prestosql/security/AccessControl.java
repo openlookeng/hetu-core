@@ -21,6 +21,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.transaction.TransactionId;
 
 import java.security.Principal;
@@ -355,7 +356,7 @@ public interface AccessControl
     /**
      * Check if identity and table combination has some row level filtering
      *
-     * @return {@link io.prestosql.sql.tree.Expression} as string. Null if no row filters are present
+     * @return {@link Expression} as string. Null if no row filters are present
      */
     default String applyRowFilters(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
@@ -365,7 +366,7 @@ public interface AccessControl
     /**
      * Check if identity, table and column has some column making enabled
      *
-     * @return {@link io.prestosql.sql.tree.Expression} as string. Null if no column filters are present
+     * @return {@link Expression} as string. Null if no column filters are present
      */
     default String applyColumnMasking(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, String columnName)
     {

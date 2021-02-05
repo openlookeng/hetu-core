@@ -15,10 +15,10 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
 
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isScalar;
 import static io.prestosql.sql.planner.plan.Patterns.LateralJoin.filter;

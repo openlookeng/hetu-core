@@ -21,7 +21,7 @@ import io.prestosql.execution.StageInfo;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;

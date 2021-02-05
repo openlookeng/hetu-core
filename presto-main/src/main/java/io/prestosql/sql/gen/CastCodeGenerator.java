@@ -16,8 +16,8 @@ package io.prestosql.sql.gen;
 import com.google.common.collect.ImmutableList;
 import io.airlift.bytecode.BytecodeNode;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.RowExpression;
 
 import java.util.List;
 

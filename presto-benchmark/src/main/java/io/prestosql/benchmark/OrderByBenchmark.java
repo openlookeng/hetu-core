@@ -18,9 +18,9 @@ import io.prestosql.operator.LimitOperator.LimitOperatorFactory;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.OrderByOperator.OrderByOperatorFactory;
 import io.prestosql.operator.PagesIndex;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.OrderingCompiler;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.LocalQueryRunner;
 
 import java.util.List;

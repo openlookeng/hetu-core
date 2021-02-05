@@ -14,11 +14,11 @@
 package io.prestosql.spi.expression;
 
 import io.prestosql.Session;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.AstVisitor;
@@ -41,6 +41,7 @@ import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static java.util.Objects.requireNonNull;
 
 public final class ConnectorExpressionTranslator
@@ -74,7 +75,7 @@ public final class ConnectorExpressionTranslator
         public Expression translate(ConnectorExpression expression)
         {
             if (expression instanceof Variable) {
-                return variableMappings.get(((Variable) expression).getName()).toSymbolReference();
+                return toSymbolReference(variableMappings.get(((Variable) expression).getName()));
             }
 
             if (expression instanceof Constant) {

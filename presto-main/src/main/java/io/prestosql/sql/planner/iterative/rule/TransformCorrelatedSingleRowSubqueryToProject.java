@@ -15,12 +15,13 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
 
 import java.util.List;
 
@@ -79,7 +80,7 @@ public class TransformCorrelatedSingleRowSubqueryToProject
         }
         if (subqueryProjections.size() == 1) {
             Assignments assignments = Assignments.builder()
-                    .putIdentities(parent.getInput().getOutputSymbols())
+                    .putAll(AssignmentUtils.identityAsSymbolReferences(parent.getInput().getOutputSymbols()))
                     .putAll(subqueryProjections.get(0).getAssignments())
                     .build();
             return Result.ofPlanNode(projectNode(parent.getInput(), assignments, context));

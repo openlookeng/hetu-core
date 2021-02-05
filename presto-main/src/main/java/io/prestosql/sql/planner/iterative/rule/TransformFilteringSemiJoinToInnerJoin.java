@@ -20,15 +20,17 @@ import io.prestosql.Session;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.tree.Expression;
 
@@ -39,15 +41,17 @@ import java.util.function.Predicate;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.SystemSessionProperties.isRewriteFilteringSemiJoinToInnerJoin;
 import static io.prestosql.matching.Capture.newCapture;
+import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.planner.ExpressionSymbolInliner.inlineSymbols;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
 import static io.prestosql.sql.planner.plan.Patterns.semiJoin;
 import static io.prestosql.sql.planner.plan.Patterns.source;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 /**
@@ -96,21 +100,21 @@ public class TransformFilteringSemiJoinToInnerJoin
         SemiJoinNode semiJoin = captures.get(SEMI_JOIN);
 
         Symbol semiJoinSymbol = semiJoin.getSemiJoinOutput();
-        Predicate<Expression> isSemiJoinSymbol = expression -> expression.equals(semiJoinSymbol.toSymbolReference());
+        Predicate<Expression> isSemiJoinSymbol = expression -> expression.equals(SymbolUtils.toSymbolReference(semiJoinSymbol));
 
-        List<Expression> conjuncts = extractConjuncts(filterNode.getPredicate());
+        List<Expression> conjuncts = extractConjuncts(castToExpression(filterNode.getPredicate()));
         if (conjuncts.stream().noneMatch(isSemiJoinSymbol)) {
             return Result.empty();
         }
         Expression filteredPredicate = and(conjuncts.stream()
-                .filter(expression -> !expression.equals(semiJoinSymbol.toSymbolReference()))
+                .filter(expression -> !expression.equals(SymbolUtils.toSymbolReference(semiJoinSymbol)))
                 .collect(toImmutableList()));
 
         Expression simplifiedPredicate = inlineSymbols(symbol -> {
             if (symbol.equals(semiJoinSymbol)) {
                 return TRUE_LITERAL;
             }
-            return symbol.toSymbolReference();
+            return SymbolUtils.toSymbolReference(symbol);
         }, filteredPredicate);
 
         Optional<Expression> joinFilter = simplifiedPredicate.equals(TRUE_LITERAL) ? Optional.empty() : Optional.of(simplifiedPredicate);
@@ -132,7 +136,7 @@ public class TransformFilteringSemiJoinToInnerJoin
                 filteringSourceDistinct,
                 ImmutableList.of(new EquiJoinClause(semiJoin.getSourceJoinSymbol(), semiJoin.getFilteringSourceJoinSymbol())),
                 semiJoin.getSource().getOutputSymbols(),
-                joinFilter,
+                joinFilter.isPresent() ? Optional.of(castToRowExpression(joinFilter.get())) : Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -143,8 +147,8 @@ public class TransformFilteringSemiJoinToInnerJoin
                 context.getIdAllocator().getNextId(),
                 innerJoin,
                 Assignments.builder()
-                        .putIdentities(innerJoin.getOutputSymbols())
-                        .put(semiJoinSymbol, TRUE_LITERAL)
+                        .putAll(AssignmentUtils.identityAsSymbolReferences(innerJoin.getOutputSymbols()))
+                        .put(semiJoinSymbol, castToRowExpression(TRUE_LITERAL))
                         .build());
 
         return Result.ofPlanNode(project);

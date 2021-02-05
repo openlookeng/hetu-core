@@ -16,10 +16,11 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.ProjectNode;
 
 import static io.prestosql.sql.planner.plan.Patterns.project;
+import static io.prestosql.sql.relational.ProjectNodeUtils.isIdentity;
 
 /**
  * Removes projection nodes that only perform non-renaming identity projections
@@ -28,7 +29,7 @@ public class RemoveRedundantIdentityProjections
         implements Rule<ProjectNode>
 {
     private static final Pattern<ProjectNode> PATTERN = project()
-            .matching(ProjectNode::isIdentity)
+            .matching(projectNode -> isIdentity(projectNode))
             // only drop this projection if it does not constrain the outputs
             // of its child
             .matching(RemoveRedundantIdentityProjections::outputsSameAsSource);

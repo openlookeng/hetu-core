@@ -15,18 +15,19 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.PlanNode;
 import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.semiJoin;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
@@ -88,10 +89,11 @@ public class TestPruneSemiJoinColumns
         Symbol rightKey = p.symbol("rightKey");
         List<Symbol> outputs = ImmutableList.of(match, leftKey, leftKeyHash, leftValue);
         return p.project(
-                Assignments.identity(
+                Assignments.copyOf(
                         outputs.stream()
                                 .filter(projectionFilter)
-                                .collect(toImmutableList())),
+                                .collect(Collectors.toMap(v -> v, v -> p.variable(v.getName(), BIGINT)))),
+
                 p.semiJoin(
                         leftKey,
                         rightKey,

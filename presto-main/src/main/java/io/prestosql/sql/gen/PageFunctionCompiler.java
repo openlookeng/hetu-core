@@ -45,15 +45,15 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.InputReferenceExpression;
+import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.RowExpressionVisitor;
 import io.prestosql.sql.gen.LambdaBytecodeGenerator.CompiledLambda;
 import io.prestosql.sql.planner.CompilerConfig;
-import io.prestosql.sql.relational.ConstantExpression;
-import io.prestosql.sql.relational.DeterminismEvaluator;
 import io.prestosql.sql.relational.Expressions;
-import io.prestosql.sql.relational.InputReferenceExpression;
-import io.prestosql.sql.relational.LambdaDefinitionExpression;
-import io.prestosql.sql.relational.RowExpression;
-import io.prestosql.sql.relational.RowExpressionVisitor;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 
@@ -98,7 +98,7 @@ import static java.util.Objects.requireNonNull;
 public class PageFunctionCompiler
 {
     private final Metadata metadata;
-    private final DeterminismEvaluator determinismEvaluator;
+    private final RowExpressionDeterminismEvaluator determinismEvaluator;
 
     private final LoadingCache<RowExpression, Supplier<PageProjection>> projectionCache;
     private final LoadingCache<RowExpression, Supplier<PageFilter>> filterCache;
@@ -115,7 +115,7 @@ public class PageFunctionCompiler
     public PageFunctionCompiler(Metadata metadata, int expressionCacheSize)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
-        this.determinismEvaluator = new DeterminismEvaluator(metadata);
+        this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
 
         if (expressionCacheSize > 0) {
             projectionCache = CacheBuilder.newBuilder()

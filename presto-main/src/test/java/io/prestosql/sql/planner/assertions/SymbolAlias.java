@@ -13,7 +13,8 @@
  */
 package io.prestosql.sql.planner.assertions;
 
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 
 import static java.util.Objects.requireNonNull;
 
@@ -29,7 +30,7 @@ class SymbolAlias
 
     public Symbol toSymbol(SymbolAliases aliases)
     {
-        return Symbol.from(aliases.get(alias));
+        return SymbolUtils.from(aliases.get(alias));
     }
 
     @Override

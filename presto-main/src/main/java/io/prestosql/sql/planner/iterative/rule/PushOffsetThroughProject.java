@@ -16,15 +16,16 @@ package io.prestosql.sql.planner.iterative.rule;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.OffsetNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.iterative.rule.Util.transpose;
 import static io.prestosql.sql.planner.plan.Patterns.offset;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
+import static io.prestosql.sql.relational.ProjectNodeUtils.isIdentity;
 
 /**
  * Transforms:
@@ -47,7 +48,7 @@ public class PushOffsetThroughProject
             .with(source().matching(
                     project()
                             // do not push offset through identity projection which could be there for column pruning purposes
-                            .matching(projectNode -> !projectNode.isIdentity())
+                            .matching(projectNode -> !isIdentity(projectNode))
                             .capturedAs(CHILD)));
 
     @Override

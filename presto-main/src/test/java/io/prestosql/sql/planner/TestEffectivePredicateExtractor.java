@@ -22,43 +22,47 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.AbstractMockMetadata;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableProperties;
-import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.UnknownType;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.UnionNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
@@ -93,12 +97,15 @@ import java.util.stream.IntStream;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
+import static io.prestosql.spi.plan.AggregationNode.globalAggregation;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.or;
-import static io.prestosql.sql.planner.plan.AggregationNode.globalAggregation;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.assignment;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
@@ -114,13 +121,13 @@ public class TestEffectivePredicateExtractor
     private static final Symbol E = new Symbol("e");
     private static final Symbol F = new Symbol("f");
     private static final Symbol G = new Symbol("g");
-    private static final Expression AE = A.toSymbolReference();
-    private static final Expression BE = B.toSymbolReference();
-    private static final Expression CE = C.toSymbolReference();
-    private static final Expression DE = D.toSymbolReference();
-    private static final Expression EE = E.toSymbolReference();
-    private static final Expression FE = F.toSymbolReference();
-    private static final Expression GE = G.toSymbolReference();
+    private static final Expression AE = toSymbolReference(A);
+    private static final Expression BE = toSymbolReference(B);
+    private static final Expression CE = toSymbolReference(C);
+    private static final Expression DE = toSymbolReference(D);
+    private static final Expression EE = toSymbolReference(E);
+    private static final Expression FE = toSymbolReference(F);
+    private static final Expression GE = toSymbolReference(G);
     private static final Session SESSION = TestingSession.testSessionBuilder().build();
 
     private final Metadata metadata = new AbstractMockMetadata()
@@ -170,8 +177,8 @@ public class TestEffectivePredicateExtractor
     };
 
     private final TypeAnalyzer typeAnalyzer = new TypeAnalyzer(new SqlParser(), metadata);
-    private final EffectivePredicateExtractor effectivePredicateExtractor = new EffectivePredicateExtractor(new DomainTranslator(new LiteralEncoder(metadata)), metadata, true);
-    private final EffectivePredicateExtractor effectivePredicateExtractorWithoutTableProperties = new EffectivePredicateExtractor(new DomainTranslator(new LiteralEncoder(metadata)), metadata, false);
+    private final EffectivePredicateExtractor effectivePredicateExtractor = new EffectivePredicateExtractor(new ExpressionDomainTranslator(new LiteralEncoder(metadata)), metadata, true);
+    private final EffectivePredicateExtractor effectivePredicateExtractorWithoutTableProperties = new EffectivePredicateExtractor(new ExpressionDomainTranslator(new LiteralEncoder(metadata)), metadata, false);
 
     private Map<Symbol, ColumnHandle> scanAssignments;
     private TableScanNode baseTableScan;
@@ -291,7 +298,7 @@ public class TestEffectivePredicateExtractor
                                 equals(AE, BE),
                                 equals(BE, CE),
                                 lessThan(CE, bigintLiteral(10)))),
-                Assignments.of(D, AE, E, CE));
+                assignment(D, AE, E, CE));
 
         Expression effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
 
@@ -486,8 +493,8 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A),
                         ImmutableList.of(
-                                ImmutableList.of(bigintLiteral(1)),
-                                ImmutableList.of(bigintLiteral(2)))),
+                                ImmutableList.of(bigintLiteralRowExpression(1)),
+                                ImmutableList.of(bigintLiteralRowExpression(2)))),
                 types,
                 typeAnalyzer),
                 new InPredicate(AE, new InListExpression(ImmutableList.of(bigintLiteral(1), bigintLiteral(2)))));
@@ -499,9 +506,9 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A),
                         ImmutableList.of(
-                                ImmutableList.of(bigintLiteral(1)),
-                                ImmutableList.of(bigintLiteral(2)),
-                                ImmutableList.of(new Cast(new NullLiteral(), BIGINT.toString())))),
+                                ImmutableList.of(bigintLiteralRowExpression(1)),
+                                ImmutableList.of(bigintLiteralRowExpression(2)),
+                                ImmutableList.of(castToRowExpression(new Cast(new NullLiteral(), BIGINT.toString()))))),
                 types,
                 typeAnalyzer),
                 or(
@@ -515,14 +522,14 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A),
                         ImmutableList.of(
-                                ImmutableList.of(new Cast(new NullLiteral(), BIGINT.toString())))),
+                                ImmutableList.of(castToRowExpression(new Cast(new NullLiteral(), BIGINT.toString()))))),
                 types,
                 typeAnalyzer),
                 new IsNullPredicate(AE));
 
         // many rows
-        List<List<Expression>> rows = IntStream.range(0, 500)
-                .mapToObj(TestEffectivePredicateExtractor::bigintLiteral)
+        List<List<RowExpression>> rows = IntStream.range(0, 500)
+                .mapToObj(TestEffectivePredicateExtractor::bigintLiteralRowExpression)
                 .map(ImmutableList::of)
                 .collect(toImmutableList());
         assertEquals(effectivePredicateExtractor.extract(
@@ -542,8 +549,8 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A, B),
                         ImmutableList.of(
-                                ImmutableList.of(bigintLiteral(1), bigintLiteral(100)),
-                                ImmutableList.of(bigintLiteral(2), bigintLiteral(200)))),
+                                ImmutableList.of(bigintLiteralRowExpression(1), bigintLiteralRowExpression(100)),
+                                ImmutableList.of(bigintLiteralRowExpression(2), bigintLiteralRowExpression(200)))),
                 types,
                 typeAnalyzer),
                 and(
@@ -557,8 +564,8 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A, B),
                         ImmutableList.of(
-                                ImmutableList.of(bigintLiteral(1), new Cast(new NullLiteral(), BIGINT.toString())),
-                                ImmutableList.of(new Cast(new NullLiteral(), BIGINT.toString()), bigintLiteral(200)))),
+                                ImmutableList.of(bigintLiteralRowExpression(1), castToRowExpression(new Cast(new NullLiteral(), BIGINT.toString()))),
+                                ImmutableList.of(castToRowExpression(new Cast(new NullLiteral(), BIGINT.toString())), bigintLiteralRowExpression(200)))),
                 types,
                 typeAnalyzer),
                 and(
@@ -572,7 +579,7 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A, B),
                         ImmutableList.of(
-                                ImmutableList.of(bigintLiteral(1), new FunctionCall(QualifiedName.of("rand"), ImmutableList.of())))),
+                                ImmutableList.of(bigintLiteralRowExpression(1), castToRowExpression(new FunctionCall(QualifiedName.of("rand"), ImmutableList.of()))))),
                 types,
                 typeAnalyzer),
                 new ComparisonExpression(EQUAL, AE, bigintLiteral(1)));
@@ -584,8 +591,8 @@ public class TestEffectivePredicateExtractor
                         newId(),
                         ImmutableList.of(A),
                         ImmutableList.of(
-                                ImmutableList.of(bigintLiteral(1)),
-                                ImmutableList.of(BE))),
+                                ImmutableList.of(bigintLiteralRowExpression(1)),
+                                ImmutableList.of(castToRowExpression(BE)))),
                 types,
                 typeAnalyzer),
                 TRUE_LITERAL);
@@ -643,7 +650,7 @@ public class TestEffectivePredicateExtractor
                         .addAll(left.getOutputSymbols())
                         .addAll(right.getOutputSymbols())
                         .build(),
-                Optional.of(lessThanOrEqual(BE, EE)),
+                Optional.of(castToRowExpression(lessThanOrEqual(BE, EE))),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -715,7 +722,7 @@ public class TestEffectivePredicateExtractor
                         .addAll(leftScan.getOutputSymbols())
                         .addAll(rightScan.getOutputSymbols())
                         .build(),
-                Optional.of(FALSE_LITERAL),
+                Optional.of(castToRowExpression(FALSE_LITERAL)),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -948,7 +955,7 @@ public class TestEffectivePredicateExtractor
 
     private static FilterNode filter(PlanNode source, Expression predicate)
     {
-        return new FilterNode(newId(), source, predicate);
+        return new FilterNode(newId(), source, castToRowExpression(predicate));
     }
 
     private static Expression bigintLiteral(long number)
@@ -957,6 +964,14 @@ public class TestEffectivePredicateExtractor
             return new GenericLiteral("BIGINT", String.valueOf(number));
         }
         return new LongLiteral(String.valueOf(number));
+    }
+
+    private static RowExpression bigintLiteralRowExpression(long number)
+    {
+        if (number < Integer.MAX_VALUE && number > Integer.MIN_VALUE) {
+            return castToRowExpression(new GenericLiteral("BIGINT", String.valueOf(number)));
+        }
+        return castToRowExpression(new LongLiteral(String.valueOf(number)));
     }
 
     private static ComparisonExpression equals(Expression expression1, Expression expression2)
@@ -972,6 +987,11 @@ public class TestEffectivePredicateExtractor
     private static ComparisonExpression lessThanOrEqual(Expression expression1, Expression expression2)
     {
         return new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN_OR_EQUAL, expression1, expression2);
+    }
+
+    private RowExpression lessThanOrEqual(RowExpression expression1, RowExpression expression2)
+    {
+        return PlanBuilder.comparison(OperatorType.LESS_THAN_OR_EQUAL, expression1, expression2);
     }
 
     private static ComparisonExpression greaterThan(Expression expression1, Expression expression2)

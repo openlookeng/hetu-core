@@ -23,9 +23,9 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexWriter;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

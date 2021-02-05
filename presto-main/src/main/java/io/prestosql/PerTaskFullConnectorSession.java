@@ -14,9 +14,9 @@
  */
 package io.prestosql;
 
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.DriverTaskId;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.security.ConnectorIdentity;
 
 import java.util.Map;

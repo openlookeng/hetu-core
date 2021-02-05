@@ -37,7 +37,6 @@ import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.transaction.IsolationLevel;
 
 import java.sql.Connection;
@@ -63,17 +62,17 @@ public final class InMemoryJdbcDatabase
     private final String schemaName;
     private final ConnectorFactory connectorFactory;
 
-    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName, SqlQueryWriter queryWriter)
+    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName)
             throws SQLException
     {
-        this(driver, connectionUrl, connectorName, schemaName, queryWriter, new BaseJdbcConfig(), new Properties());
+        this(driver, connectionUrl, connectorName, schemaName, new BaseJdbcConfig(), new Properties());
     }
 
-    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName, SqlQueryWriter queryWriter, BaseJdbcConfig baseJdbcConfig, Properties connectionProperties)
+    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName, BaseJdbcConfig baseJdbcConfig, Properties connectionProperties)
             throws SQLException
     {
         this.schemaName = schemaName;
-        jdbcClient = new InMemoryJdbcClient(baseJdbcConfig, driver, connectionUrl, queryWriter, connectionProperties);
+        jdbcClient = new InMemoryJdbcClient(baseJdbcConfig, driver, connectionUrl, connectionProperties);
         connection = DriverManager.getConnection(connectionUrl, connectionProperties);
         this.connectorFactory = new InMemoryJdbcConnectorFactory(this.jdbcClient, connectorName);
     }
@@ -194,19 +193,9 @@ public final class InMemoryJdbcDatabase
     private static class InMemoryJdbcClient
             extends BaseJdbcClient
     {
-        private final SqlQueryWriter sqlQueryWriter;
-
-        public InMemoryJdbcClient(BaseJdbcConfig baseJdbcConfig, Driver driver, String connectionUrl, SqlQueryWriter sqlQueryWriter,
-                Properties properties)
+        public InMemoryJdbcClient(BaseJdbcConfig baseJdbcConfig, Driver driver, String connectionUrl, Properties properties)
         {
             super(baseJdbcConfig, "\"", new DriverConnectionFactory(driver, connectionUrl, Optional.empty(), Optional.empty(), properties));
-            this.sqlQueryWriter = sqlQueryWriter;
-        }
-
-        @Override
-        public Optional<SqlQueryWriter> getSqlQueryWriter()
-        {
-            return Optional.ofNullable(this.sqlQueryWriter);
         }
     }
 }

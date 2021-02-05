@@ -20,18 +20,20 @@ import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.VariableReferenceSymbolConverter;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.SymbolMapper;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.LambdaExpression;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,9 +47,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.SystemSessionProperties.preferPartialAggregation;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.PARTIAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.operator.aggregation.AggregationUtils.isDecomposable;
+import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.PARTIAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
@@ -84,7 +87,7 @@ public class PushPartialAggregationThroughExchange
     {
         ExchangeNode exchangeNode = captures.get(EXCHANGE_NODE);
 
-        boolean decomposable = aggregationNode.isDecomposable(metadata);
+        boolean decomposable = isDecomposable(aggregationNode, metadata);
 
         if (aggregationNode.getStep().equals(SINGLE) &&
                 aggregationNode.hasEmptyGroupingSet() &&
@@ -159,13 +162,16 @@ public class PushPartialAggregationThroughExchange
             }
 
             SymbolMapper symbolMapper = mappingsBuilder.build();
+            if (symbolMapper.getTypes() == null) {
+                symbolMapper.setTypes(context.getSymbolAllocator().getTypes());
+            }
             AggregationNode mappedPartial = symbolMapper.map(aggregation, source, context.getIdAllocator());
 
             Assignments.Builder assignments = Assignments.builder();
 
             for (Symbol output : aggregation.getOutputSymbols()) {
                 Symbol input = symbolMapper.map(output);
-                assignments.put(output, input.toSymbolReference());
+                assignments.put(output, VariableReferenceSymbolConverter.toVariableReference(input, context.getSymbolAllocator().getTypes()));
             }
             partials.add(new ProjectNode(context.getIdAllocator().getNextId(), mappedPartial, assignments.build()));
         }
@@ -220,10 +226,10 @@ public class PushPartialAggregationThroughExchange
                     entry.getKey(),
                     new AggregationNode.Aggregation(
                             signature,
-                            ImmutableList.<Expression>builder()
-                                    .add(intermediateSymbol.toSymbolReference())
+                            ImmutableList.<RowExpression>builder()
+                                    .add(new VariableReferenceExpression(intermediateSymbol.getName(), function.getIntermediateType()))
                                     .addAll(originalAggregation.getArguments().stream()
-                                            .filter(LambdaExpression.class::isInstance)
+                                            .filter(PushPartialAggregationThroughExchange::isLambda)
                                             .collect(toImmutableList()))
                                     .build(),
                             false,
@@ -255,5 +261,10 @@ public class PushPartialAggregationThroughExchange
                 FINAL,
                 node.getHashSymbol(),
                 node.getGroupIdSymbol());
+    }
+
+    private static boolean isLambda(RowExpression rowExpression)
+    {
+        return rowExpression instanceof LambdaDefinitionExpression;
     }
 }

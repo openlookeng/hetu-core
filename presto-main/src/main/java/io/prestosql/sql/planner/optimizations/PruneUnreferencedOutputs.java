@@ -23,54 +23,54 @@ import com.google.common.collect.Sets;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.sql.planner.OrderingScheme;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ExceptNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.SetOperationNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
-import io.prestosql.sql.planner.plan.ExceptNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.IntersectNode;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.planner.plan.SetOperationNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
-import io.prestosql.sql.tree.Expression;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -92,6 +92,8 @@ import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isScal
 import static io.prestosql.sql.planner.plan.LateralJoinNode.Type.INNER;
 import static io.prestosql.sql.planner.plan.LateralJoinNode.Type.LEFT;
 import static io.prestosql.sql.planner.plan.LateralJoinNode.Type.RIGHT;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 
@@ -110,12 +112,12 @@ public class PruneUnreferencedOutputs
         implements PlanOptimizer
 {
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
         requireNonNull(types, "types is null");
-        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
         return SimplePlanRewriter.rewriteWith(new Rewriter(), plan, ImmutableSet.of());
@@ -187,10 +189,18 @@ public class PruneUnreferencedOutputs
         {
             Set<Symbol> expectedFilterInputs = new HashSet<>();
             if (node.getFilter().isPresent()) {
-                expectedFilterInputs = ImmutableSet.<Symbol>builder()
-                        .addAll(SymbolsExtractor.extractUnique(node.getFilter().get()))
-                        .addAll(context.get())
-                        .build();
+                if (isExpression(node.getFilter().get())) {
+                    expectedFilterInputs = ImmutableSet.<Symbol>builder()
+                            .addAll(SymbolsExtractor.extractUnique(castToExpression(node.getFilter().get())))
+                            .addAll(context.get())
+                            .build();
+                }
+                else {
+                    expectedFilterInputs = ImmutableSet.<Symbol>builder()
+                            .addAll(SymbolsExtractor.extractUnique(node.getFilter().get()))
+                            .addAll(context.get())
+                            .build();
+                }
             }
 
             ImmutableSet.Builder<Symbol> leftInputsBuilder = ImmutableSet.builder();
@@ -452,10 +462,24 @@ public class PruneUnreferencedOutputs
         @Override
         public PlanNode visitFilter(FilterNode node, RewriteContext<Set<Symbol>> context)
         {
-            Set<Symbol> expectedInputs = ImmutableSet.<Symbol>builder()
-                    .addAll(SymbolsExtractor.extractUnique(node.getPredicate()))
-                    .addAll(context.get())
-                    .build();
+            Set<Symbol> expectedInputs;
+            if (isExpression(node.getPredicate())) {
+                expectedInputs = ImmutableSet.<Symbol>builder()
+                        .addAll(SymbolsExtractor.extractUnique(castToExpression(node.getPredicate())))
+                        .addAll(context.get())
+                        .build();
+            }
+            else {
+                Map<Integer, Symbol> layout = new HashMap<>();
+                int channel = 0;
+                for (Symbol symbol : node.getSource().getOutputSymbols()) {
+                    layout.put(channel++, symbol);
+                }
+                expectedInputs = ImmutableSet.<Symbol>builder()
+                        .addAll(SymbolsExtractor.extractUnique(node.getPredicate(), layout))
+                        .addAll(context.get())
+                        .build();
+            }
 
             PlanNode source = context.rewrite(node.getSource(), expectedInputs);
 
@@ -541,7 +565,12 @@ public class PruneUnreferencedOutputs
             Assignments.Builder builder = Assignments.builder();
             node.getAssignments().forEach((symbol, expression) -> {
                 if (context.get().contains(symbol)) {
-                    expectedInputs.addAll(SymbolsExtractor.extractUnique(expression));
+                    if (isExpression(expression)) {
+                        expectedInputs.addAll(SymbolsExtractor.extractUnique(castToExpression(expression)));
+                    }
+                    else {
+                        expectedInputs.addAll(SymbolsExtractor.extractUnique(expression));
+                    }
                     builder.put(symbol, expression);
                 }
             });
@@ -769,12 +798,12 @@ public class PruneUnreferencedOutputs
         public PlanNode visitValues(ValuesNode node, RewriteContext<Set<Symbol>> context)
         {
             ImmutableList.Builder<Symbol> rewrittenOutputSymbolsBuilder = ImmutableList.builder();
-            ImmutableList.Builder<ImmutableList.Builder<Expression>> rowBuildersBuilder = ImmutableList.builder();
+            ImmutableList.Builder<ImmutableList.Builder<RowExpression>> rowBuildersBuilder = ImmutableList.builder();
             // Initialize builder for each row
             for (int i = 0; i < node.getRows().size(); i++) {
                 rowBuildersBuilder.add(ImmutableList.builder());
             }
-            ImmutableList<ImmutableList.Builder<Expression>> rowBuilders = rowBuildersBuilder.build();
+            ImmutableList<ImmutableList.Builder<RowExpression>> rowBuilders = rowBuildersBuilder.build();
             for (int i = 0; i < node.getOutputSymbols().size(); i++) {
                 Symbol outputSymbol = node.getOutputSymbols().get(i);
                 // If output symbol is used
@@ -786,7 +815,7 @@ public class PruneUnreferencedOutputs
                     }
                 }
             }
-            List<List<Expression>> rewrittenRows = rowBuilders.stream()
+            List<List<RowExpression>> rewrittenRows = rowBuilders.stream()
                     .map(ImmutableList.Builder::build)
                     .collect(toImmutableList());
             return new ValuesNode(node.getId(), rewrittenOutputSymbolsBuilder.build(), rewrittenRows);
@@ -803,11 +832,16 @@ public class PruneUnreferencedOutputs
             // extract symbols required subquery plan
             ImmutableSet.Builder<Symbol> subqueryAssignmentsSymbolsBuilder = ImmutableSet.builder();
             Assignments.Builder subqueryAssignments = Assignments.builder();
-            for (Map.Entry<Symbol, Expression> entry : node.getSubqueryAssignments().getMap().entrySet()) {
+            for (Map.Entry<Symbol, RowExpression> entry : node.getSubqueryAssignments().getMap().entrySet()) {
                 Symbol output = entry.getKey();
-                Expression expression = entry.getValue();
+                RowExpression expression = entry.getValue();
                 if (context.get().contains(output)) {
-                    subqueryAssignmentsSymbolsBuilder.addAll(SymbolsExtractor.extractUnique(expression));
+                    if (isExpression(expression)) {
+                        subqueryAssignmentsSymbolsBuilder.addAll(SymbolsExtractor.extractUnique(castToExpression(expression)));
+                    }
+                    else {
+                        subqueryAssignmentsSymbolsBuilder.addAll(SymbolsExtractor.extractUnique(expression));
+                    }
                     subqueryAssignments.put(output, expression);
                 }
             }

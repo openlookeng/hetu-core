@@ -17,7 +17,7 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.concurrent.atomic.AtomicLong;
 

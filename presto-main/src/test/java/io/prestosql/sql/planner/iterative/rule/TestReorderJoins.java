@@ -18,19 +18,20 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.PlanNodeStatsEstimate;
 import io.prestosql.cost.SymbolStatsEstimate;
+import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.sql.planner.FunctionCallBuilder;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.RuleAssert;
 import io.prestosql.sql.planner.iterative.rule.test.RuleTester;
-import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
+import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -42,24 +43,23 @@ import static io.airlift.testing.Closeables.closeAllRuntimeException;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_MAX_BROADCAST_TABLE_SIZE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.AUTOMATIC;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 public class TestReorderJoins
 {
     private RuleTester tester;
 
     // TWO_ROWS are used to prevent node from being scalar
-    private static final ImmutableList<List<Expression>> TWO_ROWS = ImmutableList.of(ImmutableList.of(), ImmutableList.of());
+    private static final ImmutableList<List<RowExpression>> TWO_ROWS = ImmutableList.of(ImmutableList.of(), ImmutableList.of());
 
     @BeforeClass
     public void setUp()
@@ -337,10 +337,10 @@ public class TestReorderJoins
                                 p.values(new PlanNodeId("valuesB"), p.symbol("B1")),
                                 ImmutableList.of(new EquiJoinClause(p.symbol("A1"), p.symbol("B1"))),
                                 ImmutableList.of(p.symbol("A1"), p.symbol("B1")),
-                                Optional.of(new ComparisonExpression(
-                                        LESS_THAN,
-                                        p.symbol("A1").toSymbolReference(),
-                                        new FunctionCallBuilder(tester.getMetadata()).setName(QualifiedName.of("random")).build()))))
+                                Optional.of(castToRowExpression(new ComparisonExpression(
+                                        ComparisonExpression.Operator.LESS_THAN,
+                                        new SymbolReference("A1"),
+                                        new FunctionCallBuilder(tester.getMetadata()).setName(QualifiedName.of("random")).build())))))
                 .doesNotFire();
     }
 
@@ -362,7 +362,7 @@ public class TestReorderJoins
                                 ImmutableList.of(
                                         new EquiJoinClause(p.symbol("B2"), p.symbol("C1"))),
                                 ImmutableList.of(p.symbol("A1")),
-                                Optional.of(new ComparisonExpression(EQUAL, p.symbol("A1").toSymbolReference(), p.symbol("B1").toSymbolReference()))))
+                                Optional.of(castToRowExpression(new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("A1"), new SymbolReference("B1"))))))
                 .overrideStats("valuesA", PlanNodeStatsEstimate.builder()
                         .setOutputRowCount(10)
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("A1"), new SymbolStatsEstimate(0, 100, 0, 100, 10)))
@@ -407,7 +407,7 @@ public class TestReorderJoins
                                 ImmutableList.of(
                                         new EquiJoinClause(p.symbol("B2"), p.symbol("C1"))),
                                 ImmutableList.of(p.symbol("A1")),
-                                Optional.of(new ComparisonExpression(EQUAL, p.symbol("A1").toSymbolReference(), p.symbol("B1").toSymbolReference()))))
+                                Optional.of(castToRowExpression(new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("A1"), new SymbolReference("B1"))))))
                 .overrideStats("valuesA", PlanNodeStatsEstimate.builder()
                         .setOutputRowCount(40)
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("A1"), new SymbolStatsEstimate(0, 100, 0, 100, 10)))

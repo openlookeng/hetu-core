@@ -16,7 +16,7 @@ package io.prestosql.operator;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.memory.context.MemoryTrackingContext;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.testing.TestingSession;
 import io.prestosql.testing.TestingTaskContext;
 

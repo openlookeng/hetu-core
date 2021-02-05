@@ -23,7 +23,6 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.dynamicfilter.DynamicFilterService;
@@ -40,7 +39,6 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
@@ -49,6 +47,14 @@ import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
@@ -68,19 +74,13 @@ import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.PlanFragmenter;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.PlanOptimizers;
 import io.prestosql.sql.planner.StageExecutionPlan;
 import io.prestosql.sql.planner.SubPlan;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Explain;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
 import org.joda.time.DateTime;
@@ -353,13 +353,13 @@ public class SqlQueryExecution
     {
         if (sourceNode != null && sourceNode instanceof ProjectNode) {
             ProjectNode projectNode = (ProjectNode) sourceNode;
-            Map<Symbol, Expression> assignments = projectNode.getAssignments().getMap();
+            Map<Symbol, RowExpression> assignments = projectNode.getAssignments().getMap();
             for (Symbol symbol : assignments.keySet()) {
                 if (mapping.containsKey(symbol.getName())) {
                     Set<String> sets = mapping.get(symbol.getName());
-                    Expression expression = assignments.get(symbol);
-                    if (expression instanceof SymbolReference) {
-                        sets.add(((SymbolReference) expression).getName());
+                    RowExpression expression = assignments.get(symbol);
+                    if (expression instanceof VariableReferenceExpression) {
+                        sets.add(((VariableReferenceExpression) expression).getName());
                     }
                     else {
                         sets.add(expression.toString());
@@ -368,9 +368,9 @@ public class SqlQueryExecution
                 else {
                     for (Map.Entry<String, Set<String>> entry : mapping.entrySet()) {
                         if (entry.getValue().contains(symbol.getName())) {
-                            Expression expression = assignments.get(symbol);
-                            if (expression instanceof SymbolReference) {
-                                entry.getValue().add(((SymbolReference) expression).getName());
+                            RowExpression expression = assignments.get(symbol);
+                            if (expression instanceof VariableReferenceExpression) {
+                                entry.getValue().add(((VariableReferenceExpression) expression).getName());
                             }
                             else {
                                 entry.getValue().add(expression.toString());

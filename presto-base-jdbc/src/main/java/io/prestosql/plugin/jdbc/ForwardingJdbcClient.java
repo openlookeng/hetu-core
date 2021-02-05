@@ -13,6 +13,8 @@
  */
 package io.prestosql.plugin.jdbc;
 
+import io.prestosql.plugin.jdbc.optimization.BaseJdbcQueryGenerator;
+import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -20,10 +22,10 @@ import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.sql.SqlQueryWriter;
+import io.prestosql.spi.relation.RowExpressionService;
+import io.prestosql.spi.sql.QueryGenerator;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.builder.BaseSqlQueryWriter;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -55,6 +57,12 @@ public abstract class ForwardingJdbcClient
     public List<SchemaTableName> getTableNames(JdbcIdentity identity, Optional<String> schema)
     {
         return getDelegate().getTableNames(identity, schema);
+    }
+
+    @Override
+    public String getIdentifierQuote()
+    {
+        return getDelegate().getIdentifierQuote();
     }
 
     @Override
@@ -219,7 +227,7 @@ public abstract class ForwardingJdbcClient
     }
 
     /**
-     * Hetu's sub-query push down requires to get output columns of the given sql query.
+     * Hetu's push down requires to get output columns of the given sql query.
      * The returned list of columns does not necessarily match with the underlying table schema.
      * It interprets all the selected values as a separate column.
      * For example `SELECT CAST(MAX(price) AS varchar) as max_price FORM orders GROUP BY customer`
@@ -236,26 +244,26 @@ public abstract class ForwardingJdbcClient
         return getDelegate().getColumns(session, sql, types);
     }
 
-    /**
-     * Hetu's sub-query push down expects the JDBC connectors to provide a {@link SqlQueryWriter}
-     * to write SQL queries for the respective databases. By default, this method provides the
-     * {@link BaseSqlQueryWriter} which writes Presto ANSI SQL queries.
-     * <p>
-     * Override this method in the JDBC client of supporting database and return a {@link SqlQueryWriter}
-     * object which knows how to write database specific SQL queries.
-     *
-     * @return the optional SQL query writer which can write database specific SQL queries
-     */
-    @Override
-    public Optional<SqlQueryWriter> getSqlQueryWriter()
-    {
-        return getDelegate().getSqlQueryWriter();
-    }
-
     // default method to check if execution plan caching is supported by this connector
     @Override
     public boolean isExecutionPlanCacheSupported()
     {
         return getDelegate().isExecutionPlanCacheSupported();
+    }
+
+    /**
+     * Hetu's query push down expects the JDBC connectors to provide a {@link QueryGenerator}
+     * to write SQL queries for the respective databases. By default, this method provides the
+     * {@link BaseJdbcQueryGenerator} which writes Presto ANSI SQL queries.
+     * <p>
+     * Override this method in the JDBC client of supporting database and return a {@link QueryGenerator}
+     * object which knows how to write database specific SQL queries.
+     *
+     * @return the optional SQL query writer which can write database specific SQL queries
+     */
+    @Override
+    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
+    {
+        return getDelegate().getQueryGenerator(rowExpressionService);
     }
 }

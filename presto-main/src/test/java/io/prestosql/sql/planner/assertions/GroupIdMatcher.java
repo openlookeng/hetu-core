@@ -16,15 +16,16 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.GroupIdNode;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
 
 import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
 
@@ -71,7 +72,7 @@ public class GroupIdMatcher
             return NO_MATCH;
         }
 
-        return match(groupIdAlias, groudIdNode.getGroupIdSymbol().toSymbolReference());
+        return match(groupIdAlias, toSymbolReference(groudIdNode.getGroupIdSymbol()));
     }
 
     @Override

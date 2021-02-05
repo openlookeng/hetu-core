@@ -23,10 +23,10 @@ import io.prestosql.geospatial.Rectangle;
 import io.prestosql.plugin.memory.MemoryConnectorFactory;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.sql.planner.LogicalPlanner;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.Test;
 

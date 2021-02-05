@@ -48,6 +48,11 @@
 
         <dependency>
             <groupId>io.hetu.core</groupId>
+            <artifactId>presto-expressions</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
             <artifactId>hetu-common</artifactId>
         </dependency>
 

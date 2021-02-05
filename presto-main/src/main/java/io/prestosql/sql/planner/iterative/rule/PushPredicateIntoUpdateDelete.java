@@ -19,13 +19,13 @@ import io.prestosql.Session;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.sql.planner.DomainTranslator;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -93,7 +93,7 @@ public class PushPredicateIntoUpdateDelete
     {
         Expression deterministicPredicate = filterDeterministicConjuncts(predicate);
 
-        DomainTranslator.ExtractionResult decomposedPredicate = DomainTranslator.fromPredicate(
+        ExpressionDomainTranslator.ExtractionResult decomposedPredicate = ExpressionDomainTranslator.fromPredicate(
                 metadata,
                 session,
                 deterministicPredicate,

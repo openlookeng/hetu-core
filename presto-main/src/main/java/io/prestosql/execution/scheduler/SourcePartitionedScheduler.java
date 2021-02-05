@@ -31,12 +31,12 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.SplitSource;
 import io.prestosql.split.SplitSource.SplitBatch;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.tree.Expression;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -255,7 +255,7 @@ public class SourcePartitionedScheduler
                     scheduleGroup.nextSplitBatchFuture = null;
 
                     // add split filter to filter out split has no valid rows
-                    SplitFiltering.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
+                    SplitFiltering.Tuple<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
                     List<Split> filteredSplit = applyFilter ? SplitFiltering.getFilteredSplit(pair.first,
                             SplitFiltering.getFullyQualifiedName(stage), pair.second, nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 

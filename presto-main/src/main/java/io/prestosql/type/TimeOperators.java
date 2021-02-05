@@ -46,9 +46,9 @@ import static io.prestosql.spi.function.OperatorType.SUBTRACT;
 import static io.prestosql.spi.function.OperatorType.XX_HASH_64;
 import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static io.prestosql.spi.type.TimeType.TIME;
-import static io.prestosql.util.DateTimeUtils.parseTimeWithoutTimeZone;
-import static io.prestosql.util.DateTimeUtils.printTimeWithoutTimeZone;
-import static io.prestosql.util.DateTimeZoneIndex.getChronology;
+import static io.prestosql.spi.util.DateTimeUtils.parseTimeWithoutTimeZone;
+import static io.prestosql.spi.util.DateTimeUtils.printTimeWithoutTimeZone;
+import static io.prestosql.spi.util.DateTimeZoneIndex.getChronology;
 
 public final class TimeOperators
 {

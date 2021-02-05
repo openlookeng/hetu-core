@@ -28,9 +28,9 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.PartitionedLookupSourceFactory;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.LocalQueryRunner;
 import io.prestosql.testing.NullOutputOperator.NullOutputOperatorFactory;
 

@@ -43,7 +43,6 @@ import io.prestosql.spi.connector.ProjectionApplicationResult;
 import io.prestosql.spi.connector.SampleType;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
-import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -51,11 +50,9 @@ import io.prestosql.spi.security.GrantInfo;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.RoleGrant;
-import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
-import io.prestosql.spi.type.Type;
 
 import java.util.Collection;
 import java.util.List;
@@ -697,46 +694,6 @@ public class ClassLoaderSafeConnectorMetadata
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.applyFilter(session, table, constraint, disjuctConstaints, allColumnHandles, pushPartitionOnly);
-        }
-    }
-
-    /**
-     * This method decides if the sub-query can be pushed down to the connector based on the connector.
-     * <p>
-     * Connectors can indicate whether they don't support predicate push down or that the action had no effect
-     * by returning {@link Optional#empty()}. Connectors should expect this method to be called multiple times
-     * </p>
-     * during the optimization of a given query.
-     * <p>
-     * <b>Note</b>: it's critical for connectors to return Optional.empty() if calling this method has no effect for that
-     * invocation, even if the connector generally supports push down. Doing otherwise can cause the optimizer
-     * to loop indefinitely.
-     * </p>
-     *
-     * @param session Presto session
-     * @param handle randomly selected connector handle from the sub-query
-     * @param subQuery the actual sub-query to be pushed down
-     * @param types column types
-     * @return optional SubQueryApplicationResult which has the new TableHandle if the connector supports this feature
-     */
-    public Optional<SubQueryApplicationResult<ConnectorTableHandle>> applySubQuery(ConnectorSession session, ConnectorTableHandle handle, String subQuery, Map<String, Type> types)
-    {
-        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.applySubQuery(session, handle, subQuery, types);
-        }
-    }
-
-    /**
-     * Sub-query push down expects supporting connectors to provide a {@link SqlQueryWriter}
-     * to write SQL queries for the respective databases.
-     *
-     * @return the optional SQL query writer which can write database specific SQL queries
-     */
-    @Override
-    public Optional<SqlQueryWriter> getSqlQueryWriter()
-    {
-        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.getSqlQueryWriter();
         }
     }
 

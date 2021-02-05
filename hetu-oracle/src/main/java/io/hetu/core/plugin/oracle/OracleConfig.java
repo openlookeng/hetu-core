@@ -37,8 +37,6 @@ public class OracleConfig
 
     private static final int DEFAULT_SCALE = 0;
 
-    private boolean isQueryPushDownEnabled = true;
-
     private UnsupportedTypeHandling unsupportedTypeHandling = UnsupportedTypeHandling.FAIL;
 
     private RoundingMode roundingMode = RoundingMode.UNNECESSARY;
@@ -46,25 +44,6 @@ public class OracleConfig
     private int numberDefaultScale = DEFAULT_SCALE;
 
     private boolean synonymsEnabled;
-
-    public boolean isQueryPushDownEnabled()
-    {
-        return isQueryPushDownEnabled;
-    }
-
-    /**
-     * set Query Push Down Enabled
-     *
-     * @param isQueryPushDownEnabledParameter config from properties
-     * @return oracle config object
-     */
-    @Config("hetu.query.pushdown.enabled")
-    @ConfigDescription("Enable sub-query push down to this data center. It's set by default")
-    public OracleConfig setQueryPushDownEnabled(boolean isQueryPushDownEnabledParameter)
-    {
-        this.isQueryPushDownEnabled = isQueryPushDownEnabledParameter;
-        return this;
-    }
 
     public UnsupportedTypeHandling getUnsupportedTypeHandling()
     {

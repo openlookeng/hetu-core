@@ -15,14 +15,14 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.TopNNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.TopNNode;
 
+import static io.prestosql.spi.plan.TopNNode.Step.FINAL;
+import static io.prestosql.spi.plan.TopNNode.Step.PARTIAL;
+import static io.prestosql.spi.plan.TopNNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.Patterns.TopN.step;
 import static io.prestosql.sql.planner.plan.Patterns.topN;
-import static io.prestosql.sql.planner.plan.TopNNode.Step.FINAL;
-import static io.prestosql.sql.planner.plan.TopNNode.Step.PARTIAL;
-import static io.prestosql.sql.planner.plan.TopNNode.Step.SINGLE;
 
 public class CreatePartialTopN
         implements Rule<TopNNode>

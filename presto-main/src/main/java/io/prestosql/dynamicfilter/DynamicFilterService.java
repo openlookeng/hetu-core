@@ -29,20 +29,20 @@ import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.DynamicFilterUtils;
 
@@ -415,17 +415,17 @@ public class DynamicFilterService
     {
         ImmutableMap.Builder<String, Symbol> resultBuilder = ImmutableMap.builder();
         for (DynamicFilters.Descriptor descriptor : dynamicFilters) {
-            Expression expression = descriptor.getInput();
+            RowExpression expression = descriptor.getInput();
 
             // Extract the column symbols from CAST expressions
-            while (expression instanceof Cast) {
-                expression = ((Cast) expression).getExpression();
+            while (expression instanceof CallExpression) {
+                expression = ((CallExpression) expression).getArguments().get(0);
             }
 
-            if (!(expression instanceof SymbolReference)) {
+            if (!(expression instanceof VariableReferenceExpression)) {
                 continue;
             }
-            resultBuilder.put(descriptor.getId(), Symbol.from(expression));
+            resultBuilder.put(descriptor.getId(), new Symbol(((VariableReferenceExpression) expression).getName()));
         }
         return resultBuilder.build();
     }

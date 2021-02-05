@@ -36,6 +36,7 @@ import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.Plugin;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
+import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
@@ -161,6 +162,12 @@ public final class ThriftQueryRunner
         public TestingPrestoServer getCoordinator()
         {
             return source.getCoordinator();
+        }
+
+        @Override
+        public ConnectorPlanOptimizerManager getPlanOptimizerManager()
+        {
+            return source.getPlanOptimizerManager();
         }
 
         @Override

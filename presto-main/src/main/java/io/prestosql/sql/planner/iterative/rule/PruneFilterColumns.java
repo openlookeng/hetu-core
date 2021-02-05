@@ -14,11 +14,11 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.Streams;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.Optional;
 import java.util.Set;
@@ -26,6 +26,7 @@ import java.util.Set;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.iterative.rule.Util.restrictChildOutputs;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 
 public class PruneFilterColumns
         extends ProjectOffPushDownRule<FilterNode>
@@ -40,7 +41,7 @@ public class PruneFilterColumns
     {
         Set<Symbol> prunedFilterInputs = Streams.concat(
                 referencedOutputs.stream(),
-                SymbolsExtractor.extractUnique(filterNode.getPredicate()).stream())
+                SymbolsExtractor.extractUnique(castToExpression(filterNode.getPredicate())).stream())
                 .collect(toImmutableSet());
 
         return restrictChildOutputs(idAllocator, filterNode, prunedFilterInputs);

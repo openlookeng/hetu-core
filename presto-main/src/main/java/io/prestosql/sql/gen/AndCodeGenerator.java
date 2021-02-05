@@ -20,8 +20,8 @@ import io.airlift.bytecode.Variable;
 import io.airlift.bytecode.control.IfStatement;
 import io.airlift.bytecode.instruction.LabelNode;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.RowExpression;
 
 import java.util.List;
 

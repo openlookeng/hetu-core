@@ -17,8 +17,8 @@ import io.airlift.bytecode.BytecodeNode;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.RowExpression;
 
 import java.util.ArrayList;
 import java.util.List;

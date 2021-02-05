@@ -23,7 +23,6 @@ import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.type.InternalTypeManager;
-import io.prestosql.util.DateTimeUtils;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -46,6 +45,7 @@ import static io.prestosql.spi.type.StandardTypes.INTEGER;
 import static io.prestosql.spi.type.StandardTypes.TIMESTAMP;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static io.prestosql.spi.util.DateTimeUtils.parseDate;
 import static org.testng.Assert.assertEquals;
 
 public class TestIonSqlQueryBuilder
@@ -105,7 +105,7 @@ public class TestIonSqlQueryBuilder
                 new HiveColumnHandle("t1", HIVE_TIMESTAMP, parseTypeSignature(TIMESTAMP), 0, REGULAR, Optional.empty()),
                 new HiveColumnHandle("t2", HIVE_DATE, parseTypeSignature(StandardTypes.DATE), 1, REGULAR, Optional.empty()));
         TupleDomain<HiveColumnHandle> tupleDomain = withColumnDomains(ImmutableMap.of(
-                columns.get(1), Domain.create(SortedRangeSet.copyOf(DATE, ImmutableList.of(Range.equal(DATE, (long) DateTimeUtils.parseDate("2001-08-22")))), false)));
+                columns.get(1), Domain.create(SortedRangeSet.copyOf(DATE, ImmutableList.of(Range.equal(DATE, (long) parseDate("2001-08-22")))), false)));
 
         assertEquals("SELECT s._1, s._2 FROM S3Object s WHERE (case s._2 when '' then null else CAST(s._2 AS TIMESTAMP) end = `2001-08-22`)", queryBuilder.buildSql(columns, tupleDomain));
     }

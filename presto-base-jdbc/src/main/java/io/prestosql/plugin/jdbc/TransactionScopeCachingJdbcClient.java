@@ -41,6 +41,12 @@ public class TransactionScopeCachingJdbcClient
     }
 
     @Override
+    public String getIdentifierQuote()
+    {
+        return delegate.getIdentifierQuote();
+    }
+
+    @Override
     public List<JdbcColumnHandle> getColumns(ConnectorSession session, JdbcTableHandle tableHandle)
     {
         return getColumnsCache.computeIfAbsent(tableHandle, ignored -> super.getColumns(session, tableHandle));

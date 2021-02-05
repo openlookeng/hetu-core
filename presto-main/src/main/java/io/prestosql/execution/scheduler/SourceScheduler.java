@@ -16,7 +16,7 @@ package io.prestosql.execution.scheduler;
 
 import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.List;
 

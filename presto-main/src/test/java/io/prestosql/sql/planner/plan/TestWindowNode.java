@@ -13,26 +13,39 @@
  */
 package io.prestosql.sql.planner.plan;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import io.airlift.json.ObjectMapperProvider;
+import com.google.inject.Injector;
+import com.google.inject.Key;
+import com.google.inject.Module;
+import io.airlift.bootstrap.Bootstrap;
+import io.airlift.json.JsonCodec;
+import io.airlift.json.JsonModule;
 import io.airlift.slice.Slice;
+import io.prestosql.metadata.HandleJsonModule;
 import io.prestosql.server.SliceDeserializer;
 import io.prestosql.server.SliceSerializer;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.sql.expression.Types;
+import io.prestosql.spi.type.TestingTypeDeserializer;
+import io.prestosql.spi.type.TestingTypeManager;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.Serialization;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.OrderingScheme;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.FunctionCall;
-import io.prestosql.sql.tree.WindowFrame;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -41,41 +54,36 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.google.inject.multibindings.Multibinder.newSetBinder;
+import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.airlift.json.JsonBinder.jsonBinder;
+import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static org.testng.Assert.assertEquals;
 
 public class TestWindowNode
 {
-    private SymbolAllocator symbolAllocator;
+    private PlanSymbolAllocator planSymbolAllocator;
     private ValuesNode sourceNode;
     private Symbol columnA;
     private Symbol columnB;
     private Symbol columnC;
 
-    private final ObjectMapper objectMapper;
+    private final JsonCodec<WindowNode> codec;
 
     public TestWindowNode()
+            throws Exception
     {
-        // dependencies copied from ServerMainModule.java to avoid depending on whole ServerMainModule here
-        SqlParser sqlParser = new SqlParser();
-        ObjectMapperProvider provider = new ObjectMapperProvider();
-        provider.setJsonSerializers(ImmutableMap.of(
-                Slice.class, new SliceSerializer(),
-                Expression.class, new Serialization.ExpressionSerializer()));
-        provider.setJsonDeserializers(ImmutableMap.of(
-                Slice.class, new SliceDeserializer(),
-                Expression.class, new Serialization.ExpressionDeserializer(sqlParser),
-                FunctionCall.class, new Serialization.FunctionCallDeserializer(sqlParser)));
-        objectMapper = provider.get();
+        codec = getJsonCodec();
     }
 
     @BeforeClass
     public void setUp()
     {
-        symbolAllocator = new SymbolAllocator();
-        columnA = symbolAllocator.newSymbol("a", BIGINT);
-        columnB = symbolAllocator.newSymbol("b", BIGINT);
-        columnC = symbolAllocator.newSymbol("c", BIGINT);
+        planSymbolAllocator = new PlanSymbolAllocator();
+        columnA = planSymbolAllocator.newSymbol("a", BIGINT);
+        columnB = planSymbolAllocator.newSymbol("b", BIGINT);
+        columnC = planSymbolAllocator.newSymbol("c", BIGINT);
 
         sourceNode = new ValuesNode(
                 newId(),
@@ -87,7 +95,7 @@ public class TestWindowNode
     public void testSerializationRoundtrip()
             throws Exception
     {
-        Symbol windowSymbol = symbolAllocator.newSymbol("sum", BIGINT);
+        Symbol windowSymbol = planSymbolAllocator.newSymbol("sum", BIGINT);
         Signature signature = new Signature(
                 "sum",
                 FunctionKind.WINDOW,
@@ -97,10 +105,10 @@ public class TestWindowNode
                 ImmutableList.of(BIGINT.getTypeSignature()),
                 false);
         WindowNode.Frame frame = new WindowNode.Frame(
-                WindowFrame.Type.RANGE,
-                FrameBound.Type.UNBOUNDED_PRECEDING,
+                Types.WindowFrameType.RANGE,
+                Types.FrameBoundType.UNBOUNDED_PRECEDING,
                 Optional.empty(),
-                FrameBound.Type.UNBOUNDED_FOLLOWING,
+                Types.FrameBoundType.UNBOUNDED_FOLLOWING,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
@@ -111,7 +119,7 @@ public class TestWindowNode
                 Optional.of(new OrderingScheme(
                         ImmutableList.of(columnB),
                         ImmutableMap.of(columnB, SortOrder.ASC_NULLS_FIRST))));
-        Map<Symbol, WindowNode.Function> functions = ImmutableMap.of(windowSymbol, new WindowNode.Function(signature, ImmutableList.of(columnC.toSymbolReference()), frame));
+        Map<Symbol, WindowNode.Function> functions = ImmutableMap.of(windowSymbol, new WindowNode.Function(signature, ImmutableList.of(new VariableReferenceExpression(columnC.getName(), BIGINT)), frame));
         Optional<Symbol> hashSymbol = Optional.of(columnB);
         Set<Symbol> prePartitionedInputs = ImmutableSet.of(columnA);
         WindowNode windowNode = new WindowNode(
@@ -123,9 +131,9 @@ public class TestWindowNode
                 prePartitionedInputs,
                 0);
 
-        String json = objectMapper.writeValueAsString(windowNode);
+        String json = codec.toJson(windowNode);
 
-        WindowNode actualNode = objectMapper.readValue(json, WindowNode.class);
+        WindowNode actualNode = codec.fromJson(json);
 
         assertEquals(actualNode.getId(), windowNode.getId());
         assertEquals(actualNode.getSpecification(), windowNode.getSpecification());
@@ -139,5 +147,36 @@ public class TestWindowNode
     private static PlanNodeId newId()
     {
         return new PlanNodeId(UUID.randomUUID().toString());
+    }
+
+    private JsonCodec<WindowNode> getJsonCodec()
+            throws Exception
+    {
+        Module module = binder -> {
+            SqlParser sqlParser = new SqlParser();
+            TypeManager typeManager = new TestingTypeManager();
+            binder.install(new JsonModule());
+            binder.install(new HandleJsonModule());
+            binder.bind(SqlParser.class).toInstance(sqlParser);
+            binder.bind(TypeManager.class).toInstance(typeManager);
+            configBinder(binder).bindConfig(FeaturesConfig.class);
+            newSetBinder(binder, Type.class);
+            jsonBinder(binder).addSerializerBinding(Slice.class).to(SliceSerializer.class);
+            jsonBinder(binder).addDeserializerBinding(Slice.class).to(SliceDeserializer.class);
+            jsonBinder(binder).addDeserializerBinding(Type.class).to(TestingTypeDeserializer.class);
+            jsonBinder(binder).addSerializerBinding(Expression.class).to(Serialization.ExpressionSerializer.class);
+            jsonBinder(binder).addDeserializerBinding(Expression.class).to(Serialization.ExpressionDeserializer.class);
+            jsonBinder(binder).addDeserializerBinding(FunctionCall.class).to(Serialization.FunctionCallDeserializer.class);
+            jsonBinder(binder).addKeySerializerBinding(VariableReferenceExpression.class).to(Serialization.VariableReferenceExpressionSerializer.class);
+            jsonBinder(binder).addKeyDeserializerBinding(VariableReferenceExpression.class).to(Serialization.VariableReferenceExpressionDeserializer.class);
+            jsonCodecBinder(binder).bindJsonCodec(WindowNode.class);
+        };
+        Bootstrap app = new Bootstrap(ImmutableList.of(module));
+        Injector injector = app
+                .strictConfig()
+                .doNotInitializeLogging()
+                .quiet()
+                .initialize();
+        return injector.getInstance(new Key<JsonCodec<WindowNode>>() {});
     }
 }

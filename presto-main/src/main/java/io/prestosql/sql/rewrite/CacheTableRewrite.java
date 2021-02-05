@@ -27,6 +27,7 @@ import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
@@ -34,10 +35,9 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.DomainTranslator;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.rule.SimplifyExpressions;
@@ -246,13 +246,13 @@ final class CacheTableRewrite
             // Use SimplifyExpressions class to rewrite the replacement predicate into a new expression
             Expression rewritten = SimplifyExpressions.rewrite(rewrittenPredicate,
                     session,
-                    new SymbolAllocator(symbolMapping),
+                    new PlanSymbolAllocator(symbolMapping),
                     metadata,
                     literalEncoder,
                     new TypeAnalyzer(sqlParser, metadata));
 
             // Extract TupleDomain from the new expression
-            TupleDomain<Symbol> tupleDomain = DomainTranslator.fromPredicate(metadata, session, rewritten, types).getTupleDomain();
+            TupleDomain<Symbol> tupleDomain = ExpressionDomainTranslator.fromPredicate(metadata, session, rewritten, types).getTupleDomain();
             HashMap<ColumnMetadata, Domain> columnDomainMap = new HashMap<>();
 
             ColumnMetadata finalColumnMetadata = columnMetadata;

@@ -15,6 +15,7 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.operator.scalar.TryFunction;
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.DecimalLiteral;
@@ -22,7 +23,6 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.LambdaExpression;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.TryExpression;
-import io.prestosql.type.FunctionType;
 import org.testng.annotations.Test;
 
 import static io.prestosql.spi.type.DecimalType.createDecimalType;
@@ -55,7 +55,7 @@ public class TestDesugarTryExpressionRewriter
                 tester().getMetadata(),
                 tester().getTypeAnalyzer(),
                 tester().getSession(),
-                new SymbolAllocator()),
+                new PlanSymbolAllocator()),
                 after);
     }
 }

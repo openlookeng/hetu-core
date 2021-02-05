@@ -18,11 +18,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
+import io.prestosql.spi.plan.JoinNode.DistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.JoinNode.DistributionType;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.Test;
 
@@ -32,6 +32,8 @@ import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.SystemSessionProperties.SPILL_ENABLED;
 import static io.prestosql.SystemSessionProperties.TASK_CONCURRENCY;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
@@ -47,8 +49,6 @@ import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPLICATE;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 
 public class TestAddExchangesPlans

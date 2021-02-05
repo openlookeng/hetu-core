@@ -21,7 +21,6 @@ import com.google.inject.Inject;
 import io.airlift.discovery.client.ServiceSelectorManager;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.filesystem.FileSystemClientManager;
@@ -29,6 +28,7 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.CatalogName;
 
 import java.io.File;
 import java.io.IOException;

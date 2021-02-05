@@ -15,7 +15,7 @@ package io.prestosql.transaction;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.Duration;
-import io.prestosql.connector.CatalogName;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.transaction.IsolationLevel;
 import org.joda.time.DateTime;
 

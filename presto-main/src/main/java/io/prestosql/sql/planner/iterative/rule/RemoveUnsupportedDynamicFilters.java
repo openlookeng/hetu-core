@@ -21,29 +21,29 @@ import io.prestosql.cost.PlanNodeStatsEstimate;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.expressions.RowExpressionRewriter;
+import io.prestosql.expressions.RowExpressionTreeRewriter;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.Constraint;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statistics.Estimate;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.ExpressionRewriter;
-import io.prestosql.sql.tree.ExpressionTreeRewriter;
-import io.prestosql.sql.tree.LogicalBinaryExpression;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashSet;
 import java.util.List;
@@ -56,14 +56,14 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxSize;
 import static io.prestosql.SystemSessionProperties.isOptimizeDynamicFilterGeneration;
+import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
+import static io.prestosql.spi.sql.RowExpressionUtils.combineConjuncts;
+import static io.prestosql.spi.sql.RowExpressionUtils.combinePredicates;
+import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.DynamicFilters.getDescriptor;
 import static io.prestosql.sql.DynamicFilters.isDynamicFilter;
-import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
-import static io.prestosql.sql.ExpressionUtils.combinePredicates;
-import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
-import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -90,16 +90,16 @@ public class RemoveUnsupportedDynamicFilters
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         this.removedDynamicFilterIds = new HashSet<>();
-        this.statsProvider = new CachingStatsProvider(statsCalculator, session, symbolAllocator.getTypes());
+        this.statsProvider = new CachingStatsProvider(statsCalculator, session, planSymbolAllocator.getTypes());
         PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(session, metadata, removedDynamicFilterIds), ImmutableSet.of());
         return SimplePlanRewriter.rewriteWith(new RemoveFilterVisitor(removedDynamicFilterIds), result.getNode(), null);
     }
 
     private class Rewriter
-            extends PlanVisitor<PlanWithConsumedDynamicFilters, Set<String>>
+            extends InternalPlanVisitor<PlanWithConsumedDynamicFilters, Set<String>>
     {
         private final Metadata metadata;
         private final Session session;
@@ -113,7 +113,7 @@ public class RemoveUnsupportedDynamicFilters
         }
 
         @Override
-        protected PlanWithConsumedDynamicFilters visitPlan(PlanNode node, Set<String> allowedDynamicFilterIds)
+        public PlanWithConsumedDynamicFilters visitPlan(PlanNode node, Set<String> allowedDynamicFilterIds)
         {
             List<PlanWithConsumedDynamicFilters> children = node.getSources().stream()
                     .map(source -> source.accept(this, allowedDynamicFilterIds))
@@ -227,12 +227,12 @@ public class RemoveUnsupportedDynamicFilters
         {
             PlanWithConsumedDynamicFilters result = node.getSource().accept(this, allowedDynamicFilterIds);
 
-            Expression original = node.getPredicate();
+            RowExpression original = node.getPredicate();
             ImmutableSet.Builder<String> consumedDynamicFilterIds = ImmutableSet.<String>builder()
                     .addAll(result.getConsumedDynamicFilterIds());
 
             PlanNode source = result.getNode();
-            Expression modified;
+            RowExpression modified;
             if (source instanceof TableScanNode) {
                 // Keep only small table
                 DynamicFilters.ExtractResult extractResult = extractDynamicFilters(original);
@@ -249,7 +249,7 @@ public class RemoveUnsupportedDynamicFilters
                 modified = removeAllDynamicFilters(original);
             }
 
-            if (TRUE_LITERAL.equals(modified)) {
+            if (TRUE_CONSTANT.equals(modified)) {
                 return new PlanWithConsumedDynamicFilters(source, consumedDynamicFilterIds.build());
             }
 
@@ -275,7 +275,7 @@ public class RemoveUnsupportedDynamicFilters
             // Only handle the case that build side of JoinNode is0
             // TableScanNode or FilterNode above TableScanNode
             // as the estimates will be more accurate
-            Optional<Expression> predicates = Optional.empty();
+            Optional<RowExpression> predicates = Optional.empty();
             if (node instanceof TableScanNode) {
                 buildSideTableScanNode = Optional.of(node);
                 predicates = ((TableScanNode) buildSideTableScanNode.get()).getPredicate();
@@ -343,7 +343,7 @@ public class RemoveUnsupportedDynamicFilters
             }
         }
 
-        private Expression removeDynamicFilters(Expression expression, Set<String> allowedDynamicFilterIds, ImmutableSet.Builder<String> consumedDynamicFilterIds)
+        private RowExpression removeDynamicFilters(RowExpression expression, Set<String> allowedDynamicFilterIds, ImmutableSet.Builder<String> consumedDynamicFilterIds)
         {
             return combineConjuncts(extractConjuncts(expression)
                     .stream()
@@ -351,7 +351,7 @@ public class RemoveUnsupportedDynamicFilters
                     .filter(conjunct ->
                             getDescriptor(conjunct)
                                     .map(descriptor -> {
-                                        if (descriptor.getInput() instanceof SymbolReference &&
+                                        if (descriptor.getInput() instanceof VariableReferenceExpression &&
                                                 allowedDynamicFilterIds.contains(descriptor.getId())) {
                                             consumedDynamicFilterIds.add(descriptor.getId());
                                             return true;
@@ -361,9 +361,9 @@ public class RemoveUnsupportedDynamicFilters
                     .collect(toImmutableList()));
         }
 
-        private Expression removeAllDynamicFilters(Expression expression)
+        private RowExpression removeAllDynamicFilters(RowExpression expression)
         {
-            Expression rewrittenExpression = removeNestedDynamicFilters(expression);
+            RowExpression rewrittenExpression = removeNestedDynamicFilters(expression);
             DynamicFilters.ExtractResult extractResult = extractDynamicFilters(rewrittenExpression);
             if (extractResult.getDynamicConjuncts().isEmpty()) {
                 return rewrittenExpression;
@@ -371,37 +371,39 @@ public class RemoveUnsupportedDynamicFilters
             return combineConjuncts(extractResult.getStaticConjuncts());
         }
 
-        private Expression removeNestedDynamicFilters(Expression expression)
+        private RowExpression removeNestedDynamicFilters(RowExpression expression)
         {
-            return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>()
+            return RowExpressionTreeRewriter.rewriteWith(new RowExpressionRewriter<Void>()
             {
                 @Override
-                public Expression rewriteLogicalBinaryExpression(LogicalBinaryExpression node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
+                public RowExpression rewriteSpecialForm(SpecialForm node, Void context, RowExpressionTreeRewriter<Void> treeRewriter)
                 {
-                    LogicalBinaryExpression rewrittenNode = treeRewriter.defaultRewrite(node, context);
-
+                    if (node.getForm() != SpecialForm.Form.AND || node.getForm() != SpecialForm.Form.OR) {
+                        return node;
+                    }
+                    SpecialForm rewrittenNode = treeRewriter.defaultRewrite(node, context);
                     boolean modified = (node != rewrittenNode);
-                    ImmutableList.Builder<Expression> expressionBuilder = ImmutableList.builder();
-                    if (isDynamicFilter(rewrittenNode.getLeft())) {
-                        expressionBuilder.add(TRUE_LITERAL);
+                    ImmutableList.Builder<RowExpression> expressionBuilder = ImmutableList.builder();
+                    if (isDynamicFilter(rewrittenNode.getArguments().get(0))) {
+                        expressionBuilder.add(TRUE_CONSTANT);
                         modified = true;
                     }
                     else {
-                        expressionBuilder.add(rewrittenNode.getLeft());
+                        expressionBuilder.add(rewrittenNode.getArguments().get(0));
                     }
 
-                    if (isDynamicFilter(rewrittenNode.getRight())) {
-                        expressionBuilder.add(TRUE_LITERAL);
+                    if (isDynamicFilter(rewrittenNode.getArguments().get(1))) {
+                        expressionBuilder.add(TRUE_CONSTANT);
                         modified = true;
                     }
                     else {
-                        expressionBuilder.add(rewrittenNode.getRight());
+                        expressionBuilder.add(rewrittenNode.getArguments().get(1));
                     }
 
                     if (!modified) {
                         return node;
                     }
-                    return combinePredicates(node.getOperator(), expressionBuilder.build());
+                    return combinePredicates(node.getForm(), expressionBuilder.build());
                 }
             }, expression);
         }
@@ -443,8 +445,8 @@ public class RemoveUnsupportedDynamicFilters
         public PlanNode visitFilter(FilterNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
-            Expression original = node.getPredicate();
-            Expression modified;
+            RowExpression original = node.getPredicate();
+            RowExpression modified;
             if (source instanceof TableScanNode) {
                 modified = combineConjuncts(extractConjuncts(original)
                         .stream()

@@ -25,11 +25,11 @@ import io.prestosql.spi.block.LazyBlockLoader;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.util.BloomFilter;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.statestore.StateStoreProvider;
 
 import java.io.ByteArrayInputStream;

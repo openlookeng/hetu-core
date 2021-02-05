@@ -20,6 +20,7 @@ import io.airlift.configuration.ConfigDescription;
 import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
@@ -101,6 +102,8 @@ public class DataCenterConfig
     private DataSize remoteHeaderSize = DataSize.valueOf("4kB");
 
     private boolean isQueryPushDownEnabled = true;
+
+    private JdbcPushDownModule queryPushDownModule = JdbcPushDownModule.DEFAULT;
 
     private Duration metadataCacheTtl = new Duration(1, TimeUnit.SECONDS); // DataCenter metadata cache eviction time
 
@@ -679,6 +682,25 @@ public class DataCenterConfig
     public DataCenterConfig setQueryPushDownEnabled(boolean isQueryPushDownEnabledParameter)
     {
         this.isQueryPushDownEnabled = isQueryPushDownEnabledParameter;
+        return this;
+    }
+
+    public JdbcPushDownModule getQueryPushDownModule()
+    {
+        return queryPushDownModule;
+    }
+
+    /**
+     * set queryPushDownEnabled
+     *
+     * @param queryPushDownModule Push Down Module
+     * @return DataCenterConfig object
+     */
+    @Config("dc.query.pushdown.module")
+    @ConfigDescription("query push down module [FULL_PUSDOWN/BASE_PUSHDOWN]")
+    public DataCenterConfig setQueryPushDownModule(JdbcPushDownModule queryPushDownModule)
+    {
+        this.queryPushDownModule = queryPushDownModule;
         return this;
     }
 

@@ -14,18 +14,18 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import org.testng.annotations.Test;
 
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Predicates.alwaysTrue;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.filter;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
@@ -70,7 +70,7 @@ public class TestPruneFilterColumns
         Symbol a = planBuilder.symbol("a");
         Symbol b = planBuilder.symbol("b");
         return planBuilder.project(
-                Assignments.identity(Stream.of(a, b).filter(projectionFilter).collect(toImmutableSet())),
+                Assignments.copyOf(Stream.of(a, b).filter(projectionFilter).collect(Collectors.toMap(v -> v, v -> planBuilder.variable(v.getName())))),
                 planBuilder.filter(
                         planBuilder.expression("b > 5"),
                         planBuilder.values(a, b)));

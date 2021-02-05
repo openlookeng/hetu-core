@@ -22,6 +22,7 @@ import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 import org.weakref.jmx.guice.MBeanModule;
 
@@ -67,6 +68,7 @@ public class JdbcConnectorFactory
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             Bootstrap app = new Bootstrap(
                     binder -> binder.bind(TypeManager.class).toInstance(context.getTypeManager()),
+                    binder -> binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService()),
                     new JdbcModule(catalogName),
                     new MBeanServerModule(),
                     new MBeanModule(),

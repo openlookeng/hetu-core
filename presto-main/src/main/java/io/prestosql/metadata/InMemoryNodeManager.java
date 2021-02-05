@@ -19,7 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import io.prestosql.client.NodeVersion;
-import io.prestosql.connector.CatalogName;
+import io.prestosql.spi.connector.CatalogName;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.inject.Inject;

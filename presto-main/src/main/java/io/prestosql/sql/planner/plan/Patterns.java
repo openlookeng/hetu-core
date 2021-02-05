@@ -15,7 +15,23 @@ package io.prestosql.sql.planner.plan;
 
 import io.prestosql.matching.Pattern;
 import io.prestosql.matching.Property;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.ExceptNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.tree.Expression;
 
@@ -140,6 +156,11 @@ public class Patterns
     public static Pattern<TableWriterNode> tableWriterNode()
     {
         return typeOf(TableWriterNode.class);
+    }
+
+    public static Pattern<VacuumTableNode> vacuumTableNode()
+    {
+        return typeOf(VacuumTableNode.class);
     }
 
     public static Pattern<TopNNode> topN()
@@ -312,7 +333,7 @@ public class Patterns
 
     public static class Values
     {
-        public static Property<ValuesNode, Lookup, List<List<Expression>>> rows()
+        public static Property<ValuesNode, Lookup, List<List<RowExpression>>> rows()
         {
             return property("rows", ValuesNode::getRows);
         }

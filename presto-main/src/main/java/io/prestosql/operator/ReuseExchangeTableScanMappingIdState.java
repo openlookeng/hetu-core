@@ -15,6 +15,7 @@
 package io.prestosql.operator;
 
 import io.prestosql.spi.Page;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spiller.Spiller;
 
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static io.prestosql.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
+import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 
 public class ReuseExchangeTableScanMappingIdState
 {
