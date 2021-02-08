@@ -34,10 +34,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.CharType;
-import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.RowType.Field;
 import io.prestosql.spi.type.StandardTypes;
@@ -94,6 +92,7 @@ import io.prestosql.sql.tree.SubqueryExpression;
 import io.prestosql.sql.tree.SubscriptExpression;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.WhenClause;
+import io.prestosql.type.FunctionType;
 import io.prestosql.type.LikeFunctions;
 import io.prestosql.type.TypeCoercion;
 import io.prestosql.util.Failures;
@@ -133,8 +132,7 @@ import static io.prestosql.sql.analyzer.ConstantExpressionVerifier.verifyExpress
 import static io.prestosql.sql.analyzer.ExpressionAnalyzer.createConstantAnalyzer;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.gen.VarArgsToMapAdapterGenerator.generateVarArgsToMapAdapter;
-import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
-import static io.prestosql.sql.planner.SymbolUtils.from;
+import static io.prestosql.sql.planner.DeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.iterative.rule.CanonicalizeExpressionRewriter.canonicalizeExpression;
 import static io.prestosql.type.JsonType.JSON;
 import static io.prestosql.type.LikeFunctions.isLikePattern;
@@ -340,7 +338,7 @@ public class ExpressionInterpreter
         @Override
         protected Object visitSymbolReference(SymbolReference node, Object context)
         {
-            return ((SymbolResolver) context).getValue(from(node));
+            return ((SymbolResolver) context).getValue(Symbol.from(node));
         }
 
         @Override
@@ -613,7 +611,7 @@ public class ExpressionInterpreter
                 List<Expression> expressionValues = toExpressions(values, types);
                 List<Expression> simplifiedExpressionValues = Stream.concat(
                         expressionValues.stream()
-                                .filter(ExpressionDeterminismEvaluator::isDeterministic)
+                                .filter(DeterminismEvaluator::isDeterministic)
                                 .distinct(),
                         expressionValues.stream()
                                 .filter((expression -> !isDeterministic(expression))))
@@ -1081,13 +1079,6 @@ public class ExpressionInterpreter
         {
             Object value = process(node.getExpression(), context);
             Type targetType = metadata.getType(parseTypeSignature(node.getType()));
-            if (targetType == null) {
-                throw new IllegalArgumentException("Unsupported type: " + node.getType());
-            }
-            if (value == null) {
-                return null;
-            }
-
             Type sourceType = type(node.getExpression());
             if (value instanceof Expression) {
                 if (targetType.equals(sourceType)) {

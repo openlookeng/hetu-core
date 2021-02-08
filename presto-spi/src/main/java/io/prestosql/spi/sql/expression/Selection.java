@@ -14,8 +14,6 @@
  */
 package io.prestosql.spi.sql.expression;
 
-import java.util.Locale;
-
 import static java.util.Objects.requireNonNull;
 
 public class Selection
@@ -44,9 +42,9 @@ public class Selection
         return alias;
     }
 
-    public boolean isAliased(boolean caseInsensitive)
+    public boolean isAliased()
     {
-        return caseInsensitive ? !this.alias.equals(expression) : !this.alias.toLowerCase(Locale.ENGLISH).equals(expression.toLowerCase(Locale.ENGLISH));
+        return !this.alias.equals(expression);
     }
 
     @Override

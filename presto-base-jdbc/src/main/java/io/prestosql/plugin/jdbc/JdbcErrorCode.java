@@ -18,16 +18,12 @@ import io.prestosql.spi.ErrorCodeSupplier;
 import io.prestosql.spi.ErrorType;
 
 import static io.prestosql.spi.ErrorType.EXTERNAL;
-import static io.prestosql.spi.ErrorType.INTERNAL_ERROR;
 
 public enum JdbcErrorCode
         implements ErrorCodeSupplier
 {
     JDBC_ERROR(0, EXTERNAL),
-    JDBC_NON_TRANSIENT_ERROR(1, EXTERNAL),
-    JDBC_UNSUPPORTED_EXPRESSION(2, EXTERNAL),
-    JDBC_UNCLASSIFIED_ERROR(3, EXTERNAL),
-    JDBC_QUERY_GENERATOR_FAILURE(4, INTERNAL_ERROR);
+    JDBC_NON_TRANSIENT_ERROR(1, EXTERNAL);
 
     private final ErrorCode errorCode;
 

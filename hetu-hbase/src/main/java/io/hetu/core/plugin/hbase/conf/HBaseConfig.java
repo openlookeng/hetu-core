@@ -30,7 +30,6 @@ public class HBaseConfig
     private boolean isRpcProtectionEnable; // Whether to enable hbase data communication encryption, default is false
     private String zkQuorum;
     private String zkClientPort;
-    private String zkZnodeParent = "/hbase";
     private String metastoreType;
     private String defaultValue = "NULL";
     private String jaasConfPath; // java.security.auth.login.config: jaas.conf
@@ -148,17 +147,6 @@ public class HBaseConfig
     public void setZkClientPort(String zkClientPort)
     {
         this.zkClientPort = zkClientPort;
-    }
-
-    public String getZkZnodeParent()
-    {
-        return zkZnodeParent;
-    }
-
-    @Config("hbase.zookeeper.znode.parent")
-    public void setZkZnodeParent(String zkZnodeParent)
-    {
-        this.zkZnodeParent = zkZnodeParent;
     }
 
     public String getMetastoreType()

@@ -13,7 +13,7 @@
  */
 package io.prestosql.operator;
 
-import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 public interface SourceOperatorFactory
         extends OperatorFactory

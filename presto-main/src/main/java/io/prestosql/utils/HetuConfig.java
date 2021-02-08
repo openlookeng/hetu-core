@@ -35,11 +35,11 @@ import static io.airlift.units.DataSize.Unit.GIGABYTE;
 public class HetuConfig
 {
     private Boolean enableFilter = Boolean.FALSE;
-    private DataSize indexCacheMaxMemory = new DataSize(10, GIGABYTE);
-    private long indexCacheLoadingThreads = 10L;
+    private DataSize indexCacheMaxMemory = new DataSize(1, GIGABYTE);
+    private long indexCacheLoadingThreads = 2L;
     private Duration indexCacheLoadingDelay = new Duration(10, TimeUnit.SECONDS);
-    private Duration indexCacheTTL = new Duration(24, TimeUnit.HOURS);
-    private Boolean indexCacheSoftReference = Boolean.TRUE;
+    private Duration indexCacheTTL = new Duration(1, TimeUnit.HOURS);
+    private Boolean indexCacheSoftReference = Boolean.FALSE;
     private String indexStoreUri = "/opt/hetu/indices/";
     private String indexStoreFileSystemProfile = "local-config-default";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
@@ -51,8 +51,8 @@ public class HetuConfig
     private int dataCenterSplits = 5;
     private Duration dataCenterConsumerTimeout = new Duration(10, TimeUnit.MINUTES);
     private boolean executionPlanCacheEnabled;
-    private long executionPlanCacheMaxItems = 10000L;
-    private long executionPlanCacheTimeout = 86400000L;
+    private long executionPlanCacheMaxItems = 1000L;
+    private long executionPlanCacheTimeout = 60000L;
     private boolean splitCacheMapEnabled = Boolean.FALSE;
     private Duration splitCacheStateUpdateInterval = new Duration(2, TimeUnit.SECONDS);
     private boolean isTraceStackVisible;

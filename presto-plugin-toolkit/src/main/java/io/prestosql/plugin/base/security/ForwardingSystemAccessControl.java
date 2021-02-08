@@ -299,10 +299,4 @@ public abstract class ForwardingSystemAccessControl
     {
         delegate().checkCanUpdateIndex(identity, index);
     }
-
-    @Override
-    public void checkCanShowIndex(Identity identity, CatalogSchemaTableName index)
-    {
-        delegate().checkCanShowIndex(identity, index);
-    }
 }

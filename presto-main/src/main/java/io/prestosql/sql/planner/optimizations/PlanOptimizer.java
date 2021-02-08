@@ -15,17 +15,17 @@ package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 public interface PlanOptimizer
 {
     PlanNode optimize(PlanNode plan,
             Session session,
             TypeProvider types,
-            PlanSymbolAllocator planSymbolAllocator,
+            SymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator,
             WarningCollector warningCollector);
 }

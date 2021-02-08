@@ -15,13 +15,11 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.NullableValue;
 
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static java.util.Objects.requireNonNull;
 
 public class LookupSymbolResolver
@@ -46,7 +44,7 @@ public class LookupSymbolResolver
         checkArgument(column != null, "Missing column assignment for %s", symbol);
 
         if (!bindings.containsKey(column)) {
-            return toSymbolReference(symbol);
+            return symbol.toSymbolReference();
         }
 
         return bindings.get(column).getValue();

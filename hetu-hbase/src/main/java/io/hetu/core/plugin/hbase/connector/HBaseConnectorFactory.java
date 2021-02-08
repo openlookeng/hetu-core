@@ -75,13 +75,12 @@ public class HBaseConnectorFactory
     public Connector create(String catalogName, Map<String, String> config, ConnectorContext context)
     {
         requireNonNull(config, "config is null");
+
         HBaseConnectorId.setConnectorId(catalogName);
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             hetuMetastore = context.getHetuMetastore();
-            Bootstrap app = new Bootstrap(binder ->
-                    binder.bind(HetuMetastore.class).toInstance(context.getHetuMetastore()),
-                    new HBaseModule(), this.module);
+            Bootstrap app = new Bootstrap(new HBaseModule(), this.module);
             Injector injector =
                     app.strictConfig().doNotInitializeLogging().quiet().setRequiredConfigurationProperties(config).initialize();
             return injector.getInstance(HBaseConnector.class);

@@ -14,11 +14,11 @@
  */
 package io.hetu.core.heuristicindex;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.heuristicindex.util.IndexConstants;
-import io.hetu.core.plugin.heuristicindex.index.btree.BTreeIndex;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -31,17 +31,15 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.locks.Lock;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.prestosql.spi.heuristicindex.IndexRecord.COLUMN_DELIMITER;
@@ -55,6 +53,8 @@ import static java.util.Objects.requireNonNull;
 public class HeuristicIndexClient
         implements IndexClient
 {
+    private static final HetuFileSystemClient LOCAL_FS_CLIENT = new HetuLocalFileSystemClient(
+            new LocalConfig(new Properties()), Paths.get("/"));
     private static final Logger LOG = Logger.get(HeuristicIndexClient.class);
 
     private HetuFileSystemClient fs;
@@ -158,7 +158,7 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public RecordStatus lookUpIndexRecord(CreateIndexMetadata createIndexMetadata)
+    public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
         IndexRecord sameNameRecord = indexRecordManager.lookUpIndexRecord(createIndexMetadata.getIndexName());
@@ -168,33 +168,35 @@ public class HeuristicIndexClient
 
         if (sameNameRecord == null) {
             if (sameIndexRecord != null) {
-                return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_CONTENT : RecordStatus.SAME_CONTENT;
+                LOG.error("Index with same (table,column,indexType) already exists with name [%s]%n%n", sameIndexRecord.name);
+                return true;
             }
         }
         else {
             if (sameIndexRecord != null) {
                 boolean partitionMerge = createIndexMetadata.getPartitions().size() != 0;
+                String conflict = String.join(",", sameIndexRecord.partitions);
 
                 for (String partition : createIndexMetadata.getPartitions()) {
                     if (sameIndexRecord.partitions.isEmpty() || sameIndexRecord.partitions.contains(partition)) {
                         partitionMerge = false;
+                        conflict = partition;
                         break;
                     }
                 }
 
                 if (!partitionMerge) {
-                    return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_INDEX_PART_CONFLICT : RecordStatus.SAME_INDEX_PART_CONFLICT;
-                }
-                else {
-                    return sameIndexRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE : RecordStatus.SAME_INDEX_PART_CAN_MERGE;
+                    LOG.error("Same entry already exists and partitions contain conflicts: [%s]. To update, please delete old index first.%n%n", conflict);
+                    return true;
                 }
             }
             else {
-                return sameNameRecord.isInProgressRecord() ? RecordStatus.IN_PROGRESS_SAME_NAME : RecordStatus.SAME_NAME;
+                LOG.error("Index with name [%s] already exists with different content: [%s]%n%n", createIndexMetadata.getIndexName(), sameNameRecord);
+                return true;
             }
         }
 
-        return RecordStatus.NOT_FOUND;
+        return false;
     }
 
     @Override
@@ -205,7 +207,7 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public IndexRecord lookUpIndexRecord(String name)
+    public IndexRecord getIndexRecord(String name)
             throws IOException
     {
         return indexRecordManager.lookUpIndexRecord(name);
@@ -215,36 +217,23 @@ public class HeuristicIndexClient
     public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        List<String> properties = new LinkedList<>();
-        for (String propKey : createIndexMetadata.getProperties().stringPropertyNames()) {
-            properties.add(propKey + "=" + createIndexMetadata.getProperties().getProperty(propKey));
-        }
         indexRecordManager.addIndexRecord(
                 createIndexMetadata.getIndexName(),
                 createIndexMetadata.getUser(),
                 createIndexMetadata.getTableName(),
                 createIndexMetadata.getIndexColumns().stream().map(Map.Entry::getKey).toArray(String[]::new),
                 createIndexMetadata.getIndexType(),
-                properties,
                 createIndexMetadata.getPartitions());
     }
 
     @Override
-    public void deleteIndexRecord(String indexName, List<String> partitionsToDelete)
-            throws IOException
-    {
-        indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
-    }
-
-    @Override
-    public void deleteIndex(String indexName, List<String> partitionsToDelete)
+    public void deleteIndex(String indexName)
             throws IOException
     {
         IndexRecord indexRecord = indexRecordManager.lookUpIndexRecord(indexName);
         Path toDelete = root.resolve(indexRecord.table).resolve(String.join(COLUMN_DELIMITER, indexRecord.columns)).resolve(indexRecord.indexType);
 
         if (!fs.exists(toDelete)) {
-            indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
             return;
         }
 
@@ -261,25 +250,19 @@ public class HeuristicIndexClient
             }));
             lock.lock();
 
-            if (partitionsToDelete.isEmpty()) {
-                fs.deleteRecursively(toDelete);
-            }
-            else {
-                List<Path> toDeletePartitions = fs.walk(toDelete)
-                        .filter(fs::isDirectory)
-                        .filter(path -> partitionsToDelete.contains(path.getFileName().toString()))
-                        .collect(Collectors.toList());
-
-                for (Path path : toDeletePartitions) {
-                    fs.deleteRecursively(path);
-                }
-            }
+            fs.deleteRecursively(toDelete);
         }
         finally {
             lock.unlock();
         }
 
-        indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
+        indexRecordManager.deleteIndexRecord(indexName);
+        return;
+    }
+
+    private boolean notDirectory(Path path)
+    {
+        return !LOCAL_FS_CLIENT.isDirectory(path);
     }
 
     /**
@@ -303,7 +286,7 @@ public class HeuristicIndexClient
         Path absolutePath = Paths.get(root.toString(), path);
 
         if (!fs.exists(absolutePath)) {
-            return ImmutableMap.of();
+            return result.build();
         }
 
         try (Stream<Path> tarsOnRemote = fs.walk(absolutePath).filter(p -> p.toString().contains(".tar"))) {
@@ -335,39 +318,5 @@ public class HeuristicIndexClient
         Map<String, Index> resultMap = result.build();
 
         return resultMap;
-    }
-
-    @Override
-    public List<IndexMetadata> readPartitionIndex(String path)
-            throws IOException
-    {
-        Path indexKeyPath = Paths.get(path);
-        Path absolutePath = Paths.get(this.root.toString(), path);
-        String tableName = indexKeyPath.subpath(0, 1).toString();
-        String column = indexKeyPath.subpath(1, 2).toString();
-        List<IndexMetadata> result = new ArrayList<>();
-        if (fs.exists(absolutePath)) {
-            List<Path> paths = fs.list(absolutePath).collect(Collectors.toList());
-            for (Path filePath : paths) {
-                BTreeIndex index = new BTreeIndex();
-                InputStream inputStream = fs.newInputStream(filePath);
-                index.deserialize(inputStream);
-                IndexMetadata indexMetadata = new IndexMetadata(
-                        index,
-                        tableName,
-                        new String[] {column},
-                        root.toString(),
-                        filePath.toString(),
-                        0L,
-                        0L);
-                result.add(indexMetadata);
-            }
-
-            return result;
-        }
-        else {
-            LOG.debug("File path doesn't exists" + absolutePath);
-            return ImmutableList.of();
-        }
     }
 }

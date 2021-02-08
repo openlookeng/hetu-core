@@ -130,10 +130,6 @@ public class TablesResource
             @QueryParam("force") boolean force)
             throws ExecutionException
     {
-        if (force) {
-            previewTableCache.refreshCache();
-            columnCache.refreshCache();
-        }
         dataCenterConnectorManager.loadAllDCCatalogs();
         List<String> catalogs = catalogManager.getCatalogs().stream().map(c -> c.getCatalogName()).collect(Collectors.toList());
         final ImmutableList.Builder<CatalogSchema> builder = ImmutableList.builder();

@@ -504,7 +504,6 @@ public class Query
         }
         else {
             nextToken = OptionalLong.empty();
-            queryManager.checkForQueryPruning(queryId, queryInfo);
         }
 
         URI nextResultsUri = null;

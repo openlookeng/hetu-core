@@ -16,7 +16,7 @@ package io.prestosql.sql.planner.optimizations;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
-import io.prestosql.operator.window.RankingFunction;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import org.testng.annotations.Test;
 
@@ -24,14 +24,7 @@ import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
-import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
-import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
-import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
-import static io.prestosql.spi.plan.JoinNode.Type.INNER;
-import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
-import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
@@ -43,14 +36,17 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.rowNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
-import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topNRankingNumber;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topNRowNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPLICATE;
-import static java.lang.String.format;
+import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 
 public class TestWindow
         extends BasePlanTest
@@ -72,6 +68,15 @@ public class TestWindow
                                         .partitionBy(ImmutableList.of("orderkey")),
                                 project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey"))))));
 
+        assertDistributedPlan("SELECT orderkey FROM (SELECT orderkey, row_number() OVER (PARTITION BY orderkey ORDER BY custkey) n FROM orders) WHERE n = 1",
+                anyTree(
+                        topNRowNumber(pattern -> pattern
+                                        .specification(
+                                                ImmutableList.of("orderkey"),
+                                                ImmutableList.of("custkey"),
+                                                ImmutableMap.of("custkey", ASC_NULLS_LAST)),
+                                project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey", "custkey", "custkey"))))));
+
         // Window partition key is not pre-bucketed.
         assertDistributedPlan("SELECT rank() OVER (PARTITION BY orderstatus) FROM orders",
                 anyTree(
@@ -90,48 +95,30 @@ public class TestWindow
                                         exchange(REMOTE, REPARTITION,
                                                 project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus"))))))));
 
-        //Window to TopN RankingFunction
-        for (RankingFunction rankingFunction : RankingFunction.values()) {
-            assertDistributedPlan(format("SELECT orderkey FROM (SELECT orderkey, %s() OVER (PARTITION BY orderkey ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getValue().getName()),
-                    anyTree(
-                            topNRankingNumber(pattern -> pattern
-                                            .specification(
-                                                    ImmutableList.of("orderkey"),
-                                                    ImmutableList.of("custkey"),
-                                                    ImmutableMap.of("custkey", ASC_NULLS_LAST)),
-                                    project(tableScan("orders", ImmutableMap.of("orderkey", "orderkey", "custkey", "custkey"))))));
-
-            assertDistributedPlan(format("SELECT orderstatus FROM (SELECT orderstatus, %s() OVER (PARTITION BY orderstatus ORDER BY custkey) n FROM orders) WHERE n = 1", rankingFunction.getValue().getName()),
-                    anyTree(
-                            topNRankingNumber(pattern -> pattern
-                                            .specification(
-                                                    ImmutableList.of("orderstatus"),
-                                                    ImmutableList.of("custkey"),
-                                                    ImmutableMap.of("custkey", ASC_NULLS_LAST))
-                                            .partial(false),
-                                    exchange(LOCAL, GATHER,
-                                            exchange(REMOTE, REPARTITION,
-                                                    topNRankingNumber(topNRowNumber -> topNRowNumber
-                                                                    .specification(
-                                                                            ImmutableList.of("orderstatus"),
-                                                                            ImmutableList.of("custkey"),
-                                                                            ImmutableMap.of("custkey", ASC_NULLS_LAST))
-                                                                    .partial(true),
-                                                            project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus", "custkey", "custkey")))))))));
-        }
+        assertDistributedPlan("SELECT orderstatus FROM (SELECT orderstatus, row_number() OVER (PARTITION BY orderstatus ORDER BY custkey) n FROM orders) WHERE n = 1",
+                anyTree(
+                        topNRowNumber(pattern -> pattern
+                                        .specification(
+                                                ImmutableList.of("orderstatus"),
+                                                ImmutableList.of("custkey"),
+                                                ImmutableMap.of("custkey", ASC_NULLS_LAST))
+                                        .partial(false),
+                                exchange(LOCAL, GATHER,
+                                        exchange(REMOTE, REPARTITION,
+                                                topNRowNumber(topNRowNumber -> topNRowNumber
+                                                                .specification(
+                                                                        ImmutableList.of("orderstatus"),
+                                                                        ImmutableList.of("custkey"),
+                                                                        ImmutableMap.of("custkey", ASC_NULLS_LAST))
+                                                                .partial(true),
+                                                        project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus", "custkey", "custkey")))))))));
     }
 
     @Test
     public void testWindowAfterJoin()
     {
-        Session noJoinReordering = Session.builder(getQueryRunner().getDefaultSession())
-                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
-                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
-                .build();
-
         // Window partition key is a super set of join key.
         assertDistributedPlan("SELECT rank() OVER (PARTITION BY o.orderstatus, o.orderkey) FROM orders o JOIN lineitem l ON o.orderstatus = l.linestatus",
-                noJoinReordering,
                 anyTree(
                         window(pattern -> pattern
                                         .specification(specification(ImmutableList.of("orderstatus", "orderkey"), ImmutableList.of(), ImmutableMap.of()))
@@ -147,7 +134,6 @@ public class TestWindow
 
         // Window partition key is not a super set of join key.
         assertDistributedPlan("SELECT rank() OVER (PARTITION BY o.orderkey) FROM orders o JOIN lineitem l ON o.orderstatus = l.linestatus",
-                noJoinReordering,
                 anyTree(
                         window(pattern -> pattern
                                         .specification(specification(ImmutableList.of("orderkey"), ImmutableList.of(), ImmutableMap.of()))
@@ -163,9 +149,8 @@ public class TestWindow
 
         // Test broadcast join
         Session broadcastJoin = Session.builder(this.getQueryRunner().getDefaultSession())
-                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.BROADCAST.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
                 .setSystemProperty(FORCE_SINGLE_NODE_OUTPUT, Boolean.toString(false))
-                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
                 .build();
         assertDistributedPlan("SELECT rank() OVER (PARTITION BY o.custkey) FROM orders o JOIN lineitem l ON o.orderstatus = l.linestatus",
                 broadcastJoin,

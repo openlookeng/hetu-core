@@ -18,22 +18,21 @@ import com.google.common.collect.Iterables;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.metadata.TableHandle;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateTarget;
@@ -47,6 +46,7 @@ import io.prestosql.sql.planner.plan.TableWriterNode.UpdateTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTargetReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
+import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
 import java.util.Optional;
@@ -75,7 +75,7 @@ public class BeginTableWrite
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         return SimplePlanRewriter.rewriteWith(new Rewriter(session), plan, new Context());
     }
@@ -237,8 +237,7 @@ public class BeginTableWrite
                         scan.getOutputSymbols(),
                         scan.getAssignments(),
                         scan.getEnforcedConstraint(),
-                        scan.getPredicate(), scan.getStrategy(),
-                        scan.getReuseTableScanMappingId(), 0);
+                        scan.getPredicate());
             }
 
             if (node instanceof FilterNode) {

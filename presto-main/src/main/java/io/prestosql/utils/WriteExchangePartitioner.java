@@ -17,11 +17,11 @@ package io.prestosql.utils;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 
 import java.util.List;

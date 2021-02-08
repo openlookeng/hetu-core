@@ -14,13 +14,13 @@
 package io.prestosql.split;
 
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.DriverTaskId;
 import io.prestosql.metadata.DeletesAsInsertTableHandle;
 import io.prestosql.metadata.InsertTableHandle;
 import io.prestosql.metadata.OutputTableHandle;
 import io.prestosql.metadata.UpdateTableHandle;
 import io.prestosql.metadata.VacuumTableHandle;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorSession;

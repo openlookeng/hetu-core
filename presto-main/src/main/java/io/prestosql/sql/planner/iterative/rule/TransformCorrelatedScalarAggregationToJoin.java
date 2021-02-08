@@ -16,14 +16,14 @@ package io.prestosql.sql.planner.iterative.rule;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.ScalarAggregationToJoinRewriter;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 
 import java.util.Optional;
 

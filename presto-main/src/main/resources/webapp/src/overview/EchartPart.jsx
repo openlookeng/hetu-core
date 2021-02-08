@@ -1,17 +1,3 @@
-/*
- * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import  React from "react";
 import echarts from 'echarts/lib/echarts';
 import "echarts/lib/chart/line";
@@ -22,7 +8,7 @@ import "echarts/lib/component/title";
 import OverviewActions from "./OverviewActions";
 import OverviewStore from "./OverviewStore";
 import MultiSelect from 'react-simple-multi-select';
-import {formatCount, formatDataSizeBytes, bubbleSort} from "../utils";
+import {formatCount, formatDataSizeBytes} from "../utils";
 import _ from "lodash";
 
 class EchartPart extends React.Component{
@@ -289,14 +275,12 @@ class EchartPart extends React.Component{
                     entry.value = Number((sum / dataset.length).toFixed(2));
                 }
             });
-
-            let heatMapDataSort = bubbleSort(heatMapData);
-            this.state.heatMapChart = heatMapDataSort.slice(0,10);
+            this.state.heatMapChart = heatMapData;
             let heatMapChart = echarts.init(this.refs.heatMapChart, "royal");
             let heatMapChartOption = heatMapChart.getOption();
             heatMapChartOption.series = [{
                 type: "treemap",
-                data: heatMapDataSort.slice(0,10),
+                data: heatMapData,
                 breadcrumb: {
                     show: false
                 }
@@ -335,13 +319,12 @@ class EchartPart extends React.Component{
                     entry.value = Number((sum / dataset.length).toFixed(2));
                 }
             });
-            let heatMapMemoryDataSort = bubbleSort(heatMapMemoryData);
-            this.state.heatMapMemoryChart = heatMapMemoryDataSort.slice(0,10);
+            this.state.heatMapMemoryChart = heatMapMemoryData;
             let heatMapMemoryChart = echarts.init(this.refs.heatMapMemoryChart, "royal");
             let heatMapMemoryChartOption = heatMapMemoryChart.getOption();
             heatMapMemoryChartOption.series = [{
                 type: "treemap",
-                data: heatMapMemoryDataSort.slice(0,10),
+                data: heatMapMemoryData,
                 breadcrumb: {
                     show: false
                 },

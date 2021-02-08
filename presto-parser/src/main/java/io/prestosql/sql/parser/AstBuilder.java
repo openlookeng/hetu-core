@@ -17,7 +17,6 @@ package io.prestosql.sql.parser;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.sql.tree.AddColumn;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
@@ -402,10 +401,7 @@ class AstBuilder
     @Override
     public Node visitDropIndex(SqlBaseParser.DropIndexContext context)
     {
-        return new DropIndex(getLocation(context),
-                getQualifiedName(context.qualifiedName()),
-                context.EXISTS() != null,
-                visitIfPresent(context.expression(), Expression.class));
+        return new DropIndex(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
     }
 
     @Override
@@ -1828,7 +1824,7 @@ class AstBuilder
     @Override
     public Node visitCurrentRowBound(SqlBaseParser.CurrentRowBoundContext context)
     {
-        return new FrameBound(getLocation(context), Types.FrameBoundType.CURRENT_ROW);
+        return new FrameBound(getLocation(context), FrameBound.Type.CURRENT_ROW);
     }
 
     @Override
@@ -2273,37 +2269,37 @@ class AstBuilder
         throw new IllegalArgumentException("Unsupported sign: " + token.getText());
     }
 
-    private static Types.WindowFrameType getFrameType(Token type)
+    private static WindowFrame.Type getFrameType(Token type)
     {
         switch (type.getType()) {
             case SqlBaseLexer.RANGE:
-                return Types.WindowFrameType.RANGE;
+                return WindowFrame.Type.RANGE;
             case SqlBaseLexer.ROWS:
-                return Types.WindowFrameType.ROWS;
+                return WindowFrame.Type.ROWS;
         }
 
         throw new IllegalArgumentException("Unsupported frame type: " + type.getText());
     }
 
-    private static Types.FrameBoundType getBoundedFrameBoundType(Token token)
+    private static FrameBound.Type getBoundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case SqlBaseLexer.PRECEDING:
-                return Types.FrameBoundType.PRECEDING;
+                return FrameBound.Type.PRECEDING;
             case SqlBaseLexer.FOLLOWING:
-                return Types.FrameBoundType.FOLLOWING;
+                return FrameBound.Type.FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());
     }
 
-    private static Types.FrameBoundType getUnboundedFrameBoundType(Token token)
+    private static FrameBound.Type getUnboundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case SqlBaseLexer.PRECEDING:
-                return Types.FrameBoundType.UNBOUNDED_PRECEDING;
+                return FrameBound.Type.UNBOUNDED_PRECEDING;
             case SqlBaseLexer.FOLLOWING:
-                return Types.FrameBoundType.UNBOUNDED_FOLLOWING;
+                return FrameBound.Type.UNBOUNDED_FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());

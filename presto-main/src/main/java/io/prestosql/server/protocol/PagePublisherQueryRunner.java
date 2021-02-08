@@ -52,9 +52,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
-import static io.prestosql.statestore.StateStoreConstants.CROSS_LAYER_DYNAMIC_FILTER;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
-import static io.prestosql.statestore.StateStoreConstants.QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.UUID.randomUUID;
@@ -255,14 +253,6 @@ public class PagePublisherQueryRunner
         // try to remove bloomFilter and columns type from hazelcast
         if (stateStoreProvider.getStateStore() != null) {
             StateCollection collection = stateStoreProvider.getStateStore().getStateCollection(queryId + CROSS_REGION_DYNAMIC_FILTER_COLLECTION);
-            if (collection != null) {
-                collection.destroy();
-            }
-            collection = stateStoreProvider.getStateStore().getStateCollection(queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING);
-            if (collection != null) {
-                collection.destroy();
-            }
-            collection = stateStoreProvider.getStateStore().getStateCollection(queryId + CROSS_LAYER_DYNAMIC_FILTER);
             if (collection != null) {
                 collection.destroy();
             }

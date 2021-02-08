@@ -66,8 +66,7 @@ public class TestHetuHBaseMetastore
                         false,
                         serializerClassName,
                         Optional.of(""),
-                        Optional.of("testTable"),
-                        Optional.of(""));
+                        Optional.of("testTable"));
 
         metaStore.addHBaseTable(testHBaseTable1);
 
@@ -80,8 +79,7 @@ public class TestHetuHBaseMetastore
                         false,
                         serializerClassName,
                         Optional.of(""),
-                        Optional.of("testTable2"),
-                        Optional.of(""));
+                        Optional.of("testTable2"));
 
         metaStore.addHBaseTable(testHBaseTable2);
         // test get all tables
@@ -102,8 +100,7 @@ public class TestHetuHBaseMetastore
                         false,
                         serializerClassName,
                         Optional.of(""),
-                        Optional.of("testTable3"),
-                        Optional.of(""));
+                        Optional.of("testTable3"));
         metaStore.renameHBaseTable(testHBaseTable3, "hbase.testTable1");
         hBaseTables = metaStore.getAllHBaseTables();
         assertFalse(hBaseTables.containsKey("hbase.testTable1"));

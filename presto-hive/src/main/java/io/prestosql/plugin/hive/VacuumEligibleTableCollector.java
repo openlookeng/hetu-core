@@ -15,7 +15,6 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
-import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.connector.ConnectorVacuumTableInfo;
@@ -125,8 +124,7 @@ public class VacuumEligibleTableCollector
     {
         private Table getTable(String schemaName, String tableName, SemiTransactionalHiveMetastore metastore)
         {
-            HiveIdentity identity = new HiveIdentity(new ConnectorIdentity("openLooKeng", Optional.empty(), Optional.empty()));
-            Optional<Table> table = metastore.getTable(identity, schemaName, tableName);
+            Optional<Table> table = metastore.getTable(schemaName, tableName);
             if (!table.isPresent() || table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
                 throw new TableNotFoundException(new SchemaTableName(schemaName, tableName));
             }
@@ -173,11 +171,10 @@ public class VacuumEligibleTableCollector
                     }
                     Table tableInfo = getTable(database, table, taskMetastore);
                     if (isTransactional(tableInfo)) {
-                        ConnectorIdentity connectorIdentity = new ConnectorIdentity("openLooKeng", Optional.empty(), Optional.empty());
-                        HiveIdentity identity = new HiveIdentity(connectorIdentity);
-                        Optional<List<String>> partitions = taskMetastore.getPartitionNames(identity, database, table);
+                        Optional<List<String>> partitions = taskMetastore.getPartitionNames(database, table);
                         String tablePath = getLocation(tableInfo);
-                        HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(connectorIdentity);
+                        HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(
+                                new ConnectorIdentity("openLooKeng", Optional.empty(), Optional.empty()));
                         hdfsEnvironment.doAs("openLooKeng", () -> {
                             try {
                                 // For Hive partitioned table

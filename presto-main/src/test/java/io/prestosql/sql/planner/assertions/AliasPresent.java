@@ -15,9 +15,8 @@ package io.prestosql.sql.planner.assertions;
 
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.Optional;
 
@@ -40,7 +39,7 @@ class AliasPresent
     public Optional<Symbol> getAssignedSymbol(PlanNode node, Session session, Metadata metadata, SymbolAliases symbolAliases)
     {
         return symbolAliases.getOptional(alias)
-                .map(SymbolUtils::from);
+                .map(Symbol::from);
     }
 
     @Override

@@ -20,12 +20,12 @@ import io.prestosql.Session;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.SymbolMapper;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -107,9 +107,7 @@ public class PushTableWriteThroughUnion
             }
         }
         sourceMappings.add(outputMappings.build());
-        ImmutableMap.Builder<String, String> stringMapping = ImmutableMap.builder();
-        mappings.build().forEach((symbol1, symbol2) -> stringMapping.put(symbol1.getName(), symbol2.getName()));
-        SymbolMapper symbolMapper = new SymbolMapper(stringMapping.build(), context.getSymbolAllocator().getTypes());
+        SymbolMapper symbolMapper = new SymbolMapper(mappings.build());
         return symbolMapper.map(writerNode, unionNode.getSources().get(source), context.getIdAllocator().getNextId());
     }
 

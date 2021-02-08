@@ -22,19 +22,19 @@ import io.airlift.slice.Slice;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.LambdaDefinitionExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.RowExpressionVisitor;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.SpecialForm.Form;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.relational.CallExpression;
+import io.prestosql.sql.relational.ConstantExpression;
+import io.prestosql.sql.relational.InputReferenceExpression;
+import io.prestosql.sql.relational.LambdaDefinitionExpression;
+import io.prestosql.sql.relational.RowExpression;
+import io.prestosql.sql.relational.RowExpressionVisitor;
+import io.prestosql.sql.relational.SpecialForm;
+import io.prestosql.sql.relational.SpecialForm.Form;
+import io.prestosql.sql.relational.VariableReferenceExpression;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.Comparator;
@@ -55,9 +55,9 @@ import static io.prestosql.spi.function.OperatorType.LESS_THAN;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.function.OperatorType.NOT_EQUAL;
 import static io.prestosql.spi.function.Signature.mangleOperatorName;
-import static io.prestosql.spi.relation.SpecialForm.Form.AND;
-import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.relational.SpecialForm.Form.AND;
+import static io.prestosql.sql.relational.SpecialForm.Form.OR;
 import static io.prestosql.sql.relational.SqlToRowExpressionTranslator.translate;
 import static java.lang.Integer.min;
 import static java.util.Objects.requireNonNull;
@@ -88,14 +88,6 @@ public class ExpressionEquivalence
 
         RowExpression canonicalizedLeft = leftRowExpression.accept(CANONICALIZATION_VISITOR, null);
         RowExpression canonicalizedRight = rightRowExpression.accept(CANONICALIZATION_VISITOR, null);
-
-        return canonicalizedLeft.equals(canonicalizedRight);
-    }
-
-    public boolean areExpressionsEquivalent(RowExpression leftExpression, RowExpression rightExpression)
-    {
-        RowExpression canonicalizedLeft = leftExpression.accept(CANONICALIZATION_VISITOR, null);
-        RowExpression canonicalizedRight = rightExpression.accept(CANONICALIZATION_VISITOR, null);
 
         return canonicalizedLeft.equals(canonicalizedRight);
     }

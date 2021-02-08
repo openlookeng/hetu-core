@@ -17,10 +17,10 @@ import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.Patterns.limit;
@@ -62,8 +62,7 @@ public class PushLimitIntoTableScan
                             tableScan.getOutputSymbols(),
                             tableScan.getAssignments(),
                             tableScan.getEnforcedConstraint(),
-                            tableScan.getPredicate(), tableScan.getStrategy(),
-                            tableScan.getReuseTableScanMappingId(), 0);
+                            tableScan.getPredicate());
 
                     if (!result.isLimitGuaranteed()) {
                         node = new LimitNode(limit.getId(), node, limit.getCount(), limit.isPartial());

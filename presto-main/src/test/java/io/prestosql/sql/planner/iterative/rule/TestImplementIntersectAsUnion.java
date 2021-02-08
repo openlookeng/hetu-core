@@ -16,10 +16,10 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.FilterNode;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;

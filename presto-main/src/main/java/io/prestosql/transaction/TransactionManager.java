@@ -15,9 +15,9 @@ package io.prestosql.transaction;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.CatalogMetadata;
 import io.prestosql.security.AccessControl;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.transaction.IsolationLevel;
 

@@ -13,18 +13,18 @@
  */
 package io.prestosql.sql.planner.optimizations;
 
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.ExceptNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.IntersectNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.ExceptNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.IntersectNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 
 import java.util.function.Function;
 
@@ -45,7 +45,7 @@ public final class DistinctOutputQueryUtil
     }
 
     private static final class IsDistinctPlanVisitor
-            extends InternalPlanVisitor<Boolean, Void>
+            extends PlanVisitor<Boolean, Void>
     {
         /*
         With the iterative optimizer, plan nodes are replaced with
@@ -62,7 +62,7 @@ public final class DistinctOutputQueryUtil
         }
 
         @Override
-        public Boolean visitPlan(PlanNode node, Void context)
+        protected Boolean visitPlan(PlanNode node, Void context)
         {
             return false;
         }

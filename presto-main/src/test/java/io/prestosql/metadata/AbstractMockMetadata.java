@@ -17,12 +17,12 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.operator.window.WindowFunctionSupplier;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.block.BlockEncodingSerde;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -36,6 +36,7 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
 import io.prestosql.spi.connector.SampleType;
+import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.function.FunctionKind;
@@ -43,12 +44,12 @@ import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlFunction;
-import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.security.GrantInfo;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.RoleGrant;
+import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
@@ -82,6 +83,22 @@ public abstract class AbstractMockMetadata
     public Set<ConnectorCapabilities> getConnectorCapabilities(Session session, CatalogName catalogName)
     {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Hetu supports pushing sub-query with join down to the connector.
+     * This method decides if the sub-query can be pushed down to the connector based on the connector.
+     *
+     * @param session Presto session
+     * @param tableHandle a table used in the sub-query (if the sub query has more than one tables, use a random table from the sub-query)
+     * @param subQuery the actual sub-query to be pushed down
+     * @param types Presto types of intermediate symbols
+     * @return optional SubQueryApplicationResult which has the new TableHandle if the connector supports this feature
+     */
+    @Override
+    public Optional<SubQueryApplicationResult<TableHandle>> applySubQuery(Session session, TableHandle tableHandle, String subQuery, Map<String, Type> types)
+    {
+        return Optional.empty();
     }
 
     @Override
@@ -656,6 +673,18 @@ public abstract class AbstractMockMetadata
     }
 
     /**
+     * Hetu's sub-query push down expects supporting connectors to provide a {@link SqlQueryWriter}
+     * to write SQL queries for the respective databases.
+     *
+     * @return the optional SQL query writer which can write database specific SQL queries
+     */
+    @Override
+    public Optional<SqlQueryWriter> getSqlQueryWriter(Session session, TableHandle tableHandle)
+    {
+        return Optional.empty();
+    }
+
+    /**
      * Hetu can only cache execution plans for supported connectors.
      * This method overrides {@link ConnectorMetadata} returns true to indicate
      * execution plan caching is enabled for testing connectors.
@@ -665,17 +694,6 @@ public abstract class AbstractMockMetadata
      */
     @Override
     public boolean isExecutionPlanCacheSupported(Session session, TableHandle handle)
-    {
-        return true;
-    }
-
-    /**
-     * Hetu can only create index for supported connectors.
-     *
-     * @param session Presto session
-     * @param tableName Connector specific tableName
-     */
-    public boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName)
     {
         return true;
     }

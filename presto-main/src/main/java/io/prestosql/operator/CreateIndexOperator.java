@@ -14,7 +14,6 @@
  */
 package io.prestosql.operator;
 
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.spi.HetuConstant;
@@ -23,23 +22,21 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexWriter;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -53,7 +50,7 @@ public class CreateIndexOperator
     private final OperatorContext operatorContext;
     private final CreateIndexMetadata createIndexMetadata;
     private final HeuristicIndexerManager heuristicIndexerManager;
-    private static final Logger LOG = Logger.get(CreateIndexOperator.class);
+    private final AtomicBoolean recordCreated;
 
     public CreateIndexOperator(
             OperatorContext operatorContext,
@@ -61,7 +58,8 @@ public class CreateIndexOperator
             HeuristicIndexerManager heuristicIndexerManager,
             Map<String, IndexWriter> levelWriter,
             Map<IndexWriter, CreateIndexOperator> persistBy,
-            Map<CreateIndexOperator, Boolean> finished)
+            Map<CreateIndexOperator, Boolean> finished,
+            AtomicBoolean recordCreated)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.createIndexMetadata = requireNonNull(createIndexMetadata, "createIndexMetadata is null");
@@ -69,6 +67,7 @@ public class CreateIndexOperator
         this.levelWriter = requireNonNull(levelWriter, "levelWriter is null");
         this.persistBy = requireNonNull(persistBy, "persisted is null");
         this.finished = requireNonNull(finished, "finished is null");
+        this.recordCreated = requireNonNull(recordCreated, "recordCreated is null");
     }
 
     private State state = State.NEEDS_INPUT;
@@ -111,14 +110,9 @@ public class CreateIndexOperator
 
         // persist index to disk if this operator is responsible for persisting a writer
         try {
-            Iterator<Map.Entry<String, IndexWriter>> iterator = levelWriter.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<String, IndexWriter> entry = iterator.next();
-                if (persistBy.get(entry.getValue()) == this) {
-                    String writerKey = entry.getKey();
-                    entry.getValue().persist();
-                    iterator.remove(); // remove reference to writer once persisted so it can be GCed
-                    LOG.debug("Writer for %s has finished persisting. Remaining: %d", writerKey, levelWriter.size());
+            for (IndexWriter writer : levelWriter.values()) {
+                if (persistBy.get(writer) == this) {
+                    writer.persist();
                 }
             }
         }
@@ -126,40 +120,17 @@ public class CreateIndexOperator
             throw new UncheckedIOException("Persisting index failed: ", e);
         }
 
-        synchronized (levelWriter) {
-            // All writers have finished persisting
-            if (levelWriter.isEmpty()) {
-                LOG.debug("Writing index record by %s", this);
-                if (persistBy.isEmpty()) {
-                    // table scan is empty. no data scanned from table. addInput() has never been called.
-                    throw new IllegalStateException("The table is empty. No index will be created.");
+        // only one operator needs to create the record
+        if (!recordCreated.getAndSet(true)) {
+            // update metadata
+            IndexClient indexClient = heuristicIndexerManager.getIndexClient();
+            try {
+                if (!indexClient.indexRecordExists(createIndexMetadata)) {
+                    indexClient.addIndexRecord(createIndexMetadata);
                 }
-
-                // update metadata
-                IndexClient indexClient = heuristicIndexerManager.getIndexClient();
-                try {
-                    IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
-                    LOG.debug("Current record status: %s", recordStatus);
-
-                    switch (recordStatus) {
-                        case SAME_NAME:
-                        case IN_PROGRESS_SAME_NAME:
-                        case IN_PROGRESS_SAME_CONTENT:
-                        case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
-                        case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
-                            indexClient.deleteIndexRecord(createIndexMetadata.getIndexName(), Collections.emptyList());
-                            indexClient.addIndexRecord(createIndexMetadata);
-                            break;
-                        case NOT_FOUND:
-                        case SAME_INDEX_PART_CAN_MERGE:
-                            indexClient.addIndexRecord(createIndexMetadata);
-                            break;
-                        default:
-                    }
-                }
-                catch (IOException e) {
-                    throw new UncheckedIOException("Unable to update index records: ", e);
-                }
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException("Unable to update index records: ", e);
             }
         }
 
@@ -194,7 +165,8 @@ public class CreateIndexOperator
             Type type = entry.getValue();
 
             for (int position = 0; position < block.getPositionCount(); ++position) {
-                values.computeIfAbsent(indexColumn, k -> new ArrayList<>()).add(getNativeValue(type, block, position));
+                values.computeIfAbsent(indexColumn, k -> new ArrayList<>());
+                values.get(indexColumn).add(getNativeValue(type, block, position));
             }
         }
 
@@ -205,27 +177,25 @@ public class CreateIndexOperator
             switch (createIndexMetadata.getCreateLevel()) {
                 case STRIPE: {
                     String filePath = page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH);
-                    levelWriter.computeIfAbsent(filePath, k -> heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
-                    persistBy.putIfAbsent(levelWriter.get(filePath), this);
-                    levelWriter.get(filePath).addData(values, connectorMetadata);
+                    levelWriter.putIfAbsent(filePath, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
+                    IndexWriter indexWriter = levelWriter.get(filePath);
+                    persistBy.putIfAbsent(indexWriter, this);
+                    indexWriter.addData(
+                            values,
+                            connectorMetadata);
                     break;
                 }
                 case PARTITION: {
                     String partition = getPartitionName(page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH),
                             createIndexMetadata.getTableName());
                     levelWriter.putIfAbsent(partition, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
-                    persistBy.putIfAbsent(levelWriter.get(partition), this);
-                    levelWriter.get(partition).addData(values, connectorMetadata);
-                    break;
-                }
-                case TABLE: {
-                    levelWriter.putIfAbsent(createIndexMetadata.getTableName(), heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
-                    persistBy.putIfAbsent(levelWriter.get(createIndexMetadata.getTableName()), this);
-                    levelWriter.get(createIndexMetadata.getTableName()).addData(values, connectorMetadata);
+                    IndexWriter indexWriter = levelWriter.get(partition);
+                    // TODO: use partitioned index writer here
                     break;
                 }
                 default:
-                    throw new IllegalArgumentException("Create level not supported");
+                    new IOException("Create level not supported");
+                    break;
             }
         }
         catch (IOException e) {
@@ -266,6 +236,7 @@ public class CreateIndexOperator
         private final Map<String, IndexWriter> levelWriter;
         private final Map<IndexWriter, CreateIndexOperator> persistBy;
         private final Map<CreateIndexOperator, Boolean> finished;
+        private final AtomicBoolean recordCreated;
         private boolean closed;
 
         public CreateIndexOperatorFactory(
@@ -281,6 +252,7 @@ public class CreateIndexOperator
             this.levelWriter = new ConcurrentHashMap<>();
             this.persistBy = new ConcurrentHashMap<>();
             this.finished = new ConcurrentHashMap<>();
+            this.recordCreated = new AtomicBoolean();
         }
 
         @Override
@@ -288,7 +260,7 @@ public class CreateIndexOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CreateIndexOperator.class.getSimpleName());
-            return new CreateIndexOperator(operatorContext, createIndexMetadata, heuristicIndexerManager, levelWriter, persistBy, finished);
+            return new CreateIndexOperator(operatorContext, createIndexMetadata, heuristicIndexerManager, levelWriter, persistBy, finished, recordCreated);
         }
 
         @Override
@@ -318,8 +290,8 @@ public class CreateIndexOperator
 
     private static String getPartitionName(String uri, String tableName)
     {
-        Path path = Paths.get(uri);
-        String[] dataPathElements = path.toString().split("/");
+        URI uriObj = URI.create(uri);
+        String[] dataPathElements = uriObj.getPath().split("/");
         String[] fullTableName = tableName.split("\\.");
         String simpleTableName = fullTableName[fullTableName.length - 1];
         for (int i = 0; i < dataPathElements.length; i++) {
@@ -328,6 +300,6 @@ public class CreateIndexOperator
             }
         }
 
-        throw new IllegalStateException("Partition level is not supported for non partitioned table.");
+        throw new IllegalStateException("Datasource path " + uri + " does not include a partition");
     }
 }

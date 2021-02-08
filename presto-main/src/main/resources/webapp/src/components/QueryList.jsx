@@ -29,7 +29,6 @@ import {
 } from "../utils";
 import Header from "../queryeditor/components/Header";
 import Footer from "../queryeditor/components/Footer";
-import StatusFooter from "../queryeditor/components/StatusFooter";
 import NavigationMenu from "../NavigationMenu";
 
 export class QueryListItem extends React.Component {
@@ -641,9 +640,6 @@ export class QueryList extends React.Component {
                 </div>
                 {queryList}
                 </div>
-                </div>
-                <div className='flex flex-row flex-initial statusFooter'>
-                     <StatusFooter />
                 </div>
                 <div className='flex flex-row flex-initial footer'>
                     <Footer/>

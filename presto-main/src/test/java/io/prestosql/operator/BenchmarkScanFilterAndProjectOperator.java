@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
 import io.prestosql.SequencePageBuilder;
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
@@ -25,19 +26,17 @@ import io.prestosql.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOp
 import io.prestosql.operator.project.CursorProcessor;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.FixedPageSource;
-import io.prestosql.spi.operator.ReuseExchangeOperator;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.ExpressionCompiler;
 import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.sql.parser.SqlParser;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.relational.RowExpression;
 import io.prestosql.sql.relational.SqlToRowExpressionTranslator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.testing.TestingMetadata.TestingColumnHandle;
@@ -178,13 +177,7 @@ public class BenchmarkScanFilterAndProjectOperator
                     null,
                     types,
                     FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_SIZE,
-                    FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_ROW_COUNT,
-                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                    0,
-                    false,
-                    Optional.empty(),
-                    0,
-                    0);
+                    FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_ROW_COUNT);
         }
 
         public TaskContext createTaskContext()

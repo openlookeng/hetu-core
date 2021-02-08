@@ -18,17 +18,17 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Iterables;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.ExceptNode;
-import io.prestosql.spi.plan.IntersectNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.SetOperationNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.ExceptNode;
+import io.prestosql.sql.planner.plan.IntersectNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.SetOperationNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
+import io.prestosql.sql.planner.plan.UnionNode;
 
 import java.util.Collection;
 import java.util.Map;
@@ -39,12 +39,12 @@ public class SetFlatteningOptimizer
         implements PlanOptimizer
 {
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
         requireNonNull(types, "types is null");
-        requireNonNull(planSymbolAllocator, "symbolAllocator is null");
+        requireNonNull(symbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
         return SimplePlanRewriter.rewriteWith(new Rewriter(), plan, false);

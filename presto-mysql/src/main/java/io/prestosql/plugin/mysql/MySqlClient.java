@@ -16,7 +16,6 @@ package io.prestosql.plugin.mysql;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.mysql.jdbc.Statement;
 import io.airlift.json.ObjectMapperProvider;
@@ -33,19 +32,10 @@ import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.StatsCollecting;
 import io.prestosql.plugin.jdbc.WriteMapping;
-import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
-import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
-import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
-import io.prestosql.plugin.mysql.optimization.MySqlQueryGenerator;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.relation.RowExpressionService;
-import io.prestosql.spi.sql.QueryGenerator;
-import io.prestosql.spi.type.AbstractType;
-import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
@@ -59,15 +49,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 
@@ -80,18 +65,13 @@ import static com.mysql.jdbc.SQLError.SQL_STATE_SYNTAX_ERROR;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.jdbc.ColumnMapping.DISABLE_PUSHDOWN;
 import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
-import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_QUERY_GENERATOR_FAILURE;
-import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_UNSUPPORTED_EXPRESSION;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.realWriteFunction;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.timestampWriteFunctionUsingSqlTimestamp;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.varbinaryWriteFunction;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.varcharWriteFunction;
-import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.BASE_PUSHDOWN;
-import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.DEFAULT;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.type.Decimals.MAX_PRECISION;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
@@ -106,13 +86,11 @@ public class MySqlClient
         extends BaseJdbcClient
 {
     private final Type jsonType;
-    private final JdbcPushDownModule pushDownModule;
 
     @Inject
     public MySqlClient(BaseJdbcConfig config, @StatsCollecting ConnectionFactory connectionFactory, TypeManager typeManager)
     {
         super(config, "`", connectionFactory);
-        this.pushDownModule = config.getPushDownModule();
         this.jsonType = typeManager.getType(new TypeSignature(StandardTypes.JSON));
     }
 
@@ -288,76 +266,6 @@ public class MySqlClient
     public boolean isLimitGuaranteed()
     {
         return true;
-    }
-
-    @Override
-    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
-    {
-        // In most cases, the running efficiency of MySql is not satisfactory, so just base push down by default.
-        JdbcPushDownModule mysqlPushDownModule = pushDownModule == DEFAULT ? BASE_PUSHDOWN : pushDownModule;
-        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, mysqlPushDownModule);
-        return Optional.of(new MySqlQueryGenerator(rowExpressionService, pushDownParameter));
-    }
-
-    @SuppressWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")
-    @Override
-    public Map<String, ColumnHandle> getColumns(ConnectorSession session, String sql, Map<String, Type> types)
-    {
-        try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session));
-                PreparedStatement statement = connection.prepareStatement(sql)) {
-            ResultSetMetaData metaData = statement.getMetaData();
-            ImmutableMap.Builder<String, ColumnHandle> columnBuilder = new ImmutableMap.Builder<>();
-
-            for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                String columnName = metaData.getColumnLabel(i);
-                String typeName = metaData.getColumnTypeName(i);
-                int precision = metaData.getPrecision(i);
-                int dataType = metaData.getColumnType(i);
-                int scale = metaData.getScale(i);
-
-                // MySql JDBC returns decimal(41, 0) for output of SQL functions like sum,
-                // decimal(41, 0) is an invalid precision, cannot be used to create Presto
-                // type.The following if block uses the presto type for that specific column
-                // extracted from logical plan during pre-processing
-                if (dataType == Types.DECIMAL && (precision > MAX_PRECISION || scale < 0)) {
-                    // Covert MySql Decimal type to Presto type
-                    Type type = types.get(columnName.toLowerCase(ENGLISH));
-                    if (type instanceof AbstractType) {
-                        TypeSignature signature = type.getTypeSignature();
-                        typeName = signature.getBase().toUpperCase(ENGLISH);
-                        dataType = JDBCType.valueOf(typeName).getVendorTypeNumber();
-                        if (type instanceof DecimalType) {
-                            precision = ((DecimalType) type).getPrecision();
-                            scale = ((DecimalType) type).getScale();
-                        }
-                    }
-                }
-                boolean isNullable = metaData.isNullable(i) != ResultSetMetaData.columnNoNulls;
-
-                JdbcTypeHandle typeHandle = new JdbcTypeHandle(dataType, Optional.ofNullable(typeName), precision, scale, Optional.empty());
-                Optional<ColumnMapping> columnMapping;
-                try {
-                    columnMapping = toPrestoType(session, connection, typeHandle);
-                }
-                catch (UnsupportedOperationException ex) {
-                    throw new PrestoException(JDBC_UNSUPPORTED_EXPRESSION, format("Data type [%s] is not support", typeHandle.getJdbcTypeName()));
-                }
-                // skip unsupported column types
-                if (columnMapping.isPresent()) {
-                    Type type = columnMapping.get().getType();
-                    JdbcColumnHandle handle = new JdbcColumnHandle(columnName, typeHandle, type, isNullable);
-                    columnBuilder.put(columnName.toLowerCase(ENGLISH), handle);
-                }
-                else {
-                    return Collections.emptyMap();
-                }
-            }
-
-            return columnBuilder.build();
-        }
-        catch (SQLException | PrestoException e) {
-            throw new PrestoException(JDBC_QUERY_GENERATOR_FAILURE, String.format("Query generator failed for [%s]", e.getMessage()));
-        }
     }
 
     private ColumnMapping jsonColumnMapping()

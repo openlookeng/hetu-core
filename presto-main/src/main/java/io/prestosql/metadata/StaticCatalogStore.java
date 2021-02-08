@@ -32,8 +32,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.catalog.CatalogFilePath.getCatalogBasePath;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 
 public class StaticCatalogStore
 {
@@ -95,7 +95,7 @@ public class StaticCatalogStore
 
         log.info("-- Loading catalog %s --", file);
 
-        Map<String, String> properties = new HashMap<>(loadPropertiesFrom(file.getPath()));
+        Map<String, String> properties = new HashMap<>(loadProperties(file));
         catalogStoreUtil.decryptEncryptedProperties(catalogName, properties);
 
         String connectorName = properties.remove("connector.name");

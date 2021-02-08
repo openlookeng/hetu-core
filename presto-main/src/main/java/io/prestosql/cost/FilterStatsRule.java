@@ -15,20 +15,15 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.FilterNode;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.isDefaultFilterFactorEnabled;
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 
 public class FilterStatsRule
         extends SimpleStatsRule<FilterNode>
@@ -53,18 +48,7 @@ public class FilterStatsRule
     public Optional<PlanNodeStatsEstimate> doCalculate(FilterNode node, StatsProvider statsProvider, Lookup lookup, Session session, TypeProvider types)
     {
         PlanNodeStatsEstimate sourceStats = statsProvider.getStats(node.getSource());
-        PlanNodeStatsEstimate estimate;
-        if (isExpression(node.getPredicate())) {
-            estimate = filterStatsCalculator.filterStats(sourceStats, castToExpression(node.getPredicate()), session, types);
-        }
-        else {
-            Map<Integer, Symbol> layout = new HashMap<>();
-            int channel = 0;
-            for (Symbol symbol : node.getSource().getOutputSymbols()) {
-                layout.put(channel++, symbol);
-            }
-            estimate = filterStatsCalculator.filterStats(sourceStats, node.getPredicate(), session, types, layout);
-        }
+        PlanNodeStatsEstimate estimate = filterStatsCalculator.filterStats(sourceStats, node.getPredicate(), session, types);
         if (isDefaultFilterFactorEnabled(session) && estimate.isOutputRowCountUnknown()) {
             estimate = sourceStats.mapOutputRowCount(sourceRowCount -> sourceStats.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);
         }

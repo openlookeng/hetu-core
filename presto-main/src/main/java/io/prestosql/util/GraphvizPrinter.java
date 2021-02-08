@@ -18,39 +18,30 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.GroupIdNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.Partitioning.ArgumentBinding;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.SubPlan;
-import io.prestosql.sql.planner.SymbolUtils;
-import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
@@ -59,11 +50,17 @@ import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,7 +71,6 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Maps.immutableEnumMap;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static io.prestosql.sql.planner.planprinter.PlanPrinter.formatAggregation;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
@@ -204,7 +200,7 @@ public final class GraphvizPrinter
     }
 
     private static class NodePrinter
-            extends InternalPlanVisitor<Void, Void>
+            extends PlanVisitor<Void, Void>
     {
         private static final int MAX_NAME_WIDTH = 100;
         private final StringBuilder output;
@@ -217,7 +213,7 @@ public final class GraphvizPrinter
         }
 
         @Override
-        public Void visitPlan(PlanNode node, Void context)
+        protected Void visitPlan(PlanNode node, Void context)
         {
             throw new UnsupportedOperationException(format("Node %s does not have a Graphviz visitor", node.getClass().getName()));
         }
@@ -291,10 +287,10 @@ public final class GraphvizPrinter
         }
 
         @Override
-        public Void visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
+        public Void visitTopNRowNumber(TopNRowNumberNode node, Void context)
         {
             printNode(node,
-                    "TopNRankingNumber",
+                    "TopNRowNumber",
                     format("partition by = %s|order by = %s|n = %s",
                             Joiner.on(", ").join(node.getPartitionBy()),
                             Joiner.on(", ").join(node.getOrderingScheme().getOrderBy()), node.getMaxRowCountPerPartition()),
@@ -325,7 +321,7 @@ public final class GraphvizPrinter
         public Void visitExchange(ExchangeNode node, Void context)
         {
             List<ArgumentBinding> symbols = node.getOutputSymbols().stream()
-                    .map(SymbolUtils::toSymbolReference)
+                    .map(Symbol::toSymbolReference)
                     .map(ArgumentBinding::expressionBinding)
                     .collect(toImmutableList());
             if (node.getType() == REPARTITION) {
@@ -376,9 +372,9 @@ public final class GraphvizPrinter
         public Void visitProject(ProjectNode node, Void context)
         {
             StringBuilder builder = new StringBuilder();
-            for (Map.Entry<Symbol, RowExpression> entry : node.getAssignments().entrySet()) {
-                if ((entry.getValue() instanceof VariableReferenceExpression) &&
-                        ((VariableReferenceExpression) entry.getValue()).getName().equals(entry.getKey().getName())) {
+            for (Map.Entry<Symbol, Expression> entry : node.getAssignments().entrySet()) {
+                if ((entry.getValue() instanceof SymbolReference) &&
+                        ((SymbolReference) entry.getValue()).getName().equals(entry.getKey().getName())) {
                     // skip identity assignments
                     continue;
                 }
@@ -457,7 +453,7 @@ public final class GraphvizPrinter
         {
             List<Expression> joinExpressions = new ArrayList<>();
             for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
-                joinExpressions.add(JoinNodeUtils.toExpression(clause));
+                joinExpressions.add(clause.toExpression());
             }
 
             String criteria = Joiner.on(" AND ").join(joinExpressions);
@@ -542,8 +538,8 @@ public final class GraphvizPrinter
             List<Expression> joinExpressions = new ArrayList<>();
             for (IndexJoinNode.EquiJoinClause clause : node.getCriteria()) {
                 joinExpressions.add(new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
-                        toSymbolReference(clause.getProbe()),
-                        toSymbolReference(clause.getIndex())));
+                        clause.getProbe().toSymbolReference(),
+                        clause.getIndex().toSymbolReference()));
             }
 
             String criteria = Joiner.on(" AND ").join(joinExpressions);
@@ -615,7 +611,7 @@ public final class GraphvizPrinter
     }
 
     private static class EdgePrinter
-            extends InternalPlanVisitor<Void, Void>
+            extends PlanVisitor<Void, Void>
     {
         private final StringBuilder output;
         private final Map<PlanFragmentId, PlanFragment> fragmentsById;
@@ -629,7 +625,7 @@ public final class GraphvizPrinter
         }
 
         @Override
-        public Void visitPlan(PlanNode node, Void context)
+        protected Void visitPlan(PlanNode node, Void context)
         {
             for (PlanNode child : node.getSources()) {
                 printEdge(node, child);

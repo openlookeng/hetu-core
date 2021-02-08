@@ -486,17 +486,3 @@ export function formatShortDateTime(date: Date): string {
     const dayOfMonth = "" + date.getDate();
     return year + "-" + (month[1] ? month : "0" + month[0]) + "-" + (dayOfMonth[1] ? dayOfMonth: "0" + dayOfMonth[0]) + " " + formatShortTime(date);
 }
-
-export function bubbleSort(arr): void {
-    let len = arr.length;
-    for(let i = 0; i < len - 1; i++) {
-        for(let j = 0; j < len - 1 - i; j++) {
-            if(arr[j].value < arr[j+1].value) {
-                let temp = arr[j+1];
-                arr[j+1] = arr[j];
-                arr[j] = temp;
-            }
-        }
-    }
-    return arr;
-}

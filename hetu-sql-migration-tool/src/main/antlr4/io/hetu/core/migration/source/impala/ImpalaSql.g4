@@ -192,6 +192,9 @@ kuduAttributes
     : '{' ((NOT)? NULL | ENCODING expression | COMPRESSION expression | DEFAULT expression | BLOCK_SIZE number) '}'
     ;
 
+likeClause
+    : LIKE qualifiedName (optionType=(INCLUDING | EXCLUDING) PROPERTIES)?
+    ;
 hintClause
     : '-- +SHUFFLE' | '-- +NOSHUFFLE -- +CLUSTERED'
     | '/* +SHUFFLE */' | '/* +NOSHUFFLE */' | '/* +CLUSTERED */'
@@ -390,7 +393,13 @@ primaryExpression
     | value=primaryExpression '[' index=valueExpression ']'                               #subscript
     | identifier                                                                          #columnReference
     | base=primaryExpression '.' fieldName=identifier                                     #dereference
-    | name=CURRENT_TIMESTAMP '(' ')'                                                      #specialDateTimeFunction
+    | name=CURRENT_DATE                                                                   #specialDateTimeFunction
+    | name=CURRENT_TIME ('(' precision=INTEGER_VALUE ')')?                                #specialDateTimeFunction
+    | name=CURRENT_TIMESTAMP ('(' precision=INTEGER_VALUE ')')?                           #specialDateTimeFunction
+    | name=LOCALTIME ('(' precision=INTEGER_VALUE ')')?                                   #specialDateTimeFunction
+    | name=LOCALTIMESTAMP ('(' precision=INTEGER_VALUE ')')?                              #specialDateTimeFunction
+    | name=CURRENT_USER                                                                   #currentUser
+    | name=CURRENT_PATH                                                                   #currentPath
     | SUBSTRING '(' valueExpression FROM valueExpression (FOR valueExpression)? ')'       #substring
     | NORMALIZE '(' valueExpression (',' normalForm)? ')'                                 #normalize
     | EXTRACT '(' identifier FROM valueExpression ')'                                     #extract
@@ -400,6 +409,7 @@ primaryExpression
 
 string
     : STRING                                #basicStringLiteral
+    | UNICODE_STRING (UESCAPE STRING)?      #unicodeStringLiteral
     ;
 
 comparisonOperator
@@ -836,6 +846,10 @@ CONCAT: '||';
 STRING
     : '\'' (~'\'' | '\\' | ('\\' '\''))* '\''
     | '"' (~'"' | '\\' | '\\"')* '"'
+    ;
+
+UNICODE_STRING
+    : 'U&\'' ( ~'\'' | '\'\'' )* '\''
     ;
 
 // Note: we allow any character inside the binary literal and validate

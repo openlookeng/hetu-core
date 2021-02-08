@@ -13,8 +13,6 @@
  */
 package io.prestosql.sql.planner;
 
-import io.prestosql.spi.plan.Symbol;
-
 public interface SymbolResolver
 {
     Object getValue(Symbol symbol);

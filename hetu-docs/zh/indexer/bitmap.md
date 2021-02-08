@@ -1,40 +1,19 @@
 
-# BitMap（位图）索引
-
-BitMap索引使用位图。索引的大小随着索引列中不同值的个数而增加。例如，一个标记性别的列很小，而一个ID列的索引则会极大（不推荐）。
-
-注意：在ORC算子下推启用时，BitMap索引效果更好。可以通过设置`hive.properties`中的`hive.orc-predicate-pushdown-enabled=true`来启用，
-或者在命令行中启用`set session hive.orc_predicate_pushdown_enabled=true;`。
-
-参见[Properties](../admin/properties.md)获得更多信息。
-
-## 过滤
-
-1. BitMap索引用于过滤从ORC文件中读取的数据，且仅供worker节点使用。
-
-## 选择适用的列
-
-BitMap索引在拥有较少不同值数量的列上比较适用，例如：性别。
-
-## 支持的运算符
-
-    =   Equality
-    
-## 支持的列类型
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+# 位图索引
 
 ## 用例
 
-创建：
-```sql
-create index idx using bitmap on hive.hindex.users (gender);
-create index idx using bitmap on hive.hindex.users (gender) where regionkey=1;
-create index idx using bitmap on hive.hindex.users (gender) where regionkey in (3, 1);
+位图索引用于过滤从ORC文件中读取的数据，且仅供**worker**节点使用。
+
+- 如果包含这个索引的列是查询中谓词的一部分，那么读取ORC文件的性能可能会得提升。
+
+例如，如果索引在`country`列，并且查询语句是
+
+``` sql
+select * from table where country="China"
 ```
 
-* 假设表已按照`regionkey`列分区
+- 如果列的值不是太明显（例如国家）和分散，则此索引最有效。
 
-使用:
-```sql
-select name from hive.hindex.users where gender="female"
-```
+例如，假设表存储的是用户来自何处的信息，并且表数据存在于10个文件中。可能有多个用户来自某一国家，因此每个文件将有一些来自该国的用户。如果我们在国家列创建一个位图索引，那么在读取数据文件时，我们可以在早期执行过滤。即，谓词被下推到文件读取。如果没有这个索引，所有的数据文件将会作为页读入内存，然后再过滤。如果有此索引，我们可以确保内存页中已经只包含与谓词匹配的行。这有助于减少内存和CPU使用率，并且提高多并发查询的性能。
+

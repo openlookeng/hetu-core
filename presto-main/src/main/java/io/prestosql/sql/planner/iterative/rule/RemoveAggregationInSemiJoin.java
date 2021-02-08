@@ -17,8 +17,8 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import static com.google.common.collect.Iterables.getOnlyElement;

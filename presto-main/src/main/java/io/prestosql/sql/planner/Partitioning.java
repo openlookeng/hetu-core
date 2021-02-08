@@ -19,12 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.NullableValue;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.sql.tree.CoalesceExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 
@@ -32,25 +27,16 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.prestosql.spi.relation.SpecialForm.Form.COALESCE;
-import static io.prestosql.sql.planner.Partitioning.ArgumentBinding.expressionBinding;
-import static io.prestosql.sql.planner.SymbolUtils.from;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
@@ -68,7 +54,7 @@ public final class Partitioning
     public static Partitioning create(PartitioningHandle handle, List<Symbol> columns)
     {
         return new Partitioning(handle, columns.stream()
-                .map(SymbolUtils::toSymbolReference)
+                .map(Symbol::toSymbolReference)
                 .map(ArgumentBinding::expressionBinding)
                 .collect(toImmutableList()));
     }
@@ -331,7 +317,7 @@ public final class Partitioning
         public Symbol getColumn()
         {
             verify(expression instanceof SymbolReference, "Expect the expression to be a SymbolReference");
-            return from(expression);
+            return Symbol.from(expression);
         }
 
         @JsonProperty
@@ -351,7 +337,7 @@ public final class Partitioning
             if (isConstant()) {
                 return this;
             }
-            return expressionBinding(toSymbolReference(translator.apply(from(expression))));
+            return expressionBinding(translator.apply(Symbol.from(expression)).toSymbolReference());
         }
 
         public Optional<ArgumentBinding> translate(Translator translator)
@@ -362,12 +348,12 @@ public final class Partitioning
 
             if (!isVariable()) {
                 return translator.expressionTranslator.apply(expression)
-                        .map(SymbolUtils::toSymbolReference)
+                        .map(Symbol::toSymbolReference)
                         .map(ArgumentBinding::expressionBinding);
             }
 
-            Optional<ArgumentBinding> newColumn = translator.columnTranslator.apply(SymbolUtils.from(expression))
-                    .map(SymbolUtils::toSymbolReference)
+            Optional<ArgumentBinding> newColumn = translator.columnTranslator.apply(Symbol.from(expression))
+                    .map(Symbol::toSymbolReference)
                     .map(ArgumentBinding::expressionBinding);
             if (newColumn.isPresent()) {
                 return newColumn;
@@ -375,7 +361,7 @@ public final class Partitioning
             // As a last resort, check for a constant mapping for the symbol
             // Note: this MUST be last because we want to favor the symbol representation
             // as it makes further optimizations possible.
-            return translator.constantTranslator.apply(from(expression))
+            return translator.constantTranslator.apply(Symbol.from(expression))
                     .map(ArgumentBinding::constantBinding);
         }
 
@@ -408,67 +394,5 @@ public final class Partitioning
         {
             return Objects.hash(expression, constant);
         }
-    }
-
-    public Optional<Partitioning> translateRowExpression(Map<Symbol, Partitioning.ArgumentBinding> inputToOutputMappings, Map<Symbol, RowExpression> assignments, TypeProvider types)
-    {
-        ImmutableList.Builder<ArgumentBinding> newArguments = ImmutableList.builder();
-        for (ArgumentBinding argument : arguments) {
-            if (argument.isConstant()) {
-                newArguments.add(argument);
-            }
-            else if (argument.isVariable()) {
-                Symbol symbol = SymbolUtils.from(argument.getExpression());
-                if (!inputToOutputMappings.containsKey(symbol)) {
-                    return Optional.empty();
-                }
-                newArguments.add(inputToOutputMappings.get(symbol));
-            }
-            else {
-                checkArgument(argument.getExpression() instanceof CoalesceExpression, format("Expect argument to be COALESCE but get %s", argument.getExpression()));
-                Set<Expression> coalesceArguments = ImmutableSet.copyOf(((CoalesceExpression) argument.getExpression()).getOperands());
-                if (!coalesceArguments.stream().allMatch(SymbolReference.class::isInstance)) {
-                    break;
-                }
-                // We are using the property that the result of coalesce from full outer join keys would not be null despite of the order
-                // of the arguments. Thus we extract and compare the variables of the COALESCE as a set rather than compare COALESCE directly.
-                Symbol translated = null;
-                for (Map.Entry<Symbol, RowExpression> entry : assignments.entrySet()) {
-                    if (isExpression(entry.getValue())) {
-                        if (castToExpression(entry.getValue()) instanceof CoalesceExpression) {
-                            Set<Expression> coalesceOperands = ImmutableSet.copyOf(((CoalesceExpression) castToExpression(entry.getValue())).getOperands());
-                            if (!coalesceOperands.stream().allMatch(SymbolReference.class::isInstance)) {
-                                continue;
-                            }
-
-                            if (coalesceOperands.equals(coalesceArguments)) {
-                                translated = entry.getKey();
-                                break;
-                            }
-                        }
-                    }
-                    else {
-                        if (entry.getValue() instanceof SpecialForm && ((SpecialForm) entry.getValue()).getForm().equals(COALESCE)) {
-                            Set<RowExpression> assignmentArguments = ImmutableSet.copyOf(((SpecialForm) entry.getValue()).getArguments());
-                            if (!assignmentArguments.stream().allMatch(VariableReferenceExpression.class::isInstance)) {
-                                continue;
-                            }
-
-                            Set<Expression> assignmentSet = assignmentArguments.stream().map(arg -> new SymbolReference(((VariableReferenceExpression) arg).getName())).collect(Collectors.toSet());
-                            if (assignmentSet.equals(coalesceArguments)) {
-                                translated = entry.getKey();
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (translated == null) {
-                    return Optional.empty();
-                }
-                newArguments.add(expressionBinding(new SymbolReference(translated.getName())));
-            }
-        }
-
-        return Optional.of(new Partitioning(handle, newArguments.build()));
     }
 }

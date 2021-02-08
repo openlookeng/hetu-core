@@ -16,11 +16,11 @@ package io.prestosql.cost;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import org.testng.annotations.Test;
@@ -30,14 +30,12 @@ import java.util.Optional;
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.cost.PlanNodeStatsAssertion.assertThat;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
-import static io.prestosql.spi.plan.JoinNode.Type.FULL;
-import static io.prestosql.spi.plan.JoinNode.Type.INNER;
-import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
-import static io.prestosql.spi.plan.JoinNode.Type.RIGHT;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.FULL;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.LEFT;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.RIGHT;
 import static java.lang.Double.NaN;
 import static org.testng.Assert.assertEquals;
 
@@ -181,13 +179,13 @@ public class TestJoinStatsRule
             Symbol rightJoinColumnSymbol = pb.symbol(RIGHT_JOIN_COLUMN, DOUBLE);
             Symbol leftJoinColumnSymbol2 = pb.symbol(LEFT_JOIN_COLUMN_2, BIGINT);
             Symbol rightJoinColumnSymbol2 = pb.symbol(RIGHT_JOIN_COLUMN_2, DOUBLE);
-            ComparisonExpression leftJoinColumnLessThanTen = new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN, toSymbolReference(leftJoinColumnSymbol), new LongLiteral("10"));
+            ComparisonExpression leftJoinColumnLessThanTen = new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN, leftJoinColumnSymbol.toSymbolReference(), new LongLiteral("10"));
             return pb
                     .join(INNER, pb.values(leftJoinColumnSymbol, leftJoinColumnSymbol2),
                             pb.values(rightJoinColumnSymbol, rightJoinColumnSymbol2),
                             ImmutableList.of(new EquiJoinClause(leftJoinColumnSymbol2, rightJoinColumnSymbol2), new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol)),
                             ImmutableList.of(leftJoinColumnSymbol, leftJoinColumnSymbol2, rightJoinColumnSymbol, rightJoinColumnSymbol2),
-                            Optional.of(castToRowExpression(leftJoinColumnLessThanTen)));
+                            Optional.of(leftJoinColumnLessThanTen));
         }).withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
                 .withSourceStats(1, planNodeStats(RIGHT_ROWS_COUNT, RIGHT_JOIN_COLUMN_STATS, RIGHT_JOIN_COLUMN_2_STATS))
                 .check(stats -> stats.equalTo(innerJoinStats));

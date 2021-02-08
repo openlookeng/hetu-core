@@ -16,6 +16,7 @@ package io.prestosql.tests;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.testing.Closeables;
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.metadata.AllNodes;
 import io.prestosql.metadata.InternalNode;
@@ -24,10 +25,8 @@ import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.Plugin;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
-import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
@@ -151,12 +150,6 @@ public final class StandaloneQueryRunner
     public NodePartitioningManager getNodePartitioningManager()
     {
         return server.getNodePartitioningManager();
-    }
-
-    @Override
-    public ConnectorPlanOptimizerManager getPlanOptimizerManager()
-    {
-        return server.getPlanOptimizerManager();
     }
 
     @Override

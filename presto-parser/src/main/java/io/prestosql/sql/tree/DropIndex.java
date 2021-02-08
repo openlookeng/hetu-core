@@ -27,24 +27,22 @@ public class DropIndex
 {
     private final QualifiedName indexName;
     private final boolean exists;
-    private final Optional<Expression> where;
 
     public DropIndex(QualifiedName indexName, boolean exists)
     {
-        this(Optional.empty(), indexName, exists, Optional.empty());
+        this(Optional.empty(), indexName, exists);
     }
 
-    public DropIndex(NodeLocation location, QualifiedName indexName, boolean exists, Optional<Expression> where)
+    public DropIndex(NodeLocation location, QualifiedName indexName, boolean exists)
     {
-        this(Optional.of(location), indexName, exists, where);
+        this(Optional.of(location), indexName, exists);
     }
 
-    private DropIndex(Optional<NodeLocation> location, QualifiedName indexName, boolean exists, Optional<Expression> where)
+    private DropIndex(Optional<NodeLocation> location, QualifiedName indexName, boolean exists)
     {
         super(location);
         this.indexName = indexName;
         this.exists = exists;
-        this.where = where;
     }
 
     public QualifiedName getIndexName()
@@ -52,14 +50,9 @@ public class DropIndex
         return indexName;
     }
 
-    public boolean exists()
+    public boolean isExists()
     {
         return exists;
-    }
-
-    public Optional<Expression> getPartitions()
-    {
-        return where;
     }
 
     @Override

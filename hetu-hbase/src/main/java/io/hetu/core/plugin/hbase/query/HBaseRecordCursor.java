@@ -26,6 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 
+import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.List;
 
@@ -186,6 +187,22 @@ public class HBaseRecordCursor
         if (iterator.hasNext()) {
             serializer.reset();
             Result row = iterator.next();
+
+            bytesRead += row.getRow().length;
+
+            byte[] bytes;
+            for (HBaseColumnHandle hc : columnHandles) {
+                if (!hc.getName().equals(rowIdName)) {
+                    bytes =
+                            row.getValue(
+                                    hc.getFamily().get().getBytes(Charset.forName("UTF-8")),
+                                    hc.getQualifier().get().getBytes(Charset.forName("UTF-8")));
+                    if (bytes != null) {
+                        bytesRead += bytes.length;
+                    }
+                }
+            }
+
             serializer.deserialize(row, this.defaultValue);
             return true;
         }

@@ -18,9 +18,9 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.operator.JoinProbe.JoinProbeFactory;
 import io.prestosql.operator.LookupJoinOperators.JoinType;
 import io.prestosql.operator.LookupOuterOperator.LookupOuterOperatorFactory;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpillerFactory;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Optional;

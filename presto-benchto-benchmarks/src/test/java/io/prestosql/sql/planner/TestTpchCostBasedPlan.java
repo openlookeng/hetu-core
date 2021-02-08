@@ -71,15 +71,15 @@ public class TestTpchCostBasedPlan
     protected Stream<String> getQueryResourcePaths()
     {
         return IntStream.range(1, 23)
-                .boxed()
-                .flatMap(i -> {
-                    String queryId = format("q%02d", i);
-                    if (i == 17) {
-                        return Stream.of(queryId + "_1", queryId + "_2");
-                    }
-                    return Stream.of(queryId);
-                })
-                .map(queryId -> format("/sql/presto/tpch/%s.sql", queryId));
+            .boxed()
+            .flatMap(i -> {
+                String queryId = format("q%02d", i);
+                if (i == 17) {
+                    return Stream.of(queryId + "_1", queryId + "_2");
+                }
+                return Stream.of(queryId);
+            })
+            .map(queryId -> format("/sql/presto/tpch/%s.sql", queryId));
     }
 
     @SuppressWarnings("unused")

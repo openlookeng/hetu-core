@@ -29,20 +29,16 @@ import io.prestosql.matching.Match;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.Plan;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
-import io.prestosql.sql.planner.RuleStatsRecorder;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
-import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Memo;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.transaction.TransactionManager;
 
 import java.util.HashMap;
@@ -167,13 +163,13 @@ public class RuleAssert
 
     private RuleApplication applyRule()
     {
-        PlanSymbolAllocator planSymbolAllocator = new PlanSymbolAllocator(types.allTypes());
+        SymbolAllocator symbolAllocator = new SymbolAllocator(types.allTypes());
         Memo memo = new Memo(idAllocator, plan);
         Lookup lookup = Lookup.from(planNode -> Stream.of(memo.resolve(planNode)));
 
         PlanNode memoRoot = memo.getNode(memo.getRootGroup());
 
-        return inTransaction(session -> applyRule(rule, memoRoot, ruleContext(statsCalculator, costCalculator, planSymbolAllocator, memo, lookup, session)));
+        return inTransaction(session -> applyRule(rule, memoRoot, ruleContext(statsCalculator, costCalculator, symbolAllocator, memo, lookup, session)));
     }
 
     private static <T> RuleApplication applyRule(Rule<T> rule, PlanNode planNode, Rule.Context context)
@@ -198,7 +194,7 @@ public class RuleAssert
     {
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, session, types);
-        return inTransaction(session -> textLogicalPlan(translateExpressions(plan, types), types, metadata, StatsAndCosts.create(plan, statsProvider, costProvider), session, 2, false));
+        return inTransaction(session -> textLogicalPlan(plan, types, metadata, StatsAndCosts.create(plan, statsProvider, costProvider), session, 2, false));
     }
 
     private <T> T inTransaction(Function<Session, T> transactionSessionConsumer)
@@ -212,16 +208,10 @@ public class RuleAssert
                 });
     }
 
-    private PlanNode translateExpressions(PlanNode node, TypeProvider typeProvider)
+    private Rule.Context ruleContext(StatsCalculator statsCalculator, CostCalculator costCalculator, SymbolAllocator symbolAllocator, Memo memo, Lookup lookup, Session session)
     {
-        IterativeOptimizer optimizer = new IterativeOptimizer(new RuleStatsRecorder(), statsCalculator, costCalculator, new TranslateExpressions(metadata, new SqlParser()).rules(metadata));
-        return optimizer.optimize(node, session, typeProvider, new PlanSymbolAllocator(typeProvider.allTypes()), idAllocator, WarningCollector.NOOP);
-    }
-
-    private Rule.Context ruleContext(StatsCalculator statsCalculator, CostCalculator costCalculator, PlanSymbolAllocator planSymbolAllocator, Memo memo, Lookup lookup, Session session)
-    {
-        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, Optional.of(memo), lookup, session, planSymbolAllocator.getTypes());
-        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(memo), session, planSymbolAllocator.getTypes());
+        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, Optional.of(memo), lookup, session, symbolAllocator.getTypes());
+        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(memo), session, symbolAllocator.getTypes());
 
         return new Rule.Context()
         {
@@ -238,9 +228,9 @@ public class RuleAssert
             }
 
             @Override
-            public PlanSymbolAllocator getSymbolAllocator()
+            public SymbolAllocator getSymbolAllocator()
             {
-                return planSymbolAllocator;
+                return symbolAllocator;
             }
 
             @Override

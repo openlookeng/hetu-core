@@ -221,24 +221,14 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("Cannot delete from table %s%s", tableName, formatExtraInfo(extraInfo)));
     }
 
-    public static void denyCreateIndex()
+    public static void denyCreateIndex(String indexName)
     {
-        throw new AccessDeniedException("Cannot create index");
-    }
-
-    public static void denyCreateIndex(String tableName)
-    {
-        denyCreateIndex(tableName, null);
+        denyCreateIndex(indexName, null);
     }
 
     public static void denyCreateIndex(String indexName, String extraInfo)
     {
         throw new AccessDeniedException(format("Cannot create index %s%s", indexName, formatExtraInfo(extraInfo)));
-    }
-
-    public static void denyDropIndex()
-    {
-        throw new AccessDeniedException("Cannot drop index");
     }
 
     public static void denyDropIndex(String indexName)
@@ -251,11 +241,6 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("Cannot drop index %s%s", indexName, formatExtraInfo(extraInfo)));
     }
 
-    public static void denyRenameIndex()
-    {
-        throw new AccessDeniedException("Cannot rename index");
-    }
-
     public static void denyRenameIndex(String indexName, String newIndexName)
     {
         denyRenameIndex(indexName, newIndexName, null);
@@ -266,11 +251,6 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("Cannot rename table from %s to %s%s", indexName, newIndexName, formatExtraInfo(extraInfo)));
     }
 
-    public static void denyUpdateIndex()
-    {
-        throw new AccessDeniedException("Cannot update index");
-    }
-
     public static void denyUpdateIndex(String indexName)
     {
         denyUpdateIndex(indexName, null);
@@ -279,21 +259,6 @@ public class AccessDeniedException
     public static void denyUpdateIndex(String indexName, String extraInfo)
     {
         throw new AccessDeniedException(format("Cannot update table %s%s", indexName, formatExtraInfo(extraInfo)));
-    }
-
-    public static void denyShowIndex()
-    {
-        throw new AccessDeniedException("Cannot show index");
-    }
-
-    public static void denyShowIndex(String indexName)
-    {
-        denyShowIndex(indexName, null);
-    }
-
-    public static void denyShowIndex(String indexName, String extraInfo)
-    {
-        throw new AccessDeniedException(format("Cannot show index %s%s", indexName, formatExtraInfo(extraInfo)));
     }
 
     public static void denyCreateView(String viewName)

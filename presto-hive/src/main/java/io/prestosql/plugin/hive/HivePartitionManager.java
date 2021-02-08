@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.airlift.slice.Slice;
-import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.MetastoreUtil;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Table;
@@ -114,7 +113,7 @@ public class HivePartitionManager
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
     }
 
-    public HivePartitionResult getPartitions(SemiTransactionalHiveMetastore metastore, HiveIdentity identity, ConnectorTableHandle tableHandle, Constraint constraint)
+    public HivePartitionResult getPartitions(SemiTransactionalHiveMetastore metastore, ConnectorTableHandle tableHandle, Constraint constraint)
     {
         HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
         TupleDomain<ColumnHandle> effectivePredicate = constraint.getSummary()
@@ -128,7 +127,7 @@ public class HivePartitionManager
             return new HivePartitionResult(partitionColumns, ImmutableList.of(), none(), none(), none(), hiveBucketHandle, Optional.empty());
         }
 
-        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+        Table table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
 
         Optional<HiveBucketing.HiveBucketFilter> bucketFilter = HiveBucketing.getHiveBucketFilter(table, effectivePredicate);
@@ -157,7 +156,7 @@ public class HivePartitionManager
                 .collect(toImmutableList());
         }
         else {
-            List<String> partitionNames = getFilteredPartitionNames(metastore, identity, tableName, partitionColumns, effectivePredicate);
+            List<String> partitionNames = getFilteredPartitionNames(metastore, tableName, partitionColumns, effectivePredicate);
             partitionsIterable = () -> partitionNames.stream()
                     // Apply extra filters which could not be done by getFilteredPartitionNames
                     .map(partitionName -> parseValuesAndFilterPartition(tableName, partitionName, partitionColumns, partitionTypes, effectivePredicate, predicate))
@@ -233,10 +232,10 @@ public class HivePartitionManager
                 handle.isSuitableToPush());
     }
 
-    public List<HivePartition> getOrLoadPartitions(SemiTransactionalHiveMetastore metastore, HiveIdentity identity, HiveTableHandle table)
+    public List<HivePartition> getOrLoadPartitions(SemiTransactionalHiveMetastore metastore, HiveTableHandle table)
     {
         return table.getPartitions().orElseGet(() ->
-                getPartitionsAsList(getPartitions(metastore, identity, table, new Constraint(table.getEnforcedConstraint()))));
+                getPartitionsAsList(getPartitions(metastore, table, new Constraint(table.getEnforcedConstraint()))));
     }
 
     private static TupleDomain<HiveColumnHandle> toCompactTupleDomain(TupleDomain<ColumnHandle> effectivePredicate, int threshold)
@@ -288,7 +287,7 @@ public class HivePartitionManager
         return constraint.test(partition.getKeys());
     }
 
-    private List<String> getFilteredPartitionNames(SemiTransactionalHiveMetastore metastore, HiveIdentity identity, SchemaTableName tableName, List<HiveColumnHandle> partitionKeys, TupleDomain<ColumnHandle> effectivePredicate)
+    private List<String> getFilteredPartitionNames(SemiTransactionalHiveMetastore metastore, SchemaTableName tableName, List<HiveColumnHandle> partitionKeys, TupleDomain<ColumnHandle> effectivePredicate)
     {
         checkArgument(effectivePredicate.getDomains().isPresent());
 
@@ -351,7 +350,7 @@ public class HivePartitionManager
         }
 
         // fetch the partition names
-        return metastore.getPartitionNamesByParts(identity, tableName.getSchemaName(), tableName.getTableName(), filter)
+        return metastore.getPartitionNamesByParts(tableName.getSchemaName(), tableName.getTableName(), filter)
                 .orElseThrow(() -> new TableNotFoundException(tableName));
     }
 

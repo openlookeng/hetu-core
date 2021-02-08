@@ -1,47 +1,22 @@
 
-# MinMax Index
+# Minmax Index
 
-MinMax simply keeps tracks of the largest and smallest value.
-The size of the index is extremely small.
-However, this index will only be useful if the table is sorted
-on the indexed column.
+## Use cases
 
-## Filtering
+MinMax Index is used for split filtering, and is used only by the **coordinator** nodes.
 
-1. MinMax Index is used on coordinator for filtering splits during scheduling
+If this index exists on a column which is part of a predicate in the query, the engine may be able to improve performance by filtering scheduled splits similar to Bloom Index.
 
-## Selecting column for MinMax Index
+For example if an index exists on column
 
-MinMax Index will only work well on columns on which the table is sorted.
-For example, ID or age.
+`age`
 
-## Supported operators
+and the query is
 
-    =       Equality
-    >       Greater than
-    >=      Greater than or equal
-    <       Less than
-    <=      Less than or equal
-
-## Supported column types
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
-
-## Examples
-
-Creating index:
 ```sql
-create index idx using minmax on hive.hindex.users (age);
-create index idx using minmax on hive.hindex.users (age) where regionkey=1;
-create index idx using minmax on hive.hindex.users (age) where regionkey in (3, 1);
+select * from table where age > 50
 ```
 
-* assuming users table is partitioned on `regionkey`
 
-Using index:
-```sql
-select name from hive.hindex.users where age=20
-select name from hive.hindex.users where age>20
-select name from hive.hindex.users where age<20
-select name from hive.hindex.users where age>=20
-select name from hive.hindex.users where age<=20
-```
+
+*Tip: sorting the data on the index column will provide the best results*

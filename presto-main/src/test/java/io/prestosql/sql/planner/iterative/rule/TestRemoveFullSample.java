@@ -19,11 +19,10 @@ import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.plan.SampleNode.Type;
 import org.testng.annotations.Test;
 
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.filter;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expressions;
 
 public class TestRemoveFullSample
         extends BaseRuleTest
@@ -53,8 +52,8 @@ public class TestRemoveFullSample
                                         p.values(
                                                 ImmutableList.of(p.symbol("a"), p.symbol("b")),
                                                 ImmutableList.of(
-                                                        constantExpressions(BIGINT, 1L, 10L),
-                                                        constantExpressions(BIGINT, 2L, 11L))))))
+                                                        expressions("1", "10"),
+                                                        expressions("2", "11"))))))
                 // TODO: verify contents
                 .matches(filter("b > 5", values(ImmutableMap.of("a", 0, "b", 1))));
     }

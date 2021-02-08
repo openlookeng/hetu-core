@@ -14,7 +14,6 @@
 package io.prestosql.cost;
 
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.DateType;
@@ -23,6 +22,7 @@ import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.SmallintType;
 import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 
 import java.util.Collection;

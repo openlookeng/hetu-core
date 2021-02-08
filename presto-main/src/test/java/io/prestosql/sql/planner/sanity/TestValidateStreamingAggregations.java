@@ -15,27 +15,27 @@ package io.prestosql.sql.planner.sanity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
-import io.prestosql.spi.connector.CatalogName;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.PlanNode;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 import java.util.function.Function;
 
-import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
 
 public class TestValidateStreamingAggregations
         extends BasePlanTest

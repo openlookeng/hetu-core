@@ -21,22 +21,19 @@ import com.google.inject.Inject;
 import io.airlift.discovery.client.ServiceSelectorManager;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
-import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.connector.CatalogName;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -49,9 +46,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
@@ -69,8 +66,6 @@ public class DynamicCatalogStore
     private final Duration scanInterval;
     private final DynamicCatalogConfig dynamicCatalogConfig;
     private final CatalogStoreUtil catalogStoreUtil;
-    private CatalogStore localCatalogStore;
-    private CatalogStore shareCatalogStore;
 
     @Inject
     public DynamicCatalogStore(ConnectorManager connectorManager,
@@ -92,47 +87,16 @@ public class DynamicCatalogStore
         this.catalogStoreUtil = catalogStoreUtil;
     }
 
-    public void loadCatalogStores(FileSystemClientManager fileSystemClientManager)
+    public synchronized Set<String> listCatalogNames(CatalogStore catalogStore)
             throws IOException
     {
-        if (!dynamicCatalogConfig.isDynamicCatalogEnabled()) {
-            return;
-        }
-
-        int maxCatalogFileSize = (int) dynamicCatalogConfig.getCatalogMaxFileSize().toBytes();
-        String localConfigurationDir = dynamicCatalogConfig.getCatalogConfigurationDir();
-        Properties properties = new Properties();
-        properties.put("fs.client.type", "local");
-        this.localCatalogStore = new LocalCatalogStore(localConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(properties, Paths.get(localConfigurationDir)),
-                maxCatalogFileSize);
-
-        String shareConfigurationDir = dynamicCatalogConfig.getCatalogShareConfigurationDir();
-        this.shareCatalogStore = new ShareCatalogStore(shareConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(dynamicCatalogConfig.getShareFileSystemProfile(), Paths.get(shareConfigurationDir)),
-                maxCatalogFileSize);
+        return ImmutableSet.copyOf(catalogStore.listCatalogNames());
     }
 
-    private CatalogStore getCatalogStore(CatalogStoreType type)
-    {
-        if (type == CatalogStoreType.LOCAL) {
-            return localCatalogStore;
-        }
-        else {
-            return shareCatalogStore;
-        }
-    }
-
-    public synchronized Set<String> listCatalogNames(CatalogStoreType type)
+    public synchronized String getCatalogVersion(CatalogStore catalogStore, String catalogName)
             throws IOException
     {
-        return ImmutableSet.copyOf(getCatalogStore(type).listCatalogNames());
-    }
-
-    public synchronized String getCatalogVersion(String catalogName, CatalogStoreType type)
-            throws IOException
-    {
-        return getCatalogStore(type).getCatalogInformation(catalogName).getVersion();
+        return catalogStore.getCatalogInformation(catalogName).getVersion();
     }
 
     private void loadLocalCatalog(CatalogStore localCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
@@ -146,7 +110,7 @@ public class DynamicCatalogStore
             // create connection, will load catalog from local disk to catalog manager.
             CatalogFilePath catalogPath = new CatalogFilePath(dynamicCatalogConfig.getCatalogConfigurationDir(), catalogName);
             File propertiesFile = catalogPath.getPropertiesPath().toFile();
-            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(propertiesFile.getPath()));
+            Map<String, String> properties = new HashMap<>(loadProperties(propertiesFile));
             catalogStoreUtil.decryptEncryptedProperties(catalogName, properties);
             properties.remove(CATALOG_NAME);
             connectorManager.createConnection(catalogName, catalogInfo.getConnectorName(), ImmutableMap.copyOf(properties));
@@ -193,7 +157,7 @@ public class DynamicCatalogStore
         log.info("-- Removed catalog [%s] --", catalogName);
     }
 
-    private void updateLocalCatalog(CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
+    private void updateLocalCatalog(CatalogStore localCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
     {
         String catalogName = catalogInfo.getCatalogName();
         log.info("-- Updating catalog [%s] --", catalogName);
@@ -218,7 +182,7 @@ public class DynamicCatalogStore
      * and finally, update the catalogs in announcer, let other coordinator and workers know that current
      * prestoServer haves this catalog.
      */
-    public synchronized void loadCatalog(String catalogName)
+    public synchronized void loadCatalog(CatalogStore localCatalogStore, CatalogStore shareCatalogStore, String catalogName)
     {
         // pull config files from share file system.
         try (CatalogFileInputStream configFiles = shareCatalogStore.getCatalogFiles(catalogName)) {
@@ -239,7 +203,7 @@ public class DynamicCatalogStore
     /**
      * unload catalog from memory
      */
-    public synchronized void unloadCatalog(String catalogName)
+    public synchronized void unloadCatalog(CatalogStore localCatalogStore, String catalogName)
     {
         unloadLocalCatalog(localCatalogStore, catalogName);
     }
@@ -249,10 +213,10 @@ public class DynamicCatalogStore
      *
      * @param catalogName catalog name
      */
-    public synchronized void reloadCatalog(String catalogName)
+    public synchronized void reloadCatalog(CatalogStore localCatalogStore, CatalogStore shareCatalogStore, String catalogName)
     {
-        unloadCatalog(catalogName);
-        loadCatalog(catalogName);
+        unloadCatalog(localCatalogStore, catalogName);
+        loadCatalog(localCatalogStore, shareCatalogStore, catalogName);
     }
 
     /**
@@ -261,7 +225,7 @@ public class DynamicCatalogStore
      *
      * @param configFiles specified config files of catalog.
      */
-    public synchronized void loadCatalogAndCreateShareFiles(CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
+    public synchronized void loadCatalogAndCreateShareFiles(CatalogStore localCatalogStore, CatalogStore shareCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
     {
         String catalogName = catalogInfo.getCatalogName();
         try {
@@ -285,7 +249,7 @@ public class DynamicCatalogStore
         catch (IOException | PrestoException ex) {
             // if it has any exception, rollback
             log.error(ex, "-- Try to load catalog [%s] failed --", catalogName);
-            unloadCatalog(catalogName);
+            unloadCatalog(localCatalogStore, catalogName);
             throw new PrestoException(GENERIC_USER_ERROR, ex.getMessage(), ex);
         }
     }
@@ -295,7 +259,7 @@ public class DynamicCatalogStore
      *
      * @param catalogName catalog name
      */
-    public synchronized void deleteCatalogShareFiles(String catalogName)
+    public synchronized void deleteCatalogShareFiles(CatalogStore shareCatalogStore, String catalogName)
     {
         try {
             shareCatalogStore.deleteCatalog(catalogName, false);
@@ -389,7 +353,7 @@ public class DynamicCatalogStore
         }
     }
 
-    private void updateRemoteCatalog(CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
+    private void updateRemoteCatalog(CatalogStore shareCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
     {
         String catalogName = catalogInfo.getCatalogName();
         // delete catalog files from share file system.
@@ -413,7 +377,7 @@ public class DynamicCatalogStore
         waitForAtLeastOneNodeAddedCatalog(catalogName);
     }
 
-    public synchronized void updateCatalogAndShareFiles(CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
+    public synchronized void updateCatalogAndShareFiles(CatalogStore localCatalogStore, CatalogStore shareCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
     {
         String catalogName = catalogInfo.getCatalogName();
         CatalogInfo previousCatalogInfo;
@@ -449,11 +413,11 @@ public class DynamicCatalogStore
             //      config files need read again when been stored to share file system,
             //      so we need mark the input stream. After updated, reset the input streams.
             newCatalogFiles.mark();
-            updateLocalCatalog(catalogInfo, newCatalogFiles);
+            updateLocalCatalog(localCatalogStore, catalogInfo, newCatalogFiles);
             newCatalogFiles.reset();
 
             // update remote catalog.
-            updateRemoteCatalog(catalogInfo, newCatalogFiles);
+            updateRemoteCatalog(shareCatalogStore, catalogInfo, newCatalogFiles);
         }
         catch (PrestoException | IOException ex) {
             // update failed, rollback.
@@ -477,14 +441,14 @@ public class DynamicCatalogStore
         }
     }
 
-    public Lock getCatalogLock(String catalogName)
+    public Lock getCatalogLock(CatalogStore shareCatalogStore, String catalogName)
             throws IOException
     {
         return shareCatalogStore.getCatalogLock(catalogName);
     }
 
-    public enum CatalogStoreType {
-        LOCAL,
-        SHARE
+    public void releaseCatalogLock(CatalogStore shareCatalogStore, String catalogName)
+    {
+        shareCatalogStore.releaseCatalogLock(catalogName);
     }
 }

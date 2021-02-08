@@ -15,12 +15,10 @@ package io.prestosql.execution.scheduler;
 
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.execution.RemoteTask;
-import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 public interface NodeSelector
@@ -42,12 +40,11 @@ public interface NodeSelector
      * Identifies the nodes for running the specified splits.
      *
      * @param splits the splits that need to be assigned to nodes
-     * @param stage
      * @return a multimap from node to splits only for splits for which we could identify a node to schedule on.
      * If we cannot find an assignment for a split, it is not included in the map. Also returns a future indicating when
      * to reattempt scheduling of this batch of splits, if some of them could not be scheduled.
      */
-    SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage);
+    SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks);
 
     /**
      * Identifies the nodes for running the specified splits based on a precomputed fixed partitioning.

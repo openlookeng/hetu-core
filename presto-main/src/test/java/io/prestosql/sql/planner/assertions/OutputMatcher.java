@@ -17,14 +17,13 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
 import static java.util.Objects.requireNonNull;
@@ -54,7 +53,7 @@ public class OutputMatcher
             boolean found = false;
             while (i < node.getOutputSymbols().size()) {
                 Symbol outputSymbol = node.getOutputSymbols().get(i++);
-                if (expression.equals(toSymbolReference(outputSymbol))) {
+                if (expression.equals(outputSymbol.toSymbolReference())) {
                     found = true;
                     break;
                 }

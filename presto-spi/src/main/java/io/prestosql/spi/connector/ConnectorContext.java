@@ -19,7 +19,6 @@ import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
-import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 
 public interface ConnectorContext
@@ -55,11 +54,6 @@ public interface ConnectorContext
     }
 
     default HetuMetastore getHetuMetastore()
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    default RowExpressionService getRowExpressionService()
     {
         throw new UnsupportedOperationException();
     }

@@ -49,11 +49,9 @@ import static io.prestosql.spi.security.AccessDeniedException.denyRevokeTablePri
 import static io.prestosql.spi.security.AccessDeniedException.denySelectColumns;
 import static io.prestosql.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowColumnsMetadata;
-import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowRoles;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowSchemas;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowTablesMetadata;
-import static io.prestosql.spi.security.AccessDeniedException.denyUpdateIndex;
 
 public interface SystemAccessControl
 {
@@ -355,20 +353,7 @@ public interface SystemAccessControl
      *
      * @throws AccessDeniedException if not allowed
      */
-    default void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index)
-    {
-        denyUpdateIndex(index.toString());
-    }
-
-    /**
-     * Check if identity is allowed to show the specified index
-     *
-     * @throws AccessDeniedException if not allowed
-     */
-    default void checkCanShowIndex(Identity identity, CatalogSchemaTableName index)
-    {
-        denyShowIndex(index.toString());
-    }
+    default void checkCanUpdateIndex(Identity identity, CatalogSchemaTableName index) {}
 
     /**
      * Check if identity is allowed to create the specified view in a catalog.

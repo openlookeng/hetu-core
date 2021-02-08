@@ -18,7 +18,6 @@ package io.hetu.core.heuristicindex.filter;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.InListExpression;
@@ -99,33 +98,15 @@ public class HeuristicIndexFilter
         return Collections.emptyIterator();
     }
 
-    private static Expression extractExpression(Expression expression)
-    {
-        if (expression instanceof Cast) {
-            // extract the inner expression for CAST expressions
-            return extractExpression(((Cast) expression).getExpression());
-        }
-        else {
-            return expression;
-        }
-    }
-
     // Apply the indices on the expression. Currently only ComparisonExpression is supported
     private boolean matchAny(ComparisonExpression compExp)
     {
-        Expression left = extractExpression(compExp.getLeft());
-        Expression right = extractExpression(compExp.getRight());
-
-        if (!(left instanceof SymbolReference)) {
+        if (!(compExp.getLeft() instanceof SymbolReference)) {
             return true;
         }
 
-        String columnName = ((SymbolReference) left).getName();
+        String columnName = ((SymbolReference) compExp.getLeft()).getName();
         List<IndexMetadata> selectedIndices = HeuristicIndexSelector.select(compExp, indices.get(columnName));
-
-        if (selectedIndices == null || selectedIndices.isEmpty()) {
-            return true;
-        }
 
         for (IndexMetadata indexMetadata : selectedIndices) {
             if (indexMetadata == null || indexMetadata.getIndex() == null) {
@@ -138,7 +119,7 @@ public class HeuristicIndexFilter
                     return true;
                 }
             }
-            catch (UnsupportedOperationException e) {
+            catch (IllegalArgumentException e) {
                 // Unable to apply the index. Don't filter out
                 return true;
             }

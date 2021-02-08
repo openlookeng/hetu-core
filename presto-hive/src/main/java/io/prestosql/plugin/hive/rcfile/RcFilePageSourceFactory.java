@@ -31,9 +31,10 @@ import io.prestosql.rcfile.RcFileReader;
 import io.prestosql.rcfile.binary.BinaryRcFileEncoding;
 import io.prestosql.rcfile.text.TextRcFileEncoding;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -54,8 +55,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
@@ -107,7 +110,7 @@ public class RcFilePageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Optional<DynamicFilterSupplier> dynamicFilters,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

@@ -16,25 +16,23 @@ package io.prestosql.sql.planner.optimizations;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.optimizations.PlanNodeDecorrelator.DecorrelatedNode;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
 
@@ -45,11 +43,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypeSignatures;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 
@@ -57,15 +53,15 @@ import static java.util.Objects.requireNonNull;
 public class ScalarAggregationToJoinRewriter
 {
     private final Metadata metadata;
-    private final PlanSymbolAllocator planSymbolAllocator;
+    private final SymbolAllocator symbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
     private final Lookup lookup;
     private final PlanNodeDecorrelator planNodeDecorrelator;
 
-    public ScalarAggregationToJoinRewriter(Metadata metadata, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
+    public ScalarAggregationToJoinRewriter(Metadata metadata, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
-        this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
+        this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
         this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
         this.lookup = requireNonNull(lookup, "lookup is null");
         this.planNodeDecorrelator = new PlanNodeDecorrelator(idAllocator, lookup);
@@ -79,10 +75,10 @@ public class ScalarAggregationToJoinRewriter
             return lateralJoinNode;
         }
 
-        Symbol nonNull = planSymbolAllocator.newSymbol("non_null", BooleanType.BOOLEAN);
+        Symbol nonNull = symbolAllocator.newSymbol("non_null", BooleanType.BOOLEAN);
         Assignments scalarAggregationSourceAssignments = Assignments.builder()
-                .putAll(AssignmentUtils.identityAsSymbolReferences(source.get().getNode().getOutputSymbols()))
-                .put(nonNull, castToRowExpression(TRUE_LITERAL))
+                .putIdentities(source.get().getNode().getOutputSymbols())
+                .put(nonNull, TRUE_LITERAL)
                 .build();
         ProjectNode scalarAggregationSourceWithNonNullableSymbol = new ProjectNode(
                 idAllocator.getNextId(),
@@ -107,7 +103,7 @@ public class ScalarAggregationToJoinRewriter
         AssignUniqueId inputWithUniqueColumns = new AssignUniqueId(
                 idAllocator.getNextId(),
                 lateralJoinNode.getInput(),
-                planSymbolAllocator.newSymbol("unique", BigintType.BIGINT));
+                symbolAllocator.newSymbol("unique", BigintType.BIGINT));
 
         JoinNode leftOuterJoin = new JoinNode(
                 idAllocator.getNextId(),
@@ -119,7 +115,7 @@ public class ScalarAggregationToJoinRewriter
                         .addAll(inputWithUniqueColumns.getOutputSymbols())
                         .addAll(scalarAggregationSource.getOutputSymbols())
                         .build(),
-                joinExpression.map(OriginalExpressionUtils::castToRowExpression),
+                joinExpression,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -144,7 +140,7 @@ public class ScalarAggregationToJoinRewriter
 
         if (subqueryProjection.isPresent()) {
             Assignments assignments = Assignments.builder()
-                    .putAll(AssignmentUtils.identityAsSymbolReferences(aggregationOutputSymbols))
+                    .putIdentities(aggregationOutputSymbols)
                     .putAll(subqueryProjection.get().getAssignments())
                     .build();
 
@@ -157,7 +153,7 @@ public class ScalarAggregationToJoinRewriter
             return new ProjectNode(
                     idAllocator.getNextId(),
                     aggregationNode.get(),
-                    AssignmentUtils.identityAsSymbolReferences(aggregationOutputSymbols));
+                    Assignments.identity(aggregationOutputSymbols));
         }
     }
 
@@ -180,12 +176,12 @@ public class ScalarAggregationToJoinRewriter
             Symbol symbol = entry.getKey();
             if (aggregation.getSignature().getName().equals("count")) {
                 List<TypeSignature> scalarAggregationSourceTypeSignatures = ImmutableList.of(
-                        planSymbolAllocator.getTypes().get(nonNullableAggregationSourceSymbol).getTypeSignature());
+                        symbolAllocator.getTypes().get(nonNullableAggregationSourceSymbol).getTypeSignature());
                 aggregations.put(symbol, new Aggregation(
                         metadata.resolveFunction(
                                 QualifiedName.of("count"),
                                 fromTypeSignatures(scalarAggregationSourceTypeSignatures)),
-                        ImmutableList.of(castToRowExpression(toSymbolReference(nonNullableAggregationSourceSymbol))),
+                        ImmutableList.of(nonNullableAggregationSourceSymbol.toSymbolReference()),
                         false,
                         Optional.empty(),
                         Optional.empty(),

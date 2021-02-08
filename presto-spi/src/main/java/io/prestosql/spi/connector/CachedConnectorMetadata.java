@@ -25,9 +25,11 @@ import io.prestosql.spi.security.GrantInfo;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.RoleGrant;
+import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
+import io.prestosql.spi.type.Type;
 
 import javax.annotation.Nullable;
 
@@ -773,6 +775,21 @@ public class CachedConnectorMetadata
             SampleType sampleType, double sampleRatio)
     {
         return delegate.applySample(session, handle, sampleType, sampleRatio);
+    }
+
+    @Override
+    public Optional<SubQueryApplicationResult<ConnectorTableHandle>> applySubQuery(ConnectorSession session,
+            ConnectorTableHandle handle,
+            String subQuery,
+            Map<String, Type> types)
+    {
+        return delegate.applySubQuery(session, handle, subQuery, types);
+    }
+
+    @Override
+    public Optional<SqlQueryWriter> getSqlQueryWriter()
+    {
+        return delegate.getSqlQueryWriter();
     }
 
     private void invalidateCaches(ConnectorSession session)

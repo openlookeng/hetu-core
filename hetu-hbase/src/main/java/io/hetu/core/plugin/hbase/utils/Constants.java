@@ -62,24 +62,19 @@ public class Constants
     public static final String SEPARATOR = ":";
 
     /**
-     * SEPARATOR_START_END_KEY
-     */
-    public static final String SEPARATOR_START_END_KEY = "~";
-
-    /**
-     * START_END_ROW_KEYS_COUNT
-     */
-    public static final int START_END_KEYS_COUNT = 100;
-
-    /**
-     * ROWKEY_TAIL
-     */
-    public static final String ROWKEY_TAIL = "|";
-
-    /**
      * DEFAULT
      */
     public static final String DEFAULT = "default";
+
+    /**
+     * ARRAY
+     */
+    public static final String ARRAY = "ARRYA [ ";
+
+    /**
+     * apostrophe
+     */
+    public static final String APOSTROPHE = "'";
 
     /**
      * 2
@@ -90,6 +85,21 @@ public class Constants
      * 3
      */
     public static final int NUMBER3 = 3;
+
+    /**
+     * 4
+     */
+    public static final int NUMBER4 = 4;
+
+    /**
+     * 1024
+     */
+    public static final int NUMBER1024 = 1024;
+
+    /**
+     * -1
+     */
+    public static final int NUMBER_NEGATIVE_1 = -1;
 
     /**
      * "no such transaction: %s"
@@ -104,12 +114,22 @@ public class Constants
     /**
      * SCAN_CACHING_SIZE
      */
-    public static final int SCAN_CACHING_SIZE = 10000;
+    public static final int SCAN_CACHING_SIZE = 5000;
 
     /**
-     * PUT_BATCH_SIZE
+     * constant string
      */
-    public static final int PUT_BATCH_SIZE = 10000;
+    public static final String S_SCHEMA = "schema";
+
+    /**
+     * constant string
+     */
+    public static final String S_TABLE = "table";
+
+    /**
+     * constant string
+     */
+    public static final String S_COLUMNS = "columns";
 
     /**
      * constant string
@@ -139,7 +159,7 @@ public class Constants
     /**
      * constant string
      */
-    public static final String S_SPLIT_BY_CHAR = "splitByChar";
+    public static final String S_NAME = "name";
 
     /**
      * constant string
@@ -154,7 +174,17 @@ public class Constants
     /**
      * constant string
      */
+    public static final String S_TYPE = "type";
+
+    /**
+     * constant string
+     */
     public static final String S_ORDINAL = "ordinal";
+
+    /**
+     * constant string
+     */
+    public static final String S_COMMENT = "comment";
 
     /**
      * constant string
@@ -165,6 +195,11 @@ public class Constants
      * constant string
      */
     public static final String S_TRUE = "true";
+
+    /**
+     * constant string
+     */
+    public static final String S_FLASE = "false";
 
     /**
      * constant string

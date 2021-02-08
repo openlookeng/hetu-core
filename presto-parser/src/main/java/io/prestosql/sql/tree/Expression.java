@@ -39,9 +39,4 @@ public abstract class Expression
     {
         return ExpressionFormatter.formatExpression(this, Optional.empty()); // This will not replace parameters, but we don't have access to them here
     }
-
-    public boolean absEquals(Object o)
-    {
-        return false;
-    }
 }

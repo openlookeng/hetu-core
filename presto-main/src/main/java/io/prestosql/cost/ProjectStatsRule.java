@@ -15,19 +15,16 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.Map;
 import java.util.Optional;
 
 import static io.prestosql.sql.planner.plan.Patterns.project;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class ProjectStatsRule
@@ -55,18 +52,9 @@ public class ProjectStatsRule
         PlanNodeStatsEstimate sourceStats = statsProvider.getStats(node.getSource());
         PlanNodeStatsEstimate.Builder calculatedStats = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(sourceStats.getOutputRowCount());
-        Map<Integer, Symbol> layout = null;
-        for (Map.Entry<Symbol, RowExpression> entry : node.getAssignments().entrySet()) {
-            RowExpression expression = entry.getValue();
-            if (isExpression(expression)) {
-                calculatedStats.addSymbolStatistics(entry.getKey(), scalarStatsCalculator.calculate(castToExpression(expression), sourceStats, session, types));
-            }
-            else {
-                if (layout == null) {
-                    layout = SymbolUtils.toLayOut(node.getOutputSymbols());
-                }
-                calculatedStats.addSymbolStatistics(entry.getKey(), scalarStatsCalculator.calculate(expression, sourceStats, session, layout));
-            }
+
+        for (Map.Entry<Symbol, Expression> entry : node.getAssignments().entrySet()) {
+            calculatedStats.addSymbolStatistics(entry.getKey(), scalarStatsCalculator.calculate(entry.getValue(), sourceStats, session, types));
         }
         return Optional.of(calculatedStats.build());
     }

@@ -16,16 +16,16 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.JoinNode;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.originalExpressions;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expressions;
 
 public class TestTablePushdown
         extends BaseRuleTest
@@ -37,7 +37,7 @@ public class TestTablePushdown
     {
         tester().assertThat(new TablePushdown(METADATA))
                 .on(p -> p.join(JoinNode.Type.LEFT,
-                        p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(originalExpressions("10"))),
+                        p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(expressions("10"))),
                         p.values(new Symbol("COL2"), new Symbol("COL3")),
                         ImmutableList.of(new JoinNode.EquiJoinClause(new Symbol("COL1"), new Symbol("COL2"))),
                         ImmutableList.of(new Symbol("COL1"), new Symbol("COL2")),
@@ -54,7 +54,7 @@ public class TestTablePushdown
                 .on(p -> p.join(
                         JoinNode.Type.INNER,
                         p.join(JoinNode.Type.INNER,
-                                p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(originalExpressions("10"))),
+                                p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(expressions("10"))),
                                 p.values(new Symbol("COL2"), new Symbol("COL3")),
                                 ImmutableList.of(new JoinNode.EquiJoinClause(new Symbol("COL1"), new Symbol("COL2"))),
                                 ImmutableList.of(new Symbol("COL1"), new Symbol("COL2")),
@@ -62,7 +62,7 @@ public class TestTablePushdown
                                 Optional.empty(),
                                 Optional.empty()),
                         p.join(JoinNode.Type.INNER,
-                                p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(originalExpressions("10"))),
+                                p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(expressions("10"))),
                                 p.values(new Symbol("COL2"), new Symbol("COL3")),
                                 ImmutableList.of(new JoinNode.EquiJoinClause(new Symbol("COL1"), new Symbol("COL2"))),
                                 ImmutableList.of(new Symbol("COL1"), new Symbol("COL2")),
@@ -86,8 +86,8 @@ public class TestTablePushdown
                         p.aggregation(a -> a.source(
                                 p.join(
                                         JoinNode.Type.INNER,
-                                        p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(originalExpressions("10"))),
-                                        p.values(ImmutableList.of(p.symbol("COL2")), ImmutableList.of(originalExpressions("20"))),
+                                        p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(expressions("10"))),
+                                        p.values(ImmutableList.of(p.symbol("COL2")), ImmutableList.of(expressions("20"))),
                                         ImmutableList.of(new JoinNode.EquiJoinClause(new Symbol("COL1"), new Symbol("COL2"))),
                                         ImmutableList.of(new Symbol("COL1"), new Symbol("COL2")),
                                         Optional.empty(),
@@ -98,8 +98,8 @@ public class TestTablePushdown
                         p.aggregation(a -> a.source(
                                 p.join(
                                         JoinNode.Type.INNER,
-                                        p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(originalExpressions("10"))),
-                                        p.values(ImmutableList.of(p.symbol("COL2")), ImmutableList.of(originalExpressions("20"))),
+                                        p.values(ImmutableList.of(p.symbol("COL1")), ImmutableList.of(expressions("10"))),
+                                        p.values(ImmutableList.of(p.symbol("COL2")), ImmutableList.of(expressions("20"))),
                                         ImmutableList.of(new JoinNode.EquiJoinClause(new Symbol("COL1"), new Symbol("COL2"))),
                                         ImmutableList.of(new Symbol("COL1"), new Symbol("COL2")),
                                         Optional.empty(),

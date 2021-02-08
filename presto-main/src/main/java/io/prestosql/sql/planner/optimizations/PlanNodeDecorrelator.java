@@ -18,23 +18,22 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.ExpressionUtils;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
@@ -47,9 +46,8 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static java.util.Objects.requireNonNull;
 
@@ -78,7 +76,7 @@ public class PlanNodeDecorrelator
     }
 
     private class DecorrelatingVisitor
-            extends InternalPlanVisitor<Optional<DecorrelationResult>, Void>
+            extends PlanVisitor<Optional<DecorrelationResult>, Void>
     {
         final List<Symbol> correlation;
 
@@ -88,7 +86,7 @@ public class PlanNodeDecorrelator
         }
 
         @Override
-        public Optional<DecorrelationResult> visitPlan(PlanNode node, Void context)
+        protected Optional<DecorrelationResult> visitPlan(PlanNode node, Void context)
         {
             return Optional.of(new DecorrelationResult(
                     node,
@@ -117,7 +115,7 @@ public class PlanNodeDecorrelator
                 return Optional.empty();
             }
 
-            Expression predicate = castToExpression(node.getPredicate());
+            Expression predicate = node.getPredicate();
             Map<Boolean, List<Expression>> predicates = ExpressionUtils.extractConjuncts(predicate).stream()
                     .collect(Collectors.partitioningBy(PlanNodeDecorrelator.DecorrelatingVisitor.this::isCorrelated));
             List<Expression> correlatedPredicates = ImmutableList.copyOf(predicates.get(true));
@@ -127,7 +125,7 @@ public class PlanNodeDecorrelator
             FilterNode newFilterNode = new FilterNode(
                     idAllocator.getNextId(),
                     childDecorrelationResult.node,
-                    castToRowExpression(ExpressionUtils.combineConjuncts(uncorrelatedPredicates)));
+                    ExpressionUtils.combineConjuncts(uncorrelatedPredicates));
 
             Set<Symbol> symbolsToPropagate = Sets.difference(SymbolsExtractor.extractUnique(correlatedPredicates), ImmutableSet.copyOf(correlation));
             return Optional.of(new DecorrelationResult(
@@ -261,7 +259,7 @@ public class PlanNodeDecorrelator
 
             Assignments assignments = Assignments.builder()
                     .putAll(node.getAssignments())
-                    .putAll(AssignmentUtils.identityAsSymbolReferences((symbolsToAdd)))
+                    .putIdentities(symbolsToAdd)
                     .build();
 
             return Optional.of(new DecorrelationResult(
@@ -288,8 +286,8 @@ public class PlanNodeDecorrelator
                     continue;
                 }
 
-                Symbol left = SymbolUtils.from(comparison.getLeft());
-                Symbol right = SymbolUtils.from(comparison.getRight());
+                Symbol left = Symbol.from(comparison.getLeft());
+                Symbol right = Symbol.from(comparison.getRight());
 
                 if (correlation.contains(left) && !correlation.contains(right)) {
                     mapping.put(left, right);
@@ -332,9 +330,8 @@ public class PlanNodeDecorrelator
 
         SymbolMapper getCorrelatedSymbolMapper()
         {
-            SymbolMapper.Builder builder = SymbolMapper.builder();
-            correlatedSymbolsMapping.forEach(builder::put);
-            return builder.build();
+            return new SymbolMapper(correlatedSymbolsMapping.asMap().entrySet().stream()
+                    .collect(toImmutableMap(Map.Entry::getKey, symbols -> Iterables.getLast(symbols.getValue()))));
         }
 
         /**

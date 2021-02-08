@@ -14,9 +14,9 @@
 package io.prestosql.connector.system;
 
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;

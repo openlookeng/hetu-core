@@ -19,9 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.prestosql.spi.connector.CreateIndexMetadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -29,7 +27,7 @@ import java.util.List;
 
 @Immutable
 public class CreateIndexNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     private final PlanNode source;
     private final CreateIndexMetadata createIndexMetadata;
@@ -70,7 +68,7 @@ public class CreateIndexNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitCreateIndex(this, context);
     }

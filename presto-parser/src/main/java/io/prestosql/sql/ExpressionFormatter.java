@@ -96,6 +96,7 @@ import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.sql.SqlFormatter.formatSql;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -242,7 +243,7 @@ public final class ExpressionFormatter
         {
             ImmutableList.Builder<String> valueStrings = ImmutableList.builder();
             for (Expression value : node.getValues()) {
-                valueStrings.add(SqlFormatter.formatSql(value, parameters));
+                valueStrings.add(formatSql(value, parameters));
             }
             return "ARRAY[" + Joiner.on(",").join(valueStrings.build()) + "]";
         }
@@ -250,7 +251,7 @@ public final class ExpressionFormatter
         @Override
         protected String visitSubscriptExpression(SubscriptExpression node, Void context)
         {
-            return SqlFormatter.formatSql(node.getBase(), parameters) + "[" + SqlFormatter.formatSql(node.getIndex(), parameters) + "]";
+            return formatSql(node.getBase(), parameters) + "[" + formatSql(node.getIndex(), parameters) + "]";
         }
 
         @Override
@@ -315,13 +316,13 @@ public final class ExpressionFormatter
         @Override
         protected String visitSubqueryExpression(SubqueryExpression node, Void context)
         {
-            return "(" + SqlFormatter.formatSql(node.getQuery(), parameters) + ")";
+            return "(" + formatSql(node.getQuery(), parameters) + ")";
         }
 
         @Override
         protected String visitExists(ExistsPredicate node, Void context)
         {
-            return "(EXISTS " + SqlFormatter.formatSql(node.getSubquery(), parameters) + ")";
+            return "(EXISTS " + formatSql(node.getSubquery(), parameters) + ")";
         }
 
         @Override

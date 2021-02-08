@@ -32,9 +32,9 @@ import static io.prestosql.spi.type.TimeZoneKey.getTimeZoneKey;
 import static io.prestosql.spi.type.TimeZoneKey.getTimeZoneKeyForOffset;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.type.IntervalDayTimeType.INTERVAL_DAY_TIME;
+import static io.prestosql.util.DateTimeZoneIndex.getDateTimeZone;
 import static org.joda.time.DateTimeZone.UTC;
 
 public abstract class TestTimestampWithTimeZoneBase

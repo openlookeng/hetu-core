@@ -28,12 +28,12 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.relational.ConstantExpression;
+import io.prestosql.sql.relational.RowExpression;
 import io.prestosql.util.FastutilSetHelper;
 
 import java.lang.invoke.MethodHandle;

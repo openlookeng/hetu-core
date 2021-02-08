@@ -15,11 +15,11 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.List;
 import java.util.Optional;

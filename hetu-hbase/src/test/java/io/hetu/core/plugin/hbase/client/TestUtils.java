@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 
 import static io.hetu.core.plugin.hbase.utils.ValueSetUtils.createValueSet;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -140,8 +139,7 @@ public class TestUtils
                 false,
                 "io.hetu.core.plugin.hbase.utils.serializers.StringRowSerializer",
                 Optional.of("test_table"),
-                "",
-                OptionalLong.empty());
+                "");
     }
 
     /**
@@ -156,8 +154,7 @@ public class TestUtils
                 false,
                 "StringRowSerializer",
                 Optional.of(table),
-                "",
-                OptionalLong.empty());
+                "");
     }
 
     /**
@@ -259,7 +256,6 @@ public class TestUtils
                                 external,
                                 Optional.of(serializerClassName),
                                 Optional.of(table),
-                                Optional.of(""),
                                 Optional.of(""));
                 hTableMetaMemory.put(key, hBaseTable);
             }

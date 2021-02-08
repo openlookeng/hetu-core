@@ -72,9 +72,7 @@ The properties that apply to Carbondata connector security are listed in the [Ca
 | `hive.hdfs.presto.principal`              | The Kerberos principal that openLooKeng will use when connecting to HDFS. |                                                 |
 | `hive.hdfs.presto.keytab`                 | HDFS client keytab location.                                 |                                                 |
 | `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.md#table-statistics) for details. | `true`                                          |
-| `carbondata.vacuum-service-threads`       | Specifies number of threads for Auto-Vacuum & Auto-cleanup. Min value is 1. | 2                                               |
-| `carbondata.auto-vacuum-enabled`          | Enable auto-vacuum on carbondata tables. To enable auto-vacuum on engine side, add `auto-vacuum.enabled=true` in config.properties of coordinator node(s). | false                                               |
-
+| `carbondata.vacuum-service-threads`       | Specifies number of threads for Auto-cleanup. Min value is 1. | 2                                               |
 
 ## Hive Thrift Metastore Configuration Properties
 

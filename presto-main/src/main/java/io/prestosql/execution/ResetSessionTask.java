@@ -14,10 +14,10 @@
 package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ResetSession;

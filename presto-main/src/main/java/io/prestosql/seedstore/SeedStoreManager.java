@@ -44,8 +44,8 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.SEED_STORE_FAILURE;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -328,7 +328,7 @@ public class SeedStoreManager
 
         // load state store config if exist
         if (stateStoreConfig.exists()) {
-            Map<String, String> stateStoreProperties = new HashMap<>(loadPropertiesFrom(stateStoreConfig.getPath()));
+            Map<String, String> stateStoreProperties = new HashMap<>(loadProperties(stateStoreConfig));
             filesystemProfile = stateStoreProperties.getOrDefault(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_PROFILE, filesystemProfile);
             // for now, seed store is started only if tcp-ip mode enabled and tcp-ip.seeds is not set
             String discoveryMode = stateStoreProperties.get(StateStoreConstants.DISCOVERY_MODE_PROPERTY_NAME);
@@ -338,7 +338,7 @@ public class SeedStoreManager
 
         // load seed store config if exist
         if (seedStoreConfig.exists()) {
-            Map<String, String> seedStoreProperties = new HashMap<>(loadPropertiesFrom(seedStoreConfig.getPath()));
+            Map<String, String> seedStoreProperties = new HashMap<>(loadProperties(seedStoreConfig));
             properties.putAll(seedStoreProperties);
             seedStoreType = properties.getOrDefault(SEED_STORE_TYPE_PROPERTY_NAME, seedStoreType);
             filesystemProfile = properties.getOrDefault(SEED_STORE_FILESYSTEM_PROFILE, filesystemProfile);

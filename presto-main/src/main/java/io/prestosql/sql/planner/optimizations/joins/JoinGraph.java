@@ -16,16 +16,15 @@ package io.prestosql.sql.planner.optimizations.joins;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.GroupReference;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.iterative.GroupReference;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.ArrayList;
@@ -37,10 +36,7 @@ import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Maps.transformValues;
-import static io.prestosql.spi.plan.JoinNode.Type.INNER;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.ProjectNodeUtils.isIdentity;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -220,7 +216,7 @@ public class JoinGraph
     }
 
     private static class Builder
-            extends InternalPlanVisitor<JoinGraph, Context>
+            extends PlanVisitor<JoinGraph, Context>
     {
         // TODO When io.prestosql.sql.planner.optimizations.EliminateCrossJoins is removed, remove 'shallow' flag
         private final boolean shallow;
@@ -233,7 +229,7 @@ public class JoinGraph
         }
 
         @Override
-        public JoinGraph visitPlan(PlanNode node, Context context)
+        protected JoinGraph visitPlan(PlanNode node, Context context)
         {
             if (!shallow) {
                 for (PlanNode child : node.getSources()) {
@@ -255,7 +251,7 @@ public class JoinGraph
         public JoinGraph visitFilter(FilterNode node, Context context)
         {
             JoinGraph graph = node.getSource().accept(this, context);
-            return graph.withFilter(castToExpression(node.getPredicate()));
+            return graph.withFilter(node.getPredicate());
         }
 
         @Override
@@ -272,7 +268,7 @@ public class JoinGraph
             JoinGraph graph = left.joinWith(right, node.getCriteria(), context, node.getId());
 
             if (node.getFilter().isPresent()) {
-                return graph.withFilter(castToExpression(node.getFilter().get()));
+                return graph.withFilter(node.getFilter().get());
             }
             return graph;
         }
@@ -280,9 +276,9 @@ public class JoinGraph
         @Override
         public JoinGraph visitProject(ProjectNode node, Context context)
         {
-            if (isIdentity(node)) {
+            if (node.isIdentity()) {
                 JoinGraph graph = node.getSource().accept(this, context);
-                return graph.withAssignments(transformValues(node.getAssignments().getMap(), OriginalExpressionUtils::castToExpression));
+                return graph.withAssignments(node.getAssignments().getMap());
             }
             return visitPlan(node, context);
         }

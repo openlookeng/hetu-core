@@ -14,67 +14,70 @@
  */
 package io.prestosql.sql.rewrite;
 
-import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.sql.DynamicFilters;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
+import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * this is a query specific dynamic filter context design to avoid any duplication of calculation
  */
 public class DynamicFilterContext
 {
+    private final StateStore stateStore;
     private final List<DynamicFilters.Descriptor> descriptors;
     private Map<String, String> filterIds = new HashMap<>();
 
-    public DynamicFilterContext(List<DynamicFilters.Descriptor> descriptors, Map<Integer, Symbol> layOut)
+    public DynamicFilterContext(Map<Symbol, ColumnHandle> columns, List<DynamicFilters.Descriptor> descriptors, StateStoreProvider stateStoreProvider)
     {
         this.descriptors = descriptors;
+        this.stateStore = stateStoreProvider.getStateStore();
 
-        initFilterIds(layOut);
+        initFilterIds();
     }
 
     /**
-     * For a specific set of descriptor, the id for a column is unique
+     * for a specific set of descriptor, the id for a column is unique
      *
-     * @param column column symbol
-     * @return Id of dynamic filter for the column
+     * @param column
+     * @return
      */
     public String getId(Symbol column)
     {
         return filterIds.get(column.getName());
     }
 
-    /**
-     * Get id for all the dynamic filters
-     *
-     * @return Set of dynamic filter ids
-     */
-    public Set<String> getFilterIds()
-    {
-        return ImmutableSet.copyOf(filterIds.values());
-    }
-
-    private void initFilterIds(Map<Integer, Symbol> layOut)
+    private void initFilterIds()
     {
         for (DynamicFilters.Descriptor dynamicFilter : descriptors) {
-            if (dynamicFilter.getInput() instanceof VariableReferenceExpression) {
-                String colName = ((VariableReferenceExpression) dynamicFilter.getInput()).getName();
+            if (dynamicFilter.getInput() instanceof SymbolReference) {
+                String colName = ((SymbolReference) dynamicFilter.getInput()).getName();
                 filterIds.putIfAbsent(colName, dynamicFilter.getId());
             }
             else {
-                List<Symbol> symbolList = SymbolsExtractor.extractAll(dynamicFilter.getInput(), layOut);
+                List<Symbol> symbolList = SymbolsExtractor.extractAll(dynamicFilter.getInput());
                 for (Symbol symbol : symbolList) {
                     //FIXME: KEN: is it possible to override?
                     filterIds.putIfAbsent(symbol.getName(), dynamicFilter.getId());
                 }
             }
         }
+    }
+
+    /**
+     * Returns a state store guaranteed to be initialized
+     *
+     * @return
+     */
+    public StateStore getStateStore()
+    {
+        return stateStore;
     }
 }

@@ -26,6 +26,7 @@ import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.connector.CatalogConnectorStore;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.system.AnalyzePropertiesSystemTable;
 import io.prestosql.connector.system.CatalogSystemTable;
@@ -43,7 +44,6 @@ import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.TaskCountEstimator;
-import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.CommentTask;
 import io.prestosql.execution.CommitTask;
@@ -92,6 +92,7 @@ import io.prestosql.metadata.QualifiedTablePrefix;
 import io.prestosql.metadata.SchemaPropertyManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.metadata.Split;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TablePropertyManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.operator.Driver;
@@ -114,14 +115,7 @@ import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.Plugin;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorFactory;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.operator.ReuseExchangeOperator;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.FileSingleStreamSpillerFactory;
 import io.prestosql.spiller.GenericPartitioningSpillerFactory;
@@ -144,21 +138,22 @@ import io.prestosql.sql.gen.JoinFilterFunctionCompiler;
 import io.prestosql.sql.gen.OrderingCompiler;
 import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
 import io.prestosql.sql.planner.LogicalPlanner;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.PlanFragmenter;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.PlanOptimizers;
 import io.prestosql.sql.planner.SubPlan;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.planprinter.PlanPrinter;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
-import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
-import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.CreateTable;
@@ -178,8 +173,6 @@ import io.prestosql.sql.tree.StartTransaction;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.EmbeddedStateStoreLauncher;
 import io.prestosql.statestore.LocalStateStoreProvider;
-import io.prestosql.statestore.StateStoreProvider;
-import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.testing.PageConsumerOperator.PageConsumerOutputFactory;
 import io.prestosql.transaction.InMemoryTransactionManager;
 import io.prestosql.transaction.TransactionManager;
@@ -250,7 +243,6 @@ public class LocalQueryRunner
     private final PageSourceManager pageSourceManager;
     private final IndexManager indexManager;
     private final NodePartitioningManager nodePartitioningManager;
-    private final ConnectorPlanOptimizerManager planOptimizerManager;
     private final PageSinkManager pageSinkManager;
     private final TransactionManager transactionManager;
     private final FileSingleStreamSpillerFactory singleStreamSpillerFactory;
@@ -325,7 +317,6 @@ public class LocalQueryRunner
                 catalogManager,
                 notificationExecutor);
         this.nodePartitioningManager = new NodePartitioningManager(nodeScheduler);
-        this.planOptimizerManager = new ConnectorPlanOptimizerManager();
 
         this.metadata = new MetadataManager(
                 featuresConfig,
@@ -365,7 +356,6 @@ public class LocalQueryRunner
                 pageSourceManager,
                 indexManager,
                 nodePartitioningManager,
-                planOptimizerManager,
                 pageSinkManager,
                 new HandleResolver(),
                 nodeManager,
@@ -380,9 +370,7 @@ public class LocalQueryRunner
                 null,
                 new ServerConfig(),
                 new NodeSchedulerConfig(),
-                heuristicIndexerManager,
-                new RowExpressionDomainTranslator(metadata),
-                new RowExpressionDeterminismEvaluator(metadata));
+                heuristicIndexerManager);
 
         GlobalSystemConnectorFactory globalSystemConnectorFactory = new GlobalSystemConnectorFactory(ImmutableSet.of(
                 new NodeSystemTable(nodeManager),
@@ -529,12 +517,6 @@ public class LocalQueryRunner
     public NodePartitioningManager getNodePartitioningManager()
     {
         return nodePartitioningManager;
-    }
-
-    @Override
-    public ConnectorPlanOptimizerManager getPlanOptimizerManager()
-    {
-        return planOptimizerManager;
     }
 
     public PageSourceManager getPageSourceManager()
@@ -756,7 +738,6 @@ public class LocalQueryRunner
         NodeInfo nodeInfo = new NodeInfo("test");
 
         SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
-        StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         LocalExecutionPlanner executionPlanner = new LocalExecutionPlanner(
                 metadata,
                 new TypeAnalyzer(sqlParser, metadata),
@@ -779,9 +760,7 @@ public class LocalQueryRunner
                 new LookupJoinOperators(),
                 new OrderingCompiler(),
                 nodeInfo,
-                stateStoreProvider,
-                new StateStoreListenerManager(stateStoreProvider),
-                new DynamicFilterCacheManager(),
+                new LocalStateStoreProvider(seedStoreManager),
                 heuristicIndexerManager);
 
         // plan query
@@ -806,8 +785,7 @@ public class LocalQueryRunner
                     table,
                     stageExecutionDescriptor.isScanGroupedExecution(tableScan.getId()) ? GROUPED_SCHEDULING : UNGROUPED_SCHEDULING,
                     null,
-                    Optional.empty(), Collections.emptyMap(), ImmutableSet.of(),
-                    tableScan.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
+                    Optional.empty(), Collections.emptyMap(), ImmutableSet.of());
 
             ImmutableSet.Builder<ScheduledSplit> scheduledSplits = ImmutableSet.builder();
             while (!splitSource.isFinished()) {
@@ -886,7 +864,6 @@ public class LocalQueryRunner
                 forceSingleNode,
                 new MBeanExporter(new TestingMBeanServer()),
                 splitManager,
-                planOptimizerManager,
                 pageSourceManager,
                 statsCalculator,
                 costCalculator,

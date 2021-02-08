@@ -14,7 +14,7 @@
 package io.prestosql.cost;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import org.testng.annotations.Test;
 
 import java.util.Optional;

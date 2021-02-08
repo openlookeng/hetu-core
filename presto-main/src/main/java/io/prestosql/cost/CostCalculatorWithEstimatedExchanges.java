@@ -15,17 +15,17 @@
 package io.prestosql.cost;
 
 import io.prestosql.Session;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.GroupReference;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.iterative.GroupReference;
 import io.prestosql.sql.planner.iterative.rule.DetermineJoinDistributionType;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
@@ -85,7 +85,7 @@ public class CostCalculatorWithEstimatedExchanges
     }
 
     private static class ExchangeCostEstimator
-            extends InternalPlanVisitor<LocalCostEstimate, Void>
+            extends PlanVisitor<LocalCostEstimate, Void>
     {
         private final StatsProvider stats;
         private final TypeProvider types;
@@ -99,7 +99,7 @@ public class CostCalculatorWithEstimatedExchanges
         }
 
         @Override
-        public LocalCostEstimate visitPlan(PlanNode node, Void context)
+        protected LocalCostEstimate visitPlan(PlanNode node, Void context)
         {
             // TODO implement logic for other node types and return LocalCostEstimate.unknown() here (or throw)
             return LocalCostEstimate.zero();

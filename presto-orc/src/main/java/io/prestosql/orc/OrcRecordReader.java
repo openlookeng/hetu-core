@@ -54,10 +54,9 @@ import static io.prestosql.orc.reader.ColumnReaders.createColumnReader;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_FILE_MODIFICATION;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_FILE_PATH;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_INDEX_LEVEL;
-import static io.prestosql.spi.HetuConstant.DATASOURCE_PAGE_NUMBER;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_INDEX_UNIT_FINISHED;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_NUMBER;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_OFFSET;
-import static io.prestosql.spi.HetuConstant.DATASOURCE_TOTAL_PAGES;
 import static java.lang.Math.toIntExact;
 
 public class OrcRecordReader
@@ -67,7 +66,6 @@ public class OrcRecordReader
     private static final Logger log = Logger.get(OrcRecordReader.class);
 
     private SplitMetadata splitMetadata;
-    private int pageCount;
 
     public OrcRecordReader(
             List<OrcColumn> readColumns,
@@ -175,15 +173,7 @@ public class OrcRecordReader
         // only include page metadata if enabled
         if (pageMetadataEnabled) {
             Properties pageMetadata = new Properties();
-            pageCount++;
-            pageMetadata.setProperty(DATASOURCE_PAGE_NUMBER, String.valueOf(pageCount));
-            if (isCurrentStripeFinished()) {
-                // Only set the total page count when the current stripe has finished
-                // Therefore whenever this property is available in pageMetaData,
-                // it indicates that the stripe has finished and this is the last page
-                pageMetadata.setProperty(DATASOURCE_TOTAL_PAGES, String.valueOf(pageCount));
-                pageCount = 0;
-            }
+            pageMetadata.setProperty(DATASOURCE_INDEX_UNIT_FINISHED, isCurrentStripeFinished().toString());
             pageMetadata.setProperty(DATASOURCE_STRIPE_NUMBER, String.valueOf(currentStripe));
             pageMetadata.setProperty(DATASOURCE_STRIPE_OFFSET, Long.valueOf(stripes.get(currentStripe).getOffset()).toString());
             if (splitMetadata != null) {

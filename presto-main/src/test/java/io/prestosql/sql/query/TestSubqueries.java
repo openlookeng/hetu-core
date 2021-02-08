@@ -15,12 +15,12 @@ package io.prestosql.sql.query;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -28,9 +28,6 @@ import org.testng.annotations.Test;
 
 import java.util.function.Consumer;
 
-import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.spi.plan.AggregationNode.Step.PARTIAL;
-import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.exchange;
@@ -38,6 +35,9 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.PARTIAL;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static org.testng.Assert.assertEquals;

@@ -18,20 +18,16 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.sql.planner.OrderingSchemeUtils;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.OrderingScheme;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.OrderBy;
@@ -52,9 +48,6 @@ import static io.prestosql.sql.planner.plan.Patterns.filter;
 import static io.prestosql.sql.planner.plan.Patterns.join;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.values;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.sql.tree.SortItem.Ordering.ASCENDING;
 import static io.prestosql.sql.tree.SortItem.Ordering.DESCENDING;
 import static java.util.Objects.requireNonNull;
@@ -127,7 +120,7 @@ public class ExpressionRewriteRuleSet
         @Override
         public Result apply(ProjectNode projectNode, Captures captures, Context context)
         {
-            Assignments assignments = AssignmentUtils.rewrite(projectNode.getAssignments(), x -> rewriter.rewrite(x, context));
+            Assignments assignments = projectNode.getAssignments().rewrite(x -> rewriter.rewrite(x, context));
             if (projectNode.getAssignments().equals(assignments)) {
                 return Result.empty();
             }
@@ -171,15 +164,15 @@ public class ExpressionRewriteRuleSet
                                                 orderBy.getOrdering(symbol).isNullsFirst() ? NullOrdering.FIRST : NullOrdering.LAST))
                                         .collect(toImmutableList()))),
                                 aggregation.isDistinct(),
-                                aggregation.getArguments().stream().map(OriginalExpressionUtils::castToExpression).collect(toImmutableList())),
+                                aggregation.getArguments()),
                         context);
                 verify(call.getName().equals(QualifiedName.of(aggregation.getSignature().getName())), "Aggregation function name changed");
                 Aggregation newAggregation = new Aggregation(
                         aggregation.getSignature(),
-                        call.getArguments().stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList()),
+                        call.getArguments(),
                         call.isDistinct(),
-                        call.getFilter().map(SymbolUtils::from),
-                        call.getOrderBy().map(OrderingSchemeUtils::fromOrderBy),
+                        call.getFilter().map(Symbol::from),
+                        call.getOrderBy().map(OrderingScheme::fromOrderBy),
                         aggregation.getMask());
                 aggregations.put(entry.getKey(), newAggregation);
                 if (!aggregation.equals(newAggregation)) {
@@ -220,13 +213,7 @@ public class ExpressionRewriteRuleSet
         @Override
         public Result apply(FilterNode filterNode, Captures captures, Context context)
         {
-            RowExpression rewritten;
-            if (isExpression(filterNode.getPredicate())) {
-                rewritten = castToRowExpression(rewriter.rewrite(castToExpression(filterNode.getPredicate()), context));
-            }
-            else {
-                rewritten = filterNode.getPredicate();
-            }
+            Expression rewritten = rewriter.rewrite(filterNode.getPredicate(), context);
             if (filterNode.getPredicate().equals(rewritten)) {
                 return Result.empty();
             }
@@ -253,8 +240,8 @@ public class ExpressionRewriteRuleSet
         @Override
         public Result apply(JoinNode joinNode, Captures captures, Context context)
         {
-            Optional<Expression> filter = joinNode.getFilter().map(x -> rewriter.rewrite(castToExpression(x), context));
-            if (!joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).equals(filter)) {
+            Optional<Expression> filter = joinNode.getFilter().map(x -> rewriter.rewrite(x, context));
+            if (!joinNode.getFilter().equals(filter)) {
                 return Result.ofPlanNode(new JoinNode(
                         joinNode.getId(),
                         joinNode.getType(),
@@ -262,7 +249,7 @@ public class ExpressionRewriteRuleSet
                         joinNode.getRight(),
                         joinNode.getCriteria(),
                         joinNode.getOutputSymbols(),
-                        filter.map(OriginalExpressionUtils::castToRowExpression),
+                        filter,
                         joinNode.getLeftHashSymbol(),
                         joinNode.getRightHashSymbol(),
                         joinNode.getDistributionType(),
@@ -293,20 +280,15 @@ public class ExpressionRewriteRuleSet
         public Result apply(ValuesNode valuesNode, Captures captures, Context context)
         {
             boolean anyRewritten = false;
-            ImmutableList.Builder<List<RowExpression>> rows = ImmutableList.builder();
-            for (List<RowExpression> row : valuesNode.getRows()) {
-                ImmutableList.Builder<RowExpression> newRow = ImmutableList.builder();
-                for (RowExpression expression : row) {
-                    if (isExpression(expression)) {
-                        RowExpression rewritten = castToRowExpression(rewriter.rewrite(castToExpression(expression), context));
-                        if (!expression.equals(rewritten)) {
-                            anyRewritten = true;
-                        }
-                        newRow.add(rewritten);
+            ImmutableList.Builder<List<Expression>> rows = ImmutableList.builder();
+            for (List<Expression> row : valuesNode.getRows()) {
+                ImmutableList.Builder<Expression> newRow = ImmutableList.builder();
+                for (Expression expression : row) {
+                    Expression rewritten = rewriter.rewrite(expression, context);
+                    if (!expression.equals(rewritten)) {
+                        anyRewritten = true;
                     }
-                    else {
-                        newRow.add(expression);
-                    }
+                    newRow.add(rewritten);
                 }
                 rows.add(newRow.build());
             }

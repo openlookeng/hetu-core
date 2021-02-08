@@ -19,7 +19,6 @@ import io.airlift.log.Logger;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.spi.PrestoTransportException;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorFactory;
 

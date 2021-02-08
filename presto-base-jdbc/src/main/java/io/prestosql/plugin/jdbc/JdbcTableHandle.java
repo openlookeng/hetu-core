@@ -16,7 +16,6 @@ package io.prestosql.plugin.jdbc;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Joiner;
-import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult.GeneratedSql;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -25,7 +24,6 @@ import io.prestosql.spi.predicate.TupleDomain;
 import javax.annotation.Nullable;
 
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 
 import static java.util.Objects.requireNonNull;
@@ -41,8 +39,8 @@ public class JdbcTableHandle
     private final String tableName;
     private final TupleDomain<ColumnHandle> constraint;
     private final OptionalLong limit;
-    // Hetu: If query is push down use pushDown sql to build sql and use columnHandles directly
-    private final Optional<GeneratedSql> generatedSql;
+    // Hetu: If subQuery is not null, it will be used by the DC Connector to build the sql
+    private final String subQuery;
 
     public JdbcTableHandle(SchemaTableName schemaTableName, @Nullable String catalogName, @Nullable String schemaName, String tableName)
     {
@@ -58,6 +56,7 @@ public class JdbcTableHandle
      * @param schemaName
      * @param tableName
      * @param constraint
+     * @param limit
      */
     public JdbcTableHandle(
             SchemaTableName schemaTableName,
@@ -67,7 +66,7 @@ public class JdbcTableHandle
             TupleDomain<ColumnHandle> constraint,
             OptionalLong limit)
     {
-        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty());
+        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, null);
     }
 
     @JsonCreator
@@ -78,7 +77,7 @@ public class JdbcTableHandle
             @JsonProperty("tableName") String tableName,
             @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
             @JsonProperty("limit") OptionalLong limit,
-            @JsonProperty("sql") Optional<GeneratedSql> generatedSql)
+            @JsonProperty("subQuery") String subQuery)
     {
         this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
         this.catalogName = catalogName;
@@ -86,7 +85,7 @@ public class JdbcTableHandle
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
         this.limit = requireNonNull(limit, "limit is null");
-        this.generatedSql = generatedSql;
+        this.subQuery = subQuery;
     }
 
     @JsonProperty
@@ -122,15 +121,21 @@ public class JdbcTableHandle
     }
 
     @JsonProperty
-    public Optional<GeneratedSql> getGeneratedSql()
-    {
-        return generatedSql;
-    }
-
-    @JsonProperty
     public OptionalLong getLimit()
     {
         return limit;
+    }
+
+    /**
+     * Return the sub-query.
+     *
+     * @return sub-query if it was assigned otherwise, null
+     */
+    @JsonProperty
+    @Nullable
+    public String getSubQuery()
+    {
+        return subQuery;
     }
 
     /**
@@ -164,7 +169,7 @@ public class JdbcTableHandle
     {
         JdbcTableHandle oldJdbcTableHandle = (JdbcTableHandle) oldConnectorTableHandle;
         return new JdbcTableHandle(schemaTableName, catalogName, schemaName, tableName, oldJdbcTableHandle.getConstraint(),
-                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql());
+                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getSubQuery());
     }
 
     @Override
@@ -190,12 +195,8 @@ public class JdbcTableHandle
     public String toString()
     {
         StringBuilder builder = new StringBuilder();
-        if (generatedSql.isPresent()) {
-            Joiner.on(".").skipNulls().appendTo(builder, catalogName, generatedSql.get());
-        }
-        else {
-            Joiner.on(".").skipNulls().appendTo(builder, catalogName, schemaName, tableName);
-        }
+        builder.append(schemaTableName).append(" ");
+        Joiner.on(".").skipNulls().appendTo(builder, catalogName, schemaName, tableName, subQuery);
         limit.ifPresent(value -> builder.append(" limit=").append(value));
         return builder.toString();
     }

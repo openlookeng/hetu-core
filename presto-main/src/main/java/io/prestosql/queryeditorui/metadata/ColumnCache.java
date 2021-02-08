@@ -106,11 +106,6 @@ public class ColumnCache
         return cache.build();
     }
 
-    public void refreshCache()
-    {
-        tableColumnCache.invalidateAll();
-    }
-
     public void populateCache(final String fqnTableName)
     {
         requireNonNull(fqnTableName, "fqnTableName is null");

@@ -14,10 +14,10 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;

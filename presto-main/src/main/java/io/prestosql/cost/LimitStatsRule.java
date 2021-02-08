@@ -15,9 +15,9 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.LimitNode;
 
 import java.util.Optional;
 

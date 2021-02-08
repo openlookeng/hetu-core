@@ -220,7 +220,7 @@ public class MemoryMetadata
         ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
         for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
             ColumnMetadata column = tableMetadata.getColumns().get(i);
-            columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType()), column.getName(), column.getType()));
+            columns.add(new ColumnInfo(new MemoryColumnHandle(i), column.getName(), column.getType()));
         }
 
         tableIds.put(tableMetadata.getTable(), tableId);

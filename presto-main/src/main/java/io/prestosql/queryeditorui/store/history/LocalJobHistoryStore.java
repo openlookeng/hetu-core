@@ -21,7 +21,6 @@ import io.prestosql.queryeditorui.EvictingDeque;
 import io.prestosql.queryeditorui.protocol.Job;
 import io.prestosql.queryeditorui.protocol.Table;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -87,12 +86,12 @@ public class LocalJobHistoryStore
         final ImmutableList.Builder<Job> builder = ImmutableList.builder();
         long added = 0;
 
-        for (Iterator<Job> job = historyCache.descendingIterator(); job.hasNext(); ) {
+        for (Job job : historyCache) {
             if (added + 1 > maxResults) {
                 break;
             }
 
-            builder.add(job.next());
+            builder.add(job);
             added += 1;
         }
 

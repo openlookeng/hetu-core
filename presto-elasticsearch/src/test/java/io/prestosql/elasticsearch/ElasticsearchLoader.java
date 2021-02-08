@@ -21,8 +21,6 @@ import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.type.Type;
 import io.prestosql.tests.AbstractTestingPrestoClient;
 import io.prestosql.tests.ResultsSession;
-import org.elasticsearch.action.bulk.BulkRequest;
-import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 
@@ -43,6 +41,7 @@ import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static java.util.Objects.requireNonNull;
 import static org.elasticsearch.client.Requests.flushRequest;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.common.xcontent.XContentType.JSON;
 
 public class ElasticsearchLoader
         extends AbstractTestingPrestoClient<Void>
@@ -53,10 +52,10 @@ public class ElasticsearchLoader
     public ElasticsearchLoader(
             Client client,
             String tableName,
-            TestingPrestoServer prestoServer,
+            TestingPrestoServer hetuServer,
             Session defaultSession)
     {
-        super(prestoServer, defaultSession);
+        super(hetuServer, defaultSession);
 
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.client = requireNonNull(client, "client is null");
@@ -88,8 +87,6 @@ public class ElasticsearchLoader
             }
             checkState(types.get() != null, "Type information is missing");
             List<Column> columns = statusInfo.getColumns();
-
-            BulkRequest request = new BulkRequest();
             for (List<Object> fields : data.getData()) {
                 try {
                     XContentBuilder dataBuilder = jsonBuilder().startObject();
@@ -99,15 +96,14 @@ public class ElasticsearchLoader
                         dataBuilder.field(columns.get(i).getName(), value);
                     }
                     dataBuilder.endObject();
-
-                    request.add(new IndexRequest(tableName, "doc").source(dataBuilder));
+                    client.prepareIndex(tableName, "doc")
+                            .setSource(dataBuilder.string(), JSON)
+                            .get();
                 }
                 catch (IOException e) {
                     throw new UncheckedIOException("Error loading data into Elasticsearch index: " + tableName, e);
                 }
             }
-
-            client.bulk(request).actionGet();
             client.admin().indices().flush(flushRequest(tableName)).actionGet();
         }
 

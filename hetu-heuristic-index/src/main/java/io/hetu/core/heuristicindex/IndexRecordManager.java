@@ -16,9 +16,9 @@ package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.util.SecurePathWhiteList;
+import io.hetu.core.filesystem.SupportedFileAttributes;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
-import io.prestosql.spi.filesystem.SupportedFileAttributes;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 
 import java.io.BufferedReader;
@@ -39,6 +39,7 @@ public class IndexRecordManager
     private final HetuFileSystemClient fs;
     private final Path root;
 
+    private final Object cacheLock = new Object();
     private List<IndexRecord> cache;
     private long cacheLastModifiedTime;
 
@@ -60,12 +61,12 @@ public class IndexRecordManager
             throws IOException
     {
         Path recordFile = root.resolve(RECORD_FILE_NAME);
-        ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
+        List<IndexRecord> records = new ArrayList<>();
 
         if (!fs.exists(recordFile)) {
-            synchronized (this) {
+            synchronized (cacheLock) {
                 // invalidate cache
-                cache = records.build();
+                cache = records;
                 cacheLastModifiedTime = 0;
             }
             return cache;
@@ -73,7 +74,7 @@ public class IndexRecordManager
 
         long modifiedTime = (long) fs.getAttribute(recordFile, SupportedFileAttributes.LAST_MODIFIED_TIME);
         if (modifiedTime != cacheLastModifiedTime) {
-            synchronized (this) {
+            synchronized (cacheLock) {
                 if (modifiedTime == cacheLastModifiedTime) {
                     // already updated by another call
                     return cache;
@@ -86,11 +87,7 @@ public class IndexRecordManager
                         records.add(new IndexRecord(line));
                     }
                 }
-                catch (Exception e) {
-                    throw new IllegalArgumentException(
-                            "Error reading index record. If you have recently updated server, please delete old index directory and recreate the indices.", e);
-                }
-                cache = records.build();
+                cache = records;
                 cacheLastModifiedTime = modifiedTime;
             }
         }
@@ -128,16 +125,16 @@ public class IndexRecordManager
 
     /**
      * Add IndexRecord into record file. If the method is called with a name that already exists,
-     * it will OVERWRITE the existing entry but combine the partition column
+     * it will OVERWRITE the existing entry but combine the note part
      */
-    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
+    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> partitions)
             throws IOException
     {
         // Protect root directory
         FileBasedLock lock = new FileBasedLock(fs, root);
         try {
             lock.lock();
-            List<IndexRecord> records = new ArrayList<>(getIndexRecords()); // read from records and make a copy
+            List<IndexRecord> records = getIndexRecords();
             Iterator<IndexRecord> iterator = records.iterator();
             while (iterator.hasNext()) {
                 IndexRecord record = iterator.next();
@@ -146,7 +143,7 @@ public class IndexRecordManager
                     iterator.remove();
                 }
             }
-            records.add(new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions));
+            records.add(new IndexRecord(name, user, table, columns, indexType, partitions));
             writeIndexRecords(records);
         }
         finally {
@@ -154,36 +151,15 @@ public class IndexRecordManager
         }
     }
 
-    public synchronized void deleteIndexRecord(String name, List<String> partitionsToRemove)
+    public synchronized void deleteIndexRecord(String name)
             throws IOException
     {
         // Protect root directory
         FileBasedLock lock = new FileBasedLock(fs, root);
         try {
             lock.lock();
-            List<IndexRecord> records = new ArrayList<>(getIndexRecords()); // read from records and make a copy
-            if (partitionsToRemove.isEmpty()) {
-                // remove record
-                records.removeIf(record -> record.name.equals(name));
-            }
-            else {
-                // only remove partitions
-                Iterator<IndexRecord> iterator = records.iterator();
-                IndexRecord newRecord = null;
-                while (iterator.hasNext()) {
-                    IndexRecord record = iterator.next();
-                    if (record.name.equals(name)) {
-                        record.partitions.removeAll(partitionsToRemove);
-                        newRecord = new IndexRecord(record.name, record.user, record.table,
-                                record.columns, record.indexType, record.properties, record.partitions);
-                        iterator.remove();
-                    }
-                }
-                // If this is a partial remove, and there are still partitions remaining, put the updated record back
-                if (newRecord != null && !newRecord.partitions.isEmpty()) {
-                    records.add(newRecord);
-                }
-            }
+            List<IndexRecord> records = getIndexRecords();
+            records.removeIf(record -> record.name.equals(name));
             writeIndexRecords(records);
         }
         finally {
@@ -200,9 +176,10 @@ public class IndexRecordManager
     {
         Path recordFile = root.resolve(RECORD_FILE_NAME);
 
+        boolean writeHead = false;
         try (OutputStream os = fs.newOutputStream(recordFile)) {
             // Use IndexRecord to generate a special "entry" as table head so it's easier to maintain when csv format changes
-            String head = IndexRecord.getHeader();
+            String head = new IndexRecord("Name", "User", "Table", new String[] {"Columns"}, "IndexType", ImmutableList.of("Partitions")).toCsvRecord();
             os.write(head.getBytes());
             for (IndexRecord record : records) {
                 os.write(record.toCsvRecord().getBytes());

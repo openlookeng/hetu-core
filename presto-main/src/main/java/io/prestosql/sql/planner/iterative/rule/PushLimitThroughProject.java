@@ -17,12 +17,11 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.SymbolMapper;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 
@@ -31,8 +30,6 @@ import static io.prestosql.sql.planner.iterative.rule.Util.transpose;
 import static io.prestosql.sql.planner.plan.Patterns.limit;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.ProjectNodeUtils.isIdentity;
 
 public class PushLimitThroughProject
         implements Rule<LimitNode>
@@ -43,7 +40,7 @@ public class PushLimitThroughProject
             .with(source().matching(
                     project()
                             // do not push limit through identity projection which could be there for column pruning purposes
-                            .matching(projectNode -> !isIdentity(projectNode))
+                            .matching(projectNode -> !projectNode.isIdentity())
                             .capturedAs(CHILD)));
 
     @Override
@@ -65,12 +62,12 @@ public class PushLimitThroughProject
         // for a LimitNode with ties, the tiesResolvingScheme must be rewritten in terms of symbols before projection
         SymbolMapper.Builder symbolMapper = SymbolMapper.builder();
         for (Symbol symbol : parent.getTiesResolvingScheme().get().getOrderBy()) {
-            Expression expression = castToExpression(projectNode.getAssignments().get(symbol));
+            Expression expression = projectNode.getAssignments().get(symbol);
             // if a symbol results from some computation, the translation fails
             if (!(expression instanceof SymbolReference)) {
                 return Result.empty();
             }
-            symbolMapper.put(symbol, SymbolUtils.from(expression));
+            symbolMapper.put(symbol, Symbol.from(expression));
         }
 
         LimitNode mappedLimitNode = symbolMapper.build().map(parent, projectNode.getSource());

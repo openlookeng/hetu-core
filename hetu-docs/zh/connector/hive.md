@@ -121,7 +121,6 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.metastore.uri`| 使用Thrift协议连接Hive元存储的URI。如果提供了多个URI，则默认使用第一个URI，其余URI为回退元存储。该属性必选。示例：`thrift://192.0.2.3:9083`或`thrift://192.0.2.3:9083,thrift://192.0.2.4:9083`|
 | `hive.metastore.username`| openLooKeng用于访问Hive metastore的用户名。|
 | `hive.metastore.authentication.type`| Hive元存储身份验证类型。取值为`NONE`或`KERBEROS`（默认为`NONE`）。|
-| `hive.metastore.thrift.impersonation.enabled` |  启用Hive元存储用户模拟。|
 | `hive.metastore.thrift.client.ssl.enabled`| 连接元存储时使用SSL。默认为`false`。当为true时，表示需要keystore或truststore其中一个。keystore/truststore的路径和密码需要在`jvm.config`中设置。密钥列表如下：`-Djavax.net.ssl.keystoreType= e.g. jks` `-Djavax.net.ssl.keyStore=` `-Djavax.net.ssl.keyStorePassword=` `-Djavax.net.ssl.trustStore=` `-Djavax.net.ssl.trustStorePassword=`|
 | `hive.metastore.service.principal`| Hive元存储服务的Kerberos主体。|
 | `hive.metastore.client.principal`| openLooKeng在连接到Hive元存储服务时将使用的Kerberos主体。|
@@ -255,20 +254,20 @@ Hive连接器缓存ORC文件数据，以提供更好的性能并减少查询时�
 | 属性名称| 说明| 默认值|
 |:----------|:----------|:----------|
 | `hive.orc.file-tail.cache.enabled`| 启用ORC文件尾缓存| `false`|
-| `hive.orc.file-tail.cache.ttl`| ORC文件尾缓存TTL| `4 hours`|
-| `hive.orc.file-tail.cache.limit`| ORC文件尾缓存最大条目数| `50,000`|
+| `hive.orc.file-tail.cache.ttl`| ORC文件尾缓存TTL| `30 mins`|
+| `hive.orc.file-tail.cache.limit`| ORC文件尾缓存最大条目数| `10,000`|
 | `hive.orc.stripe-footer.cache.enabled`| 启用ORC分条页脚缓存| `false`|
-| `hive.orc.stripe-footer.cache.ttl`| ORC分条页脚缓存的TTL| `4 hours`|
-| `hive.orc.stripe-footer.cache.limit`| ORC分条页脚缓存最大条目数| `250,000`|
+| `hive.orc.stripe-footer.cache.ttl`| ORC分条页脚缓存的TTL| `30 mins`|
+| `hive.orc.stripe-footer.cache.limit`| ORC分条页脚缓存最大条目数| `25,000`|
 | `hive.orc.row-index.cache.enabled`| 启用ORC行索引缓存| `false`|
-| `hive.orc.row-index.cache.ttl`| ORC行索引缓存TTL| `4 hours`|
-| `hive.orc.row-index.cache.limit`| ORC行索引缓存最大条目数| `250,000`|
+| `hive.orc.row-index.cache.ttl`| ORC行索引缓存TTL| `30 mins`|
+| `hive.orc.row-index.cache.limit`| ORC行索引缓存最大条目数| `50,000`|
 | `hive.orc.bloom-filters.cache.enabled`| 启用ORC布隆过滤器缓存| `false`|
-| `hive.orc.bloom-filters.cache.ttl`| ORC布隆过滤器缓存TTL| `4 hours`|
-| `hive.orc.bloom-filters.cache.limit`| ORC布隆过滤器缓存最大条目数| `250,000`|
+| `hive.orc.bloom-filters.cache.ttl`| ORC布隆过滤器缓存TTL| `30 mins`|
+| `hive.orc.bloom-filters.cache.limit`| ORC布隆过滤器缓存最大条目数| `50,000`|
 | `hive.orc.row-data.block.cache.enabled`| 启用ORC行组块缓存| `false`|
-| `hive.orc.row-data.block.cache.ttl`| ORC行组缓存TTL| `4 hours`|
-| `hive.orc.row-data.block.cache.max.weight`| ORC行组缓存最大权重。| `20 GB`|
+| `hive.orc.row-data.block.cache.ttl`| ORC行组缓存TTL| `30 mins`|
+| `hive.orc.row-data.block.cache.max.weight`| ORC行组缓存最大权重。| `500 MB`|
 
 TTL: 是指自最后一次读写cache到现在的时间间隔。如后文所讲, 在写cache阶段会周期性执行时间过期验证,在读cache的时也会触发过期验证。
 

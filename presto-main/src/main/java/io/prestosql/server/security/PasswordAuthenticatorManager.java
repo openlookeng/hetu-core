@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.util.Objects.requireNonNull;
 
 public class PasswordAuthenticatorManager
@@ -62,7 +62,7 @@ public class PasswordAuthenticatorManager
         }
 
         File configFileLocation = CONFIG_FILE.getAbsoluteFile();
-        Map<String, String> properties = new HashMap<>(loadPropertiesFrom(configFileLocation.getPath()));
+        Map<String, String> properties = new HashMap<>(loadProperties(configFileLocation));
 
         String name = properties.remove(NAME_PROPERTY);
         checkArgument(!isNullOrEmpty(name),

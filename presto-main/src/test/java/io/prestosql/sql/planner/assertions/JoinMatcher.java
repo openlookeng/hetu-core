@@ -17,10 +17,9 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.JoinNode.DistributionType;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.JoinNode.DistributionType;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
@@ -31,8 +30,6 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 final class JoinMatcher
@@ -87,16 +84,8 @@ final class JoinMatcher
             if (!joinNode.getFilter().isPresent()) {
                 return NO_MATCH;
             }
-            RowExpression expression = joinNode.getFilter().get();
-            if (isExpression(expression)) {
-                if (!new ExpressionVerifier(symbolAliases).process(castToExpression(expression), filter.get())) {
-                    return NO_MATCH;
-                }
-            }
-            else {
-                if (!new RowExpressionVerifier(symbolAliases, metadata, session, node.getOutputSymbols()).process(filter.get(), expression)) {
-                    return NO_MATCH;
-                }
+            if (!new ExpressionVerifier(symbolAliases).process(joinNode.getFilter().get(), filter.get())) {
+                return NO_MATCH;
             }
         }
         else {

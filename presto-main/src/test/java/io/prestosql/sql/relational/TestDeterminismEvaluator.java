@@ -15,8 +15,6 @@ package io.prestosql.sql.relational;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.type.StandardTypes;
 import org.testng.annotations.Test;
 
@@ -38,7 +36,7 @@ public class TestDeterminismEvaluator
     @Test
     public void testDeterminismEvaluator()
     {
-        RowExpressionDeterminismEvaluator determinismEvaluator = new RowExpressionDeterminismEvaluator(createTestMetadataManager());
+        DeterminismEvaluator determinismEvaluator = new DeterminismEvaluator(createTestMetadataManager());
 
         CallExpression random = new CallExpression(
                 new Signature(

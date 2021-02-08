@@ -25,11 +25,11 @@ import io.prestosql.operator.Work;
 import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.JoinCompiler;
+import io.prestosql.sql.planner.plan.AggregationNode;
 
 import java.io.IOException;
 import java.util.List;

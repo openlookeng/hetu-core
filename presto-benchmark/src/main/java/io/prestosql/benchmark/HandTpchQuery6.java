@@ -28,10 +28,11 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.AggregationNode.Step;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.gen.PageFunctionCompiler;
+import io.prestosql.sql.planner.plan.AggregationNode.Step;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.LocalQueryRunner;
+import io.prestosql.util.DateTimeUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +44,6 @@ import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.spi.util.DateTimeUtils.parseDate;
 import static io.prestosql.sql.relational.Expressions.field;
 
 public class HandTpchQuery6
@@ -95,8 +95,8 @@ public class HandTpchQuery6
     public static class TpchQuery6Filter
             implements PageFilter
     {
-        private static final int MIN_SHIP_DATE = parseDate("1994-01-01");
-        private static final int MAX_SHIP_DATE = parseDate("1995-01-01");
+        private static final int MIN_SHIP_DATE = DateTimeUtils.parseDate("1994-01-01");
+        private static final int MAX_SHIP_DATE = DateTimeUtils.parseDate("1995-01-01");
         private static final InputChannels INPUT_CHANNELS = new InputChannels(1, 2, 3);
 
         private boolean[] selectedPositions = new boolean[0];

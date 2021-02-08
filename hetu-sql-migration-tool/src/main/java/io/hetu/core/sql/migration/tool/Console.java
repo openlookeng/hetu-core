@@ -111,6 +111,16 @@ public class Console
             }
         }
 
+        // abort any running query if the CLI is terminated
+        AtomicBoolean exiting = new AtomicBoolean();
+        ThreadInterruptor interruptor = new ThreadInterruptor();
+        CountDownLatch exited = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            exiting.set(true);
+            interruptor.interrupt();
+            awaitUninterruptibly(exited, EXIT_DELAY.toMillis(), MILLISECONDS);
+        }));
+
         // set source type
         if (cliOptions.sourceType != null && !cliOptions.sourceType.isEmpty()) {
             if (!setSourceType(cliOptions.sourceType.toLowerCase(ENGLISH), session)) {
@@ -124,6 +134,7 @@ public class Console
         }
 
         // get migration config
+        MigrationConfig migrationConfig;
         try {
             session.setMigrationConfig(new MigrationConfig(cliOptions.configFile));
         }
@@ -132,52 +143,37 @@ public class Console
             return false;
         }
 
-        try (ThreadInterruptor interruptor = new ThreadInterruptor()) {
-            // abort any running query if the CLI is terminated
-            AtomicBoolean exiting = new AtomicBoolean();
-            CountDownLatch exited = new CountDownLatch(1);
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                exiting.set(true);
-                interruptor.interrupt();
-                awaitUninterruptibly(exited, EXIT_DELAY.toMillis(), MILLISECONDS);
-            }));
+        if (hasQuery) {
+            // generate name of the target file
+            String outputFile = null;
+            if (cliOptions.outputPath != null) {
+                if (!new File(cliOptions.outputPath).isDirectory()) {
+                    System.out.println("Error: Output is not a directory");
+                    return false;
+                }
 
-            if (hasQuery) {
-                // generate name of the target file
-                String outputFile = null;
-                if (cliOptions.outputPath != null) {
-                    if (!new File(cliOptions.outputPath).isDirectory()) {
-                        System.out.println("Error: Output is not a directory");
-                        return false;
-                    }
-
-                    outputFile = cliOptions.outputPath + File.separator;
-                    if (cliOptions.sqlFile == null) {
-                        outputFile += System.currentTimeMillis();
+                outputFile = cliOptions.outputPath + File.separator;
+                if (cliOptions.sqlFile == null) {
+                    outputFile += System.currentTimeMillis();
+                }
+                else {
+                    String fileName = new File(cliOptions.sqlFile).getName();
+                    int dotIndex = fileName.lastIndexOf('.');
+                    if (dotIndex == -1) {
+                        outputFile += fileName + "_" + System.currentTimeMillis();
                     }
                     else {
-                        String fileName = new File(cliOptions.sqlFile).getName();
-                        int dotIndex = fileName.lastIndexOf('.');
-                        if (dotIndex == -1) {
-                            outputFile += fileName + "_" + System.currentTimeMillis();
-                        }
-                        else {
-                            outputFile += fileName.substring(0, dotIndex) + "_" + System.currentTimeMillis();
-                        }
-                    }
-                    if (new File(outputFile).exists()) {
-                        System.out.println(format("Error: Output file %s already exists!", outputFile));
-                        return false;
+                        outputFile += fileName.substring(0, dotIndex) + "_" + System.currentTimeMillis();
                     }
                 }
-                session.setDebugEnable(cliOptions.debug != null && cliOptions.debug.equalsIgnoreCase("true"));
-                session.setConsolePrintEnable(cliOptions.execute != null || session.isDebugEnable());
-                return executeCommand(query, outputFile, session);
             }
-
-            runConsole(session, exiting);
-            return true;
+            session.setDebugEnable(cliOptions.debug != null && cliOptions.debug.equalsIgnoreCase("true"));
+            session.setConsolePrintEnable(cliOptions.execute != null || session.isDebugEnable());
+            return executeCommand(query, outputFile, session);
         }
+
+        runConsole(session, exiting);
+        return true;
     }
 
     private void runConsole(SessionProperties session, AtomicBoolean exiting)
@@ -345,11 +341,11 @@ public class Console
 
     private static Path getHistoryFile()
     {
-        String path = System.getenv("MIGRATION_TOOL_HISTORY_FILE");
+        String path = System.getenv("PRESTO_HISTORY_FILE");
         if (!isNullOrEmpty(path)) {
             return Paths.get(path);
         }
-        return Paths.get(nullToEmpty(USER_HOME.value()), ".migration_tool_history");
+        return Paths.get(nullToEmpty(USER_HOME.value()), ".presto_history");
     }
 
     public boolean executeCommand(String query, String outputFile, SessionProperties session)

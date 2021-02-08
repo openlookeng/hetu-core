@@ -26,70 +26,20 @@ class Header
     extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {
-      user: UserStore.getCurrentUser(),
-      noConnection: false,
-      lightShown: false,
-      info: null,
-      lastSuccess: Date.now(),
-      modalShown: false,
-      errorText: null,
-    };
+    this.state = getStateFromStore();
     this._onChange = this._onChange.bind(this);
   }
 
   componentDidMount() {
     UserStore.listen(this._onChange);
     UserActions.fetchCurrentUser();
-    this.refreshLoop.bind(this)();
   }
 
   componentWillUnmount() {
     UserStore.unlisten(this._onChange);
   }
 
-  refreshLoop() {
-    clearTimeout(this.timeoutId);
-    fetch("../v1/info")
-    .then(response => response.json())
-    .then(info => {
-      this.setState({
-        info: info,
-        noConnection: false,
-        lastSuccess: Date.now(),
-        modalShown: false,
-      });
-    this.resetTimer();
-    })
-    .catch(error => {
-      this.setState({
-        noConnection: true,
-        lightShown: !this.state.lightShown,
-        errorText: error
-      });
-      this.resetTimer();
-    });
-  }
-
-  resetTimer() {
-    clearTimeout(this.timeoutId);
-    this.timeoutId = setTimeout(this.refreshLoop.bind(this), 1000);
-  }
-
-  renderStatusLight() {
-    if (this.state.noConnection) {
-      if (this.state.lightShown) {
-        return <span className="status-light status-light-red" id="status-indicator"/>;
-      }
-      else {
-        return <span className="status-light" id="status-indicator"/>
-      }
-    }
-    return <span className="status-light status-light-green" id="status-indicator"/>;
-  }
-
   render() {
-    const info = this.state.info;
     return (
       <header className='flex flex-row'>
         <div className='flex'>
@@ -98,25 +48,6 @@ class Header
           </a>
         </div>
         <div className='flex justify-flex-end menu'>
-          <div className='flex flex-initial version'>
-            <div className="version-inner">
-              Version :
-              {info? info.nodeVersion.version : 'null'}
-            </div>
-            <div className="version-inner">
-              Environment :
-              {info ? info.environment : 'null'}
-            </div>
-            <div className="version-inner">
-              Uptime
-              : {info ? info.uptime : '0s'}
-            </div>
-            <div className="version-inner">
-              <span data-toggle="tooltip" data-placement="bottom" title="Connection status">
-                {this.renderStatusLight()}
-              </span>
-            </div>
-          </div>
           <div className='flex flex-initial'>
             <div>
               <i className='glyphicon glyphicon-user'/>

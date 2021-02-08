@@ -14,9 +14,9 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
@@ -34,9 +34,9 @@ public class TestPruneProjectColumns
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");
                     return p.project(
-                            Assignments.of(b, p.variable(b.getName())),
+                            Assignments.identity(b),
                             p.project(
-                                    Assignments.of(a, p.variable(a.getName()), b, p.variable(b.getName())),
+                                    Assignments.identity(a, b),
                                     p.values(a, b)));
                 })
                 .matches(
@@ -55,9 +55,9 @@ public class TestPruneProjectColumns
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");
                     return p.project(
-                            Assignments.of(b, p.variable(b.getName())),
+                            Assignments.identity(b),
                             p.project(
-                                    Assignments.of(b, p.variable(b.getName())),
+                                    Assignments.identity(b),
                                     p.values(a, b)));
                 })
                 .doesNotFire();

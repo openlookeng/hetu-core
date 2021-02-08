@@ -14,7 +14,6 @@
 package io.prestosql.sql.tree;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.sql.expression.Types.FrameBoundType;
 
 import java.util.List;
 import java.util.Objects;
@@ -26,42 +25,51 @@ import static java.util.Objects.requireNonNull;
 public class FrameBound
         extends Node
 {
-    private final FrameBoundType type;
+    public enum Type
+    {
+        UNBOUNDED_PRECEDING,
+        PRECEDING,
+        CURRENT_ROW,
+        FOLLOWING,
+        UNBOUNDED_FOLLOWING
+    }
+
+    private final Type type;
     private final Optional<Expression> value;
 
-    public FrameBound(FrameBoundType type)
+    public FrameBound(Type type)
     {
         this(Optional.empty(), type);
     }
 
-    public FrameBound(NodeLocation location, FrameBoundType type)
+    public FrameBound(NodeLocation location, Type type)
     {
         this(Optional.of(location), type);
     }
 
-    public FrameBound(FrameBoundType type, Expression value)
+    public FrameBound(Type type, Expression value)
     {
         this(Optional.empty(), type, value);
     }
 
-    private FrameBound(Optional<NodeLocation> location, FrameBoundType type)
+    private FrameBound(Optional<NodeLocation> location, Type type)
     {
         this(location, type, null);
     }
 
-    public FrameBound(NodeLocation location, FrameBoundType type, Expression value)
+    public FrameBound(NodeLocation location, Type type, Expression value)
     {
         this(Optional.of(location), type, value);
     }
 
-    private FrameBound(Optional<NodeLocation> location, FrameBoundType type, Expression value)
+    private FrameBound(Optional<NodeLocation> location, Type type, Expression value)
     {
         super(location);
         this.type = requireNonNull(type, "type is null");
         this.value = Optional.ofNullable(value);
     }
 
-    public FrameBoundType getType()
+    public Type getType()
     {
         return type;
     }

@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.PlanNodeStatsEstimate;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.planprinter.NodeRepresentation.TypedSymbol;
 
 import java.util.Iterator;

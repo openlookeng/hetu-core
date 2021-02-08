@@ -14,10 +14,10 @@
 package io.prestosql.cost;
 
 import io.prestosql.Session;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 public interface StatsCalculator
 {

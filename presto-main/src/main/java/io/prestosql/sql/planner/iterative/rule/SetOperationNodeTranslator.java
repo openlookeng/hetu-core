@@ -17,17 +17,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.SetOperationNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.SetOperationNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -44,13 +44,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.concat;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
-import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.sourceSymbolMap;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
 import static java.util.Objects.requireNonNull;
@@ -60,12 +57,12 @@ public class SetOperationNodeTranslator
     private static final String MARKER = "marker";
     private static final Signature COUNT_AGGREGATION = new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN));
     private static final Literal GENERIC_LITERAL = new GenericLiteral("BIGINT", "1");
-    private final PlanSymbolAllocator planSymbolAllocator;
+    private final SymbolAllocator symbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
 
-    public SetOperationNodeTranslator(PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator)
+    public SetOperationNodeTranslator(SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator)
     {
-        this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "SymbolAllocator is null");
+        this.symbolAllocator = requireNonNull(symbolAllocator, "SymbolAllocator is null");
         this.idAllocator = requireNonNull(idAllocator, "PlanNodeIdAllocator is null");
     }
 
@@ -85,7 +82,7 @@ public class SetOperationNodeTranslator
         List<Symbol> aggregationOutputs = allocateSymbols(markers.size(), "count", BIGINT);
         AggregationNode aggregation = computeCounts(union, outputs, markers, aggregationOutputs);
         List<Expression> presentExpression = aggregationOutputs.stream()
-                .map(symbol -> new ComparisonExpression(GREATER_THAN_OR_EQUAL, toSymbolReference(symbol), GENERIC_LITERAL))
+                .map(symbol -> new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbol.toSymbolReference(), GENERIC_LITERAL))
                 .collect(toImmutableList());
         return new TranslationResult(aggregation, presentExpression);
     }
@@ -94,7 +91,7 @@ public class SetOperationNodeTranslator
     {
         ImmutableList.Builder<Symbol> symbolsBuilder = ImmutableList.builder();
         for (int i = 0; i < count; i++) {
-            symbolsBuilder.add(planSymbolAllocator.newSymbol(nameHint, type));
+            symbolsBuilder.add(symbolAllocator.newSymbol(nameHint, type));
         }
         return symbolsBuilder.build();
     }
@@ -103,24 +100,24 @@ public class SetOperationNodeTranslator
     {
         ImmutableList.Builder<PlanNode> result = ImmutableList.builder();
         for (int i = 0; i < nodes.size(); i++) {
-            result.add(appendMarkers(idAllocator, planSymbolAllocator, nodes.get(i), i, markers, sourceSymbolMap(node, i)));
+            result.add(appendMarkers(idAllocator, symbolAllocator, nodes.get(i), i, markers, node.sourceSymbolMap(i)));
         }
         return result.build();
     }
 
-    private static PlanNode appendMarkers(PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator, PlanNode source, int markerIndex, List<Symbol> markers, Map<Symbol, SymbolReference> projections)
+    private static PlanNode appendMarkers(PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, PlanNode source, int markerIndex, List<Symbol> markers, Map<Symbol, SymbolReference> projections)
     {
         Assignments.Builder assignments = Assignments.builder();
         // add existing intersect symbols to projection
         for (Map.Entry<Symbol, SymbolReference> entry : projections.entrySet()) {
-            Symbol symbol = planSymbolAllocator.newSymbol(entry.getKey().getName(), planSymbolAllocator.getTypes().get(entry.getKey()));
-            assignments.put(symbol, castToRowExpression(entry.getValue()));
+            Symbol symbol = symbolAllocator.newSymbol(entry.getKey().getName(), symbolAllocator.getTypes().get(entry.getKey()));
+            assignments.put(symbol, entry.getValue());
         }
 
         // add extra marker fields to the projection
         for (int i = 0; i < markers.size(); ++i) {
             Expression expression = (i == markerIndex) ? TRUE_LITERAL : new Cast(new NullLiteral(), StandardTypes.BOOLEAN);
-            assignments.put(planSymbolAllocator.newSymbol(markers.get(i).getName(), BOOLEAN), castToRowExpression(expression));
+            assignments.put(symbolAllocator.newSymbol(markers.get(i).getName(), BOOLEAN), expression);
         }
 
         return new ProjectNode(idAllocator.getNextId(), source, assignments.build());
@@ -146,7 +143,7 @@ public class SetOperationNodeTranslator
             Symbol output = aggregationOutputs.get(i);
             aggregations.put(output, new AggregationNode.Aggregation(
                     COUNT_AGGREGATION,
-                    ImmutableList.of(castToRowExpression(toSymbolReference(markers.get(i)))),
+                    ImmutableList.of(markers.get(i).toSymbolReference()),
                     false,
                     Optional.empty(),
                     Optional.empty(),

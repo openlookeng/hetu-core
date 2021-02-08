@@ -18,13 +18,12 @@ import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.StandardTypes;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Literal;
 import io.prestosql.sql.tree.NullLiteral;
@@ -41,7 +40,6 @@ import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 
 public class SimplifyCountOverConstant
         implements Rule<AggregationNode>
@@ -103,9 +101,9 @@ public class SimplifyCountOverConstant
             return false;
         }
 
-        Expression argument = castToExpression(aggregation.getArguments().get(0));
+        Expression argument = aggregation.getArguments().get(0);
         if (argument instanceof SymbolReference) {
-            argument = castToExpression(inputs.get(SymbolUtils.from(argument)));
+            argument = inputs.get(Symbol.from(argument));
         }
 
         return argument instanceof Literal && !(argument instanceof NullLiteral);

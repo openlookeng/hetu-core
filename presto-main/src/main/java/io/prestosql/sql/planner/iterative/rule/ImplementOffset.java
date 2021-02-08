@@ -16,12 +16,12 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.GenericLiteral;
@@ -29,9 +29,7 @@ import io.prestosql.sql.tree.GenericLiteral;
 import java.util.Optional;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.Patterns.offset;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 /**
  * Transforms:
@@ -77,16 +75,15 @@ public class ImplementOffset
         FilterNode filterNode = new FilterNode(
                 context.getIdAllocator().getNextId(),
                 rowNumberNode,
-                castToRowExpression(
-                    new ComparisonExpression(
-                            ComparisonExpression.Operator.GREATER_THAN,
-                            toSymbolReference(rowNumberSymbol),
-                            new GenericLiteral("BIGINT", Long.toString(parent.getCount())))));
+                new ComparisonExpression(
+                        ComparisonExpression.Operator.GREATER_THAN,
+                        rowNumberSymbol.toSymbolReference(),
+                        new GenericLiteral("BIGINT", Long.toString(parent.getCount()))));
 
         ProjectNode projectNode = new ProjectNode(
                 context.getIdAllocator().getNextId(),
                 filterNode,
-                AssignmentUtils.identityAsSymbolReferences(parent.getOutputSymbols()));
+                Assignments.identity(parent.getOutputSymbols()));
 
         return Result.ofPlanNode(projectNode);
     }

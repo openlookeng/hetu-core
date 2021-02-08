@@ -13,10 +13,9 @@
  */
 package io.prestosql.sql.planner.iterative.rule;
 
-import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ExistsPredicate;
 import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LongLiteral;
@@ -47,7 +46,7 @@ public class TestTransformUncorrelatedInPredicateSubqueryToSemiJoin
     {
         tester().assertThat(new TransformUncorrelatedInPredicateSubqueryToSemiJoin())
                 .on(p -> p.apply(
-                        Assignments.of(p.symbol("x"), OriginalExpressionUtils.castToRowExpression(new ExistsPredicate(new LongLiteral("1")))),
+                        Assignments.of(p.symbol("x"), new ExistsPredicate(new LongLiteral("1"))),
                         emptyList(),
                         p.values(),
                         p.values()))
@@ -61,7 +60,9 @@ public class TestTransformUncorrelatedInPredicateSubqueryToSemiJoin
                 .on(p -> p.apply(
                         Assignments.of(
                                 p.symbol("x"),
-                                (OriginalExpressionUtils.castToRowExpression(new InPredicate(new SymbolReference("y"), new SymbolReference("z"))))),
+                                new InPredicate(
+                                        new SymbolReference("y"),
+                                        new SymbolReference("z"))),
                         emptyList(),
                         p.values(p.symbol("y")),
                         p.values(p.symbol("z"))))

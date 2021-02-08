@@ -23,26 +23,11 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableProperties;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.LocalProperty;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.GroupIdNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.Partitioning.ArgumentBinding;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
@@ -51,11 +36,18 @@ import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OutputNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -64,10 +56,16 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.TopNRowNumberNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 
 import javax.annotation.concurrent.Immutable;
@@ -95,8 +93,6 @@ import static io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.S
 import static io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties.StreamDistribution.MULTIPLE;
 import static io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties.StreamDistribution.SINGLE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public final class StreamPropertyDerivations
@@ -154,7 +150,7 @@ public final class StreamPropertyDerivations
     }
 
     private static class Visitor
-            extends InternalPlanVisitor<StreamProperties, List<StreamProperties>>
+            extends PlanVisitor<StreamProperties, List<StreamProperties>>
     {
         private final Metadata metadata;
         private final Session session;
@@ -166,7 +162,7 @@ public final class StreamPropertyDerivations
         }
 
         @Override
-        public StreamProperties visitPlan(PlanNode node, List<StreamProperties> inputProperties)
+        protected StreamProperties visitPlan(PlanNode node, List<StreamProperties> inputProperties)
         {
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }
@@ -357,20 +353,12 @@ public final class StreamPropertyDerivations
             return properties.translate(column -> Optional.ofNullable(identities.get(column)));
         }
 
-        private static Map<Symbol, Symbol> computeIdentityTranslations(Map<Symbol, RowExpression> assignments)
+        private static Map<Symbol, Symbol> computeIdentityTranslations(Map<Symbol, Expression> assignments)
         {
             Map<Symbol, Symbol> inputToOutput = new HashMap<>();
-            for (Map.Entry<Symbol, RowExpression> assignment : assignments.entrySet()) {
-                RowExpression expression = assignment.getValue();
-                if (isExpression(expression)) {
-                    if (castToExpression(expression) instanceof SymbolReference) {
-                        inputToOutput.put(SymbolUtils.from(castToExpression(expression)), assignment.getKey());
-                    }
-                }
-                else {
-                    if (expression instanceof VariableReferenceExpression) {
-                        inputToOutput.put(new Symbol(((VariableReferenceExpression) expression).getName()), assignment.getKey());
-                    }
+            for (Map.Entry<Symbol, Expression> assignment : assignments.entrySet()) {
+                if (assignment.getValue() instanceof SymbolReference) {
+                    inputToOutput.put(Symbol.from(assignment.getValue()), assignment.getKey());
                 }
             }
             return inputToOutput;
@@ -542,7 +530,7 @@ public final class StreamPropertyDerivations
         }
 
         @Override
-        public StreamProperties visitTopNRankingNumber(TopNRankingNumberNode node, List<StreamProperties> inputProperties)
+        public StreamProperties visitTopNRowNumber(TopNRowNumberNode node, List<StreamProperties> inputProperties)
         {
             return Iterables.getOnlyElement(inputProperties);
         }

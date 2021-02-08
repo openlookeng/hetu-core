@@ -14,7 +14,6 @@
 package io.prestosql.operator.aggregation;
 
 import com.google.common.base.CaseFormat;
-import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.aggregation.state.CentralMomentsState;
 import io.prestosql.operator.aggregation.state.CorrelationState;
 import io.prestosql.operator.aggregation.state.CovarianceState;
@@ -22,11 +21,9 @@ import io.prestosql.operator.aggregation.state.RegressionState;
 import io.prestosql.operator.aggregation.state.VarianceState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.type.TypeSignature;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -36,39 +33,6 @@ public final class AggregationUtils
 {
     private AggregationUtils()
     {
-    }
-
-    public static boolean isDecomposable(AggregationNode aggregationNode, Metadata metadata)
-    {
-        boolean hasOrderBy = aggregationNode.getAggregations().values().stream()
-                .map(AggregationNode.Aggregation::getOrderingScheme)
-                .anyMatch(Optional::isPresent);
-
-        boolean hasDistinct = aggregationNode.getAggregations().values().stream()
-                .anyMatch(AggregationNode.Aggregation::isDistinct);
-
-        boolean decomposableFunctions = aggregationNode.getAggregations().values().stream()
-                .map(AggregationNode.Aggregation::getSignature)
-                .map(metadata::getAggregateFunctionImplementation)
-                .allMatch(InternalAggregationFunction::isDecomposable);
-
-        return !hasOrderBy && !hasDistinct && decomposableFunctions;
-    }
-
-    public static boolean hasSingleNodeExecutionPreference(AggregationNode aggregationNode, Metadata metadata)
-    {
-        // There are two kinds of aggregations the have single node execution preference:
-        //
-        // 1. aggregations with only empty grouping sets like
-        //
-        // SELECT count(*) FROM lineitem;
-        //
-        // there is no need for distributed aggregation. Single node FINAL aggregation will suffice,
-        // since all input have to be aggregated into one line output.
-        //
-        // 2. aggregations that must produce default output and are not decomposable, we can not distribute them.
-        return (aggregationNode.hasEmptyGroupingSet() && !aggregationNode.hasNonEmptyGroupingSet()) ||
-                (aggregationNode.hasDefaultOutput() && !isDecomposable(aggregationNode, metadata));
     }
 
     public static void updateVarianceState(VarianceState state, double value)

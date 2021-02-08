@@ -15,11 +15,11 @@ package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.OptimizerStatsRecorder;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import static java.util.Objects.requireNonNull;
 
@@ -40,7 +40,7 @@ public final class StatsRecordingPlanOptimizer
             PlanNode plan,
             Session session,
             TypeProvider types,
-            PlanSymbolAllocator planSymbolAllocator,
+            SymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator,
             WarningCollector warningCollector)
     {
@@ -48,7 +48,7 @@ public final class StatsRecordingPlanOptimizer
         long duration;
         try {
             long start = System.nanoTime();
-            result = delegate.optimize(plan, session, types, planSymbolAllocator, idAllocator, warningCollector);
+            result = delegate.optimize(plan, session, types, symbolAllocator, idAllocator, warningCollector);
             duration = System.nanoTime() - start;
         }
         catch (RuntimeException e) {

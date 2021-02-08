@@ -15,19 +15,18 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import org.testng.annotations.Test;
 
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Predicates.alwaysTrue;
-import static io.prestosql.spi.type.BigintType.BIGINT;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.limit;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
@@ -67,7 +66,7 @@ public class TestPruneLimitColumns
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");
                     return p.project(
-                            Assignments.of(b, p.variable(b.getName())),
+                            Assignments.identity(ImmutableList.of(b)),
                             p.limit(1, ImmutableList.of(a), p.values(a, b)));
                 })
                 .doesNotFire();
@@ -78,7 +77,7 @@ public class TestPruneLimitColumns
         Symbol a = planBuilder.symbol("a");
         Symbol b = planBuilder.symbol("b");
         return planBuilder.project(
-                Assignments.copyOf(Stream.of(a, b).filter(projectionFilter).collect(Collectors.toMap(v -> v, v -> planBuilder.variable(v.getName(), BIGINT)))),
+                Assignments.identity(Stream.of(a, b).filter(projectionFilter).collect(toImmutableSet())),
                 planBuilder.limit(1, planBuilder.values(a, b)));
     }
 }

@@ -16,13 +16,12 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.tree.LongLiteral;
 
 import static io.prestosql.matching.Pattern.empty;
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.plan.Patterns.Values.rows;
 import static io.prestosql.sql.planner.plan.Patterns.delete;
 import static io.prestosql.sql.planner.plan.Patterns.exchange;
@@ -75,6 +74,6 @@ public class RemoveEmptyDelete
                 new ValuesNode(
                         node.getId(),
                         node.getOutputSymbols(),
-                        ImmutableList.of(ImmutableList.of(new ConstantExpression(0L, BIGINT)))));
+                        ImmutableList.of(ImmutableList.of(new LongLiteral("0")))));
     }
 }

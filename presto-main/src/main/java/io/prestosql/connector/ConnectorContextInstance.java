@@ -20,7 +20,6 @@ import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
-import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 
 import static java.util.Objects.requireNonNull;
@@ -35,7 +34,6 @@ public class ConnectorContextInstance
     private final PageIndexerFactory pageIndexerFactory;
     private final HetuMetastore hetuMetastore;
     private final IndexClient indexClient;
-    private final RowExpressionService rowExpressionService;
 
     public ConnectorContextInstance(
             NodeManager nodeManager,
@@ -44,8 +42,7 @@ public class ConnectorContextInstance
             PageSorter pageSorter,
             PageIndexerFactory pageIndexerFactory,
             HetuMetastore hetuMetastore,
-            IndexClient indexClient,
-            RowExpressionService rowExpressionService)
+            IndexClient indexClient)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.versionEmbedder = requireNonNull(versionEmbedder, "versionEmbedder is null");
@@ -54,7 +51,6 @@ public class ConnectorContextInstance
         this.pageIndexerFactory = requireNonNull(pageIndexerFactory, "pageIndexerFactory is null");
         this.hetuMetastore = hetuMetastore;
         this.indexClient = indexClient;
-        this.rowExpressionService = rowExpressionService;
     }
 
     @Override
@@ -97,11 +93,5 @@ public class ConnectorContextInstance
     public HetuMetastore getHetuMetastore()
     {
         return hetuMetastore;
-    }
-
-    @Override
-    public RowExpressionService getRowExpressionService()
-    {
-        return rowExpressionService;
     }
 }

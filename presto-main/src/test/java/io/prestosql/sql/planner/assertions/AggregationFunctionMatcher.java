@@ -15,23 +15,19 @@ package io.prestosql.sql.planner.assertions;
 
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.sql.planner.OrderingSchemeUtils;
+import io.prestosql.sql.planner.OrderingScheme;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.QualifiedName;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class AggregationFunctionMatcher
@@ -71,34 +67,11 @@ public class AggregationFunctionMatcher
         if (expectedCall.getWindow().isPresent()) {
             return false;
         }
-        if (!Objects.equals(expectedCall.getName(), QualifiedName.of(aggregation.getSignature().getName())) ||
-                !Objects.equals(expectedCall.getFilter(), aggregation.getFilter()) ||
-                !Objects.equals(expectedCall.getOrderBy().map(OrderingSchemeUtils::fromOrderBy), aggregation.getOrderingScheme()) ||
-                !Objects.equals(expectedCall.isDistinct(), aggregation.isDistinct()) ||
-                expectedCall.getArguments().size() != aggregation.getArguments().size()) {
-            return false;
-        }
-        for (int i = 0; i < aggregation.getArguments().size(); i++) {
-            if (isExpression(aggregation.getArguments().get(i))) {
-                if (!Objects.equals(expectedCall.getArguments().get(i), castToExpression(aggregation.getArguments().get(i)))) {
-                    return false;
-                }
-            }
-            else {
-                if (aggregation.getArguments().get(i) instanceof VariableReferenceExpression && expectedCall.getArguments().get(i) instanceof SymbolReference) {
-                    if (expectedCall.getArguments().get(i) instanceof AnySymbolReference) {
-                        return true;
-                    }
-                    if (((SymbolReference) expectedCall.getArguments().get(i)).getName() != ((VariableReferenceExpression) aggregation.getArguments().get(i)).getName()) {
-                        return false;
-                    }
-                }
-                else {
-                    return false;
-                }
-            }
-        }
-        return true;
+        return Objects.equals(expectedCall.getName(), QualifiedName.of(aggregation.getSignature().getName())) &&
+                Objects.equals(expectedCall.getFilter(), aggregation.getFilter()) &&
+                Objects.equals(expectedCall.getOrderBy().map(OrderingScheme::fromOrderBy), aggregation.getOrderingScheme()) &&
+                Objects.equals(expectedCall.isDistinct(), aggregation.isDistinct()) &&
+                Objects.equals(expectedCall.getArguments(), aggregation.getArguments());
     }
 
     @Override

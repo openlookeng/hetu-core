@@ -18,45 +18,37 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.metadata.MetadataManager;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.plugin.tpch.TpchTableLayoutHandle;
 import io.prestosql.security.AllowAllAccessControl;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.operator.ReuseExchangeOperator;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.PlanFragmenter;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
-import io.prestosql.sql.planner.RuleStatsRecorder;
 import io.prestosql.sql.planner.SubPlan;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.iterative.IterativeOptimizer;
-import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
-import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.IsNullPredicate;
@@ -75,18 +67,16 @@ import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.tpch.TpchTransactionHandle.INSTANCE;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
-import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.partitionedExchange;
 import static io.prestosql.sql.planner.plan.ExchangeNode.replicatedExchange;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.transaction.TransactionBuilder.transaction;
 import static java.lang.String.format;
@@ -105,7 +95,6 @@ public class TestCostCalculator
     private PlanFragmenter planFragmenter;
     private Session session;
     private LocalQueryRunner localQueryRunner;
-    private MetadataManager metadata;
 
     @BeforeClass
     public void setUp()
@@ -118,7 +107,6 @@ public class TestCostCalculator
 
         localQueryRunner = new LocalQueryRunner(session);
         localQueryRunner.createCatalog("tpch", new TpchConnectorFactory(), ImmutableMap.of());
-        metadata = createTestMetadataManager();
 
         planFragmenter = new PlanFragmenter(localQueryRunner.getMetadata(), localQueryRunner.getNodePartitioningManager(), new QueryManagerConfig());
     }
@@ -194,7 +182,7 @@ public class TestCostCalculator
     {
         TableScanNode tableScan = tableScan("ts", "string");
         IsNullPredicate expression = new IsNullPredicate(new SymbolReference("string"));
-        FilterNode filter = new FilterNode(new PlanNodeId("filter"), tableScan, castToRowExpression(expression));
+        FilterNode filter = new FilterNode(new PlanNodeId("filter"), tableScan, expression);
         Map<String, PlanCostEstimate> costs = ImmutableMap.of("ts", cpuCost(1000));
         Map<String, PlanNodeStatsEstimate> stats = ImmutableMap.of(
                 "filter", statsEstimate(filter, 4000),
@@ -593,15 +581,8 @@ public class TestCostCalculator
                 .collect(ImmutableMap.toImmutableMap(entry -> new Symbol(entry.getKey()), Map.Entry::getValue)));
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator(stats), session, typeProvider);
         CostProvider costProvider = new TestingCostProvider(costs, costCalculatorUsingExchanges, statsProvider, session, typeProvider);
-        PlanNode plan = translateExpression(node, statsCalculator(stats), typeProvider);
-        SubPlan subPlan = fragment(new Plan(plan, typeProvider, StatsAndCosts.create(plan, statsProvider, costProvider)));
-        return new CostAssertionBuilder(subPlan.getFragment().getStatsAndCosts().getCosts().getOrDefault(plan.getId(), PlanCostEstimate.unknown()));
-    }
-
-    private PlanNode translateExpression(PlanNode node, StatsCalculator statsCalculator, TypeProvider typeProvider)
-    {
-        IterativeOptimizer optimizer = new IterativeOptimizer(new RuleStatsRecorder(), statsCalculator, costCalculatorUsingExchanges, new TranslateExpressions(metadata, new SqlParser()).rules(metadata));
-        return optimizer.optimize(node, session, typeProvider, new PlanSymbolAllocator(typeProvider.allTypes()), new PlanNodeIdAllocator(), WarningCollector.NOOP);
+        SubPlan subPlan = fragment(new Plan(node, typeProvider, StatsAndCosts.create(node, statsProvider, costProvider)));
+        return new CostAssertionBuilder(subPlan.getFragment().getStatsAndCosts().getCosts().getOrDefault(node.getId(), PlanCostEstimate.unknown()));
     }
 
     private static class TestingCostProvider
@@ -817,10 +798,7 @@ public class TestCostCalculator
                 symbolsList,
                 assignments.build(),
                 TupleDomain.all(),
-                Optional.empty(),
-                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
-                0);
+                Optional.empty());
     }
 
     private PlanNode project(String id, PlanNode source, String symbol, Expression expression)
@@ -828,7 +806,7 @@ public class TestCostCalculator
         return new ProjectNode(
                 new PlanNodeId(id),
                 source,
-                PlanBuilder.assignment(new Symbol(symbol), expression));
+                Assignments.of(new Symbol(symbol), expression));
     }
 
     private AggregationNode aggregation(String id, PlanNode source)

@@ -17,11 +17,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.Expression;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -34,7 +31,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class SpatialJoinNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     public enum Type
     {
@@ -70,7 +67,7 @@ public class SpatialJoinNode
     private final PlanNode left;
     private final PlanNode right;
     private final List<Symbol> outputSymbols;
-    private final RowExpression filter;
+    private final Expression filter;
     private final Optional<Symbol> leftPartitionSymbol;
     private final Optional<Symbol> rightPartitionSymbol;
     private final Optional<String> kdbTree;
@@ -89,7 +86,7 @@ public class SpatialJoinNode
             @JsonProperty("left") PlanNode left,
             @JsonProperty("right") PlanNode right,
             @JsonProperty("outputSymbols") List<Symbol> outputSymbols,
-            @JsonProperty("filter") RowExpression filter,
+            @JsonProperty("filter") Expression filter,
             @JsonProperty("leftPartitionSymbol") Optional<Symbol> leftPartitionSymbol,
             @JsonProperty("rightPartitionSymbol") Optional<Symbol> rightPartitionSymbol,
             @JsonProperty("kdbTree") Optional<String> kdbTree)
@@ -144,7 +141,7 @@ public class SpatialJoinNode
     }
 
     @JsonProperty("filter")
-    public RowExpression getFilter()
+    public Expression getFilter()
     {
         return filter;
     }
@@ -187,7 +184,7 @@ public class SpatialJoinNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitSpatialJoin(this, context);
     }

@@ -26,7 +26,7 @@ import io.prestosql.operator.project.PageFilter;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.operator.project.PageProjection;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.relational.RowExpression;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 

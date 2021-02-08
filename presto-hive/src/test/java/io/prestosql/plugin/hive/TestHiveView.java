@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
@@ -29,7 +28,6 @@ import io.prestosql.plugin.hive.metastore.StorageFormat;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.metastore.file.FileHiveMetastore;
 import io.prestosql.spi.connector.ConnectorMetadata;
-import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.SchemaTableName;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -99,9 +97,7 @@ public class TestHiveView
                 "  \"runAsInvoker\" : false\n" +
                 "}";
         String owner = "test";
-        ConnectorSession session = newSession();
-        HiveIdentity identity = new HiveIdentity(session);
-        metastoreClient.createTable(identity, buildHiveView(temporaryCreateView, owner, viewData), buildInitialPrivilegeSet(owner));
+        metastoreClient.createTable(buildHiveView(temporaryCreateView, owner, viewData), buildInitialPrivilegeSet(owner));
         try (Transaction transaction = newTransaction()) {
             ConnectorMetadata metadata = transaction.getMetadata();
             Optional<ConnectorViewDefinition> views = metadata.getView(newSession(), temporaryCreateView);
@@ -110,7 +106,7 @@ public class TestHiveView
             assertTrue(metadata.listViews(newSession(), Optional.of(temporaryCreateView.getSchemaName())).contains(temporaryCreateView));
         }
         finally {
-            metastoreClient.dropTable(identity, temporaryCreateView.getSchemaName(), temporaryCreateView.getTableName(), true);
+            metastoreClient.dropTable(temporaryCreateView.getSchemaName(), temporaryCreateView.getTableName(), true);
         }
     }
 

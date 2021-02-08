@@ -15,7 +15,6 @@ package io.prestosql.plugin.hive.metastore;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.hive.HiveACIDWriteType;
-import io.prestosql.plugin.hive.HivePartition;
 import io.prestosql.plugin.hive.HiveTableHandle;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -23,7 +22,6 @@ import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,7 +34,6 @@ public class HiveTransaction
     private final long transactionId;
     private final ScheduledFuture<?> heartbeatTask;
     private final Map<HiveTableHandle, AtomicBoolean> locksMap = new HashMap<>();
-    private final Map<HivePartition, AtomicBoolean> partitionLocks = new HashMap<>();
 
     private final Map<SchemaTableName, ValidTxnWriteIdList> validHiveTransactionsForTable = new HashMap<>();
 
@@ -85,51 +82,24 @@ public class HiveTransaction
     }
 
     //If the query is on the same table, on which update/delete happening separate lock not required.
-    private synchronized boolean isSharedLockNeeded(HiveTableHandle tableHandle)
+    private boolean isSharedLockNeeded(HiveTableHandle tableHandle)
     {
-        if (tableHandle.getPartitions().isPresent() && tableHandle.getPartitions().get().size() > 0) {
-            List<HivePartition> hivePartitions = tableHandle.getPartitions().get();
-            for (HivePartition partition : hivePartitions) {
-                AtomicBoolean partitionLockFlag = partitionLocks.get(partition);
-                if (partitionLockFlag == null || !partitionLockFlag.get()) {
-                    //some partition lock not found
-                    return true;
-                }
-            }
-        }
-        else {
-            AtomicBoolean lockFlag = locksMap.get(tableHandle);
-            if (lockFlag == null || !lockFlag.get()) {
-                return true;
-            }
+        AtomicBoolean lockFlag = locksMap.get(tableHandle);
+        if (lockFlag == null || !lockFlag.get()) {
+            return true;
         }
         return false;
     }
 
-    private synchronized void setLockFlagForTable(HiveTableHandle tableHandle)
+    private void setLockFlagForTable(HiveTableHandle tableHandle)
     {
-        if (tableHandle.getPartitions().isPresent() && tableHandle.getPartitions().get().size() > 0) {
-            List<HivePartition> hivePartitions = tableHandle.getPartitions().get();
-            hivePartitions.stream().forEach(hivePartition -> {
-                AtomicBoolean flag = partitionLocks.get(hivePartition);
-                if (flag == null) {
-                    flag = new AtomicBoolean(true);
-                    partitionLocks.put(hivePartition, flag);
-                }
-                else {
-                    flag.set(true);
-                }
-            });
+        AtomicBoolean flag = locksMap.get(tableHandle);
+        if (flag == null) {
+            flag = new AtomicBoolean(true);
+            locksMap.put(tableHandle, flag);
         }
         else {
-            AtomicBoolean flag = locksMap.get(tableHandle);
-            if (flag == null) {
-                flag = new AtomicBoolean(true);
-                locksMap.put(tableHandle, flag);
-            }
-            else {
-                flag.set(true);
-            }
+            flag.set(true);
         }
     }
 

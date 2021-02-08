@@ -17,16 +17,15 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 
 import java.util.Optional;
 import java.util.Set;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.iterative.rule.Util.pruneInputs;
 import static io.prestosql.sql.planner.plan.Patterns.project;
@@ -61,7 +60,7 @@ public abstract class ProjectOffPushDownRule<N extends PlanNode>
     {
         N targetNode = captures.get(targetCapture);
 
-        return pruneInputs(targetNode.getOutputSymbols(), parent.getAssignments().getExpressions().stream().collect(toImmutableList()))
+        return pruneInputs(targetNode.getOutputSymbols(), parent.getAssignments().getExpressions())
                 .flatMap(prunedOutputs -> this.pushDownProjectOff(context.getIdAllocator(), targetNode, prunedOutputs))
                 .map(newChild -> parent.replaceChildren(ImmutableList.of(newChild)))
                 .map(Result::ofPlanNode)

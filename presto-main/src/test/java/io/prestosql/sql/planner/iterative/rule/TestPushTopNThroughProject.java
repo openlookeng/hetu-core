@@ -15,25 +15,21 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.assertions.ExpressionMatcher;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.relational.Expressions;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.BooleanLiteral;
+import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.testing.TestingMetadata;
 import org.testng.annotations.Test;
 
-import static io.prestosql.spi.function.Signature.internalOperator;
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.sort;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topN;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.relational.Expressions.call;
-import static io.prestosql.sql.relational.Expressions.variable;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.ADD;
 import static io.prestosql.sql.tree.SortItem.NullOrdering.FIRST;
 import static io.prestosql.sql.tree.SortItem.Ordering.ASCENDING;
 
@@ -53,7 +49,7 @@ public class TestPushTopNThroughProject
                             1,
                             ImmutableList.of(projectedA),
                             p.project(
-                                    Assignments.of(projectedA, p.variable("a"), projectedB, p.variable("b")),
+                                    Assignments.of(projectedA, new SymbolReference("a"), projectedB, new SymbolReference("b")),
                                     p.values(a, b)));
                 })
                 .matches(
@@ -65,8 +61,6 @@ public class TestPushTopNThroughProject
     @Test
     public void testPushdownTopNNonIdentityProjectionWithExpression()
     {
-        Signature signature = internalOperator(OperatorType.ADD, BIGINT.getTypeSignature(), BIGINT.getTypeSignature());
-
         tester().assertThat(new PushTopNThroughProject())
                 .on(p -> {
                     Symbol projectedA = p.symbol("projectedA");
@@ -78,8 +72,8 @@ public class TestPushTopNThroughProject
                             ImmutableList.of(projectedA),
                             p.project(
                                     Assignments.of(
-                                            projectedA, p.variable("a"),
-                                            projectedC, call(signature, BIGINT, Expressions.variable("a", BIGINT), Expressions.variable("b", BIGINT))),
+                                            projectedA, new SymbolReference("a"),
+                                            projectedC, new ArithmeticBinaryExpression(ADD, new SymbolReference("a"), new SymbolReference("b"))),
                                     p.values(a, b)));
                 })
                 .matches(
@@ -97,7 +91,7 @@ public class TestPushTopNThroughProject
                     return p.topN(1,
                             ImmutableList.of(a),
                             p.project(
-                                    Assignments.of(a, variable(a.getName(), BIGINT)),
+                                    Assignments.of(a, a.toSymbolReference()),
                                     p.values(a)));
                 }).doesNotFire();
     }
@@ -113,7 +107,7 @@ public class TestPushTopNThroughProject
                             1,
                             ImmutableList.of(projectedA),
                             p.project(
-                                    Assignments.of(projectedA, variable("a", BIGINT)),
+                                    Assignments.of(projectedA, new SymbolReference("a")),
                                     p.filter(
                                             BooleanLiteral.TRUE_LITERAL,
                                             p.tableScan(ImmutableList.of(), ImmutableMap.of()))));
@@ -131,7 +125,7 @@ public class TestPushTopNThroughProject
                             1,
                             ImmutableList.of(projectedA),
                             p.project(
-                                    Assignments.of(projectedA, variable("a", BIGINT)),
+                                    Assignments.of(projectedA, new SymbolReference("a")),
                                     p.tableScan(
                                             ImmutableList.of(a),
                                             ImmutableMap.of(a, new TestingMetadata.TestingColumnHandle("a")))));

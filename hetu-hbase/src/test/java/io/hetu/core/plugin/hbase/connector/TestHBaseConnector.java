@@ -427,8 +427,7 @@ public class TestHBaseConnector
                         false,
                         Optional.of("StringRowSerializer"),
                         Optional.of(""),
-                        Optional.of("table"),
-                        Optional.of(""));
+                        Optional.of("table"));
         // table is null
         try {
             hconn.dropTable(hBaseTable);
@@ -493,8 +492,7 @@ public class TestHBaseConnector
                         false,
                         Optional.of("StringRowSerializer"),
                         Optional.of(""),
-                        Optional.of("test_table"),
-                        Optional.of(""));
+                        Optional.of("test_table"));
         try {
             method.invoke(hconn, hBaseTable, "rowkey");
         }
@@ -583,7 +581,7 @@ public class TestHBaseConnector
         hConnector.getPageSourceProvider();
         hConnector.getPageSinkProvider();
         hConnector.getPageSinkProvider();
-        assertEquals(hConnector.getTableProperties().size(), 8);
+        assertEquals(hConnector.getTableProperties().size(), 7);
         assertEquals(hConnector.getColumnProperties().size(), 2);
     }
 }

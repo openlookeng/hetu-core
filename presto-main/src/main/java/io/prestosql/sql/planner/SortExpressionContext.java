@@ -14,7 +14,7 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
 import java.util.Objects;
@@ -24,21 +24,21 @@ import static java.util.Objects.requireNonNull;
 
 public class SortExpressionContext
 {
-    private final RowExpression sortExpression;
-    private final List<RowExpression> searchExpressions;
+    private final Expression sortExpression;
+    private final List<Expression> searchExpressions;
 
-    public SortExpressionContext(RowExpression sortExpression, List<RowExpression> searchExpressions)
+    public SortExpressionContext(Expression sortExpression, List<Expression> searchExpressions)
     {
         this.sortExpression = requireNonNull(sortExpression, "sortExpression can not be null");
         this.searchExpressions = ImmutableList.copyOf(searchExpressions);
     }
 
-    public RowExpression getSortExpression()
+    public Expression getSortExpression()
     {
         return sortExpression;
     }
 
-    public List<RowExpression> getSearchExpressions()
+    public List<Expression> getSearchExpressions()
     {
         return searchExpressions;
     }

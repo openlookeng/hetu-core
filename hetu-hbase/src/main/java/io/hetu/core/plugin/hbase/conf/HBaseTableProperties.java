@@ -78,10 +78,6 @@ public final class HBaseTableProperties
      * hbase_table_name
      */
     public static final String HBASE_TABLE_NAME = "hbase_table_name";
-    /**
-     * split_by_char
-     */
-    public static final String SPLIT_BY_CHAR = "split_by_char";
     private static final String COLON_SPLITTER = ":";
     private static final String COMMA_SPLITTER = ",";
     private static final String PIPE_SPLITTER = "\\|";
@@ -150,14 +146,8 @@ public final class HBaseTableProperties
                         "Point to the table of hbase, establish the mapping of external access",
                         null,
                         false);
-        PropertyMetadata<String> s8 =
-                stringProperty(
-                        SPLIT_BY_CHAR,
-                        "Create multi-splits by the first char of rowKey",
-                        "0~9,a~z,A~Z",
-                        false);
 
-        tableProperties = ImmutableList.of(s1, s2, s3, s4, s5, s6, s7, s8);
+        tableProperties = ImmutableList.of(s1, s2, s3, s4, s5, s6, s7);
     }
 
     public List<PropertyMetadata<?>> getTableProperties()
@@ -175,14 +165,16 @@ public final class HBaseTableProperties
      */
     public static Optional<Map<String, Pair<String, String>>> getColumnMapping(Map<String, Object> tableProperties)
     {
-        Optional<String> strMapping = getStringFromProperties(COLUMN_MAPPING, tableProperties);
-        if (!strMapping.isPresent()) {
+        requireNonNull(tableProperties);
+
+        String strMapping = String.valueOf(tableProperties.get(COLUMN_MAPPING));
+        if (Constants.S_NULL.equals(strMapping)) {
             return Optional.empty();
         }
 
         // Parse out the column mapping list : "column_name:family:qualifier"
         ImmutableMap.Builder<String, Pair<String, String>> mapping = ImmutableMap.builder();
-        for (String m1 : strMapping.get().split(COMMA_SPLITTER)) {
+        for (String m1 : strMapping.split(COMMA_SPLITTER)) {
             String[] tokens = m1.trim().split(COLON_SPLITTER);
             checkState(
                     tokens.length == Constants.NUMBER3,
@@ -202,13 +194,14 @@ public final class HBaseTableProperties
      */
     public static Optional<List<String>> getIndexColumns(Map<String, Object> tableProperties)
     {
-        Optional<String> indexColumns = getStringFromProperties(INDEX_COLUMNS, tableProperties);
-        if (!indexColumns.isPresent()) {
+        requireNonNull(tableProperties);
+
+        String indexColumns = String.valueOf(tableProperties.get(INDEX_COLUMNS));
+        if (Constants.S_NULL.equals(indexColumns)) {
             return Optional.empty();
         }
-        else {
-            return Optional.of(Arrays.asList(StringUtils.split(indexColumns.get(), ',')));
-        }
+
+        return Optional.of(Arrays.asList(StringUtils.split(indexColumns, ',')));
     }
 
     /**
@@ -219,7 +212,14 @@ public final class HBaseTableProperties
      */
     public static Optional<String> getIndexColumnsAsStr(Map<String, Object> tableProperties)
     {
-        return getStringFromProperties(INDEX_COLUMNS, tableProperties);
+        requireNonNull(tableProperties);
+
+        String indexColumns = String.valueOf(tableProperties.get(INDEX_COLUMNS));
+        if (Constants.S_NULL.equals(indexColumns)) {
+            return Optional.empty();
+        }
+
+        return Optional.of(indexColumns);
     }
 
     /**
@@ -230,15 +230,17 @@ public final class HBaseTableProperties
      */
     public static Optional<Map<String, Set<String>>> getLocalityGroups(Map<String, Object> tableProperties)
     {
-        Optional<String> groupStr = getStringFromProperties(LOCALITY_GROUPS, tableProperties);
-        if (!groupStr.isPresent()) {
+        requireNonNull(tableProperties);
+
+        String groupStr = String.valueOf(tableProperties.get(LOCALITY_GROUPS));
+        if (Constants.S_NULL.equals(groupStr)) {
             return Optional.empty();
         }
 
         ImmutableMap.Builder<String, Set<String>> groups = ImmutableMap.builder();
 
         // Split all configured locality groups
-        for (String group : groupStr.get().split(PIPE_SPLITTER)) {
+        for (String group : groupStr.split(PIPE_SPLITTER)) {
             String[] locGroups = group.trim().split(COLON_SPLITTER);
             if (locGroups.length != Constants.NUMBER2) {
                 throw new PrestoException(
@@ -267,7 +269,13 @@ public final class HBaseTableProperties
      */
     public static Optional<String> getRowId(Map<String, Object> tableProperties)
     {
-        return getStringFromProperties(ROW_ID, tableProperties);
+        requireNonNull(tableProperties);
+
+        String rowId = String.valueOf(tableProperties.get(ROW_ID));
+        if (Constants.S_NULL.equals(rowId)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(rowId);
     }
 
     /**
@@ -278,7 +286,13 @@ public final class HBaseTableProperties
      */
     public static Optional<String> getSerializerClass(Map<String, Object> tableProperties)
     {
-        return getStringFromProperties(SERIALIZER, tableProperties);
+        requireNonNull(tableProperties);
+
+        String serializerClass = String.valueOf(tableProperties.get(SERIALIZER));
+        if (Constants.S_NULL.equals(serializerClass)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(serializerClass);
     }
 
     /**
@@ -303,28 +317,12 @@ public final class HBaseTableProperties
      */
     public static Optional<String> getHBaseTableName(Map<String, Object> tableProperties)
     {
-        return getStringFromProperties(HBASE_TABLE_NAME, tableProperties);
-    }
-
-    /**
-     * getSplitByChar
-     *
-     * @param tableProperties tableProperties
-     * @return Optional<String>
-     */
-    public static Optional<String> getSplitByChar(Map<String, Object> tableProperties)
-    {
-        return getStringFromProperties(SPLIT_BY_CHAR, tableProperties);
-    }
-
-    private static Optional<String> getStringFromProperties(String key, Map<String, Object> tableProperties)
-    {
         requireNonNull(tableProperties);
 
-        String value = String.valueOf(tableProperties.get(key));
-        if (Constants.S_NULL.equals(value)) {
+        String hbaseTableName = String.valueOf(tableProperties.get(HBASE_TABLE_NAME));
+        if (Constants.S_NULL.equals(hbaseTableName)) {
             return Optional.empty();
         }
-        return Optional.ofNullable(value);
+        return Optional.ofNullable(hbaseTableName);
     }
 }

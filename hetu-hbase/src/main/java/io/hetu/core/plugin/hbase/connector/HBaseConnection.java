@@ -191,7 +191,6 @@ public class HBaseConnection
     {
         cfg.set("hbase.zookeeper.quorum", hbaseConfig.getZkQuorum());
         cfg.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
-        cfg.set("zookeeper.znode.parent", hbaseConfig.getZkZnodeParent());
 
         try {
             init();
@@ -542,8 +541,7 @@ public class HBaseConnection
                         HBaseTableProperties.isExternal(tableProperties),
                         HBaseTableProperties.getSerializerClass(tableProperties),
                         HBaseTableProperties.getIndexColumnsAsStr(meta.getProperties()),
-                        HBaseTableProperties.getHBaseTableName(meta.getProperties()),
-                        HBaseTableProperties.getSplitByChar(meta.getProperties()));
+                        HBaseTableProperties.getHBaseTableName(meta.getProperties()));
 
         table.setColumnsToMap(columnHandleMap);
 
@@ -565,18 +563,14 @@ public class HBaseConnection
                 }
             }
             else {
-                String hbaseTableName = table.getFullTableName().replace(Constants.POINT, Constants.SEPARATOR);
-                table.setHbaseTableName(Optional.of(hbaseTableName));
-                if (table.isExternal() && !existTable(hbaseTableName)) {
-                    throw new PrestoException(
-                            HBaseErrorCode.HBASE_CREATE_ERROR,
-                            format("Use lk creating new HBase table [%s], we must specify 'with(external=false)'. ", table.getTable()));
-                }
-
                 // create namespace if not exist
                 createNamespaceIfNotExist(this.getHbaseAdmin(), table.getSchema());
+
+                String hbaseTableName = table.getFullTableName().replace(Constants.POINT, Constants.SEPARATOR);
+                table.setHbaseTableName(Optional.ofNullable(hbaseTableName));
                 // create hbase table
                 createHBaseTable(table);
+
                 // save tableCatalog to memory and file
                 hBaseMetastore.addHBaseTable(table);
                 return table;

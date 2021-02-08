@@ -20,7 +20,6 @@ import com.google.common.collect.ImmutableMap;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
 import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -32,9 +31,6 @@ import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import java.io.IOException;
-import java.util.Collections;
 
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN;
@@ -53,21 +49,22 @@ public class TestHeuristicIndexFilter
 
     @BeforeClass
     public void setup()
-            throws IOException
     {
         bloomIndex1 = new BloomIndex();
         bloomIndex1.setExpectedNumOfEntries(2);
-        bloomIndex1.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("a", "b"))));
+        bloomIndex1.addValues(ImmutableMap.of("testColumn", ImmutableList.of("a", "b")));
 
         bloomIndex2 = new BloomIndex();
         bloomIndex2.setExpectedNumOfEntries(2);
-        bloomIndex2.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("c", "d"))));
+        bloomIndex2.addValues(ImmutableMap.of("testColumn", ImmutableList.of("c", "d")));
 
         minMaxIndex1 = new MinMaxIndex();
-        minMaxIndex1.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(1L, 5L, 10L))));
+        minMaxIndex1.setExpectedNumOfEntries(3);
+        minMaxIndex1.addValues(ImmutableMap.of("testColumn", ImmutableList.of(1L, 5L, 10L)));
 
         minMaxIndex2 = new MinMaxIndex();
-        minMaxIndex2.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(50L, 80L, 100L))));
+        minMaxIndex2.setExpectedNumOfEntries(3);
+        minMaxIndex2.addValues(ImmutableMap.of("testColumn", ImmutableList.of(50L, 80L, 100L)));
     }
 
     @Test

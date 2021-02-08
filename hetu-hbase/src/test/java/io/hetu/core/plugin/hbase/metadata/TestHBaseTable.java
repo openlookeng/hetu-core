@@ -47,7 +47,6 @@ public class TestHBaseTable
                         false,
                         Optional.of("StringRowSerializer"),
                         Optional.of("table"),
-                        Optional.of(""),
                         Optional.of(""));
     }
 

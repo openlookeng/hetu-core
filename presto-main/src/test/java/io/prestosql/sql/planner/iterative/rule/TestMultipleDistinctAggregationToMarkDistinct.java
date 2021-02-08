@@ -14,9 +14,8 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -78,10 +77,10 @@ public class TestMultipleDistinctAggregationToMarkDistinct
                         .source(
                                 p.project(
                                         Assignments.builder()
-                                                .put(p.symbol("input1"), p.variable("input1"))
-                                                .put(p.symbol("input2"), p.variable("input2"))
-                                                .put(p.symbol("filter1"), OriginalExpressionUtils.castToRowExpression(expression("input2 > 0")))
-                                                .put(p.symbol("filter2"), OriginalExpressionUtils.castToRowExpression(expression("input1 > 0")))
+                                                .putIdentity(p.symbol("input1"))
+                                                .putIdentity(p.symbol("input2"))
+                                                .put(p.symbol("filter1"), expression("input2 > 0"))
+                                                .put(p.symbol("filter2"), expression("input1 > 0"))
                                                 .build(),
                                         p.values(
                                                 p.symbol("input1"),
@@ -96,10 +95,10 @@ public class TestMultipleDistinctAggregationToMarkDistinct
                         .source(
                                 p.project(
                                         Assignments.builder()
-                                                .put(p.symbol("input1"), p.variable("input1"))
-                                                .put(p.symbol("input2"), p.variable("input2"))
-                                                .put(p.symbol("filter1"), OriginalExpressionUtils.castToRowExpression(expression("input2 > 0")))
-                                                .put(p.symbol("filter2"), OriginalExpressionUtils.castToRowExpression(expression("input1 > 0")))
+                                                .putIdentity(p.symbol("input1"))
+                                                .putIdentity(p.symbol("input2"))
+                                                .put(p.symbol("filter1"), expression("input2 > 0"))
+                                                .put(p.symbol("filter2"), expression("input1 > 0"))
                                                 .build(),
                                         p.values(
                                                 p.symbol("input1"),

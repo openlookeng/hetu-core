@@ -15,13 +15,13 @@ package io.prestosql.sql.planner.assertions;
 
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 
 import java.util.Map;
 import java.util.Optional;

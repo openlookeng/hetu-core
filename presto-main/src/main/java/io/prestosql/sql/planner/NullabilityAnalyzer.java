@@ -13,14 +13,6 @@
  */
 package io.prestosql.sql.planner;
 
-import io.prestosql.expressions.DefaultRowExpressionTraversalVisitor;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
 import io.prestosql.sql.tree.DereferenceExpression;
@@ -34,10 +26,8 @@ import io.prestosql.sql.tree.SimpleCaseExpression;
 import io.prestosql.sql.tree.SubscriptExpression;
 import io.prestosql.sql.tree.TryExpression;
 
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public final class NullabilityAnalyzer
@@ -56,15 +46,6 @@ public final class NullabilityAnalyzer
 
         AtomicBoolean result = new AtomicBoolean(false);
         new Visitor().process(expression, result);
-        return result.get();
-    }
-
-    public static boolean mayReturnNullOnNonNullInput(RowExpression expression, TypeManager typeManager)
-    {
-        requireNonNull(expression, "expression is null");
-
-        AtomicBoolean result = new AtomicBoolean(false);
-        expression.accept(new RowExpressionVisitor(typeManager), result);
         return result.get();
     }
 
@@ -149,67 +130,6 @@ public final class NullabilityAnalyzer
         {
             // TODO: this should look at whether the return type of the function is annotated with @SqlNullable
             result.set(true);
-            return null;
-        }
-    }
-
-    private static class RowExpressionVisitor
-            extends DefaultRowExpressionTraversalVisitor<AtomicBoolean>
-    {
-        private final TypeManager typeManager;
-
-        public RowExpressionVisitor(TypeManager typeManager)
-        {
-            this.typeManager = typeManager;
-        }
-
-        @Override
-        public Void visitCall(CallExpression call, AtomicBoolean result)
-        {
-            Signature signature = call.getSignature();
-
-            Optional<OperatorType> operator = Signature.getOperatorType(signature.getName());
-            if (operator.isPresent()) {
-                switch (operator.get()) {
-                    case SATURATED_FLOOR_CAST:
-                    case CAST: {
-                        checkArgument(call.getArguments().size() == 1);
-                        Type sourceType = call.getArguments().get(0).getType();
-                        Type targetType = call.getType();
-                        if (!typeManager.isTypeOnlyCoercion(sourceType, targetType)) {
-                            result.set(true);
-                        }
-                    }
-                    case SUBSCRIPT:
-                        result.set(true);
-                }
-            }
-            else if (!functionReturnsNullForNotNullInput(signature)) {
-                result.set(true);
-            }
-
-            call.getArguments().forEach(argument -> argument.accept(this, result));
-            return null;
-        }
-
-        private boolean functionReturnsNullForNotNullInput(Signature signature)
-        {
-            return (signature.getName().equalsIgnoreCase("like"));
-        }
-
-        @Override
-        public Void visitSpecialForm(SpecialForm specialForm, AtomicBoolean result)
-        {
-            switch (specialForm.getForm()) {
-                case IN:
-                case IF:
-                case SWITCH:
-                case WHEN:
-                case NULL_IF:
-                case DEREFERENCE:
-                    result.set(true);
-            }
-            specialForm.getArguments().forEach(argument -> argument.accept(this, result));
             return null;
         }
     }

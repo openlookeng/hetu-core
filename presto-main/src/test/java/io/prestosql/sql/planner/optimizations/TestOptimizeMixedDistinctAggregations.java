@@ -25,7 +25,6 @@ import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.rule.MultipleDistinctAggregationToMarkDistinct;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
 import io.prestosql.sql.planner.iterative.rule.SingleDistinctAggregationToGroupBy;
-import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.tree.FunctionCall;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
@@ -34,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anySymbol;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
@@ -44,6 +42,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
 
 public class TestOptimizeMixedDistinctAggregations
         extends BasePlanTest
@@ -115,7 +114,7 @@ public class TestOptimizeMixedDistinctAggregations
     private void assertUnitPlan(String sql, PlanMatchPattern pattern)
     {
         List<PlanOptimizer> optimizers = ImmutableList.of(
-                new UnaliasSymbolReferences(getQueryRunner().getMetadata()),
+                new UnaliasSymbolReferences(),
                 new IterativeOptimizer(
                         new RuleStatsRecorder(),
                         getQueryRunner().getStatsCalculator(),
@@ -124,11 +123,6 @@ public class TestOptimizeMixedDistinctAggregations
                                 new RemoveRedundantIdentityProjections(),
                                 new SingleDistinctAggregationToGroupBy(),
                                 new MultipleDistinctAggregationToMarkDistinct())),
-                new IterativeOptimizer(
-                        new RuleStatsRecorder(),
-                        getQueryRunner().getStatsCalculator(),
-                        getQueryRunner().getEstimatedExchangesCostCalculator(),
-                        new TranslateExpressions(getQueryRunner().getMetadata(), getQueryRunner().getSqlParser()).rules(getMetadata())),
                 new OptimizeMixedDistinctAggregations(getQueryRunner().getMetadata()),
                 new PruneUnreferencedOutputs());
         assertPlan(sql, pattern, optimizers);

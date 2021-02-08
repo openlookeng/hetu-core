@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,22 +20,22 @@ import io.prestosql.cost.PlanNodeStatsEstimate;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Constraint;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.statistics.ColumnStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.SymbolReference;
 
@@ -50,8 +49,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.SystemSessionProperties.shouldEnableTablePushdown;
 import static io.prestosql.sql.planner.plan.Patterns.join;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.util.SpecialCommentFormatter.getUniqueColumnTableMap;
 import static java.util.Objects.requireNonNull;
 
@@ -228,22 +225,21 @@ public class TablePushdown
         TableHandle tableHandle = tableNode.getTable();
         TableStatistics tableStatistics = metadata.getTableStatistics(ruleContext.getSession(), tableHandle, Constraint.alwaysTrue());
 
-        /*
-         * We check here if tablestats is null or not.
-         * If not null then check if the stats match as per requirement.
-         * */
-        if (tableStatistics != null && isTableWithUniqueColumnTableStatistics(tableStatistics, tableHandle)) {
-            return true;
+        if (tableStatistics != null) {
+            /*
+             * We check here if tablestats is null or not.
+             * If not null then proceed as follows.
+             * */
+            return isTableWithUniqueColumnTableStatistics(tableStatistics, tableHandle);
         }
         else {
             /*
-             * if table statistics are not available or due to approx stats doesn't match, check if user hint is available.
-             * If not, return false as nothing can be tested at this point.
-             * If user hint is available, check-
-             * If table name of the current table doesn't match with user hint, then return false;
-             * If it matches, then check if the user supplied column name is present in the join criteria. If it does, return true;
-             * Else, return false.
-             * */
+            * if table statistics are not available, check if user hint is available. If not, return false as nothing can be tested at this point.
+            * If user hint is available, check-
+            * If table name of the current table doesn't match with user hint, then return false;
+            * If it matches, then check if the user supplied column name is present in the join criteria. If it does, return true;
+            * Else, return false.
+            * */
             if (uniqueColumnsPerTable.isEmpty()) {
                 return false;
             }
@@ -636,7 +632,7 @@ public class TablePushdown
     private boolean needNewInnerJoinFilter(JoinNode originalJoinNode, PlanNode childOfInnerJoin)
     {
         if (originalJoinNode.getFilter().isPresent()) {
-            ComparisonExpression originalJoinNodeFilter = (ComparisonExpression) castToExpression(originalJoinNode.getFilter().get());
+            ComparisonExpression originalJoinNodeFilter = (ComparisonExpression) originalJoinNode.getFilter().get();
             List<Symbol> innerJoinChildOPSymbols = childOfInnerJoin.getOutputSymbols();
 
             SymbolReference originalFilterSymbolRefLeft = (SymbolReference) originalJoinNodeFilter.getLeft();
@@ -704,7 +700,7 @@ public class TablePushdown
          * */
         for (Map.Entry<Symbol, ColumnHandle> tableEntry : subqueryTableNode.getAssignments().entrySet()) {
             Symbol s = tableEntry.getKey();
-            assignmentsBuilder.put(s, castToRowExpression(new SymbolReference(s.getName())));
+            assignmentsBuilder.put(s, s.toSymbolReference());
         }
 
         ProjectNode parentOfSubqueryTableNode = new ProjectNode(

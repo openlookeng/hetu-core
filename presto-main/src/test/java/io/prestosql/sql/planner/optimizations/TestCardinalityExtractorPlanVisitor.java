@@ -19,10 +19,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.TestingColumnHandle;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import org.testng.annotations.Test;
 
 import static io.prestosql.metadata.AbstractMockMetadata.dummyMetadata;

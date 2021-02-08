@@ -22,9 +22,9 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.operator.project.PageProjection;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.PageFunctionCompiler;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.relational.Expressions;
 
 import java.util.List;

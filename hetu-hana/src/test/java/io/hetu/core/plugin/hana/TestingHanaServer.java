@@ -35,8 +35,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.hetu.core.plugin.hana.TestHanaConstants.TEST_PROPERTY_FILE_PATH;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 
 public final class TestingHanaServer
 {
@@ -107,7 +107,7 @@ public final class TestingHanaServer
     {
         File file = new File(TEST_PROPERTY_FILE_PATH);
         try {
-            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(file.getPath()));
+            Map<String, String> properties = new HashMap<>(loadProperties(file));
             LOG.info("test-hana properties: %s", properties);
 
             String connectionUrl = properties.get("connection.url");

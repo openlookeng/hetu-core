@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.hive.metastore;
 
-import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.connector.SchemaTableName;
 
 import java.util.List;
@@ -25,17 +24,15 @@ import static java.util.Objects.requireNonNull;
 
 public class HivePageSinkMetadataProvider
 {
-    private final HiveIdentity identity;
     private final HiveMetastore delegate;
     private final SchemaTableName schemaTableName;
     private final Optional<Table> table;
     private final Map<List<String>, Optional<Partition>> modifiedPartitions;
 
-    public HivePageSinkMetadataProvider(HivePageSinkMetadata pageSinkMetadata, HiveMetastore delegate, HiveIdentity identity)
+    public HivePageSinkMetadataProvider(HivePageSinkMetadata pageSinkMetadata, HiveMetastore delegate)
     {
         requireNonNull(pageSinkMetadata, "pageSinkMetadata is null");
         this.delegate = delegate;
-        this.identity = requireNonNull(identity, "identity is null");
         this.schemaTableName = pageSinkMetadata.getSchemaTableName();
         this.table = pageSinkMetadata.getTable();
         this.modifiedPartitions = pageSinkMetadata.getModifiedPartitions();
@@ -54,7 +51,7 @@ public class HivePageSinkMetadataProvider
         }
         Optional<Partition> modifiedPartition = modifiedPartitions.get(partitionValues);
         if (modifiedPartition == null) {
-            return delegate.getPartition(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName(), partitionValues);
+            return delegate.getPartition(schemaTableName.getSchemaName(), schemaTableName.getTableName(), partitionValues);
         }
         else {
             return modifiedPartition;

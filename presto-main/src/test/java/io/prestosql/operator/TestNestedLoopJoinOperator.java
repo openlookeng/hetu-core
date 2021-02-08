@@ -19,8 +19,8 @@ import io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFact
 import io.prestosql.operator.NestedLoopJoinOperator.NestedLoopJoinOperatorFactory;
 import io.prestosql.operator.NestedLoopJoinOperator.NestedLoopPageBuilder;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingTaskContext;
 import org.testng.annotations.AfterClass;

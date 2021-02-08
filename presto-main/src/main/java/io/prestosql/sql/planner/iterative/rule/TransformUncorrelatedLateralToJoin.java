@@ -17,16 +17,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.Optional;
 
 import static io.prestosql.matching.Pattern.empty;
 import static io.prestosql.sql.planner.plan.Patterns.LateralJoin.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.lateralJoin;
+import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 public class TransformUncorrelatedLateralToJoin
         implements Rule<LateralJoinNode>
@@ -45,7 +47,7 @@ public class TransformUncorrelatedLateralToJoin
     {
         return Result.ofPlanNode(new JoinNode(
                 context.getIdAllocator().getNextId(),
-                JoinNode.Type.INNER,
+                lateralJoinNode.getType().toJoinNodeType(),
                 lateralJoinNode.getInput(),
                 lateralJoinNode.getSubquery(),
                 ImmutableList.of(),
@@ -53,11 +55,20 @@ public class TransformUncorrelatedLateralToJoin
                         .addAll(lateralJoinNode.getInput().getOutputSymbols())
                         .addAll(lateralJoinNode.getSubquery().getOutputSymbols())
                         .build(),
-                Optional.empty(),
+                filter(lateralJoinNode.getFilter()),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 ImmutableMap.of()));
+    }
+
+    private Optional<Expression> filter(Expression lateralJoinFilter)
+    {
+        if (lateralJoinFilter.equals(TRUE_LITERAL)) {
+            return Optional.empty();
+        }
+
+        return Optional.of(lateralJoinFilter);
     }
 }

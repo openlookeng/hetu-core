@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.RuleStatsRecorder;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
@@ -26,6 +25,7 @@ import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.rule.GatherAndMergeWindows;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.WindowFrame;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
@@ -322,8 +322,8 @@ public class TestReorderWindows
     private void assertUnitPlan(@Language("SQL") String sql, PlanMatchPattern pattern)
     {
         List<PlanOptimizer> optimizers = ImmutableList.of(
-                new UnaliasSymbolReferences(getQueryRunner().getMetadata()),
-                new PredicatePushDown(getQueryRunner().getMetadata(), new TypeAnalyzer(getQueryRunner().getSqlParser(), getQueryRunner().getMetadata()), false, false), new IterativeOptimizer(
+                new UnaliasSymbolReferences(),
+                new PredicatePushDown(getQueryRunner().getMetadata(), new TypeAnalyzer(getQueryRunner().getSqlParser(), getQueryRunner().getMetadata()), false), new IterativeOptimizer(
                         new RuleStatsRecorder(),
                         getQueryRunner().getStatsCalculator(),
                         getQueryRunner().getEstimatedExchangesCostCalculator(),

@@ -34,7 +34,6 @@ public class DynamicCatalogConfig
     private DataSize catalogMaxFileSize = new DataSize(128, KILOBYTE);
     private int catalogMaxFileNumber = 10;
     private String catalogValidFileSuffixes;
-    private String shareFileSystemProfile = "hdfs-config-default";
 
     @Config("catalog.dynamic-enabled")
     @ConfigDescription("Whether to enable dynamic catalog.")
@@ -47,19 +46,6 @@ public class DynamicCatalogConfig
     public boolean isDynamicCatalogEnabled()
     {
         return this.dynamicCatalogEnabled;
-    }
-
-    @Config("catalog.share.filesystem.profile")
-    @ConfigDescription("The profile of share file system.")
-    public DynamicCatalogConfig setShareFileSystemProfile(String shareFileSystemProfile)
-    {
-        this.shareFileSystemProfile = shareFileSystemProfile;
-        return this;
-    }
-
-    public String getShareFileSystemProfile()
-    {
-        return this.shareFileSystemProfile;
     }
 
     @LegacyConfig("catalog.config-dir")

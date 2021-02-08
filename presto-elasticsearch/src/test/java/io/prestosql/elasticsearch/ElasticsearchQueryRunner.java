@@ -14,18 +14,23 @@
 package io.prestosql.elasticsearch;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.tpch.TpchTable;
 import io.prestosql.Session;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.plugin.tpch.TpchPlugin;
 import io.prestosql.testing.QueryRunner;
 import io.prestosql.tests.DistributedQueryRunner;
 import io.prestosql.tests.TestingPrestoClient;
 
+import java.io.File;
+import java.net.URL;
 import java.util.Map;
 
+import static com.google.common.io.Resources.getResource;
 import static io.airlift.testing.Closeables.closeAllSuppress;
 import static io.airlift.units.Duration.nanosSince;
 import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
@@ -56,16 +61,18 @@ public final class ElasticsearchQueryRunner
 
             embeddedElasticsearchNode.start();
 
-            TestingElasticsearchConnectorFactory testFactory = new TestingElasticsearchConnectorFactory();
+            ElasticsearchTableDescriptionProvider tableDescriptions = createTableDescriptions(queryRunner.getCoordinator().getMetadata());
+
+            TestingElasticsearchConnectorFactory testFactory = new TestingElasticsearchConnectorFactory(tableDescriptions);
 
             installElasticsearchPlugin(queryRunner, testFactory);
 
-            TestingPrestoClient prestoClient = queryRunner.getClient();
+            TestingPrestoClient hetuClient = queryRunner.getClient();
 
             LOG.info("Loading data...");
             long startTime = System.nanoTime();
             for (TpchTable<?> table : tables) {
-                loadTpchTopic(embeddedElasticsearchNode, prestoClient, table);
+                loadTpchTopic(embeddedElasticsearchNode, hetuClient, table);
             }
             LOG.info("Loading complete in %s", nanosSince(startTime).toString(SECONDS));
 
@@ -77,27 +84,42 @@ public final class ElasticsearchQueryRunner
         }
     }
 
+    private static ElasticsearchTableDescriptionProvider createTableDescriptions(Metadata metadata)
+            throws Exception
+    {
+        JsonCodec<ElasticsearchTableDescription> codec = new CodecSupplier<>(ElasticsearchTableDescription.class, metadata).get();
+
+        URL metadataUrl = getResource(ElasticsearchQueryRunner.class, "/queryrunner");
+        ElasticsearchConnectorConfig config = new ElasticsearchConnectorConfig()
+                .setTableDescriptionDirectory(new File(metadataUrl.toURI()))
+                .setDefaultSchema(TPCH_SCHEMA);
+        return new ElasticsearchTableDescriptionProvider(config, codec);
+    }
+
     private static void installElasticsearchPlugin(QueryRunner queryRunner, TestingElasticsearchConnectorFactory factory)
             throws Exception
     {
         queryRunner.installPlugin(new ElasticsearchPlugin(factory));
+        URL metadataUrl = getResource(ElasticsearchQueryRunner.class, "/queryrunner");
         Map<String, String> config = ImmutableMap.<String, String>builder()
-                .put("elasticsearch.host", "localhost")
-                .put("elasticsearch.port", "9200")
                 .put("elasticsearch.default-schema-name", TPCH_SCHEMA)
+                .put("elasticsearch.table-description-directory", metadataUrl.toURI().toString())
                 .put("elasticsearch.scroll-size", "1000")
                 .put("elasticsearch.scroll-timeout", "1m")
+                .put("elasticsearch.max-hits", "1000000")
                 .put("elasticsearch.request-timeout", "2m")
+                .put("elasticsearch.max-request-retries", "3")
+                .put("elasticsearch.max-request-retry-time", "5s")
                 .build();
 
         queryRunner.createCatalog("elasticsearch", "elasticsearch", config);
     }
 
-    private static void loadTpchTopic(EmbeddedElasticsearchNode embeddedElasticsearchNode, TestingPrestoClient prestoClient, TpchTable<?> table)
+    private static void loadTpchTopic(EmbeddedElasticsearchNode embeddedElasticsearchNode, TestingPrestoClient hetuClient, TpchTable<?> table)
     {
         long start = System.nanoTime();
         LOG.info("Running import for %s", table.getTableName());
-        ElasticsearchLoader loader = new ElasticsearchLoader(embeddedElasticsearchNode.getClient(), table.getTableName().toLowerCase(ENGLISH), prestoClient.getServer(), prestoClient.getDefaultSession());
+        ElasticsearchLoader loader = new ElasticsearchLoader(embeddedElasticsearchNode.getClient(), table.getTableName().toLowerCase(ENGLISH), hetuClient.getServer(), hetuClient.getDefaultSession());
         loader.execute(format("SELECT * from %s", new QualifiedObjectName(TPCH_SCHEMA, TINY_SCHEMA_NAME, table.getTableName().toLowerCase(ENGLISH))));
         LOG.info("Imported %s in %s", table.getTableName(), nanosSince(start).convertToMostSuccinctTimeUnit());
     }

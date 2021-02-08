@@ -15,13 +15,12 @@ package io.prestosql.metadata;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.HostAddress;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSplit;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -53,11 +52,6 @@ public final class Split
     public ConnectorSplit getConnectorSplit()
     {
         return connectorSplit;
-    }
-
-    public List<Split> getSplits()
-    {
-        return connectorSplit.getUnwrappedSplits().stream().map(x -> new Split(catalogName, x, lifespan)).collect(Collectors.toList());
     }
 
     @JsonProperty

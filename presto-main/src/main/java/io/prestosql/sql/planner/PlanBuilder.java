@@ -14,19 +14,15 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.Analysis;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
 import java.util.Map;
 
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 class PlanBuilder
@@ -93,7 +89,7 @@ class PlanBuilder
         return translations;
     }
 
-    public PlanBuilder appendProjections(Iterable<Expression> expressions, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator)
+    public PlanBuilder appendProjections(Iterable<Expression> expressions, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator)
     {
         TranslationMap translations = copyTranslations();
 
@@ -101,13 +97,13 @@ class PlanBuilder
 
         // add an identity projection for underlying plan
         for (Symbol symbol : getRoot().getOutputSymbols()) {
-            projections.put(symbol, castToRowExpression(toSymbolReference(symbol)));
+            projections.put(symbol, symbol.toSymbolReference());
         }
 
         ImmutableMap.Builder<Symbol, Expression> newTranslations = ImmutableMap.builder();
         for (Expression expression : expressions) {
-            Symbol symbol = planSymbolAllocator.newSymbol(expression, getAnalysis().getTypeWithCoercions(expression));
-            projections.put(symbol, castToRowExpression(translations.rewrite(expression)));
+            Symbol symbol = symbolAllocator.newSymbol(expression, getAnalysis().getTypeWithCoercions(expression));
+            projections.put(symbol, translations.rewrite(expression));
             newTranslations.put(symbol, expression);
         }
         // Now append the new translations into the TranslationMap

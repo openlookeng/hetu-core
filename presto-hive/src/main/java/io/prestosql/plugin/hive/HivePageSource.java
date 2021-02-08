@@ -34,7 +34,6 @@ import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
@@ -52,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.hive.HiveBucketing.getHiveBucket;
@@ -81,7 +81,8 @@ public class HivePageSource
     private final ConnectorPageSource delegate;
 
     private final List<HivePartitionKey> partitionKeys;
-    private final Optional<DynamicFilterSupplier> dynamicFilterSupplier;
+    private final Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier;
+    private final long waitUntil;
     private boolean isSelectiveRead;
 
     public HivePageSource(
@@ -90,7 +91,7 @@ public class HivePageSource
             DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             ConnectorPageSource delegate,
-            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier,
             ConnectorSession session,
             List<HivePartitionKey> partitionKeys)
     {
@@ -104,6 +105,8 @@ public class HivePageSource
         this.dynamicFilterSupplier = dynamicFilterSupplier;
 
         this.partitionKeys = partitionKeys;
+        //FIXME: KEN: BIG ASSUMPTION, assuming system time is synchronized across the cluster
+        this.waitUntil = session.getStartTime() + session.getDynamicFilteringWaitTime().toMillis();
         this.rowFilteringThreshold = getDynamicFilteringRowFilteringThreshold(session);
 
         int size = columnMappings.size();
@@ -163,15 +166,30 @@ public class HivePageSource
         return delegate.isFinished();
     }
 
+    private Map<ColumnHandle, DynamicFilter> getDynamicFilters()
+    {
+        return dynamicFilterSupplier == null ? ImmutableMap.of() : dynamicFilterSupplier.get();
+    }
+
+    /**
+     * this method is design to wait until a specific time when there are expected dynamic filters
+     * The wait until time is relative to the SQL query start time
+     */
+    private boolean needToWait()
+    {
+        //assuming start time is global indicting the time query execution started
+        //assuming system time is accurate enough to ms level
+        return System.currentTimeMillis() <= waitUntil;
+    }
+
     @Override
     public Page getNextPage()
     {
         try {
-            final Map<ColumnHandle, DynamicFilter> dynamicFilters;
-            if (dynamicFilterSupplier.isPresent()) {
-                dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
+            final Map<ColumnHandle, DynamicFilter> dynamicFilters = getDynamicFilters();
+            if (dynamicFilterSupplier != null) {
                 // Wait for any dynamic filter
-                if (dynamicFilters.isEmpty() && dynamicFilterSupplier.get().isBlocked()) {
+                if (dynamicFilters.isEmpty() && needToWait()) {
                     return null;
                 }
 
@@ -180,9 +198,6 @@ public class HivePageSource
                     close();
                     return null;
                 }
-            }
-            else {
-                dynamicFilters = ImmutableMap.of();
             }
 
             Page dataPage = delegate.getNextPage();

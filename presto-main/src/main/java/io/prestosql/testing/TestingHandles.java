@@ -13,8 +13,8 @@
  */
 package io.prestosql.testing;
 
-import io.prestosql.spi.connector.CatalogName;
-import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.connector.CatalogName;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.testing.TestingMetadata.TestingTableHandle;
 
 import java.util.Optional;

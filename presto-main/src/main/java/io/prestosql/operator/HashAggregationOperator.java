@@ -26,12 +26,12 @@ import io.prestosql.operator.aggregation.builder.SpillableHashAggregationBuilder
 import io.prestosql.operator.scalar.CombineHashFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.plan.AggregationNode.Step;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.JoinCompiler;
+import io.prestosql.sql.planner.plan.AggregationNode.Step;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Optional;

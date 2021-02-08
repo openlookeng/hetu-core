@@ -136,19 +136,9 @@ public class StateStoreConstants
     public static final String CROSS_REGION_DYNAMIC_FILTER_COLLECTION = "-dynamic-filters";
 
     /**
-     * cross region dynamic filter collections
+     * Cross region dynamic filter collection columns
      */
-    public static final String CROSS_REGION_DYNAMIC_FILTERS = "cross-region-dynamic-filters";
-
-    /**
-     * query column names to output symbols mapping
-     */
-    public static final String QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING = "-query-column-name-to-symbol-mapping";
-
-    /**
-     * cross layer dynamic filter
-     */
-    public static final String CROSS_LAYER_DYNAMIC_FILTER = "-cross-layer-dynamic-filter";
+    public static final String CROSS_REGION_DYNAMIC_FILTER_COLLECTION_COLUMNS_TYPE = "-dynamic-filters-columns-type";
 
     /**
      * Hazelcast tcp-ip members

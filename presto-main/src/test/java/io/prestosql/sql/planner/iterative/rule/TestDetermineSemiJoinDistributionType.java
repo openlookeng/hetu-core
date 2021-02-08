@@ -33,12 +33,12 @@ import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.PlanNodeStatsEstimate;
 import io.prestosql.cost.SymbolStatsEstimate;
 import io.prestosql.cost.TaskCountEstimator;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.RuleAssert;
 import io.prestosql.sql.planner.iterative.rule.test.RuleTester;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -51,7 +51,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.semiJoin;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expressions;
 import static io.prestosql.sql.planner.plan.SemiJoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.sql.planner.plan.SemiJoinNode.DistributionType.REPLICATED;
 
@@ -82,15 +82,14 @@ public class TestDetermineSemiJoinDistributionType
         assertDetermineSemiJoinDistributionType()
                 .on(p ->
                         p.semiJoin(
-                                p.values(ImmutableList.of(p.symbol("A1")), ImmutableList.of(constantExpressions(BIGINT, 10L), constantExpressions(BIGINT, 11L))),
-                                p.values(ImmutableList.of(p.symbol("B1")), ImmutableList.of(constantExpressions(BIGINT, 50), constantExpressions(BIGINT, 11))),
+                                p.values(ImmutableList.of(p.symbol("A1")), ImmutableList.of(expressions("10"), expressions("11"))),
+                                p.values(ImmutableList.of(p.symbol("B1")), ImmutableList.of(expressions("50"), expressions("11"))),
                                 p.symbol("A1"),
                                 p.symbol("B1"),
                                 p.symbol("output"),
                                 Optional.empty(),
                                 Optional.empty(),
-                                Optional.of(REPLICATED),
-                                Optional.empty()))
+                                Optional.of(REPLICATED)))
                 .doesNotFire();
     }
 
@@ -119,7 +118,6 @@ public class TestDetermineSemiJoinDistributionType
                             a1,
                             b1,
                             p.symbol("output"),
-                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty());
@@ -158,7 +156,6 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("output"),
                                 Optional.empty(),
                                 Optional.empty(),
-                                Optional.empty(),
                                 Optional.empty()))
                 .matches(semiJoin(
                         "A1",
@@ -193,7 +190,6 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("output"),
                                 Optional.empty(),
                                 Optional.empty(),
-                                Optional.empty(),
                                 Optional.empty()))
                 .matches(semiJoin(
                         "A1",
@@ -226,7 +222,6 @@ public class TestDetermineSemiJoinDistributionType
                                 p.symbol("A1"),
                                 p.symbol("B1"),
                                 p.symbol("output"),
-                                Optional.empty(),
                                 Optional.empty(),
                                 Optional.empty(),
                                 Optional.empty()))
@@ -272,7 +267,6 @@ public class TestDetermineSemiJoinDistributionType
                             p.symbol("output"),
                             Optional.empty(),
                             Optional.empty(),
-                            Optional.empty(),
                             Optional.empty());
                 })
                 .matches(semiJoin(
@@ -307,7 +301,6 @@ public class TestDetermineSemiJoinDistributionType
                             a1,
                             b1,
                             p.symbol("output"),
-                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty());

@@ -14,17 +14,16 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.offset;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.relational.Expressions.constant;
+import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 public class TestPushOffsetThroughProject
         extends BaseRuleTest
@@ -38,7 +37,7 @@ public class TestPushOffsetThroughProject
                     return p.offset(
                             5,
                             p.project(
-                                    Assignments.of(a, constant(true, BOOLEAN)),
+                                    Assignments.of(a, TRUE_LITERAL),
                                     p.values()));
                 })
                 .matches(
@@ -56,7 +55,7 @@ public class TestPushOffsetThroughProject
                     return p.offset(
                             5,
                             p.project(
-                                    Assignments.of(a, p.variable(a.getName())),
+                                    Assignments.of(a, a.toSymbolReference()),
                                     p.values(a)));
                 }).doesNotFire();
     }

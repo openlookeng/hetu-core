@@ -13,9 +13,10 @@
  */
 package io.prestosql.sql.planner.assertions;
 
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.sql.expression.Types.FrameBoundType;
-import io.prestosql.spi.sql.expression.Types.WindowFrameType;
+import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.FrameBound;
+import io.prestosql.sql.tree.WindowFrame;
 
 import java.util.Optional;
 
@@ -25,17 +26,17 @@ import static java.util.Objects.requireNonNull;
 public class WindowFrameProvider
         implements ExpectedValueProvider<WindowNode.Frame>
 {
-    private final WindowFrameType type;
-    private final FrameBoundType startType;
+    private final WindowFrame.Type type;
+    private final FrameBound.Type startType;
     private final Optional<SymbolAlias> startValue;
-    private final FrameBoundType endType;
+    private final FrameBound.Type endType;
     private final Optional<SymbolAlias> endValue;
 
     WindowFrameProvider(
-            WindowFrameType type,
-            FrameBoundType startType,
+            WindowFrame.Type type,
+            FrameBound.Type startType,
             Optional<SymbolAlias> startValue,
-            FrameBoundType endType,
+            FrameBound.Type endType,
             Optional<SymbolAlias> endValue)
     {
         this.type = requireNonNull(type, "type is null");
@@ -50,8 +51,8 @@ public class WindowFrameProvider
     {
         // synthetize original start/end value to keep the constructor of the frame happy. These are irrelevant for the purpose
         // of testing the plan structure.
-        Optional<String> originalStartValue = startValue.map(SymbolAlias::toString);
-        Optional<String> originalEndValue = endValue.map(SymbolAlias::toString);
+        Optional<Expression> originalStartValue = startValue.map(alias -> alias.toSymbol(aliases).toSymbolReference());
+        Optional<Expression> originalEndValue = endValue.map(alias -> alias.toSymbol(aliases).toSymbolReference());
 
         return new WindowNode.Frame(
                 type,

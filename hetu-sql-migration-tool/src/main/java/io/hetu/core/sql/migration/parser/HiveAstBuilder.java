@@ -20,8 +20,6 @@ import com.google.common.collect.Lists;
 import io.hetu.core.migration.source.hive.HiveSqlBaseVisitor;
 import io.hetu.core.migration.source.hive.HiveSqlLexer;
 import io.hetu.core.migration.source.hive.HiveSqlParser;
-import io.prestosql.spi.sql.expression.Types;
-import io.prestosql.spi.sql.expression.Types.FrameBoundType;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.tree.AddColumn;
@@ -599,6 +597,8 @@ public class HiveAstBuilder
             Identifier name = new Identifier("location");
             Expression value = (StringLiteral) visit(context.location);
             properties.add(new Property(name, value));
+
+            addDiff(DiffType.MODIFIED, context.LOCATION().getText(), LOCATION + " = " + value, "[LOCATION] is formatted");
         }
         if (context.TBLPROPERTIES() != null) {
             List<Property> tableProperties = visit(context.properties().property(), Property.class);
@@ -877,6 +877,7 @@ public class HiveAstBuilder
     public Node visitAlterTablePartitionTouch(HiveSqlParser.AlterTablePartitionTouchContext context)
     {
         addDiff(DiffType.UNSUPPORTED, context.TOUCH().getText(), "[TOUCH PARTITION] is not supported");
+        addDiff(DiffType.UNSUPPORTED, context.PARTITION().getText(), null);
         throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Alter Table Touch Partition", context);
     }
 
@@ -2288,7 +2289,7 @@ public class HiveAstBuilder
     @Override
     public Node visitCurrentRowBound(HiveSqlParser.CurrentRowBoundContext context)
     {
-        return new FrameBound(getLocation(context), FrameBoundType.CURRENT_ROW);
+        return new FrameBound(getLocation(context), FrameBound.Type.CURRENT_ROW);
     }
 
     @Override
@@ -2569,8 +2570,14 @@ public class HiveAstBuilder
         switch (token.getType()) {
             case HiveSqlLexer.CURRENT_DATE:
                 return CurrentTime.Function.DATE;
+            case HiveSqlLexer.CURRENT_TIME:
+                return CurrentTime.Function.TIME;
             case HiveSqlLexer.CURRENT_TIMESTAMP:
                 return CurrentTime.Function.TIMESTAMP;
+            case HiveSqlLexer.LOCALTIME:
+                return CurrentTime.Function.LOCALTIME;
+            case HiveSqlLexer.LOCALTIMESTAMP:
+                return CurrentTime.Function.LOCALTIMESTAMP;
         }
 
         throw new IllegalArgumentException("Unsupported special function: " + token.getText());
@@ -2602,37 +2609,37 @@ public class HiveAstBuilder
         throw new IllegalArgumentException("Unsupported interval field: " + token.getText());
     }
 
-    private static Types.WindowFrameType getFrameType(Token type)
+    private static WindowFrame.Type getFrameType(Token type)
     {
         switch (type.getType()) {
             case HiveSqlLexer.RANGE:
-                return Types.WindowFrameType.RANGE;
+                return WindowFrame.Type.RANGE;
             case HiveSqlLexer.ROWS:
-                return Types.WindowFrameType.ROWS;
+                return WindowFrame.Type.ROWS;
         }
 
         throw new IllegalArgumentException("Unsupported frame type: " + type.getText());
     }
 
-    private static Types.FrameBoundType getBoundedFrameBoundType(Token token)
+    private static FrameBound.Type getBoundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case HiveSqlLexer.PRECEDING:
-                return Types.FrameBoundType.PRECEDING;
+                return FrameBound.Type.PRECEDING;
             case HiveSqlLexer.FOLLOWING:
-                return Types.FrameBoundType.FOLLOWING;
+                return FrameBound.Type.FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());
     }
 
-    private static Types.FrameBoundType getUnboundedFrameBoundType(Token token)
+    private static FrameBound.Type getUnboundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case HiveSqlLexer.PRECEDING:
-                return Types.FrameBoundType.UNBOUNDED_PRECEDING;
+                return FrameBound.Type.UNBOUNDED_PRECEDING;
             case HiveSqlLexer.FOLLOWING:
-                return Types.FrameBoundType.UNBOUNDED_FOLLOWING;
+                return FrameBound.Type.UNBOUNDED_FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());

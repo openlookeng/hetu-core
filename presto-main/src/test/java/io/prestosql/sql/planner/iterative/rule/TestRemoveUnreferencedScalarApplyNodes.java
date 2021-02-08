@@ -15,9 +15,8 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
@@ -30,7 +29,7 @@ public class TestRemoveUnreferencedScalarApplyNodes
     {
         tester().assertThat(new RemoveUnreferencedScalarApplyNodes())
                 .on(p -> p.apply(
-                        Assignments.of(p.symbol("z"), OriginalExpressionUtils.castToRowExpression(p.expression("x IN (y)"))),
+                        Assignments.of(p.symbol("z"), p.expression("x IN (y)")),
                         ImmutableList.of(),
                         p.values(p.symbol("x")),
                         p.values(p.symbol("y"))))

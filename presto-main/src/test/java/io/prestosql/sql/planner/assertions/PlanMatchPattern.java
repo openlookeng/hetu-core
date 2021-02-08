@@ -24,45 +24,42 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Step;
-import io.prestosql.spi.plan.ExceptNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.GroupIdNode;
-import io.prestosql.spi.plan.GroupReference;
-import io.prestosql.spi.plan.IntersectNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.sql.expression.Types.FrameBoundType;
-import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.iterative.GroupReference;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Step;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
+import io.prestosql.sql.planner.plan.ExceptNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
+import io.prestosql.sql.planner.plan.IntersectNode;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
 import io.prestosql.sql.planner.plan.OutputNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SortItem;
@@ -268,10 +265,10 @@ public final class PlanMatchPattern
     }
 
     public static ExpectedValueProvider<WindowNode.Frame> windowFrame(
-            WindowFrameType type,
-            FrameBoundType startType,
+            WindowFrame.Type type,
+            FrameBound.Type startType,
             Optional<String> startValue,
-            FrameBoundType endType,
+            FrameBound.Type endType,
             Optional<String> endValue)
     {
         return new WindowFrameProvider(
@@ -296,9 +293,9 @@ public final class PlanMatchPattern
         return builder.build();
     }
 
-    public static PlanMatchPattern topNRankingNumber(Consumer<TopNRankingNumberMatcher.Builder> handler, PlanMatchPattern source)
+    public static PlanMatchPattern topNRowNumber(Consumer<TopNRowNumberMatcher.Builder> handler, PlanMatchPattern source)
     {
-        TopNRankingNumberMatcher.Builder builder = new TopNRankingNumberMatcher.Builder(source);
+        TopNRowNumberMatcher.Builder builder = new TopNRowNumberMatcher.Builder(source);
         handler.accept(builder);
         return builder.build();
     }
@@ -367,22 +364,12 @@ public final class PlanMatchPattern
 
     public static PlanMatchPattern semiJoin(String sourceSymbolAlias, String filteringSymbolAlias, String outputAlias, PlanMatchPattern source, PlanMatchPattern filtering)
     {
-        return semiJoin(sourceSymbolAlias, filteringSymbolAlias, outputAlias, Optional.empty(), Optional.empty(), source, filtering);
+        return semiJoin(sourceSymbolAlias, filteringSymbolAlias, outputAlias, Optional.empty(), source, filtering);
     }
 
     public static PlanMatchPattern semiJoin(String sourceSymbolAlias, String filteringSymbolAlias, String outputAlias, Optional<SemiJoinNode.DistributionType> distributionType, PlanMatchPattern source, PlanMatchPattern filtering)
     {
-        return semiJoin(sourceSymbolAlias, filteringSymbolAlias, outputAlias, distributionType, Optional.empty(), source, filtering);
-    }
-
-    public static PlanMatchPattern semiJoin(String sourceSymbolAlias, String filteringSymbolAlias, String outputAlias, boolean hasDynamicFilter, PlanMatchPattern source, PlanMatchPattern filtering)
-    {
-        return semiJoin(sourceSymbolAlias, filteringSymbolAlias, outputAlias, Optional.empty(), Optional.of(hasDynamicFilter), source, filtering);
-    }
-
-    public static PlanMatchPattern semiJoin(String sourceSymbolAlias, String filteringSymbolAlias, String outputAlias, Optional<SemiJoinNode.DistributionType> distributionType, Optional<Boolean> hasDynamicFilter, PlanMatchPattern source, PlanMatchPattern filtering)
-    {
-        return node(SemiJoinNode.class, source, filtering).with(new SemiJoinMatcher(sourceSymbolAlias, filteringSymbolAlias, outputAlias, distributionType, hasDynamicFilter));
+        return node(SemiJoinNode.class, source, filtering).with(new SemiJoinMatcher(sourceSymbolAlias, filteringSymbolAlias, outputAlias, distributionType));
     }
 
     public static PlanMatchPattern join(JoinNode.Type joinType, List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, PlanMatchPattern left, PlanMatchPattern right)
@@ -520,12 +507,7 @@ public final class PlanMatchPattern
 
     public static PlanMatchPattern filter(Expression expectedPredicate, PlanMatchPattern source)
     {
-        return node(FilterNode.class, source).with(new FilterMatcher(OriginalExpressionUtils.castToRowExpression(expectedPredicate), Optional.empty()));
-    }
-
-    public static PlanMatchPattern filter(Expression expectedPredicate, Expression dynamicFilter, PlanMatchPattern source)
-    {
-        return node(FilterNode.class, source).with(new FilterMatcher(OriginalExpressionUtils.castToRowExpression(expectedPredicate), Optional.of(OriginalExpressionUtils.castToRowExpression(dynamicFilter))));
+        return node(FilterNode.class, source).with(new FilterMatcher(expectedPredicate));
     }
 
     public static PlanMatchPattern apply(List<String> correlationSymbolAliases, Map<String, ExpressionMatcher> subqueryAssignments, PlanMatchPattern inputPattern, PlanMatchPattern subqueryPattern)
@@ -809,12 +791,7 @@ public final class PlanMatchPattern
     {
         return aliases
                 .stream()
-                .map(arg -> {
-                    if (arg instanceof AnySymbol) {
-                        return new AnySymbolReference();
-                    }
-                    return SymbolUtils.toSymbolReference(arg.toSymbol(symbolAliases));
-                })
+                .map(arg -> arg.toSymbol(symbolAliases).toSymbolReference())
                 .collect(toImmutableList());
     }
 

@@ -17,12 +17,12 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.StandardErrorCode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.sql.planner.FunctionCallBuilder;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.LongLiteral;
@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.assignUniqueId;
@@ -47,16 +46,14 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.lateral;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.markDistinct;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.assignment;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
-import static io.prestosql.sql.relational.Expressions.constant;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expressions;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 public class TestTransformCorrelatedScalarSubquery
         extends BaseRuleTest
 {
-    private static final ImmutableList<List<RowExpression>> ONE_ROW = ImmutableList.of(ImmutableList.of(constant(1L, BIGINT)));
-    private static final ImmutableList<List<RowExpression>> TWO_ROWS = ImmutableList.of(ImmutableList.of(constant(1L, BIGINT)), ImmutableList.of(constant(2L, BIGINT)));
+    private static final ImmutableList<List<Expression>> ONE_ROW = ImmutableList.of(ImmutableList.of(new LongLiteral("1")));
+    private static final ImmutableList<List<Expression>> TWO_ROWS = ImmutableList.of(ImmutableList.of(new LongLiteral("1")), ImmutableList.of(new LongLiteral("2")));
 
     private Rule<?> rule = new TransformCorrelatedScalarSubquery(createTestMetadataManager());
 
@@ -86,7 +83,7 @@ public class TestTransformCorrelatedScalarSubquery
                 .on(p -> p.lateral(
                         ImmutableList.<Symbol>of(),
                         p.values(p.symbol("a")),
-                        p.values(ImmutableList.of(p.symbol("b")), ImmutableList.of(constantExpressions(BIGINT, 1L)))))
+                        p.values(ImmutableList.of(p.symbol("b")), ImmutableList.of(expressions("1")))))
                 .doesNotFire();
     }
 
@@ -127,7 +124,7 @@ public class TestTransformCorrelatedScalarSubquery
                         p.values(p.symbol("corr")),
                         p.enforceSingleRow(
                                 p.project(
-                                        assignment(p.symbol("a2"), p.expression("a * 2")),
+                                        Assignments.of(p.symbol("a2"), p.expression("a * 2")),
                                         p.filter(
                                                 p.expression("1 = a"), // TODO use correlated predicate, it requires support for correlated subqueries in plan matchers
                                                 p.values(ImmutableList.of(p.symbol("a")), TWO_ROWS))))))
@@ -156,10 +153,10 @@ public class TestTransformCorrelatedScalarSubquery
                         ImmutableList.of(p.symbol("corr")),
                         p.values(p.symbol("corr")),
                         p.project(
-                                assignment(p.symbol("a3"), p.expression("a2 + 1")),
+                                Assignments.of(p.symbol("a3"), p.expression("a2 + 1")),
                                 p.enforceSingleRow(
                                         p.project(
-                                                assignment(p.symbol("a2"), p.expression("a * 2")),
+                                                Assignments.of(p.symbol("a2"), p.expression("a * 2")),
                                                 p.filter(
                                                         p.expression("1 = a"), // TODO use correlated predicate, it requires support for correlated subqueries in plan matchers
                                                         p.values(ImmutableList.of(p.symbol("a")), TWO_ROWS)))))))

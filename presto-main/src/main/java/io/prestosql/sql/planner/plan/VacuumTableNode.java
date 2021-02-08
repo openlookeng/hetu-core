@@ -18,10 +18,8 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.metadata.TableHandle;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
 
 import javax.annotation.concurrent.Immutable;
@@ -35,7 +33,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class VacuumTableNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     private final TableHandle table;
     private final String partition;
@@ -167,7 +165,7 @@ public class VacuumTableNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitVacuumTable(this, context);
     }

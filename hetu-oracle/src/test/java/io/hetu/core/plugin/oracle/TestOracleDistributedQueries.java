@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.hetu.core.plugin.oracle;
 
 import com.google.common.collect.ImmutableList;
@@ -1560,14 +1562,6 @@ public class TestOracleDistributedQueries
         assertQueryFails(
                 "SELECT * FROM (VALUES array[2, 2]) a(x) FULL OUTER JOIN UNNEST(x) ON true",
                 "line .*: UNNEST on other than the right side of CROSS JOIN is not supported");
-    }
-
-    @Test
-    public void testSynonyms()
-    {
-        try (TestSynonym synonym = new TestSynonym(oracleServer, oracleServer.getUser() + ".test_synonym", "FOR ORDERS")) {
-            assertQueryFails("SELECT orderkey FROM " + synonym.getName(), "line 1:22: Table oracle.* does not exist");
-        }
     }
 
     /**

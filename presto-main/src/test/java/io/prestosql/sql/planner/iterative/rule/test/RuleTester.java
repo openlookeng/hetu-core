@@ -15,11 +15,11 @@ package io.prestosql.sql.planner.iterative.rule.test;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.Plugin;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
 import io.prestosql.sql.planner.TypeAnalyzer;

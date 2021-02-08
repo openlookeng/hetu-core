@@ -20,13 +20,12 @@ import io.prestosql.operator.aggregation.MaxDataSizeForStats;
 import io.prestosql.operator.aggregation.SumDataSizeForStats;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.statistics.TableStatisticType;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.tree.QualifiedName;
@@ -44,18 +43,16 @@ import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 public class StatisticsAggregationPlanner
 {
-    private final PlanSymbolAllocator planSymbolAllocator;
+    private final SymbolAllocator symbolAllocator;
     private final Metadata metadata;
 
-    public StatisticsAggregationPlanner(PlanSymbolAllocator planSymbolAllocator, Metadata metadata)
+    public StatisticsAggregationPlanner(SymbolAllocator symbolAllocator, Metadata metadata)
     {
-        this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
+        this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
@@ -84,7 +81,7 @@ public class StatisticsAggregationPlanner
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty());
-            Symbol symbol = planSymbolAllocator.newSymbol("rowCount", BIGINT);
+            Symbol symbol = symbolAllocator.newSymbol("rowCount", BIGINT);
             aggregations.put(symbol, aggregation);
             descriptor.addTableStatistic(ROW_COUNT, symbol);
         }
@@ -94,10 +91,10 @@ public class StatisticsAggregationPlanner
             ColumnStatisticType statisticType = columnStatisticMetadata.getStatisticType();
             Symbol inputSymbol = columnToSymbolMap.get(columnName);
             verify(inputSymbol != null, "inputSymbol is null");
-            Type inputType = planSymbolAllocator.getTypes().get(inputSymbol);
+            Type inputType = symbolAllocator.getTypes().get(inputSymbol);
             verify(inputType != null, "inputType is null for symbol: %s", inputSymbol);
             ColumnStatisticsAggregation aggregation = createColumnAggregation(statisticType, inputSymbol, inputType);
-            Symbol symbol = planSymbolAllocator.newSymbol(statisticType + ":" + columnName, aggregation.getOutputType());
+            Symbol symbol = symbolAllocator.newSymbol(statisticType + ":" + columnName, aggregation.getOutputType());
             aggregations.put(symbol, aggregation.getAggregation());
             descriptor.addColumnStatistic(columnStatisticMetadata, symbol);
         }
@@ -110,19 +107,19 @@ public class StatisticsAggregationPlanner
     {
         switch (statisticType) {
             case MIN_VALUE:
-                return createAggregation(QualifiedName.of("min"), toSymbolReference(input), inputType, inputType);
+                return createAggregation(QualifiedName.of("min"), input.toSymbolReference(), inputType, inputType);
             case MAX_VALUE:
-                return createAggregation(QualifiedName.of("max"), toSymbolReference(input), inputType, inputType);
+                return createAggregation(QualifiedName.of("max"), input.toSymbolReference(), inputType, inputType);
             case NUMBER_OF_DISTINCT_VALUES:
-                return createAggregation(QualifiedName.of("approx_distinct"), toSymbolReference(input), inputType, BIGINT);
+                return createAggregation(QualifiedName.of("approx_distinct"), input.toSymbolReference(), inputType, BIGINT);
             case NUMBER_OF_NON_NULL_VALUES:
-                return createAggregation(QualifiedName.of("count"), toSymbolReference(input), inputType, BIGINT);
+                return createAggregation(QualifiedName.of("count"), input.toSymbolReference(), inputType, BIGINT);
             case NUMBER_OF_TRUE_VALUES:
-                return createAggregation(QualifiedName.of("count_if"), toSymbolReference(input), BOOLEAN, BIGINT);
+                return createAggregation(QualifiedName.of("count_if"), input.toSymbolReference(), BOOLEAN, BIGINT);
             case TOTAL_SIZE_IN_BYTES:
-                return createAggregation(QualifiedName.of(SumDataSizeForStats.NAME), toSymbolReference(input), inputType, BIGINT);
+                return createAggregation(QualifiedName.of(SumDataSizeForStats.NAME), input.toSymbolReference(), inputType, BIGINT);
             case MAX_VALUE_SIZE_IN_BYTES:
-                return createAggregation(QualifiedName.of(MaxDataSizeForStats.NAME), toSymbolReference(input), inputType, BIGINT);
+                return createAggregation(QualifiedName.of(MaxDataSizeForStats.NAME), input.toSymbolReference(), inputType, BIGINT);
             default:
                 throw new IllegalArgumentException("Unsupported statistic type: " + statisticType);
         }
@@ -136,7 +133,7 @@ public class StatisticsAggregationPlanner
         return new ColumnStatisticsAggregation(
                 new AggregationNode.Aggregation(
                         signature,
-                        ImmutableList.of(castToRowExpression(input)),
+                        ImmutableList.of(input),
                         false,
                         Optional.empty(),
                         Optional.empty(),

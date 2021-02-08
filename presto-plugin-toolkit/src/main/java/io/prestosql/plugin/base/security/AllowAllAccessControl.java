@@ -203,12 +203,12 @@ public class AllowAllAccessControl
     }
 
     @Override
-    public void checkCanCreateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+    public void checkCanCreateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
     {
     }
 
     @Override
-    public void checkCanDropIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+    public void checkCanDropIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
     {
     }
 
@@ -219,11 +219,6 @@ public class AllowAllAccessControl
 
     @Override
     public void checkCanUpdateIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
-    {
-    }
-
-    @Override
-    public void checkCanShowIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
     {
     }
 

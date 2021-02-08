@@ -61,8 +61,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.QUERY_REJECTED;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -157,7 +157,7 @@ public final class InternalResourceGroupManager<C>
             throws Exception
     {
         if (RESOURCE_GROUPS_CONFIGURATION.exists()) {
-            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(RESOURCE_GROUPS_CONFIGURATION.getPath()));
+            Map<String, String> properties = new HashMap<>(loadProperties(RESOURCE_GROUPS_CONFIGURATION));
 
             String configurationManagerName = properties.remove(CONFIGURATION_MANAGER_PROPERTY_NAME);
             checkArgument(!isNullOrEmpty(configurationManagerName),

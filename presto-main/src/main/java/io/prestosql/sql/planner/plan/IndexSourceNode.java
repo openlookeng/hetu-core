@@ -19,12 +19,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.metadata.IndexHandle;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.sql.planner.Symbol;
 
 import java.util.List;
 import java.util.Map;
@@ -34,7 +32,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class IndexSourceNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     private final IndexHandle indexHandle;
     private final TableHandle tableHandle;
@@ -110,7 +108,7 @@ public class IndexSourceNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitIndexSource(this, context);
     }

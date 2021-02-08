@@ -40,6 +40,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
 import static io.prestosql.sql.analyzer.RegexLibrary.JONI;
 import static java.util.Objects.requireNonNull;
@@ -70,15 +72,15 @@ public class FeaturesConfig
     private double memoryCostWeight = 10;
     private double networkCostWeight = 15;
     private boolean distributedIndexJoinsEnabled;
-    private JoinDistributionType joinDistributionType = JoinDistributionType.AUTOMATIC;
-    private DataSize joinMaxBroadcastTableSize = new DataSize(100, MEGABYTE);
+    private JoinDistributionType joinDistributionType = PARTITIONED;
+    private DataSize joinMaxBroadcastTableSize;
     private boolean colocatedJoinsEnabled;
     private boolean groupedExecutionEnabled;
     private boolean dynamicScheduleForGroupedExecution;
     private int concurrentLifespansPerTask;
     private boolean spatialJoinsEnabled = true;
     private boolean fastInequalityJoins = true;
-    private JoinReorderingStrategy joinReorderingStrategy = JoinReorderingStrategy.AUTOMATIC;
+    private JoinReorderingStrategy joinReorderingStrategy = ELIMINATE_CROSS_JOINS;
     private int maxReorderedJoins = 9;
     private boolean redistributeWrites = true;
     // redistribute writes type config
@@ -129,19 +131,15 @@ public class FeaturesConfig
     private boolean parseDecimalLiteralsAsDouble;
     private boolean useMarkDistinct = true;
     private boolean preferPartialAggregation = true;
-    private boolean optimizeTopNRankingNumber = true;
+    private boolean optimizeTopNRowNumber = true;
     private boolean workProcessorPipelines;
     private boolean skipRedundantSort = true;
     private boolean predicatePushdownUseTableProperties = true;
     private boolean pushTableThroughSubquery;
-    private boolean rewriteFilteringSemiJoinToInnerJoin;
-    private boolean reuseTableScanEnabled;
-    private boolean spillReuseTableScan;
-    private int spillOperatorThresholdReuseExchange = 10;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
-    private boolean enableDynamicFiltering = true;
-    private Duration dynamicFilteringWaitTime = new Duration(1000, MILLISECONDS);
+    private boolean enableDynamicFiltering;
+    private Duration dynamicFilteringWaitTime = new Duration(0, MILLISECONDS);
     private int dynamicFilteringMaxSize = 1000000;
     private int dynamicFilteringMaxPerDriverRowCount = 10000;
     private DynamicFilterDataType dynamicFilteringDataType = BLOOM_FILTER;
@@ -153,8 +151,6 @@ public class FeaturesConfig
     private DataSize filterAndProjectMinOutputPageSize = new DataSize(500, KILOBYTE);
     private int filterAndProjectMinOutputPageRowCount = 256;
     private int maxGroupingSets = 2048;
-    //transform selfjoin to aggregates if applicable
-    private boolean transformSelfJoinToGroupby = true;
 
     public enum JoinReorderingStrategy
     {
@@ -385,18 +381,6 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isRewriteFilteringSemiJoinToInnerJoin()
-    {
-        return rewriteFilteringSemiJoinToInnerJoin;
-    }
-
-    @Config("optimizer.rewrite-filtering-semi-join-to-inner-join")
-    public FeaturesConfig setRewriteFilteringSemiJoinToInnerJoin(boolean rewriteFilteringSemiJoinToInnerJoin)
-    {
-        this.rewriteFilteringSemiJoinToInnerJoin = rewriteFilteringSemiJoinToInnerJoin;
-        return this;
-    }
-
     public boolean isRedistributeWrites()
     {
         return redistributeWrites;
@@ -484,15 +468,15 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isOptimizeTopNRankingNumber()
+    public boolean isOptimizeTopNRowNumber()
     {
-        return optimizeTopNRankingNumber;
+        return optimizeTopNRowNumber;
     }
 
-    @Config("optimizer.optimize-top-n-ranking-number")
-    public FeaturesConfig setOptimizeTopNRankingNumber(boolean optimizeTopNRankingNumber)
+    @Config("optimizer.optimize-top-n-row-number")
+    public FeaturesConfig setOptimizeTopNRowNumber(boolean optimizeTopNRowNumber)
     {
-        this.optimizeTopNRankingNumber = optimizeTopNRankingNumber;
+        this.optimizeTopNRowNumber = optimizeTopNRowNumber;
         return this;
     }
 
@@ -506,18 +490,6 @@ public class FeaturesConfig
     {
         this.optimizeHashGeneration = optimizeHashGeneration;
         return this;
-    }
-
-    @Config("optimizer.transform-self-join-to-groupby")
-    public FeaturesConfig setTransformSelfJoinToGroupby(boolean transformSelfJoinToGroupby)
-    {
-        this.transformSelfJoinToGroupby = transformSelfJoinToGroupby;
-        return this;
-    }
-
-    public boolean isTransformSelfJoinToGroupby()
-    {
-        return transformSelfJoinToGroupby;
     }
 
     public boolean isQueryPushDown()
@@ -1176,42 +1148,6 @@ public class FeaturesConfig
     public FeaturesConfig setPushTableThroughSubquery(boolean value)
     {
         this.pushTableThroughSubquery = value;
-        return this;
-    }
-
-    public boolean isReuseTableScanEnabled()
-    {
-        return reuseTableScanEnabled;
-    }
-
-    @Config("optimizer.reuse-table-scan")
-    public FeaturesConfig setReuseTableScanEnabled(boolean reuseTableScanEnabled)
-    {
-        this.reuseTableScanEnabled = reuseTableScanEnabled;
-        return this;
-    }
-
-    public boolean isSpillReuseExchange()
-    {
-        return spillReuseTableScan;
-    }
-
-    @Config("experimental.spill-reuse-tablescan")
-    public FeaturesConfig setSpillReuseExchange(boolean spillReuseTableScan)
-    {
-        this.spillReuseTableScan = spillReuseTableScan;
-        return this;
-    }
-
-    public int getSpillOperatorThresholdReuseExchange()
-    {
-        return spillOperatorThresholdReuseExchange;
-    }
-
-    @Config("experimental.spill-threshold-reuse-tablescan")
-    public FeaturesConfig setSpillOperatorThresholdReuseExchange(int spillOperatorThresholdReuseExchange)
-    {
-        this.spillOperatorThresholdReuseExchange = spillOperatorThresholdReuseExchange;
         return this;
     }
 }

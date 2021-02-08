@@ -18,17 +18,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageState;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.alg.StrongConnectivityInspector;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -170,7 +170,7 @@ public class PhasedExecutionSchedule
     }
 
     private static class Visitor
-            extends InternalPlanVisitor<Set<PlanFragmentId>, PlanFragmentId>
+            extends PlanVisitor<Set<PlanFragmentId>, PlanFragmentId>
     {
         private final Map<PlanFragmentId, PlanFragment> fragments;
         private final DirectedGraph<PlanFragmentId, DefaultEdge> graph;
@@ -306,7 +306,7 @@ public class PhasedExecutionSchedule
         }
 
         @Override
-        public Set<PlanFragmentId> visitPlan(PlanNode node, PlanFragmentId currentFragmentId)
+        protected Set<PlanFragmentId> visitPlan(PlanNode node, PlanFragmentId currentFragmentId)
         {
             List<PlanNode> sources = node.getSources();
             if (sources.isEmpty()) {

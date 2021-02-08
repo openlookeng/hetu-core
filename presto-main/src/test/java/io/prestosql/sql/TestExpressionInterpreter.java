@@ -20,7 +20,6 @@ import io.airlift.slice.Slices;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.scalar.FunctionAssertions;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.SqlTimestampWithTimeZone;
 import io.prestosql.spi.type.Type;
@@ -29,6 +28,7 @@ import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.ExpressionInterpreter;
 import io.prestosql.sql.planner.FunctionCallBuilder;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.Expression;
@@ -66,14 +66,13 @@ import static io.prestosql.spi.type.TimeZoneKey.getTimeZoneKey;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
-import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
 import static io.prestosql.sql.ExpressionFormatter.formatExpression;
 import static io.prestosql.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
 import static io.prestosql.sql.ParsingUtil.createParsingOptions;
 import static io.prestosql.sql.planner.ExpressionInterpreter.expressionInterpreter;
 import static io.prestosql.sql.planner.ExpressionInterpreter.expressionOptimizer;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.type.IntervalDayTimeType.INTERVAL_DAY_TIME;
+import static io.prestosql.util.DateTimeZoneIndex.getDateTimeZone;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static org.testng.Assert.assertEquals;
@@ -1487,7 +1486,7 @@ public class TestExpressionInterpreter
                     return Decimals.encodeUnscaledValue(new BigInteger("12345678901234567890123"));
             }
 
-            return toSymbolReference(symbol);
+            return symbol.toSymbolReference();
         });
     }
 

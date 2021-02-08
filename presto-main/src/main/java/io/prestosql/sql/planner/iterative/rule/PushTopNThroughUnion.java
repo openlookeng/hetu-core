@@ -18,23 +18,23 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.SymbolMapper;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.UnionNode;
 
 import java.util.Set;
 
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Sets.intersection;
 import static io.prestosql.matching.Capture.newCapture;
-import static io.prestosql.spi.plan.TopNNode.Step.PARTIAL;
 import static io.prestosql.sql.planner.plan.Patterns.TopN.step;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.topN;
 import static io.prestosql.sql.planner.plan.Patterns.union;
+import static io.prestosql.sql.planner.plan.TopNNode.Step.PARTIAL;
 
 public class PushTopNThroughUnion
         implements Rule<TopNNode>

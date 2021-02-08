@@ -14,9 +14,8 @@
 package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.ChildReplacer;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +26,7 @@ import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.sql.planner.iterative.Lookup.noLookup;
+import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static java.util.Objects.requireNonNull;
 
 public class PlanNodeSearcher
@@ -159,7 +159,7 @@ public class PlanNodeSearcher
             List<PlanNode> sources = node.getSources().stream()
                     .map(this::removeAllRecursive)
                     .collect(toImmutableList());
-            return ChildReplacer.replaceChildren(node, sources);
+            return replaceChildren(node, sources);
         }
         return node;
     }
@@ -185,7 +185,7 @@ public class PlanNodeSearcher
                 return node;
             }
             else if (sources.size() == 1) {
-                return ChildReplacer.replaceChildren(node, ImmutableList.of(removeFirstRecursive(sources.get(0))));
+                return replaceChildren(node, ImmutableList.of(removeFirstRecursive(sources.get(0))));
             }
             else {
                 throw new IllegalArgumentException("Unable to remove first node when a node has multiple children, use removeAll instead");
@@ -210,7 +210,7 @@ public class PlanNodeSearcher
             List<PlanNode> sources = node.getSources().stream()
                     .map(source -> replaceAllRecursive(source, nodeToReplace))
                     .collect(toImmutableList());
-            return ChildReplacer.replaceChildren(node, sources);
+            return replaceChildren(node, sources);
         }
         return node;
     }
@@ -232,7 +232,7 @@ public class PlanNodeSearcher
             return node;
         }
         else if (sources.size() == 1) {
-            return ChildReplacer.replaceChildren(node, ImmutableList.of(replaceFirstRecursive(node, sources.get(0))));
+            return replaceChildren(node, ImmutableList.of(replaceFirstRecursive(node, sources.get(0))));
         }
         else {
             throw new IllegalArgumentException("Unable to replace first node when a node has multiple children, use replaceAll instead");

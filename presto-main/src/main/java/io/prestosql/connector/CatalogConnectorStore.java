@@ -16,7 +16,6 @@ package io.prestosql.connector;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.Duration;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.Connector;
 
 import javax.annotation.concurrent.ThreadSafe;

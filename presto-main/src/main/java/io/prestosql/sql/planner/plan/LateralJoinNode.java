@@ -16,10 +16,7 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Join;
 import io.prestosql.sql.tree.Node;
@@ -40,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  */
 @Immutable
 public class LateralJoinNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     public enum Type
     {
@@ -183,7 +180,7 @@ public class LateralJoinNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitLateralJoin(this, context);
     }

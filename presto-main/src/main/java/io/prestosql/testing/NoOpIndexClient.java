@@ -19,74 +19,57 @@ import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 public class NoOpIndexClient
         implements IndexClient
 {
-    private static final String ERROR_MSG = "Heuristic Index is not enabled or is configured incorrectly.";
-
     @Override
     public List<IndexMetadata> readSplitIndex(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 
     @Override
     public long getLastModified(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
-    }
-
-    @Override
-    public List<IndexMetadata> readPartitionIndex(String path)
-            throws IOException
-    {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 
     @Override
     public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 
     @Override
-    public void deleteIndexRecord(String indexName, List<String> partitionsToDelete)
+    public boolean indexRecordExists(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 
     @Override
-    public RecordStatus lookUpIndexRecord(CreateIndexMetadata createIndexMetadata)
+    public void deleteIndex(String indexName)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
-    }
-
-    @Override
-    public void deleteIndex(String indexName, List<String> partitionsToDelete)
-            throws IOException
-    {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 
     @Override
     public List<IndexRecord> getAllIndexRecords()
             throws IOException
     {
-        return new ArrayList<IndexRecord>();
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 
     @Override
-    public IndexRecord lookUpIndexRecord(String name)
+    public IndexRecord getIndexRecord(String name)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException("This is a no-op index client");
     }
 }

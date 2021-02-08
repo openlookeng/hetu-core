@@ -16,12 +16,11 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.Optional;
 
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -57,7 +56,7 @@ public class AliasMatcher
     {
         Optional<Symbol> symbol = matcher.getAssignedSymbol(node, session, metadata, symbolAliases);
         if (symbol.isPresent() && alias.isPresent()) {
-            return match(alias.get(), toSymbolReference(symbol.get()));
+            return match(alias.get(), symbol.get().toSymbolReference());
         }
         return new MatchResult(symbol.isPresent());
     }

@@ -15,14 +15,14 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.sql.planner.FunctionCallBuilder;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.QualifiedName;
@@ -34,7 +34,6 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.filter;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.assignment;
 
 public class TestExpressionRewriteRuleSet
         extends BaseRuleTest
@@ -47,7 +46,7 @@ public class TestExpressionRewriteRuleSet
     {
         tester().assertThat(zeroRewriter.projectExpressionRewrite())
                 .on(p -> p.project(
-                        assignment(p.symbol("y"), PlanBuilder.expression("x IS NOT NULL")),
+                        Assignments.of(p.symbol("y"), PlanBuilder.expression("x IS NOT NULL")),
                         p.values(p.symbol("x"))))
                 .matches(
                         project(ImmutableMap.of("y", expression("0")), values("x")));
@@ -58,7 +57,7 @@ public class TestExpressionRewriteRuleSet
     {
         tester().assertThat(zeroRewriter.projectExpressionRewrite())
                 .on(p -> p.project(
-                        assignment(p.symbol("y"), PlanBuilder.expression("0")),
+                        Assignments.of(p.symbol("y"), PlanBuilder.expression("0")),
                         p.values(p.symbol("x"))))
                 .doesNotFire();
     }
@@ -134,7 +133,7 @@ public class TestExpressionRewriteRuleSet
         tester().assertThat(zeroRewriter.valuesExpressionRewrite())
                 .on(p -> p.values(
                         ImmutableList.<Symbol>of(p.symbol("a")),
-                        ImmutableList.of((ImmutableList.of(OriginalExpressionUtils.castToRowExpression(PlanBuilder.expression("1")))))))
+                        ImmutableList.of((ImmutableList.of(PlanBuilder.expression("1"))))))
                 .matches(
                         values(ImmutableList.of("a"), ImmutableList.of(ImmutableList.of(new LongLiteral("0")))));
     }
@@ -145,7 +144,7 @@ public class TestExpressionRewriteRuleSet
         tester().assertThat(zeroRewriter.valuesExpressionRewrite())
                 .on(p -> p.values(
                         ImmutableList.<Symbol>of(p.symbol("a")),
-                        ImmutableList.of((ImmutableList.of(OriginalExpressionUtils.castToRowExpression(PlanBuilder.expression("0")))))))
+                        ImmutableList.of((ImmutableList.of(PlanBuilder.expression("0"))))))
                 .doesNotFire();
     }
 }

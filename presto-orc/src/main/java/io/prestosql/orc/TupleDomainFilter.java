@@ -50,11 +50,6 @@ public interface TupleDomainFilter
 
     boolean testFloat(float value);
 
-    default boolean isSingleValue()
-    {
-        return false;
-    }
-
     abstract class AbstractTupleDomainFilter
             implements TupleDomainFilter
     {
@@ -443,11 +438,6 @@ public interface TupleDomainFilter
         public static DoubleRange of(double lower, boolean lowerUnbounded, boolean lowerExclusive, double upper, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
         {
             return new DoubleRange(lower, lowerUnbounded, lowerExclusive, upper, upperUnbounded, upperExclusive, nullAllowed);
-        }
-
-        public boolean isSingleValue()
-        {
-            return lower == upper && !lowerExclusive && !upperExclusive;
         }
 
         public double getLower()
@@ -951,21 +941,6 @@ public interface TupleDomainFilter
             return new LongDecimalRange(lowerLow, lowerHigh, lowerUnbounded, lowerExclusive, upperLow, upperHigh, upperUnbounded, upperExclusive, nullAllowed);
         }
 
-        public boolean isSingleValue()
-        {
-            return (lowerLow == upperLow && lowerHigh == upperHigh && !lowerExclusive && !upperExclusive);
-        }
-
-        public long getLowerLow()
-        {
-            return lowerLow;
-        }
-
-        public long getLowerHigh()
-        {
-            return lowerHigh;
-        }
-
         @Override
         public boolean testDecimal(long valueLow, long valueHigh)
         {
@@ -1054,16 +1029,6 @@ public interface TupleDomainFilter
         public static FloatRange of(float lower, boolean lowerUnbounded, boolean lowerExclusive, float upper, boolean upperUnbounded, boolean upperExclusive, boolean nullAllowed)
         {
             return new FloatRange(lower, lowerUnbounded, lowerExclusive, upper, upperUnbounded, upperExclusive, nullAllowed);
-        }
-
-        public boolean isSingleValue()
-        {
-            return lower == upper && !lowerExclusive && !upperExclusive;
-        }
-
-        public float getLower()
-        {
-            return lower;
         }
 
         @Override
@@ -1164,39 +1129,6 @@ public interface TupleDomainFilter
         }
     }
 
-    class LongDecimalValue
-    {
-        long lowerLow;
-        long lowerHigh;
-
-        LongDecimalValue(long lowerLow, long lowerHigh)
-        {
-            this.lowerLow = lowerLow;
-            this.lowerHigh = lowerHigh;
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
-            }
-
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
-            LongDecimalValue that = (LongDecimalValue) o;
-            return (lowerLow == that.lowerLow) && (lowerHigh == that.lowerHigh);
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Arrays.hashCode(new long[]{lowerLow, lowerHigh});
-        }
-    }
-
     class MultiValues
             extends AbstractTupleDomainFilter
     {
@@ -1223,32 +1155,6 @@ public interface TupleDomainFilter
         public boolean testLength(int length)
         {
             return true;
-        }
-
-        @Override
-        public boolean testFloat(float value)
-        {
-            if (Float.isNaN(value)) {
-                return false;
-            }
-
-            return values.contains(value);
-        }
-
-        @Override
-        public boolean testDouble(double value)
-        {
-            if (Double.isNaN(value)) {
-                return false;
-            }
-
-            return values.contains(value);
-        }
-
-        @Override
-        public boolean testDecimal(long low, long high)
-        {
-            return values.contains(new LongDecimalValue(low, high));
         }
 
         @Override

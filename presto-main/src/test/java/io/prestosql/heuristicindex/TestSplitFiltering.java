@@ -17,25 +17,26 @@ package io.prestosql.heuristicindex;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.units.Duration;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.spi.type.VarcharType;
 import io.prestosql.split.SplitSource;
-import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.relational.Expressions;
-import io.prestosql.sql.relational.Signatures;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.Cast;
+import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.InListExpression;
+import io.prestosql.sql.tree.InPredicate;
+import io.prestosql.sql.tree.LogicalBinaryExpression;
+import io.prestosql.sql.tree.LongLiteral;
+import io.prestosql.sql.tree.NotExpression;
+import io.prestosql.sql.tree.StringLiteral;
+import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.utils.MockSplit;
 import io.prestosql.utils.TestUtil;
 import org.testng.annotations.Test;
@@ -49,10 +50,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.heuristicindex.SplitFiltering.getAllColumns;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
@@ -72,10 +71,9 @@ public class TestSplitFiltering
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(5000, TimeUnit.MILLISECONDS));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
 
-        //ComparisonExpression expr = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new StringLiteral("test_value"));
-        RowExpression expression = PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("test_value"), VarcharType.VARCHAR));
+        ComparisonExpression expr = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new StringLiteral("test_value"));
 
-        SqlStageExecution stage = TestUtil.getTestStage(expression);
+        SqlStageExecution stage = TestUtil.getTestStage(expr);
 
         List<Split> mockSplits = new ArrayList<>();
         MockSplit mock = new MockSplit("hdfs://hacluster/AppData/BIProd/DWD/EVT/bogus_table/000000_0", 0, 10, 0);
@@ -90,7 +88,7 @@ public class TestSplitFiltering
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
         HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
-        SplitFiltering.Tuple<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
+        SplitFiltering.Tuple<Optional<Expression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
         List<Split> filteredSplits = SplitFiltering.getFilteredSplit(pair.first,
                 SplitFiltering.getFullyQualifiedName(stage), pair.second, nextSplits, indexerManager);
         assertNotNull(filteredSplits);
@@ -104,61 +102,58 @@ public class TestSplitFiltering
     public void testIsSplitFilterApplicableForOperators()
     {
         // EQUAL is supported
-        testIsSplitFilterApplicableForOperator(PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR)),
+        testIsSplitFilterApplicableForOperator(
+                new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new StringLiteral("hello")),
                 true);
 
         // GREATER_THAN is supported
         testIsSplitFilterApplicableForOperator(
-                PlanBuilder.comparison(OperatorType.GREATER_THAN, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR)),
+                new ComparisonExpression(ComparisonExpression.Operator.GREATER_THAN, new SymbolReference("a"), new StringLiteral("hello")),
                 true);
 
         // LESS_THAN is supported
         testIsSplitFilterApplicableForOperator(
-                PlanBuilder.comparison(OperatorType.LESS_THAN, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR)), true);
+                new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN, new SymbolReference("a"), new StringLiteral("hello")),
+                true);
 
         // GREATER_THAN_OR_EQUAL is supported
         testIsSplitFilterApplicableForOperator(
-                PlanBuilder.comparison(OperatorType.GREATER_THAN_OR_EQUAL, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR)),
+                new ComparisonExpression(ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL, new SymbolReference("a"), new StringLiteral("hello")),
                 true);
 
         // LESS_THAN_OR_EQUAL is supported
         testIsSplitFilterApplicableForOperator(
-                PlanBuilder.comparison(OperatorType.LESS_THAN_OR_EQUAL, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR)),
+                new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN_OR_EQUAL, new SymbolReference("a"), new StringLiteral("hello")),
                 true);
 
         // NOT is not supported
         testIsSplitFilterApplicableForOperator(
-                Expressions.call(Signatures.notSignature(), BOOLEAN, new VariableReferenceExpression("a", VarcharType.VARCHAR)),
+                new NotExpression(new SymbolReference("a")),
                 true);
 
         // Test multiple supported predicates
         // AND is supported
-        RowExpression castExpressionA = Expressions.call(Signatures.castSignature(BIGINT, BIGINT), BIGINT, new VariableReferenceExpression("a", BIGINT));
-        RowExpression castExpressionB = Expressions.call(Signatures.castSignature(BIGINT, BIGINT), BIGINT, new VariableReferenceExpression("b", BIGINT));
-        RowExpression expr1 = PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("a", BIGINT), castExpressionA);
-        RowExpression expr2 = PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("b", BIGINT), castExpressionB);
-        RowExpression andLbExpression = new SpecialForm(SpecialForm.Form.AND, BIGINT, expr1, expr2);
+        ComparisonExpression expr1 = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new Cast(new StringLiteral("a"), "A"));
+        ComparisonExpression expr2 = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("b"), new Cast(new StringLiteral("b"), "B"));
+        LogicalBinaryExpression andLbExpression = new LogicalBinaryExpression(LogicalBinaryExpression.Operator.AND, expr1, expr2);
         testIsSplitFilterApplicableForOperator(
                 andLbExpression,
                 true);
 
         // OR is supported
-        RowExpression orLbExpression = new SpecialForm(SpecialForm.Form.OR, BIGINT, expr1, expr2);
+        LogicalBinaryExpression orLbExpression = new LogicalBinaryExpression(LogicalBinaryExpression.Operator.OR, expr1, expr2);
         testIsSplitFilterApplicableForOperator(
                 orLbExpression,
                 true);
 
         // IN is supported
-        RowExpression item0 = new ConstantExpression(utf8Slice("a"), VarcharType.VARCHAR);
-        RowExpression item1 = new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR);
-        RowExpression item2 = new ConstantExpression(utf8Slice("hello2"), VarcharType.VARCHAR);
-        RowExpression inExpression = new SpecialForm(SpecialForm.Form.IN, BOOLEAN, ImmutableList.of(item0, item1, item2));
+        InPredicate inExpression = new InPredicate(new SymbolReference("a"), new InListExpression(ImmutableList.of(new StringLiteral("hello"), new StringLiteral("hello2"))));
         testIsSplitFilterApplicableForOperator(
                 inExpression,
                 true);
     }
 
-    private void testIsSplitFilterApplicableForOperator(RowExpression expression, boolean expected)
+    private void testIsSplitFilterApplicableForOperator(Expression expression, boolean expected)
     {
         SqlStageExecution stage = TestUtil.getTestStage(expression);
         assertEquals(SplitFiltering.isSplitFilterApplicable(stage), expected);
@@ -167,26 +162,25 @@ public class TestSplitFiltering
     @Test
     public void testGetColumns()
     {
-        RowExpression rowExpression1 = PlanBuilder.comparison(OperatorType.EQUAL,
-                new VariableReferenceExpression("col_a", BIGINT), new ConstantExpression(8L, BIGINT));
-        RowExpression rowExpression2 = new SpecialForm(SpecialForm.Form.IN, BOOLEAN,
-                new VariableReferenceExpression("col_b", BIGINT), new ConstantExpression(20L, BIGINT), new ConstantExpression(80L, BIGINT));
-        RowExpression expression1 = new SpecialForm(SpecialForm.Form.AND, BOOLEAN, rowExpression1, rowExpression2);
+        Expression expression1 = new LogicalBinaryExpression(
+                LogicalBinaryExpression.Operator.AND,
+                new ComparisonExpression(EQUAL, new SymbolReference("col_a"), new LongLiteral("8")),
+                new InPredicate(new SymbolReference("col_b"),
+                        new InListExpression(ImmutableList.of(new LongLiteral("20"), new LongLiteral("80")))));
 
-        RowExpression rowExpression3 = PlanBuilder.comparison(OperatorType.EQUAL,
-                new VariableReferenceExpression("c1", VarcharType.VARCHAR), new ConstantExpression("d", VarcharType.VARCHAR));
-        RowExpression rowExpression4 = PlanBuilder.comparison(OperatorType.EQUAL,
-                new VariableReferenceExpression("c2", VarcharType.VARCHAR), new ConstantExpression("e", VarcharType.VARCHAR));
-        RowExpression rowExpression5 = new SpecialForm(SpecialForm.Form.IN, BOOLEAN,
-                new VariableReferenceExpression("c2", VarcharType.VARCHAR), new ConstantExpression("a", VarcharType.VARCHAR), new ConstantExpression("f", VarcharType.VARCHAR));
-        RowExpression expression6 = new SpecialForm(SpecialForm.Form.OR, BOOLEAN, rowExpression4, rowExpression5);
-        RowExpression expression2 = new SpecialForm(SpecialForm.Form.AND, BOOLEAN, rowExpression3, expression6);
+        Expression expression2 = new LogicalBinaryExpression(
+                LogicalBinaryExpression.Operator.AND,
+                new ComparisonExpression(EQUAL, new SymbolReference("c1"), new StringLiteral("d")),
+                new LogicalBinaryExpression(LogicalBinaryExpression.Operator.OR,
+                        new ComparisonExpression(EQUAL, new SymbolReference("c2"), new StringLiteral("e")),
+                        new InPredicate(new SymbolReference("c2"),
+                                new InListExpression(ImmutableList.of(new StringLiteral("a"), new StringLiteral("f"))))));
 
         parseExpressionGetColumns(expression1, ImmutableSet.of("col_a", "col_b"));
         parseExpressionGetColumns(expression2, ImmutableSet.of("c1", "c2"));
     }
 
-    private void parseExpressionGetColumns(RowExpression expression, Set<String> expected)
+    private void parseExpressionGetColumns(Expression expression, Set<String> expected)
     {
         Set<String> columns = new HashSet<>();
         getAllColumns(expression, columns, new HashMap<>());

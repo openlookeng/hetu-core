@@ -16,12 +16,12 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.optimizations.ApplyNodeUtil;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.ExistsPredicate;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.Node;
+import io.prestosql.sql.tree.QuantifiedComparisonExpression;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -32,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class ApplyNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     private final PlanNode input;
     private final PlanNode subquery;
@@ -87,7 +87,7 @@ public class ApplyNode
 
         checkArgument(input.getOutputSymbols().containsAll(correlation), "Input does not contain symbols from correlation");
         checkArgument(
-                subqueryAssignments.getExpressions().stream().allMatch(ApplyNodeUtil::isSupportedSubqueryExpression),
+                subqueryAssignments.getExpressions().stream().allMatch(ApplyNode::isSupportedSubqueryExpression),
                 "Unexpected expression used for subquery expression");
 
         this.input = input;
@@ -95,6 +95,13 @@ public class ApplyNode
         this.subqueryAssignments = subqueryAssignments;
         this.correlation = ImmutableList.copyOf(correlation);
         this.originSubquery = originSubquery;
+    }
+
+    private static boolean isSupportedSubqueryExpression(Expression expression)
+    {
+        return expression instanceof InPredicate ||
+                expression instanceof ExistsPredicate ||
+                expression instanceof QuantifiedComparisonExpression;
     }
 
     @JsonProperty("input")
@@ -144,7 +151,7 @@ public class ApplyNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitApply(this, context);
     }

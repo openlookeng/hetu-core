@@ -17,12 +17,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.PlanNodeDecorrelator;
 import io.prestosql.sql.planner.optimizations.PlanNodeDecorrelator.DecorrelatedNode;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.Optional;
@@ -31,7 +31,6 @@ import static io.prestosql.matching.Pattern.nonEmpty;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.planner.plan.Patterns.LateralJoin.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.lateralJoin;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 /**
@@ -70,7 +69,7 @@ public class TransformCorrelatedLateralJoinToJoin
                             decorrelatedNode.getNode(),
                             ImmutableList.of(),
                             lateralJoinNode.getOutputSymbols(),
-                            joinFilter.equals(TRUE_LITERAL) ? Optional.empty() : Optional.of(castToRowExpression(joinFilter)),
+                            joinFilter.equals(TRUE_LITERAL) ? Optional.empty() : Optional.of(joinFilter),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),

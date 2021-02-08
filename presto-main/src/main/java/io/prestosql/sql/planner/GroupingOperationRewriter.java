@@ -13,7 +13,6 @@
  */
 package io.prestosql.sql.planner;
 
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.FieldId;
 import io.prestosql.sql.analyzer.RelationId;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
@@ -32,7 +31,6 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.ADD;
 import static java.util.Objects.requireNonNull;
 
@@ -72,7 +70,7 @@ public final class GroupingOperationRewriter
             // It is necessary to add a 1 to the groupId because the underlying array is indexed starting at 1
             return new SubscriptExpression(
                     new ArrayConstructor(groupingResults),
-                    new ArithmeticBinaryExpression(ADD, toSymbolReference(groupIdSymbol.get()), new GenericLiteral("BIGINT", "1")));
+                    new ArithmeticBinaryExpression(ADD, groupIdSymbol.get().toSymbolReference(), new GenericLiteral("BIGINT", "1")));
         }
     }
 

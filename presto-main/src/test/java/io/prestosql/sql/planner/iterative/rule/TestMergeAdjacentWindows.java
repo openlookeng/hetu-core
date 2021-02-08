@@ -17,22 +17,20 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.sql.tree.WindowFrame;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
-import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
@@ -40,14 +38,15 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.castToRowExpression;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
+import static io.prestosql.sql.tree.FrameBound.Type.CURRENT_ROW;
+import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
 
 public class TestMergeAdjacentWindows
         extends BaseRuleTest
 {
     private static final WindowNode.Frame frame = new WindowNode.Frame(
-            Types.WindowFrameType.RANGE,
+            WindowFrame.Type.RANGE,
             UNBOUNDED_PRECEDING,
             Optional.empty(),
             CURRENT_ROW,
@@ -180,13 +179,11 @@ public class TestMergeAdjacentWindows
                                 ImmutableMap.of(p.symbol("lagOutput"), newWindowNodeFunction(LAG, "a", "one")),
                                 p.project(
                                         Assignments.builder()
-                                                .put(p.symbol("one"), castToRowExpression("CAST(1 AS bigint)"))
-                                                .put(p.symbol("a"), p.variable("a"))
-                                                .put(p.symbol("avgOutput"), p.variable("avgOutput"))
+                                                .put(p.symbol("one"), expression("CAST(1 AS bigint)"))
+                                                .putIdentities(ImmutableList.of(p.symbol("a"), p.symbol("avgOutput")))
                                                 .build(),
                                         p.project(
-                                                Assignments.copyOf(ImmutableMap.of(p.symbol("a"), p.variable("a"),
-                                                        p.symbol("avgOutput"), p.variable("avgOutput"), p.symbol("unused"), p.variable("unused"))),
+                                                Assignments.identity(p.symbol("a"), p.symbol("avgOutput"), p.symbol("unused")),
                                                 p.window(
                                                         newWindowNodeSpecification(p, "a"),
                                                         ImmutableMap.of(p.symbol("avgOutput"), newWindowNodeFunction(AVG, "a")),
@@ -223,7 +220,7 @@ public class TestMergeAdjacentWindows
     {
         return new WindowNode.Function(
                 signature,
-                Arrays.stream(symbols).map(symbol -> new VariableReferenceExpression(symbol, BIGINT)).collect(Collectors.toList()),
+                Arrays.stream(symbols).map(SymbolReference::new).collect(Collectors.toList()),
                 frame);
     }
 

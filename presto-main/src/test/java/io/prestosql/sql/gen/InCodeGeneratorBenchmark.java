@@ -20,10 +20,10 @@ import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.relational.RowExpression;
+import io.prestosql.sql.relational.SpecialForm;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -47,13 +47,13 @@ import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
-import static io.prestosql.spi.relation.SpecialForm.Form.IN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.field;
+import static io.prestosql.sql.relational.SpecialForm.Form.IN;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static org.openjdk.jmh.annotations.Mode.AverageTime;
 

@@ -17,9 +17,9 @@ import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableMetadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.Domain;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
 
 import java.util.Map;
 import java.util.Optional;

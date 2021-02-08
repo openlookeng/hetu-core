@@ -17,14 +17,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.plan.OrderingScheme;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.OrderingScheme;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.Partitioning.ArgumentBinding;
 import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.planner.PartitioningScheme;
+import io.prestosql.sql.planner.Symbol;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -44,7 +42,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class ExchangeNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     public enum Type
     {
@@ -240,7 +238,7 @@ public class ExchangeNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitExchange(this, context);
     }

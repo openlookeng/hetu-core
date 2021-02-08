@@ -20,10 +20,6 @@ import io.airlift.slice.Slice;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.type.ArrayType;
-import io.prestosql.spi.type.FunctionType;
-import io.prestosql.spi.type.MapType;
-import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarcharType;
@@ -104,48 +100,7 @@ public class LiteralFunction
 
     public static boolean isSupportedLiteralType(Type type)
     {
-        if (type instanceof FunctionType) {
-            // FunctionType contains compiled lambda thus not serializable.
-            return false;
-        }
-        if (type instanceof ArrayType) {
-            return isSupportedLiteralType(((ArrayType) type).getElementType());
-        }
-        else if (type instanceof RowType) {
-            RowType rowType = (RowType) type;
-            return rowType.getTypeParameters().stream()
-                    .allMatch(LiteralFunction::isSupportedLiteralType);
-        }
-        else if (type instanceof MapType) {
-            MapType mapType = (MapType) type;
-            return isSupportedLiteralType(mapType.getKeyType()) && isSupportedLiteralType(mapType.getValueType());
-        }
         return SUPPORTED_LITERAL_TYPES.contains(type.getJavaType());
-    }
-
-    public static long estimatedSizeInBytes(Object object)
-    {
-        if (object == null) {
-            return 1;
-        }
-        Class<?> javaType = object.getClass();
-        if (javaType == Long.class) {
-            return Long.BYTES;
-        }
-        else if (javaType == Double.class) {
-            return Double.BYTES;
-        }
-        else if (javaType == Boolean.class) {
-            return 1;
-        }
-        else if (object instanceof Block) {
-            return ((Block) object).getSizeInBytes();
-        }
-        else if (object instanceof Slice) {
-            return ((Slice) object).length();
-        }
-        // unknown for rest of types
-        return Integer.MAX_VALUE;
     }
 
     public static Signature getLiteralFunctionSignature(Type type)

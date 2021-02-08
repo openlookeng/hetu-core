@@ -14,7 +14,6 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.ResolvedField;
@@ -37,7 +36,6 @@ import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -120,7 +118,7 @@ class TranslationMap
             public Expression rewriteExpression(Expression node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
             {
                 if (expressionToSymbols.containsKey(node)) {
-                    return toSymbolReference(expressionToSymbols.get(node));
+                    return expressionToSymbols.get(node).toSymbolReference();
                 }
 
                 Expression translated = expressionToExpressions.getOrDefault(node, node);
@@ -134,7 +132,7 @@ class TranslationMap
         if (expression instanceof FieldReference) {
             int fieldIndex = ((FieldReference) expression).getFieldIndex();
             fieldSymbols[fieldIndex] = symbol;
-            expressionToSymbols.put(toSymbolReference(rewriteBase.getSymbol(fieldIndex)), symbol);
+            expressionToSymbols.put(rewriteBase.getSymbol(fieldIndex).toSymbolReference(), symbol);
             return;
         }
 
@@ -196,7 +194,7 @@ class TranslationMap
             {
                 Symbol symbol = rewriteBase.getSymbol(node.getFieldIndex());
                 checkState(symbol != null, "No symbol mapping for node '%s' (%s)", node, node.getFieldIndex());
-                return toSymbolReference(symbol);
+                return symbol.toSymbolReference();
             }
 
             @Override
@@ -205,7 +203,7 @@ class TranslationMap
                 LambdaArgumentDeclaration referencedLambdaArgumentDeclaration = analysis.getLambdaArgumentReference(node);
                 if (referencedLambdaArgumentDeclaration != null) {
                     Symbol symbol = lambdaDeclarationToSymbolMap.get(NodeRef.of(referencedLambdaArgumentDeclaration));
-                    return coerceIfNecessary(node, toSymbolReference(symbol));
+                    return coerceIfNecessary(node, symbol.toSymbolReference());
                 }
                 else {
                     return rewriteExpressionWithResolvedName(node);
@@ -215,7 +213,7 @@ class TranslationMap
             private Expression rewriteExpressionWithResolvedName(Expression node)
             {
                 return getSymbol(rewriteBase, node)
-                        .map(symbol -> coerceIfNecessary(node, toSymbolReference(symbol)))
+                        .map(symbol -> coerceIfNecessary(node, symbol.toSymbolReference()))
                         .orElse(coerceIfNecessary(node, node));
             }
 
@@ -227,7 +225,7 @@ class TranslationMap
                     if (resolvedField.isPresent()) {
                         if (resolvedField.get().isLocal()) {
                             return getSymbol(rewriteBase, node)
-                                    .map(symbol -> coerceIfNecessary(node, toSymbolReference(symbol)))
+                                    .map(symbol -> coerceIfNecessary(node, symbol.toSymbolReference()))
                                     .orElseThrow(() -> new IllegalStateException("No symbol mapping for node " + node));
                         }
                     }

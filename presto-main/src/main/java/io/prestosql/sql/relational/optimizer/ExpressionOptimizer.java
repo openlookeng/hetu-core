@@ -20,15 +20,15 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.LambdaDefinitionExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.RowExpressionVisitor;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.sql.relational.CallExpression;
+import io.prestosql.sql.relational.ConstantExpression;
+import io.prestosql.sql.relational.InputReferenceExpression;
+import io.prestosql.sql.relational.LambdaDefinitionExpression;
+import io.prestosql.sql.relational.RowExpression;
+import io.prestosql.sql.relational.RowExpressionVisitor;
+import io.prestosql.sql.relational.SpecialForm;
+import io.prestosql.sql.relational.VariableReferenceExpression;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
@@ -43,7 +43,6 @@ import static io.prestosql.operator.scalar.JsonStringToMapCast.JSON_STRING_TO_MA
 import static io.prestosql.operator.scalar.JsonStringToRowCast.JSON_STRING_TO_ROW_NAME;
 import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.internalScalarFunction;
-import static io.prestosql.spi.relation.SpecialForm.Form.BIND;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.ARRAY;
 import static io.prestosql.spi.type.StandardTypes.MAP;
@@ -54,6 +53,7 @@ import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.constantNull;
 import static io.prestosql.sql.relational.Signatures.CAST;
+import static io.prestosql.sql.relational.SpecialForm.Form.BIND;
 import static io.prestosql.type.JsonType.JSON;
 
 public class ExpressionOptimizer

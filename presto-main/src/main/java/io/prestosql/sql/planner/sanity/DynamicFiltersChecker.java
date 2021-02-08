@@ -17,15 +17,14 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.SemiJoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
 
 import java.util.HashSet;
 import java.util.List;
@@ -45,10 +44,10 @@ public class DynamicFiltersChecker
     @Override
     public void validate(PlanNode plan, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
-        plan.accept(new InternalPlanVisitor<Set<String>, Void>()
+        plan.accept(new PlanVisitor<Set<String>, Void>()
         {
             @Override
-            public Set<String> visitPlan(PlanNode node, Void context)
+            protected Set<String> visitPlan(PlanNode node, Void context)
             {
                 Set<String> consumed = new HashSet<>();
                 for (PlanNode source : node.getSources()) {
@@ -61,7 +60,7 @@ public class DynamicFiltersChecker
             public Set<String> visitOutput(OutputNode node, Void context)
             {
                 Set<String> unmatched = visitPlan(node, context);
-                verify(unmatched.isEmpty(), "All consumed dynamic filters could not be matched with a join/semi-join.");
+                verify(unmatched.isEmpty(), "All consumed dynamic filters could not be matched with a join.");
                 return unmatched;
             }
 
@@ -79,27 +78,6 @@ public class DynamicFiltersChecker
                 Set<String> unmatched = new HashSet<>(consumedBuildSide);
                 unmatched.addAll(consumedProbeSide);
                 unmatched.removeAll(currentJoinDynamicFilters);
-                return ImmutableSet.copyOf(unmatched);
-            }
-
-            @Override
-            public Set<String> visitSemiJoin(SemiJoinNode node, Void context)
-            {
-                Set<String> consumedSourceSide = node.getSource().accept(this, context);
-                Set<String> consumedFilteringSourceSide = node.getFilteringSource().accept(this, context);
-
-                Set<String> unmatched = new HashSet<>(consumedSourceSide);
-                unmatched.addAll(consumedFilteringSourceSide);
-
-                if (node.getDynamicFilterId().isPresent()) {
-                    String dynamicFilterId = node.getDynamicFilterId().get();
-                    verify(consumedSourceSide.contains(dynamicFilterId),
-                            "The dynamic filter %s present in semi-join was not consumed by it's source side.", dynamicFilterId);
-                    verify(!consumedFilteringSourceSide.contains(dynamicFilterId),
-                            "The dynamic filter %s present in semi-join was consumed by it's filtering source side.", dynamicFilterId);
-                    unmatched.remove(dynamicFilterId);
-                }
-
                 return ImmutableSet.copyOf(unmatched);
             }
 

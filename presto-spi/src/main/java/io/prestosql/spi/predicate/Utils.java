@@ -37,7 +37,7 @@ public final class Utils
         return blockBuilder.build();
     }
 
-    public static Object blockToNativeValue(Type type, Block block)
+    static Object blockToNativeValue(Type type, Block block)
     {
         return readNativeValue(type, block, 0);
     }

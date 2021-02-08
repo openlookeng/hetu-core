@@ -19,18 +19,17 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.joins.JoinGraph;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.HashMap;
@@ -44,13 +43,11 @@ import java.util.Set;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Maps.transformValues;
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.AUTOMATIC;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.planner.iterative.rule.Util.restrictOutputs;
 import static io.prestosql.sql.planner.plan.Patterns.join;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 
@@ -201,14 +198,14 @@ public class EliminateCrossJoins
             result = new FilterNode(
                     idAllocator.getNextId(),
                     result,
-                    castToRowExpression(filter));
+                    filter);
         }
 
         if (graph.getAssignments().isPresent()) {
             result = new ProjectNode(
                     idAllocator.getNextId(),
                     result,
-                    Assignments.copyOf(transformValues(graph.getAssignments().get(), OriginalExpressionUtils::castToRowExpression)));
+                    Assignments.copyOf(graph.getAssignments().get()));
         }
 
         // If needed, introduce a projection to constrain the outputs to what was originally expected

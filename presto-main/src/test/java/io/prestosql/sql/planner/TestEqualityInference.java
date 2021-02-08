@@ -22,8 +22,6 @@ import com.google.common.collect.Iterables;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.operator.scalar.TryFunction;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.type.FunctionType;
 import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.ArrayConstructor;
@@ -45,6 +43,7 @@ import io.prestosql.sql.tree.SimpleCaseExpression;
 import io.prestosql.sql.tree.SubscriptExpression;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.WhenClause;
+import io.prestosql.type.FunctionType;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;

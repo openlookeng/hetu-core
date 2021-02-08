@@ -18,9 +18,9 @@ import com.google.common.collect.Multimap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 /**
  * It is going to be executed to verify logical planner correctness
@@ -46,7 +46,7 @@ public final class PlanSanityChecker
                         Stage.FINAL,
                         new ValidateDependenciesChecker(),
                         new NoDuplicatePlanNodeIdsChecker(),
-//                        new SugarFreeChecker(),
+                        new SugarFreeChecker(),
                         new TypeValidator(),
                         new NoSubqueryExpressionLeftChecker(),
                         new NoIdentifierLeftChecker(),

@@ -37,8 +37,7 @@ public class TestThriftHiveMetastoreConfig
                 .setMaxBackoffDelay(new Duration(1, SECONDS))
                 .setMaxRetryTime(new Duration(30, SECONDS))
                 .setMaxWaitForTransactionLock(new Duration(10, MINUTES))
-                .setRoleNameCaseSensitive(false)
-                .setImpersonationEnabled(false));
+                .setRoleNameCaseSensitive(false));
     }
 
     @Test
@@ -52,7 +51,6 @@ public class TestThriftHiveMetastoreConfig
                 .put("hive.metastore.thrift.client.max-retry-time", "60s")
                 .put("hive.metastore.thrift.txn-lock-max-wait", "5m")
                 .put("hive.metastore.thrift.is-role-name-case-sensitive", "true")
-                .put("hive.metastore.thrift.impersonation.enabled", "true")
                 .build();
 
         ThriftHiveMetastoreConfig expected = new ThriftHiveMetastoreConfig()
@@ -62,8 +60,7 @@ public class TestThriftHiveMetastoreConfig
                 .setMaxBackoffDelay(new Duration(4, SECONDS))
                 .setMaxRetryTime(new Duration(60, SECONDS))
                 .setMaxWaitForTransactionLock(new Duration(5, MINUTES))
-                .setRoleNameCaseSensitive(true)
-                .setImpersonationEnabled(true);
+                .setRoleNameCaseSensitive(true);
 
         assertFullMapping(properties, expected);
     }

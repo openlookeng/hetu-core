@@ -15,9 +15,9 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
@@ -39,7 +39,7 @@ public class TestPruneMarkDistinctColumns
                     Symbol mark = p.symbol("mark");
                     Symbol unused = p.symbol("unused");
                     return p.project(
-                            Assignments.of(key2, p.variable(key.getName())),
+                            Assignments.of(key2, key.toSymbolReference()),
                             p.markDistinct(mark, ImmutableList.of(key), p.values(key, unused)));
                 })
                 .matches(
@@ -59,7 +59,7 @@ public class TestPruneMarkDistinctColumns
                     Symbol hash = p.symbol("hash");
                     Symbol unused = p.symbol("unused");
                     return p.project(
-                            Assignments.of(mark, p.variable(mark.getName())),
+                            Assignments.identity(mark),
                             p.markDistinct(
                                     mark,
                                     ImmutableList.of(key),
@@ -86,7 +86,7 @@ public class TestPruneMarkDistinctColumns
                     Symbol key = p.symbol("key");
                     Symbol mark = p.symbol("mark");
                     return p.project(
-                            Assignments.of(mark, p.variable(mark.getName())),
+                            Assignments.identity(mark),
                             p.markDistinct(mark, ImmutableList.of(key), p.values(key)));
                 })
                 .doesNotFire();
@@ -101,7 +101,7 @@ public class TestPruneMarkDistinctColumns
                     Symbol key = p.symbol("key");
                     Symbol mark = p.symbol("mark");
                     return p.project(
-                            Assignments.of(key, p.variable(key.getName()), mark, p.variable(mark.getName())),
+                            Assignments.identity(key, mark),
                             p.markDistinct(mark, ImmutableList.of(key), p.values(key)));
                 })
                 .doesNotFire();

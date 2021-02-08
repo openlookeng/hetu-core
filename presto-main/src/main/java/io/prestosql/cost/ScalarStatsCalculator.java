@@ -17,17 +17,6 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.LambdaDefinitionExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.RowExpressionVisitor;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
@@ -36,8 +25,8 @@ import io.prestosql.sql.analyzer.ExpressionAnalyzer;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.planner.ExpressionInterpreter;
 import io.prestosql.sql.planner.NoOpSymbolResolver;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.relational.RowExpressionOptimizer;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.ArithmeticUnaryExpression;
 import io.prestosql.sql.tree.AstVisitor;
@@ -57,19 +46,13 @@ import java.util.Map;
 import java.util.OptionalDouble;
 
 import static io.prestosql.cost.StatsUtil.toStatsRepresentation;
-import static io.prestosql.spi.function.OperatorType.DIVIDE;
-import static io.prestosql.spi.function.OperatorType.MODULUS;
-import static io.prestosql.spi.relation.SpecialForm.Form.COALESCE;
 import static io.prestosql.sql.planner.LiteralInterpreter.evaluate;
-import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
-import static io.prestosql.sql.planner.SymbolUtils.from;
 import static io.prestosql.util.MoreMath.max;
 import static io.prestosql.util.MoreMath.min;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
 import static java.lang.Math.abs;
-import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
@@ -85,247 +68,17 @@ public class ScalarStatsCalculator
 
     public SymbolStatsEstimate calculate(Expression scalarExpression, PlanNodeStatsEstimate inputStatistics, Session session, TypeProvider types)
     {
-        return new ExpressionVisitor(inputStatistics, session, types).process(scalarExpression);
+        return new Visitor(inputStatistics, session, types).process(scalarExpression);
     }
 
-    public SymbolStatsEstimate calculate(RowExpression scalarExpression, PlanNodeStatsEstimate inputStatistics, Session session, Map<Integer, Symbol> layout)
-    {
-        return scalarExpression.accept(new RowExpressionStatsVisitor(inputStatistics, session, layout), null);
-    }
-
-    private class RowExpressionStatsVisitor
-            implements RowExpressionVisitor<SymbolStatsEstimate, Void>
-    {
-        private final PlanNodeStatsEstimate input;
-        private final Session session;
-        private final Map<Integer, Symbol> layout;
-
-        public RowExpressionStatsVisitor(PlanNodeStatsEstimate input, Session session, Map<Integer, Symbol> layout)
-        {
-            this.input = requireNonNull(input, "input is null");
-            this.session = requireNonNull(session, "session is null");
-            this.layout = layout;
-        }
-
-        @Override
-        public SymbolStatsEstimate visitCall(CallExpression call, Void context)
-        {
-            Signature signature = call.getSignature();
-            if (signature.getName().contains("NEGATION")) {
-                return computeNegationStatistics(call, context);
-            }
-
-            if (!signature.getName().startsWith("$operator$")) {
-                return SymbolStatsEstimate.unknown();
-            }
-
-            if (signature.unmangleOperator(signature.getName()).isArithmeticOperator()) {
-                return computeArithmeticBinaryStatistics(call, context);
-            }
-
-            RowExpression value = new RowExpressionOptimizer(metadata).optimize(call, OPTIMIZED, session.toConnectorSession());
-
-            if (value instanceof ConstantExpression && ((ConstantExpression) value).getValue() == null) {
-                return nullStatsEstimate();
-            }
-
-            if (value instanceof ConstantExpression) {
-                return value.accept(this, context);
-            }
-
-            // value is not a constant but we can still propagate estimation through cast
-            if (signature.unmangleOperator(signature.getName()).equals(OperatorType.CAST)) {
-                return computeCastStatistics(call, context);
-            }
-            return SymbolStatsEstimate.unknown();
-        }
-
-        @Override
-        public SymbolStatsEstimate visitInputReference(InputReferenceExpression reference, Void context)
-        {
-            if (reference.getField() <= layout.size()) {
-                return input.getSymbolStatistics(layout.get(reference.getField()));
-            }
-            return SymbolStatsEstimate.unknown();
-        }
-
-        @Override
-        public SymbolStatsEstimate visitConstant(ConstantExpression literal, Void context)
-        {
-            if (literal.getValue() == null) {
-                return nullStatsEstimate();
-            }
-
-            OptionalDouble doubleValue = toStatsRepresentation(metadata, session, literal.getType(), literal.getValue());
-            SymbolStatsEstimate.Builder estimate = SymbolStatsEstimate.builder()
-                    .setNullsFraction(0)
-                    .setDistinctValuesCount(1);
-
-            if (doubleValue.isPresent()) {
-                estimate.setLowValue(doubleValue.getAsDouble());
-                estimate.setHighValue(doubleValue.getAsDouble());
-            }
-            return estimate.build();
-        }
-
-        @Override
-        public SymbolStatsEstimate visitLambda(LambdaDefinitionExpression lambda, Void context)
-        {
-            return SymbolStatsEstimate.unknown();
-        }
-
-        @Override
-        public SymbolStatsEstimate visitVariableReference(VariableReferenceExpression reference, Void context)
-        {
-            return input.getSymbolStatistics(new Symbol(reference.getName()));
-        }
-
-        @Override
-        public SymbolStatsEstimate visitSpecialForm(SpecialForm specialForm, Void context)
-        {
-            if (specialForm.getForm().equals(COALESCE)) {
-                SymbolStatsEstimate result = null;
-                for (RowExpression operand : specialForm.getArguments()) {
-                    SymbolStatsEstimate operandEstimates = operand.accept(this, context);
-                    if (result != null) {
-                        result = estimateCoalesce(input, result, operandEstimates);
-                    }
-                    else {
-                        result = operandEstimates;
-                    }
-                }
-                return requireNonNull(result, "result is null");
-            }
-            return SymbolStatsEstimate.unknown();
-        }
-
-        private SymbolStatsEstimate computeCastStatistics(CallExpression call, Void context)
-        {
-            requireNonNull(call, "call is null");
-            SymbolStatsEstimate sourceStats = call.getArguments().get(0).accept(this, context);
-
-            // todo - make this general postprocessing rule.
-            double distinctValuesCount = sourceStats.getDistinctValuesCount();
-            double lowValue = sourceStats.getLowValue();
-            double highValue = sourceStats.getHighValue();
-
-            if (isIntegralType(call.getType().getTypeSignature(), metadata)) {
-                // todo handle low/high value changes if range gets narrower due to cast (e.g. BIGINT -> SMALLINT)
-                if (isFinite(lowValue)) {
-                    lowValue = Math.round(lowValue);
-                }
-                if (isFinite(highValue)) {
-                    highValue = Math.round(highValue);
-                }
-                if (isFinite(lowValue) && isFinite(highValue)) {
-                    double integersInRange = highValue - lowValue + 1;
-                    if (!isNaN(distinctValuesCount) && distinctValuesCount > integersInRange) {
-                        distinctValuesCount = integersInRange;
-                    }
-                }
-            }
-
-            return SymbolStatsEstimate.builder()
-                    .setNullsFraction(sourceStats.getNullsFraction())
-                    .setLowValue(lowValue)
-                    .setHighValue(highValue)
-                    .setDistinctValuesCount(distinctValuesCount)
-                    .build();
-        }
-
-        private SymbolStatsEstimate computeNegationStatistics(CallExpression call, Void context)
-        {
-            requireNonNull(call, "call is null");
-            SymbolStatsEstimate stats = call.getArguments().get(0).accept(this, context);
-            if (call.getSignature().getName().contains("NEGATION")) {
-                return SymbolStatsEstimate.buildFrom(stats)
-                        .setLowValue(-stats.getHighValue())
-                        .setHighValue(-stats.getLowValue())
-                        .build();
-            }
-            throw new IllegalStateException(format("Unexpected sign: %s(%s)" + call.getSignature().getName(), call.getSignature()));
-        }
-
-        private SymbolStatsEstimate computeArithmeticBinaryStatistics(CallExpression call, Void context)
-        {
-            requireNonNull(call, "call is null");
-            SymbolStatsEstimate left = call.getArguments().get(0).accept(this, context);
-            SymbolStatsEstimate right = call.getArguments().get(1).accept(this, context);
-
-            SymbolStatsEstimate.Builder result = SymbolStatsEstimate.builder()
-                    .setAverageRowSize(Math.max(left.getAverageRowSize(), right.getAverageRowSize()))
-                    .setNullsFraction(left.getNullsFraction() + right.getNullsFraction() - left.getNullsFraction() * right.getNullsFraction())
-                    .setDistinctValuesCount(min(left.getDistinctValuesCount() * right.getDistinctValuesCount(), input.getOutputRowCount()));
-
-            OperatorType operatorType = call.getSignature().unmangleOperator(call.getSignature().getName());
-            double leftLow = left.getLowValue();
-            double leftHigh = left.getHighValue();
-            double rightLow = right.getLowValue();
-            double rightHigh = right.getHighValue();
-            if (isNaN(leftLow) || isNaN(leftHigh) || isNaN(rightLow) || isNaN(rightHigh)) {
-                result.setLowValue(NaN).setHighValue(NaN);
-            }
-            else if (operatorType.equals(DIVIDE) && rightLow < 0 && rightHigh > 0) {
-                result.setLowValue(Double.NEGATIVE_INFINITY)
-                        .setHighValue(Double.POSITIVE_INFINITY);
-            }
-            else if (operatorType.equals(MODULUS)) {
-                double maxDivisor = max(abs(rightLow), abs(rightHigh));
-                if (leftHigh <= 0) {
-                    result.setLowValue(max(-maxDivisor, leftLow))
-                            .setHighValue(0);
-                }
-                else if (leftLow >= 0) {
-                    result.setLowValue(0)
-                            .setHighValue(min(maxDivisor, leftHigh));
-                }
-                else {
-                    result.setLowValue(max(-maxDivisor, leftLow))
-                            .setHighValue(min(maxDivisor, leftHigh));
-                }
-            }
-            else {
-                double v1 = operate(operatorType, leftLow, rightLow);
-                double v2 = operate(operatorType, leftLow, rightHigh);
-                double v3 = operate(operatorType, leftHigh, rightLow);
-                double v4 = operate(operatorType, leftHigh, rightHigh);
-                double lowValue = min(v1, v2, v3, v4);
-                double highValue = max(v1, v2, v3, v4);
-
-                result.setLowValue(lowValue)
-                        .setHighValue(highValue);
-            }
-
-            return result.build();
-        }
-
-        private double operate(OperatorType operator, double left, double right)
-        {
-            switch (operator) {
-                case ADD:
-                    return left + right;
-                case SUBTRACT:
-                    return left - right;
-                case MULTIPLY:
-                    return left * right;
-                case DIVIDE:
-                    return left / right;
-                case MODULUS:
-                    return left % right;
-                default:
-                    throw new IllegalStateException("Unsupported ArithmeticBinaryExpression.Operator: " + operator);
-            }
-        }
-    }
-
-    private class ExpressionVisitor
+    private class Visitor
             extends AstVisitor<SymbolStatsEstimate, Void>
     {
         private final PlanNodeStatsEstimate input;
         private final Session session;
         private final TypeProvider types;
 
-        ExpressionVisitor(PlanNodeStatsEstimate input, Session session, TypeProvider types)
+        Visitor(PlanNodeStatsEstimate input, Session session, TypeProvider types)
         {
             this.input = input;
             this.session = session;
@@ -341,7 +94,7 @@ public class ScalarStatsCalculator
         @Override
         protected SymbolStatsEstimate visitSymbolReference(SymbolReference node, Void context)
         {
-            return input.getSymbolStatistics(from(node));
+            return input.getSymbolStatistics(Symbol.from(node));
         }
 
         @Override
@@ -415,7 +168,7 @@ public class ScalarStatsCalculator
             double lowValue = sourceStats.getLowValue();
             double highValue = sourceStats.getHighValue();
 
-            if (isIntegralType(targetType, metadata)) {
+            if (isIntegralType(targetType)) {
                 // todo handle low/high value changes if range gets narrower due to cast (e.g. BIGINT -> SMALLINT)
                 if (isFinite(lowValue)) {
                     lowValue = Math.round(lowValue);
@@ -437,6 +190,22 @@ public class ScalarStatsCalculator
                     .setHighValue(highValue)
                     .setDistinctValuesCount(distinctValuesCount)
                     .build();
+        }
+
+        private boolean isIntegralType(TypeSignature targetType)
+        {
+            switch (targetType.getBase()) {
+                case StandardTypes.BIGINT:
+                case StandardTypes.INTEGER:
+                case StandardTypes.SMALLINT:
+                case StandardTypes.TINYINT:
+                    return true;
+                case StandardTypes.DECIMAL:
+                    DecimalType decimalType = (DecimalType) metadata.getType(targetType);
+                    return decimalType.getScale() == 0;
+                default:
+                    return false;
+            }
         }
 
         @Override
@@ -536,7 +305,7 @@ public class ScalarStatsCalculator
             for (Expression operand : node.getOperands()) {
                 SymbolStatsEstimate operandEstimates = process(operand);
                 if (result != null) {
-                    result = estimateCoalesce(input, result, operandEstimates);
+                    result = estimateCoalesce(result, operandEstimates);
                 }
                 else {
                     result = operandEstimates;
@@ -544,43 +313,27 @@ public class ScalarStatsCalculator
             }
             return requireNonNull(result, "result is null");
         }
-    }
 
-    private static SymbolStatsEstimate estimateCoalesce(PlanNodeStatsEstimate input, SymbolStatsEstimate left, SymbolStatsEstimate right)
-    {
-        // Question to reviewer: do you have a method to check if fraction is empty or saturated?
-        if (left.getNullsFraction() == 0) {
-            return left;
-        }
-        else if (left.getNullsFraction() == 1.0) {
-            return right;
-        }
-        else {
-            return SymbolStatsEstimate.builder()
-                    .setLowValue(min(left.getLowValue(), right.getLowValue()))
-                    .setHighValue(max(left.getHighValue(), right.getHighValue()))
-                    .setDistinctValuesCount(left.getDistinctValuesCount() +
-                            min(right.getDistinctValuesCount(), input.getOutputRowCount() * left.getNullsFraction()))
-                    .setNullsFraction(left.getNullsFraction() * right.getNullsFraction())
-                    // TODO check if dataSize estimation method is correct
-                    .setAverageRowSize(max(left.getAverageRowSize(), right.getAverageRowSize()))
-                    .build();
-        }
-    }
-
-    private static boolean isIntegralType(TypeSignature targetType, Metadata metadata)
-    {
-        switch (targetType.getBase()) {
-            case StandardTypes.BIGINT:
-            case StandardTypes.INTEGER:
-            case StandardTypes.SMALLINT:
-            case StandardTypes.TINYINT:
-                return true;
-            case StandardTypes.DECIMAL:
-                DecimalType decimalType = (DecimalType) metadata.getType(targetType);
-                return decimalType.getScale() == 0;
-            default:
-                return false;
+        private SymbolStatsEstimate estimateCoalesce(SymbolStatsEstimate left, SymbolStatsEstimate right)
+        {
+            // Question to reviewer: do you have a method to check if fraction is empty or saturated?
+            if (left.getNullsFraction() == 0) {
+                return left;
+            }
+            else if (left.getNullsFraction() == 1.0) {
+                return right;
+            }
+            else {
+                return SymbolStatsEstimate.builder()
+                        .setLowValue(min(left.getLowValue(), right.getLowValue()))
+                        .setHighValue(max(left.getHighValue(), right.getHighValue()))
+                        .setDistinctValuesCount(left.getDistinctValuesCount() +
+                                min(right.getDistinctValuesCount(), input.getOutputRowCount() * left.getNullsFraction()))
+                        .setNullsFraction(left.getNullsFraction() * right.getNullsFraction())
+                        // TODO check if dataSize estimation method is correct
+                        .setAverageRowSize(max(left.getAverageRowSize(), right.getAverageRowSize()))
+                        .build();
+            }
         }
     }
 

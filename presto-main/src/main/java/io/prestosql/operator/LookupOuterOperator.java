@@ -18,8 +18,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.HashSet;
 import java.util.List;

@@ -24,9 +24,9 @@ import io.prestosql.cost.CostProvider;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins.JoinEnumerationResult;
@@ -109,19 +109,19 @@ public class TestJoinEnumerator
     private Rule.Context createContext()
     {
         PlanNodeIdAllocator planNodeIdAllocator = new PlanNodeIdAllocator();
-        PlanSymbolAllocator planSymbolAllocator = new PlanSymbolAllocator();
+        SymbolAllocator symbolAllocator = new SymbolAllocator();
         CachingStatsProvider statsProvider = new CachingStatsProvider(
                 queryRunner.getStatsCalculator(),
                 Optional.empty(),
                 noLookup(),
                 queryRunner.getDefaultSession(),
-                planSymbolAllocator.getTypes());
+                symbolAllocator.getTypes());
         CachingCostProvider costProvider = new CachingCostProvider(
                 queryRunner.getCostCalculator(),
                 statsProvider,
                 Optional.empty(),
                 queryRunner.getDefaultSession(),
-                planSymbolAllocator.getTypes());
+                symbolAllocator.getTypes());
 
         return new Rule.Context()
         {
@@ -138,9 +138,9 @@ public class TestJoinEnumerator
             }
 
             @Override
-            public PlanSymbolAllocator getSymbolAllocator()
+            public SymbolAllocator getSymbolAllocator()
             {
-                return planSymbolAllocator;
+                return symbolAllocator;
             }
 
             @Override

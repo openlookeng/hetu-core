@@ -26,23 +26,10 @@ public class PasswordSecurityConfig
     private String keystorePassword;
     private String fileStorePath = File.separator + "catalogs" + File.separator + "keys" + File.separator + "keystore.jks";
     private String rsaPadding = "RSA/ECB/OAEPWITHSHA256AndMGF1Padding";
-    private String shareFileSystemProfile = "hdfs-config-default";
 
     public String getDecryptionType()
     {
         return decryptionType;
-    }
-
-    @Config("security.share.filesystem.profile")
-    public PasswordSecurityConfig setShareFileSystemProfile(String shareFileSystemProfile)
-    {
-        this.shareFileSystemProfile = shareFileSystemProfile;
-        return this;
-    }
-
-    public String getShareFileSystemProfile()
-    {
-        return shareFileSystemProfile;
     }
 
     @Config("security.password.decryption-type")
@@ -93,7 +80,7 @@ public class PasswordSecurityConfig
         return rsaPadding;
     }
 
-    @Config("security.key.cipher-transformations")
+    @Config("security.key.rsa-padding")
     public void setRsaPadding(String rsaPadding)
     {
         this.rsaPadding = rsaPadding;

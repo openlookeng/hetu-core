@@ -16,17 +16,16 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import org.testng.annotations.Test;
 
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
-import static io.prestosql.spi.type.BigintType.BIGINT;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.sort;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
@@ -77,7 +76,7 @@ public class TestPruneTopNColumns
         Symbol a = planBuilder.symbol("a");
         Symbol b = planBuilder.symbol("b");
         return planBuilder.project(
-                Assignments.copyOf(ImmutableList.of(a, b).stream().filter(projectionTopN).collect(Collectors.toMap(v -> v, v -> planBuilder.variable(v.getName(), BIGINT)))),
+                Assignments.identity(ImmutableList.of(a, b).stream().filter(projectionTopN).collect(toImmutableSet())),
                 planBuilder.topN(
                         COUNT,
                         ImmutableList.of(b),

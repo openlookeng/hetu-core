@@ -813,11 +813,6 @@ public class BackgroundHiveSplitLoader
         return getHiveSchema(partition.get(), table);
     }
 
-    public Table getTable()
-    {
-        return table;
-    }
-
     public static class BucketSplitInfo
     {
         private final List<HiveColumnHandle> bucketColumns;

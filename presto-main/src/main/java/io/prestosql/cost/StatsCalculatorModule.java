@@ -55,10 +55,6 @@ public class StatsCalculatorModule
         rules.add(new SemiJoinStatsRule());
         rules.add(new RowNumberStatsRule(normalizer));
         rules.add(new SortStatsRule());
-        rules.add(new GroupIdStatsRule(normalizer));
-        rules.add(new TopNStatsRule(normalizer));
-        rules.add(new MarkDistinctStatsRule(normalizer));
-        rules.add(new WindowStatsRule(normalizer));
 
         return new ComposableStatsCalculator(rules.build());
     }

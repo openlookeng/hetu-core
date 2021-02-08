@@ -45,7 +45,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
-import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTERS;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -200,19 +199,22 @@ public class PagePublisherQueryManager
         StateStore stateStore = this.stateStoreProvider.getStateStore();
 
         if (queryRunner != null && stateStore != null) {
+            String collectionName = queryRunner.getQueryId().getId() + CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
             if (this.stateStoreProvider.getStateStore() == null) {
                 return;
             }
 
-            String collectionName = queryRunner.getQueryId().getId() + CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
             synchronized (queryRunner) {
                 if (queryRunner.isDone() || queryRunner.isExpired()) {
                     return;
                 }
 
-                StateMap map = (StateMap<String, Map<String, byte[]>>) stateStore.getOrCreateStateCollection(CROSS_REGION_DYNAMIC_FILTERS, StateCollection.Type.MAP);
+                StateMap map = (StateMap<Integer, byte[]>) stateStore.getStateCollection(collectionName);
+                if (map == null) {
+                    map = (StateMap<Integer, byte[]>) stateStore.createStateCollection(collectionName, StateCollection.Type.MAP);
+                }
 
-                map.put(collectionName, bloomFilters);
+                map.putAll(bloomFilters);
             }
         }
     }

@@ -15,25 +15,25 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Predicates.alwaysTrue;
-import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
 
 public class TestPruneAggregationColumns
         extends BaseRuleTest
@@ -71,7 +71,7 @@ public class TestPruneAggregationColumns
         Symbol b = planBuilder.symbol("b");
         Symbol key = planBuilder.symbol("key");
         return planBuilder.project(
-                Assignments.copyOf(ImmutableList.of(a, b).stream().filter(projectionFilter).collect(Collectors.toMap(v -> v, v -> planBuilder.variable(v.getName())))),
+                Assignments.identity(ImmutableList.of(a, b).stream().filter(projectionFilter).collect(toImmutableSet())),
                 planBuilder.aggregation(aggregationBuilder -> aggregationBuilder
                         .source(planBuilder.values(key))
                         .singleGroupingSet(key)

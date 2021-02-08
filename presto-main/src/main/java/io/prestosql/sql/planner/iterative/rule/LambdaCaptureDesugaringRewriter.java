@@ -16,8 +16,8 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.BindExpression;
 import io.prestosql.sql.tree.Expression;
@@ -35,14 +35,13 @@ import java.util.function.Function;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.sql.planner.ExpressionSymbolInliner.inlineSymbols;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static java.util.Objects.requireNonNull;
 
 public class LambdaCaptureDesugaringRewriter
 {
-    public static Expression rewrite(Expression expression, TypeProvider symbolTypes, PlanSymbolAllocator planSymbolAllocator)
+    public static Expression rewrite(Expression expression, TypeProvider symbolTypes, SymbolAllocator symbolAllocator)
     {
-        return ExpressionTreeRewriter.rewriteWith(new Visitor(symbolTypes, planSymbolAllocator), expression, new Context());
+        return ExpressionTreeRewriter.rewriteWith(new Visitor(symbolTypes, symbolAllocator), expression, new Context());
     }
 
     private LambdaCaptureDesugaringRewriter() {}
@@ -51,12 +50,12 @@ public class LambdaCaptureDesugaringRewriter
             extends ExpressionRewriter<Context>
     {
         private final TypeProvider symbolTypes;
-        private final PlanSymbolAllocator planSymbolAllocator;
+        private final SymbolAllocator symbolAllocator;
 
-        public Visitor(TypeProvider symbolTypes, PlanSymbolAllocator planSymbolAllocator)
+        public Visitor(TypeProvider symbolTypes, SymbolAllocator symbolAllocator)
         {
             this.symbolTypes = requireNonNull(symbolTypes, "symbolTypes is null");
-            this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
+            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
         }
 
         @Override
@@ -83,14 +82,14 @@ public class LambdaCaptureDesugaringRewriter
             ImmutableMap.Builder<Symbol, Symbol> captureSymbolToExtraSymbol = ImmutableMap.builder();
             ImmutableList.Builder<LambdaArgumentDeclaration> newLambdaArguments = ImmutableList.builder();
             for (Symbol captureSymbol : captureSymbols) {
-                Symbol extraSymbol = planSymbolAllocator.newSymbol(captureSymbol.getName(), symbolTypes.get(captureSymbol));
+                Symbol extraSymbol = symbolAllocator.newSymbol(captureSymbol.getName(), symbolTypes.get(captureSymbol));
                 captureSymbolToExtraSymbol.put(captureSymbol, extraSymbol);
                 newLambdaArguments.add(new LambdaArgumentDeclaration(new Identifier(extraSymbol.getName())));
             }
             newLambdaArguments.addAll(node.getArguments());
 
             ImmutableMap<Symbol, Symbol> symbolsMap = captureSymbolToExtraSymbol.build();
-            Function<Symbol, Expression> symbolMapping = symbol -> toSymbolReference(symbolsMap.getOrDefault(symbol, symbol));
+            Function<Symbol, Expression> symbolMapping = symbol -> symbolsMap.getOrDefault(symbol, symbol).toSymbolReference();
             Expression rewrittenExpression = new LambdaExpression(newLambdaArguments.build(), inlineSymbols(symbolMapping, rewrittenBody));
 
             if (captureSymbols.size() != 0) {

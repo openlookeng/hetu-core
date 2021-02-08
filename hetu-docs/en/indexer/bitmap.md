@@ -1,45 +1,19 @@
 
 # Bitmap Index
 
-Bitmap Index utilizes Bitmaps. The size of the index increases as the number
-of unique values in the column increases. For example, a column like gender
-will have a small size. Whereas a column like ID will have an extremely 
-large size (not recommended).
+## Use cases
 
-Note: Bitmap Index can additionally benefit when ORC predicate pushdown is enabled.
-This can be enabled by setting `hive.orc-predicate-pushdown-enabled=true`
-in `hive.properties` or setting the session using `set session hive.orc_predicate_pushdown_enabled=true;`. 
-Setting this to true will improve improve the performance of queries that utilize Bitmap Index.
-See [Properties](../admin/properties.md) for details.
+Bitmap Index is used for filtering data read from ORC files and is used only by the **worker** nodes
 
-## Filtering
+- If this index exists on a column which is part of a predicate in the query, the performance may be improved while reading the ORC files.
 
-1. Bitmap Index is used on workers for filtering rows when reading ORC files.
+For example, if an index exists on column `country` and the query is
 
-## Selecting column for Bitmap Index
-
-Bitmap Index works on columns that have a low cardinality (i.e. few unique values),
-such as a Gender column.
-
-## Supported operators
-
-    =       Equality
-
-## Supported column types
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
-
-## Examples
-
-Creating index:
-```sql
-create index idx using bitmap on hive.hindex.users (gender);
-create index idx using bitmap on hive.hindex.users (gender) where regionkey=1;
-create index idx using bitmap on hive.hindex.users (gender) where regionkey in (3, 1);
+``` sql
+select * from table where country="China"
 ```
 
-* assuming users table is partitioned on `regionkey`
+- This index works best if the column's values are not too distinct (e.g. country) and are distributed.
 
-Using index:
-```sql
-select name from hive.hindex.users where gender="female"
-```
+For example, assume that the table stores information about where users are from and the table data is in 10 files. There maybe be several users from a particular country, so each file will have some users from the country. If we create a bitmap index on the country column, we can perform filtering early on while reading the data files. i.e. the predicate is pushed down to the reading of the file. Without this index, all the data files will need to be read into memory as Pages and then the filtering would happen. With the index, we can ensure that the Pages already only contain the rows matching the predicate. This can help reduce the memory and CPU usage and can result in improved performance when many concurrent queries are running.
+

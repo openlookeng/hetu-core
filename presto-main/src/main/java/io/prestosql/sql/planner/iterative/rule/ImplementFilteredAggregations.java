@@ -17,15 +17,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.Map;
 import java.util.Optional;
@@ -33,9 +33,7 @@ import java.util.Optional;
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.ExpressionUtils.combineDisjunctsWithDefault;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 /**
@@ -98,10 +96,10 @@ public class ImplementFilteredAggregations
                 Symbol filter = aggregation.getFilter().get();
                 Symbol symbol = context.getSymbolAllocator().newSymbol(filter.getName(), BOOLEAN);
                 verify(!mask.isPresent(), "Expected aggregation without mask symbols, see Rule pattern");
-                newAssignments.put(symbol, castToRowExpression(toSymbolReference(filter)));
+                newAssignments.put(symbol, new SymbolReference(filter.getName()));
                 mask = Optional.of(symbol);
 
-                maskSymbols.add(toSymbolReference(symbol));
+                maskSymbols.add(symbol.toSymbolReference());
             }
             else {
                 aggregateWithoutFilterPresent = true;
@@ -122,7 +120,7 @@ public class ImplementFilteredAggregations
         }
 
         // identity projection for all existing inputs
-        newAssignments.putAll(AssignmentUtils.identityAsSymbolReferences(aggregationNode.getSource().getOutputSymbols()));
+        newAssignments.putIdentities(aggregationNode.getSource().getOutputSymbols());
 
         return Result.ofPlanNode(
                 new AggregationNode(
@@ -133,7 +131,7 @@ public class ImplementFilteredAggregations
                                         context.getIdAllocator().getNextId(),
                                         aggregationNode.getSource(),
                                         newAssignments.build()),
-                                castToRowExpression(predicate)),
+                                predicate),
                         aggregations.build(),
                         aggregationNode.getGroupingSets(),
                         ImmutableList.of(),

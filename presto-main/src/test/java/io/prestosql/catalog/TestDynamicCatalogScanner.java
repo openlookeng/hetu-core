@@ -25,6 +25,8 @@ import static org.testng.Assert.assertTrue;
 public class TestDynamicCatalogScanner
         extends TestDynamicCatalogRunner
 {
+    private final CatalogStoreUtil catalogStoreUtil = server.getInstance(Key.get(CatalogStoreUtil.class));
+
     public TestDynamicCatalogScanner()
             throws Exception
     {
@@ -36,10 +38,12 @@ public class TestDynamicCatalogScanner
     {
         String catalogName = "tpch101";
         assertTrue(executeAddCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
-        server.getInstance(Key.get(DynamicCatalogStore.class)).unloadCatalog(catalogName);
-        assertFalse(server.getCatalogManager().getCatalog(catalogName).isPresent());
-        server.getInstance(Key.get(DynamicCatalogScanner.class)).scan();
-        assertTrue(server.getCatalogManager().getCatalog(catalogName).isPresent());
+        try (CatalogStore localCatalogStore = catalogStoreUtil.getLocalCatalogStore()) {
+            server.getInstance(Key.get(DynamicCatalogStore.class)).unloadCatalog(localCatalogStore, catalogName);
+            assertFalse(server.getCatalogManager().getCatalog(catalogName).isPresent());
+            server.getInstance(Key.get(DynamicCatalogScanner.class)).scan();
+            assertTrue(server.getCatalogManager().getCatalog(catalogName).isPresent());
+        }
     }
 
     @Test
@@ -60,6 +64,9 @@ public class TestDynamicCatalogScanner
     {
         String catalogName = "tpch103";
         assertTrue(executeAddCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
-        server.getInstance(Key.get(DynamicCatalogStore.class)).loadCatalog(catalogName);
+        try (CatalogStore localCatalogStore = catalogStoreUtil.getLocalCatalogStore();
+                CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
+            server.getInstance(Key.get(DynamicCatalogStore.class)).loadCatalog(localCatalogStore, shareCatalogStore, catalogName);
+        }
     }
 }

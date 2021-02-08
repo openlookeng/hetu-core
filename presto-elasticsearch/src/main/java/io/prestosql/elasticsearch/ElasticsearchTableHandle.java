@@ -15,55 +15,50 @@ package io.prestosql.elasticsearch;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Joiner;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.Objects;
-import java.util.Optional;
 
+import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
 public final class ElasticsearchTableHandle
         implements ConnectorTableHandle
 {
-    private final String schema;
-    private final String index;
+    private final SchemaTableName schemaTableName;
     private final TupleDomain<ColumnHandle> constraint;
-    private final Optional<String> query;
 
-    public ElasticsearchTableHandle(String schema, String index, Optional<String> query)
+    public ElasticsearchTableHandle(String schemaName, String tableName)
     {
-        this.schema = requireNonNull(schema, "schema is null");
-        this.index = requireNonNull(index, "index is null");
-        this.query = requireNonNull(query, "query is null");
-
-        constraint = TupleDomain.all();
+        this(schemaName, tableName, TupleDomain.all());
     }
 
     @JsonCreator
     public ElasticsearchTableHandle(
-            @JsonProperty("schema") String schema,
-            @JsonProperty("index") String index,
-            @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
-            @JsonProperty("query") Optional<String> query)
+            @JsonProperty("schemaName") String schemaName,
+            @JsonProperty("tableName") String tableName,
+            @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint)
     {
-        this.schema = requireNonNull(schema, "schema is null");
-        this.index = requireNonNull(index, "index is null");
+        requireNonNull(schemaName, "schemaName is null");
+        requireNonNull(tableName, "tableName is null");
+        this.schemaTableName = new SchemaTableName(schemaName.toLowerCase(ENGLISH), tableName.toLowerCase(ENGLISH));
         this.constraint = requireNonNull(constraint, "constraint is null");
-        this.query = requireNonNull(query, "query is null");
     }
 
     @JsonProperty
-    public String getSchema()
+    public String getSchemaName()
     {
-        return schema;
+        return schemaTableName.getSchemaName();
     }
 
     @JsonProperty
-    public String getIndex()
+    public String getTableName()
     {
-        return index;
+        return schemaTableName.getTableName();
     }
 
     @JsonProperty
@@ -72,31 +67,35 @@ public final class ElasticsearchTableHandle
         return constraint;
     }
 
-    @JsonProperty
-    public Optional<String> getQuery()
+    public SchemaTableName getSchemaTableName()
     {
-        return query;
-    }
-
-    @Override
-    public boolean equals(Object o)
-    {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ElasticsearchTableHandle that = (ElasticsearchTableHandle) o;
-        return schema.equals(that.schema) &&
-                index.equals(that.index) &&
-                constraint.equals(that.constraint) &&
-                query.equals(that.query);
+        return schemaTableName;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(schema, index, constraint, query);
+        return Objects.hash(getSchemaName(), getTableName());
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if ((obj == null) || (getClass() != obj.getClass())) {
+            return false;
+        }
+
+        ElasticsearchTableHandle other = (ElasticsearchTableHandle) obj;
+        return Objects.equals(this.getSchemaName(), other.getSchemaName()) &&
+                Objects.equals(this.getTableName(), other.getTableName());
+    }
+
+    @Override
+    public String toString()
+    {
+        return Joiner.on(":").join(getSchemaName(), getTableName());
     }
 }

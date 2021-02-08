@@ -3,44 +3,33 @@
 
 本节介绍openLooKeng的动态目录特性。通常openLooKeng管理员通过将目录概要文件（例如`hive.properties`）放置在连接节点目录（`etc/catalog`）下来将数据源添加到引擎。每当需要添加、更新或删除目录时，都需要重启所有协调节点和工作节点。
 
-为了动态修改目录，openLooKeng引入了动态目录的特性。开启此特性需要：
-
-* 首先，在`etc/config.properties`中配置：
+为了动态修改目录，openLooKeng引入了动态目录的特性。开启此特性需要在`etc/config.properties`中配置：
 
     catalog.dynamic-enabled=true
 
-* 其次，在`hdfs-config-default.properties`中配置用于存储动态目录信息的文件系统。你可以通过`etc/node.properties`中的`catalog.share.filesystem.profile`属性修改这个文件名，默认为`hdfs-config-default`，你可以查看[文件系统文档](../develop/filesystem.md )以获取更多信息。
+然后在`hdfs-config-catalog.properties`和`local-config-catalog.properties`中配置用于存储动态目录信息的文件系统。查看[文件系统文档](../develop/filesystem.md )以获取更多信息。
 
-  在`etc/filesystem/`目录下添加`hdfs-config-default.properties`文件， 如果这个目录不存在，请创建。
-
-  ```
-  fs.client.type=hdfs
-  hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
-  hdfs.authentication.type=NONE
-  fs.hdfs.impl.disable.cache=true
-  ```
-
-  如果HDFS开启Kerberos认证，那么
-
-  ```
-  fs.client.type=hdfs
-  hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
-  hdfs.authentication.type=KERBEROS
-  hdfs.krb5.conf.path=/opt/openlookeng/config/krb5.conf
-  hdfs.krb5.keytab.path=/opt/openlookeng/config/user.keytab
-  hdfs.krb5.principal=openlookeng@HADOOP.COM # replace openlookeng@HADOOP.COM to your principal 
-  fs.hdfs.impl.disable.cache=true
-  ```
-
-* 最后，在`etc/node.properties`配置用户文件系统中的存储动态目录信息的路径
-
-  ```
-  catalog.config-dir=/opt/openlookeng/catalog
-  catalog.share.config-dir=/opt/openkeng/catalog/share
-  ```
-
-  
-
+* 在`etc/filesystem/`目录下添加`hdfs-config-catalog.properties`文件， 如果这个目录不存在，请创建。
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=NONE
+fs.hdfs.impl.disable.cache=true
+```
+如果HDFS开启Kerberos认证，那么
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=KERBEROS
+hdfs.krb5.conf.path=/opt/openlookeng/config/krb5.conf
+hdfs.krb5.keytab.path=/opt/openlookeng/config/user.keytab
+hdfs.krb5.principal=openlookeng@HADOOP.COM # replace openlookeng@HADOOP.COM to your principal 
+fs.hdfs.impl.disable.cache=true
+```
+* 在`etc/filesystem/`目录下添加`local-config-catalog.properties`文件。
+```
+fs.client.type=local
+```
 ## 使用
 
 目录操作是通过openLooKeng协调节点上的RESTful API来完成的。HTTP请求具有如下形态（以hive连接节点为例），POST/PUT请求体形式为`multipart/form-data`：
@@ -137,9 +126,8 @@ UPDATE操作是DELETE和ADD操作的组合。首先管理员向协调节点发�
 
 | 属性名称| 是否必选| 描述| 默认值|
 |----------|----------|----------|----------|
-| `catalog.config-dir`| 是| 本地磁盘存放配置文件的根目录。||
-| `catalog.share.config-dir`| 否 | 共享文件系统中存放配置文件的根目录。||
-| `catalog.share.filesystem.profile` | 否 | 共享文件系统的配置文件名 |hdfs-config-default|
+| `catalog.config-dir`| 是| 本地磁盘存放配置文件的根目录。| 
+| `catalog.share.config-dir`| 是| 共享文件系统中存放配置文件的根目录。| 
 
 ## 对查询的影响
 

@@ -13,9 +13,8 @@
  */
 package io.prestosql.sql.planner.iterative;
 
-import io.prestosql.spi.plan.GroupReference;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,7 +30,7 @@ public class Plans
     }
 
     private static class ResolvingVisitor
-            extends InternalPlanVisitor<PlanNode, Void>
+            extends PlanVisitor<PlanNode, Void>
     {
         private final Lookup lookup;
 
@@ -41,7 +40,7 @@ public class Plans
         }
 
         @Override
-        public PlanNode visitPlan(PlanNode node, Void context)
+        protected PlanNode visitPlan(PlanNode node, Void context)
         {
             List<PlanNode> children = node.getSources().stream()
                     .map(child -> child.accept(this, context))

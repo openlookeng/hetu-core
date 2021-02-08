@@ -18,12 +18,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.HashSet;
@@ -35,9 +33,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
-import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static java.util.Collections.emptyList;
 
@@ -105,7 +102,6 @@ public class SingleDistinctAggregationToGroupBy
                 .values().stream()
                 .filter(Aggregation::isDistinct)
                 .map(Aggregation::getArguments)
-                .map(rowExpressions -> rowExpressions.stream().map(OriginalExpressionUtils::castToExpression).collect(toImmutableList()))
                 .<Set<Expression>>map(HashSet::new)
                 .distinct();
     }
@@ -123,7 +119,7 @@ public class SingleDistinctAggregationToGroupBy
                 .collect(Collectors.toList());
 
         Set<Symbol> symbols = Iterables.getOnlyElement(argumentSets).stream()
-                .map(SymbolUtils::from)
+                .map(Symbol::from)
                 .collect(Collectors.toSet());
 
         return Result.ofPlanNode(

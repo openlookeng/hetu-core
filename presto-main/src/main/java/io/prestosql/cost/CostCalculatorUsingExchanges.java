@@ -16,31 +16,26 @@ package io.prestosql.cost;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.GroupIdNode;
-import io.prestosql.spi.plan.GroupReference;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.iterative.GroupReference;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.LimitNode;
 import io.prestosql.sql.planner.plan.OutputNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.UnionNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
@@ -58,9 +53,8 @@ import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.calculateRe
 import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.calculateRemoteRepartitionCost;
 import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.calculateRemoteReplicateCost;
 import static io.prestosql.cost.LocalCostEstimate.addPartialComponents;
-import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.spi.plan.AggregationNode.Step.PARTIAL;
-import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
+import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
 import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
 
@@ -87,7 +81,7 @@ public class CostCalculatorUsingExchanges
     }
 
     private static class CostEstimator
-            extends InternalPlanVisitor<PlanCostEstimate, Void>
+            extends PlanVisitor<PlanCostEstimate, Void>
     {
         private final StatsProvider stats;
         private final CostProvider sourcesCosts;
@@ -103,7 +97,7 @@ public class CostCalculatorUsingExchanges
         }
 
         @Override
-        public PlanCostEstimate visitPlan(PlanNode node, Void context)
+        protected PlanCostEstimate visitPlan(PlanNode node, Void context)
         {
             // TODO implement cost estimates for all plan nodes
             return PlanCostEstimate.unknown();
@@ -142,41 +136,6 @@ public class CostCalculatorUsingExchanges
         }
 
         @Override
-        public PlanCostEstimate visitGroupId(GroupIdNode node, Void context)
-        {
-            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node.getSource()).getOutputSizeInBytes(node.getOutputSymbols(), types));
-            return costForStreaming(node, localCost);
-        }
-
-        @Override
-        public PlanCostEstimate visitTopN(TopNNode node, Void context)
-        {
-            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node.getSource()).getOutputSizeInBytes(node.getOutputSymbols(), types));
-            return costForStreaming(node, localCost);
-        }
-
-        @Override
-        public PlanCostEstimate visitMarkDistinct(MarkDistinctNode node, Void context)
-        {
-            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node.getSource()).getOutputSizeInBytes(node.getOutputSymbols(), types));
-            return costForStreaming(node, localCost);
-        }
-
-        @Override
-        public PlanCostEstimate visitSort(SortNode node, Void context)
-        {
-            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node.getSource()).getOutputSizeInBytes(node.getOutputSymbols(), types));
-            return costForStreaming(node, localCost);
-        }
-
-        @Override
-        public PlanCostEstimate visitWindow(WindowNode node, Void context)
-        {
-            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node.getSource()).getOutputSizeInBytes(node.getOutputSymbols(), types));
-            return costForStreaming(node, localCost);
-        }
-
-        @Override
         public PlanCostEstimate visitOutput(OutputNode node, Void context)
         {
             return costForStreaming(node, LocalCostEstimate.zero());
@@ -207,7 +166,7 @@ public class CostCalculatorUsingExchanges
         @Override
         public PlanCostEstimate visitAggregation(AggregationNode node, Void context)
         {
-            if (node.getStep() != FINAL && node.getStep() != PARTIAL && node.getStep() != SINGLE) {
+            if (node.getStep() != FINAL && node.getStep() != SINGLE) {
                 return PlanCostEstimate.unknown();
             }
             PlanNodeStatsEstimate aggregationStats = getStats(node);

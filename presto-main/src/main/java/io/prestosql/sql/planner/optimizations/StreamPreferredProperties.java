@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import io.prestosql.Session;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties;
 import io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties.StreamDistribution;
 

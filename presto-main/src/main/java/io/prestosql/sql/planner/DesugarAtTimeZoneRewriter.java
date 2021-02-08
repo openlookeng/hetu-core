@@ -43,7 +43,7 @@ public class DesugarAtTimeZoneRewriter
 
     private DesugarAtTimeZoneRewriter() {}
 
-    public static Expression rewrite(Expression expression, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, PlanSymbolAllocator planSymbolAllocator)
+    public static Expression rewrite(Expression expression, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, SymbolAllocator symbolAllocator)
     {
         requireNonNull(metadata, "metadata is null");
         requireNonNull(typeAnalyzer, "typeAnalyzer is null");
@@ -51,7 +51,7 @@ public class DesugarAtTimeZoneRewriter
         if (expression instanceof SymbolReference) {
             return expression;
         }
-        Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, planSymbolAllocator.getTypes(), expression);
+        Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, symbolAllocator.getTypes(), expression);
 
         return rewrite(expression, expressionTypes, metadata);
     }

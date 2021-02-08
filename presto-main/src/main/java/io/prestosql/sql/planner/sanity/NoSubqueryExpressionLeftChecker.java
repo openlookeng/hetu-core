@@ -16,18 +16,13 @@ package io.prestosql.sql.planner.sanity;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.ExpressionExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.DefaultTraversalVisitor;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SubqueryExpression;
-
-import java.util.List;
-
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 public final class NoSubqueryExpressionLeftChecker
         implements PlanSanityChecker.Checker
@@ -35,12 +30,7 @@ public final class NoSubqueryExpressionLeftChecker
     @Override
     public void validate(PlanNode plan, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
-        List<Expression> expressions = ExpressionExtractor.extractExpressions(plan)
-                .stream()
-                .filter(OriginalExpressionUtils::isExpression)
-                .map(OriginalExpressionUtils::castToExpression)
-                .collect(toImmutableList());
-        for (Expression expression : expressions) {
+        for (Expression expression : ExpressionExtractor.extractExpressions(plan)) {
             new DefaultTraversalVisitor<Void, Void>()
             {
                 @Override

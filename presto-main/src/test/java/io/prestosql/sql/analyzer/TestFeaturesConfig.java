@@ -32,11 +32,10 @@ import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.BLOOM_FILTER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType.HASHSET;
-import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
-import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.NONE;
-import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_PATH;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILL_ENABLED;
@@ -56,15 +55,15 @@ public class TestFeaturesConfig
                 .setMemoryCostWeight(10)
                 .setNetworkCostWeight(15)
                 .setDistributedIndexJoinsEnabled(false)
-                .setJoinDistributionType(JoinDistributionType.AUTOMATIC)
-                .setJoinMaxBroadcastTableSize(new DataSize(100, MEGABYTE))
+                .setJoinDistributionType(PARTITIONED)
+                .setJoinMaxBroadcastTableSize(null)
                 .setGroupedExecutionEnabled(false)
                 .setDynamicScheduleForGroupedExecutionEnabled(false)
                 .setConcurrentLifespansPerTask(0)
                 .setFastInequalityJoins(true)
                 .setColocatedJoinsEnabled(false)
                 .setSpatialJoinsEnabled(true)
-                .setJoinReorderingStrategy(JoinReorderingStrategy.AUTOMATIC)
+                .setJoinReorderingStrategy(ELIMINATE_CROSS_JOINS)
                 .setMaxReorderedJoins(9)
                 .setRedistributeWrites(true)
                 // redistribute writes type config
@@ -106,7 +105,7 @@ public class TestFeaturesConfig
                 .setFilterAndProjectMinOutputPageRowCount(256)
                 .setUseMarkDistinct(true)
                 .setPreferPartialAggregation(true)
-                .setOptimizeTopNRankingNumber(true)
+                .setOptimizeTopNRowNumber(true)
                 .setHistogramGroupImplementation(HistogramGroupImplementation.NEW)
                 .setArrayAggGroupImplementation(ArrayAggGroupImplementation.NEW)
                 .setMultimapAggGroupImplementation(MultimapAggGroupImplementation.NEW)
@@ -115,10 +114,10 @@ public class TestFeaturesConfig
                 .setWorkProcessorPipelines(false)
                 .setSkipRedundantSort(true)
                 .setPredicatePushdownUseTableProperties(true)
-                .setEnableDynamicFiltering(true)
+                .setEnableDynamicFiltering(false)
                 .setDynamicFilteringMaxPerDriverRowCount(10000)
                 .setDynamicFilteringDataType(BLOOM_FILTER)
-                .setDynamicFilteringWaitTime(new Duration(1000, MILLISECONDS))
+                .setDynamicFilteringWaitTime(new Duration(0, MILLISECONDS))
                 .setDynamicFilteringMaxSize(1000000)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(1, MEGABYTE))
                 .setDynamicFilteringBloomFilterFpp(0.1)
@@ -129,13 +128,7 @@ public class TestFeaturesConfig
                 .setPushLimitThroughUnion(true)
                 .setEnableExecutionPlanCache(true)
                 .setImplicitConversionEnabled(false)
-                .setPushTableThroughSubquery(false)
-                .setRewriteFilteringSemiJoinToInnerJoin(false)
-                .setTransformSelfJoinToGroupby(true)
-                .setRewriteFilteringSemiJoinToInnerJoin(false)
-                .setSpillReuseExchange(false)
-                .setSpillOperatorThresholdReuseExchange(10)
-                .setReuseTableScanEnabled(false));
+                .setPushTableThroughSubquery(false));
     }
 
     @Test
@@ -199,13 +192,13 @@ public class TestFeaturesConfig
                 .put("multimapagg.implementation", "LEGACY")
                 .put("optimizer.use-mark-distinct", "false")
                 .put("optimizer.prefer-partial-aggregation", "false")
-                .put("optimizer.optimize-top-n-ranking-number", "false")
+                .put("optimizer.optimize-top-n-row-number", "false")
                 .put("distributed-sort", "false")
                 .put("analyzer.max-grouping-sets", "2047")
                 .put("experimental.work-processor-pipelines", "true")
                 .put("optimizer.skip-redundant-sort", "false")
                 .put("optimizer.predicate-pushdown-use-table-properties", "false")
-                .put("enable-dynamic-filtering", "false")
+                .put("enable-dynamic-filtering", "true")
                 .put("experimental.enable-execution-plan-cache", "false")
                 .put("hetu.query-pushdown", "false")
                 .put("optimizer.push-limit-down", "false")
@@ -220,11 +213,6 @@ public class TestFeaturesConfig
                 .put("dynamic-filtering-bloom-filter-fpp", "0.001")
                 .put("implicit-conversion", "true")
                 .put("optimizer.push-table-through-subquery", "true")
-                .put("optimizer.rewrite-filtering-semi-join-to-inner-join", "true")
-                .put("optimizer.transform-self-join-to-groupby", "false")
-                .put("optimizer.reuse-table-scan", "true")
-                .put("experimental.spill-reuse-tablescan", "true")
-                .put("experimental.spill-threshold-reuse-tablescan", "100")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -249,7 +237,7 @@ public class TestFeaturesConfig
                 .setMaxReorderedJoins(5)
                 .setRedistributeWrites(false)
                 // redistribute writes type config
-                .setRedistributeWritesType(RedistributeWritesType.PARTITIONED)
+                .setRedistributeWritesType(FeaturesConfig.RedistributeWritesType.PARTITIONED)
                 .setScaleWriters(true)
                 .setWriterMinSize(new DataSize(42, GIGABYTE))
                 .setOptimizeMetadataQueries(true)
@@ -282,7 +270,7 @@ public class TestFeaturesConfig
                 .setFilterAndProjectMinOutputPageRowCount(2048)
                 .setUseMarkDistinct(false)
                 .setPreferPartialAggregation(false)
-                .setOptimizeTopNRankingNumber(false)
+                .setOptimizeTopNRowNumber(false)
                 .setHistogramGroupImplementation(HistogramGroupImplementation.LEGACY)
                 .setArrayAggGroupImplementation(ArrayAggGroupImplementation.LEGACY)
                 .setMultimapAggGroupImplementation(MultimapAggGroupImplementation.LEGACY)
@@ -292,25 +280,20 @@ public class TestFeaturesConfig
                 .setWorkProcessorPipelines(true)
                 .setSkipRedundantSort(false)
                 .setPredicatePushdownUseTableProperties(false)
-                .setEnableDynamicFiltering(false)
+                .setEnableDynamicFiltering(true)
                 .setQueryPushDown(false)
                 .setImplicitConversionEnabled(true)
                 .setPushLimitDown(false)
                 .setPushLimitThroughUnion(false)
                 .setPushLimitThroughSemiJoin(false)
                 .setPushLimitThroughOuterJoin(false)
-                .setRewriteFilteringSemiJoinToInnerJoin(true)
                 .setEnableExecutionPlanCache(false)
                 .setDynamicFilteringMaxPerDriverRowCount(256)
                 .setDynamicFilteringDataType(HASHSET)
                 .setDynamicFilteringWaitTime(new Duration(200, MILLISECONDS))
                 .setDynamicFilteringMaxSize(10000)
                 .setDynamicFilteringMaxPerDriverSize(new DataSize(64, KILOBYTE))
-                .setDynamicFilteringBloomFilterFpp(0.001)
-                .setTransformSelfJoinToGroupby(false)
-                .setReuseTableScanEnabled(true)
-                .setSpillReuseExchange(true)
-                .setSpillOperatorThresholdReuseExchange(100);
+                .setDynamicFilteringBloomFilterFpp(0.001);
         assertFullMapping(properties, expected);
     }
 

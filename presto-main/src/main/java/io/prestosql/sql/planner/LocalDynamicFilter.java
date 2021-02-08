@@ -13,8 +13,6 @@
  */
 package io.prestosql.sql.planner;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -26,19 +24,17 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.operator.DynamicFilterSourceOperator;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.analyzer.FeaturesConfig;
-import io.prestosql.sql.planner.plan.SemiJoinNode;
+import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
@@ -56,7 +52,6 @@ import static io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter.convertBlo
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.DataType.BLOOM_FILTER;
 import static io.prestosql.spi.statestore.StateCollection.Type.SET;
 import static io.prestosql.sql.DynamicFilters.Descriptor;
-import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.utils.DynamicFilterUtils.PARTIALPREFIX;
 import static io.prestosql.utils.DynamicFilterUtils.TASKSPREFIX;
 import static io.prestosql.utils.DynamicFilterUtils.createKey;
@@ -83,7 +78,7 @@ public class LocalDynamicFilter
     // The resulting predicate for local dynamic filtering.
     private Map<String, Set> result = new HashMap<>();
 
-    private FeaturesConfig.DynamicFilterDataType dynamicFilterDataType;
+    private DynamicFilterDataType dynamicFilterDataType;
     private final double bloomFilterFpp;
     private final StateStoreProvider stateStoreProvider;
     private final TaskId taskId;
@@ -97,7 +92,7 @@ public class LocalDynamicFilter
     }
 
     public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount,
-                              DynamicFilter.Type filterType, FeaturesConfig.DynamicFilterDataType dataType,
+                              DynamicFilter.Type filterType, DynamicFilterDataType dataType,
                               double bloomFilterFpp, TaskId taskId, StateStoreProvider stateStoreProvider)
     {
         this.probeSymbols = requireNonNull(probeSymbols, "probeSymbols is null");
@@ -162,33 +157,14 @@ public class LocalDynamicFilter
         return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, partitionCount, type, session, taskId, stateStoreProvider));
     }
 
-    public static Optional<LocalDynamicFilter> create(SemiJoinNode semiJoinNode, Session session, TaskId taskId, StateStoreProvider stateStoreProvider)
+    private static void mapProbeSymbols(Expression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
     {
-        if (!semiJoinNode.getDynamicFilterId().isPresent()) {
-            return Optional.empty();
-        }
-        String dynamicFilterId = semiJoinNode.getDynamicFilterId().get();
-        DynamicFilter.Type type;
-        List<FilterNode> localFilterNodeWithThisDynamicFiltering = findFilterNodeInStage(semiJoinNode);
-        if (localFilterNodeWithThisDynamicFiltering.isEmpty()) {
-            type = DynamicFilter.Type.GLOBAL;
-        }
-        else {
-            type = DynamicFilter.Type.LOCAL;
-        }
-        Multimap<String, Symbol> probeSymbols = ImmutableMultimap.of(dynamicFilterId, semiJoinNode.getSourceJoinSymbol());
-        Map<String, Integer> buildChannels = ImmutableMap.of(dynamicFilterId, semiJoinNode.getFilteringSource().getOutputSymbols().indexOf(semiJoinNode.getFilteringSourceJoinSymbol()));
-        return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, 1, type, session, taskId, stateStoreProvider));
-    }
-
-    private static void mapProbeSymbols(RowExpression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
-    {
-        DynamicFilters.ExtractResult extractResult = extractDynamicFilters(predicate);
+        DynamicFilters.ExtractResult extractResult = DynamicFilters.extractDynamicFilters(predicate);
         for (Descriptor descriptor : extractResult.getDynamicConjuncts()) {
-            if (descriptor.getInput() instanceof VariableReferenceExpression) {
+            if (descriptor.getInput() instanceof SymbolReference) {
                 // Add descriptors that match the local dynamic filter (from the current join node).
                 if (joinDynamicFilters.contains(descriptor.getId())) {
-                    Symbol probeSymbol = new Symbol(((VariableReferenceExpression) descriptor.getInput()).getName());
+                    Symbol probeSymbol = Symbol.from(descriptor.getInput());
                     log.debug("Adding dynamic filter %s: %s", descriptor, probeSymbol);
                     probeSymbols.put(descriptor.getId(), probeSymbol);
                 }

@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.util.Objects.requireNonNull;
 
 public class EventListenerManager
@@ -58,7 +58,7 @@ public class EventListenerManager
             throws Exception
     {
         if (EVENT_LISTENER_CONFIGURATION.exists()) {
-            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(EVENT_LISTENER_CONFIGURATION.getPath()));
+            Map<String, String> properties = new HashMap<>(loadProperties(EVENT_LISTENER_CONFIGURATION));
 
             String eventListenerName = properties.remove(EVENT_LISTENER_PROPERTY_NAME);
             checkArgument(!isNullOrEmpty(eventListenerName),

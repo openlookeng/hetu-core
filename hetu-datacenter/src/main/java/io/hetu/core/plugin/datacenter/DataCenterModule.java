@@ -18,8 +18,6 @@ package io.hetu.core.plugin.datacenter;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
-import io.hetu.core.plugin.datacenter.optimization.DataCenterPlanOptimizer;
-import io.hetu.core.plugin.datacenter.optimization.DataCenterQueryGenerator;
 import io.prestosql.spi.type.TypeManager;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
@@ -50,8 +48,6 @@ public class DataCenterModule
     {
         binder.bind(TypeManager.class).toInstance(typeManager);
         binder.bind(DataCenterConnector.class).in(Scopes.SINGLETON);
-        binder.bind(DataCenterPlanOptimizer.class).in(Scopes.SINGLETON);
-        binder.bind(DataCenterQueryGenerator.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(DataCenterConfig.class);
     }
 }

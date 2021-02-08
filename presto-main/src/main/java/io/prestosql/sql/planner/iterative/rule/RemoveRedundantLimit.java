@@ -16,9 +16,9 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
 
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMost;
 import static io.prestosql.sql.planner.plan.Patterns.limit;

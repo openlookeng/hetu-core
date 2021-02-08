@@ -18,19 +18,19 @@ import com.google.common.collect.Range;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.sql.planner.FunctionCallBuilder;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
+import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.QualifiedName;
@@ -45,14 +45,12 @@ import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.extractCardinality;
 import static io.prestosql.sql.planner.plan.LateralJoinNode.Type.LEFT;
 import static io.prestosql.sql.planner.plan.Patterns.LateralJoin.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.LateralJoin.filter;
 import static io.prestosql.sql.planner.plan.Patterns.lateralJoin;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 
@@ -160,22 +158,21 @@ public class TransformCorrelatedScalarSubquery
         FilterNode filterNode = new FilterNode(
                 context.getIdAllocator().getNextId(),
                 markDistinctNode,
-                castToRowExpression(
-                    new SimpleCaseExpression(
-                            toSymbolReference(isDistinct),
-                            ImmutableList.of(
-                                    new WhenClause(TRUE_LITERAL, TRUE_LITERAL)),
-                            Optional.of(new Cast(
-                                    new FunctionCallBuilder(metadata)
-                                            .setName(QualifiedName.of("fail"))
-                                            .addArgument(INTEGER, new LongLiteral(Integer.toString(SUBQUERY_MULTIPLE_ROWS.toErrorCode().getCode())))
-                                            .addArgument(VARCHAR, new StringLiteral("Scalar sub-query has returned multiple rows"))
-                                            .build(),
-                                    BOOLEAN)))));
+                new SimpleCaseExpression(
+                        isDistinct.toSymbolReference(),
+                        ImmutableList.of(
+                                new WhenClause(TRUE_LITERAL, TRUE_LITERAL)),
+                        Optional.of(new Cast(
+                                new FunctionCallBuilder(metadata)
+                                        .setName(QualifiedName.of("fail"))
+                                        .addArgument(INTEGER, new LongLiteral(Integer.toString(SUBQUERY_MULTIPLE_ROWS.toErrorCode().getCode())))
+                                        .addArgument(VARCHAR, new StringLiteral("Scalar sub-query has returned multiple rows"))
+                                        .build(),
+                                BOOLEAN))));
 
         return Result.ofPlanNode(new ProjectNode(
                 context.getIdAllocator().getNextId(),
                 filterNode,
-                AssignmentUtils.identityAsSymbolReferences((lateralJoinNode.getOutputSymbols()))));
+                Assignments.identity(lateralJoinNode.getOutputSymbols())));
     }
 }

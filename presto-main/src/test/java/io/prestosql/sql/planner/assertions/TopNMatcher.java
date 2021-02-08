@@ -17,10 +17,10 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.TopNNode.Step;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern.Ordering;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.TopNNode.Step;
 
 import java.util.List;
 

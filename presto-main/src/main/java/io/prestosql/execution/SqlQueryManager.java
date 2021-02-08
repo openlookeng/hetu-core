@@ -251,8 +251,17 @@ public class SqlQueryManager
                 queryMonitor.queryCompletedEvent(finalQueryInfo);
             }
             finally {
-                // execution MUST be added to the expiration queue or there will be a leak
-                queryTracker.expireQuery(queryExecution.getQueryId());
+                boolean isUiQuery = finalQueryInfo.getSession().getSource()
+                        .map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source))
+                        .orElse(false);
+                if (isUiQuery && finalQueryInfo.getState() == QueryState.FINISHED) {
+                    // UI related queries need not take up the history space.
+                    queryTracker.removeQuery(queryExecution.getQueryId());
+                }
+                else {
+                    // execution MUST be added to the expiration queue or there will be a leak
+                    queryTracker.expireQuery(queryExecution.getQueryId());
+                }
             }
         });
 
@@ -407,18 +416,6 @@ public class SqlQueryManager
                     }
                 }
             }
-        }
-    }
-
-    @Override
-    public void checkForQueryPruning(QueryId queryId, QueryInfo queryInfo)
-    {
-        boolean isUiQuery = queryInfo.getSession().getSource()
-                .map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source))
-                .orElse(false);
-        if (isUiQuery && queryInfo.getState() == QueryState.FINISHED) {
-            // UI related queries need not take up the history space.
-            queryTracker.removeQuery(queryId);
         }
     }
 }

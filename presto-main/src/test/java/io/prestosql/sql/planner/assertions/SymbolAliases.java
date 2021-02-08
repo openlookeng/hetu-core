@@ -14,10 +14,9 @@
 package io.prestosql.sql.planner.assertions;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashMap;
@@ -27,9 +26,6 @@ import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -101,21 +97,13 @@ public final class SymbolAliases
     private Map<String, SymbolReference> getUpdatedAssignments(Assignments assignments)
     {
         ImmutableMap.Builder<String, SymbolReference> mapUpdate = ImmutableMap.builder();
-        for (Map.Entry<Symbol, RowExpression> assignment : assignments.getMap().entrySet()) {
+        for (Map.Entry<Symbol, Expression> assignment : assignments.getMap().entrySet()) {
             for (Map.Entry<String, SymbolReference> existingAlias : map.entrySet()) {
-                RowExpression expression = assignment.getValue();
-                if (isExpression(expression) && castToExpression(assignment.getValue()).equals(existingAlias.getValue())) {
+                if (assignment.getValue().equals(existingAlias.getValue())) {
                     // Simple symbol rename
-                    mapUpdate.put(existingAlias.getKey(), toSymbolReference(assignment.getKey()));
+                    mapUpdate.put(existingAlias.getKey(), assignment.getKey().toSymbolReference());
                 }
-
-                else if (!isExpression(expression) &&
-                        (expression instanceof VariableReferenceExpression) &&
-                        ((VariableReferenceExpression) expression).getName().equals(existingAlias.getValue().getName())) {
-                    // Simple symbol rename
-                    mapUpdate.put(existingAlias.getKey(), new SymbolReference(assignment.getKey().getName()));
-                }
-                else if (toSymbolReference(assignment.getKey()).equals(existingAlias.getValue())) {
+                else if (assignment.getKey().toSymbolReference().equals(existingAlias.getValue())) {
                     /*
                      * Special case for nodes that can alias symbols in the node's assignment map.
                      * In this case, we've already added the alias in the map, but we won't include it

@@ -19,17 +19,17 @@ import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Constraint;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.ColumnStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.FixedWidthType;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.ExpressionDomainTranslator;
+import io.prestosql.sql.planner.DomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.HashMap;
@@ -50,14 +50,14 @@ public class TableScanStatsRule
 
     private final Metadata metadata;
     private final FilterStatsCalculator filterStatsCalculator;
-    private final ExpressionDomainTranslator domainTranslator;
+    private final DomainTranslator domainTranslator;
 
     public TableScanStatsRule(Metadata metadata, StatsNormalizer normalizer, FilterStatsCalculator filterStatsCalculator)
     {
         super(normalizer); // Use stats normalization since connector can return inconsistent stats values
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.filterStatsCalculator = requireNonNull(filterStatsCalculator, "filterStatsCalculator is null");
-        this.domainTranslator = new ExpressionDomainTranslator(new LiteralEncoder(metadata));
+        this.domainTranslator = new DomainTranslator(new LiteralEncoder(metadata));
     }
 
     @Override

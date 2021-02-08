@@ -15,9 +15,9 @@ package io.prestosql.sql.planner.planprinter;
 
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.PlanNodeStatsEstimate;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Optional;

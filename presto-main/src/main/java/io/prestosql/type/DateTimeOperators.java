@@ -28,8 +28,8 @@ import static io.prestosql.spi.function.OperatorType.ADD;
 import static io.prestosql.spi.function.OperatorType.SUBTRACT;
 import static io.prestosql.spi.type.DateTimeEncoding.unpackMillisUtc;
 import static io.prestosql.spi.type.DateTimeEncoding.updateMillisUtc;
-import static io.prestosql.spi.util.DateTimeZoneIndex.getChronology;
-import static io.prestosql.spi.util.DateTimeZoneIndex.unpackChronology;
+import static io.prestosql.util.DateTimeZoneIndex.getChronology;
+import static io.prestosql.util.DateTimeZoneIndex.unpackChronology;
 
 public final class DateTimeOperators
 {

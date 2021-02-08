@@ -20,8 +20,6 @@ import org.testng.annotations.Test;
 
 import java.util.Map;
 
-import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.BASE_PUSHDOWN;
-import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.DEFAULT;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -55,9 +53,7 @@ public class TestBaseJdbcConfig
                 .setNumTestsPerEvictionRun(3)
                 .setTimeBetweenEvictionRunsMillis(-1L)
                 .setMaxWaitMillis(-1L)
-                .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, MINUTES))
-                .setPushDownEnable(true)
-                .setPushDownModule(DEFAULT));
+                .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, MINUTES)));
     }
 
     @Test
@@ -87,9 +83,7 @@ public class TestBaseJdbcConfig
                 .put("jdbc.connection.pool.maxTotal", "200")
                 .put("jdbc.connection.pool.maxIdle", "20")
                 .put("jdbc.connection.pool.minIdle", "12")
-                .put("jdbc.pushdown-enabled", "false")
                 .put("use-connection-pool", "true")
-                .put("jdbc.pushdown-module", "BASE_PUSHDOWN")
                 .build();
 
         BaseJdbcConfig expected = new BaseJdbcConfig()
@@ -116,9 +110,7 @@ public class TestBaseJdbcConfig
                 .setNumTestsPerEvictionRun(100)
                 .setTimeBetweenEvictionRunsMillis(1000)
                 .setMaxWaitMillis(1000)
-                .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, SECONDS))
-                .setPushDownEnable(false)
-                .setPushDownModule(BASE_PUSHDOWN);
+                .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, SECONDS));
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

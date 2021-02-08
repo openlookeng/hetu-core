@@ -15,8 +15,8 @@ package io.prestosql.sql.gen;
 
 import io.airlift.slice.Slices;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.relational.CallExpression;
+import io.prestosql.sql.relational.RowExpression;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;

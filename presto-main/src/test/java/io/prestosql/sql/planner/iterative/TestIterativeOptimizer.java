@@ -22,11 +22,11 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.sql.planner.RuleStatsRecorder;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -107,7 +107,7 @@ public class TestIterativeOptimizer
             if (isIdentityProjection(project)) {
                 return Result.ofPlanNode(project.getSource());
             }
-            PlanNode projectNode = new ProjectNode(context.getIdAllocator().getNextId(), project, AssignmentUtils.identityAsSymbolReferences(project.getOutputSymbols()));
+            PlanNode projectNode = new ProjectNode(context.getIdAllocator().getNextId(), project, Assignments.identity(project.getOutputSymbols()));
             return Result.ofPlanNode(projectNode);
         }
 

@@ -16,16 +16,15 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
 import static java.util.Objects.requireNonNull;
@@ -61,7 +60,7 @@ public class CorrelationMatcher
 
         int i = 0;
         for (String alias : this.correlation) {
-            if (!symbolAliases.get(alias).equals(toSymbolReference(actualCorrelation.get(i++)))) {
+            if (!symbolAliases.get(alias).equals(actualCorrelation.get(i++).toSymbolReference())) {
                 return NO_MATCH;
             }
         }

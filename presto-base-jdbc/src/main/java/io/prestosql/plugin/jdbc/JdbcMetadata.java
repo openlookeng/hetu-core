@@ -33,10 +33,13 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
+import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
+import io.prestosql.spi.type.Type;
 
 import java.util.Collection;
 import java.util.List;
@@ -140,6 +143,69 @@ public class JdbcMetadata
     public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
     {
         return jdbcClient.isExecutionPlanCacheSupported();
+    }
+
+    /**
+     * Hetu supports pushing sub-query with join down to the connector.
+     * This method decides if the sub-query can be pushed down to the connector based on the connector.
+     * <p>
+     * Connectors can indicate whether they don't support predicate push down or that the action had no effect
+     * by returning {@link Optional#empty()}. Connectors should expect this method to be called multiple times
+     * </p>
+     * during the optimization of a given query.
+     * <p>
+     * <b>Note</b>: it's critical for connectors to return Optional.empty() if calling this method has no effect for that
+     * invocation, even if the connector generally supports push down. Doing otherwise can cause the optimizer
+     * to loop indefinitely.
+     * </p>
+     *
+     * @param session Presto session
+     * @param table randomly selected connector handle from the sub-query
+     * @param subQuery the actual sub-query to be pushed down
+     * @param types Presto types of intermediate symbols
+     * @return optional SubQueryApplicationResult which has the new TableHandle if the connector supports this feature
+     */
+    @Override
+    public Optional<SubQueryApplicationResult<ConnectorTableHandle>> applySubQuery(ConnectorSession session, ConnectorTableHandle table, String subQuery, Map<String, Type> types)
+    {
+        // If the subQuery pushed down to the connector, table name, limit or predicate push downs are not necessary
+        // Therefore, either of the table name can be used for the new TableHandle as long as the subQuery is valid
+        requireNonNull(subQuery, "cannot apply null sub-query");
+        JdbcTableHandle tableHandle = (JdbcTableHandle) table;
+
+        // If the JDBC Client can get the columns from the sub-query, it should be able to push sub-query down
+        Map<String, ColumnHandle> assignments = jdbcClient.getColumns(session, subQuery, types);
+        if (assignments.isEmpty()) {
+            return Optional.empty();
+        }
+        // Extract the types returned by the database
+        ImmutableMap.Builder<String, Type> typesBuilder = new ImmutableMap.Builder<>();
+        for (Map.Entry<String, ColumnHandle> entry : assignments.entrySet()) {
+            typesBuilder.put(entry.getKey(), ((JdbcColumnHandle) entry.getValue()).getColumnType());
+        }
+
+        JdbcTableHandle handle = new JdbcTableHandle(
+                tableHandle.getSchemaTableName(),
+                tableHandle.getCatalogName(),
+                tableHandle.getSchemaName(),
+                tableHandle.getTableName(),
+                tableHandle.getConstraint(),
+                OptionalLong.empty(),
+                subQuery);
+
+        return Optional.of(new SubQueryApplicationResult<>(handle, assignments, typesBuilder.build()));
+    }
+
+    /**
+     * Hetu's sub-query push down expects supporting connectors to provide a {@link SqlQueryWriter}
+     * to write SQL queries for the respective databases.
+     *
+     * @return the optional SQL query writer which can write database specific SQL queries
+     */
+    @Override
+    public Optional<SqlQueryWriter> getSqlQueryWriter()
+    {
+        return jdbcClient.getSqlQueryWriter();
     }
 
     @Override

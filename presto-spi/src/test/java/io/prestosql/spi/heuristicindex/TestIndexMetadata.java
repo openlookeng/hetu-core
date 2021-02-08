@@ -14,14 +14,13 @@
  */
 package io.prestosql.spi.heuristicindex;
 
-import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.Properties;
 
 import static org.testng.Assert.assertEquals;
 
@@ -33,20 +32,13 @@ public class TestIndexMetadata
         Index index = new Index()
         {
             @Override
-            public Set<Level> getSupportedIndexLevels()
-            {
-                return ImmutableSet.of(Level.STRIPE);
-            }
-
-            @Override
             public String getId()
             {
                 return null;
             }
 
             @Override
-            public boolean addValues(List<Pair<String, List<Object>>> values)
-                    throws IOException
+            public boolean addValues(Map<String, List<Object>> values)
             {
                 return false;
             }
@@ -58,19 +50,70 @@ public class TestIndexMetadata
             }
 
             @Override
-            public void serialize(OutputStream out) throws IOException
+            public void serialize(OutputStream os)
             {
             }
 
             @Override
-            public Index deserialize(InputStream in) throws IOException
+            public Index deserialize(InputStream is)
+            {
+                return this;
+            }
+
+            @Override
+            public Index intersect(Index another)
             {
                 return null;
+            }
+
+            @Override
+            public Index union(Index another)
+            {
+                return null;
+            }
+
+            @Override
+            public Properties getProperties()
+            {
+                return null;
+            }
+
+            @Override
+            public void setProperties(Properties properties)
+            {
+            }
+
+            @Override
+            public int getExpectedNumOfEntries()
+            {
+                return 0;
+            }
+
+            @Override
+            public void setExpectedNumOfEntries(int expectedNumOfEntries)
+            {
+            }
+
+            @Override
+            public long getMemorySize()
+            {
+                return 0;
+            }
+
+            @Override
+            public void setMemorySize(long memorySize)
+            {
+            }
+
+            @Override
+            public boolean supportMultiColumn()
+            {
+                return false;
             }
         };
 
         String table = "table";
-        String[] columns = new String[]{"columns"};
+        String[] columns = new String[] {"columns"};
         String rootUri = "/tmp";
         String uri = "foo";
         long splitStart = 10;

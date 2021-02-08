@@ -16,7 +16,7 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode.Type;
 import io.prestosql.sql.tree.Expression;
@@ -27,8 +27,6 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class SpatialJoinMatcher
@@ -62,15 +60,8 @@ public class SpatialJoinMatcher
         checkState(shapeMatches(node), "Plan testing framework error: shapeMatches returned false in detailMatches in %s", this.getClass().getName());
 
         SpatialJoinNode joinNode = (SpatialJoinNode) node;
-        if (isExpression(joinNode.getFilter())) {
-            if (!new ExpressionVerifier(symbolAliases).process(castToExpression(joinNode.getFilter()), filter)) {
-                return NO_MATCH;
-            }
-        }
-        else {
-            if (!new RowExpressionVerifier(symbolAliases, metadata, session, joinNode.getOutputSymbols()).process(filter, joinNode.getFilter())) {
-                return NO_MATCH;
-            }
+        if (!new ExpressionVerifier(symbolAliases).process(joinNode.getFilter(), filter)) {
+            return NO_MATCH;
         }
         if (!joinNode.getKdbTree().equals(kdbTree)) {
             return NO_MATCH;

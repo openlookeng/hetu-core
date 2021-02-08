@@ -15,20 +15,10 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.LambdaDefinitionExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.RowExpressionVisitor;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
 import io.prestosql.sql.tree.DefaultTraversalVisitor;
 import io.prestosql.sql.tree.DereferenceExpression;
@@ -38,15 +28,14 @@ import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.prestosql.sql.planner.SymbolUtils.from;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
+import static io.prestosql.sql.planner.ExpressionExtractor.extractExpressions;
+import static io.prestosql.sql.planner.ExpressionExtractor.extractExpressionsNonRecursive;
+import static io.prestosql.sql.planner.iterative.Lookup.noLookup;
+import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
 import static java.util.Objects.requireNonNull;
 
 public final class SymbolsExtractor
@@ -56,19 +45,7 @@ public final class SymbolsExtractor
     public static Set<Symbol> extractUnique(PlanNode node)
     {
         ImmutableSet.Builder<Symbol> uniqueSymbols = ImmutableSet.builder();
-        ExpressionExtractor.extractExpressions(node).forEach(expression -> {
-            if (isExpression(expression)) {
-                uniqueSymbols.addAll(extractUnique(castToExpression(expression)));
-            }
-            else {
-                Map<Integer, Symbol> layout = new HashMap<>();
-                int channel = 0;
-                for (Symbol symbol : node.getOutputSymbols()) {
-                    layout.put(channel++, symbol);
-                }
-                uniqueSymbols.addAll(extractUnique(expression, layout));
-            }
-        });
+        extractExpressions(node).forEach(expression -> uniqueSymbols.addAll(extractUnique(expression)));
 
         return uniqueSymbols.build();
     }
@@ -76,7 +53,7 @@ public final class SymbolsExtractor
     public static Set<Symbol> extractUniqueNonRecursive(PlanNode node)
     {
         ImmutableSet.Builder<Symbol> uniqueSymbols = ImmutableSet.builder();
-        ExpressionExtractor.extractExpressionsNonRecursive(node).forEach(expression -> uniqueSymbols.addAll(extractUniqueVariableInternal(expression)));
+        extractExpressionsNonRecursive(node).forEach(expression -> uniqueSymbols.addAll(extractUnique(expression)));
 
         return uniqueSymbols.build();
     }
@@ -84,14 +61,7 @@ public final class SymbolsExtractor
     public static Set<Symbol> extractUnique(PlanNode node, Lookup lookup)
     {
         ImmutableSet.Builder<Symbol> uniqueSymbols = ImmutableSet.builder();
-        ExpressionExtractor.extractExpressions(node, lookup).forEach(expression -> {
-            if (isExpression(expression)) {
-                uniqueSymbols.addAll(extractUnique(castToExpression(expression)));
-            }
-            else {
-                uniqueSymbols.addAll(extractUnique(expression));
-            }
-        });
+        extractExpressions(node, lookup).forEach(expression -> uniqueSymbols.addAll(extractUnique(expression)));
 
         return uniqueSymbols.build();
     }
@@ -99,36 +69,6 @@ public final class SymbolsExtractor
     public static Set<Symbol> extractUnique(Expression expression)
     {
         return ImmutableSet.copyOf(extractAll(expression));
-    }
-
-    public static Set<Symbol> extractUnique(RowExpression expression)
-    {
-        if (isExpression(expression)) {
-            return extractUnique(castToExpression(expression));
-        }
-        return ImmutableSet.copyOf(extractAll(expression, new HashMap<>()));
-    }
-
-    public static Set<Symbol> extractUnique(Iterable<? extends RowExpression> expressions, List<Map<Integer, Symbol>> layouts)
-    {
-        ImmutableSet.Builder<Symbol> unique = ImmutableSet.builder();
-        if (layouts != null && !layouts.isEmpty()) {
-            int pos = 0;
-            for (RowExpression expression : expressions) {
-                unique.addAll(extractAll(expression, layouts.get(pos++)));
-            }
-        }
-        else {
-            for (RowExpression expression : expressions) {
-                unique.addAll(extractAll(expression));
-            }
-        }
-        return unique.build();
-    }
-
-    public static Set<Symbol> extractUnique(RowExpression expression, Map<Integer, Symbol> layout)
-    {
-        return ImmutableSet.copyOf(extractAll(expression, layout));
     }
 
     public static Set<Symbol> extractUnique(Iterable<? extends Expression> expressions)
@@ -157,33 +97,11 @@ public final class SymbolsExtractor
         return builder.build();
     }
 
-    public static List<Symbol> extractAll(RowExpression expression)
-    {
-        if (isExpression(expression)) {
-            return extractAll(castToExpression(expression));
-        }
-        ImmutableList.Builder<Symbol> builder = ImmutableList.builder();
-        expression.accept(new SymbolRowExpressionVisitor(new HashMap<>()), builder);
-        return builder.build();
-    }
-
-    public static List<Symbol> extractAll(RowExpression expression, Map<Integer, Symbol> layout)
-    {
-        ImmutableList.Builder<Symbol> builder = ImmutableList.builder();
-        expression.accept(new SymbolRowExpressionVisitor(layout), builder);
-        return builder.build();
-    }
-
     public static List<Symbol> extractAll(Aggregation aggregation)
     {
         ImmutableList.Builder<Symbol> builder = ImmutableList.builder();
-        for (RowExpression argument : aggregation.getArguments()) {
-            if (isExpression(argument)) {
-                builder.addAll(extractAll(castToExpression(argument)));
-            }
-            else {
-                builder.addAll(extractAll(argument));
-            }
+        for (Expression argument : aggregation.getArguments()) {
+            builder.addAll(extractAll(argument));
         }
         aggregation.getFilter().ifPresent(builder::add);
         aggregation.getOrderingScheme().ifPresent(orderBy -> builder.addAll(orderBy.getOrderBy()));
@@ -193,13 +111,8 @@ public final class SymbolsExtractor
     public static List<Symbol> extractAll(WindowNode.Function function)
     {
         ImmutableList.Builder<Symbol> builder = ImmutableList.builder();
-        for (RowExpression argument : function.getArguments()) {
-            if (isExpression(argument)) {
-                builder.addAll(extractAll(castToExpression(argument)));
-            }
-            else {
-                builder.addAll(extractAll(argument));
-            }
+        for (Expression argument : function.getArguments()) {
+            builder.addAll(extractAll(argument));
         }
         function.getFrame().getEndValue().ifPresent(builder::add);
         function.getFrame().getStartValue().ifPresent(builder::add);
@@ -216,12 +129,12 @@ public final class SymbolsExtractor
 
     public static Set<Symbol> extractOutputSymbols(PlanNode planNode)
     {
-        return extractOutputSymbols(planNode, Lookup.noLookup());
+        return extractOutputSymbols(planNode, noLookup());
     }
 
     public static Set<Symbol> extractOutputSymbols(PlanNode planNode, Lookup lookup)
     {
-        return PlanNodeSearcher.searchFrom(planNode, lookup)
+        return searchFrom(planNode, lookup)
                 .findAll()
                 .stream()
                 .flatMap(node -> node.getOutputSymbols().stream())
@@ -230,19 +143,11 @@ public final class SymbolsExtractor
 
     public static Set<Symbol> extractAllSymbols(PlanNode planNode, Lookup lookup)
     {
-        return PlanNodeSearcher.searchFrom(planNode, lookup)
+        return searchFrom(planNode, lookup)
                 .findAll()
                 .stream()
                 .flatMap(node -> node.getAllSymbols().stream())
                 .collect(toImmutableSet());
-    }
-
-    private static Set<Symbol> extractUniqueVariableInternal(RowExpression expression)
-    {
-        if (isExpression(expression)) {
-            return extractUnique(castToExpression(expression));
-        }
-        return extractUnique(expression);
     }
 
     private static class SymbolBuilderVisitor
@@ -251,58 +156,7 @@ public final class SymbolsExtractor
         @Override
         protected Void visitSymbolReference(SymbolReference node, ImmutableList.Builder<Symbol> builder)
         {
-            builder.add(from(node));
-            return null;
-        }
-    }
-
-    private static class SymbolRowExpressionVisitor
-            implements RowExpressionVisitor<Void, ImmutableList.Builder<Symbol>>
-    {
-        private final Map<Integer, Symbol> layout;
-
-        public SymbolRowExpressionVisitor(Map<Integer, Symbol> layout)
-        {
-            this.layout = layout;
-        }
-
-        @Override
-        public Void visitInputReference(InputReferenceExpression input, ImmutableList.Builder<Symbol> context)
-        {
-            context.add(layout.get(input.getField()));
-            return null;
-        }
-
-        @Override
-        public Void visitCall(CallExpression call, ImmutableList.Builder<Symbol> context)
-        {
-            call.getArguments().forEach(argument -> argument.accept(this, context));
-            return null;
-        }
-
-        @Override
-        public Void visitConstant(ConstantExpression literal, ImmutableList.Builder<Symbol> context)
-        {
-            return null;
-        }
-
-        @Override
-        public Void visitLambda(LambdaDefinitionExpression lambda, ImmutableList.Builder<Symbol> context)
-        {
-            return null;
-        }
-
-        @Override
-        public Void visitVariableReference(VariableReferenceExpression reference, ImmutableList.Builder<Symbol> context)
-        {
-            context.add(new Symbol(reference.getName()));
-            return null;
-        }
-
-        @Override
-        public Void visitSpecialForm(SpecialForm specialForm, ImmutableList.Builder<Symbol> context)
-        {
-            specialForm.getArguments().forEach(argument -> argument.accept(this, context));
+            builder.add(Symbol.from(node));
             return null;
         }
     }

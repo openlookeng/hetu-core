@@ -16,14 +16,12 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.plan.WindowNode.Function;
-import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.planner.plan.WindowNode.Function;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.QualifiedName;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.Map;
 import java.util.Objects;
@@ -31,8 +29,6 @@ import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class WindowFunctionMatcher
@@ -87,30 +83,11 @@ public class WindowFunctionMatcher
         if (expectedCall.getWindow().isPresent()) {
             return false;
         }
-        if (!signature.map(windowFunction.getSignature()::equals).orElse(true) ||
-                !expectedFrame.map(windowFunction.getFrame()::equals).orElse(true) ||
-                !Objects.equals(expectedCall.getName(), QualifiedName.of(windowFunction.getSignature().getName())) ||
-                expectedCall.getArguments().size() != windowFunction.getArguments().size()) {
-            return false;
-        }
-        for (int i = 0; i < windowFunction.getArguments().size(); i++) {
-            if (isExpression(windowFunction.getArguments().get(i))) {
-                if (!Objects.equals(expectedCall.getArguments().get(i), castToExpression(windowFunction.getArguments().get(i)))) {
-                    return false;
-                }
-            }
-            else {
-                if (windowFunction.getArguments().get(i) instanceof VariableReferenceExpression && expectedCall.getArguments().get(i) instanceof SymbolReference) {
-                    if (((SymbolReference) expectedCall.getArguments().get(i)).getName() != ((VariableReferenceExpression) windowFunction.getArguments().get(i)).getName()) {
-                        return false;
-                    }
-                }
-                else {
-                    return false;
-                }
-            }
-        }
-        return true;
+
+        return signature.map(windowFunction.getSignature()::equals).orElse(true) &&
+                expectedFrame.map(windowFunction.getFrame()::equals).orElse(true) &&
+                Objects.equals(expectedCall.getName(), QualifiedName.of(windowFunction.getSignature().getName())) &&
+                Objects.equals(expectedCall.getArguments(), windowFunction.getArguments());
     }
 
     @Override

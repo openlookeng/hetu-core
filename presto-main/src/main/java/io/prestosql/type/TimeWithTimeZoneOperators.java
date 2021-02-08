@@ -49,9 +49,9 @@ import static io.prestosql.spi.function.OperatorType.XX_HASH_64;
 import static io.prestosql.spi.type.DateTimeEncoding.unpackMillisUtc;
 import static io.prestosql.spi.type.DateTimeEncoding.unpackZoneKey;
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
-import static io.prestosql.spi.util.DateTimeUtils.parseTimeWithTimeZone;
-import static io.prestosql.spi.util.DateTimeUtils.printTimeWithTimeZone;
-import static io.prestosql.spi.util.DateTimeZoneIndex.getChronology;
+import static io.prestosql.util.DateTimeUtils.parseTimeWithTimeZone;
+import static io.prestosql.util.DateTimeUtils.printTimeWithTimeZone;
+import static io.prestosql.util.DateTimeZoneIndex.getChronology;
 
 public final class TimeWithTimeZoneOperators
 {

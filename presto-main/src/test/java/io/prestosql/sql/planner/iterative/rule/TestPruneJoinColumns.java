@@ -16,20 +16,20 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
@@ -93,10 +93,10 @@ public class TestPruneJoinColumns
         Symbol rightValue = p.symbol("rightValue");
         List<Symbol> outputs = ImmutableList.of(leftKey, leftValue, rightKey, rightValue);
         return p.project(
-                Assignments.copyOf(
+                Assignments.identity(
                         outputs.stream()
                                 .filter(projectionFilter)
-                                .collect(Collectors.toMap(v -> v, v -> p.variable(v.getName())))),
+                                .collect(toImmutableList())),
                 p.join(
                         JoinNode.Type.INNER,
                         p.values(leftKey, leftValue),

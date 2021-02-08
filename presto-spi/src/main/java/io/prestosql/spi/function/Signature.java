@@ -22,9 +22,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -105,28 +103,14 @@ public final class Signature
 
     public static String mangleOperatorName(OperatorType operatorType)
     {
-        return OPERATOR_PREFIX + operatorType.name().toLowerCase(Locale.ENGLISH);
-    }
-
-    public static Optional<OperatorType> getOperatorType(String name)
-    {
-        if (name.startsWith(OPERATOR_PREFIX)) {
-            return Optional.of(OperatorType.valueOf(name.substring(OPERATOR_PREFIX.length()).toUpperCase(Locale.ENGLISH)));
-        }
-
-        return Optional.empty();
+        return OPERATOR_PREFIX + operatorType.name();
     }
 
     @VisibleForTesting
     public static OperatorType unmangleOperator(String mangledName)
     {
         checkArgument(mangledName.startsWith(OPERATOR_PREFIX), "not a mangled operator name: %s", mangledName);
-        return OperatorType.valueOf(mangledName.substring(OPERATOR_PREFIX.length()).toUpperCase());
-    }
-
-    public static boolean isMangleOperator(String mangledName)
-    {
-        return mangledName.startsWith(OPERATOR_PREFIX);
+        return OperatorType.valueOf(mangledName.substring(OPERATOR_PREFIX.length()));
     }
 
     public Signature withAlias(String name)

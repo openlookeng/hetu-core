@@ -14,22 +14,11 @@
 package io.prestosql.sql.relational;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.LambdaDefinitionExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.RowExpressionVisitor;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.SpecialForm.Form;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 
 public final class Expressions
 {
@@ -47,11 +36,6 @@ public final class Expressions
         return new ConstantExpression(null, type);
     }
 
-    public static boolean isNull(RowExpression expression)
-    {
-        return expression instanceof ConstantExpression && ((ConstantExpression) expression).isNull();
-    }
-
     public static CallExpression call(Signature signature, Type returnType, RowExpression... arguments)
     {
         return new CallExpression(signature, returnType, Arrays.asList(arguments));
@@ -65,26 +49,6 @@ public final class Expressions
     public static InputReferenceExpression field(int field, Type type)
     {
         return new InputReferenceExpression(field, type);
-    }
-
-    public static SpecialForm specialForm(Form form, Type returnType, RowExpression... arguments)
-    {
-        return new SpecialForm(form, returnType, arguments);
-    }
-
-    public static SpecialForm specialForm(Form form, Type returnType, List<RowExpression> arguments)
-    {
-        return new SpecialForm(form, returnType, arguments);
-    }
-
-    public static Set<RowExpression> uniqueSubExpressions(RowExpression expression)
-    {
-        return ImmutableSet.copyOf(subExpressions(ImmutableList.of(expression)));
-    }
-
-    public static List<RowExpression> subExpressions(RowExpression expression)
-    {
-        return subExpressions(ImmutableList.of(expression));
     }
 
     public static List<RowExpression> subExpressions(Iterable<RowExpression> expressions)
@@ -146,10 +110,5 @@ public final class Expressions
         }
 
         return builder.build();
-    }
-
-    public static VariableReferenceExpression variable(String name, Type type)
-    {
-        return new VariableReferenceExpression(name, type);
     }
 }

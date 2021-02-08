@@ -24,9 +24,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.OptionalLong;
 
 import static org.testng.Assert.assertEquals;
 
@@ -72,10 +70,10 @@ public class TestHbaseSplitManager
     {
         try {
             hsm.getSplits(null, null, TestUtils.createHBaseTableHandle(), null);
-            throw new NoSuchElementException("No value present");
+            throw new NullPointerException("testSplitManager : failed");
         }
-        catch (NoSuchElementException e) {
-            assertEquals(e.toString(), "java.util.NoSuchElementException: No value present");
+        catch (NullPointerException e) {
+            assertEquals(e.toString(), "java.lang.NullPointerException: null pointer found when getting splits for scan");
         }
     }
 
@@ -96,8 +94,7 @@ public class TestHbaseSplitManager
                         "",
                         TestUtils.createTupleDomain(1),
                         TestUtils.createColumnList(),
-                        0,
-                        OptionalLong.empty());
+                        0);
 
         hsm.getSplits(null, null, tableHandle, null);
     }

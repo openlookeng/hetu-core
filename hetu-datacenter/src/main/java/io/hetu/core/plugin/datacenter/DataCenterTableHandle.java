@@ -17,7 +17,6 @@ package io.hetu.core.plugin.datacenter;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Joiner;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 
@@ -44,7 +43,7 @@ public final class DataCenterTableHandle
 
     private final OptionalLong limit;
 
-    private final String pushDownSql;
+    private final String subQuery;
 
     /**
      * Constructor of data center table handle.
@@ -60,7 +59,7 @@ public final class DataCenterTableHandle
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.limit = requireNonNull(limit, "limit is null");
-        this.pushDownSql = "";
+        this.subQuery = "";
     }
 
     /**
@@ -70,25 +69,25 @@ public final class DataCenterTableHandle
      * @param schemaName schema name.
      * @param tableName table name.
      * @param limit the limit number of this query need.
-     * @param pushDownSql the sub query statement that want to be pushed down to remote data center.
+     * @param subQuery the sub query statement that want to be pushed down to remote data center.
      */
     @JsonCreator
     public DataCenterTableHandle(@JsonProperty("catalogName") String catalogName,
             @JsonProperty("schemaName") String schemaName, @JsonProperty("tableName") String tableName,
-            @JsonProperty("limit") OptionalLong limit, @JsonProperty("subQuery") String pushDownSql)
+            @JsonProperty("limit") OptionalLong limit, @JsonProperty("subQuery") String subQuery)
     {
         this.catalogName = catalogName;
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.limit = requireNonNull(limit, "limit is null");
-        this.pushDownSql = pushDownSql;
+        this.subQuery = subQuery;
     }
 
     @Override
     public ConnectorTableHandle createFrom(ConnectorTableHandle connectorTableHandle)
     {
         DataCenterTableHandle dataCenterTableHandle = (DataCenterTableHandle) connectorTableHandle;
-        return new DataCenterTableHandle(catalogName, schemaName, dataCenterTableHandle.tableName, dataCenterTableHandle.getLimit(), dataCenterTableHandle.getPushDownSql());
+        return new DataCenterTableHandle(catalogName, schemaName, dataCenterTableHandle.tableName, dataCenterTableHandle.getLimit(), dataCenterTableHandle.getSubQuery());
     }
 
     @JsonProperty
@@ -131,9 +130,9 @@ public final class DataCenterTableHandle
     }
 
     @JsonProperty
-    public String getPushDownSql()
+    public String getSubQuery()
     {
-        return pushDownSql;
+        return subQuery;
     }
 
     @Override
@@ -160,14 +159,6 @@ public final class DataCenterTableHandle
     @Override
     public String toString()
     {
-        StringBuilder builder = new StringBuilder();
-        if (!pushDownSql.isEmpty()) {
-            Joiner.on(SPLIT_DOT).skipNulls().appendTo(builder, catalogName, "{" + pushDownSql + "}");
-        }
-        else {
-            Joiner.on(SPLIT_DOT).skipNulls().appendTo(builder, catalogName, schemaName, tableName);
-        }
-        limit.ifPresent(value -> builder.append(" limit=").append(value));
-        return builder.toString();
+        return catalogName + SPLIT_DOT + schemaName + SPLIT_DOT + tableName;
     }
 }

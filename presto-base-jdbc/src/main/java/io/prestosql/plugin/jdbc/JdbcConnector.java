@@ -16,16 +16,12 @@ package io.prestosql.plugin.jdbc;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
-import io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizer;
-import io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizerProvider;
-import io.prestosql.spi.ConnectorPlanOptimizer;
 import io.prestosql.spi.connector.CachedConnectorMetadata;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorAccessControl;
 import io.prestosql.spi.connector.ConnectorCapabilities;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
-import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
@@ -61,7 +57,6 @@ public class JdbcConnector
     private final Optional<ConnectorAccessControl> accessControl;
     private final Set<Procedure> procedures;
     private final JdbcMetadataConfig config;
-    private final ConnectorPlanOptimizer planOptimizer;
 
     private final ConcurrentMap<ConnectorTransactionHandle, JdbcMetadata> transactions = new ConcurrentHashMap<>();
 
@@ -74,8 +69,7 @@ public class JdbcConnector
             JdbcPageSinkProvider jdbcPageSinkProvider,
             Optional<ConnectorAccessControl> accessControl,
             Set<Procedure> procedures,
-            JdbcMetadataConfig config,
-            JdbcPlanOptimizer planOptimizer)
+            JdbcMetadataConfig config)
     {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.jdbcMetadataFactory = requireNonNull(jdbcMetadataFactory, "jdbcMetadataFactory is null");
@@ -85,13 +79,6 @@ public class JdbcConnector
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.procedures = ImmutableSet.copyOf(requireNonNull(procedures, "procedures is null"));
         this.config = config;
-        this.planOptimizer = planOptimizer;
-    }
-
-    @Override
-    public ConnectorPlanOptimizerProvider getConnectorPlanOptimizerProvider()
-    {
-        return new JdbcPlanOptimizerProvider(planOptimizer);
     }
 
     @Override

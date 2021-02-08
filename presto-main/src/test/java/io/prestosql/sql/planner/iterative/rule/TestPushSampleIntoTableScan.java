@@ -17,11 +17,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.metadata.AbstractMockMetadata;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.connector.SampleType;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.plan.SampleNode.Type;
+import io.prestosql.sql.planner.plan.TableScanNode;
 import org.testng.annotations.Test;
 
 import java.util.Optional;

@@ -66,7 +66,6 @@ public final class TestGroups
     public static final String KAFKA = "kafka";
     public static final String AVRO = "avro";
     public static final String VACUUM = "vacuum";
-    public static final String UPDATE = "update";
 
     private TestGroups() {}
 }

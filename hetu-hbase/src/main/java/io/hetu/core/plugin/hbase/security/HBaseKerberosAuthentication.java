@@ -15,7 +15,6 @@
 package io.hetu.core.plugin.hbase.security;
 
 import io.airlift.log.Logger;
-import io.hetu.core.common.util.SecurePathWhiteList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
@@ -26,8 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * HBase Kerberos Authentication
@@ -73,21 +70,6 @@ public class HBaseKerberosAuthentication
 
         if ((conf == null)) {
             throw new IOException("input conf is invalid.");
-        }
-
-        // check file in white path list
-        try {
-            checkArgument(!userKeytabPath.contains("../"),
-                    userKeytabPath + "Path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-            checkArgument(SecurePathWhiteList.isSecurePath(userKeytabPath),
-                    userKeytabPath + "Path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-            checkArgument(!krb5ConfPath.contains("../"),
-                    krb5ConfPath + "Path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-            checkArgument(SecurePathWhiteList.isSecurePath(krb5ConfPath),
-                    krb5ConfPath + "Path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-        }
-        catch (IOException e) {
-            throw new IllegalArgumentException("Failed to get secure path list.", e);
         }
 
         // 2.check file exsits

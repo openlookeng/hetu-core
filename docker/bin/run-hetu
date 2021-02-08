@@ -177,7 +177,6 @@ if [[ $# != 0 ]]; then
                 if [[ $discoveryURI = *" "* ]]; then
                     echo "URI cannot contain spaces"
                     exit 1
-                fi
                 shift
                 shift
                 ;;
@@ -186,7 +185,6 @@ if [[ $# != 0 ]]; then
                 if [[ $includeCoordinator != true && $includeCoordinator != false ]]; then
                     echo "includeCoordinator must be boolean"
                     exit 1
-                fi
                 shift
                 shift
                 ;;
@@ -200,7 +198,6 @@ if [[ $# != 0 ]]; then
                 if [[ ! $xmx =~ ^[0-9]+[g|G|m|M|k|K]$ ]]; then
                     echo "Invalid xmx"
                     exit 1
-                fi
                 shift
                 shift
                 ;;

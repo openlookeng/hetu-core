@@ -127,17 +127,6 @@ public final class HazelcastConstants
      */
     public static final String SSL_PROTOCOLS = "hazelcast.ssl.protocols";
 
-    /**
-     * Hazelcast heartbeat interval
-     */
-    public static final int HEARTBEAT_INTERVAL_SECONDS = 5;
-
-    /**
-     * Hazelcast heartbeat timeout
-     */
-    // !Important change the value if the heartbeat timeout value of Hetu nodes changed
-    public static final int HEARTBEAT_TIMEOUT_SECONDS = 10;
-
     private HazelcastConstants()
     {
     }

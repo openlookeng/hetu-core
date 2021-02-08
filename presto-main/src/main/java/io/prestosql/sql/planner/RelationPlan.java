@@ -14,10 +14,9 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.List;
 import java.util.Optional;

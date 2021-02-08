@@ -17,14 +17,12 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.matching.Captures;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.IsNotNullPredicate;
@@ -37,10 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 
 public class TransformUncorrelatedInPredicateSubqueryToJoin
         extends TransformUncorrelatedInPredicateSubqueryToSemiJoin
@@ -52,7 +47,7 @@ public class TransformUncorrelatedInPredicateSubqueryToJoin
             return Result.empty();
         }
 
-        Expression expression = castToExpression(getOnlyElement(applyNode.getSubqueryAssignments().getExpressions()));
+        Expression expression = getOnlyElement(applyNode.getSubqueryAssignments().getExpressions());
         InPredicate inPredicate;
         if (expression instanceof InPredicate) {
             inPredicate = (InPredicate) expression;
@@ -63,9 +58,9 @@ public class TransformUncorrelatedInPredicateSubqueryToJoin
 
         Symbol semiJoinSymbol = getOnlyElement(applyNode.getSubqueryAssignments().getSymbols());
 
-        JoinNode.EquiJoinClause equiJoinClause = new JoinNode.EquiJoinClause(SymbolUtils.from(inPredicate.getValue()), SymbolUtils.from(inPredicate.getValueList()));
+        JoinNode.EquiJoinClause equiJoinClause = new JoinNode.EquiJoinClause(Symbol.from(inPredicate.getValue()), Symbol.from(inPredicate.getValueList()));
         List<Symbol> outputSymbols = new LinkedList<>(applyNode.getInput().getOutputSymbols());
-        outputSymbols.add(SymbolUtils.from(inPredicate.getValueList()));
+        outputSymbols.add(Symbol.from(inPredicate.getValueList()));
 
         AggregationNode distinctNode = new AggregationNode(
                 context.getIdAllocator().getNextId(),
@@ -90,10 +85,10 @@ public class TransformUncorrelatedInPredicateSubqueryToJoin
                 Optional.empty(),
                 Collections.emptyMap());
 
-        Map<Symbol, RowExpression> assignments = new HashMap<>();
-        assignments.put(semiJoinSymbol, castToRowExpression(new IsNotNullPredicate(inPredicate.getValueList())));
+        Map<Symbol, Expression> assignments = new HashMap<>();
+        assignments.put(semiJoinSymbol, new IsNotNullPredicate(inPredicate.getValueList()));
         for (Symbol symbol : applyNode.getInput().getOutputSymbols()) {
-            assignments.put(symbol, castToRowExpression(toSymbolReference(symbol)));
+            assignments.put(symbol, symbol.toSymbolReference());
         }
         ProjectNode projectNode = new ProjectNode(context.getIdAllocator().getNextId(),
                 joinNode,

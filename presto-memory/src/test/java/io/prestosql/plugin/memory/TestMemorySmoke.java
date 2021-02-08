@@ -102,7 +102,7 @@ public class TestMemorySmoke
                             .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
                             .map(summary -> summary.getInputPositions())
                             .collect(toImmutableSet());
-        assertEquals(rowsRead, ImmutableSet.of(0L, buildSideRowsCount));
+        assertEquals(rowsRead, ImmutableSet.of(60_175L, buildSideRowsCount));
     }
 
     @Test
@@ -136,53 +136,7 @@ public class TestMemorySmoke
                             .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
                             .map(summary -> summary.getInputPositions())
                             .collect(toImmutableSet());
-        assertEquals(rowsRead, ImmutableSet.of(6L, buildSideRowsCount));
-    }
-
-    @Test
-    public void testSemiJoinDynamicFilteringNone()
-    {
-        final long buildSideRowsCount = 15_000L;
-
-        Session session = Session.builder(getSession())
-                .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
-                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
-                .build();
-        DistributedQueryRunner runner = (DistributedQueryRunner) getQueryRunner();
-        ResultWithQueryId<MaterializedResult> result = runner.executeWithQueryId(session,
-                "SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey from orders WHERE totalprice < 0)");
-        assertEquals(result.getResult().getRowCount(), 0);
-
-        QueryStats stats = runner.getCoordinator().getQueryManager().getFullQueryInfo(result.getQueryId()).getQueryStats();
-        Set rowsRead = stats.getOperatorSummaries()
-                .stream()
-                .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
-                .map(summary -> summary.getInputPositions())
-                .collect(toImmutableSet());
-        assertEquals(rowsRead, ImmutableSet.of(0L, buildSideRowsCount));
-    }
-
-    @Test
-    public void testSemiJoinDynamicFilteringSingleValue()
-    {
-        final long buildSideRowsCount = 15_000L;
-
-        Session session = Session.builder(getSession())
-                .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
-                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
-                .build();
-        DistributedQueryRunner runner = (DistributedQueryRunner) getQueryRunner();
-        ResultWithQueryId<MaterializedResult> result = runner.executeWithQueryId(session,
-                "SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey from orders WHERE orders.comment = 'nstructions sleep furiously among ')");
-        assertEquals(result.getResult().getRowCount(), 6);
-
-        QueryStats stats = runner.getCoordinator().getQueryManager().getFullQueryInfo(result.getQueryId()).getQueryStats();
-        Set rowsRead = stats.getOperatorSummaries()
-                .stream()
-                .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
-                .map(summary -> summary.getInputPositions())
-                .collect(toImmutableSet());
-        assertEquals(rowsRead, ImmutableSet.of(6L, buildSideRowsCount));
+        assertEquals(rowsRead, ImmutableSet.of(60_175L, buildSideRowsCount));
     }
 
     @Test

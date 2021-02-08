@@ -14,9 +14,9 @@
 package io.prestosql.sql.query;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.sql.planner.LogicalPlanner;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
+import io.prestosql.sql.planner.plan.FilterNode;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

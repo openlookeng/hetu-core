@@ -13,7 +13,6 @@
  */
 package io.prestosql.sql.planner;
 
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionRewriter;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
@@ -28,7 +27,6 @@ import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.planner.SymbolUtils.from;
 
 public final class ExpressionSymbolInliner
 {
@@ -66,7 +64,7 @@ public final class ExpressionSymbolInliner
                 return node;
             }
 
-            Expression expression = mapping.apply(from(node));
+            Expression expression = mapping.apply(Symbol.from(node));
             checkState(expression != null, "Cannot resolve symbol %s", node.getName());
             return expression;
         }

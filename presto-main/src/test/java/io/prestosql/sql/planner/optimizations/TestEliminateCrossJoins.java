@@ -22,12 +22,12 @@ import org.testng.annotations.Test;
 
 import java.util.Optional;
 
-import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.filter;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 
 public class TestEliminateCrossJoins
         extends BasePlanTest
@@ -59,7 +59,7 @@ public class TestEliminateCrossJoins
 
     public TestEliminateCrossJoins()
     {
-        super(ImmutableMap.of(SystemSessionProperties.JOIN_REORDERING_STRATEGY, "ELIMINATE_CROSS_JOINS", SystemSessionProperties.ENABLE_DYNAMIC_FILTERING, "false"));
+        super(ImmutableMap.of(SystemSessionProperties.JOIN_REORDERING_STRATEGY, "ELIMINATE_CROSS_JOINS"));
     }
 
     @Test

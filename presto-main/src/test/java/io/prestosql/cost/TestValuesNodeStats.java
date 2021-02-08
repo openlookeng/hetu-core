@@ -14,19 +14,14 @@
 package io.prestosql.cost;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import org.testng.annotations.Test;
 
-import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
-import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
-import static io.prestosql.sql.relational.Expressions.constant;
-import static io.prestosql.sql.relational.Expressions.constantNull;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestValuesNodeStats
         extends BaseStatsCalculatorTest
@@ -37,9 +32,9 @@ public class TestValuesNodeStats
         tester().assertStatsFor(pb -> pb
                 .values(ImmutableList.of(pb.symbol("a", BIGINT), pb.symbol("b", DOUBLE)),
                         ImmutableList.of(
-                                ImmutableList.of(pb.binaryOperation(OperatorType.ADD, constant(3L, BIGINT), constant(3L, BIGINT)), constant(13.5e0, DOUBLE)),
-                                ImmutableList.of(constant(55L, BIGINT), constantNull(DOUBLE)),
-                                ImmutableList.of(constant(6L, BIGINT), constant(13.5e0, DOUBLE)))))
+                                ImmutableList.of(expression("3+3"), expression("13.5e0")),
+                                ImmutableList.of(expression("55"), expression("null")),
+                                ImmutableList.of(expression("6"), expression("13.5e0")))))
                 .check(outputStats -> outputStats.equalTo(
                         PlanNodeStatsEstimate.builder()
                                 .setOutputRowCount(3)
@@ -64,10 +59,10 @@ public class TestValuesNodeStats
         tester().assertStatsFor(pb -> pb
                 .values(ImmutableList.of(pb.symbol("v", createVarcharType(30))),
                         ImmutableList.of(
-                                constantExpressions(VARCHAR, utf8Slice("Alice")),
-                                constantExpressions(VARCHAR, utf8Slice("has")),
-                                constantExpressions(VARCHAR, utf8Slice("a cat")),
-                                ImmutableList.of(constantNull(VARCHAR)))))
+                                ImmutableList.of(expression("'Alice'")),
+                                ImmutableList.of(expression("'has'")),
+                                ImmutableList.of(expression("'a cat'")),
+                                ImmutableList.of(expression("null")))))
                 .check(outputStats -> outputStats.equalTo(
                         PlanNodeStatsEstimate.builder()
                                 .setOutputRowCount(4)
@@ -92,18 +87,19 @@ public class TestValuesNodeStats
         tester().assertStatsFor(pb -> pb
                 .values(ImmutableList.of(pb.symbol("a", BIGINT)),
                         ImmutableList.of(
-                                ImmutableList.of(pb.binaryOperation(OperatorType.ADD, constant(3L, BIGINT), constantNull(BIGINT))))))
+                                ImmutableList.of(expression("3 + null")))))
                 .check(outputStats -> outputStats.equalTo(nullAStats));
 
         tester().assertStatsFor(pb -> pb
                 .values(ImmutableList.of(pb.symbol("a", BIGINT)),
-                        ImmutableList.of(ImmutableList.of(constantNull(BIGINT)))))
+                        ImmutableList.of(
+                                ImmutableList.of(expression("null")))))
                 .check(outputStats -> outputStats.equalTo(nullAStats));
 
         tester().assertStatsFor(pb -> pb
                 .values(ImmutableList.of(pb.symbol("a", UNKNOWN)),
                         ImmutableList.of(
-                                ImmutableList.of(constantNull(UNKNOWN)))))
+                                ImmutableList.of(expression("null")))))
                 .check(outputStats -> outputStats.equalTo(nullAStats));
     }
 

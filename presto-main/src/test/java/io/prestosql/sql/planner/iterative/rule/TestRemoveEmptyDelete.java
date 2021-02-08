@@ -15,10 +15,10 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;

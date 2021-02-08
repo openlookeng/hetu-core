@@ -531,22 +531,21 @@ public class ClusterMemoryManager
 
         // Add new nodes
         for (InternalNode node : aliveNodes) {
-            if (!nodes.containsKey(node.getNodeIdentifier()) && shouldIncludeNode(node)) {
+            if (!nodes.containsKey(node.getNodeIdentifier())) {
                 nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
             }
+        }
+
+        // If work isn't scheduled on the coordinator (the current node) there is no point
+        // in polling or updating (when moving queries to the reserved pool) its memory pools
+        if (!isWorkScheduledOnCoordinator) {
+            nodes.remove(nodeManager.getCurrentNode().getNodeIdentifier());
         }
 
         // Schedule refresh
         for (RemoteNodeMemory node : nodes.values()) {
             node.asyncRefresh(assignments);
         }
-    }
-
-    private boolean shouldIncludeNode(InternalNode node)
-    {
-        // If work isn't scheduled on the coordinator (the current node) there is no point
-        // in polling or updating (when moving queries to the reserved pool) its memory pools
-        return isWorkScheduledOnCoordinator || !node.isCoordinator();
     }
 
     private synchronized void updatePools(Map<MemoryPoolId, Integer> queryCounts)
@@ -584,10 +583,8 @@ public class ClusterMemoryManager
     {
         Map<String, Optional<MemoryInfo>> memoryInfo = new HashMap<>();
         for (Entry<String, RemoteNodeMemory> entry : nodes.entrySet()) {
-            // workerId is of the form "node_identifier [node_host] role"
-            String role = entry.getValue().getNode().isCoordinator() ? (isWorkScheduledOnCoordinator ? "Coordinator & Worker" : "Coordinator") :
-                    "Worker";
-            String workerId = entry.getKey() + " [" + entry.getValue().getNode().getHost() + "] " + role;
+            // workerId is of the form "node_identifier [node_host]"
+            String workerId = entry.getKey() + " [" + entry.getValue().getNode().getHost() + "]";
             memoryInfo.put(workerId, entry.getValue().getInfo());
         }
         return memoryInfo;

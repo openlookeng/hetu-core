@@ -16,7 +16,6 @@
 package io.hetu.core.heuristicindex.util;
 
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.DecimalLiteral;
@@ -31,7 +30,6 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
-import java.util.Comparator;
 
 public class TypeUtils
 {
@@ -88,73 +86,5 @@ public class TypeUtils
         }
 
         throw new UnsupportedOperationException("Not Implemented Exception: " + expression.toString());
-    }
-
-    public static Object getNativeValue(Object object)
-    {
-        return object instanceof Slice ? ((Slice) object).toStringUtf8() : object;
-    }
-
-    public static String extractType(Object object)
-    {
-        if (object instanceof Long) {
-            return "Long";
-        }
-        else if (object instanceof String) {
-            return "String";
-        }
-        else if (object instanceof Integer) {
-            return "Integer";
-        }
-        else if (object instanceof Slice) {
-            return "String";
-        }
-        else {
-            throw new UnsupportedOperationException("Not a valid type to create index: " + object.getClass());
-        }
-    }
-
-    public static Comparator getComparator(String type)
-    {
-        switch (type) {
-            case "long":
-            case "Long":
-            case "Slice":
-            case "String":
-            case "int":
-            case "Integer":
-                return new Comparator<kotlin.Pair>() {
-                    @Override
-                    public int compare(kotlin.Pair o, kotlin.Pair t1)
-                    {
-                        return ((Comparable) o.getFirst()).compareTo((Comparable) t1.getFirst());
-                    }
-                };
-        }
-        throw new RuntimeException("Type is not supported");
-    }
-
-    /**
-     * Double is 8 bytes in java. This returns the 8 bytes of the decimal value of BigInteger
-     * @param value
-     * @return
-     */
-    public static byte[] getBytes(BigDecimal value)
-    {
-        byte[] bytes = new byte[8];
-        java.nio.ByteBuffer.wrap(bytes).putDouble(value.doubleValue());
-        return bytes;
-    }
-
-    /**
-     * Double is 8 bytes in java. This returns the 8 bytes of the decimal value of Double
-     * @param value
-     * @return
-     */
-    public static byte[] getBytes(Double value)
-    {
-        byte[] bytes = new byte[8];
-        java.nio.ByteBuffer.wrap(bytes).putDouble(value.doubleValue());
-        return bytes;
     }
 }

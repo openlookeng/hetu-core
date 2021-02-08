@@ -17,25 +17,25 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.connector.CatalogName;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.PlanNode;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCALE_FACTOR;
 import static io.prestosql.spi.predicate.NullableValue.asNull;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -81,10 +81,10 @@ public class TestPruneIndexSourceColumns
         ColumnHandle totalpriceHandle = new TpchColumnHandle(totalprice.getName(), DOUBLE);
 
         return p.project(
-                Assignments.copyOf(
+                Assignments.identity(
                         ImmutableList.of(orderkey, custkey, totalprice).stream()
                                 .filter(projectionFilter)
-                                .collect(Collectors.toMap(v -> v, v -> p.variable(v.getName())))),
+                                .collect(toImmutableList())),
                 p.indexSource(
                         new TableHandle(
                                 new CatalogName("local"),

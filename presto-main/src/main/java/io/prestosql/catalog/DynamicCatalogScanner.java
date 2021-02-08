@@ -36,8 +36,6 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Sets.difference;
 import static io.airlift.concurrent.Threads.threadsNamed;
-import static io.prestosql.catalog.DynamicCatalogStore.CatalogStoreType.LOCAL;
-import static io.prestosql.catalog.DynamicCatalogStore.CatalogStoreType.SHARE;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -48,14 +46,16 @@ public class DynamicCatalogScanner
     private static final Logger log = Logger.get(DiscoveryNodeManager.class);
     private final DynamicCatalogStore dynamicCatalogStore;
     private final ScheduledExecutorService catalogScannerExecutor;
+    private final CatalogStoreUtil catalogStoreUtil;
     private final Duration catalogScannerInterval;
     private final boolean dynamicCatalogEnabled;
     private final ConcurrentMap<String, Boolean> exceptionPrintFlags = new ConcurrentHashMap<>();
 
     @Inject
-    public DynamicCatalogScanner(DynamicCatalogStore dynamicCatalogStore, DynamicCatalogConfig dynamicCatalogConfig)
+    public DynamicCatalogScanner(DynamicCatalogStore dynamicCatalogStore, DynamicCatalogConfig dynamicCatalogConfig, CatalogStoreUtil catalogStoreUtil)
     {
         this.dynamicCatalogStore = requireNonNull(dynamicCatalogStore, "dynamicCatalogStore is null");
+        this.catalogStoreUtil = requireNonNull(catalogStoreUtil, "catalogStoreUtil is null");
         this.catalogScannerExecutor = newSingleThreadScheduledExecutor(threadsNamed("dynamic-catalog-scanner-%s"));
         this.catalogScannerInterval = dynamicCatalogConfig.getCatalogScannerInterval();
         this.dynamicCatalogEnabled = dynamicCatalogConfig.isDynamicCatalogEnabled();
@@ -98,75 +98,78 @@ public class DynamicCatalogScanner
     void scan()
             throws IOException
     {
-        // list all catalogs from Share File System.
-        Set<String> remoteCatalogNames = dynamicCatalogStore.listCatalogNames(SHARE);
+        try (CatalogStore localCatalogStore = catalogStoreUtil.getLocalCatalogStore();
+                CatalogStore shareCatalogStore = catalogStoreUtil.getShareCatalogStore()) {
+            // list all catalogs from Share File System.
+            Set<String> remoteCatalogNames = dynamicCatalogStore.listCatalogNames(shareCatalogStore);
 
-        // list all catalogs in the local disk.
-        Set<String> localCatalogNames = dynamicCatalogStore.listCatalogNames(LOCAL);
+            // list all catalogs in the local disk.
+            Set<String> localCatalogNames = dynamicCatalogStore.listCatalogNames(localCatalogStore);
 
-        // add new catalogs.
-        Set<String> newCatalogNames = difference(remoteCatalogNames, localCatalogNames);
-        for (String newCatalogName : newCatalogNames) {
-            log.info("-- Need add catalog [%s] --", newCatalogName);
-            try {
-                dynamicCatalogStore.loadCatalog(newCatalogName);
-                exceptionPrintFlags.put(newCatalogName, false);
+            // add new catalogs.
+            Set<String> newCatalogNames = difference(remoteCatalogNames, localCatalogNames);
+            for (String newCatalogName : newCatalogNames) {
+                log.info("-- Need add catalog [%s] --", newCatalogName);
+                try {
+                    dynamicCatalogStore.loadCatalog(localCatalogStore, shareCatalogStore, newCatalogName);
+                    exceptionPrintFlags.put(newCatalogName, false);
+                }
+                catch (Throwable ignore) {
+                    exceptionPrint(newCatalogName, String.format("Scanner try to load catalog [%s] failed", newCatalogName), ignore);
+                }
             }
-            catch (Throwable ignore) {
-                exceptionPrint(newCatalogName, String.format("Scanner try to load catalog [%s] failed", newCatalogName), ignore);
-            }
-        }
 
-        // unload catalogs.
-        Set<String> deleteCatalogNames = difference(localCatalogNames, remoteCatalogNames);
-        for (String deleteCatalogName : deleteCatalogNames) {
-            log.info("-- Need remove catalog [%s] --", deleteCatalogName);
-            try {
-                dynamicCatalogStore.unloadCatalog(deleteCatalogName);
-                exceptionPrintFlags.put(deleteCatalogName, false);
+            // unload catalogs.
+            Set<String> deleteCatalogNames = difference(localCatalogNames, remoteCatalogNames);
+            for (String deleteCatalogName : deleteCatalogNames) {
+                log.info("-- Need remove catalog [%s] --", deleteCatalogName);
+                try {
+                    dynamicCatalogStore.unloadCatalog(localCatalogStore, deleteCatalogName);
+                    exceptionPrintFlags.put(deleteCatalogName, false);
+                }
+                catch (Throwable ignore) {
+                    exceptionPrint(deleteCatalogName, String.format("Scanner try to unload catalog [%s] failed", deleteCatalogName), ignore);
+                }
             }
-            catch (Throwable ignore) {
-                exceptionPrint(deleteCatalogName, String.format("Scanner try to unload catalog [%s] failed", deleteCatalogName), ignore);
-            }
-        }
 
-        // get local catalog names again, and compare the catalog version.
-        localCatalogNames = dynamicCatalogStore.listCatalogNames(LOCAL);
-        localCatalogNames
-                .forEach(catalogName -> {
-                    try {
-                        // if can not get the version from local disk, we will reload this catalog.
-                        String localVersion;
+            // get local catalog names again, and compare the catalog version.
+            localCatalogNames = dynamicCatalogStore.listCatalogNames(localCatalogStore);
+            localCatalogNames
+                    .forEach(catalogName -> {
                         try {
-                            localVersion = dynamicCatalogStore.getCatalogVersion(catalogName, LOCAL);
+                            // if can not get the version from local disk, we will reload this catalog.
+                            String localVersion;
+                            try {
+                                localVersion = dynamicCatalogStore.getCatalogVersion(localCatalogStore, catalogName);
+                            }
+                            catch (IOException e) {
+                                exceptionPrint(catalogName, String.format("Get local catalog version of [%s] failed", catalogName), e);
+                                localVersion = "";
+                            }
+                            String remoteVersion = dynamicCatalogStore.getCatalogVersion(shareCatalogStore, catalogName);
+                            if (!localVersion.equals(remoteVersion)) {
+                                log.info("-- Need update catalog [%s], caused by the local version [%s] is not equal the remote version [%s] --",
+                                        catalogName,
+                                        localVersion,
+                                        remoteVersion);
+                                dynamicCatalogStore.reloadCatalog(localCatalogStore, shareCatalogStore, catalogName);
+                                exceptionPrintFlags.put(catalogName, false);
+                            }
                         }
                         catch (IOException e) {
-                            exceptionPrint(catalogName, String.format("Get local catalog version of [%s] failed", catalogName), e);
-                            localVersion = "";
+                            exceptionPrint(catalogName, String.format("Get remote catalog version of [%s] failed", catalogName), e);
                         }
-                        String remoteVersion = dynamicCatalogStore.getCatalogVersion(catalogName, SHARE);
-                        if (!localVersion.equals(remoteVersion)) {
-                            log.info("-- Need update catalog [%s], caused by the local version [%s] is not equal the remote version [%s] --",
-                                    catalogName,
-                                    localVersion,
-                                    remoteVersion);
-                            dynamicCatalogStore.reloadCatalog(catalogName);
-                            exceptionPrintFlags.put(catalogName, false);
+                        catch (Throwable e) {
+                            exceptionPrint(catalogName, "Reload failed", e);
                         }
-                    }
-                    catch (IOException e) {
-                        exceptionPrint(catalogName, String.format("Get remote catalog version of [%s] failed", catalogName), e);
-                    }
-                    catch (Throwable e) {
-                        exceptionPrint(catalogName, "Reload failed", e);
-                    }
-                });
+                    });
 
-        Set<String> allCatalogNames = new HashSet<>();
-        allCatalogNames.addAll(remoteCatalogNames);
-        allCatalogNames.addAll(localCatalogNames);
-        Set<String> expiredCatalogNames = difference(exceptionPrintFlags.keySet(), allCatalogNames);
-        expiredCatalogNames.forEach(catalogName -> exceptionPrintFlags.remove(catalogName));
+            Set<String> allCatalogNames = new HashSet<>();
+            allCatalogNames.addAll(remoteCatalogNames);
+            allCatalogNames.addAll(localCatalogNames);
+            Set<String> expiredCatalogNames = difference(exceptionPrintFlags.keySet(), allCatalogNames);
+            expiredCatalogNames.forEach(catalogName -> exceptionPrintFlags.remove(catalogName));
+        }
     }
 
     void exceptionPrint(String catalogName, String message, Throwable cause)

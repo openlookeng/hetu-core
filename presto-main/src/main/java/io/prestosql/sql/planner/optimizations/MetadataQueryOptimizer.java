@@ -25,30 +25,28 @@ import io.prestosql.metadata.TableProperties;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.DiscretePredicates;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
+import io.prestosql.sql.planner.DeterminismEvaluator;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.SortNode;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.TopNNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
 import java.util.Map;
@@ -56,7 +54,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 
 /**
  * Converts cardinality-insensitive aggregations (max, min, "distinct") over partition keys
@@ -79,7 +76,7 @@ public class MetadataQueryOptimizer
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         if (!SystemSessionProperties.isOptimizeMetadataQueries(session)) {
             return plan;
@@ -149,12 +146,12 @@ public class MetadataQueryOptimizer
                 return context.defaultRewrite(node);
             }
 
-            ImmutableList.Builder<List<RowExpression>> rowsBuilder = ImmutableList.builder();
+            ImmutableList.Builder<List<Expression>> rowsBuilder = ImmutableList.builder();
             for (TupleDomain<ColumnHandle> domain : predicates.getPredicates()) {
                 if (!domain.isNone()) {
                     Map<ColumnHandle, NullableValue> entries = TupleDomain.extractFixedValues(domain).get();
 
-                    ImmutableList.Builder<RowExpression> rowBuilder = ImmutableList.builder();
+                    ImmutableList.Builder<Expression> rowBuilder = ImmutableList.builder();
                     // for each input column, add a literal expression using the entry value
                     for (Symbol input : inputs) {
                         ColumnHandle column = columns.get(input);
@@ -165,7 +162,7 @@ public class MetadataQueryOptimizer
                             return context.defaultRewrite(node);
                         }
                         else {
-                            rowBuilder.add(new ConstantExpression(value.getValue(), type));
+                            rowBuilder.add(literalEncoder.toExpression(value.getValue(), type));
                         }
                     }
                     rowsBuilder.add(rowBuilder.build());
@@ -191,7 +188,7 @@ public class MetadataQueryOptimizer
                 else if (source instanceof ProjectNode) {
                     // verify projections are deterministic
                     ProjectNode project = (ProjectNode) source;
-                    if (!Iterables.all(project.getAssignments().getExpressions().stream().map(OriginalExpressionUtils::castToExpression).collect(toList()), ExpressionDeterminismEvaluator::isDeterministic)) {
+                    if (!Iterables.all(project.getAssignments().getExpressions(), DeterminismEvaluator::isDeterministic)) {
                         return Optional.empty();
                     }
                     source = project.getSource();

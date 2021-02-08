@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-root</artifactId>
-        <version>1.2.0-SNAPSHOT</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>presto-elasticsearch</artifactId>
@@ -16,14 +16,13 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <dep.log4j.version>2.9.1</dep.log4j.version>
         <dep.elasticsearch.version>6.0.0</dep.elasticsearch.version>
-        <httpcore-nio.version>4.4.5</httpcore-nio.version>
+        <dep.searchguard.version>6.0.1-25.4</dep.searchguard.version>
     </properties>
 
     <dependencies>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore-nio</artifactId>
-            <version>${httpcore-nio.version}</version>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-record-decoder</artifactId>
         </dependency>
 
         <dependency>
@@ -82,41 +81,42 @@
         </dependency>
 
         <dependency>
+            <groupId>com.floragunn</groupId>
+            <artifactId>search-guard-ssl</artifactId>
+            <version>${dep.searchguard.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.elasticsearch.plugin</groupId>
+                    <artifactId>transport-netty4-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
             <groupId>org.elasticsearch.client</groupId>
-            <artifactId>elasticsearch-rest-high-level-client</artifactId>
-            <version>${dep.elasticsearch.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.elasticsearch.client</groupId>
-            <artifactId>elasticsearch-rest-client</artifactId>
+            <artifactId>transport</artifactId>
             <version>${dep.elasticsearch.version}</version>
             <exclusions>
                 <exclusion>
-                    <groupId>commons-logging</groupId>
-                    <artifactId>commons-logging</artifactId>
+                    <groupId>org.yaml</groupId>
+                    <artifactId>snakeyaml</artifactId>
                 </exclusion>
-            </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.2</version>
-
-            <exclusions>
-                <!-- elasticsearch-rest-high-level-client 6.0.0 brings in httpcore 4.4.5 vs (4.4.4) -->
                 <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpcore</artifactId>
+                    <groupId>org.ow2.asm</groupId>
+                    <artifactId>asm-all</artifactId>
                 </exclusion>
-
-                <!-- elasticsearch-rest-high-level-client 6.0.0 brings in commons-codec 1.10 vs (1.9) -->
                 <exclusion>
-                    <groupId>commons-codec</groupId>
-                    <artifactId>commons-codec</artifactId>
+                    <groupId>org.ow2.asm</groupId>
+                    <artifactId>asm-commons</artifactId>
                 </exclusion>
-
+                <exclusion>
+                    <groupId>org.ow2.asm</groupId>
+                    <artifactId>asm</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.hdrhistogram</groupId>
+                    <artifactId>HdrHistogram</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>commons-logging</groupId>
                     <artifactId>commons-logging</artifactId>
@@ -125,18 +125,31 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore</artifactId>
-            <version>4.4.5</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpasyncclient</artifactId>
-            <version>4.1.2</version>
-
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch</artifactId>
+            <version>${dep.elasticsearch.version}</version>
             <exclusions>
                 <exclusion>
+                    <groupId>org.yaml</groupId>
+                    <artifactId>snakeyaml</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.ow2.asm</groupId>
+                    <artifactId>asm-all</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.ow2.asm</groupId>
+                    <artifactId>asm-commons</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.ow2.asm</groupId>
+                    <artifactId>asm</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.hdrhistogram</groupId>
+                    <artifactId>HdrHistogram</artifactId>
+                </exclusion>
+                <exclusion>
                     <groupId>commons-logging</groupId>
                     <artifactId>commons-logging</artifactId>
                 </exclusion>
@@ -144,8 +157,9 @@
         </dependency>
 
         <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>security</artifactId>
+            <groupId>org.elasticsearch.plugin</groupId>
+            <artifactId>transport-netty4-client</artifactId>
+            <version>${dep.elasticsearch.version}</version>
         </dependency>
 
         <dependency>
@@ -198,11 +212,6 @@
             <groupId>org.openjdk.jol</groupId>
             <artifactId>jol-core</artifactId>
             <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.weakref</groupId>
-            <artifactId>jmxutils</artifactId>
         </dependency>
 
         <!-- for testing -->
@@ -265,18 +274,6 @@
             <artifactId>testng</artifactId>
             <scope>test</scope>
         </dependency>
-
-        <dependency>
-            <groupId>org.elasticsearch</groupId>
-            <artifactId>elasticsearch</artifactId>
-            <version>${dep.elasticsearch.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.elasticsearch.plugin</groupId>
-            <artifactId>transport-netty4-client</artifactId>
-            <version>${dep.elasticsearch.version}</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
+
 </project>

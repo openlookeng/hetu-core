@@ -20,17 +20,15 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.prestosql.metadata.AnalyzeTableHandle;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.metadata.TableHandle;
+import io.prestosql.sql.planner.Symbol;
 
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
 public class StatisticsWriterNode
-        extends InternalPlanNode
+        extends PlanNode
 {
     private final PlanNode source;
     private final Symbol rowCountSymbol;
@@ -110,7 +108,7 @@ public class StatisticsWriterNode
     }
 
     @Override
-    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitStatisticsWriterNode(this, context);
     }

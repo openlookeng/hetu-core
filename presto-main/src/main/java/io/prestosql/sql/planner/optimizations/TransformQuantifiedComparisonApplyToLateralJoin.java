@@ -18,25 +18,23 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.ExpressionUtils;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -55,15 +53,11 @@ import java.util.Optional;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static io.prestosql.spi.plan.AggregationNode.globalAggregation;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypeSignatures;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.plan.AggregationNode.globalAggregation;
 import static io.prestosql.sql.planner.plan.SimplePlanRewriter.rewriteWith;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
@@ -87,9 +81,9 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        return rewriteWith(new Rewriter(idAllocator, types, planSymbolAllocator, metadata), plan, null);
+        return rewriteWith(new Rewriter(idAllocator, types, symbolAllocator, metadata), plan, null);
     }
 
     private static class Rewriter
@@ -101,14 +95,14 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
 
         private final PlanNodeIdAllocator idAllocator;
         private final TypeProvider types;
-        private final PlanSymbolAllocator planSymbolAllocator;
+        private final SymbolAllocator symbolAllocator;
         private final Metadata metadata;
 
-        public Rewriter(PlanNodeIdAllocator idAllocator, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, Metadata metadata)
+        public Rewriter(PlanNodeIdAllocator idAllocator, TypeProvider types, SymbolAllocator symbolAllocator, Metadata metadata)
         {
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.types = requireNonNull(types, "types is null");
-            this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
+            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
         }
 
@@ -119,7 +113,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
                 return context.defaultRewrite(node);
             }
 
-            Expression expression = castToExpression(getOnlyElement(node.getSubqueryAssignments().getExpressions()));
+            Expression expression = getOnlyElement(node.getSubqueryAssignments().getExpressions());
             if (!(expression instanceof QuantifiedComparisonExpression)) {
                 return context.defaultRewrite(node);
             }
@@ -137,12 +131,12 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
             Type outputColumnType = types.get(outputColumn);
             checkState(outputColumnType.isOrderable(), "Subquery result type must be orderable");
 
-            Symbol minValue = planSymbolAllocator.newSymbol(MIN.toString(), outputColumnType);
-            Symbol maxValue = planSymbolAllocator.newSymbol(MAX.toString(), outputColumnType);
-            Symbol countAllValue = planSymbolAllocator.newSymbol("count_all", BigintType.BIGINT);
-            Symbol countNonNullValue = planSymbolAllocator.newSymbol("count_non_null", BigintType.BIGINT);
+            Symbol minValue = symbolAllocator.newSymbol(MIN.toString(), outputColumnType);
+            Symbol maxValue = symbolAllocator.newSymbol(MAX.toString(), outputColumnType);
+            Symbol countAllValue = symbolAllocator.newSymbol("count_all", BigintType.BIGINT);
+            Symbol countNonNullValue = symbolAllocator.newSymbol("count_non_null", BigintType.BIGINT);
 
-            List<Expression> outputColumnReferences = ImmutableList.of(toSymbolReference(outputColumn));
+            List<Expression> outputColumnReferences = ImmutableList.of(outputColumn.toSymbolReference());
             List<TypeSignature> outputColumnTypeSignature = ImmutableList.of(outputColumnType.getTypeSignature());
 
             subqueryPlan = new AggregationNode(
@@ -151,14 +145,14 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
                     ImmutableMap.of(
                             minValue, new Aggregation(
                                     metadata.resolveFunction(MIN, fromTypeSignatures(outputColumnTypeSignature)),
-                                    outputColumnReferences.stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList()),
+                                    outputColumnReferences,
                                     false,
                                     Optional.empty(),
                                     Optional.empty(),
                                     Optional.empty()),
                             maxValue, new Aggregation(
                                     metadata.resolveFunction(MAX, fromTypeSignatures(outputColumnTypeSignature)),
-                                    outputColumnReferences.stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList()),
+                                    outputColumnReferences,
                                     false,
                                     Optional.empty(),
                                     Optional.empty(),
@@ -172,7 +166,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
                                     Optional.empty()),
                             countNonNullValue, new Aggregation(
                                     metadata.resolveFunction(COUNT, fromTypeSignatures(outputColumnTypeSignature)),
-                                    outputColumnReferences.stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList()),
+                                    outputColumnReferences,
                                     false,
                                     Optional.empty(),
                                     Optional.empty(),
@@ -196,7 +190,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
 
             Symbol quantifiedComparisonSymbol = getOnlyElement(node.getSubqueryAssignments().getSymbols());
 
-            return projectExpressions(lateralJoinNode, Assignments.of(quantifiedComparisonSymbol, castToRowExpression(valueComparedToSubquery)));
+            return projectExpressions(lateralJoinNode, Assignments.of(quantifiedComparisonSymbol, valueComparedToSubquery));
         }
 
         public Expression rewriteUsingBounds(QuantifiedComparisonExpression quantifiedComparison, Symbol minValue, Symbol maxValue, Symbol countAllValue, Symbol countNonNullValue)
@@ -207,7 +201,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
             Expression comparisonWithExtremeValue = getBoundComparisons(quantifiedComparison, minValue, maxValue);
 
             return new SimpleCaseExpression(
-                    toSymbolReference(countAllValue),
+                    countAllValue.toSymbolReference(),
                     ImmutableList.of(new WhenClause(
                             new GenericLiteral("bigint", "0"),
                             emptySetResult)),
@@ -216,7 +210,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
                             new SearchedCaseExpression(
                                     ImmutableList.of(
                                             new WhenClause(
-                                                    new ComparisonExpression(NOT_EQUAL, toSymbolReference(countAllValue), toSymbolReference(countNonNullValue)),
+                                                    new ComparisonExpression(NOT_EQUAL, countAllValue.toSymbolReference(), countNonNullValue.toSymbolReference()),
                                                     new Cast(new NullLiteral(), BooleanType.BOOLEAN.toString()))),
                                     Optional.of(emptySetResult))))));
         }
@@ -226,8 +220,8 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
             if (quantifiedComparison.getOperator() == EQUAL && quantifiedComparison.getQuantifier() == ALL) {
                 // A = ALL B <=> min B = max B && A = min B
                 return combineConjuncts(
-                        new ComparisonExpression(EQUAL, toSymbolReference(minValue), toSymbolReference(maxValue)),
-                        new ComparisonExpression(EQUAL, quantifiedComparison.getValue(), toSymbolReference(maxValue)));
+                        new ComparisonExpression(EQUAL, minValue.toSymbolReference(), maxValue.toSymbolReference()),
+                        new ComparisonExpression(EQUAL, quantifiedComparison.getValue(), maxValue.toSymbolReference()));
             }
 
             if (EnumSet.of(LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL).contains(quantifiedComparison.getOperator())) {
@@ -236,7 +230,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
                 // A < ANY B <=> A < max B
                 // A > ANY B <=> A > min B
                 Symbol boundValue = shouldCompareValueWithLowerBound(quantifiedComparison) ? minValue : maxValue;
-                return new ComparisonExpression(quantifiedComparison.getOperator(), quantifiedComparison.getValue(), toSymbolReference(boundValue));
+                return new ComparisonExpression(quantifiedComparison.getOperator(), quantifiedComparison.getValue(), boundValue.toSymbolReference());
             }
             throw new IllegalArgumentException("Unsupported quantified comparison: " + quantifiedComparison);
         }
@@ -272,7 +266,7 @@ public class TransformQuantifiedComparisonApplyToLateralJoin
         private ProjectNode projectExpressions(PlanNode input, Assignments subqueryAssignments)
         {
             Assignments assignments = Assignments.builder()
-                    .putAll(AssignmentUtils.identityAsSymbolReferences(input.getOutputSymbols()))
+                    .putIdentities(input.getOutputSymbols())
                     .putAll(subqueryAssignments)
                     .build();
             return new ProjectNode(

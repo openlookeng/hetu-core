@@ -178,12 +178,6 @@ public class BaseJdbcClient
     }
 
     @Override
-    public String getIdentifierQuote()
-    {
-        return identifierQuote;
-    }
-
-    @Override
     public final Set<String> getSchemaNames(JdbcIdentity identity)
     {
         try (Connection connection = connectionFactory.openConnection(identity)) {
@@ -327,15 +321,15 @@ public class BaseJdbcClient
     public PreparedStatement buildSql(ConnectorSession session, Connection connection, JdbcSplit split, JdbcTableHandle table, List<JdbcColumnHandle> columns)
             throws SQLException
     {
-        if (table.getGeneratedSql().isPresent()) {
-            // Hetu: If the query is pushed down, use it as the table
+        if (table.getSubQuery() != null) {
+            // Hetu: If the sub-query is pushed down, use it as the table
             return new QueryBuilder(identifierQuote, true).buildSql(
                     this,
                     session,
                     connection,
                     null,
                     null,
-                    table.getGeneratedSql().get().getSql(),
+                    table.getSubQuery(),
                     columns,
                     table.getConstraint(),
                     split.getAdditionalPredicate(),

@@ -15,23 +15,17 @@
 package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import io.prestosql.Session;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.heuristicindex.IndexClient;
-import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.transaction.TransactionManager;
-import io.prestosql.utils.HeuristicIndexUtils;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -53,32 +47,11 @@ public class DropIndexTask
         String indexName = statement.getIndexName().toString();
 
         try {
-            IndexRecord record = indexClient.lookUpIndexRecord(indexName);
             // check indexName exist, call heuristic index api to drop index
-            if (record == null) {
-                throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exist", indexName);
+            if (indexClient.getIndexRecord(indexName) == null) {
+                throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exists", indexName);
             }
-
-            QualifiedObjectName fullObjectName = QualifiedObjectName.valueOf(record.table);
-            Session session = stateMachine.getSession();
-            accessControl.checkCanDropIndex(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
-
-            List<String> partitions = Collections.emptyList();
-            if (statement.getPartitions().isPresent()) {
-                partitions = HeuristicIndexUtils.extractPartitions(statement.getPartitions().get());
-
-                List<String> partitionsInindex = indexClient.lookUpIndexRecord(indexName).partitions;
-                if (partitionsInindex.isEmpty()) {
-                    throw new SemanticException(MISSING_INDEX, statement, "Index '%s' was not created with explicit partitions. Partial drop by partition is not supported.", indexName);
-                }
-
-                List<String> missingPartitions = new ArrayList<>(partitions);
-                missingPartitions.removeAll(partitionsInindex);
-                if (!missingPartitions.isEmpty()) {
-                    throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not contain partitions: %s", indexName, missingPartitions);
-                }
-            }
-            indexClient.deleteIndex(indexName, partitions);
+            indexClient.deleteIndex(indexName);
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);

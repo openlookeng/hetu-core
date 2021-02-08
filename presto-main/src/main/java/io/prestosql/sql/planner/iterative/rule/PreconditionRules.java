@@ -15,9 +15,9 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.ExchangeNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import static io.prestosql.sql.planner.plan.Patterns.exchange;
 import static java.util.Objects.requireNonNull;

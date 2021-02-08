@@ -20,9 +20,9 @@ import io.prestosql.operator.HashAggregationOperator.HashAggregationOperatorFact
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.plan.AggregationNode.Step;
-import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.plan.AggregationNode.Step;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.LocalQueryRunner;
 
 import java.util.List;

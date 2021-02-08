@@ -204,8 +204,7 @@ public class HetuHBaseMetastore
                 Constants.S_TRUE.equals(tableParam.get(Constants.S_EXTERNAL).toLowerCase(Locale.ENGLISH)),
                 Optional.ofNullable(tableParam.get(Constants.S_SERIALIZER_CLASS_NAME)),
                 Optional.ofNullable(tableParam.get(Constants.S_INDEX_COLUMNS)),
-                Optional.ofNullable(tableParam.get(Constants.S_HBASE_TABLE_NAME)),
-                Optional.ofNullable(tableParam.get(Constants.S_SPLIT_BY_CHAR)));
+                Optional.ofNullable(tableParam.get(Constants.S_HBASE_TABLE_NAME)));
         hBaseTable.setColumnsToMap(columnsMap);
 
         return hBaseTable;
@@ -243,7 +242,6 @@ public class HetuHBaseMetastore
         tableParam.put(Constants.S_ROWID, hBaseTable.getRowId());
         tableParam.put(Constants.S_INDEX_COLUMNS, hBaseTable.getIndexColumns());
         tableParam.put(Constants.S_HBASE_TABLE_NAME, hBaseTable.getHbaseTableName().orElse(null));
-        tableParam.put(Constants.S_SPLIT_BY_CHAR, hBaseTable.getSplitByChar().orElse(null));
 
         tableEntity.setParameters(tableParam);
 

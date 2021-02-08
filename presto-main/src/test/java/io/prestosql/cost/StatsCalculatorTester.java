@@ -17,9 +17,9 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.testing.LocalQueryRunner;
 
 import java.util.function.Function;

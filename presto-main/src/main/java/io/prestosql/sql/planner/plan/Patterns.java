@@ -15,23 +15,7 @@ package io.prestosql.sql.planner.plan;
 
 import io.prestosql.matching.Pattern;
 import io.prestosql.matching.Property;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.ExceptNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.GroupIdNode;
-import io.prestosql.spi.plan.IntersectNode;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.ProjectNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.plan.TopNNode;
-import io.prestosql.spi.plan.UnionNode;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.tree.Expression;
 
@@ -158,11 +142,6 @@ public class Patterns
         return typeOf(TableWriterNode.class);
     }
 
-    public static Pattern<VacuumTableNode> vacuumTableNode()
-    {
-        return typeOf(VacuumTableNode.class);
-    }
-
     public static Pattern<TopNNode> topN()
     {
         return typeOf(TopNNode.class);
@@ -201,11 +180,6 @@ public class Patterns
     public static Pattern<ExceptNode> except()
     {
         return typeOf(ExceptNode.class);
-    }
-
-    public static Pattern<GroupIdNode> groupId()
-    {
-        return typeOf(GroupIdNode.class);
     }
 
     public static Property<PlanNode, Lookup, PlanNode> source()
@@ -248,18 +222,6 @@ public class Patterns
         public static Property<ApplyNode, Lookup, List<Symbol>> correlation()
         {
             return property("correlation", ApplyNode::getCorrelation);
-        }
-
-        public static Property<ApplyNode, Lookup, PlanNode> subQuery()
-        {
-            return property("subquery",
-                    (node, lookup) -> lookup.resolve(node.getSubquery()));
-        }
-
-        public static Property<ApplyNode, Lookup, PlanNode> input()
-        {
-            return property("input",
-                    (node, lookup) -> lookup.resolve(node.getInput()));
         }
     }
 
@@ -333,7 +295,7 @@ public class Patterns
 
     public static class Values
     {
-        public static Property<ValuesNode, Lookup, List<List<RowExpression>>> rows()
+        public static Property<ValuesNode, Lookup, List<List<Expression>>> rows()
         {
             return property("rows", ValuesNode::getRows);
         }

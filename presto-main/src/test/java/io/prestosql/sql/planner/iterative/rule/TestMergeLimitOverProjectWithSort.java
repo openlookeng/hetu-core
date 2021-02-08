@@ -15,10 +15,10 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.assertions.ExpressionMatcher;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
@@ -41,7 +41,7 @@ public class TestMergeLimitOverProjectWithSort
                     return p.limit(
                             1,
                             p.project(
-                                    Assignments.of(b, p.variable(b.getName())),
+                                    Assignments.identity(b),
                                     p.sort(
                                             ImmutableList.of(a),
                                             p.values(a, b))));
@@ -66,7 +66,7 @@ public class TestMergeLimitOverProjectWithSort
                             1,
                             ImmutableList.of(b),
                             p.project(
-                                    Assignments.of(b, p.variable(b.getName())),
+                                    Assignments.identity(b),
                                     p.sort(
                                             ImmutableList.of(a),
                                             p.values(a, b))));

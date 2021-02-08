@@ -16,8 +16,6 @@ package io.prestosql.spi.type;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 
-import javax.inject.Inject;
-
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.util.Objects.requireNonNull;
 
@@ -26,7 +24,6 @@ public final class TestingTypeDeserializer
 {
     private final TypeManager typeManager;
 
-    @Inject
     public TestingTypeDeserializer(TypeManager typeManager)
     {
         super(Type.class);

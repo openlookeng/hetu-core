@@ -41,10 +41,11 @@ import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveUtil;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
-import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
 import io.prestosql.spi.predicate.Domain;
@@ -75,6 +76,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -122,7 +124,6 @@ public class OrcPageSourceFactory
     public static final String ACID_COLUMN_ROW_ID = "rowId";
     public static final String ACID_COLUMN_CURRENT_TRANSACTION = "currentTransaction";
     public static final String ACID_COLUMN_ROW_STRUCT = "row";
-    public static final List<String> EAGER_LOAD_INDEX_ID = ImmutableList.of("BITMAP");
 
     private static final Pattern DEFAULT_HIVE_COLUMN_NAME_PATTERN = Pattern.compile("_col\\d+");
     private static final Logger log = Logger.get(OrcPageSourceFactory.class);
@@ -158,7 +159,7 @@ public class OrcPageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
-            Optional<DynamicFilterSupplier> dynamicFilters,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -234,7 +235,7 @@ public class OrcPageSourceFactory
             boolean lazyReadSmallRanges,
             boolean orcBloomFiltersEnabled,
             FileFormatDataSourceStats stats,
-            Optional<DynamicFilterSupplier> dynamicFilters,
+            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -409,17 +410,12 @@ public class OrcPageSourceFactory
                     hdfsEnvironment,
                     startRowOffsetOfFile);
 
-            boolean eagerload = false;
-            if (indexes.isPresent()) {
-                eagerload = indexes.get().stream().anyMatch(indexMetadata -> EAGER_LOAD_INDEX_ID.contains(indexMetadata.getIndex().getId()));
-            }
-
             return new OrcPageSource(
                     recordReader,
                     columnAdaptations,
                     orcDataSource,
                     deletedRows,
-                    eagerload,
+                    indexes.isPresent(),
                     systemMemoryUsage,
                     stats);
         }

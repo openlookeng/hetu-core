@@ -14,11 +14,11 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.tree.Expression;
@@ -119,7 +119,7 @@ public class TestSimplifyExpressions
     {
         Expression actualExpression = rewriteIdentifiersToSymbolReferences(SQL_PARSER.createExpression(expression));
         Expression expectedExpression = rewriteIdentifiersToSymbolReferences(SQL_PARSER.createExpression(expected));
-        Expression rewritten = rewrite(actualExpression, TEST_SESSION, new PlanSymbolAllocator(booleanSymbolTypeMapFor(actualExpression)), METADATA, LITERAL_ENCODER, new TypeAnalyzer(SQL_PARSER, METADATA));
+        Expression rewritten = rewrite(actualExpression, TEST_SESSION, new SymbolAllocator(booleanSymbolTypeMapFor(actualExpression)), METADATA, LITERAL_ENCODER, new TypeAnalyzer(SQL_PARSER, METADATA));
         assertEquals(
                 normalize(rewritten),
                 normalize(expectedExpression));

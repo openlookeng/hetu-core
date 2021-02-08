@@ -15,10 +15,8 @@
 
 package io.hetu.core.plugin.heuristicindex.index.minmax;
 
-import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.heuristicindex.Index;
-import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
@@ -27,8 +25,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 import static io.hetu.core.heuristicindex.util.IndexConstants.TYPES_WHITELIST;
 import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
@@ -43,6 +41,7 @@ public class MinMaxIndex
 
     private Comparable min;
     private Comparable max;
+    private long memorySize;
 
     /**
      * Default Constructor
@@ -70,11 +69,10 @@ public class MinMaxIndex
     }
 
     @Override
-    public boolean addValues(List<Pair<String, List<Object>>> values)
-            throws IOException
+    public synchronized boolean addValues(Map<String, List<Object>> values)
     {
         // Currently expecting only one column
-        List<Object> columnIdxValue = values.get(0).getSecond();
+        List<Object> columnIdxValue = values.values().iterator().next();
         for (Object v : columnIdxValue) {
             if (v == null) {
                 continue;
@@ -96,12 +94,6 @@ public class MinMaxIndex
             }
         }
         return true;
-    }
-
-    @Override
-    public Set<Level> getSupportedIndexLevels()
-    {
-        return ImmutableSet.of(Level.STRIPE);
     }
 
     @Override
@@ -200,6 +192,18 @@ public class MinMaxIndex
     }
 
     @Override
+    public int getExpectedNumOfEntries()
+    {
+        return 0;
+    }
+
+    @Override
+    public void setExpectedNumOfEntries(int expectedNumOfEntries)
+    {
+        // ignore
+    }
+
+    @Override
     public boolean equals(Object o)
     {
         if (this == o) {
@@ -217,5 +221,23 @@ public class MinMaxIndex
     public int hashCode()
     {
         return Objects.hash(min, max);
+    }
+
+    @Override
+    public long getMemorySize()
+    {
+        return this.memorySize;
+    }
+
+    @Override
+    public void setMemorySize(long memorySize)
+    {
+        this.memorySize = memorySize;
+    }
+
+    @Override
+    public boolean supportMultiColumn()
+    {
+        return false;
     }
 }

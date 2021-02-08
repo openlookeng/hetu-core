@@ -62,12 +62,7 @@ public enum HBaseErrorCode
     /**
      * Thrown when hbase metastore is not right
      */
-    UNSUPPORTED_TYPE(16, EXTERNAL),
-
-    /**
-     * Thrown when a new create table specify external = true
-     */
-    HBASE_CREATE_ERROR(17, EXTERNAL);
+    UNSUPPORTED_TYPE(16, EXTERNAL);
 
     private final ErrorCode errorCode;
 

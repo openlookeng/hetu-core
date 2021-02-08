@@ -27,7 +27,6 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.testing.NoOpIndexClient;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -59,14 +58,13 @@ public class TestIndexCache
     private HiveSplit testHiveSplit;
     private List<HiveColumnHandle> testPartitions = Collections.emptyList();
     private final long loadDelay = 1000;
-    private final long numberOfIndexTypes = IndexCache.INDEX_TYPES.size();
 
     @BeforeClass
     public void setupBeforeClass()
     {
         PropertyService.setProperty(HetuConstant.FILTER_ENABLED, true);
         PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, "local-config-default");
-        PropertyService.setProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY, (long) (new DataSize(numberOfIndexTypes * 2, KILOBYTE).getValue(KILOBYTE)));
+        PropertyService.setProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY, (long) (new DataSize(10, KILOBYTE).getValue(KILOBYTE)));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_TTL, new Duration(10, TimeUnit.MINUTES));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(loadDelay, TimeUnit.MILLISECONDS));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
@@ -90,174 +88,162 @@ public class TestIndexCache
     @Test
     public void testIndexCacheGetIndices() throws Exception
     {
-        synchronized (this) {
-            when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            List<IndexMetadata> expectedIndices = new LinkedList<>();
-            IndexMetadata indexMetadata = mock(IndexMetadata.class);
-            when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            expectedIndices.add(indexMetadata);
-            Index index = mock(Index.class);
-            when(indexMetadata.getIndex()).thenReturn(index);
-            when(index.getMemoryUsage()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        List<IndexMetadata> expectedIndices = new LinkedList<>();
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
-            IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
-            when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, new NoOpIndexClient());
-            List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
-                    effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 500);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
-        }
+        IndexCache indexCache = new IndexCache(indexCacheLoader);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
+                effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        Thread.sleep(loadDelay + 1000);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 1);
     }
 
     @Test
     public void testIndexCacheThrowsExecutionException() throws Exception
     {
-        synchronized (this) {
-            when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            List<IndexMetadata> expectedIndices = new LinkedList<>();
-            IndexMetadata indexMetadata = mock(IndexMetadata.class);
-            when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            expectedIndices.add(indexMetadata);
-            Index index = mock(Index.class);
-            when(indexMetadata.getIndex()).thenReturn(index);
-            when(index.getMemoryUsage()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        List<IndexMetadata> expectedIndices = new LinkedList<>();
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
-            IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
-            when(indexCacheLoader.load(any())).thenThrow(ExecutionException.class);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenThrow(ExecutionException.class);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
-            List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
-                    effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 500);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
-                    testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-        }
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
+                effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+                testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
     }
 
     @Test
     public void testExpiredCacheIndices() throws Exception
     {
-        synchronized (this) {
-            when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            List<IndexMetadata> expectedIndices = new LinkedList<>();
-            IndexMetadata indexMetadata = mock(IndexMetadata.class);
-            when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            expectedIndices.add(indexMetadata);
-            Index index = mock(Index.class);
-            when(indexMetadata.getIndex()).thenReturn(index);
-            when(index.getMemoryUsage()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        List<IndexMetadata> expectedIndices = new LinkedList<>();
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
-            IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
-            when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
-            List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
-                    effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 500);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
-                    testPartitions);
-            assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
+                effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+                testPartitions);
+        assertEquals(actualSplitIndex.size(), 1);
 
-            // now the index is in the cache, but changing the lastmodified date of the split should invalidate it
-            when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime + 1);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
-                    testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-        }
+        // now the index is in the cache, but changing the lastmodified date of the split should invalidate it
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime + 1);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+                testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
     }
 
     @Test
     public void testIndexCacheIWIthPartitions() throws Exception
     {
-        synchronized (this) {
-            when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            List<HiveColumnHandle> partitionColumns = ImmutableList.of(partitionColumnHandle);
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        List<HiveColumnHandle> partitionColumns = ImmutableList.of(partitionColumnHandle);
 
-            List<IndexMetadata> expectedIndices = new LinkedList<>();
-            IndexMetadata indexMetadata = mock(IndexMetadata.class);
-            when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            expectedIndices.add(indexMetadata);
-            Index index = mock(Index.class);
-            when(indexMetadata.getIndex()).thenReturn(index);
-            when(index.getMemoryUsage()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
+        List<IndexMetadata> expectedIndices = new LinkedList<>();
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        expectedIndices.add(indexMetadata);
+        Index index = mock(Index.class);
+        when(indexMetadata.getIndex()).thenReturn(index);
+        when(index.getMemorySize()).thenReturn(new DataSize(1, KILOBYTE).toBytes());
 
-            IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
-            when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices);
 
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
-            List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
-                    effectivePredicateForPartition, partitionColumns);
-            assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 500);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicateForPartition,
-                    partitionColumns);
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
+                effectivePredicateForPartition, partitionColumns);
+        assertEquals(actualSplitIndex.size(), 0);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicateForPartition,
+                partitionColumns);
 
-            assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
-        }
+        assertEquals(actualSplitIndex.size(), 1);
     }
 
     @Test
     public void testIndexCacheEviction() throws Exception
     {
-        synchronized (this) {
-            IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
-            IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
-            when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
+        IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay);
+        when(testHiveSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
 
-            //get index for split1
-            List<IndexMetadata> expectedIndices1 = new LinkedList<>();
-            IndexMetadata indexMetadata1 = mock(IndexMetadata.class);
-            when(indexMetadata1.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            expectedIndices1.add(indexMetadata1);
-            Index index1 = mock(Index.class);
-            when(indexMetadata1.getIndex()).thenReturn(index1);
-            when(index1.getMemoryUsage()).thenReturn(new DataSize(2, KILOBYTE).toBytes());
-            when(indexCacheLoader.load(any())).thenReturn(expectedIndices1);
+        //get index for split1
+        List<IndexMetadata> expectedIndices1 = new LinkedList<>();
+        IndexMetadata indexMetadata1 = mock(IndexMetadata.class);
+        when(indexMetadata1.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        expectedIndices1.add(indexMetadata1);
+        Index index1 = mock(Index.class);
+        when(indexMetadata1.getIndex()).thenReturn(index1);
+        when(index1.getMemorySize()).thenReturn(new DataSize(5, KILOBYTE).toBytes());
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices1);
 
-            List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
-                    effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 500);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
-                    testPartitions);
-            // each index is has memory usage of 2, and limit is 2*types of idx, so all should be loaded
-            assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
-            assertEquals(actualSplitIndex.get(0), expectedIndices1.get(0));
-            assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
+        List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
+                effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
+                testPartitions);
+        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.get(0), expectedIndices1.get(0));
+        assertEquals(indexCache.getCacheSize(), 1);
 
-            //get index for split2
-            when(testHiveSplit.getPath()).thenReturn(testPath2);
-            List<IndexMetadata> expectedIndices2 = new LinkedList<>();
-            IndexMetadata indexMetadata2 = mock(IndexMetadata.class);
-            when(indexMetadata2.getLastModifiedTime()).thenReturn(testLastModifiedTime);
-            expectedIndices2.add(indexMetadata2);
-            Index index2 = mock(Index.class);
-            when(indexMetadata2.getIndex()).thenReturn(index2);
-            when(index2.getMemoryUsage()).thenReturn(new DataSize(2, KILOBYTE).toBytes());
-            when(indexCacheLoader.load(any())).thenReturn(expectedIndices2);
+        //get index for split2
+        when(testHiveSplit.getPath()).thenReturn(testPath2);
+        List<IndexMetadata> expectedIndices2 = new LinkedList<>();
+        IndexMetadata indexMetadata2 = mock(IndexMetadata.class);
+        when(indexMetadata2.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+        expectedIndices2.add(indexMetadata2);
+        Index index2 = mock(Index.class);
+        when(indexMetadata2.getIndex()).thenReturn(index2);
+        when(index2.getMemorySize()).thenReturn(new DataSize(8, KILOBYTE).toBytes());
+        when(indexCacheLoader.load(any())).thenReturn(expectedIndices2);
 
-            // previous indexes should be evicted bc cache was at max weight limit and new ones should be added
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-            assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
-            Thread.sleep(loadDelay + 500);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
-            assertEquals(actualSplitIndex.get(0), expectedIndices2.get(0));
-            assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        assertEquals(indexCache.getCacheSize(), 1);
+        Thread.sleep(loadDelay + 500);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 1);
+        assertEquals(actualSplitIndex.get(0), expectedIndices2.get(0));
+        assertEquals(indexCache.getCacheSize(), 1);
 
-            // get index for split1
-            when(testHiveSplit.getPath()).thenReturn(testPath);
-            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
-            assertEquals(actualSplitIndex.size(), 0);
-            assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
-        }
+        // get index for split1
+        when(testHiveSplit.getPath()).thenReturn(testPath);
+        actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+        assertEquals(actualSplitIndex.size(), 0);
+        assertEquals(indexCache.getCacheSize(), 1);
     }
 }

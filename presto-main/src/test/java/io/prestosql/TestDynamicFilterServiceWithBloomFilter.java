@@ -20,13 +20,13 @@ import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.testing.assertions.Assert;
 import io.prestosql.utils.DynamicFilterUtils;
@@ -43,7 +43,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_DATA_TYPE;
-import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.utils.DynamicFilterUtils.createKey;
 import static io.prestosql.utils.TestDynamicFilterUtil.registerDf;
@@ -88,7 +88,7 @@ public class TestDynamicFilterServiceWithBloomFilter
         registerDf(filterId, session, PARTITIONED, dynamicFilterService);
 
         // Test getDynamicFilterSupplier
-        VariableReferenceExpression mockExpression = mock(VariableReferenceExpression.class);
+        SymbolReference mockExpression = mock(SymbolReference.class);
         when(mockExpression.getName()).thenReturn("name");
         ColumnHandle mockColumnHandle = mock(ColumnHandle.class);
         Supplier<Set<DynamicFilter>> dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(),
@@ -136,7 +136,7 @@ public class TestDynamicFilterServiceWithBloomFilter
 
     private BloomFilter fetchDynamicFilter(String filterId, String queryId)
     {
-        byte[] bloomFilter = (byte[]) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS))
+        byte[] bloomFilter = (byte[]) ((StateMap) stateStoreProvider.getStateStore().getStateCollection(DynamicFilterUtils.MERGEMAP))
                 .get(DynamicFilterUtils.createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId));
         Assert.assertNotNull(bloomFilter);
 

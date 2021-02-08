@@ -15,6 +15,7 @@
 package io.hetu.core.sql.util;
 
 import io.airlift.log.Logger;
+import io.hetu.core.sql.migration.SqlMigrationException;
 import io.hetu.core.sql.migration.tool.Console;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -44,21 +45,40 @@ public class SqlResultHandleUtils
     private SqlResultHandleUtils() {}
 
     public static void writeToHtmlFile(JSONArray convertedSqls, String outputFile)
+            throws SqlMigrationException
     {
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        try (InputStream is = classLoader.getResourceAsStream(HTML_TMPLATE_FILE_NAME);
-                InputStreamReader isr = new InputStreamReader(is);
-                BufferedReader reader = new BufferedReader(isr);
-                OutputStream out = new FileOutputStream(outputFile + ".html");
-                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, UTF_8), BUFFER_SIZE)) {
+        // create an file output stream
+        BufferedWriter writer = null;
+
+        try {
+            // read the html template
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            InputStream is = classLoader.getResourceAsStream(HTML_TMPLATE_FILE_NAME);
+            if (is == null) {
+                throw new SqlMigrationException("Failed to read the html template");
+            }
+            InputStreamReader isr = new InputStreamReader(is);
+            BufferedReader reader = new BufferedReader(isr);
             String htmlTextTemplate = reader.lines().collect(Collectors.joining(System.lineSeparator()));
             htmlEscape(convertedSqls);
             String htmlFileText = htmlTextTemplate.replaceAll("\\$\\{conversionResultData}\\$", convertedSqls.toString());
 
+            OutputStream out = new FileOutputStream(outputFile + ".html");
+            writer = new BufferedWriter(new OutputStreamWriter(out, UTF_8), BUFFER_SIZE);
             writer.write(htmlFileText);
         }
         catch (IOException | JSONException e) {
             log.error(format("Failed to write result to file because of exception:" + e.getLocalizedMessage()));
+        }
+        finally {
+            if (writer != null) {
+                try {
+                    writer.close();
+                }
+                catch (IOException e) {
+                    log.error(format("Write file[%s] failed: %s", outputFile, e.getMessage()));
+                }
+            }
         }
         log.info(format("Result is saved to %s", outputFile));
     }

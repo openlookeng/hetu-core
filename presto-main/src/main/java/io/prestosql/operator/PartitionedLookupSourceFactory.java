@@ -21,8 +21,8 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.operator.LookupSourceProvider.LookupSourceLease;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.Symbol;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.Immutable;

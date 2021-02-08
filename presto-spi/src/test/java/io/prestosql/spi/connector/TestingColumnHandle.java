@@ -32,12 +32,6 @@ public class TestingColumnHandle
         this.name = requireNonNull(name, "name is null");
     }
 
-    @Override
-    public String getColumnName()
-    {
-        return name;
-    }
-
     @JsonProperty
     public String getName()
     {

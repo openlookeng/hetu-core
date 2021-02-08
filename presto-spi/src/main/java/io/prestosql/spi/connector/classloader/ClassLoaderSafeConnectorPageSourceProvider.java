@@ -21,10 +21,11 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
-import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -57,7 +58,7 @@ public class ClassLoaderSafeConnectorPageSourceProvider
     }
 
     @Override
-    public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns, Optional<DynamicFilterSupplier> dynamicFilterSupplier)
+    public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns, Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.createPageSource(transaction, session, split, table, columns, dynamicFilterSupplier);

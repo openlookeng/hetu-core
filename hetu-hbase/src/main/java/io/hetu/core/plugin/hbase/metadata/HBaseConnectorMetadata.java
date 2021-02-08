@@ -37,7 +37,6 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
-import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.TableNotFoundException;
@@ -109,8 +108,7 @@ public class HBaseConnectorMetadata
                 table.isExternal(),
                 table.getSerializerClassName(),
                 table.getHbaseTableName(),
-                table.getIndexColumns(),
-                OptionalLong.empty());
+                table.getIndexColumns());
     }
 
     @Override
@@ -166,7 +164,7 @@ public class HBaseConnectorMetadata
             return Optional.ofNullable(tableMetadata).orElse(tableMetadata);
         }
 
-        return new ConnectorTableMetadata(tableName, table.getColumnMetadatas(), table.getTableProperties());
+        return new ConnectorTableMetadata(tableName, table.getColumnMetadatas());
     }
 
     @Override
@@ -176,6 +174,7 @@ public class HBaseConnectorMetadata
         checkNoRollback();
         SchemaTableName tableName = tableMetadata.getTable();
         HBaseTable table = hbaseConn.createTable(tableMetadata);
+
         // support create table xxx as select * from yyy
         HBaseTableHandle handle =
                 new HBaseTableHandle(
@@ -188,8 +187,7 @@ public class HBaseConnectorMetadata
                         table.getIndexColumns(),
                         TupleDomain.all(),
                         table.getColumns(),
-                        table.getRowIdOrdinal(),
-                        OptionalLong.empty());
+                        table.getRowIdOrdinal());
         setRollback(() -> rollbackCreateTable(table));
 
         return handle;
@@ -220,8 +218,7 @@ public class HBaseConnectorMetadata
                         table.getRowIdOrdinal(),
                         table.getColumns(),
                         table.getSerializerClassName(),
-                        table.getHbaseTableName(),
-                        OptionalLong.empty());
+                        table.getHbaseTableName());
 
         return handle;
     }
@@ -400,43 +397,8 @@ public class HBaseConnectorMetadata
                         tableHandle.getFullTableName(),
                         newDomain,
                         tableHandle.getColumns(),
-                        tableHandle.getRowIdOrdinal(),
-                        tableHandle.getLimit());
+                        tableHandle.getRowIdOrdinal());
         return Optional.of(new ConstraintApplicationResult<>(newTableHandle, constraint.getSummary()));
-    }
-
-    @Override
-    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(
-            ConnectorSession session, ConnectorTableHandle connectorTableHandle, long limit)
-    {
-        HBaseTableHandle tableHandle;
-
-        if (connectorTableHandle instanceof HBaseTableHandle) {
-            tableHandle = (HBaseTableHandle) connectorTableHandle;
-        }
-        else {
-            return Optional.empty();
-        }
-
-        if (tableHandle.getLimit().isPresent() && tableHandle.getLimit().getAsLong() <= limit) {
-            return Optional.empty();
-        }
-
-        HBaseTableHandle newTableHandle =
-                new HBaseTableHandle(
-                        tableHandle.getSchema(),
-                        tableHandle.getTable(),
-                        tableHandle.getRowId(),
-                        tableHandle.isExternal(),
-                        tableHandle.getSerializerClassName(),
-                        tableHandle.getHbaseTableName(),
-                        tableHandle.getFullTableName(),
-                        tableHandle.getConstraint(),
-                        tableHandle.getColumns(),
-                        tableHandle.getRowIdOrdinal(),
-                        OptionalLong.of(limit));
-
-        return Optional.of(new LimitApplicationResult<>(newTableHandle, false));
     }
 
     @Override

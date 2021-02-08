@@ -29,6 +29,7 @@ import io.prestosql.memory.QueryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.Split;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.Driver;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.FilterAndProjectOperator;
@@ -46,18 +47,17 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.memory.MemoryPoolId;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.SpillSpaceTracker;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.gen.PageFunctionCompiler;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.HashGenerationOptimizer;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.relational.RowExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.testing.LocalQueryRunner;
@@ -183,7 +183,7 @@ public abstract class AbstractOperatorBenchmark
             public Operator createOperator(DriverContext driverContext)
             {
                 OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, "BenchmarkSource");
-                ConnectorPageSource pageSource = localQueryRunner.getPageSourceManager().createPageSource(session, split, tableHandle, columnHandles, Optional.empty());
+                ConnectorPageSource pageSource = localQueryRunner.getPageSourceManager().createPageSource(session, split, tableHandle, columnHandles, () -> null);
                 return new PageSourceOperator(pageSource, operatorContext);
             }
 
@@ -202,7 +202,7 @@ public abstract class AbstractOperatorBenchmark
 
     private Split getLocalQuerySplit(Session session, TableHandle handle)
     {
-        SplitSource splitSource = localQueryRunner.getSplitManager().getSplits(session, handle, UNGROUPED_SCHEDULING, null, Optional.empty(), Collections.emptyMap(), ImmutableSet.of(), false);
+        SplitSource splitSource = localQueryRunner.getSplitManager().getSplits(session, handle, UNGROUPED_SCHEDULING, null, Optional.empty(), Collections.emptyMap(), ImmutableSet.of());
         List<Split> splits = new ArrayList<>();
         while (!splitSource.isFinished()) {
             splits.addAll(getNextBatch(splitSource));
@@ -218,19 +218,19 @@ public abstract class AbstractOperatorBenchmark
 
     protected final OperatorFactory createHashProjectOperator(int operatorId, PlanNodeId planNodeId, List<Type> types)
     {
-        PlanSymbolAllocator planSymbolAllocator = new PlanSymbolAllocator();
+        SymbolAllocator symbolAllocator = new SymbolAllocator();
         ImmutableMap.Builder<Symbol, Integer> symbolToInputMapping = ImmutableMap.builder();
         ImmutableList.Builder<PageProjection> projections = ImmutableList.builder();
         for (int channel = 0; channel < types.size(); channel++) {
-            Symbol symbol = planSymbolAllocator.newSymbol("h" + channel, types.get(channel));
+            Symbol symbol = symbolAllocator.newSymbol("h" + channel, types.get(channel));
             symbolToInputMapping.put(symbol, channel);
             projections.add(new InputPageProjection(channel, types.get(channel)));
         }
 
-        Map<Symbol, Type> symbolTypes = planSymbolAllocator.getTypes().allTypes();
+        Map<Symbol, Type> symbolTypes = symbolAllocator.getTypes().allTypes();
         Optional<Expression> hashExpression = HashGenerationOptimizer.getHashExpression(
                 localQueryRunner.getMetadata(),
-                planSymbolAllocator,
+                symbolAllocator,
                 ImmutableList.copyOf(symbolTypes.keySet()));
         verify(hashExpression.isPresent());
 

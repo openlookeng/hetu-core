@@ -61,8 +61,7 @@ public class TestingHetuMetastore
             false,
             Optional.of("io.hetu.core.plugin.hbase.utils.serializers.StringRowSerializer"),
             Optional.empty(),
-            Optional.of("hbase:test_table"),
-            Optional.empty());
+            Optional.of("hbase:test_table"));
 
     private final TestingMySqlServer mySqlServer;
     private final HetuHBaseMetastore metaStore;

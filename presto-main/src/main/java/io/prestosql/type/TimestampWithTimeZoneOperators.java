@@ -52,11 +52,11 @@ import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static io.prestosql.spi.type.DateTimeEncoding.unpackMillisUtc;
 import static io.prestosql.spi.type.DateTimeEncoding.unpackZoneKey;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
-import static io.prestosql.spi.util.DateTimeUtils.parseTimestampWithTimeZone;
-import static io.prestosql.spi.util.DateTimeUtils.printTimestampWithTimeZone;
-import static io.prestosql.spi.util.DateTimeZoneIndex.getChronology;
-import static io.prestosql.spi.util.DateTimeZoneIndex.unpackChronology;
 import static io.prestosql.type.DateTimeOperators.modulo24Hour;
+import static io.prestosql.util.DateTimeUtils.parseTimestampWithTimeZone;
+import static io.prestosql.util.DateTimeUtils.printTimestampWithTimeZone;
+import static io.prestosql.util.DateTimeZoneIndex.getChronology;
+import static io.prestosql.util.DateTimeZoneIndex.unpackChronology;
 
 public final class TimestampWithTimeZoneOperators
 {

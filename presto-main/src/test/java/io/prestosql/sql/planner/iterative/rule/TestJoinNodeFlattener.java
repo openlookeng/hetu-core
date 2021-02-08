@@ -15,35 +15,37 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.expressions.LogicalRowExpressions;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins.MultiJoinNode;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.LinkedHashSet;
 import java.util.Optional;
 
 import static io.airlift.testing.Closeables.closeAllRuntimeException;
-import static io.prestosql.spi.plan.JoinNode.Type.FULL;
-import static io.prestosql.spi.plan.JoinNode.Type.INNER;
-import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.ExpressionUtils.and;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.iterative.Lookup.noLookup;
 import static io.prestosql.sql.planner.iterative.rule.ReorderJoins.MultiJoinNode.toMultiJoinNode;
-import static io.prestosql.sql.relational.Expressions.constant;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.FULL;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
+import static io.prestosql.sql.planner.plan.JoinNode.Type.LEFT;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.ADD;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
+import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN;
+import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN;
+import static io.prestosql.sql.tree.ComparisonExpression.Operator.NOT_EQUAL;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static org.testng.Assert.assertEquals;
 
@@ -161,14 +163,14 @@ public class TestJoinNodeFlattener
         ValuesNode valuesA = p.values(a1);
         ValuesNode valuesB = p.values(b1, b2);
         ValuesNode valuesC = p.values(c1, c2);
-        RowExpression bcFilter = LogicalRowExpressions.and(
-                p.comparison(OperatorType.GREATER_THAN, p.variable(c2.getName()), constant(0L, BIGINT)),
-                p.comparison(OperatorType.NOT_EQUAL, p.variable(c2.getName()), constant(7L, BIGINT)),
-                p.comparison(OperatorType.GREATER_THAN, p.variable(b2.getName()), p.variable(c2.getName())));
-        RowExpression abcFilter = p.comparison(
-                OperatorType.LESS_THAN,
-                p.binaryOperation(OperatorType.ADD, p.variable(a1.getName()), p.variable(c1.getName())),
-                p.variable(b1.getName()));
+        Expression bcFilter = and(
+                new ComparisonExpression(GREATER_THAN, c2.toSymbolReference(), new LongLiteral("0")),
+                new ComparisonExpression(NOT_EQUAL, c2.toSymbolReference(), new LongLiteral("7")),
+                new ComparisonExpression(GREATER_THAN, b2.toSymbolReference(), c2.toSymbolReference()));
+        ComparisonExpression abcFilter = new ComparisonExpression(
+                LESS_THAN,
+                new ArithmeticBinaryExpression(ADD, a1.toSymbolReference(), c1.toSymbolReference()),
+                b1.toSymbolReference());
         JoinNode joinNode = p.join(
                 INNER,
                 valuesA,
@@ -186,13 +188,11 @@ public class TestJoinNodeFlattener
                 ImmutableList.of(equiJoinClause(a1, b1)),
                 ImmutableList.of(a1, b1, b2, c1, c2),
                 Optional.of(abcFilter));
-        /*
         MultiJoinNode expected = new MultiJoinNode(
                 new LinkedHashSet<>(ImmutableList.of(valuesA, valuesB, valuesC)),
-                and(new ComparisonExpression(EQUAL, toSymbolReference(b1), toSymbolReference(c1)), new ComparisonExpression(EQUAL, toSymbolReference(a1), toSymbolReference(b1)), bcFilter, abcFilter),
+                and(new ComparisonExpression(EQUAL, b1.toSymbolReference(), c1.toSymbolReference()), new ComparisonExpression(EQUAL, a1.toSymbolReference(), b1.toSymbolReference()), bcFilter, abcFilter),
                 ImmutableList.of(a1, b1, b2, c1, c2));
         assertEquals(toMultiJoinNode(joinNode, noLookup(), DEFAULT_JOIN_LIMIT), expected);
-         */
     }
 
     @Test
@@ -323,7 +323,7 @@ public class TestJoinNodeFlattener
 
     private ComparisonExpression createEqualsExpression(Symbol left, Symbol right)
     {
-        return new ComparisonExpression(EQUAL, toSymbolReference(left), toSymbolReference(right));
+        return new ComparisonExpression(EQUAL, left.toSymbolReference(), right.toSymbolReference());
     }
 
     private EquiJoinClause equiJoinClause(Symbol symbol1, Symbol symbol2)

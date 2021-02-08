@@ -20,14 +20,12 @@ import com.google.common.collect.Iterables;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.AggregationNode.Aggregation;
-import io.prestosql.spi.plan.MarkDistinctNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.plan.MarkDistinctNode;
+import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -124,8 +122,7 @@ public class MultipleDistinctAggregationToMarkDistinct
 
             if (aggregation.isDistinct() && !aggregation.getFilter().isPresent() && !aggregation.getMask().isPresent()) {
                 Set<Symbol> inputs = aggregation.getArguments().stream()
-                        .map(OriginalExpressionUtils::castToExpression)
-                        .map(SymbolUtils::from)
+                        .map(Symbol::from)
                         .collect(toSet());
 
                 Symbol marker = markers.get(inputs);

@@ -15,10 +15,10 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.tree.BindExpression;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.LambdaArgumentDeclaration;
@@ -39,7 +39,7 @@ public class TestLambdaCaptureDesugaringRewriter
     public void testRewriteBasicLambda()
     {
         final Map<Symbol, Type> symbols = ImmutableMap.of(new Symbol("a"), BigintType.BIGINT);
-        final PlanSymbolAllocator allocator = new PlanSymbolAllocator(symbols);
+        final SymbolAllocator allocator = new SymbolAllocator(symbols);
 
         assertEquals(rewrite(expression("x -> a + x"), allocator.getTypes(), allocator),
                 new BindExpression(

@@ -16,7 +16,6 @@ package io.prestosql.plugin.hive;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
-import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.Partition;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
@@ -105,12 +104,11 @@ public class SyncPartitionMetadataProcedure
     private void doSyncPartitionMetadata(ConnectorSession session, String schemaName, String tableName, String mode)
     {
         SyncMode syncMode = toSyncMode(mode);
-        HdfsContext hdfsContext = new HdfsContext(session, schemaName, tableName);
-        HiveIdentity identity = new HiveIdentity(session);
+        HdfsContext context = new HdfsContext(session, schemaName, tableName);
         SemiTransactionalHiveMetastore metastore = ((HiveMetadata) hiveMetadataFactory.get()).getMetastore();
         SchemaTableName schemaTableName = new SchemaTableName(schemaName, tableName);
 
-        Table table = metastore.getTable(identity, schemaName, tableName)
+        Table table = metastore.getTable(schemaName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(schemaTableName));
         if (table.getPartitionColumns().isEmpty()) {
             throw new PrestoException(INVALID_PROCEDURE_ARGUMENT, "Table is not partitioned: " + schemaTableName);
@@ -121,8 +119,8 @@ public class SyncPartitionMetadataProcedure
         Set<String> partitionsToDrop;
 
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(hdfsContext, tableLocation);
-            List<String> partitionsInMetastore = metastore.getPartitionNames(identity, schemaName, tableName)
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(context, tableLocation);
+            List<String> partitionsInMetastore = metastore.getPartitionNames(schemaName, tableName)
                     .orElseThrow(() -> new TableNotFoundException(schemaTableName));
             List<String> partitionsInFileSystem = listDirectory(fileSystem, fileSystem.getFileStatus(tableLocation), table.getPartitionColumns(), table.getPartitionColumns().size()).stream()
                     .map(fileStatus -> fileStatus.getPath().toUri())

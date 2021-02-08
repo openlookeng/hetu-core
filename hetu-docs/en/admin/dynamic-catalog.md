@@ -3,39 +3,34 @@
 
 This section introduces the dynamic catalog feature of openLooKeng. Normally openLooKeng admins add data source to the engine by putting a catalog profile (e.g. `hive.properties`) in the connector directory (`etc/catalog`). Whenever there is a requirement to add, update or delete a catalog, all the coordinators and workers need to be restarted.
 
-In order to dynamically change the catalogs on-the-fly, openLooKeng introduced dynamic catalog feature. To enable this feature.
+In order to dynamically change the catalogs on-the-fly, openLooKeng introduced dynamic catalog feature. To enable this feature, configure it in the `etc/config.properties`:
 
-* First, configure it in the `etc/config.properties`:
-    ```
     catalog.dynamic-enabled=true
-    ```
-* Secondly, configure the filesystems used to store dynamic catalog information in `hdfs-config-default.properties`.
-You can change this name of file by `catalog.share.filesystem.profile` property in `etc/node.properties`, default value is `hdfs-config-default`.
-Check the [filesystem doc](../develop/filesystem.md) for more information.
 
-    Add a `hdfs-config-default.properties` file in the `etc/filesystem/` directory, if this directory does not exist, please create it.
-    ```
-    fs.client.type=hdfs
-    hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
-    hdfs.authentication.type=NONE
-    fs.hdfs.impl.disable.cache=true
-    ```
-    If HDFS enable the Kerberos, then
-    ```
-    fs.client.type=hdfs
-    hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
-    hdfs.authentication.type=KERBEROS
-    hdfs.krb5.conf.path=/opt/openlookeng/config/krb5.conf
-    hdfs.krb5.keytab.path=/opt/openlookeng/config/user.keytab
-    hdfs.krb5.principal=openlookeng@HADOOP.COM # replace openlookeng@HADOOP.COM to your principal 
-    fs.hdfs.impl.disable.cache=true
-    ```
- * Finally, configure the paths of filesystems in `etc/node.properties`.
-    ```
-    catalog.config-dir=/opt/openlookeng/catalog
-    catalog.share.config-dir=/opt/openkeng/catalog/share
-    ```
- 
+Then configure the filesystems used to store dynamic catalog information in `hdfs-config-catalog.properties`
+and `local-config-catalog.properties`. Check the [filesystem doc](../develop/filesystem.md) for more information.
+
+* Add a `hdfs-config-catalog.properties` file in the `etc/filesystem/` directory, if this directory does not exist, please create it.
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=NONE
+fs.hdfs.impl.disable.cache=true
+```
+If HDFS enable the Kerberos, then
+```
+fs.client.type=hdfs
+hdfs.config.resources=/opt/openlookeng/config/core-site.xml, /opt/openlookeng/config/hdfs-site.xml
+hdfs.authentication.type=KERBEROS
+hdfs.krb5.conf.path=/opt/openlookeng/config/krb5.conf
+hdfs.krb5.keytab.path=/opt/openlookeng/config/user.keytab
+hdfs.krb5.principal=openlookeng@HADOOP.COM # replace openlookeng@HADOOP.COM to your principal 
+fs.hdfs.impl.disable.cache=true
+```
+* Add a `local-config-catalog.properties` file in the `etc/filesystem/` directory.
+```
+fs.client.type=local
+```
 ## Usage
 
 The catalog operations are done through a RESTful API on the openLooKeng coordinator. A http request has the following shape (hive connector as an example), the form of POST/PUT body is `multipart/form-data`:
@@ -133,8 +128,7 @@ otherwise, the current workspace is the openlookeng server's directory.
 | Property Name              | Mandatory | Description                                                               | Default Value |
 |----------------------------|-----------|---------------------------------------------------------------------------|---------------|
 | `catalog.config-dir`       | YES       | Root directory for storing configuration files in local disk.             |               |
-| `catalog.share.config-dir` | NO       | Root directory for storing configuration files in the shared file system. |               |
-| `catalog.share.filesystem.profile` | NO       | The profile name of the shared file system. | hdfs-config-default |
+| `catalog.share.config-dir` | YES       | Root directory for storing configuration files in the shared file system. |               |
 
 ## Impact on queries
 

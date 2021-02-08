@@ -49,10 +49,10 @@ public class DesugarRowSubscriptRewriter
 {
     private DesugarRowSubscriptRewriter() {}
 
-    public static Expression rewrite(Expression expression, Session session, TypeAnalyzer typeAnalyzer, PlanSymbolAllocator planSymbolAllocator)
+    public static Expression rewrite(Expression expression, Session session, TypeAnalyzer typeAnalyzer, SymbolAllocator symbolAllocator)
     {
         requireNonNull(typeAnalyzer, "typeAnalyzer is null");
-        Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, planSymbolAllocator.getTypes(), expression);
+        Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, symbolAllocator.getTypes(), expression);
         return rewrite(expression, expressionTypes);
     }
 

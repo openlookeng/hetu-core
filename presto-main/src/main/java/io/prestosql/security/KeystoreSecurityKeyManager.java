@@ -37,9 +37,11 @@ import java.security.Key;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
-import java.security.interfaces.RSAPrivateKey;
 import java.util.Base64;
 
 import static java.lang.String.format;
@@ -48,6 +50,7 @@ public class KeystoreSecurityKeyManager
         implements SecurityKeyManager
 {
     private static final Logger LOG = Logger.get(KeystoreSecurityKeyManager.class);
+    private static final String SHARE_FS_CLIENT_CONFIG_NAME = "hdfs-config-catalog";
     private static final String UTF_8 = "UTF-8";
     private static final String PKCS12 = "pkcs12";
     private final FileSystemClientManager fileSystemClientManager;
@@ -108,7 +111,7 @@ public class KeystoreSecurityKeyManager
         InputStream inputStream = null;
         OutputStream outputStream = null;
         try (HetuFileSystemClient hetuFileSystemClient =
-                fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"))) {
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
             inputStream = hetuFileSystemClient.newInputStream(keystorPath);
             keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
@@ -143,20 +146,27 @@ public class KeystoreSecurityKeyManager
     {
         Path keystorePath = Paths.get(config.getFileStorePath());
         char[] keyStr = null;
-        try (HetuFileSystemClient hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"));
+        try (HetuFileSystemClient hetuFileSystemClient = fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"));
                 InputStream inputStream = hetuFileSystemClient.newInputStream(keystorePath)) {
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             keyStore.load(inputStream, config.getKeystorePassword().toCharArray());
             Key key = keyStore.getKey(catalogName, config.getKeystorePassword().toCharArray());
 
-            if (key != null) {
-                if (key instanceof SecretKey) {
-                    keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
-                    LOG.info("success to load dynamic catalog key for catalog[%s]...", catalogName);
-                }
-                else if (key instanceof RSAPrivateKey) {
-                    keyStr = new String(Base64.getEncoder().encode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
-                    LOG.info("success to load static catalog key for catalog[%s]...", catalogName);
+            if (key instanceof SecretKey) {
+                keyStr = new String(Base64.getDecoder().decode(key.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+                LOG.info("success to load key for catalog[%s]...", catalogName);
+            }
+            else if (key instanceof PrivateKey) {
+                Certificate certificate = keyStore.getCertificate(catalogName);
+                PublicKey publicKey = certificate.getPublicKey();
+                keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8)).toCharArray();
+            }
+
+            if (key == null) {
+                Certificate certificate = keyStore.getCertificate(catalogName);
+                if (certificate != null) {
+                    PublicKey publicKey = certificate.getPublicKey();
+                    keyStr = new String(Base64.getEncoder().encode(publicKey.getEncoded()), Charset.forName(UTF_8)).toCharArray();
                 }
             }
         }
@@ -193,7 +203,7 @@ public class KeystoreSecurityKeyManager
         InputStream inputStream = null;
         OutputStream outputStream = null;
         try (HetuFileSystemClient hetuFileSystemClient =
-                fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"))) {
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
             boolean isStoreFileExists = hetuFileSystemClient.exists(keystorPath);
             KeyStore keyStore = KeyStore.getInstance(PKCS12);
             if (isStoreFileExists) {
@@ -234,7 +244,7 @@ public class KeystoreSecurityKeyManager
     {
         String file = config.getFileStorePath();
         try (HetuFileSystemClient hetuFileSystemClient =
-                fileSystemClientManager.getFileSystemClient(config.getShareFileSystemProfile(), Paths.get("/"))) {
+                     fileSystemClientManager.getFileSystemClient(SHARE_FS_CLIENT_CONFIG_NAME, Paths.get("/"))) {
             int lastIndex = file.lastIndexOf(File.separator);
             String tmpFileDir = file.substring(0, lastIndex);
             if (hetuFileSystemClient.exists(Paths.get(tmpFileDir))) {

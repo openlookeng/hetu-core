@@ -14,7 +14,7 @@
 
 package io.prestosql.cost;
 
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 

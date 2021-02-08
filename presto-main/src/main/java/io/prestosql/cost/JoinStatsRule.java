@@ -16,21 +16,18 @@ package io.prestosql.cost;
 import com.google.common.annotations.VisibleForTesting;
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.JoinNode;
-import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.util.MoreMath;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 
@@ -40,10 +37,7 @@ import static com.google.common.collect.Sets.difference;
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.cost.SymbolStatsEstimate.buildFrom;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.Patterns.join;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isNaN;
@@ -153,23 +147,12 @@ public class JoinStatsRule
     {
         List<EquiJoinClause> equiJoinCriteria = node.getCriteria();
 
-        Map<Integer, Symbol> layout = new HashMap<>();
-        int channel = 0;
-        for (Symbol symbol : node.getOutputSymbols()) {
-            layout.put(channel++, symbol);
-        }
-
         if (equiJoinCriteria.isEmpty()) {
             if (!node.getFilter().isPresent()) {
                 return crossJoinStats;
             }
             // TODO: this might explode stats
-            if (isExpression(node.getFilter().get())) {
-                return filterStatsCalculator.filterStats(crossJoinStats, castToExpression(node.getFilter().get()), session, types);
-            }
-            else {
-                return filterStatsCalculator.filterStats(crossJoinStats, node.getFilter().get(), session, types, layout);
-            }
+            return filterStatsCalculator.filterStats(crossJoinStats, node.getFilter().get(), session, types);
         }
 
         PlanNodeStatsEstimate equiJoinEstimate = filterByEquiJoinClauses(crossJoinStats, node.getCriteria(), session, types);
@@ -182,13 +165,7 @@ public class JoinStatsRule
             return equiJoinEstimate;
         }
 
-        PlanNodeStatsEstimate filteredEquiJoinEstimate;
-        if (isExpression(node.getFilter().get())) {
-            filteredEquiJoinEstimate = filterStatsCalculator.filterStats(equiJoinEstimate, castToExpression(node.getFilter().get()), session, types);
-        }
-        else {
-            filteredEquiJoinEstimate = filterStatsCalculator.filterStats(equiJoinEstimate, node.getFilter().get(), session, types, layout);
-        }
+        PlanNodeStatsEstimate filteredEquiJoinEstimate = filterStatsCalculator.filterStats(equiJoinEstimate, node.getFilter().get(), session, types);
 
         if (filteredEquiJoinEstimate.isOutputRowCountUnknown()) {
             return normalizer.normalize(equiJoinEstimate.mapOutputRowCount(rowCount -> rowCount * UNKNOWN_FILTER_COEFFICIENT), types);
@@ -230,7 +207,7 @@ public class JoinStatsRule
             Session session,
             TypeProvider types)
     {
-        ComparisonExpression drivingPredicate = new ComparisonExpression(EQUAL, toSymbolReference(drivingClause.getLeft()), toSymbolReference(drivingClause.getRight()));
+        ComparisonExpression drivingPredicate = new ComparisonExpression(EQUAL, drivingClause.getLeft().toSymbolReference(), drivingClause.getRight().toSymbolReference());
         PlanNodeStatsEstimate filteredStats = filterStatsCalculator.filterStats(stats, drivingPredicate, session, types);
         for (EquiJoinClause clause : remainingClauses) {
             filteredStats = filterByAuxiliaryClause(filteredStats, clause, types);
@@ -289,7 +266,7 @@ public class JoinStatsRule
      */
     @VisibleForTesting
     PlanNodeStatsEstimate calculateJoinComplementStats(
-            Optional<RowExpression> filter,
+            Optional<Expression> filter,
             List<JoinNode.EquiJoinClause> criteria,
             PlanNodeStatsEstimate leftStats,
             PlanNodeStatsEstimate rightStats,
@@ -310,18 +287,7 @@ public class JoinStatsRule
         }
 
         // TODO: add support for non-equality conditions (e.g: <=, !=, >)
-        int numberOfFilterClauses;
-        if (filter.isPresent()) {
-            if (isExpression(filter.get())) {
-                numberOfFilterClauses = extractConjuncts(castToExpression(filter.get())).size();
-            }
-            else {
-                numberOfFilterClauses = RowExpressionUtils.extractConjuncts(filter.get()).size();
-            }
-        }
-        else {
-            numberOfFilterClauses = 0;
-        }
+        int numberOfFilterClauses = filter.map(expression -> extractConjuncts(expression).size()).orElse(0);
 
         // Heuristics: select the most selective criteria for join complement clause.
         // Principals behind this heuristics is the same as in computeInnerJoinStats:

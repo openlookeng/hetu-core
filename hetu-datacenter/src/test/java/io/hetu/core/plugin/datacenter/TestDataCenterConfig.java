@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import org.testng.annotations.Test;
 
 import java.net.URI;
@@ -37,7 +36,7 @@ public class TestDataCenterConfig
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(DataCenterConfig.class)
                 .setConnectionUrl(null)
-                .setConnectionUser(System.getProperty("user.name"))
+                .setConnectionUser(null)
                 .setRemoteClusterId(null)
                 .setConnectionPassword(null)
                 .setSocksProxy(null)
@@ -58,7 +57,6 @@ public class TestDataCenterConfig
                 .setKerberosUseCanonicalHostname(false)
                 .setExtraCredentials(null)
                 .setQueryPushDownEnabled(true)
-                .setQueryPushDownModule(JdbcPushDownModule.DEFAULT)
                 .setHttpRequestReadTimeout(READ_TIMEOUT)
                 .setHttpRequestConnectTimeout(CONNECT_TIMEOUT)
                 .setClientTimeout(new Duration(10, TimeUnit.MINUTES))
@@ -77,7 +75,7 @@ public class TestDataCenterConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>().put("connection-url",
                 "http://127.0.0.1:9002")
-                .put("connection-user", "test")
+                .put("connection-user", "root")
                 .put("dc.remote.cluster.id", "remote.cluster.id")
                 .put("connection-password", "paxxx")
                 .put("dc.accesstoken", "accesstoken")
@@ -98,7 +96,6 @@ public class TestDataCenterConfig
                 .put("dc.ssl.truststore.password", "ssl.truststore.password")
                 .put("dc.ssl.truststore.path", "ssl.truststore.path")
                 .put("dc.query.pushdown.enabled", "false")
-                .put("dc.query.pushdown.module", "FULL_PUSHDOWN")
                 .put("dc.http-request-readTimeout", "5m")
                 .put("dc.http-request-connectTimeout", "5m")
                 .put("dc.http-client-timeout", "5m")
@@ -113,7 +110,7 @@ public class TestDataCenterConfig
                 .build();
 
         DataCenterConfig expected = new DataCenterConfig().setConnectionUrl(URI.create("http://127.0.0.1:9002"))
-                .setConnectionUser("test")
+                .setConnectionUser("root")
                 .setRemoteClusterId("remote.cluster.id")
                 .setConnectionPassword("paxxx")
                 .setSocksProxy("socksproxy")
@@ -134,7 +131,6 @@ public class TestDataCenterConfig
                 .setKerberosUseCanonicalHostname(true)
                 .setExtraCredentials("extra.credentials")
                 .setQueryPushDownEnabled(false)
-                .setQueryPushDownModule(JdbcPushDownModule.FULL_PUSHDOWN)
                 .setHttpRequestReadTimeout(new Duration(5, TimeUnit.MINUTES))
                 .setHttpRequestConnectTimeout(new Duration(5, TimeUnit.MINUTES))
                 .setClientTimeout(new Duration(5, TimeUnit.MINUTES))

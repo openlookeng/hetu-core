@@ -14,11 +14,11 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.ValuesNode;
-import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.tree.Expression;
 
 import java.util.Arrays;
 import java.util.List;
@@ -48,8 +48,8 @@ public class PruneValuesColumns
             mapping[i] = valuesNode.getOutputSymbols().indexOf(newOutputs.get(i));
         }
 
-        ImmutableList.Builder<List<RowExpression>> rowsBuilder = ImmutableList.builder();
-        for (List<RowExpression> row : valuesNode.getRows()) {
+        ImmutableList.Builder<List<Expression>> rowsBuilder = ImmutableList.builder();
+        for (List<Expression> row : valuesNode.getRows()) {
             rowsBuilder.add(Arrays.stream(mapping)
                     .mapToObj(row::get)
                     .collect(Collectors.toList()));

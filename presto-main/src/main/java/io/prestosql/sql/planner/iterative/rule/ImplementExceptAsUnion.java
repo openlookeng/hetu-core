@@ -16,11 +16,11 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.plan.ExceptNode;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.ExceptNode;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NotExpression;
 
@@ -29,7 +29,6 @@ import java.util.List;
 import static com.google.common.collect.Iterables.getFirst;
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.planner.plan.Patterns.except;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 /**
  * Converts EXCEPT queries into UNION ALL..GROUP BY...WHERE
@@ -87,9 +86,7 @@ public class ImplementExceptAsUnion
         return Result.ofPlanNode(
                 new ProjectNode(
                         context.getIdAllocator().getNextId(),
-                        new FilterNode(context.getIdAllocator().getNextId(),
-                                result.getPlanNode(),
-                                castToRowExpression(and(predicatesBuilder.build()))),
-                        AssignmentUtils.identityAsSymbolReferences(node.getOutputSymbols())));
+                        new FilterNode(context.getIdAllocator().getNextId(), result.getPlanNode(), and(predicatesBuilder.build())),
+                        Assignments.identity(node.getOutputSymbols())));
     }
 }

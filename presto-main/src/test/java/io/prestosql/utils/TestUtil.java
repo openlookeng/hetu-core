@@ -18,6 +18,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.MockRemoteTaskFactory;
@@ -28,28 +29,26 @@ import io.prestosql.execution.TestSqlTaskManager;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.metadata.TableHandle;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
-import io.prestosql.spi.metadata.TableHandle;
-import io.prestosql.spi.operator.ReuseExchangeOperator;
-import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.LimitNode;
-import io.prestosql.spi.plan.PlanNode;
-import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.plan.PlanNodeIdAllocator;
-import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.LimitNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.tree.Expression;
 import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.testing.TestingMetadata;
 import io.prestosql.testing.TestingTransactionHandle;
@@ -85,7 +84,7 @@ public class TestUtil
     {
     }
 
-    public static SqlStageExecution getTestStage(RowExpression expression)
+    public static SqlStageExecution getTestStage(Expression expression)
     {
         StageId stageId = new StageId(new QueryId("query"), 0);
 
@@ -108,7 +107,7 @@ public class TestUtil
         return stage;
     }
 
-    private static PlanFragment createExchangePlanFragment(RowExpression expr)
+    private static PlanFragment createExchangePlanFragment(Expression expr)
     {
         Symbol testSymbol = new Symbol("a");
         Map<Symbol, ColumnHandle> scanAssignments = ImmutableMap.<Symbol, ColumnHandle>builder()
@@ -122,10 +121,7 @@ public class TestUtil
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 TupleDomain.none(),
-                Optional.empty(),
-                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
-                0);
+                Optional.empty());
         PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());
         FilterNode filterNode = planBuilder.filter(expr, tableScanNode);
 

@@ -33,7 +33,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static com.google.common.collect.Maps.fromProperties;
-import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -115,8 +115,8 @@ public class TestCatalogStore
     private boolean isPropertiesEqual(Path first, Path second)
             throws IOException
     {
-        Map<String, String> firstProperties = loadPropertiesFrom(first.toFile().getPath());
-        Map<String, String> secondProperties = loadPropertiesFrom(second.toFile().getPath());
+        Map<String, String> firstProperties = loadProperties(first.toFile());
+        Map<String, String> secondProperties = loadProperties(second.toFile());
         if (!difference(secondProperties, firstProperties).isEmpty()) {
             return false;
         }

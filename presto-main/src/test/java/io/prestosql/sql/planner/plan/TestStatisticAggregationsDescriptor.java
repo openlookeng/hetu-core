@@ -16,10 +16,10 @@ package io.prestosql.sql.planner.plan;
 import com.google.common.collect.ImmutableList;
 import com.google.common.reflect.TypeToken;
 import io.airlift.json.JsonCodec;
-import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.ColumnStatisticType;
-import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolAllocator;
 import org.testng.annotations.Test;
 
 import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
@@ -59,18 +59,18 @@ public class TestStatisticAggregationsDescriptor
     private static StatisticAggregationsDescriptor<Symbol> createTestDescriptor()
     {
         StatisticAggregationsDescriptor.Builder<Symbol> builder = StatisticAggregationsDescriptor.builder();
-        PlanSymbolAllocator planSymbolAllocator = new PlanSymbolAllocator();
+        SymbolAllocator symbolAllocator = new SymbolAllocator();
         for (String column : COLUMNS) {
             for (ColumnStatisticType type : ColumnStatisticType.values()) {
-                builder.addColumnStatistic(new ColumnStatisticMetadata(column, type), testSymbol(planSymbolAllocator));
+                builder.addColumnStatistic(new ColumnStatisticMetadata(column, type), testSymbol(symbolAllocator));
             }
-            builder.addGrouping(column, testSymbol(planSymbolAllocator));
+            builder.addGrouping(column, testSymbol(symbolAllocator));
         }
-        builder.addTableStatistic(ROW_COUNT, testSymbol(planSymbolAllocator));
+        builder.addTableStatistic(ROW_COUNT, testSymbol(symbolAllocator));
         return builder.build();
     }
 
-    private static Symbol testSymbol(PlanSymbolAllocator allocator)
+    private static Symbol testSymbol(SymbolAllocator allocator)
     {
         return allocator.newSymbol("test_symbol", BIGINT);
     }

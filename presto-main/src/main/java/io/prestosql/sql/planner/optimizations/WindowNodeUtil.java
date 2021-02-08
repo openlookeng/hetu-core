@@ -13,8 +13,8 @@
  */
 package io.prestosql.sql.planner.optimizations;
 
-import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.SymbolsExtractor;
+import io.prestosql.sql.planner.plan.WindowNode;
 
 import java.util.Collection;
 

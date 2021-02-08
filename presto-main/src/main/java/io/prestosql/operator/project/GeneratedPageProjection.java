@@ -19,8 +19,8 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.relational.RowExpression;
 
 import java.lang.invoke.MethodHandle;
 

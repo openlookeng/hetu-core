@@ -14,17 +14,15 @@
 package io.prestosql.sql.planner.plan;
 
 import com.google.common.collect.ImmutableCollection;
-import io.prestosql.spi.plan.Assignments;
-import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.Symbol;
 import org.testng.annotations.Test;
 
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.assignment;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static org.testng.Assert.assertTrue;
 
 public class TestAssingments
 {
-    private final Assignments assignments = assignment(new Symbol("test"), TRUE_LITERAL);
+    private final Assignments assignments = Assignments.of(new Symbol("test"), TRUE_LITERAL);
 
     @Test
     public void testOutputsImmutable()
