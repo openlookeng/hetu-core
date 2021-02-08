@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.spi.Node;
 import io.prestosql.spi.NodeManager;
+import io.prestosql.spi.connector.CatalogName;
 
 import java.util.Set;
 

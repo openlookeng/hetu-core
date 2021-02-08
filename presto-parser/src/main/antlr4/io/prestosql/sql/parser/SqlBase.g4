@@ -59,7 +59,8 @@ statement
         ON tableName=qualifiedName columnAliases
         (WITH properties)?
         (WHERE expression)?                                                     #createIndex
-    | DROP INDEX (IF EXISTS)? indexName=qualifiedName                           #dropIndex
+    | DROP INDEX (IF EXISTS)? indexName=qualifiedName
+        (WHERE expression)?                                                     #dropIndex
     | ALTER INDEX (IF EXISTS)? from=qualifiedName RENAME TO to=qualifiedName    #renameIndex
     | UPDATE INDEX (IF EXISTS)? qualifiedName (SET properties)?                 #updateIndex
     | SHOW INDEX (IF EXISTS)? qualifiedName?                                    #showIndex
@@ -383,7 +384,7 @@ booleanValue
     ;
 
 indexType
-    : BITMAP | BLOOM | MINMAX
+    : BITMAP | BLOOM | MINMAX | BTREE
     ;
 
 interval
@@ -752,6 +753,7 @@ INDEX: 'INDEX';
 BITMAP: 'BITMAP';
 BLOOM: 'BLOOM';
 MINMAX: 'MINMAX';
+BTREE: 'BTREE';
 
 EQ  : '=';
 NEQ : '<>' | '!=';

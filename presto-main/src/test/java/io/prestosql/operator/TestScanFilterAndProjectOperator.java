@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.prestosql.SequencePageBuilder;
 import io.prestosql.block.BlockAssertions;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
@@ -31,14 +30,16 @@ import io.prestosql.operator.scalar.AbstractTestFunctions;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LazyBlock;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.gen.ExpressionCompiler;
 import io.prestosql.sql.gen.PageFunctionCompiler;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.relational.RowExpression;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingSplit;
 import org.testng.annotations.Test;
@@ -113,6 +114,12 @@ public class TestScanFilterAndProjectOperator
                 null,
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, BYTE),
+                0,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                false,
+                Optional.empty(),
+                0,
                 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
@@ -157,7 +164,8 @@ public class TestScanFilterAndProjectOperator
                 null,
                 ImmutableList.of(BIGINT),
                 new DataSize(64, KILOBYTE),
-                2);
+                2,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(newDriverContext());
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -202,6 +210,12 @@ public class TestScanFilterAndProjectOperator
                 null,
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
+                0,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                0,
+                false,
+                Optional.empty(),
+                0,
                 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
@@ -237,7 +251,8 @@ public class TestScanFilterAndProjectOperator
                 null,
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, BYTE),
-                0);
+                0,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -290,7 +305,8 @@ public class TestScanFilterAndProjectOperator
                 null,
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
-                0);
+                0,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -356,7 +372,8 @@ public class TestScanFilterAndProjectOperator
                 null,
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
-                0);
+                0,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));

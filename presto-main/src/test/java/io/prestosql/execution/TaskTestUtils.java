@@ -17,8 +17,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.node.NodeInfo;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.TestSqlTaskManager.MockExchangeClientSupplier;
@@ -36,6 +36,11 @@ import io.prestosql.operator.LookupJoinOperators;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.seedstore.SeedStoreManager;
+import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spiller.GenericSpillerFactory;
 import io.prestosql.split.PageSinkManager;
 import io.prestosql.split.PageSourceManager;
@@ -50,12 +55,11 @@ import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.statestore.LocalStateStoreProvider;
+import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.testing.TestingMetadata.TestingColumnHandle;
 import io.prestosql.testing.TestingSplit;
 import io.prestosql.util.FinalizerService;
@@ -95,7 +99,10 @@ public final class TaskTestUtils
                     TABLE_SCAN_NODE_ID,
                     TEST_TABLE_HANDLE,
                     ImmutableList.of(SYMBOL),
-                    ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT))),
+                    ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT)),
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                    0,
+                    0),
             ImmutableMap.of(SYMBOL, VARCHAR),
             SOURCE_DISTRIBUTION,
             ImmutableList.of(TABLE_SCAN_NODE_ID),
@@ -126,6 +133,7 @@ public final class TaskTestUtils
         NodeInfo nodeInfo = new NodeInfo("test");
 
         SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
+        StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
 
         return new LocalExecutionPlanner(
@@ -156,7 +164,9 @@ public final class TaskTestUtils
                 new LookupJoinOperators(),
                 new OrderingCompiler(),
                 nodeInfo,
-                new LocalStateStoreProvider(seedStoreManager),
+                stateStoreProvider,
+                new StateStoreListenerManager(stateStoreProvider),
+                new DynamicFilterCacheManager(),
                 heuristicIndexerManager);
     }
 

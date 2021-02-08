@@ -79,6 +79,18 @@ public class HiveSplitWrapper
         return splits;
     }
 
+    @Override
+    public List<ConnectorSplit> getUnwrappedSplits()
+    {
+        /*
+        * Splits are unwrapped here when called by Split#getSplits()
+        * for Split Assignment processing in Reuse Exchange, where the Consumer splits are assigned
+        * to same node as Producer. Split by Split comparison is done for the same
+        * and therefore, wrapped splits cannot be used.
+        * */
+        return splits.stream().map(x -> wrap(x)).collect(Collectors.toList());
+    }
+
     @JsonProperty
     public OptionalInt getBucketNumber()
     {
@@ -120,8 +132,19 @@ public class HiveSplitWrapper
         return new HiveSplitWrapper(ImmutableList.of(hiveSplit), hiveSplit.getBucketNumber());
     }
 
+    public static HiveSplitWrapper wrap(List<HiveSplit> hiveSplitList, OptionalInt bucketNumber)
+    {
+        return new HiveSplitWrapper(hiveSplitList, bucketNumber);
+    }
+
     public static HiveSplit getOnlyHiveSplit(ConnectorSplit connectorSplit)
     {
         return getOnlyElement(((HiveSplitWrapper) connectorSplit).getSplits());
+    }
+
+    @Override
+    public int getSplitCount()
+    {
+        return splits.size();
     }
 }

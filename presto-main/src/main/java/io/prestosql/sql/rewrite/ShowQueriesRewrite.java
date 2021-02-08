@@ -20,7 +20,6 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.TableCacheInfo;
@@ -29,11 +28,11 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager.SessionPropertyValue;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
@@ -41,6 +40,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.spi.service.PropertyService;
@@ -86,6 +86,7 @@ import io.prestosql.sql.tree.TableElement;
 import io.prestosql.sql.tree.Values;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -641,18 +642,41 @@ final class ShowQueriesRewrite
         @Override
         protected Node visitShowIndex(ShowIndex node, Void context)
         {
-            List<IndexRecord> indexRecords = null;
+            List<IndexRecord> indexRecords;
             try {
                 indexRecords = readIndexRecords(node.getIndexName());
             }
             catch (IOException e) {
-                e.printStackTrace();
+                throw new UncheckedIOException("Error reading index records, ", e);
+            }
+
+            // Access Control
+            if (node.getIndexName() == null) {
+                accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), null);
+            }
+            else {
+                for (IndexRecord record : indexRecords) {
+                    QualifiedObjectName indexFullName = QualifiedObjectName.valueOf(record.table);
+                    accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
+                }
             }
 
             ImmutableList.Builder<Expression> rows = ImmutableList.builder();
             for (IndexRecord v : indexRecords) {
                 String partitions = (v.partitions == null || v.partitions.isEmpty()) ? "all" : String.join(",", v.partitions);
                 StringBuilder partitionsStrToDisplay = new StringBuilder();
+
+                String inProgressHint = "";
+                if (v.isInProgressRecord()) {
+                    long timeElapsed = System.currentTimeMillis() - v.lastModifiedTime;
+                    long millis = timeElapsed % 1000;
+                    long second = (timeElapsed / 1000) % 60;
+                    long minute = (timeElapsed / (1000 * 60)) % 60;
+                    long hour = (timeElapsed / (1000 * 60 * 60)) % 24;
+
+                    inProgressHint = String.format(" (has been in progress for %02dh %02dm %02d.%ds)", hour, minute, second, millis);
+                }
+
                 for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
                     partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
                     if (i + COL_MAX_LENGTH < partitions.length()) {
@@ -668,7 +692,7 @@ final class ShowQueriesRewrite
                         new StringLiteral(String.join(",", v.columns)),
                         new StringLiteral(v.indexType),
                         new StringLiteral(partitionsStrToDisplay.toString()),
-                        new StringLiteral(""),
+                        new StringLiteral(String.join(",", v.properties) + inProgressHint),
                         TRUE_LITERAL));
             }
 
@@ -763,7 +787,7 @@ final class ShowQueriesRewrite
             }
             else {
                 List<IndexRecord> records = Collections.singletonList(
-                        heuristicIndexerManager.getIndexClient().getIndexRecord(indexName));
+                        heuristicIndexerManager.getIndexClient().lookUpIndexRecord(indexName));
                 if (records.get(0) == null) {
                     return Collections.emptyList();
                 }

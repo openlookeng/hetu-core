@@ -76,7 +76,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "10.88", 2, "22.22", 3, "20.56", 4)
@@ -130,7 +131,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "false", 2, "true", 3)
@@ -178,7 +180,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "102", 2, "100", 3, "101", 2)
@@ -232,7 +235,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "20000", 2, "20001", 3, "20002", 2)
@@ -286,7 +290,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "8001", 2, "8002", 3, "8000", 2)
@@ -340,7 +345,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "20200520", 2, "20200521", 3, "20200522", 2)
@@ -394,7 +400,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "1.0", 2, "2", 3, "1000.10", 4)
@@ -448,7 +455,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "1.0", 2, "2", 3, "1000.10", 4)
@@ -502,7 +510,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "1995-10-09", 2, "2020-07-22", 3, "1995-11-14", 4)
@@ -556,7 +565,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "1995-10-09 00:00:00", 2, "2020-07-22 00:00:00", 3, "1995-11-14 00:00:00", 4)
@@ -610,7 +620,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "abc", 2, "def", 3, "xyz", 4)
@@ -664,7 +675,8 @@ public class TestColumnTypeCacheable
                 new CounterStat(),
                 null,
                 cachePredicates, null,
-                new HiveConfig());
+                new HiveConfig(),
+                HiveStorageFormat.ORC);
         int[] idPrefix = new int[] {1};
         ImmutableMap
                 .of("__HIVE_DEFAULT_PARTITION__", 1, "abc", 2, "def", 3, "xyz", 4)

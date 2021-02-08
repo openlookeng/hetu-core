@@ -15,12 +15,12 @@ package io.prestosql.metadata;
 
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.operator.window.WindowFunctionSupplier;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.block.BlockEncodingSerde;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -33,19 +33,18 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
 import io.prestosql.spi.connector.SampleType;
-import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlFunction;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.security.GrantInfo;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.RoleGrant;
-import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
@@ -533,22 +532,10 @@ public interface Metadata
     boolean isExecutionPlanCacheSupported(Session session, TableHandle handle);
 
     /**
-     * Hetu supports pushing sub-query with join down to the connector.
-     * This method decides if the sub-query can be pushed down to the connector based on the connector.
+     * Hetu can only create index for supported connectors.
      *
      * @param session Presto session
-     * @param tableHandle a table used in the sub-query (if the sub query has more than one tables, use a random table from the sub-query)
-     * @param subQuery the actual sub-query to be pushed down
-     * @param types Presto types of intermediate symbols
-     * @return optional SubQueryApplicationResult which has the new TableHandle if the connector supports this feature
+     * @param tableName Connector specific tableName
      */
-    Optional<SubQueryApplicationResult<TableHandle>> applySubQuery(Session session, TableHandle tableHandle, String subQuery, Map<String, Type> types);
-
-    /**
-     * Hetu's sub-query push down expects supporting connectors to provide a {@link SqlQueryWriter}
-     * to write SQL queries for the respective databases.
-     *
-     * @return the optional SQL query writer which can write database specific SQL queries
-     */
-    Optional<SqlQueryWriter> getSqlQueryWriter(Session session, TableHandle tableHandle);
+    boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName);
 }

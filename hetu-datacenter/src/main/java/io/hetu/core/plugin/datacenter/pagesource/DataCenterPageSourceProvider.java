@@ -27,15 +27,15 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.TypeManager;
 import okhttp3.OkHttpClient;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.stream.Collectors.joining;
@@ -49,14 +49,15 @@ public class DataCenterPageSourceProvider
         implements ConnectorPageSourceProvider
 {
     private static final int STRING_CAPACITY = 16;
-    private static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
+    private static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross_region_dynamic_filter_enabled";
+    private static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
     private static final String EXCHANGE_COMPRESSION = "exchange_compression";
 
     private final DataCenterConfig config;
 
     private final OkHttpClient httpClient;
 
-    private TypeManager typeManager;
+    private final TypeManager typeManager;
 
     /**
      * Constructor of data center page source provider.
@@ -90,7 +91,7 @@ public class DataCenterPageSourceProvider
 
         sql.append(" FROM ");
 
-        if (tableHandler.getSubQuery() == null || "".equals(tableHandler.getSubQuery())) {
+        if (tableHandler.getPushDownSql() == null || "".equals(tableHandler.getPushDownSql())) {
             if (!isNullOrEmpty(catalog)) {
                 sql.append(catalog).append('.');
             }
@@ -101,7 +102,7 @@ public class DataCenterPageSourceProvider
             sql.append(table);
         }
         else {
-            sql.append(tableHandler.getSubQuery());
+            sql.append("(").append(tableHandler.getPushDownSql()).append(") pushdown");
         }
 
         if (limit.isPresent()) {
@@ -114,13 +115,13 @@ public class DataCenterPageSourceProvider
     public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session,
             ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns)
     {
-        return createPageSource(transaction, session, split, table, columns, null);
+        return createPageSource(transaction, session, split, table, columns, Optional.empty());
     }
 
     @Override
     public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session,
             ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns,
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier)
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier)
     {
         // Build the sql
         String query = buildSql((DataCenterTableHandle) table, columns, ((DataCenterTableHandle) table).getLimit());
@@ -130,6 +131,7 @@ public class DataCenterPageSourceProvider
         // Only set the session if there is any dynamic filter for this page source
         if (dynamicFilterSupplier != null) {
             properties.put(ENABLE_CROSS_REGION_DYNAMIC_FILTER, "true");
+            properties.put(OPTIMIZE_DYNAMIC_FILTER_GENERATION, "false"); // close removeUnsupportedDynamicFilter optimizer
         }
         if (config.isCompressionEnabled()) {
             properties.put(EXCHANGE_COMPRESSION, "true");

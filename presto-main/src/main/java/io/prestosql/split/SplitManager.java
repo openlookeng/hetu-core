@@ -16,10 +16,9 @@ package io.prestosql.split;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitManager;
@@ -28,6 +27,7 @@ import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.resourcegroups.QueryType;
 
@@ -75,11 +75,12 @@ public class SplitManager
 
     public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        return getSplits(session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of());
+        return getSplits(session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of(), false);
     }
 
     public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
-                                 Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates)
+                                 Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
+                                 boolean partOfReuse)
     {
         CatalogName catalogName = table.getCatalogName();
         ConnectorSplitManager splitManager = getConnectorSplitManager(catalogName);
@@ -97,7 +98,7 @@ public class SplitManager
             source = splitManager.getSplits(table.getTransaction(), connectorSession, layout, splitSchedulingStrategy);
         }
         else {
-            source = splitManager.getSplits(table.getTransaction(), connectorSession, table.getConnectorHandle(), splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates);
+            source = splitManager.getSplits(table.getTransaction(), connectorSession, table.getConnectorHandle(), splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates, partOfReuse);
         }
 
         SplitSource splitSource = new ConnectorAwareSplitSource(catalogName, source);

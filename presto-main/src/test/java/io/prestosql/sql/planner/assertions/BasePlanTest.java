@@ -17,14 +17,16 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.sql.planner.LogicalPlanner;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.RuleStatsRecorder;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.optimizations.PruneUnreferencedOutputs;
 import io.prestosql.sql.planner.optimizations.UnaliasSymbolReferences;
@@ -108,6 +110,11 @@ public class BasePlanTest
         assertPlan(sql, LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED, pattern);
     }
 
+    protected void assertPlan(String sql, Session session, PlanMatchPattern pattern)
+    {
+        assertPlanWithSession(sql, session, true, pattern);
+    }
+
     protected void assertPlan(String sql, LogicalPlanner.Stage stage, PlanMatchPattern pattern)
     {
         List<PlanOptimizer> optimizers = queryRunner.getPlanOptimizers(true);
@@ -132,7 +139,14 @@ public class BasePlanTest
     protected void assertPlan(String sql, LogicalPlanner.Stage stage, PlanMatchPattern pattern, List<PlanOptimizer> optimizers)
     {
         queryRunner.inTransaction(transactionSession -> {
-            Plan actualPlan = queryRunner.createPlan(transactionSession, sql, optimizers, stage, WarningCollector.NOOP);
+            Plan actualPlan = queryRunner.createPlan(
+                    transactionSession,
+                    sql,
+                    ImmutableList.<PlanOptimizer>builder()
+                            .addAll(optimizers)
+                            .add(getExpressionTranslator()).build(),
+                    stage,
+                    WarningCollector.NOOP);
             PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), queryRunner.getStatsCalculator(), actualPlan, pattern);
             return null;
         });
@@ -151,7 +165,7 @@ public class BasePlanTest
     protected void assertMinimallyOptimizedPlan(@Language("SQL") String sql, PlanMatchPattern pattern)
     {
         List<PlanOptimizer> optimizers = ImmutableList.of(
-                new UnaliasSymbolReferences(),
+                new UnaliasSymbolReferences(queryRunner.getMetadata()),
                 new PruneUnreferencedOutputs(),
                 new IterativeOptimizer(
                         new RuleStatsRecorder(),
@@ -201,8 +215,23 @@ public class BasePlanTest
         }
     }
 
+    // Translate all OriginalExpression in planNodes to RowExpression so that we can do plan pattern asserting and printing on RowExpression only.
+    protected PlanOptimizer getExpressionTranslator()
+    {
+        return new IterativeOptimizer(
+                new RuleStatsRecorder(),
+                getQueryRunner().getStatsCalculator(),
+                getQueryRunner().getCostCalculator(),
+                ImmutableSet.copyOf(new TranslateExpressions(getMetadata(), getQueryRunner().getSqlParser()).rules(getMetadata())));
+    }
+
     public interface LocalQueryRunnerSupplier
     {
         LocalQueryRunner get();
+    }
+
+    protected Metadata getMetadata()
+    {
+        return getQueryRunner().getMetadata();
     }
 }

@@ -1,6 +1,6 @@
 ## Notice
 
-openLooKeng leverages the well-known open-source SQL engine - Presto, to provide the capability of interactive analysis on multiple data sources. Therefore, this directory includes documentations derived from Presto 316, which is licensed under Apache 2.0. It also inherits the directory organization and structure of presto-docs to help in easy browsing for existing developers/users. However, modifications were made to those sections to introduce new features and improvements within openLooKeng.
+openLooKeng leverages the well-known open-source SQL engine - Trino(formerly known as PrestoSQL), to provide the capability of interactive analysis on multiple data sources. Therefore, this directory includes documentations derived from Trino 316, which is licensed under Apache 2.0. It also inherits the directory organization and structure of presto-docs to help in easy browsing for existing developers/users. However, modifications were made to those sections to introduce new features and improvements within openLooKeng.
 
 Below are the list of major changes:
 

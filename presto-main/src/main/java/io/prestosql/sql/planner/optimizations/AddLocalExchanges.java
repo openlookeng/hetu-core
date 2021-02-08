@@ -23,28 +23,31 @@ import io.prestosql.spi.connector.ConstantProperty;
 import io.prestosql.spi.connector.GroupingProperty;
 import io.prestosql.spi.connector.LocalProperty;
 import io.prestosql.spi.connector.SortingProperty;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
@@ -54,10 +57,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.UpdateReference;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -73,6 +73,8 @@ import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
 import static io.prestosql.SystemSessionProperties.getTaskWriterCount;
 import static io.prestosql.SystemSessionProperties.isDistributedSortEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
+import static io.prestosql.operator.aggregation.AggregationUtils.hasSingleNodeExecutionPreference;
+import static io.prestosql.operator.aggregation.AggregationUtils.isDecomposable;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
@@ -107,28 +109,28 @@ public class AddLocalExchanges
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        PlanWithProperties result = plan.accept(new Rewriter(symbolAllocator, idAllocator, session), any());
+        PlanWithProperties result = plan.accept(new Rewriter(planSymbolAllocator, idAllocator, session), any());
         return result.getNode();
     }
 
     private class Rewriter
-            extends PlanVisitor<PlanWithProperties, StreamPreferredProperties>
+            extends InternalPlanVisitor<PlanWithProperties, StreamPreferredProperties>
     {
         private final PlanNodeIdAllocator idAllocator;
         private final Session session;
         private final TypeProvider types;
 
-        public Rewriter(SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Session session)
+        public Rewriter(PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, Session session)
         {
-            this.types = symbolAllocator.getTypes();
+            this.types = planSymbolAllocator.getTypes();
             this.idAllocator = idAllocator;
             this.session = session;
         }
 
         @Override
-        protected PlanWithProperties visitPlan(PlanNode node, StreamPreferredProperties parentPreferences)
+        public PlanWithProperties visitPlan(PlanNode node, StreamPreferredProperties parentPreferences)
         {
             return planAndEnforceChildren(
                     node,
@@ -285,13 +287,13 @@ public class AddLocalExchanges
         {
             checkState(node.getStep() == AggregationNode.Step.SINGLE, "step of aggregation is expected to be SINGLE, but it is %s", node.getStep());
 
-            if (node.hasSingleNodeExecutionPreference(metadata)) {
+            if (hasSingleNodeExecutionPreference(node, metadata)) {
                 return planAndEnforceChildren(node, singleStream(), defaultParallelism(session));
             }
 
             List<Symbol> groupingKeys = node.getGroupingKeys();
             if (node.hasDefaultOutput()) {
-                checkState(node.isDecomposable(metadata));
+                checkState(isDecomposable(node, metadata));
 
                 // Put fixed local exchange directly below final aggregation to ensure that final and partial aggregations are separated by exchange (in a local runner mode)
                 // This is required so that default outputs from multiple instances of partial aggregations are passed to a single final aggregation.
@@ -463,7 +465,7 @@ public class AddLocalExchanges
         }
 
         @Override
-        public PlanWithProperties visitTopNRowNumber(TopNRowNumberNode node, StreamPreferredProperties parentPreferences)
+        public PlanWithProperties visitTopNRankingNumber(TopNRankingNumberNode node, StreamPreferredProperties parentPreferences)
         {
             StreamPreferredProperties requiredProperties = parentPreferences.withDefaultParallelism(session);
 

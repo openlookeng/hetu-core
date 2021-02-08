@@ -18,13 +18,18 @@ import io.airlift.slice.Slice;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.ScalarFunction;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.function.TypeParameter;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.planner.FunctionCallBuilder;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
@@ -35,9 +40,12 @@ import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.airlift.slice.Slices.utf8Slice;
+import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
-import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static io.prestosql.sql.relational.Expressions.call;
 import static java.util.Objects.requireNonNull;
 
 public final class DynamicFilters
@@ -53,14 +61,22 @@ public final class DynamicFilters
                 .build();
     }
 
-    public static ExtractResult extractDynamicFilters(Expression expression)
+    public static RowExpression createDynamicFilterRowExpression(Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input)
     {
-        List<Expression> conjuncts = extractConjuncts(expression);
+        ConstantExpression string = new ConstantExpression(utf8Slice(id), VarcharType.VARCHAR);
+        VariableReferenceExpression expression = new VariableReferenceExpression(input.getName(), inputType);
+        Signature signature = metadata.resolveFunction(QualifiedName.of(Function.NAME), fromTypes(VarcharType.VARCHAR, inputType));
+        return call(signature, typeManager.getType(signature.getReturnType()), string, expression);
+    }
 
-        ImmutableList.Builder<Expression> staticConjuncts = ImmutableList.builder();
+    public static ExtractResult extractDynamicFilters(RowExpression expression)
+    {
+        List<RowExpression> conjuncts = extractConjuncts(expression);
+
+        ImmutableList.Builder<RowExpression> staticConjuncts = ImmutableList.builder();
         ImmutableList.Builder<Descriptor> dynamicConjuncts = ImmutableList.builder();
 
-        for (Expression conjunct : conjuncts) {
+        for (RowExpression conjunct : conjuncts) {
             Optional<Descriptor> descriptor = getDescriptor(conjunct);
             if (descriptor.isPresent()) {
                 dynamicConjuncts.add(descriptor.get());
@@ -73,44 +89,45 @@ public final class DynamicFilters
         return new ExtractResult(staticConjuncts.build(), dynamicConjuncts.build());
     }
 
-    public static boolean isDynamicFilter(Expression expression)
+    public static boolean isDynamicFilter(RowExpression expression)
     {
         return getDescriptor(expression).isPresent();
     }
 
-    public static Optional<Descriptor> getDescriptor(Expression expression)
+    public static Optional<Descriptor> getDescriptor(RowExpression expression)
     {
-        if (!(expression instanceof FunctionCall)) {
+        if (!(expression instanceof CallExpression)) {
             return Optional.empty();
         }
 
-        FunctionCall functionCall = (FunctionCall) expression;
+        CallExpression callExpression = (CallExpression) expression;
 
-        if (!functionCall.getName().getSuffix().equals(Function.NAME)) {
+        if (!callExpression.getSignature().getName().contains(Function.NAME)) {
             return Optional.empty();
         }
 
-        List<Expression> arguments = functionCall.getArguments();
+        List<RowExpression> arguments = callExpression.getArguments();
         checkArgument(arguments.size() == 2, "invalid arguments count: %s", arguments.size());
 
-        Expression firstArgument = arguments.get(0);
-        checkArgument(firstArgument instanceof StringLiteral, "firstArgument is expected to be an instance of StringLiteral: %s", firstArgument.getClass().getSimpleName());
-        String id = ((StringLiteral) firstArgument).getValue();
+        RowExpression firstArgument = arguments.get(0);
+        checkArgument(firstArgument instanceof ConstantExpression, "firstArgument is expected to be an instance of ConstantExpression: %s", firstArgument.getClass().getSimpleName());
+        Object firstArgumentValue = ((ConstantExpression) firstArgument).getValue();
+        String id = (firstArgumentValue instanceof String) ? (String) (firstArgumentValue) : ((Slice) (firstArgumentValue)).toStringUtf8();
         return Optional.of(new Descriptor(id, arguments.get(1)));
     }
 
     public static class ExtractResult
     {
-        private final List<Expression> staticConjuncts;
+        private final List<RowExpression> staticConjuncts;
         private final List<Descriptor> dynamicConjuncts;
 
-        public ExtractResult(List<Expression> staticConjuncts, List<Descriptor> dynamicConjuncts)
+        public ExtractResult(List<RowExpression> staticConjuncts, List<Descriptor> dynamicConjuncts)
         {
             this.staticConjuncts = ImmutableList.copyOf(requireNonNull(staticConjuncts, "staticConjuncts is null"));
             this.dynamicConjuncts = ImmutableList.copyOf(requireNonNull(dynamicConjuncts, "dynamicConjuncts is null"));
         }
 
-        public List<Expression> getStaticConjuncts()
+        public List<RowExpression> getStaticConjuncts()
         {
             return staticConjuncts;
         }
@@ -124,9 +141,9 @@ public final class DynamicFilters
     public static final class Descriptor
     {
         private final String id;
-        private final Expression input;
+        private final RowExpression input;
 
-        public Descriptor(String id, Expression input)
+        public Descriptor(String id, RowExpression input)
         {
             this.id = requireNonNull(id, "id is null");
             this.input = requireNonNull(input, "input is null");
@@ -137,7 +154,7 @@ public final class DynamicFilters
             return id;
         }
 
-        public Expression getInput()
+        public RowExpression getInput()
         {
             return input;
         }
@@ -172,7 +189,7 @@ public final class DynamicFilters
         }
     }
 
-    @ScalarFunction(value = Function.NAME, hidden = true, deterministic = false)
+    @ScalarFunction(value = Function.NAME, hidden = true, deterministic = true)
     public static final class Function
     {
         private Function() {}

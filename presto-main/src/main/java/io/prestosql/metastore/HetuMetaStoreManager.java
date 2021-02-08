@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -69,7 +69,7 @@ public class HetuMetaStoreManager
         LOG.info("-- Loading Hetu Metastore --");
         if (HETUMETASTORE_CONFIG_FILE.exists()) {
             // load configuration
-            Map<String, String> config = new HashMap<>(loadProperties(HETUMETASTORE_CONFIG_FILE));
+            Map<String, String> config = new HashMap<>(loadPropertiesFrom(HETUMETASTORE_CONFIG_FILE.getPath()));
             // create hetu metastore
             hetuMetastoreType = config.getOrDefault(HETU_METASTORE_TYPE_PROPERTY_NAME, HETU_METASTORE_TYPE_DEFAULT_VALUE);
             config.remove(HETU_METASTORE_TYPE_PROPERTY_NAME);

@@ -16,8 +16,8 @@ package io.prestosql.cost;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import org.testng.annotations.Test;
 

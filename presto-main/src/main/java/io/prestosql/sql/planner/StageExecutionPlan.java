@@ -16,9 +16,9 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.execution.TableInfo;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Map;

@@ -30,55 +30,66 @@ import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.StageStats;
 import io.prestosql.execution.TableInfo;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ExceptNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Marker;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.TableStatisticType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.OrderingScheme;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.SortExpressionContext;
+import io.prestosql.sql.planner.SortExpressionExtractor;
 import io.prestosql.sql.planner.SubPlan;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.iterative.GroupReference;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
-import io.prestosql.sql.planner.plan.ExceptNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExchangeNode.Scope;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.IntersectNode;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
 import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
@@ -90,19 +101,13 @@ import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.planner.planprinter.NodeRepresentation.TypedSymbol;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.util.GraphvizPrinter;
 
 import java.util.ArrayList;
@@ -125,8 +130,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.execution.StageInfo.getAllStages;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
+import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
+import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
-import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.planprinter.PlanNodeStatsSummarizer.aggregateStageStats;
 import static io.prestosql.sql.planner.planprinter.TextRenderer.formatDouble;
@@ -145,6 +152,7 @@ public class PlanPrinter
     private final PlanRepresentation representation;
     private final Function<TableScanNode, TableInfo> tableInfoSupplier;
     private final ValuePrinter valuePrinter;
+    private final Function<RowExpression, String> formatter;
 
     // NOTE: do NOT add Metadata or Session to this class.  The plan printer must be usable outside of a transaction.
     private PlanPrinter(
@@ -154,7 +162,8 @@ public class PlanPrinter
             Function<TableScanNode, TableInfo> tableInfoSupplier,
             ValuePrinter valuePrinter,
             StatsAndCosts estimatedStatsAndCosts,
-            Optional<Map<PlanNodeId, PlanNodeStats>> stats)
+            Optional<Map<PlanNodeId, PlanNodeStats>> stats,
+            Metadata metadata)
     {
         requireNonNull(planRoot, "planRoot is null");
         requireNonNull(types, "types is null");
@@ -176,7 +185,10 @@ public class PlanPrinter
 
         this.representation = new PlanRepresentation(planRoot, types, totalCpuTime, totalScheduledTime);
 
-        Visitor visitor = new Visitor(stageExecutionStrategy, types, estimatedStatsAndCosts, stats);
+        RowExpressionFormatter rowExpressionFormatter = new RowExpressionFormatter();
+        this.formatter = rowExpressionFormatter::formatRowExpression;
+
+        Visitor visitor = new Visitor(stageExecutionStrategy, types, estimatedStatsAndCosts, stats, metadata);
         planRoot.accept(visitor, null);
     }
 
@@ -198,7 +210,7 @@ public class PlanPrinter
 
         TableInfoSupplier tableInfoSupplier = new TableInfoSupplier(metadata, session);
         ValuePrinter valuePrinter = new ValuePrinter(metadata, session);
-        return new PlanPrinter(root, typeProvider, Optional.empty(), tableInfoSupplier, valuePrinter, StatsAndCosts.empty(), Optional.empty()).toJson();
+        return new PlanPrinter(root, typeProvider, Optional.empty(), tableInfoSupplier, valuePrinter, StatsAndCosts.empty(), Optional.empty(), metadata).toJson();
     }
 
     public static String textLogicalPlan(
@@ -212,7 +224,7 @@ public class PlanPrinter
     {
         TableInfoSupplier tableInfoSupplier = new TableInfoSupplier(metadata, session);
         ValuePrinter valuePrinter = new ValuePrinter(metadata, session);
-        return new PlanPrinter(plan, types, Optional.empty(), tableInfoSupplier, valuePrinter, estimatedStatsAndCosts, Optional.empty()).toText(verbose, level);
+        return new PlanPrinter(plan, types, Optional.empty(), tableInfoSupplier, valuePrinter, estimatedStatsAndCosts, Optional.empty(), metadata).toText(verbose, level);
     }
 
     public static String textDistributedPlan(StageInfo outputStageInfo, Metadata metadata, Session session, boolean verbose)
@@ -220,10 +232,11 @@ public class PlanPrinter
         return textDistributedPlan(
                 outputStageInfo,
                 new ValuePrinter(metadata, session),
-                verbose);
+                verbose,
+                metadata);
     }
 
-    public static String textDistributedPlan(StageInfo outputStageInfo, ValuePrinter valuePrinter, boolean verbose)
+    public static String textDistributedPlan(StageInfo outputStageInfo, ValuePrinter valuePrinter, boolean verbose, Metadata metadata)
     {
         Map<PlanNodeId, TableInfo> tableInfos = getAllStages(Optional.of(outputStageInfo)).stream()
                 .map(StageInfo::getTables)
@@ -245,7 +258,8 @@ public class PlanPrinter
                     Optional.of(stageInfo),
                     Optional.of(aggregatedStats),
                     verbose,
-                    allFragments));
+                    allFragments,
+                    metadata));
         }
 
         return builder.toString();
@@ -257,7 +271,7 @@ public class PlanPrinter
         ValuePrinter valuePrinter = new ValuePrinter(metadata, session);
         StringBuilder builder = new StringBuilder();
         for (PlanFragment fragment : plan.getAllFragments()) {
-            builder.append(formatFragment(tableInfoSupplier, valuePrinter, fragment, Optional.empty(), Optional.empty(), verbose, plan.getAllFragments()));
+            builder.append(formatFragment(tableInfoSupplier, valuePrinter, fragment, Optional.empty(), Optional.empty(), verbose, plan.getAllFragments(), metadata));
         }
 
         return builder.toString();
@@ -270,7 +284,8 @@ public class PlanPrinter
             Optional<StageInfo> stageInfo,
             Optional<Map<PlanNodeId, PlanNodeStats>> planNodeStats,
             boolean verbose,
-            List<PlanFragment> allFragments)
+            List<PlanFragment> allFragments,
+            Metadata metadata)
     {
         StringBuilder builder = new StringBuilder();
         builder.append(format("Fragment %s [%s]\n",
@@ -339,7 +354,8 @@ public class PlanPrinter
                         tableInfoSupplier,
                         valuePrinter,
                         fragment.getStatsAndCosts(),
-                        planNodeStats).toText(verbose, 1))
+                        planNodeStats,
+                        metadata).toText(verbose, 1))
                 .append("\n");
 
         return builder.toString();
@@ -367,19 +383,21 @@ public class PlanPrinter
     }
 
     private class Visitor
-            extends PlanVisitor<Void, Void>
+            extends InternalPlanVisitor<Void, Void>
     {
         private final Optional<StageExecutionDescriptor> stageExecutionStrategy;
         private final TypeProvider types;
         private final StatsAndCosts estimatedStatsAndCosts;
         private final Optional<Map<PlanNodeId, PlanNodeStats>> stats;
+        private final Metadata metadata;
 
-        public Visitor(Optional<StageExecutionDescriptor> stageExecutionStrategy, TypeProvider types, StatsAndCosts estimatedStatsAndCosts, Optional<Map<PlanNodeId, PlanNodeStats>> stats)
+        public Visitor(Optional<StageExecutionDescriptor> stageExecutionStrategy, TypeProvider types, StatsAndCosts estimatedStatsAndCosts, Optional<Map<PlanNodeId, PlanNodeStats>> stats, Metadata metadata)
         {
             this.stageExecutionStrategy = requireNonNull(stageExecutionStrategy, "stageExecutionStrategy is null");
             this.types = requireNonNull(types, "types is null");
             this.estimatedStatsAndCosts = requireNonNull(estimatedStatsAndCosts, "estimatedStatsAndCosts is null");
             this.stats = requireNonNull(stats, "stats is null");
+            this.metadata = requireNonNull(metadata, "metadata is null");
         }
 
         @Override
@@ -392,11 +410,11 @@ public class PlanPrinter
         @Override
         public Void visitJoin(JoinNode node, Void context)
         {
-            List<Expression> joinExpressions = new ArrayList<>();
+            List<String> joinExpressions = new ArrayList<>();
             for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
-                joinExpressions.add(clause.toExpression());
+                joinExpressions.add(JoinNodeUtils.toExpression(clause).toString());
             }
-            node.getFilter().ifPresent(joinExpressions::add);
+            node.getFilter().map(formatter::apply).ifPresent(joinExpressions::add);
 
             NodeRepresentation nodeOutput;
             if (node.isCrossJoin()) {
@@ -413,7 +431,9 @@ public class PlanPrinter
             if (!node.getDynamicFilters().isEmpty()) {
                 nodeOutput.appendDetails("dynamicFilterAssignments = %s", printDynamicFilterAssignments(node.getDynamicFilters()));
             }
-            node.getSortExpressionContext().ifPresent(sortContext -> nodeOutput.appendDetails("SortExpression[%s]", sortContext.getSortExpression()));
+
+            Optional<SortExpressionContext> sortExpressionContext = node.getFilter().flatMap(filter -> SortExpressionExtractor.extractSortExpression(metadata, node.getRightOutputSymbols(), filter));
+            sortExpressionContext.ifPresent(sortContext -> nodeOutput.appendDetails("SortExpression[%s]", formatter.apply(sortContext.getSortExpression())));
             node.getLeft().accept(this, context);
             node.getRight().accept(this, context);
 
@@ -425,7 +445,7 @@ public class PlanPrinter
         {
             NodeRepresentation nodeOutput = addNode(node,
                     node.getType().getJoinLabel(),
-                    format("[%s]", node.getFilter()));
+                    format("[%s]", formatter.apply(node.getFilter())));
 
             nodeOutput.appendDetailsLine("Distribution: %s", node.getDistributionType());
             node.getLeft().accept(this, context);
@@ -444,6 +464,7 @@ public class PlanPrinter
                             node.getFilteringSourceJoinSymbol(),
                             formatHash(node.getSourceHashSymbol(), node.getFilteringSourceHashSymbol())));
             node.getDistributionType().ifPresent(distributionType -> nodeOutput.appendDetailsLine("Distribution: %s", distributionType));
+            node.getDynamicFilterId().ifPresent(dynamicFilterId -> nodeOutput.appendDetailsLine("dynamicFilterId: %s", dynamicFilterId));
             node.getSource().accept(this, context);
             node.getFilteringSource().accept(this, context);
 
@@ -471,8 +492,8 @@ public class PlanPrinter
             List<Expression> joinExpressions = new ArrayList<>();
             for (IndexJoinNode.EquiJoinClause clause : node.getCriteria()) {
                 joinExpressions.add(new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
-                        clause.getProbe().toSymbolReference(),
-                        clause.getIndex().toSymbolReference()));
+                        toSymbolReference(clause.getProbe()),
+                        toSymbolReference(clause.getIndex())));
             }
 
             addNode(node,
@@ -621,7 +642,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitTopNRowNumber(TopNRowNumberNode node, Void context)
+        public Void visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             List<String> partitionBy = node.getPartitionBy().stream()
                     .map(Functions.toStringFunction())
@@ -636,7 +657,7 @@ public class PlanPrinter
             args.add(format("order by (%s)", Joiner.on(", ").join(orderBy)));
 
             NodeRepresentation nodeOutput = addNode(node,
-                    "TopNRowNumber",
+                    "TopNRankingNumber",
                     format("[%s limit %s]%s", Joiner.on(", ").join(args), node.getMaxRowCountPerPartition(), formatHash(node.getHashSymbol())));
 
             nodeOutput.appendDetailsLine("%s := %s", node.getRowNumberSymbol(), "row_number()");
@@ -685,6 +706,22 @@ public class PlanPrinter
         {
             TableHandle table = node.getTable();
             NodeRepresentation nodeOutput;
+            String operatorName = "";
+            String reuseTypeName = "";
+            if (node.getStrategy().equals(REUSE_STRATEGY_PRODUCER)) {
+                operatorName = "ReuseTableScan";
+                reuseTypeName = "(Producer [ID: " + node.getId().toString() + "])";
+            }
+            else if (node.getStrategy().equals(REUSE_STRATEGY_CONSUMER)) {
+                operatorName = "ReuseTableScan";
+                reuseTypeName = "(Consumer)";
+            }
+            else {
+                operatorName += "TableScan";
+            }
+
+            operatorName = operatorName + reuseTypeName;
+
             {
                 String formatString = "[";
                 List<Object> arguments = new LinkedList<>();
@@ -705,7 +742,7 @@ public class PlanPrinter
                 formatString += "]";
                 nodeOutput = addNode(
                         node,
-                        "TableScan",
+                        operatorName,
                         format(formatString, arguments.toArray()));
             }
             printTableScanInfo(nodeOutput, node);
@@ -722,8 +759,8 @@ public class PlanPrinter
         public Void visitValues(ValuesNode node, Void context)
         {
             NodeRepresentation nodeOutput = addNode(node, "Values");
-            for (List<Expression> row : node.getRows()) {
-                nodeOutput.appendDetailsLine("(" + Joiner.on(", ").join(row) + ")");
+            for (List<RowExpression> row : node.getRows()) {
+                nodeOutput.appendDetailsLine("(" + row.stream().map(formatter::apply).collect(Collectors.joining(", ")) + ")");
             }
             return null;
         }
@@ -770,10 +807,22 @@ public class PlanPrinter
 
             String formatString = "[";
             String operatorName = "";
+            String reuseTypeName = "";
             List<Object> arguments = new LinkedList<>();
 
             if (scanNode.isPresent()) {
-                operatorName += "Scan";
+                if (scanNode.get().getStrategy() == REUSE_STRATEGY_PRODUCER) {
+                    operatorName = "ReuseScan";
+                    reuseTypeName = "(Producer)";
+                }
+                else if (scanNode.get().getStrategy() == REUSE_STRATEGY_CONSUMER) {
+                    operatorName = "ReuseScan";
+                    reuseTypeName = "(Consumer)";
+                }
+                else {
+                    operatorName += "Scan";
+                }
+
                 formatString += "table = %s, ";
                 TableHandle table = scanNode.get().getTable();
                 arguments.add(table);
@@ -792,9 +841,9 @@ public class PlanPrinter
             if (filterNode.isPresent()) {
                 operatorName += "Filter";
                 formatString += "filterPredicate = %s, ";
-                Expression predicate = filterNode.get().getPredicate();
+                RowExpression predicate = filterNode.get().getPredicate();
                 DynamicFilters.ExtractResult extractResult = extractDynamicFilters(predicate);
-                arguments.add(combineConjuncts(extractResult.getStaticConjuncts()));
+                arguments.add(formatter.apply(RowExpressionUtils.combineConjuncts(extractResult.getStaticConjuncts())));
                 if (!extractResult.getDynamicConjuncts().isEmpty()) {
                     formatString += "dynamicFilter = %s, ";
                     arguments.add(printDynamicFilters(extractResult.getDynamicConjuncts()));
@@ -818,7 +867,7 @@ public class PlanPrinter
 
             NodeRepresentation nodeOutput = addNode(
                     node,
-                    operatorName,
+                    operatorName + reuseTypeName,
                     format(formatString, arguments.toArray()),
                     allNodes,
                     ImmutableList.of(sourceNode),
@@ -1189,7 +1238,7 @@ public class PlanPrinter
         }
 
         @Override
-        protected Void visitPlan(PlanNode node, Void context)
+        public Void visitPlan(PlanNode node, Void context)
         {
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }
@@ -1205,12 +1254,12 @@ public class PlanPrinter
 
         private void printAssignments(NodeRepresentation nodeOutput, Assignments assignments)
         {
-            for (Map.Entry<Symbol, Expression> entry : assignments.getMap().entrySet()) {
-                if (entry.getValue() instanceof SymbolReference && ((SymbolReference) entry.getValue()).getName().equals(entry.getKey().getName())) {
+            for (Map.Entry<Symbol, RowExpression> entry : assignments.getMap().entrySet()) {
+                if (entry.getValue() instanceof VariableReferenceExpression && ((VariableReferenceExpression) entry.getValue()).getName().equals(entry.getKey().getName())) {
                     // skip identity assignments
                     continue;
                 }
-                nodeOutput.appendDetailsLine("%s := %s", entry.getKey(), entry.getValue());
+                nodeOutput.appendDetailsLine("%s := %s", entry.getKey(), formatter.apply(entry.getValue()));
             }
         }
 

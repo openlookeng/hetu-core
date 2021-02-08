@@ -29,18 +29,20 @@ import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.DynamicFilterUtils;
 
@@ -152,7 +154,7 @@ public class DynamicFilterService
                 cachedDynamicFilters.put(queryId, new ConcurrentHashMap<>());
             }
             Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId);
-            StateMap mergedDynamicFilters = (StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP);
+            StateMap mergedDynamicFilters = (StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
 
             for (Map.Entry<String, DynamicFilterRegistryInfo> columnToDynamicFilterEntry : queryToDynamicFiltersEntry.getValue().entrySet()) {
                 if (columnToDynamicFilterEntry.getValue().isMerged()) {
@@ -218,7 +220,7 @@ public class DynamicFilterService
     private void removeFinishedQuery()
     {
         List<String> handledQuery = new ArrayList<>();
-        StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, MAP);
+        StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
         // Clear registered dynamic filter tasks
         for (String queryId : finishedQuery) {
             Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
@@ -290,29 +292,43 @@ public class DynamicFilterService
      * @param workers set of workers
      * @param stateMachine the state machine
      */
-    public void registerTasks(JoinNode node, Set<TaskId> taskIds, Set<InternalNode> workers, StageStateMachine stateMachine)
+    public void registerTasks(PlanNode node, Set<TaskId> taskIds, Set<InternalNode> workers, StageStateMachine stateMachine)
     {
-        final StateStore stateStore = stateStoreProvider.getStateStore();
-        if (taskIds.isEmpty() || stateStore == null) {
+        if (taskIds.isEmpty() || stateStoreProvider.getStateStore() == null) {
             return;
         }
-        String queryId = stateMachine.getSession().getQueryId().toString();
+        if (node instanceof JoinNode) {
+            JoinNode joinNode = (JoinNode) node;
+            registerTasksHelper(node, joinNode.getCriteria().get(0).getRight(), joinNode.getDynamicFilters(), taskIds, workers, stateMachine);
+        }
+        else if (node instanceof SemiJoinNode) {
+            SemiJoinNode semiJoinNode = (SemiJoinNode) node;
+            if (semiJoinNode.getDynamicFilterId().isPresent()) {
+                registerTasksHelper(node, semiJoinNode.getFilteringSourceJoinSymbol(), Collections.singletonMap(semiJoinNode.getDynamicFilterId().get(), semiJoinNode.getFilteringSourceJoinSymbol()), taskIds, workers, stateMachine);
+            }
+        }
+    }
 
-        for (Map.Entry<String, Symbol> entry : node.getDynamicFilters().entrySet()) {
-            Symbol buildSymbol = node.getCriteria().get(0).getRight();
+    private void registerTasksHelper(PlanNode node, Symbol buildSymbol, Map<String, Symbol> dynamicFiltersMap, Set<TaskId> taskIds, Set<InternalNode> workers, StageStateMachine stateMachine)
+    {
+        final StateStore stateStore = stateStoreProvider.getStateStore();
+        String queryId = stateMachine.getSession().getQueryId().toString();
+        for (Map.Entry<String, Symbol> entry : dynamicFiltersMap.entrySet()) {
             if (entry.getValue().getName().equals(buildSymbol.getName())) {
                 String filterId = entry.getKey();
                 stateStore.createStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId), SET);
                 stateStore.createStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId), SET);
-
                 dynamicFilters.putIfAbsent(queryId, new ConcurrentHashMap<>());
                 Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
-                filters.put(filterId, extractDynamicFilterRegistryInfo(node, stateMachine.getSession()));
-
+                if (node instanceof JoinNode) {
+                    filters.put(filterId, extractDynamicFilterRegistryInfo((JoinNode) node, stateMachine.getSession()));
+                }
+                else if (node instanceof SemiJoinNode) {
+                    filters.put(filterId, extractDynamicFilterRegistryInfo((SemiJoinNode) node, stateMachine.getSession()));
+                }
                 dynamicFiltersToTask.putIfAbsent(filterId + "-" + queryId, new CopyOnWriteArraySet<>());
                 CopyOnWriteArraySet<TaskId> taskSet = dynamicFiltersToTask.get(filterId + "-" + queryId);
                 taskSet.addAll(taskIds);
-
                 log.debug("registerTasks source " + filterId + " filters:" + filters + ", workers: "
                         + workers.stream().map(x -> x.getNodeIdentifier()).collect(Collectors.joining(",")) +
                         ", taskIds: " + taskIds.stream().map(TaskId::toString).collect(Collectors.joining(",")));
@@ -399,17 +415,17 @@ public class DynamicFilterService
     {
         ImmutableMap.Builder<String, Symbol> resultBuilder = ImmutableMap.builder();
         for (DynamicFilters.Descriptor descriptor : dynamicFilters) {
-            Expression expression = descriptor.getInput();
+            RowExpression expression = descriptor.getInput();
 
             // Extract the column symbols from CAST expressions
-            while (expression instanceof Cast) {
-                expression = ((Cast) expression).getExpression();
+            while (expression instanceof CallExpression) {
+                expression = ((CallExpression) expression).getArguments().get(0);
             }
 
-            if (!(expression instanceof SymbolReference)) {
+            if (!(expression instanceof VariableReferenceExpression)) {
                 continue;
             }
-            resultBuilder.put(descriptor.getId(), Symbol.from(expression));
+            resultBuilder.put(descriptor.getId(), new Symbol(((VariableReferenceExpression) expression).getName()));
         }
         return resultBuilder.build();
     }
@@ -417,6 +433,19 @@ public class DynamicFilterService
     private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(JoinNode node, Session session)
     {
         Symbol symbol = node.getCriteria().get(0).getLeft();
+        List<FilterNode> filterNodes = findFilterNodeInStage(node);
+
+        if (filterNodes.isEmpty()) {
+            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session);
+        }
+        else {
+            return new DynamicFilterRegistryInfo(symbol, LOCAL, session);
+        }
+    }
+
+    private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(SemiJoinNode node, Session session)
+    {
+        Symbol symbol = node.getFilteringSourceJoinSymbol();
         List<FilterNode> filterNodes = findFilterNodeInStage(node);
 
         if (filterNodes.isEmpty()) {

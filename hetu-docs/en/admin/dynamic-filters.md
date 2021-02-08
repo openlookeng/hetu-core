@@ -4,7 +4,7 @@ This section describes the openlookeng dynamic filtering features. Dynamic filte
 Openlookeng generates dynamic filter conditions based on join conditions and data read from build side during query run, and is applied to the table scan stage of probe side table as an additional filter condition, to reduce the data volume of probe table participating in join operation and effectively reduce IO read and network transmission.
 
 ## scenarios
-Openlookeng dynamic filtering is currently applicable to 'inner join' and 'right join' scenarios, only can be applied to 'hive connector' and 'DC connector'.
+Openlookeng dynamic filtering is currently applicable to 'inner join', 'semi-join' and 'right join' scenarios, only can be applied to 'hive connector', 'DC connector' and 'Memory connector'.
 
 ## Usage
 Openlookeng's dynamic filtering feature depends on the distributed cache component. Please refer to the section [Configuring HA](../installation/deployment-ha.md) to configure 'hazelcast'.
@@ -21,7 +21,7 @@ dynamic-filtering-bloom-filter-fpp=0.1
 The above attributes are described below:
 
 - `enable-dynamic-filtering`: Enable dynamic filtering feature.
-- `dynamic-filtering-wait-time`: Maximum waiting time for the dynamic filter to be ready, default to 0ms. (This feature requires the time of nodes in cluster to be highly sync-up)
+- `dynamic-filtering-wait-time`: Maximum waiting time for the dynamic filter to be ready, default to 1s. 
 - `dynamic-filtering-data-type`: Set dynamic filtering data type, default to BLOOM_FILTER.
 - `dynamic-filtering-max-size`: Max dynamic filter size, cost based optimizer won't create dynamic filter that has estimate size exceeding this value based on statistics, default to 1000000.
 - `dynamic-filtering-max-per-driver-size`: Max data size collected for dynamic filter per driver, default to 1MB.

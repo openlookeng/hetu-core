@@ -13,10 +13,10 @@
  */
 package io.prestosql.sql.planner.iterative.rule;
 
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 
 import java.util.Optional;
 import java.util.Set;
@@ -43,6 +43,9 @@ public class PruneTableScanColumns
                         filteredCopy(tableScanNode.getOutputSymbols(), referencedOutputs::contains),
                         filterKeys(tableScanNode.getAssignments(), referencedOutputs::contains),
                         tableScanNode.getEnforcedConstraint(),
-                        tableScanNode.getPredicate()));
+                        tableScanNode.getPredicate(),
+                        tableScanNode.getStrategy(),
+                        tableScanNode.getReuseTableScanMappingId(),
+                        0));
     }
 }

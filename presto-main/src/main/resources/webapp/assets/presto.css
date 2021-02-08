@@ -48,6 +48,7 @@ pre {
     max-width: 1200px;
     color: #000;
     background: #e6e6e6;
+    margin-bottom: 14px;
 }
 
 .glyphicon {
@@ -573,6 +574,7 @@ pre {
 }
 #live-plan-container, #stage-performance-header {
     margin-top: 30px;
+    margin-bottom: 20px;
 }
 
 #tasks {
@@ -896,7 +898,7 @@ g .operator-stats:hover {
 }
 
 .queryListContainer {
-    max-height: calc(100vh - 120px);
+    max-height: calc(100vh - 190px);
     overflow: auto;
 }
 

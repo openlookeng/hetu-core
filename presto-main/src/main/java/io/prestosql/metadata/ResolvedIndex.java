@@ -13,7 +13,7 @@
  */
 package io.prestosql.metadata;
 
-import io.prestosql.connector.CatalogName;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorResolvedIndex;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;

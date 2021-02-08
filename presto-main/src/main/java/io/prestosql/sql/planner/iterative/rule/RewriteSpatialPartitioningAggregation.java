@@ -19,15 +19,16 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.planner.FunctionCallBuilder;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.QualifiedName;
@@ -35,13 +36,17 @@ import io.prestosql.sql.tree.QualifiedName;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.SystemSessionProperties.getHashPartitionCount;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -92,26 +97,26 @@ public class RewriteSpatialPartitioningAggregation
     {
         ImmutableMap.Builder<Symbol, Aggregation> aggregations = ImmutableMap.builder();
         Symbol partitionCountSymbol = context.getSymbolAllocator().newSymbol("partition_count", INTEGER);
-        ImmutableMap.Builder<Symbol, Expression> envelopeAssignments = ImmutableMap.builder();
+        ImmutableMap.Builder<Symbol, RowExpression> envelopeAssignments = ImmutableMap.builder();
         for (Map.Entry<Symbol, Aggregation> entry : node.getAggregations().entrySet()) {
             Aggregation aggregation = entry.getValue();
             String name = aggregation.getSignature().getName();
             if (name.equals(NAME) && aggregation.getArguments().size() == 1) {
-                Expression geometry = getOnlyElement(aggregation.getArguments());
+                RowExpression geometry = getOnlyElement(aggregation.getArguments().stream().collect(toImmutableList()));
                 Symbol envelopeSymbol = context.getSymbolAllocator().newSymbol("envelope", metadata.getType(GEOMETRY_TYPE_SIGNATURE));
-                if (geometry instanceof FunctionCall && ((FunctionCall) geometry).getName().toString().equalsIgnoreCase("ST_Envelope")) {
+                if (isFunctionNameMatch(geometry, "ST_Envelope")) {
                     envelopeAssignments.put(envelopeSymbol, geometry);
                 }
                 else {
-                    envelopeAssignments.put(envelopeSymbol, new FunctionCallBuilder(metadata)
+                    envelopeAssignments.put(envelopeSymbol, castToRowExpression(new FunctionCallBuilder(metadata)
                             .setName(QualifiedName.of("ST_Envelope"))
-                            .addArgument(GEOMETRY_TYPE_SIGNATURE, geometry)
-                            .build());
+                            .addArgument(GEOMETRY_TYPE_SIGNATURE, castToExpression(geometry))
+                            .build()));
                 }
                 aggregations.put(entry.getKey(),
                         new Aggregation(
                                 INTERNAL_SIGNATURE,
-                                ImmutableList.of(envelopeSymbol.toSymbolReference(), partitionCountSymbol.toSymbolReference()),
+                                ImmutableList.of(castToRowExpression(toSymbolReference(envelopeSymbol)), castToRowExpression(toSymbolReference(partitionCountSymbol))),
                                 false,
                                 Optional.empty(),
                                 Optional.empty(),
@@ -129,8 +134,8 @@ public class RewriteSpatialPartitioningAggregation
                                 context.getIdAllocator().getNextId(),
                                 node.getSource(),
                                 Assignments.builder()
-                                        .putIdentities(node.getSource().getOutputSymbols())
-                                        .put(partitionCountSymbol, new LongLiteral(Integer.toString(getHashPartitionCount(context.getSession()))))
+                                        .putAll(AssignmentUtils.identityAsSymbolReferences(node.getSource().getOutputSymbols()))
+                                        .put(partitionCountSymbol, castToRowExpression(new LongLiteral(Integer.toString(getHashPartitionCount(context.getSession())))))
                                         .putAll(envelopeAssignments.build())
                                         .build()),
                         aggregations.build(),
@@ -139,5 +144,13 @@ public class RewriteSpatialPartitioningAggregation
                         node.getStep(),
                         node.getHashSymbol(),
                         node.getGroupIdSymbol()));
+    }
+
+    private static boolean isFunctionNameMatch(RowExpression rowExpression, String expectedName)
+    {
+        if (castToExpression(rowExpression) instanceof FunctionCall) {
+            return ((FunctionCall) castToExpression(rowExpression)).getName().toString().equalsIgnoreCase(expectedName);
+        }
+        return false;
     }
 }

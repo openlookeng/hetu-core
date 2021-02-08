@@ -13,16 +13,19 @@
  */
 package io.prestosql.cost;
 
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.tree.ComparisonExpression;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
+import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.cost.SymbolStatsEstimate.buildFrom;
 import static io.prestosql.util.MoreMath.firstNonNaN;
 import static io.prestosql.util.MoreMath.max;
 import static io.prestosql.util.MoreMath.min;
+import static java.lang.Double.MAX_VALUE;
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
@@ -179,8 +182,17 @@ public final class ComparisonStatsCalculator
             SymbolStatsEstimate rightExpressionStatistics,
             Optional<Symbol> rightExpressionSymbol)
     {
-        if (isNaN(leftExpressionStatistics.getDistinctValuesCount()) || isNaN(rightExpressionStatistics.getDistinctValuesCount())) {
-            return PlanNodeStatsEstimate.unknown();
+        double minNDV = 0;
+        if (isNaN(leftExpressionStatistics.getDistinctValuesCount()) && isNaN(rightExpressionStatistics.getDistinctValuesCount())) {
+            // Since both side of expression stats are unknown, we try to use from the projection columns
+            // i.e. from projection columns symbols we take min of ndv.
+            // Even if projection symbol stats not there (e.g. count(*)), then we take default factor of .9
+            minNDV = MAX_VALUE;
+            for (Map.Entry<Symbol, SymbolStatsEstimate> entry : inputStatistics.getSymbolStatistics().entrySet()) {
+                if (minNDV > entry.getValue().getDistinctValuesCount()) {
+                    minNDV = entry.getValue().getDistinctValuesCount();
+                }
+            }
         }
 
         StatisticRange leftExpressionRange = StatisticRange.from(leftExpressionStatistics);
@@ -188,14 +200,24 @@ public final class ComparisonStatsCalculator
 
         StatisticRange intersect = leftExpressionRange.intersect(rightExpressionRange);
 
-        double nullsFilterFactor = (1 - leftExpressionStatistics.getNullsFraction()) * (1 - rightExpressionStatistics.getNullsFraction());
-        double leftNdv = leftExpressionRange.getDistinctValuesCount();
-        double rightNdv = rightExpressionRange.getDistinctValuesCount();
-        double filterFactor = 1.0 / max(leftNdv, rightNdv, 1);
+        double leftNullFrac = isNaN(leftExpressionStatistics.getNullsFraction()) ? 0 : leftExpressionStatistics.getNullsFraction();
+        double rightNullFrac = isNaN(rightExpressionStatistics.getNullsFraction()) ? 0 : rightExpressionStatistics.getNullsFraction();
+        double nullsFilterFactor = (1 - leftNullFrac) * (1 - rightNullFrac);
+
+        double leftNdv = isNaN(leftExpressionRange.getDistinctValuesCount()) ? minNDV : leftExpressionRange.getDistinctValuesCount();
+        double rightNdv = isNaN(rightExpressionRange.getDistinctValuesCount()) ? minNDV : rightExpressionRange.getDistinctValuesCount();
+        double filterFactor = (minNDV == MAX_VALUE ? UNKNOWN_FILTER_COEFFICIENT : (1.0 / max(leftNdv, rightNdv, 1)));
         double retainedNdv = min(leftNdv, rightNdv);
 
-        PlanNodeStatsEstimate.Builder estimate = PlanNodeStatsEstimate.buildFrom(inputStatistics)
-                .setOutputRowCount(inputStatistics.getOutputRowCount() * nullsFilterFactor * filterFactor);
+        PlanNodeStatsEstimate.Builder estimate;
+        if (intersect.isEmpty()) {
+            estimate = PlanNodeStatsEstimate.buildFrom(inputStatistics)
+                    .setOutputRowCount(0);
+        }
+        else {
+            estimate = PlanNodeStatsEstimate.buildFrom(inputStatistics)
+                    .setOutputRowCount(inputStatistics.getOutputRowCount() * nullsFilterFactor * filterFactor);
+        }
 
         SymbolStatsEstimate equalityStats = SymbolStatsEstimate.builder()
                 .setAverageRowSize(averageExcludingNaNs(leftExpressionStatistics.getAverageRowSize(), rightExpressionStatistics.getAverageRowSize()))

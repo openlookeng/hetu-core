@@ -38,15 +38,16 @@ import io.prestosql.metadata.Split;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskStats;
 import io.prestosql.spi.memory.MemoryPoolId;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spiller.SpillSpaceTracker;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.testing.TestingMetadata.TestingColumnHandle;
 import org.joda.time.DateTime;
 
@@ -110,7 +111,10 @@ public class MockRemoteTaskFactory
                         sourceId,
                         TEST_TABLE_HANDLE,
                         ImmutableList.of(symbol),
-                        ImmutableMap.of(symbol, new TestingColumnHandle("column"))),
+                        ImmutableMap.of(symbol, new TestingColumnHandle("column")),
+                        ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                        0,
+                        0),
                 ImmutableMap.of(symbol, VARCHAR),
                 SOURCE_DISTRIBUTION,
                 ImmutableList.of(sourceId),

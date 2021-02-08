@@ -179,6 +179,11 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
+    public void checkCanShowIndex(Identity identity, CatalogSchemaTableName index)
+    {
+    }
+
+    @Override
     public void checkCanCreateView(Identity identity, CatalogSchemaTableName view)
     {
     }

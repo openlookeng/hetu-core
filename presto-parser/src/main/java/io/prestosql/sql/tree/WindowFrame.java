@@ -14,6 +14,7 @@
 package io.prestosql.sql.tree;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,26 +26,21 @@ import static java.util.Objects.requireNonNull;
 public class WindowFrame
         extends Node
 {
-    public enum Type
-    {
-        RANGE, ROWS
-    }
-
-    private final Type type;
+    private final WindowFrameType type;
     private final FrameBound start;
     private final Optional<FrameBound> end;
 
-    public WindowFrame(Type type, FrameBound start, Optional<FrameBound> end)
+    public WindowFrame(WindowFrameType type, FrameBound start, Optional<FrameBound> end)
     {
         this(Optional.empty(), type, start, end);
     }
 
-    public WindowFrame(NodeLocation location, Type type, FrameBound start, Optional<FrameBound> end)
+    public WindowFrame(NodeLocation location, WindowFrameType type, FrameBound start, Optional<FrameBound> end)
     {
         this(Optional.of(location), type, start, end);
     }
 
-    private WindowFrame(Optional<NodeLocation> location, Type type, FrameBound start, Optional<FrameBound> end)
+    private WindowFrame(Optional<NodeLocation> location, WindowFrameType type, FrameBound start, Optional<FrameBound> end)
     {
         super(location);
         this.type = requireNonNull(type, "type is null");
@@ -52,7 +48,7 @@ public class WindowFrame
         this.end = requireNonNull(end, "end is null");
     }
 
-    public Type getType()
+    public WindowFrameType getType()
     {
         return type;
     }

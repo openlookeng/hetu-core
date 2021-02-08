@@ -19,12 +19,12 @@ import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 
 import java.util.ArrayList;
@@ -105,9 +105,9 @@ public class TestDynamicFilterUtil
         when(mockPartialSet.size()).thenAnswer(i -> partial.size());
         when(mockTasksSet.size()).thenAnswer(i -> tasks.size());
 
-        when(stateStore.getStateCollection(DynamicFilterUtils.MERGEMAP)).thenReturn(mockMergeMap);
-        when(stateStore.createStateCollection(DynamicFilterUtils.MERGEMAP, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
-        when(stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGEMAP, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
+        when(stateStore.getStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS)).thenReturn(mockMergeMap);
+        when(stateStore.createStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
+        when(stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, StateCollection.Type.MAP)).thenReturn(mockMergeMap);
 
         when(stateStore.getStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId))).thenReturn(mockTasksSet);
         when(stateStore.createStateCollection(DynamicFilterUtils.createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId), StateCollection.Type.SET)).thenReturn(mockTasksSet);

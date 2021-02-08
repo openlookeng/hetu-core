@@ -15,18 +15,19 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.iterative.GroupReference;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import io.prestosql.sql.planner.optimizations.joins.JoinGraph;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ArithmeticUnaryExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
@@ -40,12 +41,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.any;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
 import static io.prestosql.sql.planner.iterative.rule.EliminateCrossJoins.getJoinOrder;
 import static io.prestosql.sql.planner.iterative.rule.EliminateCrossJoins.isOriginalOrder;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.tree.ArithmeticUnaryExpression.Sign.MINUS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -251,7 +252,7 @@ public class TestEliminateCrossJoins
         return new ProjectNode(
                 idAllocator.getNextId(),
                 source,
-                Assignments.of(new Symbol(symbol), expression));
+                Assignments.of(new Symbol(symbol), OriginalExpressionUtils.castToRowExpression(expression)));
     }
 
     private String symbol(String name)

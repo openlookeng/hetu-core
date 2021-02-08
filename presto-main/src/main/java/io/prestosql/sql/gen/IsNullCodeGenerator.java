@@ -18,8 +18,8 @@ import io.airlift.bytecode.BytecodeBlock;
 import io.airlift.bytecode.BytecodeNode;
 import io.airlift.bytecode.Variable;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.RowExpression;
 
 import java.util.List;
 

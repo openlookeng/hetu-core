@@ -15,14 +15,14 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
 import java.util.List;
@@ -40,10 +40,10 @@ public class SchedulingOrderVisitor
     private SchedulingOrderVisitor() {}
 
     private static class Visitor
-            extends PlanVisitor<Void, Consumer<PlanNodeId>>
+            extends InternalPlanVisitor<Void, Consumer<PlanNodeId>>
     {
         @Override
-        protected Void visitPlan(PlanNode node, Consumer<PlanNodeId> schedulingOrder)
+        public Void visitPlan(PlanNode node, Consumer<PlanNodeId> schedulingOrder)
         {
             for (PlanNode source : node.getSources()) {
                 source.accept(this, schedulingOrder);

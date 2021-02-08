@@ -13,14 +13,14 @@
  */
 package io.prestosql.sql.planner;
 
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 
 public class SimplePlanVisitor<C>
-        extends PlanVisitor<Void, C>
+        extends InternalPlanVisitor<Void, C>
 {
     @Override
-    protected Void visitPlan(PlanNode node, C context)
+    public Void visitPlan(PlanNode node, C context)
     {
         for (PlanNode source : node.getSources()) {
             source.accept(this, context);

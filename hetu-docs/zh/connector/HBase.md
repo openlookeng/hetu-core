@@ -10,7 +10,7 @@ HBase连接支持在外部Apache HBase实例上查询和创建表。用户可以
 
 HBase连接器维护着一个元存储，用于持久化HBase元数据，目前元存储只支持以下存储格式：`openLooKeng Metastore`。
 
-**注意：** *Hbase连接器使用Apache HBase 2.2.3版本。*
+**注意：** *Hbase连接器仅支持连接Apache HBase 2.2.3及以下的版本。*
 
 ## 连接器配置
 
@@ -38,17 +38,55 @@ hbase.metastore.type=hetuMetastore
 hbase.metastore.type=hetuMetastore
 ```
 
+**Kerberos配置：**
+
+如果HBase/Zookeeper是安全集群，则需要配置kerberos相关信息
+
+```properties
+hbase.jaas.conf.path=/xxx/jaas.conf
+
+hbase.hbase.site.path=/xxx/hbase-site.xml
+
+hbase.krb5.conf.path=/xxx/krb5.conf
+
+hbase.kerberos.keytab=/xxx/user.keytab
+
+hbase.kerberos.principal=lk_username@HADOOP.COM
+
+hbase.authentication.type=KERBEROS
+```
+
+编辑 jaas.conf
+```properties
+Client {
+com.sun.security.auth.module.Krb5LoginModule required
+useKeyTab=true
+keyTab="/xxx/user.keytab"
+principal="lk_username@HADOOP.COM"
+useTicketCache=false
+storeKey=true
+debug=true;
+};
+```
+
 ## 配置属性
 
 | 属性名称| 默认值| 是否必填| 说明|
 |----------|----------|----------|----------|
 | hbase.zookeeper.quorum| （无）| 是| ZooKeeper集群地址|
-| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口。|
+| hbase.zookeeper.property.clientPort| （无）| 是| Zookeeper客户端端口|
+| hbase.zookeeper.znode.parent| /hbase| 否| HBase的Zookeeper根节点路径|
 | hbase.client.retries.number| 3| 否| HBase客户端连接重试次数|
 | hbase.client.pause.time| 100| 否| HBase客户端断连时间|
-| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值。|
+| hbase.rpc.protection.enable| false| 否| 通信隐私保护。可以从`hbase-site.xml`获取该属性的值|
 | hbase.default.value| NULL| 否| 表中数据的默认值|
 | hbase.metastore.type| hetuMetastore| 否| HBase元数据的存储，`hetuMetastore`|
+| hbase.authentication.type| （无）| 否| HDFS/HBase组件访问安全身份验证方式|
+| hbase.kerberos.principal| （无）| 否| 安全身份验证的用户名|
+| hbase.kerberos.keytab| （无）| 否| 安全身份验证的密钥|
+| hbase.hbase.site.path| （无）| 否| 连接安全HBase集群的配置|
+| hbase.jaas.conf.path| （无）| 否| 安全身份验证的JAAS|
+| hbase.krb5.conf.path| （无）| 否| 安全身份验证的krb5|
 
 
 ## 表属性
@@ -59,6 +97,7 @@ hbase.metastore.type=hetuMetastore
 | row\_id| String| 第一个列名| 否| row\_id为HBase表中RowKey对应的列名|
 | hbase\_table\_name| String| NULL| 否| hbase\_table\_name指定要链接的HBase数据源上的表空间和表名，使用“:”连接表空间和表名，默认表空间为“default”。|
 | external| Boolean| true| 否| 如果external为true，表示该表是HBase数据源中表的映射表。不支持删除HBase数据源上原有的表。当external为false时，删除本地HBase表的同时也会删除HBase数据源上的表。|
+| split\_by\_char| String| 0~9,a~z,A~Z| 否| split\_by\_char为分片切割的依据，若RowKey的第一个字符由数字构成，则可以根据不同的数字进行分片切割，提高查询并发度。不同类型的符号用逗号隔开。如果设置不当，会导致查询数据结果不完整，请根据RowKey的实际情况进行配置。|
 
 ## 数据说明
 
@@ -82,7 +121,7 @@ CREATE SCHEMA schemaName;
 
 ### 删除模式
 
-只支持删除空模式。
+只支持删除空的模式。
 
 ```sql
 DROP SCHEMA schemaName;
@@ -94,9 +133,11 @@ HBase连接器支持两种建表形式：
 
 1. 创建表并直接链接到HBase数据源中已存在的表。
 
-2. 创建HBase数据源中不存在的新表。
+2. 创建HBase数据源中不存在的新表。我们必须指定‘external = false’。
 
 以下示例创建表`schemaName.tableName`并链接到一个名为`hbaseNamespace:hbaseTable`的现有表：
+
+映射关系的格式为：'column_name:family:qualifier'
 
 ```sql
 CREATE TABLE schemaName.tableName (
@@ -112,7 +153,7 @@ CREATE TABLE schemaName.tableName (
     qualifier9	TIMESTAMP
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier1:f1:q1, qualifier2:f1:q2, 
+    column_mapping = 'qualifier1:f1:q1, qualifier2:f1:q2, 
     qualifier3:f2:q3, qualifier4:f2:q4, qualifier5:f2:q5, qualifier6:f3:q1, 
     qualifier7:f3:q2, qualifier8:f3:q3, qualifier9:f3:q4',
     row_id = 'rowId',
@@ -133,7 +174,7 @@ CREATE TABLE default.typeMapping (
     qualifier1 	INTEGER
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier2:f1:q2',
+    column_mapping = 'qualifier1:f1:q2',
     row_id = 'rowId',
     hbase_table_name = 'hello:type4'
 );

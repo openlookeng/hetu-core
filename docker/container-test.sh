@@ -48,7 +48,7 @@ function test_container {
     I=0
     # check if hetu instance is running
     sleep ${QUERY_PERIOD}
-    until RESULT=$(docker exec "${CONTAINER_ID}" openlk --execute "SELECT 'success'"); do
+    until RESULT=$(docker exec "${CONTAINER_ID}" openlk --execute "SELECT 'success'" | tail -1); do
         if [[ $((I++)) -ge ${QUERY_RETRIES} ]]; then
             echo "Too many retries waiting for Hetu to start."
             break

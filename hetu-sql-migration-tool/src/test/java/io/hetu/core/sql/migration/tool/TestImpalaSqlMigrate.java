@@ -140,6 +140,28 @@ public class TestImpalaSqlMigrate
         String sql3 = "create table impala10(impala1 tinyint, impala2 smallint, impala3 int) TBLPROPERTIES('id'='11','cnt'=1)";
         assertUnsupported(sql3, Optional.of("TBLPROPERTIES"));
 
+        String sql4 = "create table impala10(impala1 tinyint, impala2 smallint, impala3 int) sort by (impala3)";
+        String expectedSql4 = "CREATE TABLE impala10 (\n" +
+                "   impala1 tinyint,\n" +
+                "   impala2 smallint,\n" +
+                "   impala3 int\n" +
+                ")\n" +
+                "WITH (\n" +
+                "   sorted_by = ARRAY['impala3']\n" +
+                ")";
+        assertSuccess(sql4, expectedSql4);
+
+        String sql5 = "create table impala10(impala1 tinyint, impala2 smallint, impala3 int) tblproperties('transactional'='true')";
+        String expectedSql5 = "CREATE TABLE impala10 (\n" +
+                "   impala1 tinyint,\n" +
+                "   impala2 smallint,\n" +
+                "   impala3 int\n" +
+                ")\n" +
+                "WITH (\n" +
+                "   transactional = true\n" +
+                ")";
+        assertSuccess(sql5, expectedSql5);
+
         // Test negative sql - row format is not supported
         String negativeSql1 = "CREATE TABLE tbl_row_format (id INT, name STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY 'char'";
         assertUnsupported(negativeSql1, Optional.of("ROW"));
@@ -151,6 +173,9 @@ public class TestImpalaSqlMigrate
         // CACHED IN is not supported
         String negativeSql3 = "CREATE TABLE tbl_row_format (id INT, name STRING) CACHED IN 'cache_pool_name' WITH REPLICATION = 2";
         assertUnsupported(negativeSql3, Optional.of("CACHED"));
+
+        String negativeSql4 = "create table impala10(impala1 tinyint, impala2 smallint, impala3 int) tblproperties('debug'='true')";
+        assertUnsupported(negativeSql4, Optional.of("TBLPROPERTIES"));
     }
 
     @Test
@@ -322,6 +347,32 @@ public class TestImpalaSqlMigrate
                 "CROSS JOIN t2)\n" +
                 "WHERE (t1.id > t2.id)\n";
         assertSuccess(sql9, expectedSql9);
+
+        String sql10 = "SELECT * FROM t1 where id1 is distinct from id2";
+        String expectedSql10 = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (id1 IS DISTINCT FROM id2)\n";
+        assertSuccess(sql10, expectedSql10);
+
+        String sql11 = "SELECT * FROM t1 where id1 is not distinct from id2";
+        String expectedSql11 = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (NOT (id1 IS DISTINCT FROM id2))\n";
+        assertSuccess(sql11, expectedSql11);
+
+        String sql12 = "SELECT * FROM t1 where id1 > -id2";
+        String expectedSql12 = "SELECT *\n" +
+                "FROM\n" +
+                "  t1\n" +
+                "WHERE (id1 > -(id2))\n";
+        assertSuccess(sql12, expectedSql12);
+
+        String sql13 = "SELECT CURRENT_TIMESTAMP()";
+        String expectedSql13 = "SELECT current_timestamp\n" +
+                "\n";
+        assertSuccess(sql13, expectedSql13);
     }
 
     @Test
@@ -355,6 +406,9 @@ public class TestImpalaSqlMigrate
         assertSuccess(sql2, expectedSql2);
         assertFailed(sql3);
         assertSuccess(sql4, sql2);
+
+        String sql5 = "ALTER TABLE t1 ADD IF NOT EXISTS COLUMNS (n1 INT)";
+        assertUnsupported(sql5, Optional.of("IF NOT EXISTS"));
     }
 
     @Test
@@ -557,6 +611,12 @@ public class TestImpalaSqlMigrate
 
         String sql6 = "GRANT SELECT ON SERVER s_name TO ROLE role_name WITH GRANT OPTION";
         assertUnsupported(sql6, Optional.of("GRANT"));
+
+        String sql7 = "GRANT REFRESH ON SERVER s_name TO ROLE role_name WITH GRANT OPTION";
+        assertUnsupported(sql7, Optional.of("REFRESH"));
+
+        String sql8 = "GRANT SELECT(ID) ON SERVER s_name TO ROLE role_name WITH GRANT OPTION";
+        assertUnsupported(sql8, Optional.of("SELECT(column_name)"));
     }
 
     @Test
@@ -583,6 +643,12 @@ public class TestImpalaSqlMigrate
 
         String sql5 = "REVOKE SELECT ON DATABASE db_name FROM ROLE role_name";
         assertUnsupported(sql5, Optional.of("REVOKE"));
+
+        String sql6 = "REVOKE REFRESH ON DATABASE db_name FROM ROLE role_name";
+        assertUnsupported(sql6, Optional.of("REFRESH"));
+
+        String sql7 = "REVOKE SELECT(ID) ON DATABASE db_name FROM ROLE role_name";
+        assertUnsupported(sql7, Optional.of("SELECT(column_name)"));
     }
 
     @Test
@@ -833,10 +899,34 @@ public class TestImpalaSqlMigrate
         String sql2 = "SHOW AGGREGATE FUNCTIONS IN DB1";
         String sql3 = "SHOW ANALYTIC FUNCTIONS IN DB1";
         String sql4 = "SHOW FUNCTIONS";
+        String sql5 = "SHOW FUNCTIONS LIKE 'TEST'";
         assertUnsupported(sql, Optional.of("IN"));
         assertUnsupported(sql2, Optional.of("AGGREGATE"));
         assertUnsupported(sql3, Optional.of("ANALYTIC"));
         assertSuccess(sql4, "SHOW FUNCTIONS");
+        assertUnsupported(sql5, Optional.of("LIKE"));
+    }
+
+    @Test void testFunctionCall()
+    {
+        String sql = "SELECT IF(ID=10, 1, 2) FROM T1";
+        String expectedSql = "SELECT IF((ID = 10), 1, 2)\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+
+        sql = "SELECT NULLIF(ID1, ID2) FROM T1";
+        expectedSql = "SELECT NULLIF(ID1, ID2)\n" +
+                "FROM\n" +
+                "  T1\n";
+        assertSuccess(sql, expectedSql);
+    }
+
+    @Test
+    public void testShowRoles()
+    {
+        String sql = "SHOW ROLES";
+        assertSuccess(sql, "SHOW ROLES");
     }
 
     @Test

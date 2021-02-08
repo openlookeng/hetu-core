@@ -22,12 +22,12 @@ import io.airlift.testing.Assertions;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.Session.SessionBuilder;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.AllNodes;
 import io.prestosql.metadata.Catalog;
+import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.QualifiedObjectName;
@@ -36,9 +36,11 @@ import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
 import io.prestosql.sql.parser.SqlParserOptions;
+import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.testing.MaterializedResult;
@@ -110,7 +112,7 @@ public class DistributedQueryRunner
         return new Builder(defaultSession);
     }
 
-    DistributedQueryRunner(
+    public DistributedQueryRunner(
             Session defaultSession,
             int nodeCount,
             Map<String, String> extraProperties,
@@ -263,6 +265,12 @@ public class DistributedQueryRunner
     public NodePartitioningManager getNodePartitioningManager()
     {
         return coordinator.getNodePartitioningManager();
+    }
+
+    @Override
+    public ConnectorPlanOptimizerManager getPlanOptimizerManager()
+    {
+        return coordinator.getPlanOptimizerManager();
     }
 
     @Override
@@ -485,6 +493,14 @@ public class DistributedQueryRunner
             throwIfUnchecked(e);
             throw new RuntimeException(e);
         }
+    }
+
+    public CatalogManager getCatalogManager()
+    {
+        for (TestingPrestoServer server : servers) {
+            return server.getCatalogManager();
+        }
+        return null;
     }
 
     public static class Builder

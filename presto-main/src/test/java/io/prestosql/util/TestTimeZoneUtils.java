@@ -25,9 +25,9 @@ import java.util.TreeSet;
 
 import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static io.prestosql.spi.type.TimeZoneKey.isUtcZoneId;
-import static io.prestosql.util.DateTimeZoneIndex.getDateTimeZone;
-import static io.prestosql.util.DateTimeZoneIndex.packDateTimeWithZone;
-import static io.prestosql.util.DateTimeZoneIndex.unpackDateTimeZone;
+import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
+import static io.prestosql.spi.util.DateTimeZoneIndex.packDateTimeWithZone;
+import static io.prestosql.spi.util.DateTimeZoneIndex.unpackDateTimeZone;
 import static org.testng.Assert.assertEquals;
 
 public class TestTimeZoneUtils

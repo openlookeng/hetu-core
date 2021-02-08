@@ -871,7 +871,8 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 new CounterStat(),
                 null,
-                null, null, new HiveConfig());
+                null, null, new HiveConfig(),
+                HiveStorageFormat.ORC);
     }
 
     private static Table table(

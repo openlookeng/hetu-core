@@ -18,11 +18,12 @@ import io.prestosql.Session;
 import io.prestosql.cost.ComposableStatsCalculator.Rule;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.RowExpressionInterpreter;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.ValuesNode;
 
 import java.util.List;
 import java.util.Objects;
@@ -36,6 +37,8 @@ import static io.prestosql.cost.StatsUtil.toStatsRepresentation;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
 import static io.prestosql.sql.planner.plan.Patterns.values;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.stream.Collectors.toList;
 
 public class ValuesStatsRule
@@ -81,7 +84,12 @@ public class ValuesStatsRule
         }
         return valuesNode.getRows().stream()
                 .map(row -> row.get(symbolId))
-                .map(expression -> evaluateConstantExpression(expression, symbolType, metadata, session, ImmutableList.of()))
+                .map(rowExpression -> {
+                    if (isExpression(rowExpression)) {
+                        return evaluateConstantExpression(castToExpression(rowExpression), symbolType, metadata, session, ImmutableList.of());
+                    }
+                    return RowExpressionInterpreter.evaluateConstantRowExpression(rowExpression, metadata, session.toConnectorSession());
+                })
                 .collect(toList());
     }
 

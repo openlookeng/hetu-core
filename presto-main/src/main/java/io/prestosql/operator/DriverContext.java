@@ -25,7 +25,7 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.OperationTimer.OperationTiming;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
 import java.util.List;

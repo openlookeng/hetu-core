@@ -22,13 +22,11 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.FunctionListBuilder;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.FilterAndProjectOperator.FilterAndProjectOperatorFactory;
@@ -45,6 +43,7 @@ import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSplit;
@@ -52,9 +51,14 @@ import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.connector.InMemoryRecordSet;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.connector.RecordSet;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.function.SqlFunction;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.Utils;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.Type;
@@ -65,12 +69,9 @@ import io.prestosql.sql.analyzer.SemanticErrorCode;
 import io.prestosql.sql.gen.ExpressionCompiler;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.ExpressionInterpreter;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.rule.CanonicalizeExpressionRewriter;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.relational.RowExpression;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.DefaultTraversalVisitor;
 import io.prestosql.sql.tree.DereferenceExpression;
@@ -878,7 +879,8 @@ public final class FunctionAssertions
                     null,
                     ImmutableList.of(projection.getType()),
                     new DataSize(0, BYTE),
-                    0);
+                    0,
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
         }
         catch (Throwable e) {
             if (e instanceof UncheckedExecutionException) {
@@ -950,7 +952,7 @@ public final class FunctionAssertions
             implements PageSourceProvider
     {
         @Override
-        public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter)
+        public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, Optional<DynamicFilterSupplier> dynamicFilter)
         {
             assertInstanceOf(split.getConnectorSplit(), FunctionAssertions.TestSplit.class);
             FunctionAssertions.TestSplit testSplit = (FunctionAssertions.TestSplit) split.getConnectorSplit();

@@ -21,7 +21,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 public interface IndexFactory
 {
@@ -47,6 +46,4 @@ public interface IndexFactory
     public IndexClient getIndexClient(HetuFileSystemClient fs, Path root);
 
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices);
-
-    public Set<String> getSupportedConnector();
 }

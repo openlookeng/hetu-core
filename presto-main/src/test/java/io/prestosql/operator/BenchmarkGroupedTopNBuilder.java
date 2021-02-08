@@ -36,6 +36,7 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_FIRST;
@@ -78,7 +79,7 @@ public class BenchmarkGroupedTopNBuilder
         public void setup()
         {
             page = createInputPage(Integer.valueOf(positions), types);
-            topNBuilder = new GroupedTopNBuilder(types, comparator, Integer.valueOf(topN), false, new NoChannelGroupByHash());
+            topNBuilder = new GroupedTopNBuilder(types, comparator, Integer.valueOf(topN), false, Optional.empty(), new NoChannelGroupByHash());
         }
 
         public GroupedTopNBuilder getTopNBuilder()

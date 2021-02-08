@@ -18,17 +18,17 @@ import io.prestosql.operator.PagesHashStrategy;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.function.WindowIndex;
-import io.prestosql.sql.tree.FrameBound;
+import io.prestosql.spi.sql.expression.Types.FrameBoundType;
 
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.INVALID_WINDOW_FRAME;
-import static io.prestosql.sql.tree.FrameBound.Type.FOLLOWING;
-import static io.prestosql.sql.tree.FrameBound.Type.PRECEDING;
-import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_FOLLOWING;
-import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
-import static io.prestosql.sql.tree.WindowFrame.Type.RANGE;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.FOLLOWING;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.PRECEDING;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_FOLLOWING;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
+import static io.prestosql.spi.sql.expression.Types.WindowFrameType.RANGE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.lang.Math.toIntExact;
 
@@ -201,8 +201,8 @@ public final class WindowPartition
 
     private boolean emptyFrame(FrameInfo frameInfo, int rowPosition, int endPosition)
     {
-        FrameBound.Type startType = frameInfo.getStartType();
-        FrameBound.Type endType = frameInfo.getEndType();
+        FrameBoundType startType = frameInfo.getStartType();
+        FrameBoundType endType = frameInfo.getEndType();
 
         int positions = endPosition - rowPosition;
 
@@ -218,7 +218,7 @@ public final class WindowPartition
             return false;
         }
 
-        FrameBound.Type type = frameInfo.getStartType();
+        FrameBoundType type = frameInfo.getStartType();
         if ((type != PRECEDING) && (type != FOLLOWING)) {
             return false;
         }

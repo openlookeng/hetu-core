@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.type.Type;
 
 import java.util.Objects;
 
@@ -23,17 +24,26 @@ public final class MemoryColumnHandle
         implements ColumnHandle
 {
     private final int columnIndex;
+    private final Type type;
 
     @JsonCreator
-    public MemoryColumnHandle(@JsonProperty("columnIndex") int columnIndex)
+    public MemoryColumnHandle(@JsonProperty("columnIndex") int columnIndex,
+                              @JsonProperty("type") Type type)
     {
         this.columnIndex = columnIndex;
+        this.type = type;
     }
 
     @JsonProperty
     public int getColumnIndex()
     {
         return columnIndex;
+    }
+
+    @JsonProperty
+    public Type getType()
+    {
+        return type;
     }
 
     @Override

@@ -80,6 +80,8 @@ public class HazelcastStateStoreFactory
     private static final int SEED_IP_FETCHING_RETRY_TIMES = 10;
     private static final long SEED_IP_FETCHING_INITIAL_RETRY_INTERVAL = 500L;
     private static final String COMMA = ",";
+    private static final String CLIENT_HEARTBEAT_TIMEOUT = "hazelcast.client.heartbeat.timeout";
+    private static final String CLIENT_HEARTBEAT_INTERVAL = "hazelcast.client.heartbeat.interval";
     private String name = "hazelcast";
 
     private final Map<String, StateStoreFactory> stateStoreFactories = new ConcurrentHashMap<>(0);
@@ -127,6 +129,10 @@ public class HazelcastStateStoreFactory
             SslConfig.setCipherSuites(properties.get(SSL_CIPHER_SUITES));
             SslConfig.setProtocols(properties.get(SSL_PROTOCOLS));
         }
+
+        // Set heartbeat config
+        clientConfig.setProperty(CLIENT_HEARTBEAT_TIMEOUT, String.valueOf(HazelcastConstants.HEARTBEAT_TIMEOUT_SECONDS * 1000));
+        clientConfig.setProperty(CLIENT_HEARTBEAT_INTERVAL, String.valueOf(HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS * 1000));
 
         final String discoveryMode = properties.get(DISCOVERY_MODE_CONFIG_NAME);
 

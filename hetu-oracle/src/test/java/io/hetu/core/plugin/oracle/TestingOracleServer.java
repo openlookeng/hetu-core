@@ -29,8 +29,8 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.hetu.core.plugin.oracle.TestOracleConstants.ORACLE_UT_CONFIG_FILE_PATH;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 
 /**
@@ -57,7 +57,7 @@ public class TestingOracleServer
         File file = new File(ORACLE_UT_CONFIG_FILE_PATH);
 
         try {
-            Map<String, String> properties = new HashMap<>(loadProperties(file));
+            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(file.getPath()));
             connectionUrl = properties.get("connection.url");
             user = properties.get("connection.user");
             passWd = properties.get("connection.password");
@@ -80,20 +80,35 @@ public class TestingOracleServer
                 ImmutableMap.of(
                         "USER", user,
                         "PASSWORD", passWd),
-                TestingOracleServer::helthCheck, MEMORY_SIZE);
+                this::healthCheck, MEMORY_SIZE);
     }
 
-    private static void helthCheck(DockerContainer.HostPortProvider hostPortProvider)
+    private void healthCheck(DockerContainer.HostPortProvider hostPortProvider)
             throws Exception
     {
         String jdbcUrl = getJdbcUrl(hostPortProvider);
         LOG.info("connection jdbcurl: " + jdbcUrl);
+        execute(SQL_STATEMENT, jdbcUrl);
+    }
+
+    private static String getJdbcUrl(DockerContainer.HostPortProvider hostPortProvider)
+    {
+        return format(connectionUrl, hostPortProvider.getHostPort(port));
+    }
+
+    public void execute(String sql) throws Exception
+    {
+        execute(sql, getJdbcUrl());
+    }
+
+    public void execute(String sql, String jdbcUrl) throws Exception
+    {
         try {
             Class.forName(Constants.ORACLE_JDBC_DRIVER_CLASS_NAME);
             Connection conn = DriverManager.getConnection(jdbcUrl, user, passWd);
             if (conn != null) {
                 Statement stmt = conn.createStatement();
-                stmt.execute(SQL_STATEMENT);
+                stmt.execute(sql);
             }
         }
         catch (ClassNotFoundException e) {
@@ -102,11 +117,6 @@ public class TestingOracleServer
         catch (Exception e) {
             throw new RuntimeException("Failed to execute statement: " + SQL_STATEMENT, e);
         }
-    }
-
-    private static String getJdbcUrl(DockerContainer.HostPortProvider hostPortProvider)
-    {
-        return format(connectionUrl, hostPortProvider.getHostPort(port));
     }
 
     /**

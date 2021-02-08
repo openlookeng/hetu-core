@@ -17,13 +17,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.StringLiteral;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -39,6 +39,7 @@ import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -327,7 +328,7 @@ public class TestStageStateMachine
                 new PlanFragmentId("plan"),
                 new ValuesNode(valuesNodeId,
                         ImmutableList.of(symbol),
-                        ImmutableList.of(ImmutableList.of(new StringLiteral("foo")))),
+                        ImmutableList.of(ImmutableList.of(castToRowExpression(new StringLiteral("foo"))))),
                 ImmutableMap.of(symbol, VARCHAR),
                 SOURCE_DISTRIBUTION,
                 ImmutableList.of(valuesNodeId),

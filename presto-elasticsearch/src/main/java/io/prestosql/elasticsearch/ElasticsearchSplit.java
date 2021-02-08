@@ -27,37 +27,16 @@ import static java.util.Objects.requireNonNull;
 public class ElasticsearchSplit
         implements ConnectorSplit
 {
-    private final String index;
-    private final String type;
     private final int shard;
-    private final String searchNode;
-    private final int port;
+    private final String address;
 
     @JsonCreator
     public ElasticsearchSplit(
-            @JsonProperty("index") String index,
-            @JsonProperty("type") String type,
             @JsonProperty("shard") int shard,
-            @JsonProperty("searchNode") String searchNode,
-            @JsonProperty("port") int port)
+            @JsonProperty("address") String address)
     {
-        this.index = requireNonNull(index, "index is null");
-        this.type = requireNonNull(type, "type is null");
-        this.searchNode = requireNonNull(searchNode, "searchNode is null");
-        this.port = port;
         this.shard = shard;
-    }
-
-    @JsonProperty
-    public String getIndex()
-    {
-        return index;
-    }
-
-    @JsonProperty
-    public String getType()
-    {
-        return type;
+        this.address = requireNonNull(address, "address is null");
     }
 
     @JsonProperty
@@ -67,15 +46,9 @@ public class ElasticsearchSplit
     }
 
     @JsonProperty
-    public String getSearchNode()
+    public String getAddress()
     {
-        return searchNode;
-    }
-
-    @JsonProperty
-    public int getPort()
-    {
-        return port;
+        return address;
     }
 
     @Override
@@ -87,7 +60,7 @@ public class ElasticsearchSplit
     @Override
     public List<HostAddress> getAddresses()
     {
-        return ImmutableList.of(HostAddress.fromParts(searchNode, port));
+        return ImmutableList.of(HostAddress.fromString(address));
     }
 
     @Override
@@ -100,11 +73,7 @@ public class ElasticsearchSplit
     public String toString()
     {
         return toStringHelper(this)
-                .addValue(index)
-                .addValue(type)
                 .addValue(shard)
-                .addValue(port)
-                .addValue(searchNode)
                 .toString();
     }
 }

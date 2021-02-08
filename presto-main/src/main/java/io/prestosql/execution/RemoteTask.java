@@ -18,7 +18,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.metadata.Split;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 public interface RemoteTask
 {

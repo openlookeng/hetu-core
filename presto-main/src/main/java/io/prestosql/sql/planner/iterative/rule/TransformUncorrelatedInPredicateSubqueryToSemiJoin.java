@@ -15,7 +15,8 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -28,6 +29,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.matching.Pattern.empty;
 import static io.prestosql.sql.planner.plan.Patterns.Apply.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.applyNode;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 
 /**
  * This optimizers looks for InPredicate expressions in ApplyNodes and replaces the nodes with SemiJoin nodes.
@@ -71,7 +73,7 @@ public class TransformUncorrelatedInPredicateSubqueryToSemiJoin
             return Result.empty();
         }
 
-        Expression expression = getOnlyElement(applyNode.getSubqueryAssignments().getExpressions());
+        Expression expression = castToExpression(getOnlyElement(applyNode.getSubqueryAssignments().getExpressions()));
         if (!(expression instanceof InPredicate)) {
             return Result.empty();
         }
@@ -82,9 +84,10 @@ public class TransformUncorrelatedInPredicateSubqueryToSemiJoin
         SemiJoinNode replacement = new SemiJoinNode(context.getIdAllocator().getNextId(),
                 applyNode.getInput(),
                 applyNode.getSubquery(),
-                Symbol.from(inPredicate.getValue()),
-                Symbol.from(inPredicate.getValueList()),
+                SymbolUtils.from(inPredicate.getValue()),
+                SymbolUtils.from(inPredicate.getValueList()),
                 semiJoinSymbol,
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());

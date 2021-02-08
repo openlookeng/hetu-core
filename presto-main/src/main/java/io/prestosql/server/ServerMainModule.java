@@ -42,6 +42,7 @@ import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.connector.system.SystemConnectorModule;
+import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.ExecutionFailureInfo;
 import io.prestosql.execution.ExplainAnalyzeContext;
@@ -105,6 +106,8 @@ import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.connector.ConnectorSplit;
+import io.prestosql.spi.relation.DeterminismEvaluator;
+import io.prestosql.spi.relation.DomainTranslator;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.FileSingleStreamSpillerFactory;
 import io.prestosql.spiller.GenericPartitioningSpillerFactory;
@@ -133,14 +136,18 @@ import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.sql.planner.CompilerConfig;
+import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.TypeAnalyzer;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
+import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.statestore.StateStoreProvider;
+import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.transaction.TransactionManagerConfig;
 import io.prestosql.type.TypeDeserializer;
 import io.prestosql.util.FinalizerService;
@@ -408,6 +415,9 @@ public class ServerMainModule
         binder.bind(MetadataManager.class).in(Scopes.SINGLETON);
         binder.bind(Metadata.class).to(MetadataManager.class).in(Scopes.SINGLETON);
 
+        binder.bind(DomainTranslator.class).to(RowExpressionDomainTranslator.class).in(Scopes.SINGLETON);
+        binder.bind(DeterminismEvaluator.class).to(RowExpressionDeterminismEvaluator.class).in(Scopes.SINGLETON);
+
         // type
         binder.bind(TypeAnalyzer.class).in(Scopes.SINGLETON);
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
@@ -418,6 +428,9 @@ public class ServerMainModule
 
         // node partitioning manager
         binder.bind(NodePartitioningManager.class).in(Scopes.SINGLETON);
+
+        //connector plan optimizer manager
+        binder.bind(ConnectorPlanOptimizerManager.class).in(Scopes.SINGLETON);
 
         // index manager
         binder.bind(IndexManager.class).in(Scopes.SINGLETON);
@@ -520,6 +533,12 @@ public class ServerMainModule
 
         // State store
         binder.bind(StateStoreProvider.class).to(LocalStateStoreProvider.class).in(Scopes.SINGLETON);
+
+        // State store listener manager
+        binder.bind(StateStoreListenerManager.class).in(Scopes.SINGLETON);
+
+        // dynamic filter listener service
+        binder.bind(DynamicFilterCacheManager.class).in(Scopes.SINGLETON);
     }
 
     public static class ExecutorCleanup

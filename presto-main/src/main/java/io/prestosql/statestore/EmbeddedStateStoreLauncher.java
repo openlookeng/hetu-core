@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.prestosql.spi.StandardErrorCode.STATE_STORE_FAILURE;
 import static io.prestosql.statestore.StateStoreConstants.DEFAULT_HAZELCAST_DISCOVERY_PORT;
 import static io.prestosql.statestore.StateStoreConstants.HAZELCAST;
@@ -50,7 +51,6 @@ import static io.prestosql.statestore.StateStoreConstants.HAZELCAST_DISCOVERY_TC
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CLUSTER_PROPERTY_NAME;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_TYPE_PROPERTY_NAME;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -106,7 +106,7 @@ public class EmbeddedStateStoreLauncher
         }
 
         if (STATE_STORE_LAUNCHER_CONFIGURATION.exists()) {
-            Map<String, String> properties = new HashMap<>(loadProperties(STATE_STORE_LAUNCHER_CONFIGURATION));
+            Map<String, String> properties = new HashMap<>(loadPropertiesFrom(STATE_STORE_LAUNCHER_CONFIGURATION.getPath()));
             Set<String> staticSeeds = getStateStoreStaticSeeds(properties);
             if (staticSeeds.size() > 0) {
                 launchStateStore(staticSeeds, properties);

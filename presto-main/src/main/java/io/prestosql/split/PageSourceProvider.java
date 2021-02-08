@@ -14,17 +14,16 @@
 package io.prestosql.split;
 
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.Split;
-import io.prestosql.metadata.TableHandle;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.metadata.TableHandle;
 
 import java.util.List;
-import java.util.Map;
-import java.util.function.Supplier;
+import java.util.Optional;
 
 public interface PageSourceProvider
 {
@@ -32,7 +31,7 @@ public interface PageSourceProvider
                                          Split split,
                                          TableHandle table,
                                          List<ColumnHandle> columns,
-                                         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter);
+                                         Optional<DynamicFilterSupplier> dynamicFilter);
 
     default ConnectorPageSourceProvider getPageSourceProvider(CatalogName catalogName)
     {

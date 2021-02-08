@@ -24,21 +24,29 @@ import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexWriter;
+import io.prestosql.spi.heuristicindex.Pair;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
+import static io.prestosql.spi.HetuConstant.DATASOURCE_PAGE_NUMBER;
 import static io.prestosql.spi.HetuConstant.DATASOURCE_STRIPE_OFFSET;
+import static io.prestosql.spi.HetuConstant.DATASOURCE_TOTAL_PAGES;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -56,39 +64,86 @@ public class FileIndexWriter
 
     private final String dataSourceFileName;
     private final String dataSourceFileLastModifiedTime;
-    private Map<Integer, Set<Map<String, List<Object>>>> indexValues;
+    // "stripe offset" -> (column name -> list<entry<page values, page number>>)
+    private final Map<Long, Map<String, List<Map.Entry<List<Object>, Integer>>>> indexPages;
+    private final Map<Long, AtomicInteger> pageCountExpected;
     private final CreateIndexMetadata createIndexMetadata;
     private final HetuFileSystemClient fs;
     private final Path root;
+    private Path tmpPath;
 
     /**
      * Constructor
      *
      * @param createIndexMetadata metadata of create index, includes indexName, tableName, indexType, indexColumns and partitions
-     * @param fs filesystem client to access filesystem where the indexes are persisted/stored
+     * @param fs                  filesystem client to access filesystem where the indexes are persisted/stored
      */
     public FileIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata, HetuFileSystemClient fs, Path root)
     {
         this.createIndexMetadata = createIndexMetadata;
-        this.dataSourceFileName = URI.create(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH)).getPath();
+        this.dataSourceFileName = Paths.get(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH)).toString();
         this.dataSourceFileLastModifiedTime = connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION);
         this.fs = requireNonNull(fs);
         this.root = root;
-        this.indexValues = new ConcurrentHashMap<>();
+        this.indexPages = new ConcurrentHashMap<>();
+        this.pageCountExpected = new ConcurrentHashMap<>();
     }
 
     /**
      * This method IS thread-safe. Multiple operators can add data to one writer in parallel.
      *
-     * @param values values to be indexed
+     * @param values            values to be indexed
      * @param connectorMetadata metadata for the index
      */
     @Override
     public void addData(Map<String, List<Object>> values, Properties connectorMetadata)
+            throws IOException
     {
-        int stripeOffset = Integer.parseInt(connectorMetadata.getProperty(DATASOURCE_STRIPE_OFFSET));
-        indexValues.putIfAbsent(stripeOffset, ConcurrentHashMap.newKeySet());
-        indexValues.get(stripeOffset).add(values);
+        long stripeOffset = Long.parseLong(connectorMetadata.getProperty(DATASOURCE_STRIPE_OFFSET));
+
+        // Add values first
+        indexPages.computeIfAbsent(stripeOffset, k -> new ConcurrentHashMap<>());
+        for (Map.Entry<String, List<Object>> e : values.entrySet()) {
+            indexPages.get(stripeOffset).computeIfAbsent(e.getKey(),
+                    k -> Collections.synchronizedList(new LinkedList<>()))
+                    .add(new AbstractMap.SimpleEntry(e.getValue(), Integer.parseInt(connectorMetadata.getProperty(DATASOURCE_PAGE_NUMBER))));
+        }
+
+        // Update page count
+        int current = pageCountExpected.computeIfAbsent(stripeOffset, k -> new AtomicInteger()).decrementAndGet();
+        if (connectorMetadata.getProperty(DATASOURCE_TOTAL_PAGES) != null) {
+            int expected = Integer.parseInt(connectorMetadata.getProperty(DATASOURCE_TOTAL_PAGES));
+            int updatedCurrent = pageCountExpected.get(stripeOffset).addAndGet(expected);
+            LOG.debug("offset %d finishing page received, expected page count: %d, actual received: %d, remaining: %d",
+                    stripeOffset, expected, -current, updatedCurrent);
+        }
+
+        // Check page count to know if all pages have been received for a stripe. Persist and delete values if true to save memory
+        if (pageCountExpected.get(stripeOffset).get() == 0) {
+            synchronized (pageCountExpected.get(stripeOffset)) {
+                if (indexPages.containsKey(stripeOffset)) {
+                    LOG.debug("All pages for offset %d have been received. Persisting.", stripeOffset);
+                    // sort the stripe's pages and collect the values into a single list
+                    List<Pair<String, List<Object>>> columnValuesMap = new ArrayList<>();
+                    // each entry represents a mapping from column name -> list<entry<page values, page number>>
+                    for (Map.Entry<String, List<Map.Entry<List<Object>, Integer>>> entry : indexPages.get(stripeOffset).entrySet()) {
+                        // sort the page values lists based on page numbers
+                        entry.getValue().sort(Comparator.comparingInt(Map.Entry::getValue));
+                        // collect all page values lists into a single list
+                        List<Object> columnValues = entry.getValue().stream()
+                                .map(Map.Entry::getKey).flatMap(Collection::stream).collect(Collectors.toList());
+                        columnValuesMap.add(new Pair(entry.getKey(), columnValues));
+                    }
+
+                    persistStripe(stripeOffset, columnValuesMap);
+                    indexPages.remove(stripeOffset);
+                }
+                else {
+                    LOG.debug("All pages for offset %d have been received, but the values are missing. " +
+                            "This stripe should have already been persisted by another thread.", stripeOffset);
+                }
+            }
+        }
     }
 
     /**
@@ -96,7 +151,7 @@ public class FileIndexWriter
      * <p>
      * Persist index files with following file structure:
      *
-     * <pre>>
+     * <pre>
      * /--- {this.root}
      *   |--- INDEX_RECORDS
      *   |--- table1
@@ -116,33 +171,9 @@ public class FileIndexWriter
     public void persist()
             throws IOException
     {
-        Path tmpPath = Files.createTempDirectory("tmp-indexwriter-");
-
-        for (Map.Entry<Integer, Set<Map<String, List<Object>>>> indexValue : indexValues.entrySet()) {
-            // Get sum of expected entries
-            int expectedNumEntries = 0;
-            for (Map<String, List<Object>> v : indexValue.getValue()) {
-                for (List<Object> l : v.values()) {
-                    expectedNumEntries += l.size();
-                }
-            }
-
-            // Create index and put values
-            Index index = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType().toLowerCase(Locale.ENGLISH));
-            index.setProperties(createIndexMetadata.getProperties());
-            index.setExpectedNumOfEntries(expectedNumEntries);
-            for (Map<String, List<Object>> v : indexValue.getValue()) {
-                index.addValues(v);
-            }
-
-            // Persist one index (e.g. 3.bloom)
-            Integer offset = indexValue.getKey();
-            String indexFileName = offset + "." + index.getId().toLowerCase(Locale.ENGLISH);
-            try (OutputStream os = LOCAL_FS_CLIENT.newOutputStream(tmpPath.resolve(indexFileName))) {
-                index.serialize(os);
-            }
+        for (Long offset : indexPages.keySet()) {
+            LOG.error("Offset %d data is NOT PERSISTED. Current page count: %d. Check debug log.", offset, pageCountExpected.get(offset).get());
         }
-
         // Package index files for one File and write to remote filesystem
         String table = createIndexMetadata.getTableName();
         String column = createIndexMetadata.getIndexColumns().iterator().next().getKey(); // Support indexing on only one column for now
@@ -161,6 +192,35 @@ public class FileIndexWriter
         }
         finally {
             LOCAL_FS_CLIENT.deleteRecursively(tmpPath);
+        }
+    }
+
+    private void persistStripe(Long offset, List<Pair<String, List<Object>>> stripeData)
+            throws IOException
+    {
+        synchronized (this) {
+            if (tmpPath == null) {
+                tmpPath = Files.createTempDirectory("tmp-indexwriter-");
+            }
+        }
+
+        // Get sum of expected entries
+        int expectedNumEntries = 0;
+        for (Pair<String, List<Object>> l : stripeData) {
+            expectedNumEntries += l.getSecond().size();
+        }
+
+        // Create index and put values
+        try (Index index = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType())) {
+            index.setProperties(createIndexMetadata.getProperties());
+            index.setExpectedNumOfEntries(expectedNumEntries);
+            index.addValues(stripeData);
+
+            // Persist one index (e.g. 3.bloom)
+            String indexFileName = offset + "." + index.getId();
+            try (OutputStream os = LOCAL_FS_CLIENT.newOutputStream(tmpPath.resolve(indexFileName))) {
+                index.serialize(os);
+            }
         }
     }
 }

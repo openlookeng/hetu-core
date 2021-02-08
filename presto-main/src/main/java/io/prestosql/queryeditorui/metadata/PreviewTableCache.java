@@ -107,6 +107,11 @@ public class PreviewTableCache
         return cache.build();
     }
 
+    public void refreshCache()
+    {
+        previewTableCache.invalidateAll();
+    }
+
     public List<List<Object>> getPreview(final String schema,
             final String table)
             throws ExecutionException

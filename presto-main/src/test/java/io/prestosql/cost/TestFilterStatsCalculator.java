@@ -17,10 +17,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.Expression;
 import org.testng.annotations.BeforeClass;
@@ -245,7 +245,7 @@ public class TestFilterStatsCalculator
         assertExpression("sin(x)")
                 .outputRowsCountUnknown();
         assertExpression("x = sin(x)")
-                .outputRowsCountUnknown();
+                .outputRowsCount(18.75);
     }
 
     @Test

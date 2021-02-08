@@ -40,7 +40,10 @@ import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import static io.airlift.units.DataSize.Unit.BYTE;
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
@@ -121,7 +124,7 @@ public class HiveConfig
     private double orcDefaultBloomFilterFpp = 0.05;
     private DataSize orcMaxMergeDistance = new DataSize(1, MEGABYTE);
     private DataSize orcMaxBufferSize = new DataSize(8, MEGABYTE);
-    private DataSize orcTinyStripeThreshold = new DataSize(8, MEGABYTE);
+    private DataSize orcTinyStripeThreshold = new DataSize(1, BYTE);
     private DataSize orcStreamBufferSize = new DataSize(8, MEGABYTE);
     private DataSize orcMaxReadBlockSize = new DataSize(16, MEGABYTE);
     private boolean orcLazyReadSmallRanges = true;
@@ -130,20 +133,20 @@ public class HiveConfig
     private OrcWriteValidationMode orcWriterValidationMode = OrcWriteValidationMode.BOTH;
 
     private boolean orcFileTailCacheEnabled;
-    private Duration orcFileTailCacheTtl = new Duration(30, MINUTES);
-    private long orcFileTailCacheLimit = 10_000;
+    private Duration orcFileTailCacheTtl = new Duration(4, HOURS);
+    private long orcFileTailCacheLimit = 50_000;
     private boolean orcStripeFooterCacheEnabled;
-    private Duration orcStripeFooterCacheTtl = new Duration(30, MINUTES);
-    private long orcStripeFooterCacheLimit = 25_000;
+    private Duration orcStripeFooterCacheTtl = new Duration(4, HOURS);
+    private long orcStripeFooterCacheLimit = 250_000;
     private boolean orcRowIndexCacheEnabled;
-    private Duration orcRowIndexCacheTtl = new Duration(30, MINUTES);
-    private long orcRowIndexCacheLimit = 50_000;
+    private Duration orcRowIndexCacheTtl = new Duration(4, HOURS);
+    private long orcRowIndexCacheLimit = 250_000;
     private boolean orcBloomFiltersCacheEnabled;
-    private Duration orcBloomFiltersCacheTtl = new Duration(30, MINUTES);
-    private long orcBloomFiltersCacheLimit = 50_000;
+    private Duration orcBloomFiltersCacheTtl = new Duration(4, HOURS);
+    private long orcBloomFiltersCacheLimit = 250_000;
     private boolean orcRowDataCacheEnabled;
-    private Duration orcRowDataCacheTtl = new Duration(30, MINUTES);
-    private DataSize orcRowDataCacheMaximumWeight = new DataSize(500, MEGABYTE);
+    private Duration orcRowDataCacheTtl = new Duration(4, HOURS);
+    private DataSize orcRowDataCacheMaximumWeight = new DataSize(20, GIGABYTE);
 
     private boolean rcfileWriterValidate;
 
@@ -178,7 +181,7 @@ public class HiveConfig
     private boolean temporaryStagingDirectoryEnabled = true;
     private String temporaryStagingDirectoryPath = "/tmp/presto-${USER}";
 
-    private Duration fileStatusCacheExpireAfterWrite = new Duration(1, TimeUnit.MINUTES);
+    private Duration fileStatusCacheExpireAfterWrite = new Duration(24, TimeUnit.HOURS);
     private long fileStatusCacheMaxSize = 1000 * 1000;
     private List<String> fileStatusCacheTables = ImmutableList.of();
 
@@ -187,7 +190,7 @@ public class HiveConfig
 
     private boolean tableCreatesWithLocationAllowed = true;
 
-    private boolean dynamicFilterPartitionFilteringEnabled;
+    private boolean dynamicFilterPartitionFilteringEnabled = true;
     private int dynamicFilteringRowFilteringThreshold = 2000;
 
     private boolean orcCacheStatsMetricCollectionEnabled;
@@ -207,6 +210,8 @@ public class HiveConfig
     private Duration vacuumCleanupRecheckInterval = new Duration(5, MINUTES);
     private int vacuumServiceThreads = 2;
     private Optional<Duration> vacuumCollectorInterval = Optional.of(new Duration(5, MINUTES));
+
+    private int maxNumbSplitsToGroup = 1;
 
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
@@ -1751,5 +1756,19 @@ public class HiveConfig
     public Optional<Duration> getVacuumCollectorInterval()
     {
         return vacuumCollectorInterval;
+    }
+
+    @Min(1)
+    public int getMaxSplitsToGroup()
+    {
+        return maxNumbSplitsToGroup;
+    }
+
+    @Config("hive.max-splits-to-group")
+    @ConfigDescription("max number of small splits can be grouped")
+    public HiveConfig setMaxSplitsToGroup(int maxNumbSplitsToGroup)
+    {
+        this.maxNumbSplitsToGroup = maxNumbSplitsToGroup;
+        return this;
     }
 }

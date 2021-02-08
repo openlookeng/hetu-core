@@ -76,17 +76,17 @@ public class ClusterStatsResource
         double avgProcessCpuLoad = clusterMemoryManager.getWorkerMemoryInfo().entrySet().stream()
                 .map(entry -> entry.getValue().map(MemoryInfo::getProcessCpuLoad))
                 .mapToDouble(d -> d.orElse(0.0))
-                .average().getAsDouble();
+                .average().orElse(0.0);
         double avgSystemCpuLoad = clusterMemoryManager.getWorkerMemoryInfo().entrySet().stream()
                 .map(entry -> entry.getValue().map(MemoryInfo::getSystemCpuLoad))
                 .mapToDouble(d -> d.orElse(0.0))
-                .average().getAsDouble();
+                .average().orElse(0.0);
 
         for (BasicQueryInfo query : dispatchManager.getQueries()) {
             if (query.getState() == QueryState.QUEUED) {
                 queuedQueries++;
             }
-            else if (query.getState() == QueryState.RUNNING) {
+            else if (query.getState() == QueryState.RUNNING || query.getState() == QueryState.FINISHING) {
                 if (query.getQueryStats().isFullyBlocked()) {
                     blockedQueries++;
                 }

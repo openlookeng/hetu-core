@@ -22,6 +22,7 @@ import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.prestosql.spi.relation.RowExpressionService;
 
 import java.util.Map;
 
@@ -54,7 +55,10 @@ public class DataCenterConnectorFactory
         requireNonNull(requiredConfig, "requiredConfig is null");
         try {
             // A plugin is not required to use Guice; it is just very convenient
-            Bootstrap app = new Bootstrap(new JsonModule(), new DataCenterModule(context.getTypeManager()));
+            Bootstrap app = new Bootstrap(
+                    binder -> binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService()),
+                    new JsonModule(),
+                    new DataCenterModule(context.getTypeManager()));
 
             Injector injector = app.strictConfig()
                     .doNotInitializeLogging()

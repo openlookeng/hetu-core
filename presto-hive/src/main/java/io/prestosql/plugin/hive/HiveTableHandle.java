@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.prestosql.plugin.hive.HiveMetadata.STORAGE_FORMAT;
 import static java.util.Objects.requireNonNull;
@@ -357,5 +358,33 @@ public class HiveTableHandle
     public boolean isTableCacheable()
     {
         return HiveStorageFormat.ORC.getOutputFormat().equals(tableParameters.get().get(STORAGE_FORMAT));
+    }
+
+    /**
+     * ORC is the only format supported to create heuristic index now
+     * We will add more formats in the future.
+     */
+    @Override
+    public boolean isHeuristicIndexSupported()
+    {
+        return Stream.of(HiveStorageFormat.ORC)
+                .anyMatch(storageFormat -> storageFormat.getOutputFormat().equals(tableParameters.get().get(STORAGE_FORMAT)));
+    }
+
+    /**
+     * Create heuristic index... where predicate = xxx
+     * The predicate column only support partition columns
+     */
+    @Override
+    public boolean isPartitionColumn(String column)
+    {
+        return partitionColumns.stream().map(HiveColumnHandle::getColumnName).collect(Collectors.toSet()).contains(column);
+    }
+
+    /* This method checks if reuse table scan can be used*/
+    @Override
+    public boolean isReuseTableScanSupported()
+    {
+        return true;
     }
 }

@@ -12,7 +12,7 @@ DROP TABLE  [ IF EXISTS ] table_name
 Description
 -----------
 
-Drops an existing table.
+Drop an existing table.
 
 The optional `IF EXISTS` clause causes the error to be suppressed if the table does not exist.
 

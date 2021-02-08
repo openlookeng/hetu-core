@@ -13,7 +13,7 @@
  */
 package io.prestosql.sql.planner.assertions;
 
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
 
 public interface PlanTestSymbol
 {

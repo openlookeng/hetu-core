@@ -14,7 +14,7 @@
 package io.prestosql.sql.planner;
 
 import io.prestosql.cost.StatsAndCosts;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
 
 import static java.util.Objects.requireNonNull;
 

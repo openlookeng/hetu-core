@@ -16,7 +16,7 @@ package io.prestosql.operator;
 import io.prestosql.Session;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.metadata.Split;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 public interface WorkProcessorSourceOperatorFactory
 {

@@ -16,9 +16,13 @@ package io.prestosql.spi.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -29,7 +33,17 @@ import static java.util.Objects.requireNonNull;
 public class CreateIndexMetadata
 {
     public static final String LEVEL_PROP_KEY = "level";
-    public static final Level LEVEL_DEFAULT = Level.STRIPE;
+    public static final Index.Level LEVEL_DEFAULT = Index.Level.STRIPE;
+    public static final Map<String, List<String>> INDEX_SUPPORTED_TYPES = ImmutableMap.<String, List<String>>builder()
+            .put("bloom", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+            .put("bitmap", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+            .put("minmax", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+            .put("btree", ImmutableList.of(
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"))
+            .build();
 
     private final String indexName;
     private final String tableName;
@@ -38,7 +52,7 @@ public class CreateIndexMetadata
     private final List<String> partitions;
     private final Properties properties;
     private final String user;
-    private final Level createLevel;
+    private final Index.Level createLevel;
 
     @JsonCreator
     public CreateIndexMetadata(
@@ -49,11 +63,11 @@ public class CreateIndexMetadata
             @JsonProperty("partitions") List<String> partitions,
             @JsonProperty("properties") Properties properties,
             @JsonProperty("user") String user,
-            @JsonProperty("createLevel") Level createLevel)
+            @JsonProperty("createLevel") Index.Level createLevel)
     {
         this.indexName = checkNotEmpty(indexName, "indexName");
         this.tableName = requireNonNull(tableName, "tableName is null");
-        this.indexType = requireNonNull(indexType, "indexType is null");
+        this.indexType = requireNonNull(indexType, "indexType is null").toUpperCase(Locale.ENGLISH);
         this.indexColumns = indexColumns;
         this.partitions = partitions;
         this.properties = properties;
@@ -62,7 +76,7 @@ public class CreateIndexMetadata
     }
 
     @JsonProperty
-    public Level getCreateLevel()
+    public Index.Level getCreateLevel()
     {
         return createLevel;
     }
@@ -107,12 +121,6 @@ public class CreateIndexMetadata
     public String getUser()
     {
         return user;
-    }
-
-    public enum Level
-    {
-        STRIPE,
-        PARTITION
     }
 
     @Override

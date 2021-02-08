@@ -18,20 +18,20 @@ import io.airlift.bytecode.BytecodeNode;
 import io.airlift.bytecode.Variable;
 import io.airlift.bytecode.instruction.LabelNode;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.RowExpression;
-import io.prestosql.sql.relational.SpecialForm;
-import io.prestosql.sql.relational.VariableReferenceExpression;
 import io.prestosql.sql.tree.ComparisonExpression.Operator;
 
 import java.util.List;
 
+import static io.prestosql.spi.relation.SpecialForm.Form.AND;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.gen.BytecodeUtils.ifWasNullPopAndGoto;
 import static io.prestosql.sql.gen.RowExpressionCompiler.createTempVariableReferenceExpression;
 import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Signatures.comparisonExpressionSignature;
-import static io.prestosql.sql.relational.SpecialForm.Form.AND;
 
 public class BetweenCodeGenerator
         implements BytecodeGenerator

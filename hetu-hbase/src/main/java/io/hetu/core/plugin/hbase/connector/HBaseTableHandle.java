@@ -29,6 +29,7 @@ import io.prestosql.spi.predicate.TupleDomain;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -51,6 +52,7 @@ public class HBaseTableHandle
     private final TupleDomain<ColumnHandle> constraint;
     private final List<HBaseColumnHandle> columns;
     private final int rowIdOrdinal;
+    private final OptionalLong limit;
 
     /**
      * constructor
@@ -65,6 +67,7 @@ public class HBaseTableHandle
      * @param constraint constraint
      * @param columns columns
      * @param rowIdOrdinal rowIdOrdinal
+     * @param limit limit
      */
     @JsonCreator
     public HBaseTableHandle(
@@ -77,7 +80,8 @@ public class HBaseTableHandle
             @JsonProperty("indexColumns") String indexColumns,
             @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
             @JsonProperty("columns") List<HBaseColumnHandle> columns,
-            @JsonProperty("rowIdOrdinal") int rowIdOrdinal)
+            @JsonProperty("rowIdOrdinal") int rowIdOrdinal,
+            @JsonProperty("limit") OptionalLong limit)
     {
         this.external = external;
         this.rowId = requireNonNull(rowId, "rowId is null");
@@ -89,6 +93,7 @@ public class HBaseTableHandle
         this.constraint = constraint;
         this.columns = columns;
         this.rowIdOrdinal = rowIdOrdinal;
+        this.limit = requireNonNull(limit, "limit is null");
     }
 
     /**
@@ -100,6 +105,7 @@ public class HBaseTableHandle
      * @param columns columns
      * @param serializerClassName serializerClassName
      * @param hbaseTableName hbaseTableName
+     * @param limit limit
      */
     public HBaseTableHandle(
             String schema,
@@ -107,7 +113,8 @@ public class HBaseTableHandle
             int rowIdOrdinal,
             List<HBaseColumnHandle> columns,
             String serializerClassName,
-            Optional<String> hbaseTableName)
+            Optional<String> hbaseTableName,
+            OptionalLong limit)
     {
         this(
                 schema,
@@ -119,7 +126,8 @@ public class HBaseTableHandle
                 "",
                 TupleDomain.all(),
                 columns,
-                rowIdOrdinal);
+                rowIdOrdinal,
+                limit);
     }
 
     /**
@@ -132,6 +140,7 @@ public class HBaseTableHandle
      * @param serializerClassName serializerClassName
      * @param hbaseTableName hbaseTableName
      * @param indexColumns indexColumns
+     * @param limit limit
      */
     public HBaseTableHandle(
             String schema,
@@ -140,7 +149,8 @@ public class HBaseTableHandle
             boolean external,
             String serializerClassName,
             Optional<String> hbaseTableName,
-            String indexColumns)
+            String indexColumns,
+            OptionalLong limit)
     {
         this(
                 schema,
@@ -152,7 +162,8 @@ public class HBaseTableHandle
                 indexColumns,
                 TupleDomain.all(),
                 ImmutableList.of(),
-                0);
+                0,
+                limit);
     }
 
     @JsonProperty
@@ -209,6 +220,18 @@ public class HBaseTableHandle
         return external;
     }
 
+    @JsonProperty
+    public String getIndexColumns()
+    {
+        return indexColumns;
+    }
+
+    @JsonProperty
+    public OptionalLong getLimit()
+    {
+        return limit;
+    }
+
     /**
      * toSchemaTableName
      *
@@ -246,7 +269,18 @@ public class HBaseTableHandle
     @Override
     public ConnectorTableHandle createFrom(ConnectorTableHandle oldConnectorTableHandle)
     {
-        return this;
+        HBaseTableHandle oldHBaseConnectorTableHandle = (HBaseTableHandle) oldConnectorTableHandle;
+        return new HBaseTableHandle(oldHBaseConnectorTableHandle.getSchema(),
+                oldHBaseConnectorTableHandle.getTable(),
+                oldHBaseConnectorTableHandle.getRowId(),
+                oldHBaseConnectorTableHandle.isExternal(),
+                oldHBaseConnectorTableHandle.getSerializerClassName(),
+                oldHBaseConnectorTableHandle.getHbaseTableName(),
+                oldHBaseConnectorTableHandle.getIndexColumns(),
+                oldHBaseConnectorTableHandle.getConstraint(),
+                oldHBaseConnectorTableHandle.getColumns(),
+                oldHBaseConnectorTableHandle.getRowIdOrdinal(),
+                oldHBaseConnectorTableHandle.getLimit());
     }
 
     @Override

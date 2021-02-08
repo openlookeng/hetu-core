@@ -9,7 +9,7 @@
 
 ## 插件元数据
 
-每个插件标识一个入口点：`Plugin` 接口的实现。该类名通过标准 Java `ServiceLoader` 接口提供给 openLooKeng：classpath 包含 `META-INF/services` 目录中一个名为 `io.prestosql.core.spi.Plugin` 的资源文件。该文件的内容只有一行，其中列出了插件类的名称：
+每个插件标识一个入口点：`Plugin` 接口的实现。该类名通过标准 Java `ServiceLoader` 接口提供给 openLooKeng：classpath 包含 `META-INF/services` 目录中一个名为 `io.prestosql.spi.Plugin` 的资源文件。该文件的内容只有一行，其中列出了插件类的名称：
 
 ```
 com.example.plugin.ExamplePlugin
@@ -18,7 +18,7 @@ com.example.plugin.ExamplePlugin
 对于包含在 openLooKeng 源代码中的内置插件，每当插件的 `pom.xml` 文件包含以下行时，就会创建该资源文件：
 
 ``` xml
-<packaging>presto-plugin</packaging>
+<packaging>hetu-plugin</packaging>
 ```
 
 ## 插件

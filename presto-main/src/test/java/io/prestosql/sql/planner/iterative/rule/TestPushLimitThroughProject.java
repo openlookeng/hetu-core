@@ -15,20 +15,22 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.assertions.ExpressionMatcher;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.limit;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.sort;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.ADD;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.SortItem.NullOrdering.FIRST;
@@ -45,7 +47,7 @@ public class TestPushLimitThroughProject
                     Symbol a = p.symbol("a");
                     return p.limit(1,
                             p.project(
-                                    Assignments.of(a, TRUE_LITERAL),
+                                    Assignments.of(a, castToRowExpression(TRUE_LITERAL)),
                                     p.values()));
                 })
                 .matches(
@@ -67,7 +69,7 @@ public class TestPushLimitThroughProject
                             1,
                             ImmutableList.of(projectedA),
                             p.project(
-                                    Assignments.of(projectedA, new SymbolReference("a"), projectedB, new SymbolReference("b")),
+                                    Assignments.of(projectedA, castToRowExpression(new SymbolReference("a")), projectedB, castToRowExpression(new SymbolReference("b"))),
                                     p.values(a, b)));
                 })
                 .matches(
@@ -90,8 +92,8 @@ public class TestPushLimitThroughProject
                             ImmutableList.of(projectedA),
                             p.project(
                                     Assignments.of(
-                                            projectedA, new SymbolReference("a"),
-                                            projectedC, new ArithmeticBinaryExpression(ADD, new SymbolReference("a"), new SymbolReference("b"))),
+                                            projectedA, castToRowExpression(new SymbolReference("a")),
+                                            projectedC, castToRowExpression(new ArithmeticBinaryExpression(ADD, new SymbolReference("a"), new SymbolReference("b")))),
                                     p.values(a, b)));
                 })
                 .matches(
@@ -114,8 +116,8 @@ public class TestPushLimitThroughProject
                             ImmutableList.of(projectedC),
                             p.project(
                                     Assignments.of(
-                                            projectedA, new SymbolReference("a"),
-                                            projectedC, new ArithmeticBinaryExpression(ADD, new SymbolReference("a"), new SymbolReference("b"))),
+                                            projectedA, castToRowExpression(new SymbolReference("a")),
+                                            projectedC, castToRowExpression(new ArithmeticBinaryExpression(ADD, new SymbolReference("a"), new SymbolReference("b")))),
                                     p.values(a, b)));
                 })
                 .doesNotFire();
@@ -129,7 +131,7 @@ public class TestPushLimitThroughProject
                     Symbol a = p.symbol("a");
                     return p.limit(1,
                             p.project(
-                                    Assignments.of(a, a.toSymbolReference()),
+                                    Assignments.of(a, castToRowExpression(toSymbolReference(a))),
                                     p.values(a)));
                 }).doesNotFire();
     }

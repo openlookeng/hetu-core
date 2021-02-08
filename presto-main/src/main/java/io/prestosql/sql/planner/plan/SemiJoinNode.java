@@ -16,7 +16,9 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -28,7 +30,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class SemiJoinNode
-        extends PlanNode
+        extends InternalPlanNode
 {
     private final PlanNode source;
     private final PlanNode filteringSource;
@@ -38,6 +40,7 @@ public class SemiJoinNode
     private final Optional<Symbol> sourceHashSymbol;
     private final Optional<Symbol> filteringSourceHashSymbol;
     private final Optional<DistributionType> distributionType;
+    private final Optional<String> dynamicFilterId;
 
     @JsonCreator
     public SemiJoinNode(@JsonProperty("id") PlanNodeId id,
@@ -48,7 +51,8 @@ public class SemiJoinNode
             @JsonProperty("semiJoinOutput") Symbol semiJoinOutput,
             @JsonProperty("sourceHashSymbol") Optional<Symbol> sourceHashSymbol,
             @JsonProperty("filteringSourceHashSymbol") Optional<Symbol> filteringSourceHashSymbol,
-            @JsonProperty("distributionType") Optional<DistributionType> distributionType)
+            @JsonProperty("distributionType") Optional<DistributionType> distributionType,
+            @JsonProperty("dynamicFilterId") Optional<String> dynamicFilterId)
     {
         super(id);
         this.source = requireNonNull(source, "source is null");
@@ -59,6 +63,7 @@ public class SemiJoinNode
         this.sourceHashSymbol = requireNonNull(sourceHashSymbol, "sourceHashSymbol is null");
         this.filteringSourceHashSymbol = requireNonNull(filteringSourceHashSymbol, "filteringSourceHashSymbol is null");
         this.distributionType = requireNonNull(distributionType, "distributionType is null");
+        this.dynamicFilterId = requireNonNull(dynamicFilterId, "dynamicFilterId is null");
 
         checkArgument(source.getOutputSymbols().contains(sourceJoinSymbol), "Source does not contain join symbol");
         checkArgument(filteringSource.getOutputSymbols().contains(filteringSourceJoinSymbol), "Filtering source does not contain filtering join symbol");
@@ -133,8 +138,14 @@ public class SemiJoinNode
                 .build();
     }
 
+    @JsonProperty
+    public Optional<String> getDynamicFilterId()
+    {
+        return dynamicFilterId;
+    }
+
     @Override
-    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitSemiJoin(this, context);
     }
@@ -152,7 +163,8 @@ public class SemiJoinNode
                 semiJoinOutput,
                 sourceHashSymbol,
                 filteringSourceHashSymbol,
-                distributionType);
+                distributionType,
+                dynamicFilterId);
     }
 
     public SemiJoinNode withDistributionType(DistributionType distributionType)
@@ -166,6 +178,7 @@ public class SemiJoinNode
                 semiJoinOutput,
                 sourceHashSymbol,
                 filteringSourceHashSymbol,
-                Optional.of(distributionType));
+                Optional.of(distributionType),
+                dynamicFilterId);
     }
 }

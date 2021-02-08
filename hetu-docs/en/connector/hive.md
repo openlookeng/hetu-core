@@ -121,7 +121,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.vacuum-delta-percent-threshold`     | Maximum percent of delta directories to allow without compacting it. Value should be in range 0.1 to 1.0      | 0.1   |
 | `hive.vacuum-cleanup-recheck-interval`    | Interval after which vacuum cleanup task will be resubmitted. Minimum value is 5 minutes.    | `5 Minutes`    |
 | `hive.vacuum-collector-interval`    | Interval after which vacuum collector task will be resubmitted.     | `5 Minutes`    |
-
+| `hive.max-splits-to-group`    | Max number of splits can be grouped. If value is 1 it will not group. Minimum value is 1     | `1`    |
 
 
 ## Hive Thrift Metastore Configuration Properties
@@ -132,6 +132,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.metastore.uri`                                | The URI(s) of the Hive metastore to connect to using the Thrift protocol. If multiple URIs are provided, the first URI is used by default and the rest of the URIs are fallback metastores. This property is required. Example: `thrift://192.0.2.3:9083` or `thrift://192.0.2.3:9083,thrift://192.0.2.4:9083` |
 | `hive.metastore.username`                           | The username openLooKeng will use to access the Hive metastore.     |
 | `hive.metastore.authentication.type`                | Hive metastore authentication type. Possible values are `NONE` or `KERBEROS` (defaults to `NONE`). |
+| `hive.metastore.thrift.impersonation.enabled`       | Enable Hive metastore end user impersonation. |
 | `hive.metastore.thrift.client.ssl.enabled`          | Use SSL when connecting to metastore.  default value is `false` When it is true, either keystore or truststore is required. You should set the keystore/truststore path and password in the `jvm.config`. The keys are listed as below: `-Djavax.net.ssl.keystoreType= e.g. jks` `-Djavax.net.ssl.keyStore=` `-Djavax.net.ssl.keyStorePassword=` `-Djavax.net.ssl.trustStore=` `-Djavax.net.ssl.trustStorePassword=` |
 | `hive.metastore.service.principal`                  | The Kerberos principal of the Hive metastore service.        |
 | `hive.metastore.client.principal`                   | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
@@ -286,20 +287,20 @@ files that are matching the predicates provided via `cache table` sql statement.
 | Property Name                              | Description                                          | Default   |
 | :----------------------------------------- | :--------------------------------------------------- | :-------- |
 | `hive.orc.file-tail.cache.enabled`         | Enable ORC file tail cache                           | `false`   |
-| `hive.orc.file-tail.cache.ttl`             | TTL for ORC file tail cache                          | `30 mins` |
-| `hive.orc.file-tail.cache.limit`           | Maximum number of entries in ORC file tail cache     | `10,000`  |
+| `hive.orc.file-tail.cache.ttl`             | TTL for ORC file tail cache                          | `4 hours` |
+| `hive.orc.file-tail.cache.limit`           | Maximum number of entries in ORC file tail cache     | `50,000`  |
 | `hive.orc.stripe-footer.cache.enabled`     | Enable ORC stripe footer cache                       | `false`   |
-| `hive.orc.stripe-footer.cache.ttl`         | TTL for ORC stripe footer cache                      | `30 mins` |
-| `hive.orc.stripe-footer.cache.limit`       | Maximum number of entries in ORC Stripe footer cache | `25,000`  |
+| `hive.orc.stripe-footer.cache.ttl`         | TTL for ORC stripe footer cache                      | `4 hours` |
+| `hive.orc.stripe-footer.cache.limit`       | Maximum number of entries in ORC Stripe footer cache | `250,000`  |
 | `hive.orc.row-index.cache.enabled`         | Enable ORC row index cache                           | `false`   |
-| `hive.orc.row-index.cache.ttl`             | TTL for ORC row index cache                          | `30 mins` |
-| `hive.orc.row-index.cache.limit`           | Maximum number of entries in ORC row index cache     | `50,000`  |
+| `hive.orc.row-index.cache.ttl`             | TTL for ORC row index cache                          | `4 hours` |
+| `hive.orc.row-index.cache.limit`           | Maximum number of entries in ORC row index cache     | `250,000`  |
 | `hive.orc.bloom-filters.cache.enabled`     | Enable ORC bloom filter cache                        | `false`   |
-| `hive.orc.bloom-filters.cache.ttl`         | TTL for ORC bloom filter cache                       | `30 mins` |
-| `hive.orc.bloom-filters.cache.limit`       | Maximum number of entries in ORC bloom filter cache  | `50,000`  |
+| `hive.orc.bloom-filters.cache.ttl`         | TTL for ORC bloom filter cache                       | `4 hours` |
+| `hive.orc.bloom-filters.cache.limit`       | Maximum number of entries in ORC bloom filter cache  | `250,000`  |
 | `hive.orc.row-data.block.cache.enabled`    | Enable ORC row group block cache                     | `false`   |
-| `hive.orc.row-data.block.cache.ttl`        | TTL for ORC row group cache                          | `30 mins` |
-| `hive.orc.row-data.block.cache.max.weight` | Maximum weight of ORC row group cache                | `500 MB`  |
+| `hive.orc.row-data.block.cache.ttl`        | TTL for ORC row group cache                          | `4 hours` |
+| `hive.orc.row-data.block.cache.max.weight` | Maximum weight of ORC row group cache                | `20 GB`  |
 
 TTL is time taken since cache entry was last accessed by read or write. Timed expiration is performed with periodic maintenance during writes 
 and occasionally during reads, as discussed below.

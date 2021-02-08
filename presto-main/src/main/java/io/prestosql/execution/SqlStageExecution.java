@@ -30,13 +30,16 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.QueryId;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.split.RemoteSplit;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
+import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -66,6 +69,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
+import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -111,6 +115,9 @@ public final class SqlStageExecution
     private final DynamicFilterService dynamicFilterService;
 
     private final AtomicBoolean dynamicFilterSchedulingInfoPropagated = new AtomicBoolean();
+
+    @GuardedBy("SqlStageExecution.class")
+    public static Map<QueryId, List<Integer>> queryIdReuseTableScanMappingIdFinishedMap = new ConcurrentHashMap<>();
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -186,7 +193,10 @@ public final class SqlStageExecution
                 JoinNode joinNode = (JoinNode) node;
                 dynamicFilterService.registerTasks(joinNode, allTasks, getScheduledNodes(), stateMachine);
             }
-
+            else if (node instanceof SemiJoinNode) {
+                SemiJoinNode semiJoinNode = (SemiJoinNode) node;
+                dynamicFilterService.registerTasks(semiJoinNode, allTasks, getScheduledNodes(), stateMachine);
+            }
             traverseNodesForDynamicFiltering(node.getSources());
         }
     }
@@ -323,6 +333,11 @@ public final class SqlStageExecution
         return getAllTasks().stream()
                 .map(RemoteTask::getTaskInfo)
                 .collect(toImmutableList());
+    }
+
+    public StageStateMachine getStateMachine()
+    {
+        return stateMachine;
     }
 
     public synchronized void addExchangeLocations(PlanFragmentId fragmentId, Set<RemoteTask> sourceTasks, boolean noMoreExchangeLocations)
@@ -547,6 +562,36 @@ public final class SqlStageExecution
             // after updating state, check if all tasks have final status information
             checkAllTaskFinal();
         }
+    }
+
+    //Assuming there will be only one table scan in one stage
+    public static synchronized void setReuseTableScanMappingIdStatus(StageStateMachine state)
+    {
+        if (!isReuseTableScanEnabled(state.getSession()) || state.getProducerScanNode() == null) {
+            return;
+        }
+
+        TableScanNode scanNode = state.getProducerScanNode();
+        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        if (reuseTableScanMappingIdList == null) {
+            reuseTableScanMappingIdList = new ArrayList<>();
+            reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
+            queryIdReuseTableScanMappingIdFinishedMap.put(state.getStageId().getQueryId(), reuseTableScanMappingIdList);
+        }
+        else if (!reuseTableScanMappingIdList.contains(scanNode.getReuseTableScanMappingId())) {
+            reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
+            queryIdReuseTableScanMappingIdFinishedMap.put(state.getStageId().getQueryId(), reuseTableScanMappingIdList);
+        }
+    }
+
+    public static synchronized Boolean getReuseTableScanMappingIdStatus(StageStateMachine state)
+    {
+        if (state.getConsumerScanNode() == null) {
+            return true;
+        }
+
+        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        return reuseTableScanMappingIdList != null && reuseTableScanMappingIdList.contains(state.getConsumerScanNode().getReuseTableScanMappingId());
     }
 
     private synchronized void updateFinalTaskInfo(TaskInfo finalTaskInfo)

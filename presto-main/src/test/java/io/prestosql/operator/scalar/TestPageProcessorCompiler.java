@@ -24,14 +24,14 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.InputReferenceExpression;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.sql.gen.ExpressionCompiler;
 import io.prestosql.sql.gen.PageFunctionCompiler;
-import io.prestosql.sql.relational.CallExpression;
-import io.prestosql.sql.relational.DeterminismEvaluator;
-import io.prestosql.sql.relational.InputReferenceExpression;
-import io.prestosql.sql.relational.RowExpression;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -214,7 +214,7 @@ public class TestPageProcessorCompiler
 
         PageProcessor processor = compiler.compilePageProcessor(Optional.empty(), ImmutableList.of(lessThanRandomExpression), MAX_BATCH_SIZE).get();
 
-        assertFalse(new DeterminismEvaluator(metadata).isDeterministic(lessThanRandomExpression));
+        assertFalse(new RowExpressionDeterminismEvaluator(metadata).isDeterministic(lessThanRandomExpression));
 
         Page page = new Page(createLongDictionaryBlock(1, 100));
         Page outputPage = getOnlyElement(

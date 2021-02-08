@@ -37,8 +37,8 @@ import io.prestosql.protocol.Codec;
 import io.prestosql.protocol.SmileCodec;
 import io.prestosql.server.remotetask.HttpRemoteTask;
 import io.prestosql.server.remotetask.RemoteTaskStats;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 

@@ -15,7 +15,7 @@ package io.prestosql.execution;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.prestosql.connector.CatalogName;
+import io.prestosql.spi.connector.CatalogName;
 
 import javax.annotation.concurrent.Immutable;
 

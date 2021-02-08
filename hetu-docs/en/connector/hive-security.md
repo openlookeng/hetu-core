@@ -71,12 +71,13 @@ Example: `-Djava.security.krb5.conf=/example/path/krb5.conf`.
 In a Kerberized Hadoop cluster, openLooKeng connects to the Hive metastore Thrift service using
 `SASL (Simple Authentication and Security Layer)` and authenticates using Kerberos. Kerberos authentication for the metastore is configured in the connector\'s properties file using the following properties:
 
-| Property Name                        | Description                                                  |
-| :----------------------------------- | :----------------------------------------------------------- |
-| `hive.metastore.authentication.type` | Hive metastore authentication type.                          |
-| `hive.metastore.service.principal`   | The Kerberos principal of the Hive metastore service.        |
-| `hive.metastore.client.principal`    | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
-| `hive.metastore.client.keytab`       | Hive metastore client keytab location.                       |
+| Property Name                                 | Description                                                  |
+| :-------------------------------------------- | :----------------------------------------------------------- |
+| `hive.metastore.authentication.type`          | Hive metastore authentication type.                          |
+| `hive.metastore.thrift.impersonation.enabled` | Enable Hive metastore end user impersonation.                |
+| `hive.metastore.service.principal`            | The Kerberos principal of the Hive metastore service.        |
+| `hive.metastore.client.principal`             | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
+| `hive.metastore.client.keytab`                | Hive metastore client keytab location.                       |
 
 #### `hive.metastore.authentication.type`
 
@@ -85,6 +86,12 @@ One of `NONE` or `KERBEROS`. When using the default value of `NONE`, Kerberos au
 When set to `KERBEROS` the Hive connector will connect to the Hive metastore Thrift service using SASL and authenticate using Kerberos.
 
 This property is optional; the default is `NONE`.
+
+####  `hive.metastore.thrift.impersonation.enabled`
+
+Enable end-user Hive metastore impersonation.
+
+This property is optional; the default is `false`.
 
 #### `hive.metastore.service.principal`
 
@@ -132,6 +139,7 @@ The default authentication type for the Hive metastore is `NONE`. When the authe
 
 ``` properties
 hive.metastore.authentication.type=KERBEROS
+hive.metastore.thrift.impersonation.enabled=true
 hive.metastore.service.principal=hive/hive-metastore-host.example.com@EXAMPLE.COM
 hive.metastore.client.principal=openlk@EXAMPLE.COM
 hive.metastore.client.keytab=/etc/openlookeng/hive.keytab
@@ -251,7 +259,15 @@ Keytab files must be distributed to every node in the cluster that runs openLooK
 
 ### Impersonation Accessing the Hive Metastore
 
-openLooKeng does not currently support impersonating the end user when accessing the Hive metastore.
+openLookeng supports impersonating the end user when accessing the Hive metastore.
+Metastore impersonation can be enabled with
+
+    hive.metastore.thrift.impersonation.enabled=true
+
+When using `KERBEROS` Metastore authentication with impersonation, the principal
+specified by the `hive.metastore.client.principal` property must be allowed to
+impersonate the current openLooKeng user, as discussed in the section
+[Impersonation in Hadoop](#impersonation-in-hadoop).
 
 ### Impersonation in Hadoop
 

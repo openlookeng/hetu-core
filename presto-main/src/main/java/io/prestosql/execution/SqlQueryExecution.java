@@ -23,7 +23,6 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.dynamicfilter.DynamicFilterService;
@@ -40,7 +39,6 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
@@ -49,7 +47,18 @@ import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.service.PropertyService;
+import io.prestosql.spi.statestore.StateCollection;
+import io.prestosql.spi.statestore.StateMap;
+import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.split.SplitManager;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.analyzer.Analysis;
@@ -63,20 +72,24 @@ import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.OutputExtractor;
 import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.planner.Plan;
+import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.PlanFragmenter;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.PlanOptimizers;
 import io.prestosql.sql.planner.StageExecutionPlan;
 import io.prestosql.sql.planner.SubPlan;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.tree.Explain;
+import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -90,11 +103,14 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
+import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTERS;
+import static io.prestosql.statestore.StateStoreConstants.QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -132,6 +148,7 @@ public class SqlQueryExecution
     private final CostCalculator costCalculator;
     private final DynamicFilterService dynamicFilterService;
     private final HeuristicIndexerManager heuristicIndexerManager;
+    private final StateStoreProvider stateStoreProvider;
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -159,7 +176,8 @@ public class SqlQueryExecution
             CostCalculator costCalculator,
             WarningCollector warningCollector,
             DynamicFilterService dynamicFilterService,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            StateStoreProvider stateStoreProvider)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -186,6 +204,7 @@ public class SqlQueryExecution
             this.scheduleSplitBatchSize = scheduleSplitBatchSize;
 
             this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
+            this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
 
             // clear dynamic filter tasks and data created for this query
             stateMachine.addStateChangeListener(state -> {
@@ -330,6 +349,90 @@ public class SqlQueryExecution
                 .orElseGet(() -> stateMachine.getBasicQueryInfo(Optional.ofNullable(queryScheduler.get()).map(SqlQueryScheduler::getBasicStageStats)));
     }
 
+    private void findMappingFromPlan(Map<String, Set<String>> mapping, PlanNode sourceNode)
+    {
+        if (sourceNode != null && sourceNode instanceof ProjectNode) {
+            ProjectNode projectNode = (ProjectNode) sourceNode;
+            Map<Symbol, RowExpression> assignments = projectNode.getAssignments().getMap();
+            for (Symbol symbol : assignments.keySet()) {
+                if (mapping.containsKey(symbol.getName())) {
+                    Set<String> sets = mapping.get(symbol.getName());
+                    RowExpression expression = assignments.get(symbol);
+                    if (expression instanceof VariableReferenceExpression) {
+                        sets.add(((VariableReferenceExpression) expression).getName());
+                    }
+                    else {
+                        sets.add(expression.toString());
+                    }
+                }
+                else {
+                    for (Map.Entry<String, Set<String>> entry : mapping.entrySet()) {
+                        if (entry.getValue().contains(symbol.getName())) {
+                            RowExpression expression = assignments.get(symbol);
+                            if (expression instanceof VariableReferenceExpression) {
+                                entry.getValue().add(((VariableReferenceExpression) expression).getName());
+                            }
+                            else {
+                                entry.getValue().add(expression.toString());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for (PlanNode planNode : sourceNode.getSources()) {
+            findMappingFromPlan(mapping, planNode);
+        }
+    }
+
+    private void handleCrossRegionDynamicFilter(PlanRoot plan)
+    {
+        if (!isCrossRegionDynamicFilterEnabled(getSession()) || plan == null) {
+            return;
+        }
+
+        StateStore stateStore = stateStoreProvider.getStateStore();
+        if (stateStore == null) {
+            return;
+        }
+
+        String queryId = getSession().getQueryId().getId();
+        log.debug("queryId=%s begin to find columnToColumnMapping.", queryId);
+        PlanNode outputNode = plan.getRoot().getFragment().getRoot();
+        Map<String, Set<String>> columnToSymbolMapping = new HashMap<>();
+
+        if (outputNode != null && outputNode instanceof OutputNode) {
+            List<String> queryColumnNames = ((OutputNode) outputNode).getColumnNames();
+            List<Symbol> outputSymbols = outputNode.getOutputSymbols();
+
+            Map<String, Set<String>> tmpMapping = new HashMap<>(outputSymbols.size());
+            for (Symbol symbol : outputNode.getOutputSymbols()) {
+                Set<String> sets = new HashSet();
+                sets.add(symbol.getName());
+                tmpMapping.put(symbol.getName(), sets);
+            }
+
+            for (PlanFragment fragment : plan.getRoot().getAllFragments()) {
+                if ("0".equals(fragment.getId().toString())) {
+                    continue;
+                }
+
+                PlanNode sourceNode = fragment.getRoot();
+                findMappingFromPlan(tmpMapping, sourceNode);
+            }
+
+            for (int i = 0; i < outputSymbols.size(); i++) {
+                columnToSymbolMapping.put(queryColumnNames.get(i), tmpMapping.get(outputSymbols.get(i).getName()));
+            }
+        }
+
+        // save mapping into stateStore
+        StateMap<String, Object> mappingStateMap = (StateMap<String, Object>) stateStore.getOrCreateStateCollection(CROSS_REGION_DYNAMIC_FILTERS, StateCollection.Type.MAP);
+        mappingStateMap.put(queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING, columnToSymbolMapping);
+        log.debug("queryId=%s, add columnToSymbolMapping into hazelcast success.", queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING);
+    }
+
     @Override
     public void start()
     {
@@ -343,6 +446,15 @@ public class SqlQueryExecution
 
                 // analyze query
                 PlanRoot plan = analyzeQuery();
+
+                try {
+                    handleCrossRegionDynamicFilter(plan);
+                }
+                catch (Throwable e) {
+                    // ignore any exception
+                    log.warn("something unexpected happened.. cause: %s", e.getMessage());
+                }
+
                 // plan distribution of query
                 planDistribution(plan);
 
@@ -698,6 +810,7 @@ public class SqlQueryExecution
         private final DynamicFilterService dynamicFilterService;
         private final Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache;
         private final HeuristicIndexerManager heuristicIndexerManager;
+        private final StateStoreProvider stateStoreProvider;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -722,7 +835,8 @@ public class SqlQueryExecution
                 StatsCalculator statsCalculator,
                 CostCalculator costCalculator,
                 DynamicFilterService dynamicFilterService,
-                HeuristicIndexerManager heuristicIndexerManager)
+                HeuristicIndexerManager heuristicIndexerManager,
+                StateStoreProvider stateStoreProvider)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -747,6 +861,7 @@ public class SqlQueryExecution
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
             this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+            this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -804,7 +919,8 @@ public class SqlQueryExecution
                     warningCollector,
                     dynamicFilterService,
                     this.cache,
-                    heuristicIndexerManager);
+                    heuristicIndexerManager,
+                    stateStoreProvider);
         }
     }
 }

@@ -62,6 +62,11 @@ public class Constants
      */
     public static final String ORACLE_JDBC_DRIVER_CLASS_NAME = "oracle.jdbc.driver.OracleDriver";
 
+    /**
+     * oracle include synonyms property
+     */
+    public static final String ORACLE_PROPERTY_INCLUDE_SYNONYMS = "includeSynonyms";
+
     private Constants()
     {}
 }

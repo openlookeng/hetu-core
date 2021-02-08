@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,7 +14,8 @@
  */
 import alt from '../alt';
 import xhr from "../utils/xhr";
-import _ from "lodash"
+import _ from "lodash";
+import xhrform from "../utils/xhrform";
 
 export const dataType = {
     ROOT: "ROOT",
@@ -28,6 +30,26 @@ class SchemaActions {
             'updateSchemas',
             'updateTables',
         );
+    }
+
+    deleteCatalog(catalogName) {
+        return xhrform(`../v1/catalog/${catalogName}`, {
+            headers: {
+                "X-Presto-User": "admin",
+                "Accept": "application/json"
+            },
+            method: 'DELETE'
+        }).then(() => {
+            return {
+                result: true,
+                message: "Success"
+            }
+        }).catch((error) => {
+            return {
+                result: false,
+                message: error.message
+            }
+        })
     }
 
     fetchSchemas(catalogs, refresh = false) {

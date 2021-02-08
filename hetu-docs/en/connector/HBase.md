@@ -8,7 +8,7 @@ The HBase Connector allows querying and creating tables on an external Apache HB
 
 The HBase Connector maintains a Metastore to persist HBase metadata, currently support Metastore: `openLooKeng Metastore`.
 
-**Note:** *We use Apache HBase 2.2.3 version in HBase connector*
+**Note:** *Apache HBase 2.2.3 version or ealier versions are supported in HBase connector*
 
 
 
@@ -38,17 +38,54 @@ You have to create `etc/hetu-metastore.properties` to connect database. For the 
 hbase.metastore.type=hetuMetastore
 ```
 
+**Kerberos Configuration:**
+
+If HBase/Zookeeper is a security cluster，so we should add the configuration about kerberos.
+
+```properties
+hbase.jaas.conf.path=/xxx/jaas.conf
+
+hbase.hbase.site.path=/xxx/hbase-site.xml
+
+hbase.krb5.conf.path=/xxx/krb5.conf
+
+hbase.kerberos.keytab=/xxx/user.keytab
+
+hbase.kerberos.principal=lk_username@HADOOP.COM
+
+hbase.authentication.type=KERBEROS
+```
+
+vi jaas.conf
+```properties
+Client {
+com.sun.security.auth.module.Krb5LoginModule required
+useKeyTab=true
+keyTab="/xxx/user.keytab"
+principal="lk_username@HADOOP.COM"
+useTicketCache=false
+storeKey=true
+debug=true;
+};
+```
 ## Configuration Properties
 
 | Property Name                       | Default Value | Required | Description                                                  |
 | ----------------------------------- | ------------- | -------- | ------------------------------------------------------------ |
 | hbase.zookeeper.quorum              | (none)        | Yes      | Zookeeper cluster address                                    |
 | hbase.zookeeper.property.clientPort | (none)        | Yes      | Zookeeper client port                                        |
+| hbase.zookeeper.znode.parent        | /hbase        | No       | Zookeeper znode parent of hbase                                   |
 | hbase.client.retries.number         | 3             | No       | Retry times to connect to hbase client                       |
 | hbase.client.pause.time             | 100           | No       | HBase client disconnect time                                 |
 | hbase.rpc.protection.enable         | false         | No       | Communication privacy protection. You can get this from `hbase-site.xml`. |
 | hbase.default.value                 | NULL          | No       | The default value of data in table                           |
 | hbase.metastore.type                | hetuMetastore | No       | The storage of hbase metadata, you can choose `hetuMetastore` |
+| hbase.authentication.type           | (none)        | No       | Access security authentication mode of hbase component  |
+| hbase.kerberos.principal            | (none)        | No       | User name for security authentication                        |
+| hbase.kerberos.keytab               | (none)        | No       | Key for security authentication                              |
+| hbase.hbase.site.path               | (none)        | No       | Configuration used to connect to a secure hbase cluster      |
+| hbase.jaas.conf.path                | (none)        | No       | Jaas for security authentication                             |
+| hbase.krb5.conf.path                | (none)        | No       | Krb5 for security authentication                             |
 
 
 ## Table Properties
@@ -59,7 +96,7 @@ hbase.metastore.type=hetuMetastore
 | row_id           | String  | The first column name          | No       | row_id is the column name corresponding to rowkey in the hbase table |
 | hbase_table_name | String  | null                           | No       | hbase_table_name specifies the tablespace and table name on the hbase data source to be linked, use ":" connect tablespace and table name, the default tablespace is "default". |
 | external         | Boolean | true                           | No       | If external is true, it means that the table is a mapping table of the table in the hbase data source. It does not support deleting the original table on the hbase data source; if external is false, the table on hbase data source will be deleted at the same time as the local hbase table is deleted. |
-
+| split\_by\_char| String| 0~9,a~z,A~Z| No| split\_by\_char is the basis for sharding, if the first character of rowkey consists of digits, sharding can be performed based on different digits to improve concurrency. Different types of symbols are separated by commas. If this parameter is set incorrectly, the query result may be incomplete. Set it based on the actual rowkey.|
 
 
 ## Data Types
@@ -104,10 +141,12 @@ HBase Connector supports two forms of table creation:
 
 1. Create a table and directly link to a existing table in the HBase data source.
 
-2. Create a new table that does not exist in the HBase data source.
+2. Create a new table that does not exist in the HBase data source. We must specify 'external = false'.
 
 
 Below is an example of how to create a table `schemaName.tableName` and link it to an existing table named `hbaseNamespace:hbaseTable` :
+
+Column mapping format: 'column_name:family:qualifier'
 
 ```sql
 CREATE TABLE schemaName.tableName (
@@ -123,7 +162,7 @@ CREATE TABLE schemaName.tableName (
     qualifier9	TIMESTAMP
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier1:f1:q1, qualifier2:f1:q2, 
+    column_mapping = 'qualifier1:f1:q1, qualifier2:f1:q2, 
     qualifier3:f2:q3, qualifier4:f2:q4, qualifier5:f2:q5, qualifier6:f3:q1, 
     qualifier7:f3:q2, qualifier8:f3:q3, qualifier9:f3:q4',
     row_id = 'rowId',
@@ -144,7 +183,7 @@ CREATE TABLE default.typeMapping (
     qualifier1 	INTEGER
 )
 WITH (
-    column_mapping = 'rowId:f:rowId, qualifier2:f1:q2',
+    column_mapping = 'qualifier2:f1:q2',
     row_id = 'rowId',
     hbase_table_name = 'hello:type4'
 );

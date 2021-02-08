@@ -20,14 +20,16 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 public class StatisticAggregations
@@ -56,7 +58,7 @@ public class StatisticAggregations
         return groupingSymbols;
     }
 
-    public Parts createPartialAggregations(SymbolAllocator symbolAllocator, Metadata metadata)
+    public Parts createPartialAggregations(PlanSymbolAllocator planSymbolAllocator, Metadata metadata)
     {
         ImmutableMap.Builder<Symbol, Aggregation> partialAggregation = ImmutableMap.builder();
         ImmutableMap.Builder<Symbol, Aggregation> finalAggregation = ImmutableMap.builder();
@@ -65,7 +67,7 @@ public class StatisticAggregations
             Aggregation originalAggregation = entry.getValue();
             Signature signature = originalAggregation.getSignature();
             InternalAggregationFunction function = metadata.getAggregateFunctionImplementation(signature);
-            Symbol partialSymbol = symbolAllocator.newSymbol(signature.getName(), function.getIntermediateType());
+            Symbol partialSymbol = planSymbolAllocator.newSymbol(signature.getName(), function.getIntermediateType());
             mappings.put(entry.getKey(), partialSymbol);
             partialAggregation.put(partialSymbol, new Aggregation(
                     signature,
@@ -77,7 +79,7 @@ public class StatisticAggregations
             finalAggregation.put(entry.getKey(),
                     new Aggregation(
                             signature,
-                            ImmutableList.of(partialSymbol.toSymbolReference()),
+                            ImmutableList.of(castToRowExpression(toSymbolReference(partialSymbol))),
                             false,
                             Optional.empty(),
                             Optional.empty(),

@@ -21,12 +21,31 @@ import com.google.common.collect.Sets;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataUtil;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.sql.expression.Types.FrameBoundType;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Field;
@@ -34,31 +53,22 @@ import io.prestosql.sql.analyzer.FieldId;
 import io.prestosql.sql.analyzer.RelationId;
 import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
-import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
-import io.prestosql.sql.planner.plan.LimitNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SortNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteTarget;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FetchFirst;
 import io.prestosql.sql.tree.FieldReference;
-import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GroupingOperation;
 import io.prestosql.sql.tree.Identifier;
@@ -74,6 +84,7 @@ import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.SortItem;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.Window;
@@ -83,7 +94,6 @@ import io.prestosql.utils.HeuristicIndexUtils;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -103,20 +113,27 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.isSkipRedundantSort;
+import static io.prestosql.spi.connector.CreateIndexMetadata.INDEX_SUPPORTED_TYPES;
 import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_DEFAULT;
 import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_PROP_KEY;
+import static io.prestosql.spi.plan.AggregationNode.groupingSets;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
+import static io.prestosql.spi.sql.expression.Types.WindowFrameType.RANGE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.sql.NodeUtils.getSortItemsFromOrderBy;
-import static io.prestosql.sql.planner.OrderingScheme.sortItemToSortOrder;
-import static io.prestosql.sql.planner.plan.AggregationNode.groupingSets;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.sql.planner.OrderingSchemeUtils.sortItemToSortOrder;
+import static io.prestosql.sql.planner.SymbolUtils.from;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 class QueryPlanner
 {
     private final Analysis analysis;
-    private final SymbolAllocator symbolAllocator;
+    private final PlanSymbolAllocator planSymbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
     private final Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap;
     private final Metadata metadata;
@@ -126,27 +143,27 @@ class QueryPlanner
 
     QueryPlanner(
             Analysis analysis,
-            SymbolAllocator symbolAllocator,
+            PlanSymbolAllocator planSymbolAllocator,
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
             Session session)
     {
         requireNonNull(analysis, "analysis is null");
-        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
         requireNonNull(lambdaDeclarationToSymbolMap, "lambdaDeclarationToSymbolMap is null");
         requireNonNull(metadata, "metadata is null");
         requireNonNull(session, "session is null");
 
         this.analysis = analysis;
-        this.symbolAllocator = symbolAllocator;
+        this.planSymbolAllocator = planSymbolAllocator;
         this.idAllocator = idAllocator;
         this.lambdaDeclarationToSymbolMap = lambdaDeclarationToSymbolMap;
         this.metadata = metadata;
         this.typeCoercion = new TypeCoercion(metadata::getType);
         this.session = session;
-        this.subqueryPlanner = new SubqueryPlanner(analysis, symbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session);
+        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session);
     }
 
     public RelationPlan plan(Query query)
@@ -224,7 +241,7 @@ class QueryPlanner
                 computeOutputs(builder, outputs));
     }
 
-    public DeleteRelationPlan planDeleteRowAsInsert(Delete node)
+    public UpdateDeleteRelationPlan planDeleteRowAsInsert(Delete node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());
         TableHandle handle = analysis.getTableHandle(node.getTable());
@@ -238,7 +255,7 @@ class QueryPlanner
 
         // add table columns
         for (Field field : descriptor.getAllFields()) {
-            Symbol symbol = symbolAllocator.newSymbol(field.getName().get(), field.getType());
+            Symbol symbol = planSymbolAllocator.newSymbol(field.getName().get(), field.getType());
             outputSymbols.add(symbol);
             columnsBuilder.put(symbol, analysis.getColumn(field));
             fields.add(field);
@@ -246,22 +263,26 @@ class QueryPlanner
 
         // add rowId column
         Field rowIdField = Field.newUnqualified(Optional.empty(), rowIdType);
-        Symbol rowIdSymbol = symbolAllocator.newSymbol("$rowId", rowIdField.getType());
+        Symbol rowIdSymbol = planSymbolAllocator.newSymbol("$rowId", rowIdField.getType());
         outputSymbols.add(rowIdSymbol);
         columnsBuilder.put(rowIdSymbol, rowIdHandle);
         fields.add(rowIdField);
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
         TranslationMap translations = new TranslationMap(relationPlan, analysis, lambdaDeclarationToSymbolMap);
         translations.setFieldMappings(relationPlan.getFieldMappings());
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
+        Optional<RowExpression> predicate = Optional.empty();
         if (node.getWhere().isPresent()) {
             builder = filter(builder, node.getWhere().get(), node);
+            if (builder.getRoot() instanceof FilterNode) {
+                predicate = Optional.of(((FilterNode) builder.getRoot()).getPredicate());
+            }
         }
 
         Assignments.Builder assignments = Assignments.builder();
@@ -280,16 +301,16 @@ class QueryPlanner
             if (column != rowIdColumnMetadata && column.isHidden()) {
                 continue;
             }
-            Symbol output = symbolAllocator.newSymbol(column.getName(), column.getType());
+            Symbol output = planSymbolAllocator.newSymbol(column.getName(), column.getType());
             Type tableType = column.getType();
-            Type queryType = symbolAllocator.getTypes().get(input);
+            Type queryType = planSymbolAllocator.getTypes().get(input);
 
             if (queryType.equals(tableType) || typeCoercion.isTypeOnlyCoercion(queryType, tableType)) {
-                assignments.put(output, input.toSymbolReference());
+                assignments.put(output, castToRowExpression(toSymbolReference(input)));
             }
             else {
-                Expression cast = new Cast(input.toSymbolReference(), tableType.getTypeSignature().toString());
-                assignments.put(output, cast);
+                Expression cast = new Cast(toSymbolReference(input), tableType.getTypeSignature().toString());
+                assignments.put(output, castToRowExpression(cast));
             }
             if (column == rowIdColumnMetadata) {
                 orderBySymbol = output;
@@ -316,7 +337,7 @@ class QueryPlanner
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
-        return new DeleteRelationPlan(plan, visibleTableColumnNames, sortSymbol);
+        return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
     public DeleteNode plan(Delete node)
@@ -331,7 +352,7 @@ class QueryPlanner
         ImmutableMap.Builder<Symbol, ColumnHandle> columns = ImmutableMap.builder();
         ImmutableList.Builder<Field> fields = ImmutableList.builder();
         for (Field field : descriptor.getAllFields()) {
-            Symbol symbol = symbolAllocator.newSymbol(field.getName().get(), field.getType());
+            Symbol symbol = planSymbolAllocator.newSymbol(field.getName().get(), field.getType());
             outputSymbols.add(symbol);
             columns.put(symbol, analysis.getColumn(field));
             fields.add(field);
@@ -339,13 +360,13 @@ class QueryPlanner
 
         // add rowId column
         Field rowIdField = Field.newUnqualified(rowIdHandle.getColumnName(), rowIdType);
-        Symbol rowIdSymbol = symbolAllocator.newSymbol(rowIdField.getName().get(), rowIdField.getType());
+        Symbol rowIdSymbol = planSymbolAllocator.newSymbol(rowIdField.getName().get(), rowIdField.getType());
         outputSymbols.add(rowIdSymbol);
         columns.put(rowIdSymbol, rowIdHandle);
         fields.add(rowIdField);
 
         // create table scan
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build());
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -361,13 +382,13 @@ class QueryPlanner
         // create delete node
         Symbol rowId = builder.translate(new FieldReference(relationPlan.getDescriptor().indexOf(rowIdField)));
         List<Symbol> outputs = ImmutableList.of(
-                symbolAllocator.newSymbol("partialrows", BIGINT),
-                symbolAllocator.newSymbol("fragment", VARBINARY));
+                planSymbolAllocator.newSymbol("partialrows", BIGINT),
+                planSymbolAllocator.newSymbol("fragment", VARBINARY));
 
         return new DeleteNode(idAllocator.getNextId(), builder.getRoot(), new DeleteTarget(handle, metadata.getTableMetadata(session, handle).getTable()), rowId, outputs);
     }
 
-    public UpdateRelationPlan plan(Update node)
+    public UpdateDeleteRelationPlan plan(Update node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());
         TableHandle handle = analysis.getTableHandle(node.getTable());
@@ -380,7 +401,7 @@ class QueryPlanner
         ImmutableMap.Builder<Symbol, ColumnHandle> columnsBuilder = ImmutableMap.builder();
         ImmutableList.Builder<Field> fields = ImmutableList.builder();
         for (Field field : descriptor.getAllFields()) {
-            Symbol symbol = symbolAllocator.newSymbol(field.getName().get(), field.getType());
+            Symbol symbol = planSymbolAllocator.newSymbol(field.getName().get(), field.getType());
             outputSymbols.add(symbol);
             columnsBuilder.put(symbol, analysis.getColumn(field));
             fields.add(field);
@@ -388,14 +409,14 @@ class QueryPlanner
 
         // add rowId column
         Field rowIdField = Field.newUnqualified(rowIdHandle.getColumnName(), rowIdType);
-        Symbol rowIdSymbol = symbolAllocator.newSymbol(rowIdField.getName().get(), rowIdField.getType());
+        Symbol rowIdSymbol = planSymbolAllocator.newSymbol(rowIdField.getName().get(), rowIdField.getType());
         outputSymbols.add(rowIdSymbol);
         columnsBuilder.put(rowIdSymbol, rowIdHandle);
         fields.add(rowIdField);
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -404,8 +425,12 @@ class QueryPlanner
 
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
 
+        Optional<RowExpression> predicate = Optional.empty();
         if (node.getWhere().isPresent()) {
             builder = filter(builder, node.getWhere().get(), node);
+            if (builder.getRoot() instanceof FilterNode) {
+                predicate = Optional.of(((FilterNode) builder.getRoot()).getPredicate());
+            }
         }
 
         List<AssignmentItem> assignmentItems = node.getAssignmentItems();
@@ -427,9 +452,9 @@ class QueryPlanner
             if (column != rowIdColumnMetadata && column.isHidden()) {
                 continue;
             }
-            Symbol output = symbolAllocator.newSymbol(column.getName(), column.getType());
+            Symbol output = planSymbolAllocator.newSymbol(column.getName(), column.getType());
             Type tableType = column.getType();
-            Type queryType = symbolAllocator.getTypes().get(input);
+            Type queryType = planSymbolAllocator.getTypes().get(input);
             List<AssignmentItem> assignment = assignmentItems.stream().filter(item -> item.getName().equals(QualifiedName.of(column.getName()))).collect(Collectors.toList());
             if (!assignment.isEmpty()) {
                 Expression expression = assignment.get(0).getValue();
@@ -438,19 +463,19 @@ class QueryPlanner
                     // assigning by column reference
                     Optional<Symbol> first = columns.entrySet().stream().filter(e -> e.getValue().getColumnName().equals(((Identifier) expression).getValue())).map(Entry::getKey).findFirst();
                     Symbol source = (first.orElseThrow(() -> new IllegalArgumentException("Unable to find column " + ((Identifier) expression).getValue())));
-                    cast = new Cast(source.toSymbolReference(), tableType.getTypeSignature().toString());
+                    cast = new Cast(toSymbolReference(source), tableType.getTypeSignature().toString());
                 }
                 else {
                     cast = new Cast(expression, tableType.getTypeSignature().toString());
                 }
-                assignments.put(output, cast);
+                assignments.put(output, castToRowExpression(cast));
             }
             else if (queryType.equals(tableType) || typeCoercion.isTypeOnlyCoercion(queryType, tableType)) {
-                assignments.put(output, input.toSymbolReference());
+                assignments.put(output, castToRowExpression(toSymbolReference(input)));
             }
             else {
-                Expression cast = new Cast(input.toSymbolReference(), tableType.getTypeSignature().toString());
-                assignments.put(output, cast);
+                Expression cast = new Cast(toSymbolReference(input), tableType.getTypeSignature().toString());
+                assignments.put(output, castToRowExpression(cast));
             }
             if (column == rowIdColumnMetadata) {
                 orderBySymbol = output;
@@ -476,7 +501,7 @@ class QueryPlanner
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
-        return new UpdateRelationPlan(plan, visibleTableColumnNames);
+        return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
     private static List<Symbol> computeOutputs(PlanBuilder builder, List<Expression> outputExpressions)
@@ -490,7 +515,7 @@ class QueryPlanner
 
     private PlanBuilder planQueryBody(Query query)
     {
-        RelationPlan relationPlan = new RelationPlanner(analysis, symbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+        RelationPlan relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
                 .process(query.getQueryBody(), null);
 
         return planBuilderFor(relationPlan);
@@ -501,7 +526,7 @@ class QueryPlanner
         RelationPlan relationPlan;
 
         if (node.getFrom().isPresent()) {
-            relationPlan = new RelationPlanner(analysis, symbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+            relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
                     .process(node.getFrom().get(), null);
         }
         else {
@@ -538,7 +563,7 @@ class QueryPlanner
 
     private RelationPlan planImplicitTable()
     {
-        List<Expression> emptyRow = ImmutableList.of();
+        List<RowExpression> emptyRow = ImmutableList.of();
         Scope scope = Scope.create();
         return new RelationPlan(
                 new ValuesNode(idAllocator.getNextId(), ImmutableList.of(), ImmutableList.of(emptyRow)),
@@ -557,7 +582,8 @@ class QueryPlanner
         subPlan = subqueryPlanner.handleSubqueries(subPlan, rewrittenBeforeSubqueries, node);
         Expression rewrittenAfterSubqueries = subPlan.rewrite(predicate);
 
-        return subPlan.withNewRoot(new FilterNode(idAllocator.getNextId(), subPlan.getRoot(), rewrittenAfterSubqueries));
+        return subPlan.withNewRoot(new FilterNode(idAllocator.getNextId(),
+                subPlan.getRoot(), castToRowExpression(rewrittenAfterSubqueries)));
     }
 
     private PlanBuilder project(PlanBuilder subPlan, Iterable<Expression> expressions, RelationPlan parentRelationPlan)
@@ -572,14 +598,14 @@ class QueryPlanner
         Assignments.Builder projections = Assignments.builder();
         for (Expression expression : expressions) {
             if (expression instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(expression);
-                projections.put(symbol, expression);
+                Symbol symbol = from(expression);
+                projections.put(symbol, castToRowExpression(expression));
                 outputTranslations.put(expression, symbol);
                 continue;
             }
 
-            Symbol symbol = symbolAllocator.newSymbol(expression, analysis.getTypeWithCoercions(expression));
-            projections.put(symbol, subPlan.rewrite(expression));
+            Symbol symbol = planSymbolAllocator.newSymbol(expression, analysis.getTypeWithCoercions(expression));
+            projections.put(symbol, castToRowExpression(subPlan.rewrite(expression)));
             outputTranslations.put(expression, symbol);
         }
 
@@ -601,9 +627,6 @@ class QueryPlanner
             return subPlan;
         }
 
-        // in order to create index, we need page metadata from the connector
-        session.setPageMetadataEnabled(true);
-
         // rewrite sub queries
         CreateIndex createIndex = (CreateIndex) originalStatement;
         String tableName = MetadataUtil.createQualifiedObjectName(session, originalStatement, createIndex.getTableName()).toString();
@@ -612,18 +635,24 @@ class QueryPlanner
             partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
         }
 
-        Iterator<Type> types = Arrays.stream(analysis.getRootScope().getRelationType().getAllFields()
-                .stream().map(Field::getType).toArray(Type[]::new)).iterator();
+        Map<String, Type> columnTypes = new HashMap<>();
+        for (Field field : analysis.getRootScope().getRelationType().getAllFields()) {
+            if (INDEX_SUPPORTED_TYPES.get(createIndex.getIndexType().toLowerCase(Locale.ENGLISH))
+                    .stream().noneMatch(supportType -> field.getType().getDisplayName().contains(supportType))) {
+                throw new UnsupportedOperationException("Index creation on " + field.getType().getDisplayName() + " column is not supported");
+            }
+            columnTypes.put(field.getOriginColumnName().get(), field.getType());
+        }
 
         Properties indexProperties = new Properties();
-        CreateIndexMetadata.Level indexCreationLevel = LEVEL_DEFAULT;
+        Index.Level indexCreationLevel = LEVEL_DEFAULT;
+        indexProperties.setProperty(LEVEL_PROP_KEY, String.valueOf(LEVEL_DEFAULT));
 
         for (Property property : createIndex.getProperties()) {
-            String key = property.getName().toString().replaceAll("\"", "");
-            String val = property.getValue().toString().replaceAll("\"", "").toUpperCase(Locale.ENGLISH);
+            String key = extractPropertyValue(property.getName());
+            String val = extractPropertyValue(property.getValue()).toUpperCase(Locale.ENGLISH);
             if (key.equals(LEVEL_PROP_KEY)) {
-                indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
-                continue;
+                indexCreationLevel = Index.Level.valueOf(val);
             }
             indexProperties.setProperty(key, val);
         }
@@ -634,21 +663,35 @@ class QueryPlanner
                 new CreateIndexMetadata(createIndex.getIndexName().toString(),
                         tableName,
                         createIndex.getIndexType(),
-                        createIndex.getColumnAliases().stream().map(identifier -> new AbstractMap.SimpleEntry<>(identifier.toString(), types.next())).collect(Collectors.toList()),
+                        createIndex.getColumnAliases().stream().map(identifier -> new AbstractMap.SimpleEntry<>(identifier.toString(), columnTypes.get(identifier.toString()))).collect(Collectors.toList()),
                         partitions,
                         indexProperties,
                         session.getUser(),
                         indexCreationLevel)));
     }
 
-    private Map<Symbol, Expression> coerce(Iterable<? extends Expression> expressions, PlanBuilder subPlan, TranslationMap translations)
+    private String extractPropertyValue(Expression expression)
     {
-        ImmutableMap.Builder<Symbol, Expression> projections = ImmutableMap.builder();
+        if (expression instanceof Identifier) {
+            return ((Identifier) expression).getValue();
+        }
+        else if (expression instanceof DecimalLiteral) {
+            return ((DecimalLiteral) expression).getValue();
+        }
+        else if (expression instanceof StringLiteral) {
+            return ((StringLiteral) expression).getValue();
+        }
+        return expression.toString().replaceAll("\"", "");
+    }
+
+    private Map<Symbol, RowExpression> coerce(Iterable<? extends Expression> expressions, PlanBuilder subPlan, TranslationMap translations)
+    {
+        ImmutableMap.Builder<Symbol, RowExpression> projections = ImmutableMap.builder();
 
         for (Expression expression : expressions) {
             Type type = analysis.getType(expression);
             Type coercion = analysis.getCoercion(expression);
-            Symbol symbol = symbolAllocator.newSymbol(expression, firstNonNull(coercion, type));
+            Symbol symbol = planSymbolAllocator.newSymbol(expression, firstNonNull(coercion, type));
             Expression rewritten = subPlan.rewrite(expression);
             if (coercion != null) {
                 rewritten = new Cast(
@@ -657,7 +700,7 @@ class QueryPlanner
                         false,
                         typeCoercion.isTypeOnlyCoercion(type, coercion));
             }
-            projections.put(symbol, rewritten);
+            projections.put(symbol, castToRowExpression(rewritten));
             translations.put(expression, symbol);
         }
 
@@ -676,13 +719,13 @@ class QueryPlanner
                 // If this is an identity projection, no need to rewrite it
                 // This is needed because certain synthetic identity expressions such as "group id" introduced when planning GROUPING
                 // don't have a corresponding analysis, so the code below doesn't work for them
-                projections.put(Symbol.from(expression), expression);
+                projections.put(from(expression), castToRowExpression(expression));
                 continue;
             }
 
-            Symbol symbol = symbolAllocator.newSymbol(expression, analysis.getType(expression));
+            Symbol symbol = planSymbolAllocator.newSymbol(expression, analysis.getType(expression));
             Expression rewritten = subPlan.rewrite(expression);
-            projections.put(symbol, rewritten);
+            projections.put(symbol, castToRowExpression(rewritten));
             translations.put(expression, symbol);
         }
 
@@ -693,13 +736,13 @@ class QueryPlanner
                 analysis.getParameters());
     }
 
-    private PlanBuilder explicitCoercionSymbols(PlanBuilder subPlan, Iterable<Symbol> alreadyCoerced, Iterable<? extends Expression> uncoerced)
+    private PlanBuilder explicitCoercionSymbols(PlanBuilder subPlan, List<Symbol> alreadyCoerced, Iterable<? extends Expression> uncoerced)
     {
         TranslationMap translations = subPlan.copyTranslations();
 
         Assignments assignments = Assignments.builder()
                 .putAll(coerce(uncoerced, subPlan, translations))
-                .putIdentities(alreadyCoerced)
+                .putAll(AssignmentUtils.identityAsSymbolReferences(alreadyCoerced))
                 .build();
 
         return new PlanBuilder(translations, new ProjectNode(
@@ -767,7 +810,7 @@ class QueryPlanner
 
         for (Expression expression : groupByExpressions) {
             Symbol input = subPlan.translate(expression);
-            Symbol output = symbolAllocator.newSymbol(expression, analysis.getTypeWithCoercions(expression), "gid");
+            Symbol output = planSymbolAllocator.newSymbol(expression, analysis.getTypeWithCoercions(expression), "gid");
             groupingTranslations.put(expression, output);
             groupingSetMappings.put(output, input);
         }
@@ -815,14 +858,15 @@ class QueryPlanner
         // 2.c. Generate GroupIdNode (multiple grouping sets) or ProjectNode (single grouping set)
         Optional<Symbol> groupIdSymbol = Optional.empty();
         if (groupingSets.size() > 1) {
-            groupIdSymbol = Optional.of(symbolAllocator.newSymbol("groupId", BIGINT));
+            groupIdSymbol = Optional.of(planSymbolAllocator.newSymbol("groupId", BIGINT));
             GroupIdNode groupId = new GroupIdNode(idAllocator.getNextId(), subPlan.getRoot(), groupingSets, groupingSetMappings, aggregationArguments, groupIdSymbol.get());
             subPlan = new PlanBuilder(groupingTranslations, groupId, analysis.getParameters());
         }
         else {
             Assignments.Builder assignments = Assignments.builder();
-            aggregationArguments.forEach(assignments::putIdentity);
-            groupingSetMappings.forEach((key, value) -> assignments.put(key, value.toSymbolReference()));
+
+            aggregationArguments.forEach(symbol -> assignments.put(symbol, castToRowExpression(toSymbolReference(symbol))));
+            groupingSetMappings.forEach((key, value) -> assignments.put(key, castToRowExpression(toSymbolReference(value))));
 
             ProjectNode project = new ProjectNode(idAllocator.getNextId(), subPlan.getRoot(), assignments.build());
             subPlan = new PlanBuilder(groupingTranslations, project, analysis.getParameters());
@@ -836,7 +880,7 @@ class QueryPlanner
         boolean needPostProjectionCoercion = false;
         for (FunctionCall aggregate : analysis.getAggregates(node)) {
             Expression rewritten = argumentTranslations.rewrite(aggregate);
-            Symbol newSymbol = symbolAllocator.newSymbol(rewritten, analysis.getType(aggregate));
+            Symbol newSymbol = planSymbolAllocator.newSymbol(rewritten, analysis.getType(aggregate));
 
             // TODO: this is a hack, because we apply coercions to the output of expressions, rather than the arguments to expressions.
             // Therefore we can end up with this implicit cast, and have to move it into a post-projection
@@ -849,10 +893,10 @@ class QueryPlanner
             FunctionCall functionCall = (FunctionCall) rewritten;
             aggregationsBuilder.put(newSymbol, new Aggregation(
                     analysis.getFunctionSignature(aggregate),
-                    functionCall.getArguments(),
+                    functionCall.getArguments().stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList()),
                     functionCall.isDistinct(),
-                    functionCall.getFilter().map(Symbol::from),
-                    functionCall.getOrderBy().map(OrderingScheme::fromOrderBy),
+                    functionCall.getFilter().map(SymbolUtils::from),
+                    functionCall.getOrderBy().map(OrderingSchemeUtils::fromOrderBy),
                     Optional.empty()));
         }
         Map<Symbol, Aggregation> aggregations = aggregationsBuilder.build();
@@ -892,7 +936,7 @@ class QueryPlanner
         if (needPostProjectionCoercion) {
             ImmutableList.Builder<Expression> alreadyCoerced = ImmutableList.builder();
             alreadyCoerced.addAll(groupByExpressions);
-            groupIdSymbol.map(Symbol::toSymbolReference).ifPresent(alreadyCoerced::add);
+            groupIdSymbol.map(SymbolUtils::toSymbolReference).ifPresent(alreadyCoerced::add);
 
             subPlan = explicitCoercionFields(subPlan, alreadyCoerced.build(), analysis.getAggregates(node));
         }
@@ -957,7 +1001,7 @@ class QueryPlanner
         TranslationMap newTranslations = subPlan.copyTranslations();
 
         Assignments.Builder projections = Assignments.builder();
-        projections.putIdentities(subPlan.getRoot().getOutputSymbols());
+        projections.putAll(AssignmentUtils.identityAsSymbolReferences(subPlan.getRoot().getOutputSymbols()));
 
         List<Set<Integer>> descriptor = groupingSets.stream()
                 .map(set -> set.stream()
@@ -968,7 +1012,7 @@ class QueryPlanner
         for (GroupingOperation groupingOperation : analysis.getGroupingOperations(node)) {
             Expression rewritten = GroupingOperationRewriter.rewriteGroupingOperation(groupingOperation, descriptor, analysis.getColumnReferenceFields(), groupIdSymbol);
             Type coercion = analysis.getCoercion(groupingOperation);
-            Symbol symbol = symbolAllocator.newSymbol(rewritten, analysis.getTypeWithCoercions(groupingOperation));
+            Symbol symbol = planSymbolAllocator.newSymbol(rewritten, analysis.getTypeWithCoercions(groupingOperation));
             if (coercion != null) {
                 rewritten = new Cast(
                         rewritten,
@@ -976,7 +1020,7 @@ class QueryPlanner
                         false,
                         typeCoercion.isTypeOnlyCoercion(analysis.getType(groupingOperation), coercion));
             }
-            projections.put(symbol, rewritten);
+            projections.put(symbol, castToRowExpression(rewritten));
             newTranslations.put(groupingOperation, symbol);
         }
 
@@ -1003,9 +1047,9 @@ class QueryPlanner
             Window window = windowFunction.getWindow().get();
 
             // Extract frame
-            WindowFrame.Type frameType = WindowFrame.Type.RANGE;
-            FrameBound.Type frameStartType = FrameBound.Type.UNBOUNDED_PRECEDING;
-            FrameBound.Type frameEndType = FrameBound.Type.CURRENT_ROW;
+            WindowFrameType frameType = RANGE;
+            FrameBoundType frameStartType = UNBOUNDED_PRECEDING;
+            FrameBoundType frameEndType = CURRENT_ROW;
             Expression frameStart = null;
             Expression frameEnd = null;
 
@@ -1035,7 +1079,7 @@ class QueryPlanner
                 inputs.add(frameEnd);
             }
 
-            subPlan = subPlan.appendProjections(inputs.build(), symbolAllocator, idAllocator);
+            subPlan = subPlan.appendProjections(inputs.build(), planSymbolAllocator, idAllocator);
 
             // Rewrite PARTITION BY in terms of pre-projected inputs
             ImmutableList.Builder<Symbol> partitionBySymbols = ImmutableList.builder();
@@ -1067,8 +1111,8 @@ class QueryPlanner
                     frameStartSymbol,
                     frameEndType,
                     frameEndSymbol,
-                    Optional.ofNullable(frameStart),
-                    Optional.ofNullable(frameEnd));
+                    Optional.ofNullable(frameStart).map(Expression::toString),
+                    Optional.ofNullable(frameEnd).map(Expression::toString));
 
             TranslationMap outputTranslations = subPlan.copyTranslations();
 
@@ -1090,12 +1134,16 @@ class QueryPlanner
                 continue;
             }
 
-            Symbol newSymbol = symbolAllocator.newSymbol(rewritten, analysis.getType(windowFunction));
+            Symbol newSymbol = planSymbolAllocator.newSymbol(rewritten, analysis.getType(windowFunction));
             outputTranslations.put(windowFunction, newSymbol);
 
+            List<RowExpression> arguments = new ArrayList<>();
+            for (int i = 0; i < ((FunctionCall) rewritten).getArguments().size(); i++) {
+                arguments.add(castToRowExpression(((FunctionCall) rewritten).getArguments().get(i)));
+            }
             WindowNode.Function function = new WindowNode.Function(
                     analysis.getFunctionSignature(windowFunction),
-                    ((FunctionCall) rewritten).getArguments(),
+                    arguments,
                     frame);
 
             List<Symbol> sourceSymbols = subPlan.getRoot().getOutputSymbols();
@@ -1224,7 +1272,7 @@ class QueryPlanner
     private static List<Expression> toSymbolReferences(List<Symbol> symbols)
     {
         return symbols.stream()
-                .map(Symbol::toSymbolReference)
+                .map(SymbolUtils::toSymbolReference)
                 .collect(toImmutableList());
     }
 
@@ -1235,15 +1283,21 @@ class QueryPlanner
                 .collect(toImmutableMap(expression -> expression, builder::translate));
     }
 
-    static class UpdateRelationPlan
+    static class UpdateDeleteRelationPlan
     {
         private final RelationPlan plan;
         private final List<String> columNames;
+        private final Map<Symbol, ColumnHandle> columnAssignments;
+        private final Optional<RowExpression> predicate;
 
-        UpdateRelationPlan(RelationPlan plan, List<String> columNames)
+        UpdateDeleteRelationPlan(RelationPlan plan, List<String> columNames,
+                Map<Symbol, ColumnHandle> columnAssignments,
+                Optional<RowExpression> predicate)
         {
             this.plan = plan;
             this.columNames = columNames;
+            this.columnAssignments = columnAssignments;
+            this.predicate = predicate;
         }
 
         public List<String> getColumNames()
@@ -1251,38 +1305,19 @@ class QueryPlanner
             return columNames;
         }
 
-        public RelationPlan getPlan()
+        public Map<Symbol, ColumnHandle> getColumnAssignments()
         {
-            return plan;
-        }
-    }
-
-    static class DeleteRelationPlan
-    {
-        private final RelationPlan plan;
-        private final List<String> columNames;
-        private final Symbol rowIdSymbol;
-
-        DeleteRelationPlan(RelationPlan plan, List<String> columNames, Symbol rowIdSymbol)
-        {
-            this.plan = plan;
-            this.columNames = columNames;
-            this.rowIdSymbol = rowIdSymbol;
+            return columnAssignments;
         }
 
-        public List<String> getColumNames()
+        public Optional<RowExpression> getPredicate()
         {
-            return columNames;
+            return predicate;
         }
 
         public RelationPlan getPlan()
         {
             return plan;
-        }
-
-        public Symbol getRowIdSymbol()
-        {
-            return rowIdSymbol;
         }
     }
 }

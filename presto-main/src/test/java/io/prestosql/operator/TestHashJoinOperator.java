@@ -37,13 +37,13 @@ import io.prestosql.operator.index.PageBuffer;
 import io.prestosql.operator.index.PageBufferOperator.PageBufferOperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.GenericPartitioningSpillerFactory;
 import io.prestosql.spiller.PartitioningSpillerFactory;
 import io.prestosql.spiller.SingleStreamSpiller;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingTaskContext;
 import org.testng.annotations.AfterMethod;
@@ -1583,6 +1583,11 @@ public class TestHashJoinOperator
                 public void close()
                 {
                     writing = false;
+                }
+
+                @Override
+                public void deleteFile()
+                {
                 }
             };
         }

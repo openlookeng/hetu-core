@@ -15,7 +15,6 @@ package io.prestosql.testing;
 
 import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.ConnectorAwareNodeManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
@@ -25,10 +24,15 @@ import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.gen.JoinCompiler;
+import io.prestosql.sql.relational.ConnectorRowExpressionService;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
+import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.type.InternalTypeManager;
 import io.prestosql.version.EmbedVersion;
 
@@ -43,12 +47,14 @@ public class TestingConnectorContext
     private final PageSorter pageSorter = new PagesIndexPageSorter(new PagesIndex.TestingFactory(false));
     private final PageIndexerFactory pageIndexerFactory;
     private final IndexClient indexClient = new NoOpIndexClient();
+    private final RowExpressionService rowExpressionService;
 
     public TestingConnectorContext()
     {
         Metadata metadata = createTestMetadataManager();
         pageIndexerFactory = new GroupByHashPageIndexerFactory(new JoinCompiler(metadata));
         typeManager = new InternalTypeManager(metadata);
+        rowExpressionService = new ConnectorRowExpressionService(new RowExpressionDomainTranslator(metadata), new RowExpressionDeterminismEvaluator(metadata));
     }
 
     @Override
@@ -85,5 +91,11 @@ public class TestingConnectorContext
     public IndexClient getIndexClient()
     {
         return indexClient;
+    }
+
+    @Override
+    public RowExpressionService getRowExpressionService()
+    {
+        return rowExpressionService;
     }
 }

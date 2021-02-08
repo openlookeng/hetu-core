@@ -17,24 +17,24 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.WindowNode;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Window;
-import io.prestosql.sql.tree.WindowFrame;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
-import static io.prestosql.sql.tree.FrameBound.Type.CURRENT_ROW;
-import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
 
 public class TestSwapAdjacentWindowsBySpecifications
         extends BaseRuleTest
@@ -45,7 +45,7 @@ public class TestSwapAdjacentWindowsBySpecifications
     public TestSwapAdjacentWindowsBySpecifications()
     {
         frame = new WindowNode.Frame(
-                WindowFrame.Type.RANGE,
+                Types.WindowFrameType.RANGE,
                 UNBOUNDED_PRECEDING,
                 Optional.empty(),
                 CURRENT_ROW,
@@ -102,12 +102,12 @@ public class TestSwapAdjacentWindowsBySpecifications
                                         ImmutableList.of(p.symbol("a")),
                                         Optional.empty()),
                                 ImmutableMap.of(p.symbol("avg_1", DOUBLE),
-                                        new WindowNode.Function(signature, ImmutableList.of(new SymbolReference("a")), frame)),
+                                        new WindowNode.Function(signature, ImmutableList.of(p.variable("a")), frame)),
                                 p.window(new WindowNode.Specification(
                                                 ImmutableList.of(p.symbol("a"), p.symbol("b")),
                                                 Optional.empty()),
                                         ImmutableMap.of(p.symbol("avg_2", DOUBLE),
-                                                new WindowNode.Function(signature, ImmutableList.of(new SymbolReference("b")), frame)),
+                                                new WindowNode.Function(signature, ImmutableList.of(p.variable("b")), frame)),
                                         p.values(p.symbol("a"), p.symbol("b")))))
                 .matches(
                         window(windowMatcherBuilder -> windowMatcherBuilder
@@ -130,12 +130,12 @@ public class TestSwapAdjacentWindowsBySpecifications
                                         ImmutableList.of(p.symbol("a")),
                                         Optional.empty()),
                                 ImmutableMap.of(p.symbol("avg_1"),
-                                        new WindowNode.Function(signature, ImmutableList.of(new SymbolReference("avg_2")), frame)),
+                                        new WindowNode.Function(signature, ImmutableList.of(p.variable("avg_2")), frame)),
                                 p.window(new WindowNode.Specification(
                                                 ImmutableList.of(p.symbol("a"), p.symbol("b")),
                                                 Optional.empty()),
                                         ImmutableMap.of(p.symbol("avg_2"),
-                                                new WindowNode.Function(signature, ImmutableList.of(new SymbolReference("a")), frame)),
+                                                new WindowNode.Function(signature, ImmutableList.of(p.variable("a")), frame)),
                                         p.values(p.symbol("a"), p.symbol("b")))))
                 .doesNotFire();
     }

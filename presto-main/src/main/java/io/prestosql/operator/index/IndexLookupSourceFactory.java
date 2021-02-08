@@ -25,9 +25,9 @@ import io.prestosql.operator.OuterPositionIterator;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.StaticLookupSourceProvider;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
-import io.prestosql.sql.planner.Symbol;
 
 import java.util.List;
 import java.util.Map;

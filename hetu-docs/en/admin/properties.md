@@ -10,7 +10,7 @@ This section describes the most important config properties that may be used to 
 
 > -   **Type:** `string`
 > -   **Allowed values:** `AUTOMATIC`, `PARTITIONED`, `BROADCAST`
-> -   **Default value:** `PARTITIONED`
+> -   **Default value:** `AUTOMATIC`
 >
 > The type of distributed join to use.  When set to `PARTITIONED`, openLooKeng will use hash distributed joins.  When set to `BROADCAST`, it will broadcast the right table to all nodes in the cluster that have data from the left table. Partitioned joins require redistributing both tables using a hash of the join key. This can be slower (sometimes substantially) than broadcast joins, but allows much larger joins. In particular broadcast joins will be faster if the right table is much smaller than the left.  However, broadcast joins require that the tables on the right side of the join after filtering fit in memory on each node, whereas distributed joins only need to fit in distributed memory across all nodes. When set to `AUTOMATIC`, openLooKeng will make a cost based decision as to which distribution type is optimal. It will also consider switching the left and right inputs to the join.  In `AUTOMATIC` mode, openLooKeng will default to hash distributed joins if no cost could be computed, such as if the tables do not have statistics. This can also be specified on a per-query basis using the `join_distribution_type` session property.
 
@@ -155,6 +155,17 @@ This section describes the most important config properties that may be used to 
 >
 > This config property can be overridden by the `spill_window_operator` session property.
 
+### `experimental.spill-reuse-tablescan`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Try spilling memory to disk to avoid exceeding memory limits for the query when running Reuse Exchange; This property must be used in conjunction with the `experimental.spill-enabled` property.
+> 
+>  
+>
+> This config property can be overridden by the `spill_reuse_tablescan` session property.
+
 ### `experimental.spiller-spill-path`
 
 > -   **Type:** `string`
@@ -201,6 +212,13 @@ This section describes the most important config properties that may be used to 
 >
 > Limit for memory used for unspilling a single aggregation operator
 > instance.
+
+### `experimental.spill-threshold-reuse-tablescan`
+
+> -   **Type:** `int`
+> -   **Default value:** `10 (in MB)`
+>
+> Limit for memory used for caching pages in Reuse Exchange.
 
 ### `experimental.spill-compression-enabled`
 
@@ -432,7 +450,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 
 > -   **Type:** `string`
 > -   **Allowed values:** `AUTOMATIC`, `ELIMINATE_CROSS_JOINS`, `NONE`
-> -   **Default value:** `ELIMINATE_CROSS_JOINS`
+> -   **Default value:** `AUTOMATIC`
 >
 > The join reordering strategy to use.  `NONE` maintains the order the tables are listed in the query.  `ELIMINATE_CROSS_JOINS` reorders joins to eliminate cross joins where possible and otherwise maintains the original query order. When reordering joins it also strives to maintain the original table order as much as possible. `AUTOMATIC` enumerates possible orders and uses statistics-based cost estimation to determine the least cost order. If stats are not available or if for any reason a cost could not be computed, the `ELIMINATE_CROSS_JOINS` strategy is used. This can also be specified on a per-query basis using the `join_reordering_strategy` session property.
 
@@ -448,6 +466,14 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > **Warning**
 > 
 > The number of possible join orders scales factorially with the number of relations, so increasing this value can cause serious performance issues.
+
+### `optimizer.reuse-table-scan`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Use Reuse Exchange to cache data in memory if the query contains tables or Common Table Expressions(CTE) which are present more than one time with the same projections and filters on them. Enabling this feature will reduce the time taken to execute the query by caching data in memory and avoiding reading from disk multiple times.
+> This can also be specified on a per-query basis using the `reuse_table_scan` session property. 
 
 ## Regular Expression Function Properties
 
@@ -491,14 +517,14 @@ Heuristic index is external index module that which can be used to filter to out
 ### `hetu.heuristicindex.filter.cache.max-memory`
  
 > -   **Type:** `data size`
-> -   **Default value:** `1GB`
+> -   **Default value:** `10GB`
 >
 > Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from indexstore. This property controls the maximum memory used by the index cache. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
 
 ### `hetu.heuristicindex.filter.cache.soft-reference`
  
 > -   **Type:** `boolean`
-> -   **Default value:** `false`
+> -   **Default value:** `true`
 >
 > Caching the index files provides better performance, however it utilizes memory. Enabling this property allows the Garbage Collector to remove entries from the cache if memory is running low.
 >
@@ -507,14 +533,14 @@ Heuristic index is external index module that which can be used to filter to out
 ### `hetu.heuristicindex.filter.cache.ttl`
  
 > -   **Type:** `Duration`
-> -   **Default value:** `1h`
+> -   **Default value:** `24h`
 >
 > The time period after which index cache expires.
 
 ### `hetu.heuristicindex.filter.cache.loading-threads`
  
 > -   **Type:** `integer`
-> -   **Default value:** `2`
+> -   **Default value:** `10`
 >
 > The number of threads used to load indices in parallel.
 
@@ -536,7 +562,11 @@ Heuristic index is external index module that which can be used to filter to out
  
 > -   **Type** `string` 
 >
-> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
+> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable). 
+> 
+> `LOCAL` filesystem type should only be used during testing or in single node clusters.
+> 
+> `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster. All nodes should be configured to use the same filesystem profile.
 
 ## Execution Plan Cache Properties
 
@@ -553,14 +583,14 @@ of constructing another execution plan, thus reducing the amount of query pre-pr
 ### `hetu.executionplan.cache.limit`
 > 
 > -  **Type:** `integer`
-> - **Default value:** `1000`
+> - **Default value:** `10000`
 >
 > Maximum number of execution plans to keep in the cache
  
 ### `hetu.executionplan.cache.timeout`
 > 
 > - **Type:** `integer`
-> - **Default value:** `60000 ms`
+> - **Default value:** `86400000 ms`
 > 
 > Time in milliseconds to expire cached execution plans after the last access
  

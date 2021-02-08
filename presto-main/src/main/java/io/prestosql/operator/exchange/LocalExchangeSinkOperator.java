@@ -24,7 +24,7 @@ import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeSinkFactory;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeSinkFactoryId;
 import io.prestosql.spi.Page;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.function.Function;
 

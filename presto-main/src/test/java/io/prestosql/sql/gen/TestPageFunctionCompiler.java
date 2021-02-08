@@ -22,7 +22,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.relational.CallExpression;
+import io.prestosql.spi.relation.CallExpression;
 import org.testng.annotations.Test;
 
 import java.util.Optional;

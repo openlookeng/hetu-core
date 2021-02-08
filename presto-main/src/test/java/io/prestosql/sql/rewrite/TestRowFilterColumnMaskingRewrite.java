@@ -16,7 +16,6 @@ package io.prestosql.sql.rewrite;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.informationschema.InformationSchemaConnector;
 import io.prestosql.connector.system.SystemConnector;
 import io.prestosql.execution.QueryIdGenerator;
@@ -29,6 +28,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlManager;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorMetadata;
@@ -56,10 +56,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import static io.prestosql.connector.CatalogName.createInformationSchemaCatalogName;
-import static io.prestosql.connector.CatalogName.createSystemTablesCatalogName;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.scalar.ApplyFunction.APPLY_FUNCTION;
+import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
+import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
 import static io.prestosql.spi.session.PropertyMetadata.integerProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 import static io.prestosql.spi.type.BigintType.BIGINT;

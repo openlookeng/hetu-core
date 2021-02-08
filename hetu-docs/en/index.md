@@ -24,6 +24,7 @@ headless: true
     - [LDAP Authentication]({{< relref "./docs/security/ldap.md" >}})
     - [Java Keystores and Truststores]({{< relref "./docs/security/tls.md" >}})
     - [Built-in System Access Control]({{< relref "./docs/security/built-in-system-access-control.md" >}})
+    - [Ranger Access Control]({{< relref "./docs/security/ranger-access-control.md" >}})
     - [Secure Internal Communication]({{< relref "./docs/security/internal-communication.md" >}})
     - [Password Encryption]({{< relref "./docs/security/password-encryption.md" >}})
     - [HAZELCAST Authentication]({{< relref "./docs/security/hazelcast.md" >}})
@@ -38,19 +39,24 @@ headless: true
     - [Dynamic Catalog]({{< relref "./docs/admin/dynamic-catalog.md" >}})
     - [Horizontal Scaling]({{< relref "./docs/admin/horizontal-scaling.md" >}})
     - [Dynamic Filtering]({{< relref "./docs/admin/dynamic-filters.md" >}})
+    - [State store]({{< relref "./docs/admin/state-store.md" >}})
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
 
 - [Query Optimizer]("#")
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
     - [Cost in EXPLAIN]({{< relref "./docs/optimizer/cost-in-explain.md" >}})
     - [Cost based optimizations]({{< relref "./docs/optimizer/cost-based-optimizations.md" >}})
+    - [Rule based optimizations]({{< relref "./docs/optimizer/rule-based-optimizations.md" >}})
+    - [Table pushdown]({{< relref "./docs/optimizer/table-pushdown.md" >}})
 
 - [Heuristic Indexer]("#")
     - [openLooKeng Heuristic Indexer]({{< relref "./docs/indexer/overview.md" >}})
-    - [Index Command Line Interface]({{< relref "./docs/indexer/indexer-cli.md" >}})
     - [Bitmap Index]({{< relref "./docs/indexer/bitmap.md" >}})
     - [Minmax Index]({{< relref "./docs/indexer/minmax.md" >}})
     - [Bloom Index]({{< relref "./docs/indexer/bloom.md" >}})
+    - [BTree Index]({{< relref "./docs/indexer/btree.md" >}})
+    - [HIndex Statements]({{< relref "./docs/indexer/hindex-statements.md" >}})
+    - [New Index]({{< relref "./docs/indexer/new-index.md" >}})
 
 - [Connectors]({{< relref "./docs/connector/_index.md" >}})
     - [Carbondata]({{< relref "./docs/connector/carbondata.md" >}})
@@ -74,6 +80,9 @@ headless: true
     - [TPCDS]({{< relref "./docs/connector/tpcds.md" >}})
     - [TPCH]({{< relref "./docs/connector/tpch.md" >}})
     - [VDM]({{< relref "./docs/connector/vdm.md" >}})
+    - [Oracle]({{< relref "./docs/connector/oracle.md" >}})
+    - [MongoDB]({{< relref "./docs/connector/mongodb.md" >}})
+    - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
 
 - [Functions and Operators]("#")
     - [Logical Operators]({{< relref "./docs/functions/logical.md" >}})
@@ -168,7 +177,8 @@ headless: true
 - [Migration]("#")
     - [Migrating From Hive]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL Migration Tool]({{< relref "./docs/migration/sql-migration-tool.md" >}})
-
+    - [Support Hive Functions]({{< relref "./docs/migration/hetu-hive-functions.md" >}})
+  
 - [Developer Guide]({{< relref "./docs/develop/_index.md" >}})
     - [Getting Started]({{< relref "./docs/develop/getting-started.md" >}})
     - [SPI Overview]({{< relref "./docs/develop/spi-overview.md" >}})
@@ -191,6 +201,7 @@ headless: true
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
 - [Release Notes]("#")
+    - [1.1.0]({{< relref "./docs/releasenotes/releasenotes-1.1.0.md" >}})
     - [1.0.1]({{< relref "./docs/releasenotes/releasenotes-1.0.1.md" >}})
     - [1.0.0]({{< relref "./docs/releasenotes/releasenotes-1.0.0.md" >}})
     - [0.1.0]({{< relref "./docs/releasenotes/releasenotes-0.1.0.md" >}})

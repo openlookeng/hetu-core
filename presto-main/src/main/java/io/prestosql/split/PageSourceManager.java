@@ -14,19 +14,18 @@
 package io.prestosql.split;
 
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.Split;
-import io.prestosql.metadata.TableHandle;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
-import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.metadata.TableHandle;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -50,7 +49,7 @@ public class PageSourceManager
     }
 
     @Override
-    public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter)
+    public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, Optional<DynamicFilterSupplier> dynamicFilter)
     {
         requireNonNull(columns, "columns is null");
         checkArgument(split.getCatalogName().equals(table.getCatalogName()), "mismatched split and table");
@@ -58,7 +57,7 @@ public class PageSourceManager
 
         ConnectorPageSourceProvider provider = getPageSourceProvider(catalogName);
 
-        if (dynamicFilter == null) {
+        if (!dynamicFilter.isPresent()) {
             return provider.createPageSource(
                     table.getTransaction(),
                     session.toConnectorSession(catalogName),

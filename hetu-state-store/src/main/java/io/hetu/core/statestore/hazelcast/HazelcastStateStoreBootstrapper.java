@@ -71,7 +71,9 @@ public class HazelcastStateStoreBootstrapper
         implements StateStoreBootstrapper
 {
     private HazelcastInstance hzInstance;
-    private static final String MERGEMAP = "merged";
+    private static final String MERGED_DYNAMIC_FILTERS = "merged-dynamic-filters";
+    private static final String HEARTBEAT_INTERVAL_SECONDS = "hazelcast.heartbeat.interval.seconds";
+    private static final String HEARTBEAT_TIMEOUT_SECONDS = "hazelcast.max.no.heartbeat.seconds";
     private static final int MAXIDLESECONDS = 30;
     private static final int EVICTIONSIZE = 200;
     private static final int TIMETOLIVESECONDS = 300;
@@ -98,10 +100,14 @@ public class HazelcastStateStoreBootstrapper
         hzConfig = setCpSystemConfigs(config, hzConfig);
 
         // Set eviction rules
-        hzConfig = setEvictionConfigs(hzConfig, MERGEMAP);
+        hzConfig = setEvictionConfigs(hzConfig, MERGED_DYNAMIC_FILTERS);
 
         // Set discovery port
         hzConfig = setPortConfigs(config, hzConfig);
+
+        // Set timeout rules
+        hzConfig.setProperty(HEARTBEAT_INTERVAL_SECONDS, String.valueOf(HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS));
+        hzConfig.setProperty(HEARTBEAT_TIMEOUT_SECONDS, String.valueOf(HazelcastConstants.HEARTBEAT_TIMEOUT_SECONDS + HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS));
 
         // Set hazelcast authentication config
         if (Boolean.parseBoolean(config.get(KERBEROS_ENABLED))) {

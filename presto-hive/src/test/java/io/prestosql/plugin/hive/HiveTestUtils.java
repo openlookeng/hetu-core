@@ -49,6 +49,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.spi.util.BloomFilter;
+import io.prestosql.testing.NoOpIndexClient;
 import io.prestosql.testing.TestingConnectorSession;
 import io.prestosql.type.InternalTypeManager;
 
@@ -78,7 +79,7 @@ public final class HiveTestUtils
     }
 
     public static final ConnectorSession SESSION = new TestingConnectorSession(
-            new HiveSessionProperties(new HiveConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
+            new HiveSessionProperties(new HiveConfig().setOrcLazyReadSmallRanges(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
 
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
@@ -125,7 +126,7 @@ public final class HiveTestUtils
 
     public static IndexCache getNoOpIndexCache()
     {
-        return new IndexCache(new IndexCacheLoader(null))
+        return new IndexCache(new IndexCacheLoader(null), new NoOpIndexClient())
         {
             @Override
             public List<IndexMetadata> getIndices(String catalog, String table, HiveSplit hiveSplit, TupleDomain<HiveColumnHandle> effectivePredicate, List<HiveColumnHandle> partitions)

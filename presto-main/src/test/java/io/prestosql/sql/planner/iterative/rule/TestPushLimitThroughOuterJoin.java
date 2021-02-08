@@ -14,18 +14,18 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
 import org.testng.annotations.Test;
 
+import static io.prestosql.spi.plan.JoinNode.Type.FULL;
+import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
+import static io.prestosql.spi.plan.JoinNode.Type.RIGHT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.limit;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.FULL;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.LEFT;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.RIGHT;
 
 public class TestPushLimitThroughOuterJoin
         extends BaseRuleTest

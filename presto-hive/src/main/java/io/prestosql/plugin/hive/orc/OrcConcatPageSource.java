@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive.orc;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.AbstractIterator;
 import io.airlift.log.Logger;
 import io.prestosql.spi.Page;
@@ -48,7 +49,10 @@ public class OrcConcatPageSource
                 do {
                     nextPage = source.getNextPage();
                     if (nextPage == null) {
-                        return endOfData();
+                        if (source.isFinished()) {
+                            return endOfData();
+                        }
+                        return null;
                     }
                 }
                 while (nextPage.getPositionCount() == 0);
@@ -65,8 +69,7 @@ public class OrcConcatPageSource
     @Override
     public long getCompletedBytes()
     {
-        /* Since Data Source is same... so any would do! */
-        return pageSources.get(0).getCompletedBytes();
+        return pageSources.stream().mapToLong(ConnectorPageSource::getCompletedBytes).sum();
     }
 
     @Override
@@ -120,5 +123,11 @@ public class OrcConcatPageSource
     public String toString()
     {
         return toStringHelper(this).toString();
+    }
+
+    @VisibleForTesting
+    public ConnectorPageSource getConnectorPageSource()
+    {
+        return pageSources.get(0);
     }
 }

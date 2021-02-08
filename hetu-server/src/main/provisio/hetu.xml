@@ -186,13 +186,13 @@
         <artifact id="${project.groupId}:presto-accumulo:zip:${project.version}">
             <unpack />
         </artifact>
-    </artifactSet>
+    </artifactSet>-->
 
     <artifactSet to="plugin/mongodb">
-        <artifact id="${project.groupId}:presto-mongodb:zip:${project.version}">
+        <artifact id="${project.groupId}:hetu-mongodb:zip:${project.version}">
             <unpack />
         </artifact>
-    </artifactSet>-->
+    </artifactSet>
 
     <artifactSet to="plugin/tpch">
         <artifact id="${project.groupId}:presto-tpch:zip:${project.version}">
@@ -244,6 +244,12 @@
 
     <artifactSet to="plugin/carbondata">
         <artifact id="${project.groupId}:hetu-carbondata:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
+    <artifactSet to="plugin/hetu-opengauss">
+        <artifact id="${project.groupId}:hetu-opengauss:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>

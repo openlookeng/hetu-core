@@ -21,9 +21,9 @@ import io.airlift.bytecode.expression.BytecodeExpression;
 import io.airlift.bytecode.instruction.LabelNode;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.ConstantExpression;
-import io.prestosql.sql.relational.RowExpression;
 
 import java.util.List;
 
@@ -43,7 +43,7 @@ public class DereferenceCodeGenerator
         BytecodeBlock block = new BytecodeBlock().comment("DEREFERENCE").setDescription("DEREFERENCE");
         Variable wasNull = generator.wasNull();
         Variable rowBlock = generator.getScope().createTempVariable(Block.class);
-        int index = (int) ((ConstantExpression) arguments.get(1)).getValue();
+        int index = ((Number) ((ConstantExpression) arguments.get(1)).getValue()).intValue();
 
         // clear the wasNull flag before evaluating the row value
         block.putVariable(wasNull, false);

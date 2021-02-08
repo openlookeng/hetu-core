@@ -21,25 +21,28 @@ import com.google.common.collect.Sets;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.OrderingScheme;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.WindowNode;
-import io.prestosql.sql.tree.WindowFrame;
 import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
@@ -47,8 +50,6 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.windowFrame;
-import static io.prestosql.sql.tree.FrameBound.Type.CURRENT_ROW;
-import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
 
 public class TestPruneWindowColumns
         extends BaseRuleTest
@@ -67,14 +68,14 @@ public class TestPruneWindowColumns
     private static final Set<String> inputSymbolNameSet = ImmutableSet.copyOf(inputSymbolNameList);
 
     private static final ExpectedValueProvider<WindowNode.Frame> frameProvider1 = windowFrame(
-            WindowFrame.Type.RANGE,
+            WindowFrameType.RANGE,
             UNBOUNDED_PRECEDING,
             Optional.of("startValue1"),
             CURRENT_ROW,
             Optional.of("endValue1"));
 
     private static final ExpectedValueProvider<WindowNode.Frame> frameProvider2 = windowFrame(
-            WindowFrame.Type.RANGE,
+            WindowFrameType.RANGE,
             UNBOUNDED_PRECEDING,
             Optional.of("startValue2"),
             CURRENT_ROW,
@@ -205,10 +206,10 @@ public class TestPruneWindowColumns
         List<Symbol> outputs = ImmutableList.<Symbol>builder().addAll(inputs).add(output1, output2).build();
 
         return p.project(
-                Assignments.identity(
+                Assignments.copyOf(
                         outputs.stream()
                                 .filter(projectionFilter)
-                                .collect(toImmutableList())),
+                                .collect(Collectors.toMap(v -> v, v -> p.variable(v.getName(), BIGINT)))),
                 p.window(
                         new WindowNode.Specification(
                                 ImmutableList.of(partitionKey),
@@ -219,27 +220,27 @@ public class TestPruneWindowColumns
                                 output1,
                                 new WindowNode.Function(
                                         signature,
-                                        ImmutableList.of(input1.toSymbolReference()),
+                                        ImmutableList.of(p.variable(input1.getName())),
                                         new WindowNode.Frame(
-                                                WindowFrame.Type.RANGE,
+                                                WindowFrameType.RANGE,
                                                 UNBOUNDED_PRECEDING,
                                                 Optional.of(startValue1),
                                                 CURRENT_ROW,
                                                 Optional.of(endValue1),
-                                                Optional.of(startValue1.toSymbolReference()),
-                                                Optional.of(endValue2.toSymbolReference()))),
+                                                Optional.of(startValue1.getName()),
+                                                Optional.of(endValue2.getName()))),
                                 output2,
                                 new WindowNode.Function(
                                         signature,
-                                        ImmutableList.of(input2.toSymbolReference()),
+                                        ImmutableList.of(p.variable(input2.getName())),
                                         new WindowNode.Frame(
-                                                WindowFrame.Type.RANGE,
+                                                WindowFrameType.RANGE,
                                                 UNBOUNDED_PRECEDING,
                                                 Optional.of(startValue2),
                                                 CURRENT_ROW,
                                                 Optional.of(endValue2),
-                                                Optional.of(startValue2.toSymbolReference()),
-                                                Optional.of(endValue2.toSymbolReference())))),
+                                                Optional.of(startValue2.getName()),
+                                                Optional.of(endValue2.getName())))),
                         hash,
                         p.values(
                                 inputs.stream()

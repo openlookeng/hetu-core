@@ -114,7 +114,7 @@ public final class SystemSessionProperties
     public static final String DISTRIBUTED_SORT = "distributed_sort";
     public static final String USE_MARK_DISTINCT = "use_mark_distinct";
     public static final String PREFER_PARTIAL_AGGREGATION = "prefer_partial_aggregation";
-    public static final String OPTIMIZE_TOP_N_ROW_NUMBER = "optimize_top_n_row_number";
+    public static final String OPTIMIZE_TOP_N_RANKING_NUMBER = "optimize_top_n_ranking_number";
     public static final String MAX_GROUPING_SETS = "max_grouping_sets";
     public static final String STATISTICS_CPU_TIMER_ENABLED = "statistics_cpu_timer_enabled";
     public static final String ENABLE_STATS_CALCULATOR = "enable_stats_calculator";
@@ -127,7 +127,7 @@ public final class SystemSessionProperties
     public static final String WORK_PROCESSOR_PIPELINES = "work_processor_pipelines";
     public static final String ENABLE_DYNAMIC_FILTERING = "enable_dynamic_filtering";
     public static final String QUERY_PUSHDOWN = "query_pushdown";
-    public static final String TRANSFORM_IN_TO_JOIN = "transform_in_to_join";
+    public static final String FILTERING_SEMI_JOIN_TO_INNER = "rewrite_filtering_semi_join_to_inner_join";
     public static final String JOIN_ORDER = "join_order";
     public static final String IMPLICIT_CONVERSION = "implicit_conversion";
     public static final String PUSH_LIMIT_THROUGH_UNION = "push_limit_through_union";
@@ -141,9 +141,14 @@ public final class SystemSessionProperties
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE = "dynamic_filtering_max_per_driver_size";
     public static final String DYNAMIC_FILTERING_BLOOM_FILTER_FPP = "dynamic_filtering_bloom_filter_fpp";
     public static final String ENABLE_EXECUTION_PLAN_CACHE = "enable_execution_plan_cache";
-    public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross-region-dynamic-filter-enabled";
+    public static final String ENABLE_CROSS_REGION_DYNAMIC_FILTER = "cross_region_dynamic_filter_enabled";
     public static final String ENABLE_HEURISTICINDEX_FILTER = "heuristicindex_filter_enabled";
     public static final String PUSH_TABLE_THROUGH_SUBQUERY = "push_table_through_subquery";
+    public static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
+    public static final String TRANSFORM_SELF_JOIN_TO_GROUPBY = "transform_self_join_to_groupby";
+    public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
+    public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
+    public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -172,9 +177,14 @@ public final class SystemSessionProperties
                         featuresConfig.isQueryPushDown(),
                         false),
                 booleanProperty(
-                        TRANSFORM_IN_TO_JOIN,
-                        "Transform IN to join",
-                        false,
+                        FILTERING_SEMI_JOIN_TO_INNER,
+                        "Rewrite semi join in filtering context to inner join",
+                        featuresConfig.isRewriteFilteringSemiJoinToInnerJoin(),
+                        false),
+                booleanProperty(
+                        TRANSFORM_SELF_JOIN_TO_GROUPBY,
+                        "Transform Self Join to Group BY if possible",
+                        featuresConfig.isTransformSelfJoinToGroupby(),
                         false),
                 stringProperty(
                         JOIN_ORDER,
@@ -541,9 +551,9 @@ public final class SystemSessionProperties
                         featuresConfig.isPreferPartialAggregation(),
                         false),
                 booleanProperty(
-                        OPTIMIZE_TOP_N_ROW_NUMBER,
+                        OPTIMIZE_TOP_N_RANKING_NUMBER,
                         "Use top N row number optimization",
-                        featuresConfig.isOptimizeTopNRowNumber(),
+                        featuresConfig.isOptimizeTopNRankingNumber(),
                         false),
                 integerProperty(
                         MAX_GROUPING_SETS,
@@ -641,6 +651,11 @@ public final class SystemSessionProperties
                         featuresConfig.getDynamicFilteringBloomFilterFpp(),
                         false),
                 booleanProperty(
+                        OPTIMIZE_DYNAMIC_FILTER_GENERATION,
+                        "Generate dynamic filters based on the selectivity",
+                        true,
+                        false),
+                booleanProperty(
                         ENABLE_EXECUTION_PLAN_CACHE,
                         "Enable execution plan caching",
                         featuresConfig.isEnableExecutionPlanCache(),
@@ -654,6 +669,21 @@ public final class SystemSessionProperties
                         PUSH_TABLE_THROUGH_SUBQUERY,
                         "Allow pushing outer tables into subqueries if there is a join between the two",
                         featuresConfig.isPushTableThroughSubquery(),
+                        false),
+                booleanProperty(
+                        REUSE_TABLE_SCAN,
+                        "Reuse data cached by similar table scan",
+                        featuresConfig.isReuseTableScanEnabled(),
+                        false),
+                booleanProperty(
+                        SPILL_REUSE_TABLESCAN,
+                        "Spill in TableScanOperator and WorkProcessorSourceOperatorAdapter if spill_enabled is also set",
+                        featuresConfig.isSpillReuseExchange(),
+                        false),
+                integerProperty(
+                        SPILL_THRESHOLD_REUSE_TABLESCAN,
+                        "Spiller Threshold (in MB) for TableScanOperator and WorkProcessorSourceOperatorAdapter for Reuse Exchange",
+                        featuresConfig.getSpillOperatorThresholdReuseExchange(),
                         false));
     }
 
@@ -687,9 +717,9 @@ public final class SystemSessionProperties
         return session.getSystemProperty(IMPLICIT_CONVERSION, Boolean.class);
     }
 
-    public static boolean isTransformUncorrelatedInToJoin(Session session)
+    public static boolean isRewriteFilteringSemiJoinToInnerJoin(Session session)
     {
-        return session.getSystemProperty(TRANSFORM_IN_TO_JOIN, Boolean.class);
+        return session.getSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, Boolean.class);
     }
 
     public static String getJoinOrder(Session session)
@@ -1011,9 +1041,9 @@ public final class SystemSessionProperties
         return session.getSystemProperty(PREFER_PARTIAL_AGGREGATION, Boolean.class);
     }
 
-    public static boolean isOptimizeTopNRowNumber(Session session)
+    public static boolean isOptimizeTopNRankingNumber(Session session)
     {
-        return session.getSystemProperty(OPTIMIZE_TOP_N_ROW_NUMBER, Boolean.class);
+        return session.getSystemProperty(OPTIMIZE_TOP_N_RANKING_NUMBER, Boolean.class);
     }
 
     public static boolean isDistributedSortEnabled(Session session)
@@ -1143,6 +1173,11 @@ public final class SystemSessionProperties
         return session.getSystemProperty(DYNAMIC_FILTERING_BLOOM_FILTER_FPP, Double.class);
     }
 
+    public static boolean isOptimizeDynamicFilterGeneration(Session session)
+    {
+        return session.getSystemProperty(OPTIMIZE_DYNAMIC_FILTER_GENERATION, Boolean.class);
+    }
+
     public static boolean isExecutionPlanCacheEnabled(Session session)
     {
         return session.getSystemProperty(ENABLE_EXECUTION_PLAN_CACHE, Boolean.class);
@@ -1156,5 +1191,20 @@ public final class SystemSessionProperties
     public static boolean shouldEnableTablePushdown(Session session)
     {
         return session.getSystemProperty(PUSH_TABLE_THROUGH_SUBQUERY, Boolean.class);
+    }
+
+    public static boolean isReuseTableScanEnabled(Session session)
+    {
+        return session.getSystemProperty(REUSE_TABLE_SCAN, Boolean.class);
+    }
+
+    public static boolean isSpillReuseExchange(Session session)
+    {
+        return session.getSystemProperty(SPILL_REUSE_TABLESCAN, Boolean.class);
+    }
+
+    public static int getSpillOperatorThresholdReuseExchange(Session session)
+    {
+        return session.getSystemProperty(SPILL_THRESHOLD_REUSE_TABLESCAN, Integer.class);
     }
 }

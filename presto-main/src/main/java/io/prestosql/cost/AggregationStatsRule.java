@@ -15,17 +15,20 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
+import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.PARTIAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
@@ -50,10 +53,12 @@ public class AggregationStatsRule
     protected Optional<PlanNodeStatsEstimate> doCalculate(AggregationNode node, StatsProvider statsProvider, Lookup lookup, Session session, TypeProvider types)
     {
         if (node.getGroupingSetCount() != 1) {
-            return Optional.empty();
+            // In this case there will be GroupId node below which would have calculated actual stats, so we can
+            // directly use source stats itself.
+            return Optional.of(statsProvider.getStats(node.getSource()));
         }
 
-        if (node.getStep() != SINGLE) {
+        if (node.getStep() != FINAL && node.getStep() != PARTIAL && node.getStep() != SINGLE) {
             return Optional.empty();
         }
 
@@ -77,12 +82,27 @@ public class AggregationStatsRule
         }
 
         double rowsCount = 1;
+        boolean knowsStatsFound = false;
         for (Symbol groupBySymbol : groupBySymbols) {
             SymbolStatsEstimate symbolStatistics = sourceStats.getSymbolStatistics(groupBySymbol);
+            if (symbolStatistics.isUnknown()) {
+                // Incase there is group on any function, then we will not have stats for the groupSymbol
+                // so for now we dont consider the same for overall stats calculation.
+                continue;
+            }
+
+            knowsStatsFound = true;
             int nullRow = (symbolStatistics.getNullsFraction() == 0.0) ? 0 : 1;
             rowsCount *= symbolStatistics.getDistinctValuesCount() + nullRow;
         }
-        result.setOutputRowCount(min(rowsCount, sourceStats.getOutputRowCount()));
+
+        if (knowsStatsFound) {
+            result.setOutputRowCount(min(rowsCount, sourceStats.getOutputRowCount()));
+        }
+        else {
+            // If there was no proper stats in any of the grouping symbols, we just take fixed % of source.
+            result.setOutputRowCount(sourceStats.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);
+        }
 
         for (Map.Entry<Symbol, Aggregation> aggregationEntry : aggregations.entrySet()) {
             result.addSymbolStatistics(aggregationEntry.getKey(), estimateAggregationStats(aggregationEntry.getValue(), sourceStats));

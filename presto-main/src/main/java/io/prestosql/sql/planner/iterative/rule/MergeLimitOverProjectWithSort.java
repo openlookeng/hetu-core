@@ -17,19 +17,20 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.TopNNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SortNode;
-import io.prestosql.sql.planner.plan.TopNNode;
 
 import static io.prestosql.matching.Capture.newCapture;
+import static io.prestosql.spi.plan.TopNNode.Step.PARTIAL;
+import static io.prestosql.spi.plan.TopNNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.Patterns.limit;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.sort;
 import static io.prestosql.sql.planner.plan.Patterns.source;
-import static io.prestosql.sql.planner.plan.TopNNode.Step.PARTIAL;
-import static io.prestosql.sql.planner.plan.TopNNode.Step.SINGLE;
+import static io.prestosql.sql.relational.ProjectNodeUtils.isIdentity;
 
 /**
  * Transforms:
@@ -54,7 +55,7 @@ public class MergeLimitOverProjectWithSort
     private static final Pattern<LimitNode> PATTERN = limit()
             .matching(limit -> !limit.isWithTies())
             .with(source().matching(
-                    project().capturedAs(PROJECT).matching(ProjectNode::isIdentity)
+                    project().capturedAs(PROJECT).matching(projectNode -> isIdentity(projectNode))
                             .with(source().matching(
                                     sort().capturedAs(SORT)))));
 

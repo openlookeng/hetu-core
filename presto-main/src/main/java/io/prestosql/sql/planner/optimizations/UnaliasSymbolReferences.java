@@ -22,59 +22,67 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.DeterminismEvaluator;
-import io.prestosql.sql.planner.OrderingScheme;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ExceptNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.SetOperationNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.RowExpressionVariableInliner;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.VariableReferenceSymbolConverter;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
-import io.prestosql.sql.planner.plan.ExceptNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.IntersectNode;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.planner.plan.SetOperationNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.relational.Expressions;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionRewriter;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
@@ -93,7 +101,11 @@ import java.util.Set;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -110,27 +122,36 @@ import static java.util.Objects.requireNonNull;
 public class UnaliasSymbolReferences
         implements PlanOptimizer
 {
+    private final Metadata metadata;
+
+    public UnaliasSymbolReferences(Metadata metadata)
+    {
+        this.metadata = metadata;
+    }
+
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
         requireNonNull(types, "types is null");
-        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
-        return SimplePlanRewriter.rewriteWith(new Rewriter(types), plan);
+        return SimplePlanRewriter.rewriteWith(new Rewriter(types, metadata), plan);
     }
 
     private static class Rewriter
             extends SimplePlanRewriter<Void>
     {
-        private final Map<Symbol, Symbol> mapping = new HashMap<>();
+        private final Map<String, String> mapping = new HashMap<>();
         private final TypeProvider types;
+        private final RowExpressionDeterminismEvaluator determinismEvaluator;
 
-        private Rewriter(TypeProvider types)
+        private Rewriter(TypeProvider types, Metadata metadata)
         {
             this.types = types;
+            this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
         }
 
         @Override
@@ -138,7 +159,7 @@ public class UnaliasSymbolReferences
         {
             PlanNode source = context.rewrite(node.getSource());
             //TODO: use mapper in other methods
-            SymbolMapper mapper = new SymbolMapper(mapping);
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source);
         }
 
@@ -198,7 +219,7 @@ public class UnaliasSymbolReferences
                 Symbol symbol = entry.getKey();
 
                 Signature signature = entry.getValue().getSignature();
-                List<Expression> arguments = canonicalize(entry.getValue().getArguments());
+                List<RowExpression> arguments = canonicalize(entry.getValue().getArguments());
                 WindowNode.Frame canonicalFrame = canonicalize(entry.getValue().getFrame());
 
                 functions.put(canonicalize(symbol), new WindowNode.Function(signature, arguments, canonicalFrame));
@@ -303,7 +324,7 @@ public class UnaliasSymbolReferences
                     inputsToOutputs.put(canonicalInputs, canonicalOutput);
                 }
                 else {
-                    map(canonicalOutput, output);
+                    map(canonicalOutput, VariableReferenceSymbolConverter.toVariableReference(output, types));
                 }
             }
         }
@@ -317,7 +338,7 @@ public class UnaliasSymbolReferences
                 Symbol canonicalInput = canonicalize(node.getInputs().get(0).get(symbolIndex));
 
                 if (!canonicalOutput.equals(canonicalInput)) {
-                    map(canonicalOutput, canonicalInput);
+                    map(canonicalOutput, VariableReferenceSymbolConverter.toVariableReference(canonicalInput, types));
                 }
             }
         }
@@ -371,7 +392,7 @@ public class UnaliasSymbolReferences
         @Override
         public PlanNode visitValues(ValuesNode node, RewriteContext<Void> context)
         {
-            List<List<Expression>> canonicalizedRows = node.getRows().stream()
+            List<List<RowExpression>> canonicalizedRows = node.getRows().stream()
                     .map(this::canonicalize)
                     .collect(toImmutableList());
             List<Symbol> canonicalizedOutputSymbols = canonicalizeAndDistinct(node.getOutputSymbols());
@@ -398,7 +419,7 @@ public class UnaliasSymbolReferences
         public PlanNode visitStatisticsWriterNode(StatisticsWriterNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
-            SymbolMapper mapper = new SymbolMapper(mapping);
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source);
         }
 
@@ -406,7 +427,7 @@ public class UnaliasSymbolReferences
         public PlanNode visitTableFinish(TableFinishNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
-            SymbolMapper mapper = new SymbolMapper(mapping);
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source);
         }
 
@@ -417,16 +438,17 @@ public class UnaliasSymbolReferences
         }
 
         @Override
-        public PlanNode visitTopNRowNumber(TopNRowNumberNode node, RewriteContext<Void> context)
+        public PlanNode visitTopNRankingNumber(TopNRankingNumberNode node, RewriteContext<Void> context)
         {
-            return new TopNRowNumberNode(
+            return new TopNRankingNumberNode(
                     node.getId(),
                     context.rewrite(node.getSource()),
                     canonicalizeAndDistinct(node.getSpecification()),
                     canonicalize(node.getRowNumberSymbol()),
                     node.getMaxRowCountPerPartition(),
                     node.isPartial(),
-                    canonicalize(node.getHashSymbol()));
+                    canonicalize(node.getHashSymbol()),
+                    node.getRankingFunction());
         }
 
         @Override
@@ -494,7 +516,7 @@ public class UnaliasSymbolReferences
         {
             PlanNode source = context.rewrite(node.getSource());
 
-            SymbolMapper mapper = new SymbolMapper(mapping);
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source, node.getId());
         }
 
@@ -513,7 +535,7 @@ public class UnaliasSymbolReferences
             PlanNode right = context.rewrite(node.getRight());
 
             List<JoinNode.EquiJoinClause> canonicalCriteria = canonicalizeJoinCriteria(node.getCriteria());
-            Optional<Expression> canonicalFilter = node.getFilter().map(this::canonicalize);
+            Optional<RowExpression> canonicalFilter = node.getFilter().map(this::canonicalize);
             Optional<Symbol> canonicalLeftHashSymbol = canonicalize(node.getLeftHashSymbol());
             Optional<Symbol> canonicalRightHashSymbol = canonicalize(node.getRightHashSymbol());
 
@@ -523,7 +545,7 @@ public class UnaliasSymbolReferences
                 canonicalCriteria.stream()
                         .filter(clause -> types.get(clause.getLeft()).equals(types.get(clause.getRight())))
                         .filter(clause -> node.getOutputSymbols().contains(clause.getLeft()))
-                        .forEach(clause -> map(clause.getRight(), clause.getLeft()));
+                        .forEach(clause -> map(clause.getRight(), VariableReferenceSymbolConverter.toVariableReference(clause.getLeft(), types)));
             }
 
             return new JoinNode(
@@ -556,7 +578,8 @@ public class UnaliasSymbolReferences
                     canonicalize(node.getSemiJoinOutput()),
                     canonicalize(node.getSourceHashSymbol()),
                     canonicalize(node.getFilteringSourceHashSymbol()),
-                    node.getDistributionType());
+                    node.getDistributionType(),
+                    node.getDynamicFilterId());
         }
 
         @Override
@@ -614,37 +637,45 @@ public class UnaliasSymbolReferences
         public PlanNode visitTableWriter(TableWriterNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
-            SymbolMapper mapper = new SymbolMapper(mapping);
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source);
         }
 
         @Override
-        protected PlanNode visitPlan(PlanNode node, RewriteContext<Void> context)
+        public PlanNode visitPlan(PlanNode node, RewriteContext<Void> context)
         {
             throw new UnsupportedOperationException("Unsupported plan node " + node.getClass().getSimpleName());
         }
 
-        private void map(Symbol symbol, Symbol canonical)
+        private void map(Symbol symbol, VariableReferenceExpression canonical)
         {
-            Preconditions.checkArgument(!symbol.equals(canonical), "Can't map symbol to itself: %s", symbol);
-            mapping.put(symbol, canonical);
+            Preconditions.checkArgument(!symbol.getName().equals(canonical.getName()), "Can't map symbol to itself: %s", symbol);
+            mapping.put(symbol.getName(), canonical.getName());
         }
 
         private Assignments canonicalize(Assignments oldAssignments)
         {
-            Map<Expression, Symbol> computedExpressions = new HashMap<>();
+            Map<RowExpression, Symbol> computedExpressions = new HashMap<>();
             Assignments.Builder assignments = Assignments.builder();
-            for (Map.Entry<Symbol, Expression> entry : oldAssignments.getMap().entrySet()) {
-                Expression expression = canonicalize(entry.getValue());
+            for (Map.Entry<Symbol, RowExpression> entry : oldAssignments.getMap().entrySet()) {
+                RowExpression expression = canonicalize(entry.getValue());
 
-                if (expression instanceof SymbolReference) {
+                if (expression instanceof VariableReferenceExpression) {
                     // Always map a trivial symbol projection
-                    Symbol symbol = Symbol.from(expression);
-                    if (!symbol.equals(entry.getKey())) {
-                        map(entry.getKey(), symbol);
+                    VariableReferenceExpression variable = (VariableReferenceExpression) expression;
+                    if (!variable.getName().equals(entry.getKey().getName())) {
+                        map(entry.getKey(), variable);
                     }
                 }
-                else if (DeterminismEvaluator.isDeterministic(expression) && !(expression instanceof NullLiteral)) {
+                else if (isExpression(expression) && castToExpression(expression) instanceof SymbolReference) {
+                    // Always map a trivial symbol projection
+                    Symbol symbol = SymbolUtils.from(castToExpression(expression));
+                    VariableReferenceExpression variable = new VariableReferenceExpression(symbol.getName(), types.get(symbol));
+                    if (!variable.getName().equals(entry.getKey().getName())) {
+                        map(entry.getKey(), variable);
+                    }
+                }
+                else if (!isNull(expression) && isDeterministic(expression)) {
                     // Try to map same deterministic expressions within a projection into the same symbol
                     // Omit NullLiterals since those have ambiguous types
                     Symbol computedSymbol = computedExpressions.get(expression);
@@ -655,7 +686,7 @@ public class UnaliasSymbolReferences
                     else {
                         // If we have seen the expression before and if it is deterministic
                         // then we can rewrite references to the current symbol in terms of the parallel computedSymbol in the projection
-                        map(entry.getKey(), computedSymbol);
+                        map(entry.getKey(), VariableReferenceSymbolConverter.toVariableReference(computedSymbol, types));
                     }
                 }
 
@@ -673,20 +704,54 @@ public class UnaliasSymbolReferences
             return Optional.empty();
         }
 
-        private Symbol canonicalize(Symbol symbol)
+        private boolean isDeterministic(RowExpression expression)
         {
-            Symbol canonical = symbol;
+            if (isExpression(expression)) {
+                return ExpressionDeterminismEvaluator.isDeterministic(castToExpression(expression));
+            }
+            return determinismEvaluator.isDeterministic(expression);
+        }
+
+        private static boolean isNull(RowExpression expression)
+        {
+            if (isExpression(expression)) {
+                return castToExpression(expression) instanceof NullLiteral;
+            }
+            return Expressions.isNull(expression);
+        }
+
+        private VariableReferenceExpression canonicalize(VariableReferenceExpression variable)
+        {
+            String canonical = variable.getName();
             while (mapping.containsKey(canonical)) {
                 canonical = mapping.get(canonical);
             }
-            return canonical;
+            return new VariableReferenceExpression(canonical, types.get(new Symbol(canonical)));
         }
 
-        private List<Expression> canonicalize(List<Expression> values)
+        private Symbol canonicalize(Symbol symbol)
+        {
+            String canonical = symbol.getName();
+            while (mapping.containsKey(canonical)) {
+                canonical = mapping.get(canonical);
+            }
+            return new Symbol(canonical);
+        }
+
+        private List<RowExpression> canonicalize(List<RowExpression> values)
         {
             return values.stream()
                     .map(this::canonicalize)
                     .collect(toImmutableList());
+        }
+
+        private RowExpression canonicalize(RowExpression value)
+        {
+            if (isExpression(value)) {
+                return castToRowExpression(canonicalize(castToExpression(value)));
+            }
+
+            return RowExpressionVariableInliner.inlineVariables(this::canonicalize, value);
         }
 
         private Expression canonicalize(Expression value)
@@ -696,8 +761,8 @@ public class UnaliasSymbolReferences
                 @Override
                 public Expression rewriteSymbolReference(SymbolReference node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
                 {
-                    Symbol canonical = canonicalize(Symbol.from(node));
-                    return canonical.toSymbolReference();
+                    Symbol canonical = canonicalize(SymbolUtils.from(node));
+                    return toSymbolReference(canonical);
                 }
             }, value);
         }

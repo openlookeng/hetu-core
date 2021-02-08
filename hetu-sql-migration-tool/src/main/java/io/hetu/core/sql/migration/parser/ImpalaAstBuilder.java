@@ -19,6 +19,8 @@ import com.google.common.collect.Lists;
 import io.hetu.core.migration.source.impala.ImpalaSqlBaseVisitor;
 import io.hetu.core.migration.source.impala.ImpalaSqlLexer;
 import io.hetu.core.migration.source.impala.ImpalaSqlParser;
+import io.prestosql.spi.sql.expression.Types.FrameBoundType;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.tree.AddColumn;
@@ -30,7 +32,6 @@ import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.BinaryLiteral;
-import io.prestosql.sql.tree.BindExpression;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CharLiteral;
@@ -43,9 +44,7 @@ import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.CreateView;
-import io.prestosql.sql.tree.CurrentPath;
 import io.prestosql.sql.tree.CurrentTime;
-import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.DereferenceExpression;
@@ -60,7 +59,6 @@ import io.prestosql.sql.tree.ExistsPredicate;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Extract;
-import io.prestosql.sql.tree.Format;
 import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GenericLiteral;
@@ -134,7 +132,6 @@ import io.prestosql.sql.tree.TableElement;
 import io.prestosql.sql.tree.TableSubquery;
 import io.prestosql.sql.tree.TimeLiteral;
 import io.prestosql.sql.tree.TimestampLiteral;
-import io.prestosql.sql.tree.TryExpression;
 import io.prestosql.sql.tree.Union;
 import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
@@ -159,8 +156,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.hetu.core.sql.migration.Constants.FORMAT;
 import static io.hetu.core.sql.migration.Constants.LOCATION;
 import static io.hetu.core.sql.migration.Constants.PARTITIONED_BY;
@@ -168,7 +163,6 @@ import static io.hetu.core.sql.migration.Constants.SORTED_BY;
 import static io.hetu.core.sql.migration.Constants.TRANSACTIONAL;
 import static io.hetu.core.sql.util.AstBuilderUtils.check;
 import static io.hetu.core.sql.util.AstBuilderUtils.getLocation;
-import static io.hetu.core.sql.util.AstBuilderUtils.parseError;
 import static io.hetu.core.sql.util.AstBuilderUtils.unsupportedError;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
@@ -1272,16 +1266,6 @@ public class ImpalaAstBuilder
     }
 
     @Override
-    public Node visitLikeClause(ImpalaSqlParser.LikeClauseContext context)
-    {
-        return new LikeClause(
-                getLocation(context),
-                getQualifiedName(context.qualifiedName()),
-                Optional.ofNullable(context.optionType)
-                        .map(ImpalaAstBuilder::getPropertiesOption));
-    }
-
-    @Override
     public Node visitHintClause(ImpalaSqlParser.HintClauseContext ctx)
     {
         return super.visitHintClause(ctx);
@@ -1837,11 +1821,6 @@ public class ImpalaAstBuilder
     public Node visitSpecialDateTimeFunction(ImpalaSqlParser.SpecialDateTimeFunctionContext context)
     {
         CurrentTime.Function function = getDateTimeFunctionType(context.name);
-
-        if (context.precision != null) {
-            return new CurrentTime(getLocation(context), function, Integer.parseInt(context.precision.getText()));
-        }
-
         return new CurrentTime(getLocation(context), function);
     }
 
@@ -1927,12 +1906,6 @@ public class ImpalaAstBuilder
     }
 
     @Override
-    public Node visitCurrentPath(ImpalaSqlParser.CurrentPathContext context)
-    {
-        return new CurrentPath(getLocation(context.CURRENT_PATH()));
-    }
-
-    @Override
     public Node visitSubqueryExpression(ImpalaSqlParser.SubqueryExpressionContext context)
     {
         return new SubqueryExpression(getLocation(context), (Query) visit(context.query()));
@@ -1943,12 +1916,6 @@ public class ImpalaAstBuilder
     {
         String raw = context.BINARY_LITERAL().getText();
         return new BinaryLiteral(getLocation(context), unquote(raw.substring(1)));
-    }
-
-    @Override
-    public Node visitCurrentUser(ImpalaSqlParser.CurrentUserContext context)
-    {
-        return new CurrentUser(getLocation(context.CURRENT_USER()));
     }
 
     @Override
@@ -2020,42 +1987,6 @@ public class ImpalaAstBuilder
             return new CoalesceExpression(getLocation(context), visit(context.expression(), Expression.class));
         }
 
-        if (name.toString().equalsIgnoreCase("try")) {
-            check(context.expression().size() == 1, "The 'try' function must have exactly one argument", context);
-            check(!window.isPresent(), "OVER clause not valid for 'try' function", context);
-            check(!distinct, "DISTINCT not valid for 'try' function", context);
-            check(!filter.isPresent(), "FILTER not valid for 'try' function", context);
-
-            return new TryExpression(getLocation(context), (Expression) visit(getOnlyElement(context.expression())));
-        }
-
-        if (name.toString().equalsIgnoreCase("format")) {
-            check(context.expression().size() >= 2, "The 'format' function must have at least two arguments", context);
-            check(!window.isPresent(), "OVER clause not valid for 'format' function", context);
-            check(!distinct, "DISTINCT not valid for 'format' function", context);
-            check(!filter.isPresent(), "FILTER not valid for 'format' function", context);
-
-            return new Format(getLocation(context), visit(context.expression(), Expression.class));
-        }
-
-        if (name.toString().equalsIgnoreCase("$internal$bind")) {
-            check(context.expression().size() >= 1, "The '$internal$bind' function must have at least one arguments", context);
-            check(!window.isPresent(), "OVER clause not valid for '$internal$bind' function", context);
-            check(!distinct, "DISTINCT not valid for '$internal$bind' function", context);
-            check(!filter.isPresent(), "FILTER not valid for '$internal$bind' function", context);
-
-            int numValues = context.expression().size() - 1;
-            List<Expression> arguments = context.expression().stream()
-                    .map(this::visit)
-                    .map(Expression.class::cast)
-                    .collect(toImmutableList());
-
-            return new BindExpression(
-                    getLocation(context),
-                    arguments.subList(0, numValues),
-                    arguments.get(numValues));
-        }
-
         return new FunctionCall(
                 Optional.of(getLocation(context)),
                 getQualifiedName(context.qualifiedName()),
@@ -2102,12 +2033,6 @@ public class ImpalaAstBuilder
     public Node visitBasicStringLiteral(ImpalaSqlParser.BasicStringLiteralContext context)
     {
         return new StringLiteral(getLocation(context), unquote(context.STRING().getText()));
-    }
-
-    @Override
-    public Node visitUnicodeStringLiteral(ImpalaSqlParser.UnicodeStringLiteralContext context)
-    {
-        return new StringLiteral(getLocation(context), decodeUnicodeLiteral(context));
     }
 
     @Override
@@ -2173,7 +2098,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitCurrentRowBound(ImpalaSqlParser.CurrentRowBoundContext context)
     {
-        return new FrameBound(getLocation(context), FrameBound.Type.CURRENT_ROW);
+        return new FrameBound(getLocation(context), FrameBoundType.CURRENT_ROW);
     }
 
     @Override
@@ -2384,16 +2309,8 @@ public class ImpalaAstBuilder
     private static CurrentTime.Function getDateTimeFunctionType(Token token)
     {
         switch (token.getType()) {
-            case ImpalaSqlLexer.CURRENT_DATE:
-                return CurrentTime.Function.DATE;
-            case ImpalaSqlLexer.CURRENT_TIME:
-                return CurrentTime.Function.TIME;
             case ImpalaSqlLexer.CURRENT_TIMESTAMP:
                 return CurrentTime.Function.TIMESTAMP;
-            case ImpalaSqlLexer.LOCALTIME:
-                return CurrentTime.Function.LOCALTIME;
-            case ImpalaSqlLexer.LOCALTIMESTAMP:
-                return CurrentTime.Function.LOCALTIMESTAMP;
         }
 
         throw new IllegalArgumentException("Unsupported special function: " + token.getText());
@@ -2425,37 +2342,37 @@ public class ImpalaAstBuilder
         throw new IllegalArgumentException("Unsupported interval field: " + token.getText());
     }
 
-    private static WindowFrame.Type getFrameType(Token type)
+    private static WindowFrameType getFrameType(Token type)
     {
         switch (type.getType()) {
             case ImpalaSqlLexer.RANGE:
-                return WindowFrame.Type.RANGE;
+                return WindowFrameType.RANGE;
             case ImpalaSqlLexer.ROWS:
-                return WindowFrame.Type.ROWS;
+                return WindowFrameType.ROWS;
         }
 
         throw new IllegalArgumentException("Unsupported frame type: " + type.getText());
     }
 
-    private static FrameBound.Type getBoundedFrameBoundType(Token token)
+    private static FrameBoundType getBoundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case ImpalaSqlLexer.PRECEDING:
-                return FrameBound.Type.PRECEDING;
+                return FrameBoundType.PRECEDING;
             case ImpalaSqlLexer.FOLLOWING:
-                return FrameBound.Type.FOLLOWING;
+                return FrameBoundType.FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());
     }
 
-    private static FrameBound.Type getUnboundedFrameBoundType(Token token)
+    private static FrameBoundType getUnboundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case ImpalaSqlLexer.PRECEDING:
-                return FrameBound.Type.UNBOUNDED_PRECEDING;
+                return FrameBoundType.UNBOUNDED_PRECEDING;
             case ImpalaSqlLexer.FOLLOWING:
-                return FrameBound.Type.UNBOUNDED_FOLLOWING;
+                return FrameBoundType.UNBOUNDED_FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());
@@ -2576,86 +2493,6 @@ public class ImpalaAstBuilder
         EMPTY,
         ESCAPED,
         UNICODE_SEQUENCE
-    }
-
-    private static String decodeUnicodeLiteral(ImpalaSqlParser.UnicodeStringLiteralContext context)
-    {
-        char escape;
-        if (context.UESCAPE() != null) {
-            String escapeString = unquote(context.STRING().getText());
-            check(!escapeString.isEmpty(), "Empty Unicode escape character", context);
-            check(escapeString.length() == 1, "Invalid Unicode escape character: " + escapeString, context);
-            escape = escapeString.charAt(0);
-            check(isValidUnicodeEscape(escape), "Invalid Unicode escape character: " + escapeString, context);
-        }
-        else {
-            escape = '\\';
-        }
-
-        String rawContent = unquote(context.UNICODE_STRING().getText().substring(2));
-        StringBuilder unicodeStringBuilder = new StringBuilder();
-        StringBuilder escapedCharacterBuilder = new StringBuilder();
-        int charactersNeeded = 0;
-        UnicodeDecodeState state = UnicodeDecodeState.EMPTY;
-        for (int i = 0; i < rawContent.length(); i++) {
-            char ch = rawContent.charAt(i);
-            switch (state) {
-                case EMPTY:
-                    if (ch == escape) {
-                        state = UnicodeDecodeState.ESCAPED;
-                    }
-                    else {
-                        unicodeStringBuilder.append(ch);
-                    }
-                    break;
-                case ESCAPED:
-                    if (ch == escape) {
-                        unicodeStringBuilder.append(escape);
-                        state = UnicodeDecodeState.EMPTY;
-                    }
-                    else if (ch == '+') {
-                        state = UnicodeDecodeState.UNICODE_SEQUENCE;
-                        charactersNeeded = 6;
-                    }
-                    else if (isHexDigit(ch)) {
-                        state = UnicodeDecodeState.UNICODE_SEQUENCE;
-                        charactersNeeded = 4;
-                        escapedCharacterBuilder.append(ch);
-                    }
-                    else {
-                        throw parseError("Invalid hexadecimal digit: " + ch, context);
-                    }
-                    break;
-                case UNICODE_SEQUENCE:
-                    check(isHexDigit(ch), "Incomplete escape sequence: " + escapedCharacterBuilder.toString(), context);
-                    escapedCharacterBuilder.append(ch);
-                    if (charactersNeeded == escapedCharacterBuilder.length()) {
-                        String currentEscapedCode = escapedCharacterBuilder.toString();
-                        escapedCharacterBuilder.setLength(0);
-                        int codePoint = Integer.parseInt(currentEscapedCode, 16);
-                        check(Character.isValidCodePoint(codePoint), "Invalid escaped character: " + currentEscapedCode, context);
-                        if (Character.isSupplementaryCodePoint(codePoint)) {
-                            unicodeStringBuilder.appendCodePoint(codePoint);
-                        }
-                        else {
-                            char currentCodePoint = (char) codePoint;
-                            check(!Character.isSurrogate(currentCodePoint), format("Invalid escaped character: %s. Escaped character is a surrogate. Use '\\+123456' instead.", currentEscapedCode), context);
-                            unicodeStringBuilder.append(currentCodePoint);
-                        }
-                        state = UnicodeDecodeState.EMPTY;
-                        charactersNeeded = -1;
-                    }
-                    else {
-                        check(charactersNeeded > escapedCharacterBuilder.length(), "Unexpected escape sequence length: " + escapedCharacterBuilder.length(), context);
-                    }
-                    break;
-                default:
-                    throw new UnsupportedOperationException();
-            }
-        }
-
-        check(state == UnicodeDecodeState.EMPTY, "Incomplete escape sequence: " + escapedCharacterBuilder.toString(), context);
-        return unicodeStringBuilder.toString();
     }
 
     private PrincipalSpecification getPrincipalSpecification(ImpalaSqlParser.PrincipalContext context)

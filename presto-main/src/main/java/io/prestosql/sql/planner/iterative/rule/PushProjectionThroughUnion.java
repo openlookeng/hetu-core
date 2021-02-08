@@ -18,14 +18,16 @@ import com.google.common.collect.ImmutableListMultimap;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.RowExpressionVariableInliner;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.UnionNode;
-import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashMap;
@@ -34,9 +36,13 @@ import java.util.Map;
 
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.ExpressionSymbolInliner.inlineSymbols;
+import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.sourceSymbolMap;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.union;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 
 public class PushProjectionThroughUnion
         implements Rule<ProjectNode>
@@ -68,17 +74,32 @@ public class PushProjectionThroughUnion
         ImmutableList.Builder<PlanNode> outputSources = ImmutableList.builder();
 
         for (int i = 0; i < source.getSources().size(); i++) {
-            Map<Symbol, SymbolReference> outputToInput = source.sourceSymbolMap(i);   // Map: output of union -> input of this source to the union
+            Map<Symbol, SymbolReference> outputToInput = sourceSymbolMap(source, i);   // Map: output of union -> input of this source to the union
             Assignments.Builder assignments = Assignments.builder(); // assignments for the new ProjectNode
 
             // mapping from current ProjectNode to new ProjectNode, used to identify the output layout
             Map<Symbol, Symbol> projectSymbolMapping = new HashMap<>();
 
             // Translate the assignments in the ProjectNode using symbols of the source of the UnionNode
-            for (Map.Entry<Symbol, Expression> entry : parent.getAssignments().entrySet()) {
-                Expression translatedExpression = inlineSymbols(outputToInput, entry.getValue());
+            for (Map.Entry<Symbol, RowExpression> entry : parent.getAssignments().entrySet()) {
+                RowExpression translatedExpression;
                 Type type = context.getSymbolAllocator().getTypes().get(entry.getKey());
-                Symbol symbol = context.getSymbolAllocator().newSymbol(translatedExpression, type);
+                Symbol symbol;
+                if (isExpression(entry.getValue())) {
+                    translatedExpression = castToRowExpression(inlineSymbols(outputToInput, castToExpression(entry.getValue())));
+                    symbol = context.getSymbolAllocator().newSymbol(castToExpression(translatedExpression), type);
+                }
+                else {
+                    Map<VariableReferenceExpression, VariableReferenceExpression> variable = new HashMap<>();
+                    Map<Symbol, Type> symbols = context.getSymbolAllocator().getSymbols();
+                    for (Symbol symbolMap : source.getSymbolMapping().keySet()) {
+                        Symbol symboli = source.getSymbolMapping().get(symbolMap).get(i);
+                        variable.put(new VariableReferenceExpression(symbolMap.getName(), symbols.get(symbolMap)),
+                                new VariableReferenceExpression(symboli.getName(), symbols.get(symboli)));
+                    }
+                    translatedExpression = RowExpressionVariableInliner.inlineVariables(variable, entry.getValue());
+                    symbol = context.getSymbolAllocator().newSymbol(translatedExpression);
+                }
                 assignments.put(symbol, translatedExpression);
                 projectSymbolMapping.put(entry.getKey(), symbol);
             }
@@ -93,6 +114,13 @@ public class PushProjectionThroughUnion
     {
         return !project.getAssignments()
                 .getExpressions().stream()
-                .allMatch(SymbolReference.class::isInstance);
+                .allMatch(expression -> {
+                    if (isExpression(expression)) {
+                        return castToExpression(expression) instanceof SymbolReference;
+                    }
+                    else {
+                        return expression instanceof VariableReferenceExpression;
+                    }
+                });
     }
 }

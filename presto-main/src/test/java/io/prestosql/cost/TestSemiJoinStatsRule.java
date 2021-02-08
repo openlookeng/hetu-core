@@ -13,7 +13,7 @@
  */
 package io.prestosql.cost;
 
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -45,6 +45,7 @@ public class TestSemiJoinStatsRule
                             a,
                             c,
                             semiJoinOutput,
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty());

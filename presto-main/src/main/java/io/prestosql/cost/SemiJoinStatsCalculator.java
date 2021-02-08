@@ -13,7 +13,7 @@
  */
 package io.prestosql.cost;
 
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
 
 import java.util.function.BiFunction;
 

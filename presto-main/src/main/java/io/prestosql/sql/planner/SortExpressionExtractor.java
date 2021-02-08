@@ -14,13 +14,20 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.ExpressionUtils;
-import io.prestosql.sql.tree.AstVisitor;
-import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.Node;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.InputReferenceExpression;
+import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.RowExpressionVisitor;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.sql.RowExpressionUtils;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,8 +36,9 @@ import java.util.Set;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN_OR_EQUAL;
+import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
+import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.util.Collections.singletonList;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
@@ -60,14 +68,15 @@ public final class SortExpressionExtractor
      */
     private SortExpressionExtractor() {}
 
-    public static Optional<SortExpressionContext> extractSortExpression(Set<Symbol> buildSymbols, Expression filter)
+    public static Optional<SortExpressionContext> extractSortExpression(Metadata metadata, Set<Symbol> buildSymbols, RowExpression filter)
     {
-        List<Expression> filterConjuncts = ExpressionUtils.extractConjuncts(filter);
+        List<RowExpression> filterConjuncts = RowExpressionUtils.extractConjuncts(filter);
         SortExpressionVisitor visitor = new SortExpressionVisitor(buildSymbols);
 
+        RowExpressionDeterminismEvaluator determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
         List<SortExpressionContext> sortExpressionCandidates = filterConjuncts.stream()
-                .filter(DeterminismEvaluator::isDeterministic)
-                .map(visitor::process)
+                .filter(determinismEvaluator::isDeterministic)
+                .map(conjunct -> conjunct.accept(visitor, null))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(toMap(SortExpressionContext::getSortExpression, identity(), SortExpressionExtractor::merge))
@@ -85,14 +94,14 @@ public final class SortExpressionExtractor
     private static SortExpressionContext merge(SortExpressionContext left, SortExpressionContext right)
     {
         checkArgument(left.getSortExpression().equals(right.getSortExpression()));
-        ImmutableList.Builder<Expression> searchExpressions = ImmutableList.builder();
+        ImmutableList.Builder<RowExpression> searchExpressions = ImmutableList.builder();
         searchExpressions.addAll(left.getSearchExpressions());
         searchExpressions.addAll(right.getSearchExpressions());
         return new SortExpressionContext(left.getSortExpression(), searchExpressions.build());
     }
 
     private static class SortExpressionVisitor
-            extends AstVisitor<Optional<SortExpressionContext>, Void>
+            implements RowExpressionVisitor<Optional<SortExpressionContext>, Void>
     {
         private final Set<Symbol> buildSymbols;
 
@@ -102,27 +111,32 @@ public final class SortExpressionExtractor
         }
 
         @Override
-        protected Optional<SortExpressionContext> visitExpression(Expression expression, Void context)
+        public Optional<SortExpressionContext> visitCall(CallExpression call, Void context)
         {
-            return Optional.empty();
-        }
+            if (!Signature.isMangleOperator(call.getSignature().getName())) {
+                return Optional.empty();
+            }
 
-        @Override
-        protected Optional<SortExpressionContext> visitComparisonExpression(ComparisonExpression comparison, Void context)
-        {
-            switch (comparison.getOperator()) {
+            OperatorType operatorType = Signature.unmangleOperator(call.getSignature().getName());
+            if (!operatorType.isComparisonOperator()) {
+                return Optional.empty();
+            }
+
+            switch (operatorType) {
                 case GREATER_THAN:
                 case GREATER_THAN_OR_EQUAL:
                 case LESS_THAN:
                 case LESS_THAN_OR_EQUAL:
-                    Optional<SymbolReference> sortChannel = asBuildSymbolReference(buildSymbols, comparison.getRight());
-                    boolean hasBuildReferencesOnOtherSide = hasBuildSymbolReference(buildSymbols, comparison.getLeft());
+                    RowExpression left = call.getArguments().get(0);
+                    RowExpression right = call.getArguments().get(1);
+                    Optional<VariableReferenceExpression> sortChannel = asBuildVariableReference(buildSymbols, right);
+                    boolean hasBuildReferencesOnOtherSide = hasBuildSymbolReference(buildSymbols, left);
                     if (!sortChannel.isPresent()) {
-                        sortChannel = asBuildSymbolReference(buildSymbols, comparison.getLeft());
-                        hasBuildReferencesOnOtherSide = hasBuildSymbolReference(buildSymbols, comparison.getRight());
+                        sortChannel = asBuildVariableReference(buildSymbols, left);
+                        hasBuildReferencesOnOtherSide = hasBuildSymbolReference(buildSymbols, right);
                     }
                     if (sortChannel.isPresent() && !hasBuildReferencesOnOtherSide) {
-                        return sortChannel.map(symbolReference -> new SortExpressionContext(symbolReference, singletonList(comparison)));
+                        return sortChannel.map(variable -> new SortExpressionContext(variable, singletonList(call)));
                     }
                     return Optional.empty();
                 default:
@@ -131,35 +145,73 @@ public final class SortExpressionExtractor
         }
 
         @Override
-        protected Optional<SortExpressionContext> visitBetweenPredicate(BetweenPredicate node, Void context)
+        public Optional<SortExpressionContext> visitSpecialForm(SpecialForm specialForm, Void context)
         {
-            Optional<SortExpressionContext> result = visitComparisonExpression(new ComparisonExpression(GREATER_THAN_OR_EQUAL, node.getValue(), node.getMin()), context);
-            if (result.isPresent()) {
-                return result;
+            if (specialForm.getForm().equals(SpecialForm.Form.BETWEEN)) {
+                Signature signatureLeft = Signature.internalOperator(GREATER_THAN_OR_EQUAL,
+                        BOOLEAN.getTypeSignature(),
+                        specialForm.getArguments().get(0).getType().getTypeSignature(),
+                        specialForm.getArguments().get(1).getType().getTypeSignature());
+                Optional<SortExpressionContext> left = visitCall(new CallExpression(signatureLeft,
+                        BOOLEAN, ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1))), context);
+                if (left.isPresent()) {
+                    return left;
+                }
+                Signature signatureRight = Signature.internalOperator(LESS_THAN_OR_EQUAL,
+                        BOOLEAN.getTypeSignature(),
+                        specialForm.getArguments().get(0).getType().getTypeSignature(),
+                        specialForm.getArguments().get(2).getType().getTypeSignature());
+                Optional<SortExpressionContext> right = visitCall(new CallExpression(signatureRight,
+                        BOOLEAN, ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2))), context);
+                return right;
             }
-            return visitComparisonExpression(new ComparisonExpression(LESS_THAN_OR_EQUAL, node.getValue(), node.getMax()), context);
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<SortExpressionContext> visitInputReference(InputReferenceExpression reference, Void context)
+        {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<SortExpressionContext> visitConstant(ConstantExpression literal, Void context)
+        {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<SortExpressionContext> visitLambda(LambdaDefinitionExpression lambda, Void context)
+        {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<SortExpressionContext> visitVariableReference(VariableReferenceExpression reference, Void context)
+        {
+            return Optional.empty();
         }
     }
 
-    private static Optional<SymbolReference> asBuildSymbolReference(Set<Symbol> buildLayout, Expression expression)
+    private static Optional<VariableReferenceExpression> asBuildVariableReference(Set<Symbol> buildLayout, RowExpression expression)
     {
         // Currently only we support only symbol as sort expression on build side
-        if (expression instanceof SymbolReference) {
-            SymbolReference symbolReference = (SymbolReference) expression;
-            if (buildLayout.contains(new Symbol(symbolReference.getName()))) {
-                return Optional.of(symbolReference);
+        if (expression instanceof VariableReferenceExpression) {
+            VariableReferenceExpression variableReference = (VariableReferenceExpression) expression;
+            if (buildLayout.contains(new Symbol(variableReference.getName()))) {
+                return Optional.of(variableReference);
             }
         }
         return Optional.empty();
     }
 
-    private static boolean hasBuildSymbolReference(Set<Symbol> buildSymbols, Expression expression)
+    private static boolean hasBuildSymbolReference(Set<Symbol> buildSymbols, RowExpression expression)
     {
-        return new BuildSymbolReferenceFinder(buildSymbols).process(expression);
+        return expression.accept(new BuildSymbolReferenceFinder(buildSymbols), null);
     }
 
     private static class BuildSymbolReferenceFinder
-            extends AstVisitor<Boolean, Void>
+            implements RowExpressionVisitor<Boolean, Void>
     {
         private final Set<String> buildSymbols;
 
@@ -171,10 +223,10 @@ public final class SortExpressionExtractor
         }
 
         @Override
-        protected Boolean visitNode(Node node, Void context)
+        public Boolean visitCall(CallExpression call, Void context)
         {
-            for (Node child : node.getChildren()) {
-                if (process(child, context)) {
+            for (RowExpression argument : call.getArguments()) {
+                if (argument.accept(this, context)) {
                     return true;
                 }
             }
@@ -182,9 +234,38 @@ public final class SortExpressionExtractor
         }
 
         @Override
-        protected Boolean visitSymbolReference(SymbolReference symbolReference, Void context)
+        public Boolean visitSpecialForm(SpecialForm specialForm, Void context)
         {
-            return buildSymbols.contains(symbolReference.getName());
+            for (RowExpression argument : specialForm.getArguments()) {
+                if (argument.accept(this, context)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public Boolean visitInputReference(InputReferenceExpression reference, Void context)
+        {
+            return false;
+        }
+
+        @Override
+        public Boolean visitConstant(ConstantExpression literal, Void context)
+        {
+            return false;
+        }
+
+        @Override
+        public Boolean visitLambda(LambdaDefinitionExpression lambda, Void context)
+        {
+            return lambda.getBody().accept(this, context);
+        }
+
+        @Override
+        public Boolean visitVariableReference(VariableReferenceExpression reference, Void context)
+        {
+            return buildSymbols.contains(reference.getName());
         }
     }
 }

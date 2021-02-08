@@ -13,10 +13,16 @@
  */
 package io.prestosql.sql.planner;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.MetadataManager;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.TestingRowExpressionTranslator;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -25,13 +31,21 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
 import static org.testng.Assert.assertEquals;
 
 public class TestSortExpressionExtractor
 {
+    private static final Metadata METADATA = MetadataManager.createTestMetadataManager();
+    private static final TestingRowExpressionTranslator TRANSLATOR = new TestingRowExpressionTranslator(METADATA);
     private static final Set<Symbol> BUILD_SYMBOLS = ImmutableSet.of(new Symbol("b1"), new Symbol("b2"));
+    private static final TypeProvider TYPES = TypeProvider.copyOf(ImmutableMap.of(
+            new Symbol("b1"), BIGINT,
+            new Symbol("b2"), BIGINT,
+            new Symbol("p1"), BIGINT,
+            new Symbol("p2"), BIGINT));
 
     @Test
     public void testGetSortExpression()
@@ -87,7 +101,8 @@ public class TestSortExpressionExtractor
 
     private void assertNoSortExpression(Expression expression)
     {
-        Optional<SortExpressionContext> actual = SortExpressionExtractor.extractSortExpression(BUILD_SYMBOLS, expression);
+        RowExpression rowExpression = TRANSLATOR.translate(expression, TYPES);
+        Optional<SortExpressionContext> actual = SortExpressionExtractor.extractSortExpression(METADATA, BUILD_SYMBOLS, rowExpression);
         assertEquals(actual, Optional.empty());
     }
 
@@ -117,8 +132,8 @@ public class TestSortExpressionExtractor
 
     private static void assertGetSortExpression(Expression expression, String expectedSymbol, List<Expression> searchExpressions)
     {
-        Optional<SortExpressionContext> expected = Optional.of(new SortExpressionContext(new SymbolReference(expectedSymbol), searchExpressions));
-        Optional<SortExpressionContext> actual = SortExpressionExtractor.extractSortExpression(BUILD_SYMBOLS, expression);
+        Optional<SortExpressionContext> expected = Optional.of(new SortExpressionContext(new VariableReferenceExpression(expectedSymbol, BIGINT), searchExpressions.stream().map(e -> TRANSLATOR.translate(e, TYPES)).collect(toImmutableList())));
+        Optional<SortExpressionContext> actual = SortExpressionExtractor.extractSortExpression(METADATA, BUILD_SYMBOLS, TRANSLATOR.translate(expression, TYPES));
         assertEquals(actual, expected);
     }
 }

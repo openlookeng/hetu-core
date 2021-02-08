@@ -16,13 +16,16 @@ package io.prestosql.split;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorSplitSource.ConnectorSplitBatch;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
@@ -75,5 +78,19 @@ public class ConnectorAwareSplitSource
     public String toString()
     {
         return catalogName + ":" + source;
+    }
+
+    public List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan)
+    {
+        List<ConnectorSplit> connectorSplits = new ArrayList<>();
+        for (Split split : pendingSplits) {
+            connectorSplits.add(split.getConnectorSplit());
+        }
+        List<ConnectorSplit> connectorSplits1 = source.groupSmallSplits(connectorSplits);
+        ImmutableList.Builder<Split> result = ImmutableList.builder();
+        for (ConnectorSplit connectorSplit : connectorSplits1) {
+            result.add(new Split(catalogName, connectorSplit, lifespan));
+        }
+        return result.build();
     }
 }

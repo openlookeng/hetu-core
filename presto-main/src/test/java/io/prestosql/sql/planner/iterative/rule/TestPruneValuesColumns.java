@@ -15,13 +15,16 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import org.testng.annotations.Test;
 
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestPruneValuesColumns
@@ -33,12 +36,11 @@ public class TestPruneValuesColumns
         tester().assertThat(new PruneValuesColumns())
                 .on(p ->
                         p.project(
-                                Assignments.of(p.symbol("y"), expression("x")),
+                                Assignments.of(p.symbol("y"), OriginalExpressionUtils.castToRowExpression(expression("x"))),
                                 p.values(
                                         ImmutableList.of(p.symbol("unused"), p.symbol("x")),
-                                        ImmutableList.of(
-                                                ImmutableList.of(expression("1"), expression("2")),
-                                                ImmutableList.of(expression("3"), expression("4"))))))
+                                        ImmutableList.of(constantExpressions(BIGINT, 1L, 2L),
+                                                constantExpressions(BIGINT, 3L, 4L)))))
                 .matches(
                         project(
                                 ImmutableMap.of("y", PlanMatchPattern.expression("x")),
@@ -55,7 +57,7 @@ public class TestPruneValuesColumns
         tester().assertThat(new PruneValuesColumns())
                 .on(p ->
                         p.project(
-                                Assignments.of(p.symbol("y"), expression("x")),
+                                Assignments.of(p.symbol("y"), OriginalExpressionUtils.castToRowExpression(expression("x"))),
                                 p.values(p.symbol("x"))))
                 .doesNotFire();
     }

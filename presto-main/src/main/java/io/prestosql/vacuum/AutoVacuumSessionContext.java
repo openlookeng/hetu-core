@@ -16,8 +16,8 @@ package io.prestosql.vacuum;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.server.SessionContext;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.session.ResourceEstimates;
 import io.prestosql.transaction.TransactionId;

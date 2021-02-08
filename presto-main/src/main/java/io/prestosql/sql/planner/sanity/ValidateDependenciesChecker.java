@@ -18,58 +18,59 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.ExceptNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.SetOperationNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
-import io.prestosql.sql.planner.plan.ExceptNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.IntersectNode;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OffsetNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.planner.plan.SetOperationNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
-import io.prestosql.sql.tree.Expression;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.planner.optimizations.IndexJoinOptimizer.IndexKeyTracer;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 
 /**
  * Ensures that all dependencies (i.e., symbols in expressions) for a plan node are provided by its source nodes
@@ -99,10 +102,10 @@ public final class ValidateDependenciesChecker
     }
 
     private static class Visitor
-            extends PlanVisitor<Void, Set<Symbol>>
+            extends InternalPlanVisitor<Void, Set<Symbol>>
     {
         @Override
-        protected Void visitPlan(PlanNode node, Set<Symbol> boundSymbols)
+        public Void visitPlan(PlanNode node, Set<Symbol> boundSymbols)
         {
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }
@@ -201,7 +204,7 @@ public final class ValidateDependenciesChecker
         }
 
         @Override
-        public Void visitTopNRowNumber(TopNRowNumberNode node, Set<Symbol> boundSymbols)
+        public Void visitTopNRankingNumber(TopNRankingNumberNode node, Set<Symbol> boundSymbols)
         {
             PlanNode source = node.getSource();
             source.accept(this, boundSymbols); // visit child
@@ -237,7 +240,18 @@ public final class ValidateDependenciesChecker
             Set<Symbol> inputs = createInputs(source, boundSymbols);
             checkDependencies(inputs, node.getOutputSymbols(), "Invalid node. Output symbols (%s) not in source plan output (%s)", node.getOutputSymbols(), node.getSource().getOutputSymbols());
 
-            Set<Symbol> dependencies = SymbolsExtractor.extractUnique(node.getPredicate());
+            Set<Symbol> dependencies;
+            if (isExpression(node.getPredicate())) {
+                dependencies = SymbolsExtractor.extractUnique(castToExpression(node.getPredicate()));
+            }
+            else {
+                Map<Integer, Symbol> layout = new HashMap<>();
+                int channel = 0;
+                for (Symbol symbol : node.getSource().getOutputSymbols()) {
+                    layout.put(channel++, symbol);
+                }
+                dependencies = SymbolsExtractor.extractUnique(node.getPredicate(), layout);
+            }
             checkDependencies(inputs, dependencies, "Invalid node. Predicate dependencies (%s) not in source plan output (%s)", dependencies, node.getSource().getOutputSymbols());
 
             return null;
@@ -259,8 +273,14 @@ public final class ValidateDependenciesChecker
             source.accept(this, boundSymbols); // visit child
 
             Set<Symbol> inputs = createInputs(source, boundSymbols);
-            for (Expression expression : node.getAssignments().getExpressions()) {
-                Set<Symbol> dependencies = SymbolsExtractor.extractUnique(expression);
+            for (RowExpression expression : node.getAssignments().getExpressions()) {
+                Set<Symbol> dependencies;
+                if (isExpression(expression)) {
+                    dependencies = SymbolsExtractor.extractUnique(castToExpression(expression));
+                }
+                else {
+                    dependencies = SymbolsExtractor.extractUnique(expression);
+                }
                 checkDependencies(inputs, dependencies, "Invalid node. Expression dependencies (%s) not in source plan output (%s)", dependencies, inputs);
             }
 
@@ -361,7 +381,13 @@ public final class ValidateDependenciesChecker
             }
 
             node.getFilter().ifPresent(predicate -> {
-                Set<Symbol> predicateSymbols = SymbolsExtractor.extractUnique(predicate);
+                Set<Symbol> predicateSymbols;
+                if (isExpression(predicate)) {
+                    predicateSymbols = SymbolsExtractor.extractUnique(castToExpression(predicate));
+                }
+                else {
+                    predicateSymbols = SymbolsExtractor.extractUnique(predicate);
+                }
                 checkArgument(
                         allInputs.containsAll(predicateSymbols),
                         "Symbol from filter (%s) not in sources (%s)",
@@ -643,8 +669,14 @@ public final class ValidateDependenciesChecker
                     .addAll(createInputs(node.getInput(), boundSymbols))
                     .build();
 
-            for (Expression expression : node.getSubqueryAssignments().getExpressions()) {
-                Set<Symbol> dependencies = SymbolsExtractor.extractUnique(expression);
+            for (RowExpression expression : node.getSubqueryAssignments().getExpressions()) {
+                Set<Symbol> dependencies;
+                if (isExpression(expression)) {
+                    dependencies = SymbolsExtractor.extractUnique(castToExpression(expression));
+                }
+                else {
+                    dependencies = SymbolsExtractor.extractUnique(expression);
+                }
                 checkDependencies(inputs, dependencies, "Invalid node. Expression dependencies (%s) not in source plan output (%s)", dependencies, inputs);
             }
 

@@ -15,44 +15,64 @@
 package io.prestosql.spi.heuristicindex;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class IndexRecord
 {
     public static final String COLUMN_DELIMITER = ",";
+    public static final String INPROGRESS_PROPERTY_KEY = "CreationInProgress";
+
     public final String name;
     public final String user;
     public final String table;
     public final String[] columns;
     public final String indexType;
+    public final List<String> properties;
     public final List<String> partitions;
+    public final long lastModifiedTime;
 
-    public IndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> partitions)
+    public IndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> properties, List<String> partitions)
     {
         this.name = name;
         this.user = user == null ? "" : user;
         this.table = table;
         this.columns = columns;
-        this.indexType = indexType;
+        this.indexType = indexType.toUpperCase(Locale.ENGLISH);
+        this.properties = properties;
         this.partitions = partitions;
+        this.lastModifiedTime = System.currentTimeMillis();
     }
 
     public IndexRecord(String csvRecord)
     {
-        String[] records = csvRecord.split("\\t");
+        String[] records = csvRecord.split("\\|", Integer.MAX_VALUE);
         this.name = records[0];
         this.user = records[1];
         this.table = records[2];
         this.columns = records[3].split(COLUMN_DELIMITER);
         this.indexType = records[4];
-        this.partitions = records.length > 5 ? Arrays.asList(records[5].split(",")) : Collections.emptyList();
+        this.properties = Arrays.stream(records[5].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
+        this.partitions = Arrays.stream(records[6].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
+        this.lastModifiedTime = Long.parseLong(records[7]);
+    }
+
+    public static String getHeader()
+    {
+        return String.format("%s|%s|%s|%s|%s|%s|%s|%s\n", "name", "user", "table", "columns", "indexType", "properties", "partitions", "lastModifiedTime");
     }
 
     public String toCsvRecord()
     {
-        return String.format("%s\t%s\t%s\t%s\t%s\t%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType, String.join(",", partitions));
+        return String.format("%s|%s|%s|%s|%s|%s|%s|%s\n", name, user, table, String.join(COLUMN_DELIMITER, columns), indexType,
+                String.join(",", properties), String.join(",", partitions), lastModifiedTime);
+    }
+
+    public boolean isInProgressRecord()
+    {
+        return this.properties.stream().anyMatch(property -> property.startsWith(INPROGRESS_PROPERTY_KEY));
     }
 
     @Override
@@ -75,7 +95,7 @@ public class IndexRecord
     @Override
     public int hashCode()
     {
-        int result = Objects.hash(name, user, table, indexType);
+        int result = Objects.hash(name, user, table, columns, indexType);
         result = 31 * result + Arrays.hashCode(columns);
         return result;
     }
@@ -83,10 +103,12 @@ public class IndexRecord
     @Override
     public String toString()
     {
-        return name + ","
-                + user + ","
-                + table + ","
-                + "[" + String.join(",", columns) + "],"
-                + indexType;
+        return "IndexRecord{" +
+                "name='" + name + '\'' +
+                ", table='" + table + '\'' +
+                ", columns=" + Arrays.toString(columns) +
+                ", indexType='" + indexType + '\'' +
+                ", lastModifiedTime=" + lastModifiedTime +
+                '}';
     }
 }

@@ -31,6 +31,7 @@ package io.hetu.core.plugin.datacenter;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.hetu.core.statestore.StateStoreManagerPlugin;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchPlugin;
 import io.prestosql.server.testing.TestingPrestoServer;
@@ -52,7 +53,7 @@ import static java.lang.String.format;
 public class TestCrossRegionDynamicFilter
 {
     private static final Logger LOGGER = Logger.get(TestCrossRegionDynamicFilter.class);
-
+    private static final String OPTIMIZE_DYNAMIC_FILTER_GENERATION = "optimize_dynamic_filter_generation";
     private final TestingPrestoServer remoteServer;
     private final DistributedQueryRunner queryRunner;
     private final Session enabledSession;
@@ -62,19 +63,21 @@ public class TestCrossRegionDynamicFilter
             throws Exception
     {
         this.remoteServer = new TestingPrestoServer(ImmutableMap.<String, String>builder().put("node-scheduler.include-coordinator", "true")
+                .put("hetu.embedded-state-store.enabled", "true")
                 .put("hetu.data.center.split.count", "1").build());
         this.queryRunner = createDCQueryRunner(remoteServer, ImmutableMap.of());
         this.enabledSession = testSessionBuilder()
                 .setCatalog("tpch")
                 .setSchema("tiny")
                 .setSystemProperty("enable_dynamic_filtering", "true")
-                .setSystemProperty("cross-region-dynamic-filter-enabled", "true")
+                .setSystemProperty("cross_region_dynamic_filter_enabled", "true")
+                .setSystemProperty(OPTIMIZE_DYNAMIC_FILTER_GENERATION, "false")
                 .build();
         this.disabledSession = testSessionBuilder()
                 .setCatalog("tpch")
                 .setSchema("tiny")
                 .setSystemProperty("enable_dynamic_filtering", "false")
-                .setSystemProperty("cross-region-dynamic-filter-enabled", "false")
+                .setSystemProperty("cross_region_dynamic_filter_enabled", "false")
                 .build();
     }
 
@@ -95,11 +98,11 @@ public class TestCrossRegionDynamicFilter
     @Test
     public void testDistinctJoin()
     {
-        assertQuery("SELECT COUNT(DISTINCT CAST(b.quantity AS BIGINT)), a.orderstatus " +
-                "FROM orders a " +
-                "JOIN dc.tpch.tiny.lineitem b " +
-                "ON a.orderkey = b.orderkey " +
-                "GROUP BY a.orderstatus");
+        assertQuery("SELECT a.orderstatus " +
+                "FROM dc.tpch.tiny.orders a " +
+                "JOIN customer b " +
+                "ON a.custkey = b.custkey " +
+                "where b.name='Customer#00001234' GROUP BY a.orderstatus");
     }
 
     @Test
@@ -362,7 +365,6 @@ public class TestCrossRegionDynamicFilter
         assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND NOT (orders.comment LIKE '%forges%')");
         assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND NOT (orders.comment LIKE dc.tpch.tiny.lineitem.comment)");
         assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND dc.tpch.tiny.lineitem.quantity + length(orders.comment) > 7");
-        assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND NULL");
     }
 
     @Test
@@ -1366,7 +1368,11 @@ public class TestCrossRegionDynamicFilter
 
     private void assertQuery(String sql)
     {
-        long disabledTime = System.currentTimeMillis();
+        long disabledTime = 0;
+        this.queryRunner.executeWithQueryId(disabledSession, sql);
+        this.queryRunner.executeWithQueryId(disabledSession, sql);
+
+        disabledTime = System.currentTimeMillis();
         ResultWithQueryId<MaterializedResult> expected = this.queryRunner.executeWithQueryId(disabledSession, sql);
         disabledTime = System.currentTimeMillis() - disabledTime;
 
@@ -1383,6 +1389,8 @@ public class TestCrossRegionDynamicFilter
     {
         hetuServer.installPlugin(new TpchPlugin());
         hetuServer.createCatalog("tpch", "tpch");
+        hetuServer.installPlugin(new StateStoreManagerPlugin());
+        hetuServer.loadStateSotre();
 
         DistributedQueryRunner queryRunner = null;
         try {

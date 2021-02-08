@@ -16,13 +16,15 @@ package io.prestosql.sql.planner.iterative.rule.test;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.PlanNode;
 import org.testng.annotations.Test;
 
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
 
 public class TestRuleTester
 {
@@ -33,10 +35,10 @@ public class TestRuleTester
             tester.assertThat(new DummyReplaceNodeRule())
                     .on(p ->
                             p.project(
-                                    Assignments.of(p.symbol("y"), expression("x")),
+                                    Assignments.of(p.symbol("y"), new VariableReferenceExpression("x", BIGINT)),
                                     p.values(
                                             ImmutableList.of(p.symbol("x")),
-                                            ImmutableList.of(ImmutableList.of(expression("1"))))))
+                                            ImmutableList.of(constantExpressions(BIGINT, 1L)))))
                     .matches(
                             values(ImmutableList.of("different"), ImmutableList.of()));
         }

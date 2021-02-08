@@ -109,7 +109,7 @@ class MySavedQueries extends React.Component {
     return (
       <div className='row'>
         <div className="col-md-12 text-center">
-          No saved queries
+          No sample queries
         </div>
       </div>
     );

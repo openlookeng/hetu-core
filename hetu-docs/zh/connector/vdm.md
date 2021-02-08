@@ -18,7 +18,7 @@ VDM使用openLooKeng元存储存储其数据库信息。信息可以存储在HDF
 * 下面是使用RDBMS作为VDM元数据的示例，创建`etc/hetu-metastore.properties`：
 ```
 hetu.metastore.type=jdbc
-hetu.meatstore.db.url=jdbc:mysql://....
+hetu.metastore.db.url=jdbc:mysql://....
 hetu.metastore.db.user=root
 hetu.metastore.db.password=123456
 ```

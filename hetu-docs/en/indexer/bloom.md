@@ -1,22 +1,51 @@
 
 # Bloom Index
 
-## Use cases
+Bloom Index utilizes Bloom Filters and index size will be fairly small.
 
-Bloom Index is used for split filtering, and is used only by the **coordinator** nodes.
+## Filtering
 
-- If this index exists on a column which is part of a predicate in the query, openLooKeng may be able to improve performance by filtering scheduled splits.
+1. Bloom Index is used on coordinator for filtering splits during scheduling
+2. Bloom Index is used on workers for filtering Stripes when reading ORC files
 
-For example, if an index exists on column `id` and the query is:
+## Selecting column for Bloom Index
 
+Bloom Index works on columns that have high cardinality (i.e. unique values),
+such as an ID column.
+
+## Supported operators
+
+    =       Equality
+
+## Supported column types
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
+## Configurations
+
+### `bloom.fpp`
+ 
+> -   **Type:** `Double`
+> -   **Default value:** `0.001`
+> 
+> Changes the FPP (false positive probability) value of the Bloom filter.
+> Making this value smaller will increase the effectiveness of the index but
+> will also increase the index size. The default value should be sufficient
+> in most usecases. If the index is too large, this value can be increased
+> e.g. 0.05.
+
+## Examples
+
+Creating index:
 ```sql
-select * from table where id=12345
+create index idx using bloom on hive.hindex.users (id);
+create index idx using bloom on hive.hindex.users (id) where regionkey=1;
+create index idx using bloom on hive.hindex.users (id) where regionkey in (3, 1);
+create index idx using bloom on hive.hindex.users (id) WITH ("bloom.fpp" = '0.001');
 ```
 
+* assuming users table is partitioned on `regionkey`
 
-
-- Bloom index works best if the column's values are unique (e.g. userid) and are not too distributed.
-
-For example, assume the tables stores information about users and the table data is in 10 files.  For a given userid, only one file will contain the data. Therefore creating an index on userid will help us to filter out 9 out of the 10 files at scheduling time and will save significant IO time that would've  therwise been used to read each of the files.
-
-*Tip: if possible, it is recommended to sort the data on the column being indexed.*
+Using index:
+```sql
+select name from hive.hindex.users where id=123
+```

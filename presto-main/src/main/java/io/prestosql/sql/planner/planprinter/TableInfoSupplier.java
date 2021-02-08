@@ -18,7 +18,7 @@ import io.prestosql.execution.TableInfo;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.metadata.TableProperties;
-import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.spi.plan.TableScanNode;
 
 import java.util.function.Function;
 

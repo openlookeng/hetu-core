@@ -31,8 +31,8 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.split.SplitSource;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -277,7 +277,7 @@ public class FixedSourcePartitionedScheduler
         }
 
         @Override
-        public SplitPlacementResult computeAssignments(Set<Split> splits)
+        public SplitPlacementResult computeAssignments(Set<Split> splits, SqlStageExecution stage)
         {
             return nodeSelector.computeAssignments(splits, remoteTasks.get(), bucketNodeMap);
         }

@@ -22,7 +22,6 @@ import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.TableInfo;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.metadata.TableProperties;
 import io.prestosql.operator.StageExecutionDescriptor;
@@ -31,6 +30,23 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.service.PropertyService;
@@ -38,7 +54,6 @@ import io.prestosql.split.SampledSplitSource;
 import io.prestosql.split.SplitManager;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -46,17 +61,9 @@ import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
@@ -66,16 +73,11 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTarget;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.TopNRowNumberNode;
-import io.prestosql.sql.planner.plan.UnionNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.inject.Inject;
@@ -166,7 +168,7 @@ public class DistributedExecutionPlanner
     }
 
     private final class Visitor
-            extends PlanVisitor<Map<PlanNodeId, SplitSource>, Void>
+            extends InternalPlanVisitor<Map<PlanNodeId, SplitSource>, Void>
     {
         private final Session session;
         private final StageExecutionDescriptor stageExecutionDescriptor;
@@ -188,7 +190,8 @@ public class DistributedExecutionPlanner
         @Override
         public Map<PlanNodeId, SplitSource> visitTableScan(TableScanNode node, Void context)
         {
-            return visitScanAndFilter(node.getId(), node.getTable(), Optional.empty(), node.getAssignments(), Optional.empty(), Collections.emptyMap());
+            return visitScanAndFilter(node.getId(), node.getTable(), Optional.empty(), node.getAssignments(), Optional.empty(), Collections.emptyMap(),
+                    node.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
         }
 
         @Override
@@ -200,7 +203,7 @@ public class DistributedExecutionPlanner
                     "partition", node.getPartition(),
                     "vacuumHandle", connectorVacuumTableHandle);
             return visitScanAndFilter(node.getId(), node.getTable(), Optional.empty(), ImmutableMap.of(), Optional.of(QueryType.VACUUM),
-                    queryInfo);
+                    queryInfo, false);
         }
 
         private Map<PlanNodeId, SplitSource> visitScanAndFilter(PlanNodeId nodeId,
@@ -208,7 +211,8 @@ public class DistributedExecutionPlanner
                                                                 Optional<FilterNode> filter,
                                                                 Map<Symbol, ColumnHandle> assignments,
                                                                 Optional<QueryType> queryType,
-                                                                Map<String, Object> queryInfo)
+                                                                Map<String, Object> queryInfo,
+                                                                boolean partOfReuse)
         {
             List<DynamicFilters.Descriptor> dynamicFilters = filter
                     .map(FilterNode::getPredicate)
@@ -221,6 +225,7 @@ public class DistributedExecutionPlanner
                 dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(), dynamicFilters, assignments);
             }
 
+            //TODO: Find a better to wrap the Cache Predicates
             //How would this change when we add support to cache  small tables entirely without the need to provide predicates
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates = ImmutableSet.of();
             Optional<String> fqTableName;
@@ -245,7 +250,8 @@ public class DistributedExecutionPlanner
                     dynamicFilterSupplier,
                     queryType,
                     queryInfo,
-                    userDefinedCachePredicates);
+                    userDefinedCachePredicates,
+                    partOfReuse);
 
             splitSources.add(splitSource);
 
@@ -310,7 +316,8 @@ public class DistributedExecutionPlanner
         {
             if (node.getSource() instanceof TableScanNode) {
                 TableScanNode scan = (TableScanNode) node.getSource();
-                return visitScanAndFilter(scan.getId(), scan.getTable(), Optional.of(node), scan.getAssignments(), Optional.empty(), Collections.emptyMap());
+                return visitScanAndFilter(scan.getId(), scan.getTable(), Optional.of(node), scan.getAssignments(), Optional.empty(), Collections.emptyMap(),
+                        scan.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
             }
 
             return node.getSource().accept(this, context);
@@ -369,7 +376,7 @@ public class DistributedExecutionPlanner
         }
 
         @Override
-        public Map<PlanNodeId, SplitSource> visitTopNRowNumber(TopNRowNumberNode node, Void context)
+        public Map<PlanNodeId, SplitSource> visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             return node.getSource().accept(this, context);
         }
@@ -488,7 +495,7 @@ public class DistributedExecutionPlanner
         }
 
         @Override
-        protected Map<PlanNodeId, SplitSource> visitPlan(PlanNode node, Void context)
+        public Map<PlanNodeId, SplitSource> visitPlan(PlanNode node, Void context)
         {
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }

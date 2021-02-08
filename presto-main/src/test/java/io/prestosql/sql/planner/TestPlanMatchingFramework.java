@@ -15,11 +15,17 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.Session;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import org.testng.annotations.Test;
 
+import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.columnReference;
@@ -35,7 +41,6 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictTableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static org.testng.Assert.fail;
 
 public class TestPlanMatchingFramework
@@ -141,6 +146,7 @@ public class TestPlanMatchingFramework
     public void testJoinMatcher()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 anyTree(
@@ -241,6 +247,7 @@ public class TestPlanMatchingFramework
     public void testDuplicateAliases()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 anyTree(
@@ -256,5 +263,13 @@ public class TestPlanMatchingFramework
                 output(ImmutableList.of("ORDERKEY"),
                         project(ImmutableMap.of("EXPRESSION", expression("CAST(1 AS bigint) + ORDERKEY")),
                                 tableScan("lineitem", ImmutableMap.of("ORDERKEY", "orderkey")))));
+    }
+
+    private Session noJoinReordering()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
+                .build();
     }
 }

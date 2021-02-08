@@ -10,7 +10,7 @@
 
     <groupId>io.hetu.core</groupId>
     <artifactId>presto-root</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -78,6 +78,7 @@
         <module>presto-array</module>
         <module>presto-jmx</module>
         <module>presto-record-decoder</module>
+        <module>presto-expressions</module>
         <module>presto-kafka</module>
         <module>presto-memory</module>
         <module>presto-orc</module>
@@ -132,7 +133,9 @@
         <module>hetu-seed-store</module>
         <module>hetu-state-store</module>
         <module>hetu-hbase</module>
+        <module>hetu-mongodb</module>
         <module>hetu-carbondata</module>
+        <module>hetu-opengauss</module>
         <module>hetu-filesystem-client</module>
         <module>hetu-metastore</module>
         <module>hetu-sql-migration-tool</module>
@@ -187,6 +190,12 @@
                 <artifactId>presto-spi</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>presto-expressions</artifactId>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>

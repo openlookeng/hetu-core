@@ -65,6 +65,7 @@ Hive连接器对这些服务的访问是在属性文件中配置的，该文件�
 | 属性名称| 说明|
 |:----------|:----------|
 | `hive.metastore.authentication.type`| Hive元存储身份验证类型。|
+| `hive.metastore.thrift.impersonation.enabled`| 启用Hive元存储用户模拟。|
 | `hive.metastore.service.principal`| Hive元存储服务的Kerberos主体。|
 | `hive.metastore.client.principal`| openLooKeng在连接到Hive元存储服务时将使用的Kerberos主体。|
 | `hive.metastore.client.keytab`| Hive元存储客户端keytab位置。|
@@ -121,6 +122,7 @@ Hive元存储默认的身份验证类型为`NONE`。当身份验证类型为`NON
 
 ``` properties
 hive.metastore.authentication.type=KERBEROS
+hive.metastore.thrift.impersonation.enabled=true
 hive.metastore.service.principal=hive/hive-metastore-host.example.com@EXAMPLE.COM
 hive.metastore.client.principal=openlk@EXAMPLE.COM
 hive.metastore.client.keytab=/etc/openlookeng/hive.keytab
@@ -238,7 +240,11 @@ Keytab文件需要分发到集群中每一个运行openLooKeng的节点。
 
 ### 模拟访问Hive元存储
 
-openLooKeng目前不支持在访问Hive元存储时模拟终端用户。
+openLookeng支持在访问Hive元存储时模拟最终用户,可以使用以下配置启用元存储模拟
+
+    hive.metastore.thrift.impersonation.enabled=true
+
+当用户模拟时使用`KERBEROS`元存储身份验证时，通过配置`hive.metastore.client.principal`属性指定的主体必须允许当前的openLooKeng用户来模拟，如[在Hadoop中模拟]（# 在Hadoop中模拟）章节所述。
 
 ### 在Hadoop中模拟
 

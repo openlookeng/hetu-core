@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.plugin.hive.TestHiveUtil.nonDefaultTimeZone;
 
@@ -91,13 +92,13 @@ public class TestHiveConfig
                 .setOrcMaxMergeDistance(new DataSize(1, Unit.MEGABYTE))
                 .setOrcMaxBufferSize(new DataSize(8, Unit.MEGABYTE))
                 .setOrcStreamBufferSize(new DataSize(8, Unit.MEGABYTE))
-                .setOrcTinyStripeThreshold(new DataSize(8, Unit.MEGABYTE))
+                .setOrcTinyStripeThreshold(new DataSize(1, Unit.BYTE))
                 .setOrcMaxReadBlockSize(new DataSize(16, Unit.MEGABYTE))
-                .setOrcFileTailCacheEnabled(false).setOrcFileTailCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcFileTailCacheLimit(10_000)
-                .setOrcStripeFooterCacheEnabled(false).setOrcStripeFooterCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcStripeFooterCacheLimit(25_000)
-                .setOrcRowIndexCacheEnabled(false).setOrcRowIndexCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcRowIndexCacheLimit(50_000)
-                .setOrcBloomFiltersCacheEnabled(false).setOrcBloomFiltersCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcBloomFiltersCacheLimit(50_000)
-                .setOrcRowDataCacheEnabled(false).setOrcRowDataCacheTtl(new Duration(30, TimeUnit.MINUTES)).setOrcRowDataCacheMaximumWeight(new DataSize(500, MEGABYTE))
+                .setOrcFileTailCacheEnabled(false).setOrcFileTailCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcFileTailCacheLimit(50_000)
+                .setOrcStripeFooterCacheEnabled(false).setOrcStripeFooterCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcStripeFooterCacheLimit(250_000)
+                .setOrcRowIndexCacheEnabled(false).setOrcRowIndexCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcRowIndexCacheLimit(250_000)
+                .setOrcBloomFiltersCacheEnabled(false).setOrcBloomFiltersCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcBloomFiltersCacheLimit(250_000)
+                .setOrcRowDataCacheEnabled(false).setOrcRowDataCacheTtl(new Duration(4, TimeUnit.HOURS)).setOrcRowDataCacheMaximumWeight(new DataSize(20, GIGABYTE))
                 .setOrcLazyReadSmallRanges(true)
                 .setRcfileWriterValidate(false)
                 .setOrcWriteLegacyVersion(false)
@@ -125,14 +126,14 @@ public class TestHiveConfig
                 .setS3SelectPushdownMaxConnections(500)
                 .setTemporaryStagingDirectoryEnabled(true)
                 .setTemporaryStagingDirectoryPath("/tmp/presto-${USER}")
-                .setFileStatusCacheExpireAfterWrite(new Duration(1, TimeUnit.MINUTES))
+                .setFileStatusCacheExpireAfterWrite(new Duration(24, TimeUnit.HOURS))
                 .setFileStatusCacheMaxSize(1000 * 1000)
                 .setFileStatusCacheTables("")
                 .setHiveTransactionHeartbeatInterval(null)
                 .setHiveTransactionHeartbeatThreads(5)
                 .setTableCreatesWithLocationAllowed(true)
                 .setTlsEnabled(false)
-                .setDynamicFilterPartitionFilteringEnabled(false)
+                .setDynamicFilterPartitionFilteringEnabled(true)
                 .setDynamicFilteringRowFilteringThreshold(2000)
                 .setOrcCacheStatsMetricCollectionEnabled(false)
                 .setVacuumCleanupRecheckInterval(new Duration(5, TimeUnit.MINUTES))
@@ -141,7 +142,8 @@ public class TestHiveConfig
                 .setAutoVacuumEnabled(false)
                 .setVacuumDeltaPercentThreshold(0.1)
                 .setOrcPredicatePushdownEnabled(false)
-                .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES)));
+                .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES))
+                .setMaxSplitsToGroup(1));
     }
 
     @Test
@@ -171,7 +173,7 @@ public class TestHiveConfig
                 .put("hive.dfs.connect.max-retries", "10")
                 .put("hive.dfs.verify-checksum", "false")
                 .put("hive.dfs.domain-socket-path", "/foo")
-                .put("hive.dynamic-filter-partition-filtering", "true")
+                .put("hive.dynamic-filter-partition-filtering", "false")
                 .put("hive.dynamic-filtering-row-filtering-threshold", "10000")
                 .put("hive.s3-file-system-type", "EMRFS")
                 .put("hive.config.resources", "/foo.xml,/bar.xml")
@@ -263,6 +265,7 @@ public class TestHiveConfig
                 .put("hive.auto-vacuum-enabled", "true")
                 .put("hive.orc-predicate-pushdown-enabled", "true")
                 .put("hive.vacuum-collector-interval", "5s")
+                .put("hive.max-splits-to-group", "20")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -361,7 +364,7 @@ public class TestHiveConfig
                 .setHiveTransactionHeartbeatThreads(10)
                 .setTableCreatesWithLocationAllowed(false)
                 .setTlsEnabled(true)
-                .setDynamicFilterPartitionFilteringEnabled(true)
+                .setDynamicFilterPartitionFilteringEnabled(false)
                 .setDynamicFilteringRowFilteringThreshold(10000)
                 .setOrcCacheStatsMetricCollectionEnabled(true)
                 .setVacuumCleanupRecheckInterval(new Duration(10, TimeUnit.MINUTES))
@@ -370,7 +373,8 @@ public class TestHiveConfig
                 .setAutoVacuumEnabled(true)
                 .setVacuumDeltaPercentThreshold(0.6)
                 .setOrcPredicatePushdownEnabled(true)
-                .setVacuumCollectorInterval(new Duration(5, TimeUnit.SECONDS));
+                .setVacuumCollectorInterval(new Duration(5, TimeUnit.SECONDS))
+                .setMaxSplitsToGroup(20);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

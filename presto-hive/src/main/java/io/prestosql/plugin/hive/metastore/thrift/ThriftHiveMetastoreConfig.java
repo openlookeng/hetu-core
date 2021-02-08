@@ -32,6 +32,7 @@ public class ThriftHiveMetastoreConfig
     private Duration maxRetryTime = RetryDriver.DEFAULT_MAX_RETRY_TIME;
     private Duration maxWaitForTransactionLock = new Duration(10, TimeUnit.MINUTES);
     private boolean isRoleNameCaseSensitive;
+    private boolean impersonationEnabled;
 
     @Min(0)
     public int getMaxRetries()
@@ -124,5 +125,18 @@ public class ThriftHiveMetastoreConfig
     public boolean isRoleNameCaseSensitive()
     {
         return isRoleNameCaseSensitive;
+    }
+
+    public boolean isImpersonationEnabled()
+    {
+        return impersonationEnabled;
+    }
+
+    @Config("hive.metastore.thrift.impersonation.enabled")
+    @ConfigDescription("Should end user be impersonated when communicating with metastore")
+    public ThriftHiveMetastoreConfig setImpersonationEnabled(boolean impersonationEnabled)
+    {
+        this.impersonationEnabled = impersonationEnabled;
+        return this;
     }
 }

@@ -20,11 +20,11 @@ import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SignatureBuilder;
 import io.prestosql.spi.function.TypeVariableConstraint;
 import io.prestosql.spi.type.DecimalType;
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
-import io.prestosql.type.FunctionType;
 import org.testng.annotations.Test;
 
 import java.util.List;

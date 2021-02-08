@@ -13,15 +13,16 @@
  */
 package io.prestosql.cost;
 
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestSimpleFilterProjectSemiJoinStatsRule
@@ -81,13 +82,14 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
             Symbol c = pb.symbol("c", BIGINT);
             Symbol semiJoinOutput = pb.symbol("sjo", BOOLEAN);
             return pb.filter(
-                    semiJoinOutput.toSymbolReference(),
+                    toSymbolReference(semiJoinOutput),
                     pb.semiJoin(
                             pb.values(LEFT_SOURCE_ID, a, b),
                             pb.values(RIGHT_SOURCE_ID, c),
                             a,
                             c,
                             semiJoinOutput,
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty()));
@@ -120,13 +122,14 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
             Symbol semiJoinOutput = pb.symbol("sjo", BOOLEAN);
             return pb.filter(
                     expression("sjo"),
-                    pb.project(Assignments.identity(semiJoinOutput, a),
+                    pb.project(AssignmentUtils.identityAsSymbolReferences(semiJoinOutput, a),
                             pb.semiJoin(
                                     pb.values(LEFT_SOURCE_ID, a, b),
                                     pb.values(RIGHT_SOURCE_ID, c),
                                     a,
                                     c,
                                     semiJoinOutput,
+                                    Optional.empty(),
                                     Optional.empty(),
                                     Optional.empty(),
                                     Optional.empty())));
@@ -167,6 +170,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
                             semiJoinOutput,
                             Optional.empty(),
                             Optional.empty(),
+                            Optional.empty(),
                             Optional.empty()));
         })
                 .withSourceStats(LEFT_SOURCE_ID, PlanNodeStatsEstimate.builder()
@@ -203,6 +207,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
                             a,
                             c,
                             semiJoinOutput,
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty()));

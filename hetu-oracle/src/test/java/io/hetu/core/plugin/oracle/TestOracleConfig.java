@@ -43,17 +43,18 @@ public class TestOracleConfig
     @Test
     public void testOraclePropertyMappings()
     {
-        Map<String, String> properties = new ImmutableMap.Builder<String, String>().put(
-                "hetu.query.pushdown.enabled", "false")
+        Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("oracle.number.default-scale", "2")
                 .put("oracle.number.rounding-mode", "DOWN")
                 .put("unsupported-type.handling-strategy", "CONVERT_TO_VARCHAR")
+                .put("oracle.synonyms.enabled", "true")
                 .build();
 
-        OracleConfig expected = new OracleConfig().setQueryPushDownEnabled(false)
+        OracleConfig expected = new OracleConfig()
                 .setNumberDefaultScale(NUMBER_DEFAULT_SCALE)
                 .setRoundingMode(RoundingMode.DOWN)
-                .setUnsupportedTypeHandling(UnsupportedTypeHandling.CONVERT_TO_VARCHAR);
+                .setUnsupportedTypeHandling(UnsupportedTypeHandling.CONVERT_TO_VARCHAR)
+                .setSynonymsEnabled(true);
 
         assertFullMapping(properties, expected);
     }

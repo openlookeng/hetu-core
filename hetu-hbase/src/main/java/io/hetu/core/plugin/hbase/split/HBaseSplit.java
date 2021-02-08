@@ -20,7 +20,6 @@ import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.predicate.Range;
-import org.apache.hadoop.hbase.HRegionInfo;
 
 import java.util.List;
 import java.util.Map;
@@ -43,8 +42,6 @@ public class HBaseSplit
 
     private final Map<Integer, List<Range>> ranges;
 
-    private final HRegionInfo regionInfo;
-
     private final HBaseTableHandle tableHandle;
 
     private final boolean randomSplit;
@@ -58,7 +55,6 @@ public class HBaseSplit
      * @param startRow startRow
      * @param endRow endRow
      * @param ranges search ranges
-     * @param regionInfo regionInfo
      * @param randomSplit randomSplit
      */
     @JsonCreator
@@ -69,7 +65,6 @@ public class HBaseSplit
             @JsonProperty("startRow") String startRow,
             @JsonProperty("endRow") String endRow,
             @JsonProperty("ranges") Map<Integer, List<Range>> ranges,
-            @JsonProperty("regionInfo") HRegionInfo regionInfo,
             @JsonProperty("randomSplit") boolean randomSplit)
     {
         this.rowKeyName = rowKeyName;
@@ -78,7 +73,6 @@ public class HBaseSplit
         this.startRow = startRow;
         this.endRow = endRow;
         this.ranges = ranges;
-        this.regionInfo = regionInfo;
         this.randomSplit = randomSplit;
     }
 
@@ -125,12 +119,6 @@ public class HBaseSplit
     }
 
     @JsonProperty
-    public HRegionInfo getRegionInfo()
-    {
-        return regionInfo;
-    }
-
-    @JsonProperty
     public HBaseTableHandle getTableHandle()
     {
         return tableHandle;
@@ -140,5 +128,18 @@ public class HBaseSplit
     public boolean isRandomSplit()
     {
         return randomSplit;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "HBaseSplit{" +
+                "addresses='" + addresses + '\'' +
+                ", rowKeyName='" + rowKeyName + '\'' +
+                ", startRow='" + startRow + '\'' +
+                ", endRow='" + endRow + '\'' +
+                ", ranges='" + ranges + '\'' +
+                ", randomSplit='" + randomSplit + '\'' +
+                '}';
     }
 }

@@ -15,6 +15,7 @@ package io.prestosql.queryeditorui.resources;
 
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
+import io.prestosql.queryeditorui.QueryEditorConfig;
 import io.prestosql.queryeditorui.execution.ExecutionClient;
 import io.prestosql.queryeditorui.protocol.ExecutionRequest;
 import io.prestosql.queryeditorui.protocol.ExecutionStatus.ExecutionError;
@@ -42,10 +43,12 @@ import java.util.stream.Collectors;
 public class UIExecuteResource
 {
     private ExecutionClient client;
+    private QueryEditorConfig config;
 
     @Inject
-    public UIExecuteResource(ExecutionClient client)
+    public UIExecuteResource(QueryEditorConfig config, ExecutionClient client)
     {
+        this.config = config;
         this.client = client;
     }
 
@@ -62,7 +65,7 @@ public class UIExecuteResource
             final List<UUID> uuids = client.runQuery(
                     request,
                     user,
-                    Duration.standardMinutes(15),
+                    Duration.millis(config.getExecutionTimeout().toMillis()),
                     servletRequest);
 
             List<ExecutionSuccess> successList = uuids.stream().map(ExecutionSuccess::new).collect(Collectors.toList());

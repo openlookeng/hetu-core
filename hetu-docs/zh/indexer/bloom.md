@@ -1,20 +1,48 @@
 
 # Bloom索引
 
+Bloom索引实用布隆过滤器来过滤数据。索引体积非常小。
+
+## 过滤
+
+1. Bloom索引用于调度时的分片过滤，被coordinator节点使用。
+2. Bloom索引也用于worker节点上，用于在读取ORC文件是过滤stripes。
+
+## 选择适用的列
+
+位图索引在拥有较多不同值数量的列上比较适用，例如：ID。
+
+## 支持的运算符
+
+    =       Equality
+
+## 支持的列类型
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+
+## 配置参数
+
+### `bloom.fpp`
+ 
+> -   **类型:** `Double`
+> -   **默认值:** `0.001`
+> 
+> 改变布隆过滤器的FPP (false positive probability)。
+> 更小的FPP会提高索引的过滤能力，但是会增加索引的体积。在大多数情况下默认值就足以够用。
+> 如果创建的索引太大，可以考虑增加这个值（例如，至0.05)。
+
 ## 用例
 
-Bloom索引用于分片过滤，且仅被**coordinator**节点使用。
-
-- 如果查询中作为谓词一部分的列存在此索引，openLooKeng可以通过筛选预定Splits来提高查询性能。
-
-例如，如果列`id`包含此索引，并且查询语句如下：
-
+创建索引:
 ```sql
-select * from table where id=12345
+create index idx using bloom on hive.hindex.users (id);
+create index idx using bloom on hive.hindex.users (id) where regionkey=1;
+create index idx using bloom on hive.hindex.users (id) where regionkey in (3, 1);
+create index idx using bloom on hive.hindex.users (id) WITH ("bloom.fpp" = '0.001');
 ```
 
-- 如果列的值是唯一的（例如userid）并且不太分散，则Bloom索引最有效。
+* 假设表已按照`regionkey`列分区
 
-例如，假设表中存储了用户信息，且表数据存在于10个文件中。  对于给定的用户ID，只有一个文件包含该数据。因此，对用户ID创建索引将帮助我们在调度时间内过滤掉10个文件中的9个文件，并节省大量用于读取每个文件的IO时间。
-  
-*提示：如果可能，建议对索引列中的数据进行排序*。
+使用:
+```sql
+select name from hive.hindex.users where id=123
+```

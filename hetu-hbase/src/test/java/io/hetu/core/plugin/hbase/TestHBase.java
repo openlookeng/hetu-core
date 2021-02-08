@@ -62,6 +62,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import static io.prestosql.spi.connector.ConnectorPageSink.NOT_BLOCKED;
 import static java.lang.String.format;
@@ -138,6 +139,7 @@ public class TestHBase
         HBaseErrorCode.ZOOKEEPER_ERROR.toErrorCode();
         HBaseErrorCode.IO_ERROR.toErrorCode();
         HBaseErrorCode.MINI_HBASE.toErrorCode();
+        HBaseErrorCode.HBASE_CREATE_ERROR.toErrorCode();
     }
 
     /**
@@ -378,7 +380,7 @@ public class TestHBase
         Map<Integer, List<Range>> ranges = new HashMap<>();
         HBaseSplit split =
                 new HBaseSplit(
-                        "rowkey", TestUtils.createHBaseTableHandle(), hostAddressList, null, null, ranges, null, true);
+                        "rowkey", TestUtils.createHBaseTableHandle(), hostAddressList, null, null, ranges, false);
 
         HBaseRecordSetProvider hrsp = new HBaseRecordSetProvider(hconn);
         RecordSet rs =
@@ -405,7 +407,8 @@ public class TestHBase
                         0,
                         hconn.getTable("hbase.test_table").getColumns(),
                         hconn.getTable("hbase.test_table").getSerializerClassName(),
-                        Optional.of("test_table"));
+                        Optional.of("test_table"),
+                        OptionalLong.empty());
         if (insertHandler instanceof ConnectorInsertTableHandle) {
             ConnectorPageSink cps =
                     hpsp.createPageSink(

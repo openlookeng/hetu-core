@@ -52,6 +52,7 @@ import io.prestosql.plugin.hive.LocationService;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.PartitionUpdate;
 import io.prestosql.plugin.hive.TypeTranslator;
+import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.MetastoreUtil;
@@ -336,7 +337,7 @@ public class CarbondataMetadata
         return hdfsEnvironment.doAs(user, () -> {
             SchemaTableName tableName = parent.getSchemaTableName();
             Optional<Table> table =
-                    metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+                    metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
             if (table.isPresent() && table.get().getPartitionColumns().size() > 0) {
                 throw new PrestoException(NOT_SUPPORTED, "Operations on Partitioned CarbonTables is not supported");
             }
@@ -392,7 +393,7 @@ public class CarbondataMetadata
         HiveInsertTableHandle parent = super.beginInsert(session, tableHandle);
         SchemaTableName tableName = parent.getSchemaTableName();
         Optional<Table> table =
-                this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+                this.metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
         if (table.isPresent() && table.get().getPartitionColumns().size() > 0) {
             throw new PrestoException(NOT_SUPPORTED, "Operations on Partitioned CarbonTables is not supported");
         }
@@ -445,7 +446,7 @@ public class CarbondataMetadata
         HiveInsertTableHandle parent = super.beginInsert(session, tableHandle);
         SchemaTableName tableName = parent.getSchemaTableName();
         Optional<Table> table =
-                this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+                this.metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
         if (table.isPresent() && table.get().getPartitionColumns().size() > 0) {
             throw new PrestoException(NOT_SUPPORTED, "Operations on Partitioned CarbonTables is not supported");
         }
@@ -552,7 +553,7 @@ public class CarbondataMetadata
         this.user = session.getUser();
         SchemaTableName tableName = insertTableHandle.getSchemaTableName();
         this.table =
-                this.metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+                this.metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
 
         try {
             hdfsEnvironment.getFileSystem(new HdfsEnvironment.HdfsContext(session, table.get().getDatabaseName()), new Path(table.get().getStorage().getLocation()));
@@ -588,6 +589,8 @@ public class CarbondataMetadata
             catch (IOException ex) {
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while cleaning up delta files", ex);
             }
+
+            addToAutoVacuumMap(session);
 
             return new CarbondataVacuumTableHandle(insertTableHandle.getSchemaName(),
                     insertTableHandle.getTableName(),
@@ -1036,7 +1039,7 @@ public class CarbondataMetadata
     public CarbondataTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
         requireNonNull(tableName, "tableName is null");
-        Optional<Table> table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+        Optional<Table> table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
         if (!table.isPresent()) {
             return null;
         }
@@ -1190,7 +1193,7 @@ public class CarbondataMetadata
                     schemaName,
                     tableName,
                     columnHandles,
-                    metastore.generatePageSinkMetadata(schemaTableName),
+                    metastore.generatePageSinkMetadata(new HiveIdentity(session), schemaTableName),
                     locationHandle,
                     tableStorageFormat,
                     partitionStorageFormat,
@@ -1476,7 +1479,7 @@ public class CarbondataMetadata
     public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
-        Optional<Table> target = metastore.getTable(handle.getSchemaName(), handle.getTableName());
+        Optional<Table> target = metastore.getTable(new HiveIdentity(session), handle.getSchemaName(), handle.getTableName());
         if (!target.isPresent()) {
             throw new TableNotFoundException(handle.getSchemaTableName());
         }
@@ -1627,9 +1630,9 @@ public class CarbondataMetadata
     }
 
     @Override
-    protected ConnectorTableMetadata doGetTableMetadata(SchemaTableName tableName)
+    protected ConnectorTableMetadata doGetTableMetadata(ConnectorSession session, SchemaTableName tableName)
     {
-        Optional<Table> table = metastore.getTable(tableName.getSchemaName(), tableName.getTableName());
+        Optional<Table> table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
         if (!table.isPresent() || table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
             throw new TableNotFoundException(tableName);
         }
@@ -1673,8 +1676,7 @@ public class CarbondataMetadata
     @Override
     public List<ConnectorVacuumTableInfo> getTablesForVacuum()
     {
-        LOG.debug("Carbondata does not support auto-vacuum");
-        return ImmutableList.of();
+        return CarbondataAutoVacuumThread.getAutoVacuumTableList(this.getMetastore());
     }
 
     public void submitCleanupTasks()
@@ -1720,5 +1722,23 @@ public class CarbondataMetadata
     protected boolean checkIfSuitableToPush(Set<ColumnHandle> allColumnHandles, ConnectorTableHandle tableHandle, ConnectorSession session)
     {
         return false;
+    }
+
+    @Override
+    public void cleanupQuery(ConnectorSession session)
+    {
+        super.cleanupQuery(session);
+        if ((currentState == State.VACUUM) &&
+                (!session.getSource().get().isEmpty()) &&
+                session.getSource().get().equals("auto-vacuum")) {
+            CarbondataAutoVacuumThread.removeTableFromVacuumTablesMap(table.get().getDatabaseName() + "." + table.get().getTableName());
+        }
+    }
+
+    public void addToAutoVacuumMap(ConnectorSession session)
+    {
+        if ((!session.getSource().get().isEmpty()) && session.getSource().get().equals("auto-vacuum")) {
+            CarbondataAutoVacuumThread.addTableToVacuumTablesMap(table.get().getDatabaseName() + "." + table.get().getTableName());
+        }
     }
 }

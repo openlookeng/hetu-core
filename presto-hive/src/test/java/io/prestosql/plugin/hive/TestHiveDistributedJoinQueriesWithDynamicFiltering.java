@@ -26,15 +26,16 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingConnectorSession;
 import io.prestosql.tests.AbstractTestQueryFramework;
@@ -120,12 +121,19 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
 
         HiveColumnHandle testColumnHandle = new HiveColumnHandle("p1", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter = createDynamicFilterSupplier(filterValues, testColumnHandle, "filter1");
+        Optional<DynamicFilterSupplier> dynamicFilterSupplier = Optional.of(new DynamicFilterSupplier(dynamicFilter, System.currentTimeMillis(), 10000));
 
         HiveColumnHandle testColumnHandle2 = new HiveColumnHandle("p2", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter2 = createDynamicFilterSupplier(filterValues, testColumnHandle2, "filter2");
+        Optional<DynamicFilterSupplier> dynamicFilterSupplier2 = Optional.of(new DynamicFilterSupplier(dynamicFilter2, System.currentTimeMillis(), 10000));
 
         HiveColumnHandle testColumnHandle3 = new HiveColumnHandle("p3", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
         Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter3 = createDynamicFilterSupplier(filterValues, testColumnHandle3, "filter3");
+        Optional<DynamicFilterSupplier> dynamicFilterSupplier3 = Optional.of(new DynamicFilterSupplier(dynamicFilter3, System.currentTimeMillis(), 10000));
+
+        HiveColumnHandle testColumnHandle4 = new HiveColumnHandle("p4", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
+        Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter4 = createDynamicFilterSupplier(filterValues, testColumnHandle4, "filter3");
+        Optional<DynamicFilterSupplier> dynamicFilterSupplier4 = Optional.of(new DynamicFilterSupplier(dynamicFilter4, System.currentTimeMillis(), 0));
 
         HiveConfig config = new HiveConfig();
         HivePageSourceProvider provider = new HivePageSourceProvider(config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
@@ -135,7 +143,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         HiveTransactionHandle transaction = new HiveTransactionHandle();
 
         try {
-            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle), dynamicFilter);
+            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle), dynamicFilterSupplier);
             assertFalse(result instanceof FixedPageSource);
         }
         catch (Exception e) {
@@ -143,7 +151,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         }
 
         try {
-            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle2), dynamicFilter2);
+            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle2), dynamicFilterSupplier2);
             assertTrue(result instanceof FixedPageSource);
         }
         catch (Exception e) {
@@ -151,7 +159,15 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         }
 
         try {
-            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle3), dynamicFilter3);
+            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle3), dynamicFilterSupplier3);
+            assertFalse(result instanceof FixedPageSource);
+        }
+        catch (Exception e) {
+            assertTrue(e instanceof PrestoException);
+        }
+
+        try {
+            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle3), dynamicFilterSupplier4);
             assertFalse(result instanceof FixedPageSource);
         }
         catch (Exception e) {

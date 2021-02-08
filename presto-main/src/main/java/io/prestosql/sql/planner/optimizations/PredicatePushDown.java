@@ -17,42 +17,45 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.DeterminismEvaluator;
-import io.prestosql.sql.planner.DomainTranslator;
 import io.prestosql.sql.planner.EffectivePredicateExtractor;
 import io.prestosql.sql.planner.EqualityInference;
+import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.ExpressionInterpreter;
 import io.prestosql.sql.planner.LiteralEncoder;
 import io.prestosql.sql.planner.NoOpSymbolResolver;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -84,17 +87,23 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isPredicatePushdownUseTableProperties;
+import static io.prestosql.spi.plan.JoinNode.Type.FULL;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
+import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
+import static io.prestosql.spi.plan.JoinNode.Type.RIGHT;
 import static io.prestosql.sql.DynamicFilters.createDynamicFilterExpression;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.ExpressionUtils.filterDeterministicConjuncts;
-import static io.prestosql.sql.planner.DeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.EqualityInference.createEqualityInference;
+import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.ExpressionSymbolInliner.inlineSymbols;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.FULL;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.LEFT;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.RIGHT;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.sourceSymbolMap;
+import static io.prestosql.sql.planner.plan.AssignmentUtils.identityAsSymbolReferences;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 
@@ -105,17 +114,19 @@ public class PredicatePushDown
     private final LiteralEncoder literalEncoder;
     private final TypeAnalyzer typeAnalyzer;
     private final boolean useTableProperties;
+    private final boolean dynamicFiltering;
 
-    public PredicatePushDown(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean useTableProperties)
+    public PredicatePushDown(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean useTableProperties, boolean dynamicFiltering)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.literalEncoder = new LiteralEncoder(metadata);
         this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
         this.useTableProperties = useTableProperties;
+        this.dynamicFiltering = dynamicFiltering;
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
@@ -123,11 +134,11 @@ public class PredicatePushDown
         requireNonNull(idAllocator, "idAllocator is null");
 
         EffectivePredicateExtractor effectivePredicateExtractor = new EffectivePredicateExtractor(
-                new DomainTranslator(literalEncoder),
+                new ExpressionDomainTranslator(literalEncoder),
                 metadata,
                 useTableProperties && isPredicatePushdownUseTableProperties(session));
         return SimplePlanRewriter.rewriteWith(
-                new Rewriter(symbolAllocator, idAllocator, metadata, literalEncoder, effectivePredicateExtractor, typeAnalyzer, session, types),
+                new Rewriter(planSymbolAllocator, idAllocator, metadata, literalEncoder, effectivePredicateExtractor, typeAnalyzer, session, types, dynamicFiltering),
                 plan,
                 TRUE_LITERAL);
     }
@@ -135,7 +146,7 @@ public class PredicatePushDown
     private static class Rewriter
             extends SimplePlanRewriter<Expression>
     {
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
         private final PlanNodeIdAllocator idAllocator;
         private final Metadata metadata;
         private final LiteralEncoder literalEncoder;
@@ -144,18 +155,20 @@ public class PredicatePushDown
         private final Session session;
         private final TypeProvider types;
         private final ExpressionEquivalence expressionEquivalence;
+        private final boolean dynamicFiltering;
 
         private Rewriter(
-                SymbolAllocator symbolAllocator,
+                PlanSymbolAllocator planSymbolAllocator,
                 PlanNodeIdAllocator idAllocator,
                 Metadata metadata,
                 LiteralEncoder literalEncoder,
                 EffectivePredicateExtractor effectivePredicateExtractor,
                 TypeAnalyzer typeAnalyzer,
                 Session session,
-                TypeProvider types)
+                TypeProvider types,
+                boolean dynamicFiltering)
         {
-            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
+            this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
             this.literalEncoder = requireNonNull(literalEncoder, "literalEncoder is null");
@@ -164,6 +177,7 @@ public class PredicatePushDown
             this.session = requireNonNull(session, "session is null");
             this.types = requireNonNull(types, "types is null");
             this.expressionEquivalence = new ExpressionEquivalence(metadata, typeAnalyzer);
+            this.dynamicFiltering = dynamicFiltering;
         }
 
         @Override
@@ -172,7 +186,7 @@ public class PredicatePushDown
             PlanNode rewrittenNode = context.defaultRewrite(node, TRUE_LITERAL);
             if (!context.get().equals(TRUE_LITERAL)) {
                 // Drop in a FilterNode b/c we cannot push our predicate down any further
-                rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, context.get());
+                rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, castToRowExpression(context.get()));
             }
             return rewrittenNode;
         }
@@ -187,7 +201,7 @@ public class PredicatePushDown
                 for (int index = 0; index < node.getInputs().get(i).size(); index++) {
                     outputsToInputs.put(
                             node.getOutputSymbols().get(index),
-                            node.getInputs().get(i).get(index).toSymbolReference());
+                            toSymbolReference(node.getInputs().get(i).get(index)));
                 }
 
                 Expression sourcePredicate = inlineSymbols(outputsToInputs, context.get());
@@ -224,7 +238,7 @@ public class PredicatePushDown
             // function is injective, but that's a rare case. The majority of window nodes are expected to be partitioned by
             // pre-projected symbols.
             Predicate<Expression> isSupported = conjunct ->
-                    DeterminismEvaluator.isDeterministic(conjunct) &&
+                    ExpressionDeterminismEvaluator.isDeterministic(conjunct) &&
                             SymbolsExtractor.extractUnique(conjunct).stream()
                                     .allMatch(partitionSymbols::contains);
 
@@ -233,7 +247,8 @@ public class PredicatePushDown
             PlanNode rewrittenNode = context.defaultRewrite(node, combineConjuncts(conjuncts.get(true)));
 
             if (!conjuncts.get(false).isEmpty()) {
-                rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, combineConjuncts(conjuncts.get(false)));
+                rewrittenNode = new FilterNode(idAllocator.getNextId(),
+                        rewrittenNode, castToRowExpression(combineConjuncts(conjuncts.get(false))));
             }
 
             return rewrittenNode;
@@ -243,7 +258,7 @@ public class PredicatePushDown
         public PlanNode visitProject(ProjectNode node, RewriteContext<Expression> context)
         {
             Set<Symbol> deterministicSymbols = node.getAssignments().entrySet().stream()
-                    .filter(entry -> DeterminismEvaluator.isDeterministic(entry.getValue()))
+                    .filter(entry -> ExpressionDeterminismEvaluator.isDeterministic(castToExpression(entry.getValue())))
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toSet());
 
@@ -262,7 +277,7 @@ public class PredicatePushDown
                     .collect(Collectors.partitioningBy(expression -> isInliningCandidate(expression, node)));
 
             List<Expression> inlinedDeterministicConjuncts = inlineConjuncts.get(true).stream()
-                    .map(entry -> inlineSymbols(node.getAssignments().getMap(), entry))
+                    .map(entry -> inlineSymbols(Maps.transformValues(node.getAssignments().getMap(), OriginalExpressionUtils::castToExpression), entry))
                     .collect(Collectors.toList());
 
             PlanNode rewrittenNode = context.defaultRewrite(node, combineConjuncts(inlinedDeterministicConjuncts));
@@ -273,7 +288,8 @@ public class PredicatePushDown
             nonInliningConjuncts.addAll(conjuncts.get(false));
 
             if (!nonInliningConjuncts.isEmpty()) {
-                rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, combineConjuncts(nonInliningConjuncts));
+                rewrittenNode = new FilterNode(idAllocator.getNextId(),
+                        rewrittenNode, castToRowExpression(combineConjuncts(nonInliningConjuncts)));
             }
 
             return rewrittenNode;
@@ -296,7 +312,7 @@ public class PredicatePushDown
                     .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
             return dependencies.entrySet().stream()
-                    .allMatch(entry -> entry.getValue() == 1 || node.getAssignments().get(entry.getKey()) instanceof Literal);
+                    .allMatch(entry -> entry.getValue() == 1 || castToExpression(node.getAssignments().get(entry.getKey())) instanceof Literal);
         }
 
         @Override
@@ -304,7 +320,7 @@ public class PredicatePushDown
         {
             Map<Symbol, SymbolReference> commonGroupingSymbolMapping = node.getGroupingColumns().entrySet().stream()
                     .filter(entry -> node.getCommonGroupingColumns().contains(entry.getKey()))
-                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().toSymbolReference()));
+                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> toSymbolReference(entry.getValue())));
 
             Predicate<Expression> pushdownEligiblePredicate = conjunct -> SymbolsExtractor.extractUnique(conjunct).stream()
                     .allMatch(commonGroupingSymbolMapping.keySet()::contains);
@@ -316,7 +332,8 @@ public class PredicatePushDown
 
             // All other conjuncts, if any, will be in the filter node.
             if (!conjuncts.get(false).isEmpty()) {
-                rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, combineConjuncts(conjuncts.get(false)));
+                rewrittenNode = new FilterNode(idAllocator.getNextId(),
+                        rewrittenNode, castToRowExpression(combineConjuncts(conjuncts.get(false))));
             }
 
             return rewrittenNode;
@@ -332,7 +349,8 @@ public class PredicatePushDown
             PlanNode rewrittenNode = context.defaultRewrite(node, combineConjuncts(conjuncts.get(true)));
 
             if (!conjuncts.get(false).isEmpty()) {
-                rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, combineConjuncts(conjuncts.get(false)));
+                rewrittenNode = new FilterNode(idAllocator.getNextId(),
+                        rewrittenNode, castToRowExpression(combineConjuncts(conjuncts.get(false))));
             }
             return rewrittenNode;
         }
@@ -349,7 +367,7 @@ public class PredicatePushDown
             boolean modified = false;
             ImmutableList.Builder<PlanNode> builder = ImmutableList.builder();
             for (int i = 0; i < node.getSources().size(); i++) {
-                Expression sourcePredicate = inlineSymbols(node.sourceSymbolMap(i), context.get());
+                Expression sourcePredicate = inlineSymbols(sourceSymbolMap(node, i), context.get());
                 PlanNode source = node.getSources().get(i);
                 PlanNode rewrittenSource = context.rewrite(source, sourcePredicate);
                 if (rewrittenSource != source) {
@@ -369,15 +387,19 @@ public class PredicatePushDown
         @Override
         public PlanNode visitFilter(FilterNode node, RewriteContext<Expression> context)
         {
-            PlanNode rewrittenPlan = context.rewrite(node.getSource(), combineConjuncts(node.getPredicate(), context.get()));
-            if (!(rewrittenPlan instanceof FilterNode)) {
-                return rewrittenPlan;
-            }
+            if (isExpression(node.getPredicate())) {
+                PlanNode rewrittenPlan = context.rewrite(node.getSource(),
+                        combineConjuncts(castToExpression(node.getPredicate()), context.get()));
+                if (!(rewrittenPlan instanceof FilterNode)) {
+                    return rewrittenPlan;
+                }
 
-            FilterNode rewrittenFilterNode = (FilterNode) rewrittenPlan;
-            if (!areExpressionsEquivalent(rewrittenFilterNode.getPredicate(), node.getPredicate())
-                    || node.getSource() != rewrittenFilterNode.getSource()) {
-                return rewrittenPlan;
+                FilterNode rewrittenFilterNode = (FilterNode) rewrittenPlan;
+                if (!areExpressionsEquivalent(castToExpression(rewrittenFilterNode.getPredicate()),
+                        castToExpression(node.getPredicate()))
+                        || node.getSource() != rewrittenFilterNode.getSource()) {
+                    return rewrittenPlan;
+                }
             }
 
             return node;
@@ -452,14 +474,10 @@ public class PredicatePushDown
 
             // Create identity projections for all existing symbols
             Assignments.Builder leftProjections = Assignments.builder();
-            leftProjections.putAll(node.getLeft()
-                    .getOutputSymbols().stream()
-                    .collect(Collectors.toMap(key -> key, Symbol::toSymbolReference)));
+            leftProjections.putAll(identityAsSymbolReferences(node.getLeft().getOutputSymbols()));
 
             Assignments.Builder rightProjections = Assignments.builder();
-            rightProjections.putAll(node.getRight()
-                    .getOutputSymbols().stream()
-                    .collect(Collectors.toMap(key -> key, Symbol::toSymbolReference)));
+            rightProjections.putAll(identityAsSymbolReferences(node.getRight().getOutputSymbols()));
 
             // Create new projections for the new join clauses
             List<JoinNode.EquiJoinClause> equiJoinClauses = new ArrayList<>();
@@ -474,12 +492,12 @@ public class PredicatePushDown
 
                     Symbol leftSymbol = symbolForExpression(leftExpression);
                     if (!node.getLeft().getOutputSymbols().contains(leftSymbol)) {
-                        leftProjections.put(leftSymbol, leftExpression);
+                        leftProjections.put(leftSymbol, castToRowExpression(leftExpression));
                     }
 
                     Symbol rightSymbol = symbolForExpression(rightExpression);
                     if (!node.getRight().getOutputSymbols().contains(rightSymbol)) {
-                        rightProjections.put(rightSymbol, rightExpression);
+                        rightProjections.put(rightSymbol, castToRowExpression(rightExpression));
                     }
 
                     equiJoinClauses.add(new JoinNode.EquiJoinClause(leftSymbol, rightSymbol));
@@ -524,7 +542,7 @@ public class PredicatePushDown
 
             boolean filtersEquivalent =
                     newJoinFilter.isPresent() == node.getFilter().isPresent() &&
-                            (!newJoinFilter.isPresent() || areExpressionsEquivalent(newJoinFilter.get(), node.getFilter().get()));
+                            (!newJoinFilter.isPresent() || areExpressionsEquivalent(newJoinFilter.get(), castToExpression(node.getFilter().get())));
 
             PlanNode output = node;
             if (leftSource != node.getLeft() ||
@@ -545,7 +563,7 @@ public class PredicatePushDown
                                 .addAll(leftSource.getOutputSymbols())
                                 .addAll(rightSource.getOutputSymbols())
                                 .build(),
-                        newJoinFilter,
+                        newJoinFilter.map(OriginalExpressionUtils::castToRowExpression),
                         node.getLeftHashSymbol(),
                         node.getRightHashSymbol(),
                         node.getDistributionType(),
@@ -554,11 +572,11 @@ public class PredicatePushDown
             }
 
             if (!postJoinPredicate.equals(TRUE_LITERAL)) {
-                output = new FilterNode(idAllocator.getNextId(), output, postJoinPredicate);
+                output = new FilterNode(idAllocator.getNextId(), output, castToRowExpression(postJoinPredicate));
             }
 
             if (!node.getOutputSymbols().equals(output.getOutputSymbols())) {
-                output = new ProjectNode(idAllocator.getNextId(), output, Assignments.identity(node.getOutputSymbols()));
+                output = new ProjectNode(idAllocator.getNextId(), output, identityAsSymbolReferences(node.getOutputSymbols()));
             }
 
             return output;
@@ -568,7 +586,7 @@ public class PredicatePushDown
         {
             Map<String, Symbol> dynamicFilters = ImmutableMap.of();
             List<Expression> predicates = ImmutableList.of();
-            if ((node.getType() == INNER || node.getType() == RIGHT) && isEnableDynamicFiltering(session)) {
+            if ((node.getType() == INNER || node.getType() == RIGHT) && isEnableDynamicFiltering(session) && dynamicFiltering) {
                 // New equiJoinClauses could potentially not contain symbols used in current dynamic filters.
                 // Since we use PredicatePushdown to push dynamic filters themselves,
                 // instead of separate ApplyDynamicFilters rule we derive dynamic filters within PredicatePushdown itself.
@@ -579,7 +597,7 @@ public class PredicatePushDown
                     Symbol probeSymbol = clause.getLeft();
                     Symbol buildSymbol = clause.getRight();
                     String id = idAllocator.getNextId().toString();
-                    predicatesBuilder.add(createDynamicFilterExpression(metadata, id, symbolAllocator.getTypes().get(probeSymbol), probeSymbol.toSymbolReference()));
+                    predicatesBuilder.add(createDynamicFilterExpression(metadata, id, planSymbolAllocator.getTypes().get(probeSymbol), toSymbolReference(probeSymbol)));
                     dynamicFiltersBuilder.put(id, buildSymbol);
                 }
                 dynamicFilters = dynamicFiltersBuilder.build();
@@ -622,7 +640,7 @@ public class PredicatePushDown
 
             Expression leftEffectivePredicate = effectivePredicateExtractor.extract(session, node.getLeft(), types, typeAnalyzer);
             Expression rightEffectivePredicate = effectivePredicateExtractor.extract(session, node.getRight(), types, typeAnalyzer);
-            Expression joinPredicate = node.getFilter();
+            Expression joinPredicate = castToExpression(node.getFilter());
 
             Expression leftPredicate;
             Expression rightPredicate;
@@ -670,14 +688,10 @@ public class PredicatePushDown
                     !areExpressionsEquivalent(newJoinPredicate, joinPredicate)) {
                 // Create identity projections for all existing symbols
                 Assignments.Builder leftProjections = Assignments.builder();
-                leftProjections.putAll(node.getLeft()
-                        .getOutputSymbols().stream()
-                        .collect(Collectors.toMap(key -> key, Symbol::toSymbolReference)));
+                leftProjections.putAll(identityAsSymbolReferences(node.getLeft().getOutputSymbols()));
 
                 Assignments.Builder rightProjections = Assignments.builder();
-                rightProjections.putAll(node.getRight()
-                        .getOutputSymbols().stream()
-                        .collect(Collectors.toMap(key -> key, Symbol::toSymbolReference)));
+                rightProjections.putAll(identityAsSymbolReferences(node.getRight().getOutputSymbols()));
 
                 leftSource = new ProjectNode(idAllocator.getNextId(), leftSource, leftProjections.build());
                 rightSource = new ProjectNode(idAllocator.getNextId(), rightSource, rightProjections.build());
@@ -688,14 +702,14 @@ public class PredicatePushDown
                         leftSource,
                         rightSource,
                         node.getOutputSymbols(),
-                        newJoinPredicate,
+                        castToRowExpression(newJoinPredicate),
                         node.getLeftPartitionSymbol(),
                         node.getRightPartitionSymbol(),
                         node.getKdbTree());
             }
 
             if (!postJoinPredicate.equals(TRUE_LITERAL)) {
-                output = new FilterNode(idAllocator.getNextId(), output, postJoinPredicate);
+                output = new FilterNode(idAllocator.getNextId(), output, castToRowExpression(postJoinPredicate));
             }
 
             return output;
@@ -704,10 +718,10 @@ public class PredicatePushDown
         private Symbol symbolForExpression(Expression expression)
         {
             if (expression instanceof SymbolReference) {
-                return Symbol.from(expression);
+                return SymbolUtils.from(expression);
             }
 
-            return symbolAllocator.newSymbol(expression, typeAnalyzer.getType(session, symbolAllocator.getTypes(), expression));
+            return planSymbolAllocator.newSymbol(expression, typeAnalyzer.getType(session, planSymbolAllocator.getTypes(), expression));
         }
 
         private static OuterJoinPushDownResult processLimitedOuterJoin(Expression inheritedPredicate, Expression outerEffectivePredicate, Expression innerEffectivePredicate, Expression joinPredicate, Collection<Symbol> outerSymbols)
@@ -721,12 +735,12 @@ public class PredicatePushDown
             ImmutableList.Builder<Expression> joinConjuncts = ImmutableList.builder();
 
             // Strip out non-deterministic conjuncts
-            postJoinConjuncts.addAll(filter(extractConjuncts(inheritedPredicate), not(DeterminismEvaluator::isDeterministic)));
+            postJoinConjuncts.addAll(filter(extractConjuncts(inheritedPredicate), not(ExpressionDeterminismEvaluator::isDeterministic)));
             inheritedPredicate = filterDeterministicConjuncts(inheritedPredicate);
 
             outerEffectivePredicate = filterDeterministicConjuncts(outerEffectivePredicate);
             innerEffectivePredicate = filterDeterministicConjuncts(innerEffectivePredicate);
-            joinConjuncts.addAll(filter(extractConjuncts(joinPredicate), not(DeterminismEvaluator::isDeterministic)));
+            joinConjuncts.addAll(filter(extractConjuncts(joinPredicate), not(ExpressionDeterminismEvaluator::isDeterministic)));
             joinPredicate = filterDeterministicConjuncts(joinPredicate);
 
             // Generate equality inferences
@@ -841,10 +855,10 @@ public class PredicatePushDown
             ImmutableList.Builder<Expression> joinConjuncts = ImmutableList.builder();
 
             // Strip out non-deterministic conjuncts
-            joinConjuncts.addAll(filter(extractConjuncts(inheritedPredicate), not(DeterminismEvaluator::isDeterministic)));
+            joinConjuncts.addAll(filter(extractConjuncts(inheritedPredicate), not(ExpressionDeterminismEvaluator::isDeterministic)));
             inheritedPredicate = filterDeterministicConjuncts(inheritedPredicate);
 
-            joinConjuncts.addAll(filter(extractConjuncts(joinPredicate), not(DeterminismEvaluator::isDeterministic)));
+            joinConjuncts.addAll(filter(extractConjuncts(joinPredicate), not(ExpressionDeterminismEvaluator::isDeterministic)));
             joinPredicate = filterDeterministicConjuncts(joinPredicate);
 
             leftEffectivePredicate = filterDeterministicConjuncts(leftEffectivePredicate);
@@ -954,9 +968,9 @@ public class PredicatePushDown
         {
             ImmutableList.Builder<Expression> builder = ImmutableList.builder();
             for (JoinNode.EquiJoinClause equiJoinClause : joinNode.getCriteria()) {
-                builder.add(equiJoinClause.toExpression());
+                builder.add(JoinNodeUtils.toExpression(equiJoinClause));
             }
-            joinNode.getFilter().ifPresent(builder::add);
+            joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).ifPresent(builder::add);
             return combineConjuncts(builder.build());
         }
 
@@ -994,7 +1008,7 @@ public class PredicatePushDown
         {
             Set<Symbol> innerSymbols = ImmutableSet.copyOf(innerSymbolsForOuterJoin);
             for (Expression conjunct : extractConjuncts(inheritedPredicate)) {
-                if (DeterminismEvaluator.isDeterministic(conjunct)) {
+                if (ExpressionDeterminismEvaluator.isDeterministic(conjunct)) {
                     // Ignore a conjunct for this test if we can not deterministically get responses from it
                     Object response = nullInputEvaluator(innerSymbols, conjunct);
                     if (response == null || response instanceof NullLiteral || Boolean.FALSE.equals(response)) {
@@ -1011,7 +1025,7 @@ public class PredicatePushDown
         // Temporary implementation for joins because the SimplifyExpressions optimizers can not run properly on join clauses
         private Expression simplifyExpression(Expression expression)
         {
-            Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, symbolAllocator.getTypes(), expression);
+            Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, planSymbolAllocator.getTypes(), expression);
             ExpressionInterpreter optimizer = ExpressionInterpreter.expressionOptimizer(expression, metadata, session, expressionTypes);
             return literalEncoder.toExpression(optimizer.optimize(NoOpSymbolResolver.INSTANCE), expressionTypes.get(NodeRef.of(expression)));
         }
@@ -1026,9 +1040,9 @@ public class PredicatePushDown
          */
         private Object nullInputEvaluator(final Collection<Symbol> nullSymbols, Expression expression)
         {
-            Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, symbolAllocator.getTypes(), expression);
+            Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, planSymbolAllocator.getTypes(), expression);
             return ExpressionInterpreter.expressionOptimizer(expression, metadata, session, expressionTypes)
-                    .optimize(symbol -> nullSymbols.contains(symbol) ? null : symbol.toSymbolReference());
+                    .optimize(symbol -> nullSymbols.contains(symbol) ? null : toSymbolReference(symbol));
         }
 
         private static Predicate<Expression> joinEqualityExpression(final Collection<Symbol> leftSymbols)
@@ -1055,7 +1069,7 @@ public class PredicatePushDown
         public PlanNode visitSemiJoin(SemiJoinNode node, RewriteContext<Expression> context)
         {
             Expression inheritedPredicate = context.get();
-            if (!extractConjuncts(inheritedPredicate).contains(node.getSemiJoinOutput().toSymbolReference())) {
+            if (!extractConjuncts(inheritedPredicate).contains(toSymbolReference(node.getSemiJoinOutput()))) {
                 return visitNonFilteringSemiJoin(node, context);
             }
             return visitFilteringSemiJoin(node, context);
@@ -1095,10 +1109,11 @@ public class PredicatePushDown
 
             PlanNode output = node;
             if (rewrittenSource != node.getSource() || rewrittenFilteringSource != node.getFilteringSource()) {
-                output = new SemiJoinNode(node.getId(), rewrittenSource, rewrittenFilteringSource, node.getSourceJoinSymbol(), node.getFilteringSourceJoinSymbol(), node.getSemiJoinOutput(), node.getSourceHashSymbol(), node.getFilteringSourceHashSymbol(), node.getDistributionType());
+                output = new SemiJoinNode(node.getId(), rewrittenSource, rewrittenFilteringSource, node.getSourceJoinSymbol(), node.getFilteringSourceJoinSymbol(),
+                        node.getSemiJoinOutput(), node.getSourceHashSymbol(), node.getFilteringSourceHashSymbol(), node.getDistributionType(), Optional.empty());
             }
             if (!postJoinConjuncts.isEmpty()) {
-                output = new FilterNode(idAllocator.getNextId(), output, combineConjuncts(postJoinConjuncts));
+                output = new FilterNode(idAllocator.getNextId(), output, castToRowExpression(combineConjuncts(postJoinConjuncts)));
             }
             return output;
         }
@@ -1111,8 +1126,8 @@ public class PredicatePushDown
             Expression filteringSourceEffectivePredicate = filterDeterministicConjuncts(effectivePredicateExtractor.extract(session, node.getFilteringSource(), types, typeAnalyzer));
             Expression joinExpression = new ComparisonExpression(
                     ComparisonExpression.Operator.EQUAL,
-                    node.getSourceJoinSymbol().toSymbolReference(),
-                    node.getFilteringSourceJoinSymbol().toSymbolReference());
+                    toSymbolReference(node.getSourceJoinSymbol()),
+                    toSymbolReference(node.getFilteringSourceJoinSymbol()));
 
             List<Symbol> sourceSymbols = node.getSource().getOutputSymbols();
             List<Symbol> filteringSourceSymbols = node.getFilteringSource().getOutputSymbols();
@@ -1169,11 +1184,19 @@ public class PredicatePushDown
             sourceConjuncts.addAll(allInferenceWithoutSourceInferred.generateEqualitiesPartitionedBy(in(sourceSymbols)).getScopeEqualities());
             filteringSourceConjuncts.addAll(allInferenceWithoutFilteringSourceInferred.generateEqualitiesPartitionedBy(in(filteringSourceSymbols)).getScopeEqualities());
 
+            // Add dynamic filtering predicate
+            Optional<String> dynamicFilterId = node.getDynamicFilterId();
+            if (!dynamicFilterId.isPresent() && isEnableDynamicFiltering(session) && dynamicFiltering) {
+                dynamicFilterId = Optional.of(idAllocator.getNextId().toString());
+                Symbol sourceSymbol = node.getSourceJoinSymbol();
+                sourceConjuncts.add(createDynamicFilterExpression(metadata, dynamicFilterId.get(), planSymbolAllocator.getTypes().get(sourceSymbol), SymbolUtils.toSymbolReference(sourceSymbol)));
+            }
+
             PlanNode rewrittenSource = context.rewrite(node.getSource(), combineConjuncts(sourceConjuncts));
             PlanNode rewrittenFilteringSource = context.rewrite(node.getFilteringSource(), combineConjuncts(filteringSourceConjuncts));
 
             PlanNode output = node;
-            if (rewrittenSource != node.getSource() || rewrittenFilteringSource != node.getFilteringSource()) {
+            if (rewrittenSource != node.getSource() || rewrittenFilteringSource != node.getFilteringSource() || !dynamicFilterId.equals(node.getDynamicFilterId())) {
                 output = new SemiJoinNode(
                         node.getId(),
                         rewrittenSource,
@@ -1183,10 +1206,11 @@ public class PredicatePushDown
                         node.getSemiJoinOutput(),
                         node.getSourceHashSymbol(),
                         node.getFilteringSourceHashSymbol(),
-                        node.getDistributionType());
+                        node.getDistributionType(),
+                        dynamicFilterId);
             }
             if (!postJoinConjuncts.isEmpty()) {
-                output = new FilterNode(idAllocator.getNextId(), output, combineConjuncts(postJoinConjuncts));
+                output = new FilterNode(idAllocator.getNextId(), output, castToRowExpression(combineConjuncts(postJoinConjuncts)));
             }
             return output;
         }
@@ -1208,7 +1232,7 @@ public class PredicatePushDown
             List<Expression> postAggregationConjuncts = new ArrayList<>();
 
             // Strip out non-deterministic conjuncts
-            postAggregationConjuncts.addAll(ImmutableList.copyOf(filter(extractConjuncts(inheritedPredicate), not(DeterminismEvaluator::isDeterministic))));
+            postAggregationConjuncts.addAll(ImmutableList.copyOf(filter(extractConjuncts(inheritedPredicate), not(ExpressionDeterminismEvaluator::isDeterministic))));
             inheritedPredicate = filterDeterministicConjuncts(inheritedPredicate);
 
             // Sort non-equality predicates by those that can be pushed down and those that cannot
@@ -1251,7 +1275,7 @@ public class PredicatePushDown
                         node.getGroupIdSymbol());
             }
             if (!postAggregationConjuncts.isEmpty()) {
-                output = new FilterNode(idAllocator.getNextId(), output, combineConjuncts(postAggregationConjuncts));
+                output = new FilterNode(idAllocator.getNextId(), output, castToRowExpression(combineConjuncts(postAggregationConjuncts)));
             }
             return output;
         }
@@ -1267,7 +1291,7 @@ public class PredicatePushDown
             List<Expression> postUnnestConjuncts = new ArrayList<>();
 
             // Strip out non-deterministic conjuncts
-            postUnnestConjuncts.addAll(ImmutableList.copyOf(filter(extractConjuncts(inheritedPredicate), not(DeterminismEvaluator::isDeterministic))));
+            postUnnestConjuncts.addAll(ImmutableList.copyOf(filter(extractConjuncts(inheritedPredicate), not(ExpressionDeterminismEvaluator::isDeterministic))));
             inheritedPredicate = filterDeterministicConjuncts(inheritedPredicate);
 
             // Sort non-equality predicates by those that can be pushed down and those that cannot
@@ -1294,7 +1318,7 @@ public class PredicatePushDown
                 output = new UnnestNode(node.getId(), rewrittenSource, node.getReplicateSymbols(), node.getUnnestSymbols(), node.getOrdinalitySymbol());
             }
             if (!postUnnestConjuncts.isEmpty()) {
-                output = new FilterNode(idAllocator.getNextId(), output, combineConjuncts(postUnnestConjuncts));
+                output = new FilterNode(idAllocator.getNextId(), output, castToRowExpression(combineConjuncts(postUnnestConjuncts)));
             }
             return output;
         }
@@ -1311,7 +1335,7 @@ public class PredicatePushDown
             Expression predicate = simplifyExpression(context.get());
 
             if (!TRUE_LITERAL.equals(predicate)) {
-                return new FilterNode(idAllocator.getNextId(), node, predicate);
+                return new FilterNode(idAllocator.getNextId(), node, castToRowExpression(predicate));
             }
 
             return node;

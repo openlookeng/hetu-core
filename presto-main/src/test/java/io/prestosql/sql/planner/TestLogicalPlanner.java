@@ -19,13 +19,23 @@ import io.airlift.slice.Slices;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
-import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
+import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.assertions.ExpressionMatcher;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
@@ -33,24 +43,15 @@ import io.prestosql.sql.planner.assertions.RowNumberSymbolMatcher;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.CheckSubqueryNodesAreRewritten;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.tests.QueryTemplate;
 import io.prestosql.util.MorePredicates;
@@ -67,10 +68,20 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.SystemSessionProperties.DISTRIBUTED_SORT;
+import static io.prestosql.SystemSessionProperties.FILTERING_SEMI_JOIN_TO_INNER;
 import static io.prestosql.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
 import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
+import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
+import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.PARTIAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
+import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
 import static io.prestosql.spi.predicate.Domain.singleValue;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static io.prestosql.sql.planner.LogicalPlanner.Stage.OPTIMIZED;
@@ -97,26 +108,18 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.rowNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.semiJoin;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.sort;
-import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictTableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topN;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.topNRankingNumber;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.PARTIAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPLICATE;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.LEFT;
 import static io.prestosql.sql.tree.SortItem.NullOrdering.LAST;
 import static io.prestosql.sql.tree.SortItem.Ordering.ASCENDING;
 import static io.prestosql.sql.tree.SortItem.Ordering.DESCENDING;
@@ -219,6 +222,7 @@ public class TestLogicalPlanner
                                                         .withExactOutputs(ImmutableList.of("O_ORDERKEY", "L_ORDERKEY")))))));
 
         assertPlan("SELECT DISTINCT o.orderkey FROM orders o JOIN lineitem l ON o.shippriority = l.linenumber AND o.orderkey < l.orderkey LIMIT 1",
+                noJoinReordering(),
                 anyTree(
                         node(DistinctLimitNode.class,
                                 anyTree(
@@ -263,6 +267,7 @@ public class TestLogicalPlanner
     public void testInnerInequalityJoinWithEquiJoinConjuncts()
     {
         assertPlan("SELECT 1 FROM orders o JOIN lineitem l ON o.shippriority = l.linenumber AND o.orderkey < l.orderkey",
+                noJoinReordering(),
                 anyTree(
                         anyNot(FilterNode.class,
                                 join(INNER,
@@ -293,6 +298,7 @@ public class TestLogicalPlanner
     public void testJoin()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 any(
@@ -305,6 +311,7 @@ public class TestLogicalPlanner
     public void testJoinWithOrderBySameKey()
     {
         assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey ORDER BY l.orderkey ASC, o.orderkey ASC",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 any(
@@ -333,16 +340,19 @@ public class TestLogicalPlanner
     public void testUncorrelatedSubqueries()
     {
         assertPlan("SELECT * FROM orders WHERE orderkey = (SELECT orderkey FROM lineitem ORDER BY orderkey LIMIT 1)",
+                noJoinReordering(),
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("X", "Y")),
                                 project(
-                                        tableScan("orders", ImmutableMap.of("X", "orderkey"))),
+                                        node(FilterNode.class,
+                                                tableScan("orders", ImmutableMap.of("X", "orderkey")))),
                                 project(
                                         node(EnforceSingleRowNode.class,
                                                 anyTree(
                                                         tableScan("lineitem", ImmutableMap.of("Y", "orderkey"))))))));
 
         assertPlan("SELECT * FROM orders WHERE orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber % 4 = 0)",
+                noJoinReordering(),
                 anyTree(
                         filter("S",
                                 project(
@@ -514,6 +524,7 @@ public class TestLogicalPlanner
     public void testCorrelatedScalarSubqueryInSelect()
     {
         assertDistributedPlan("SELECT name, (SELECT name FROM region WHERE regionkey = nation.regionkey) FROM nation",
+                noJoinReordering(),
                 anyTree(
                         filter(format("CASE \"is_distinct\" WHEN true THEN true ELSE CAST(fail(%s, 'Scalar sub-query has returned multiple rows') AS boolean) END", SUBQUERY_MULTIPLE_ROWS.toErrorCode().getCode()),
                                 markDistinct("is_distinct", ImmutableList.of("unique"),
@@ -531,6 +542,7 @@ public class TestLogicalPlanner
         // Use equi-clause to trigger hash partitioning of the join sources
         assertDistributedPlan(
                 "SELECT name, (SELECT max(name) FROM region WHERE regionkey = nation.regionkey AND length(name) > length(nation.name)) FROM nation",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("n_name", "n_regionkey", "unique"),
@@ -574,6 +586,7 @@ public class TestLogicalPlanner
 
         // inner join -> streaming aggregation
         assertPlan("SELECT o.orderkey, count(*) FROM orders o, lineitem l WHERE o.orderkey=l.orderkey GROUP BY 1",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("o_orderkey"),
@@ -590,6 +603,7 @@ public class TestLogicalPlanner
 
         // left join -> streaming aggregation
         assertPlan("SELECT o.orderkey, count(*) FROM orders o LEFT JOIN lineitem l ON o.orderkey=l.orderkey GROUP BY 1",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("o_orderkey"),
@@ -606,6 +620,7 @@ public class TestLogicalPlanner
 
         // cross join - no streaming
         assertPlan("SELECT o.orderkey, count(*) FROM orders o, lineitem l GROUP BY 1",
+                noJoinReordering(),
                 anyTree(
                         aggregation(
                                 singleGroupingSet("orderkey"),
@@ -737,9 +752,9 @@ public class TestLogicalPlanner
                 "SELECT orderkey FROM orders WHERE orderstatus='F'",
                 output(
                         constrainedTableScanWithTableLayout(
-                            "orders",
-                            ImmutableMap.of("orderstatus", singleValue(createVarcharType(1), utf8Slice("F"))),
-                            ImmutableMap.of("orderkey", "orderkey"))));
+                                "orders",
+                                ImmutableMap.of("orderstatus", singleValue(createVarcharType(1), utf8Slice("F"))),
+                                ImmutableMap.of("orderkey", "orderkey"))));
     }
 
     @Test
@@ -890,6 +905,31 @@ public class TestLogicalPlanner
     }
 
     @Test
+    public void testFilteringSemiJoinRewriteToInnerJoin()
+    {
+        assertPlan(
+                "SELECT custkey FROM orders WHERE custkey IN (SELECT custkey FROM customer)",
+                Session.builder(getQueryRunner().getDefaultSession())
+                        .setSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, "true")
+                        .build(),
+                anyTree(
+                        join(
+                                INNER,
+                                ImmutableList.of(equiJoinClause("ORDER_CUSTKEY", "CUSTOMER_CUSTKEY")),
+                                anyTree(
+                                        tableScan("orders", ImmutableMap.of("ORDER_CUSTKEY", "custkey"))),
+                                project(
+                                        aggregation(
+                                                singleGroupingSet("CUSTOMER_CUSTKEY"),
+                                                ImmutableMap.of(),
+                                                ImmutableMap.of(),
+                                                Optional.empty(),
+                                                FINAL,
+                                                anyTree(
+                                                        tableScan("customer", ImmutableMap.of("CUSTOMER_CUSTKEY", "custkey"))))))));
+    }
+
+    @Test
     public void testOrderByFetch()
     {
         assertPlan(
@@ -993,27 +1033,18 @@ public class TestLogicalPlanner
                 any(
                         strictProject(
                                 ImmutableMap.of("name", new ExpressionMatcher("name"), "regionkey", new ExpressionMatcher("regionkey")),
-                                filter(
-                                        "rank_num <= BIGINT '6'",
-                                        window(
-                                                windowMatcherBuilder -> windowMatcherBuilder
-                                                        .specification(specification(
-                                                                ImmutableList.of(),
-                                                                ImmutableList.of("regionkey"),
-                                                                ImmutableMap.of("regionkey", SortOrder.ASC_NULLS_LAST)))
-                                                        .addFunction(
-                                                                "rank_num",
-                                                                functionCall(
-                                                                        "rank",
-                                                                        Optional.empty(),
-                                                                        ImmutableList.of())),
-                                                anyTree(
-                                                        sort(
-                                                                ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
-                                                                any(
-                                                                        tableScan(
-                                                                                "nation",
-                                                                                ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey"))))))))));
+                                topNRankingNumber(pattern -> pattern
+                                                .specification(
+                                                        ImmutableList.of(),
+                                                        ImmutableList.of("regionkey"),
+                                                        ImmutableMap.of("regionkey", ASC_NULLS_LAST)),
+                                        anyTree(
+                                                sort(
+                                                        ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
+                                                        any(
+                                                                tableScan(
+                                                                        "nation",
+                                                                        ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey")))))))));
 
         assertPlan(
                 "SELECT name, regionkey FROM nation ORDER BY regionkey OFFSET 10 ROWS FETCH FIRST 6 ROWS WITH TIES",
@@ -1027,27 +1058,18 @@ public class TestLogicalPlanner
                                                         .partitionBy(ImmutableList.of()),
                                                 strictProject(
                                                         ImmutableMap.of("name", new ExpressionMatcher("name"), "regionkey", new ExpressionMatcher("regionkey")),
-                                                        filter(
-                                                                "rank_num <= BIGINT '16'",
-                                                                window(
-                                                                        windowMatcherBuilder -> windowMatcherBuilder
-                                                                                .specification(specification(
-                                                                                        ImmutableList.of(),
-                                                                                        ImmutableList.of("regionkey"),
-                                                                                        ImmutableMap.of("regionkey", SortOrder.ASC_NULLS_LAST)))
-                                                                                .addFunction(
-                                                                                        "rank_num",
-                                                                                        functionCall(
-                                                                                                "rank",
-                                                                                                Optional.empty(),
-                                                                                                ImmutableList.of())),
-                                                                        anyTree(
-                                                                                sort(
-                                                                                        ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
-                                                                                        any(
-                                                                                                tableScan(
-                                                                                                        "nation",
-                                                                                                        ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey")))))))))
+                                                        topNRankingNumber(pattern -> pattern
+                                                                        .specification(
+                                                                                ImmutableList.of(),
+                                                                                ImmutableList.of("regionkey"),
+                                                                                ImmutableMap.of("regionkey", ASC_NULLS_LAST)),
+                                                                anyTree(
+                                                                        sort(
+                                                                                ImmutableList.of(sort("regionkey", ASCENDING, LAST)),
+                                                                                any(
+                                                                                        tableScan(
+                                                                                                "nation",
+                                                                                                ImmutableMap.of("NAME", "name", "REGIONKEY", "regionkey"))))))))
                                                 .withAlias("row_num", new RowNumberSymbolMatcher())))));
     }
 
@@ -1147,5 +1169,13 @@ public class TestLogicalPlanner
                                 node(AggregationNode.class,
                                         node(ProjectNode.class,
                                                 values(ImmutableList.of("x")))))));
+    }
+
+    private Session noJoinReordering()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
+                .build();
     }
 }

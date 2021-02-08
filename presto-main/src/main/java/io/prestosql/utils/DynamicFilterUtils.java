@@ -16,12 +16,13 @@ package io.prestosql.utils;
 
 import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
 import io.prestosql.spi.dynamicfilter.DynamicFilter.Type;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import java.util.List;
 
@@ -39,7 +40,7 @@ public class DynamicFilterUtils
     public static final String FILTERPREFIX = "filter-";
     public static final String PARTIALPREFIX = "partial-";
     public static final String TASKSPREFIX = "tasks-";
-    public static final String MERGEMAP = "merged";
+    public static final String MERGED_DYNAMIC_FILTERS = "merged-dynamic-filters";
     public static final double BLOOM_FILTER_EXPECTED_FPP = 0.25F;
 
     private DynamicFilterUtils()
@@ -71,7 +72,16 @@ public class DynamicFilterUtils
         return filterNodes;
     }
 
-    private static boolean isFilterAboveTableScan(PlanNode node)
+    public static List<FilterNode> findFilterNodeInStage(SemiJoinNode node)
+    {
+        List<FilterNode> filterNodes = PlanNodeSearcher
+                .searchFrom(node.getFilteringSource())
+                .where(DynamicFilterUtils::isFilterAboveTableScan)
+                .findAll();
+        return filterNodes;
+    }
+
+    public static boolean isFilterAboveTableScan(PlanNode node)
     {
         if (node instanceof FilterNode) {
             return ((FilterNode) node).getSource() instanceof TableScanNode;

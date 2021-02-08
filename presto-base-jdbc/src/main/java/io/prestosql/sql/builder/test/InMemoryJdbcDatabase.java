@@ -37,13 +37,13 @@ import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.transaction.IsolationLevel;
 
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -62,17 +62,17 @@ public final class InMemoryJdbcDatabase
     private final String schemaName;
     private final ConnectorFactory connectorFactory;
 
-    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName, SqlQueryWriter queryWriter)
+    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName)
             throws SQLException
     {
-        this(driver, connectionUrl, connectorName, schemaName, queryWriter, new BaseJdbcConfig(), new Properties());
+        this(driver, connectionUrl, connectorName, schemaName, new BaseJdbcConfig(), new Properties());
     }
 
-    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName, SqlQueryWriter queryWriter, BaseJdbcConfig baseJdbcConfig, Properties connectionProperties)
+    public InMemoryJdbcDatabase(Driver driver, String connectionUrl, String connectorName, String schemaName, BaseJdbcConfig baseJdbcConfig, Properties connectionProperties)
             throws SQLException
     {
         this.schemaName = schemaName;
-        jdbcClient = new InMemoryJdbcClient(baseJdbcConfig, driver, connectionUrl, queryWriter, connectionProperties);
+        jdbcClient = new InMemoryJdbcClient(baseJdbcConfig, driver, connectionUrl, connectionProperties);
         connection = DriverManager.getConnection(connectionUrl, connectionProperties);
         this.connectorFactory = new InMemoryJdbcConnectorFactory(this.jdbcClient, connectorName);
     }
@@ -80,15 +80,17 @@ public final class InMemoryJdbcDatabase
     public void createTables()
             throws SQLException
     {
-        connection.createStatement().execute("CREATE SCHEMA " + schemaName);
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".orders (orderkey bigint NOT NULL, custkey bigint NOT NULL, orderstatus varchar(1) NOT NULL, totalprice DOUBLE NOT NULL, orderdate date NOT NULL, orderpriority varchar(15) NOT NULL, clerk varchar(15) NOT NULL, shippriority integer NOT NULL, COMMENT varchar(79) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".customer (custkey bigint NOT NULL, name varchar(25) NOT NULL, address varchar(40) NOT NULL, nationkey bigint NOT NULL, phone varchar(15) NOT NULL, acctbal DOUBLE NOT NULL, mktsegment varchar(10) NOT NULL, COMMENT varchar(117) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".supplier (suppkey bigint NOT NULL, name varchar(25) NOT NULL, address varchar(40) NOT NULL, nationkey bigint NOT NULL, phone varchar(15) NOT NULL, acctbal DOUBLE NOT NULL, COMMENT varchar(101) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".region (regionkey bigint NOT NULL, name varchar(25) NOT NULL, COMMENT varchar(152) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".lineitem (orderkey bigint NOT NULL, partkey bigint NOT NULL, suppkey bigint NOT NULL, linenumber integer NOT NULL, quantity DOUBLE NOT NULL, extendedprice DOUBLE NOT NULL, discount DOUBLE NOT NULL, tax DOUBLE NOT NULL, returnflag varchar(1) NOT NULL, linestatus varchar(1) NOT NULL, shipdate date NOT NULL, commitdate date NOT NULL, receiptdate date NOT NULL, shipinstruct varchar(25) NOT NULL, shipmode varchar(10) NOT NULL, COMMENT varchar(44) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".nation (nationkey bigint NOT NULL, name varchar(25) NOT NULL, regionkey bigint NOT NULL, COMMENT varchar(152) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".part (partkey bigint NOT NULL, name varchar(55) NOT NULL, mfgr varchar(25) NOT NULL, brand varchar(10) NOT NULL, TYPE varchar(25) NOT NULL, SIZE integer NOT NULL, container varchar(10) NOT NULL, retailprice DOUBLE NOT NULL, COMMENT varchar(23) NOT NULL) ");
-        connection.createStatement().execute("CREATE TABLE " + schemaName + ".partsupp (partkey bigint NOT NULL, suppkey bigint NOT NULL, availqty integer NOT NULL, supplycost DOUBLE NOT NULL, COMMENT varchar(199) NOT NULL)");
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE SCHEMA " + schemaName);
+            statement.execute("CREATE TABLE " + schemaName + ".orders (orderkey bigint NOT NULL, custkey bigint NOT NULL, orderstatus varchar(1) NOT NULL, totalprice DOUBLE NOT NULL, orderdate date NOT NULL, orderpriority varchar(15) NOT NULL, clerk varchar(15) NOT NULL, shippriority integer NOT NULL, COMMENT varchar(79) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".customer (custkey bigint NOT NULL, name varchar(25) NOT NULL, address varchar(40) NOT NULL, nationkey bigint NOT NULL, phone varchar(15) NOT NULL, acctbal DOUBLE NOT NULL, mktsegment varchar(10) NOT NULL, COMMENT varchar(117) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".supplier (suppkey bigint NOT NULL, name varchar(25) NOT NULL, address varchar(40) NOT NULL, nationkey bigint NOT NULL, phone varchar(15) NOT NULL, acctbal DOUBLE NOT NULL, COMMENT varchar(101) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".region (regionkey bigint NOT NULL, name varchar(25) NOT NULL, COMMENT varchar(152) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".lineitem (orderkey bigint NOT NULL, partkey bigint NOT NULL, suppkey bigint NOT NULL, linenumber integer NOT NULL, quantity DOUBLE NOT NULL, extendedprice DOUBLE NOT NULL, discount DOUBLE NOT NULL, tax DOUBLE NOT NULL, returnflag varchar(1) NOT NULL, linestatus varchar(1) NOT NULL, shipdate date NOT NULL, commitdate date NOT NULL, receiptdate date NOT NULL, shipinstruct varchar(25) NOT NULL, shipmode varchar(10) NOT NULL, COMMENT varchar(44) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".nation (nationkey bigint NOT NULL, name varchar(25) NOT NULL, regionkey bigint NOT NULL, COMMENT varchar(152) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".part (partkey bigint NOT NULL, name varchar(55) NOT NULL, mfgr varchar(25) NOT NULL, brand varchar(10) NOT NULL, TYPE varchar(25) NOT NULL, SIZE integer NOT NULL, container varchar(10) NOT NULL, retailprice DOUBLE NOT NULL, COMMENT varchar(23) NOT NULL) ");
+            statement.execute("CREATE TABLE " + schemaName + ".partsupp (partkey bigint NOT NULL, suppkey bigint NOT NULL, availqty integer NOT NULL, supplycost DOUBLE NOT NULL, COMMENT varchar(199) NOT NULL)");
+        }
         connection.commit();
     }
 
@@ -191,19 +193,9 @@ public final class InMemoryJdbcDatabase
     private static class InMemoryJdbcClient
             extends BaseJdbcClient
     {
-        private final SqlQueryWriter sqlQueryWriter;
-
-        public InMemoryJdbcClient(BaseJdbcConfig baseJdbcConfig, Driver driver, String connectionUrl, SqlQueryWriter sqlQueryWriter,
-                Properties properties)
+        public InMemoryJdbcClient(BaseJdbcConfig baseJdbcConfig, Driver driver, String connectionUrl, Properties properties)
         {
             super(baseJdbcConfig, "\"", new DriverConnectionFactory(driver, connectionUrl, Optional.empty(), Optional.empty(), properties));
-            this.sqlQueryWriter = sqlQueryWriter;
-        }
-
-        @Override
-        public Optional<SqlQueryWriter> getSqlQueryWriter()
-        {
-            return Optional.ofNullable(this.sqlQueryWriter);
         }
     }
 }

@@ -16,13 +16,15 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import org.testng.annotations.Test;
 
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.union;
@@ -37,7 +39,7 @@ public class TestPushProjectionThroughUnion
         tester().assertThat(new PushProjectionThroughUnion())
                 .on(p ->
                         p.project(
-                                Assignments.of(p.symbol("x"), new LongLiteral("3")),
+                                Assignments.of(p.symbol("x"), OriginalExpressionUtils.castToRowExpression(new LongLiteral("3"))),
                                 p.values(p.symbol("a"))))
                 .doesNotFire();
     }
@@ -52,7 +54,7 @@ public class TestPushProjectionThroughUnion
                     Symbol unioned = p.symbol("unioned");
                     Symbol renamed = p.symbol("renamed");
                     return p.project(
-                            Assignments.of(renamed, unioned.toSymbolReference()),
+                            Assignments.of(renamed, p.variable(unioned.getName())),
                             p.union(
                                     ImmutableListMultimap.<Symbol, Symbol>builder()
                                             .put(unioned, left)
@@ -75,7 +77,7 @@ public class TestPushProjectionThroughUnion
                     Symbol c = p.symbol("c");
                     Symbol cTimes3 = p.symbol("c_times_3");
                     return p.project(
-                            Assignments.of(cTimes3, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, c.toSymbolReference(), new LongLiteral("3"))),
+                            Assignments.of(cTimes3, OriginalExpressionUtils.castToRowExpression(new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, toSymbolReference(c), new LongLiteral("3")))),
                             p.union(
                                     ImmutableListMultimap.<Symbol, Symbol>builder()
                                             .put(c, a)

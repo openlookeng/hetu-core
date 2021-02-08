@@ -22,7 +22,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -30,13 +29,13 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.metadata.QualifiedObjectName;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.security.ViewAccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.PrestoWarning;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -45,8 +44,11 @@ import io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.Identity;
+import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.MapType;
@@ -143,6 +145,7 @@ import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.TableSubquery;
 import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
+import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Use;
 import io.prestosql.sql.tree.VacuumTable;
 import io.prestosql.sql.tree.Values;
@@ -167,6 +170,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -184,6 +188,13 @@ import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.connector.StandardWarningCode.REDUNDANT_ORDER_BY;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.WINDOW;
+import static io.prestosql.spi.heuristicindex.IndexRecord.INPROGRESS_PROPERTY_KEY;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.FOLLOWING;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.PRECEDING;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_FOLLOWING;
+import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
+import static io.prestosql.spi.sql.expression.Types.WindowFrameType.RANGE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
@@ -234,15 +245,9 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_IS_STALE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_PARSE_ERROR;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.WILDCARD_WITHOUT_FROM;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypeSignatures;
-import static io.prestosql.sql.planner.DeterminismEvaluator.isDeterministic;
+import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.ExpressionInterpreter.expressionOptimizer;
 import static io.prestosql.sql.tree.ExplainType.Type.DISTRIBUTED;
-import static io.prestosql.sql.tree.FrameBound.Type.CURRENT_ROW;
-import static io.prestosql.sql.tree.FrameBound.Type.FOLLOWING;
-import static io.prestosql.sql.tree.FrameBound.Type.PRECEDING;
-import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_FOLLOWING;
-import static io.prestosql.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
-import static io.prestosql.sql.tree.WindowFrame.Type.RANGE;
 import static io.prestosql.util.MoreLists.mappedCopy;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
@@ -777,6 +782,12 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitCreateIndex(CreateIndex node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
         protected Scope visitDropCache(DropCache node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
@@ -796,6 +807,12 @@ class StatementAnalyzer
 
         @Override
         protected Scope visitDropIndex(DropIndex node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
+        protected Scope visitUpdateIndex(UpdateIndex node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
         }
@@ -1027,39 +1044,100 @@ class StatementAnalyzer
         protected Scope visitTable(Table table, Optional<Scope> scope)
         {
             if (analysis.getOriginalStatement() instanceof CreateIndex) {
-                // check index parameters validate
                 CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
                 QualifiedObjectName tableFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getTableName());
+                accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), tableFullName);
                 String tableName = tableFullName.toString();
-                // check catalog validate
-                if (!heuristicIndexerManager.getSupportedCatalog().contains(tableFullName.getCatalogName())) {
+                // check whether catalog support create index
+                if (!metadata.isHeuristicIndexSupported(session, tableFullName)) {
                     throw new SemanticException(NOT_SUPPORTED, createIndex,
-                            "CREATE INDEX is not supported in '%s' connector",
+                            "CREATE INDEX is not supported in catalog '%s'",
                             tableFullName.getCatalogName());
                 }
+
                 List<String> partitions = new ArrayList<>();
+                String partitionColumn = null;
                 if (createIndex.getExpression().isPresent()) {
                     partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
-                    // check partitions validate
+                    // check partition name validate, create index …… where pt_d = xxx;
+                    // pt_d must be partition column
+                    Set<String> partitionColumns = partitions.stream().map(k -> k.substring(0, k.indexOf("="))).collect(Collectors.toSet());
+                    if (partitionColumns.size() > 1) {
+                        // currently only support one partition column
+                        throw new IllegalArgumentException("Heuristic index only supports predicates on one column");
+                    }
+                    // The only entry in set should be the only partition column name
+                    partitionColumn = partitionColumns.iterator().next();
                 }
+
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
+                if (tableHandle.isPresent() && !tableHandle.get().getConnectorHandle().isHeuristicIndexSupported()) {
+                    throw new SemanticException(NOT_SUPPORTED, table, "Catalog supported, but table storage format is not supported by heuristic index");
+                }
+                if (tableHandle.isPresent() && partitionColumn != null
+                        && !tableHandle.get().getConnectorHandle().isPartitionColumn(partitionColumn)) {
+                    throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
+                }
+
                 List<Map.Entry<String, Type>> indexColumns = new LinkedList<>();
                 for (Identifier i : createIndex.getColumnAliases()) {
                     indexColumns.add(new AbstractMap.SimpleEntry<>(i.toString(), BIGINT));
                 }
+
+                // For now, creating index for multiple columns is not supported
+                if (indexColumns.size() > 1) {
+                    throw new SemanticException(NOT_SUPPORTED, table, "Multi-column indexes are currently not supported");
+                }
+
                 try {
-                    boolean indexExist = heuristicIndexerManager.getIndexClient().indexRecordExists(new CreateIndexMetadata(
+                    // Use this place holder to check the existence of index and lock the place
+                    Properties properties = new Properties();
+                    properties.setProperty(INPROGRESS_PROPERTY_KEY, "TRUE");
+                    CreateIndexMetadata placeHolder = new CreateIndexMetadata(
                             createIndex.getIndexName().toString(),
                             tableName,
                             createIndex.getIndexType(),
                             indexColumns,
                             partitions,
-                            null,
+                            properties,
                             session.getUser(),
-                            null));
-                    if (indexExist) {
-                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                "Index '%s' already exist, or Index with same (table,column,indexType) already exists, or partitions contain conflicts",
-                                createIndex.getIndexName().toString());
+                            null);
+
+                    synchronized (StatementAnalyzer.class) {
+                        IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);
+                        switch (recordStatus) {
+                            case SAME_NAME:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index '%s' already exists", createIndex.getIndexName().toString());
+                            case SAME_CONTENT:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index with same (table,column,indexType) already exists");
+                            case SAME_INDEX_PART_CONFLICT:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index with same (table,column,indexType) already exists and partition(s) contain conflicts");
+                            case IN_PROGRESS_SAME_NAME:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index '%s' is being created by another user. Check running queries for details. If there is no running query for this index, " +
+                                                "the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                        createIndex.getIndexName().toString(), createIndex.getIndexName().toString());
+                            case IN_PROGRESS_SAME_CONTENT:
+                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                        "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                                "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX'");
+                            case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                                if (partitions.isEmpty()) {
+                                    throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                            "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                                    "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                            createIndex.getIndexName().toString());
+                                }
+                                // allow different queries to run with explicitly same partitions
+                            case SAME_INDEX_PART_CAN_MERGE:
+                            case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
+                                break;
+                            case NOT_FOUND:
+                                heuristicIndexerManager.getIndexClient().addIndexRecord(placeHolder);
+                        }
                     }
                 }
                 catch (IOException e) {
@@ -1700,8 +1778,8 @@ class StatementAnalyzer
 
         private void analyzeWindowFrame(WindowFrame frame)
         {
-            FrameBound.Type startType = frame.getStart().getType();
-            FrameBound.Type endType = frame.getEnd().orElse(new FrameBound(CURRENT_ROW)).getType();
+            Types.FrameBoundType startType = frame.getStart().getType();
+            Types.FrameBoundType endType = frame.getEnd().orElse(new FrameBound(CURRENT_ROW)).getType();
 
             if (startType == UNBOUNDED_FOLLOWING) {
                 throw new SemanticException(INVALID_WINDOW_FRAME, frame, "Window frame start cannot be UNBOUNDED FOLLOWING");
