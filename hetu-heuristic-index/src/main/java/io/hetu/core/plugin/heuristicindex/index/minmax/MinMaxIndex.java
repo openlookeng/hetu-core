@@ -17,9 +17,12 @@ package io.hetu.core.plugin.heuristicindex.index.minmax;
 
 import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecureObjectInputStream;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
-import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,6 +31,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import static io.hetu.core.heuristicindex.util.IndexConstants.TYPES_WHITELIST;
@@ -107,24 +111,28 @@ public class MinMaxIndex
     @Override
     public boolean matches(Object expression)
     {
-        if (expression instanceof ComparisonExpression) {
-            ComparisonExpression compExp = (ComparisonExpression) expression;
-            ComparisonExpression.Operator operator = compExp.getOperator();
-            Comparable value = (Comparable) extractSingleValue(compExp.getRight());
-            switch (operator) {
-                case EQUAL:
-                    return (value.compareTo(min) > 0 || value.compareTo(min) == 0)
-                            && (value.compareTo(max) < 0 || value.compareTo(max) == 0);
-                case LESS_THAN:
-                    return value.compareTo(min) > 0;
-                case LESS_THAN_OR_EQUAL:
-                    return value.compareTo(min) > 0 || value.compareTo(min) == 0;
-                case GREATER_THAN:
-                    return value.compareTo(max) < 0;
-                case GREATER_THAN_OR_EQUAL:
-                    return value.compareTo(max) < 0 || value.compareTo(max) == 0;
-                default:
-                    throw new IllegalArgumentException("Unsupported operator " + operator);
+        if (expression instanceof CallExpression) {
+            CallExpression callExp = (CallExpression) expression;
+            Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
+            if (operatorOptional.isPresent()) {
+                OperatorType operator = operatorOptional.get();
+                ConstantExpression constExp = (ConstantExpression) callExp.getArguments().get(1);
+                Comparable value = (Comparable) extractSingleValue(constExp);
+                switch (operator) {
+                    case EQUAL:
+                        return (value.compareTo(min) > 0 || value.compareTo(min) == 0)
+                                && (value.compareTo(max) < 0 || value.compareTo(max) == 0);
+                    case LESS_THAN:
+                        return value.compareTo(min) > 0;
+                    case LESS_THAN_OR_EQUAL:
+                        return value.compareTo(min) > 0 || value.compareTo(min) == 0;
+                    case GREATER_THAN:
+                        return value.compareTo(max) < 0;
+                    case GREATER_THAN_OR_EQUAL:
+                        return value.compareTo(max) < 0 || value.compareTo(max) == 0;
+                    default:
+                        throw new IllegalArgumentException("Unsupported operator " + operator);
+                }
             }
         }
 

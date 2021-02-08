@@ -15,24 +15,20 @@
 
 package io.hetu.core.heuristicindex.filter;
 
+import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.InListExpression;
-import io.prestosql.sql.tree.InPredicate;
-import io.prestosql.sql.tree.LogicalBinaryExpression;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN_OR_EQUAL;
 
 public class HeuristicIndexFilter
         implements IndexFilter
@@ -48,44 +44,38 @@ public class HeuristicIndexFilter
     public boolean matches(Object expression)
     {
         // Only push ComparisonExpression to the actual indices
-        if (expression instanceof ComparisonExpression) {
-            return matchAny((ComparisonExpression) expression);
+        if (expression instanceof CallExpression) {
+            return matchAny((CallExpression) expression);
         }
 
-        if (expression instanceof BetweenPredicate) {
-            BetweenPredicate betweenPredicate = (BetweenPredicate) expression;
-            ComparisonExpression left = new ComparisonExpression(GREATER_THAN_OR_EQUAL, betweenPredicate.getValue(), betweenPredicate.getMin());
-            ComparisonExpression right = new ComparisonExpression(LESS_THAN_OR_EQUAL, betweenPredicate.getValue(), betweenPredicate.getMax());
-            return matches(left) && matches(right);
-        }
-
-        if (expression instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) expression;
-            final LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
-            if (operator == LogicalBinaryExpression.Operator.AND) {
-                return matches(lbExpression.getLeft()) && matches(lbExpression.getRight());
-            }
-            else if (operator == LogicalBinaryExpression.Operator.OR) {
-                return matches(lbExpression.getLeft()) || matches(lbExpression.getRight());
-            }
-            else {
-                throw new IllegalArgumentException("Unsupported logical expression type: " + operator);
-            }
-        }
-
-        if (expression instanceof InPredicate) {
-            Expression valueList = ((InPredicate) expression).getValueList();
-            if (valueList instanceof InListExpression) {
-                InListExpression inListExpression = (InListExpression) valueList;
-                for (Expression expr : inListExpression.getValues()) {
-                    ComparisonExpression oneValueCompExp = new ComparisonExpression(
-                            ComparisonExpression.Operator.EQUAL, ((InPredicate) expression).getValue(), expr);
-                    if (matchAny(oneValueCompExp)) {
-                        return true;
+        if (expression instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) expression;
+            switch (specialForm.getForm()) {
+                case BETWEEN:
+                    Signature sigLeft = Signature.internalOperator(OperatorType.GREATER_THAN_OR_EQUAL,
+                            specialForm.getType().getTypeSignature(),
+                            specialForm.getArguments().get(1).getType().getTypeSignature());
+                    Signature sigRight = Signature.internalOperator(OperatorType.LESS_THAN_OR_EQUAL,
+                            specialForm.getType().getTypeSignature(),
+                            specialForm.getArguments().get(2).getType().getTypeSignature());
+                    CallExpression left = new CallExpression(sigLeft, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)));
+                    CallExpression right = new CallExpression(sigRight, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)));
+                    return matches(left) && matches(right);
+                case IN:
+                    Signature sigEqual = Signature.internalOperator(OperatorType.EQUAL,
+                            specialForm.getType().getTypeSignature(),
+                            specialForm.getArguments().get(1).getType().getTypeSignature());
+                    for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
+                        if (matches(new CallExpression(sigEqual, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), exp)))) {
+                            return true;
+                        }
                     }
-                }
-                // None of the values in the IN-valueList matches any index
-                return false;
+                    // None of the values in the IN-valueList matches any index
+                    return false;
+                case AND:
+                    return matches(specialForm.getArguments().get(0)) && matches(specialForm.getArguments().get(1));
+                case OR:
+                    return matches(specialForm.getArguments().get(0)) || matches(specialForm.getArguments().get(1));
             }
         }
 
@@ -99,29 +89,20 @@ public class HeuristicIndexFilter
         return Collections.emptyIterator();
     }
 
-    private static Expression extractExpression(Expression expression)
-    {
-        if (expression instanceof Cast) {
-            // extract the inner expression for CAST expressions
-            return extractExpression(((Cast) expression).getExpression());
-        }
-        else {
-            return expression;
-        }
-    }
-
     // Apply the indices on the expression. Currently only ComparisonExpression is supported
-    private boolean matchAny(ComparisonExpression compExp)
+    private boolean matchAny(CallExpression callExp)
     {
-        Expression left = extractExpression(compExp.getLeft());
-        Expression right = extractExpression(compExp.getRight());
-
-        if (!(left instanceof SymbolReference)) {
+        if (callExp.getArguments().size() != 2) {
             return true;
         }
+        RowExpression varRef = callExp.getArguments().get(0);
 
-        String columnName = ((SymbolReference) left).getName();
-        List<IndexMetadata> selectedIndices = HeuristicIndexSelector.select(compExp, indices.get(columnName));
+        if (!(varRef instanceof VariableReferenceExpression)) {
+            return true;
+        }
+        String columnName = ((VariableReferenceExpression) varRef).getName();
+
+        List<IndexMetadata> selectedIndices = HeuristicIndexSelector.select(callExp, indices.get(columnName));
 
         if (selectedIndices == null || selectedIndices.isEmpty()) {
             return true;
@@ -134,7 +115,7 @@ public class HeuristicIndexFilter
             }
 
             try {
-                if (indexMetadata.getIndex().matches(compExp)) {
+                if (indexMetadata.getIndex().matches(callExp)) {
                     return true;
                 }
             }

@@ -15,79 +15,25 @@
 
 package io.hetu.core.heuristicindex.util;
 
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.prestosql.sql.tree.BooleanLiteral;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.DecimalLiteral;
-import io.prestosql.sql.tree.DoubleLiteral;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.GenericLiteral;
-import io.prestosql.sql.tree.LongLiteral;
-import io.prestosql.sql.tree.StringLiteral;
-import io.prestosql.sql.tree.TimeLiteral;
-import io.prestosql.sql.tree.TimestampLiteral;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.type.Type;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.time.LocalDate;
 import java.util.Comparator;
 
 public class TypeUtils
 {
-    private static final Logger LOG = Logger.get(TypeUtils.class);
-
     private TypeUtils() {}
 
-    public static Object extractSingleValue(Expression expression)
+    public static Object extractSingleValue(ConstantExpression constantExpression)
     {
-        if (expression instanceof Cast) {
-            return extractSingleValue(((Cast) expression).getExpression());
+        Type type = constantExpression.getType();
+        Object value = constantExpression.getValue();
+        if (value instanceof Slice) {
+            return ((Slice) value).toStringUtf8();
         }
-        else if (expression instanceof BooleanLiteral) {
-            return ((BooleanLiteral) expression).getValue();
-        }
-        else if (expression instanceof DecimalLiteral) {
-            String value = ((DecimalLiteral) expression).getValue();
-            return new BigDecimal(value);
-        }
-        else if (expression instanceof DoubleLiteral) {
-            return ((DoubleLiteral) expression).getValue();
-        }
-        else if (expression instanceof LongLiteral) {
-            return ((LongLiteral) expression).getValue();
-        }
-        else if (expression instanceof StringLiteral) {
-            return ((StringLiteral) expression).getValue();
-        }
-        else if (expression instanceof TimeLiteral) {
-            return ((TimeLiteral) expression).getValue();
-        }
-        else if (expression instanceof TimestampLiteral) {
-            String value = ((TimestampLiteral) expression).getValue();
-            return Timestamp.valueOf(value).getTime();
-        }
-        else if (expression instanceof GenericLiteral) {
-            GenericLiteral genericLiteral = (GenericLiteral) expression;
-
-            if (genericLiteral.getType().equalsIgnoreCase("bigint")) {
-                return Long.valueOf(genericLiteral.getValue());
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("real")) {
-                return (long) Float.floatToIntBits(Float.parseFloat(genericLiteral.getValue()));
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("tinyint")) {
-                return Byte.valueOf(genericLiteral.getValue()).longValue();
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("smallint")) {
-                return Short.valueOf(genericLiteral.getValue()).longValue();
-            }
-            else if (genericLiteral.getType().equalsIgnoreCase("date")) {
-                return LocalDate.parse(genericLiteral.getValue()).toEpochDay();
-            }
-        }
-
-        throw new UnsupportedOperationException("Not Implemented Exception: " + expression.toString());
+        return value;
     }
 
     public static Object getNativeValue(Object object)

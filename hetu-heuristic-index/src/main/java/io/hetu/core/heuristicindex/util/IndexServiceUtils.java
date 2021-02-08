@@ -17,7 +17,10 @@ package io.hetu.core.heuristicindex.util;
 
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
-import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
@@ -30,6 +33,7 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -37,6 +41,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
+import static io.prestosql.spi.function.OperatorType.EQUAL;
 
 /**
  * Util class for creating external index.
@@ -249,14 +254,15 @@ public class IndexServiceUtils
         }
     }
 
-    public static boolean matchCompExpEqual(Object expression, Function<Object, Boolean> matchingFunction)
+    public static boolean matchCallExpEqual(Object expression, Function<Object, Boolean> matchingFunction)
     {
-        if (expression instanceof ComparisonExpression) {
-            ComparisonExpression compExp = (ComparisonExpression) expression;
-            ComparisonExpression.Operator operator = compExp.getOperator();
-            Object value = extractSingleValue(compExp.getRight());
+        if (expression instanceof CallExpression) {
+            CallExpression callExp = (CallExpression) expression;
+            Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
+            ConstantExpression constExp = (ConstantExpression) callExp.getArguments().get(1);
+            Object value = extractSingleValue(constExp);
 
-            if (operator == ComparisonExpression.Operator.EQUAL) {
+            if (operatorOptional.isPresent() && operatorOptional.get() == EQUAL) {
                 return matchingFunction.apply(value);
             }
 
