@@ -33,6 +33,8 @@ import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.SystemAccessControl;
 import io.prestosql.spi.security.SystemAccessControlFactory;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 import io.prestosql.transaction.TransactionId;
 import io.prestosql.transaction.TransactionManager;
 import org.weakref.jmx.Managed;
@@ -850,43 +852,41 @@ public class AccessControlManager
     }
 
     @Override
-    public String applyRowFilters(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    public List<ViewExpression> getRowFilters(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
+        requireNonNull(transactionId, "transactionId is null");
         requireNonNull(identity, "identity is null");
         requireNonNull(tableName, "table name is null");
 
-        authenticationCheck(() -> checkCanAccessCatalog(identity, tableName.getCatalogName()));
-        final String expressionFilter = systemAccessControl.get().applyRowLevelFiltering(identity, tableName.asCatalogSchemaTableName());
-
-        // Giving priority to system access control
-        if (expressionFilter != null) {
-            return expressionFilter;
-        }
+        ImmutableList.Builder<ViewExpression> filters = ImmutableList.builder();
 
         CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
-        if (entry == null) {
-            return null;
+        if (entry != null) {
+            entry.getAccessControl().getRowFilter(entry.getTransactionHandle(transactionId), identity, tableName.asSchemaTableName()).ifPresent(filters::add);
         }
-        return entry.getAccessControl().applyRowlevelFiltering(entry.getTransactionHandle(transactionId), identity, tableName.asSchemaTableName());
+
+        systemAccessControl.get().getRowFilter(identity, tableName.asCatalogSchemaTableName()).ifPresent(filters::add);
+
+        return filters.build();
     }
 
     @Override
-    public String applyColumnMasking(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, String columnName)
+    public List<ViewExpression> getColumnMasks(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, String columnName, Type type)
     {
+        requireNonNull(transactionId, "securityContext is null");
         requireNonNull(identity, "identity is null");
         requireNonNull(tableName, "table name is null");
-        requireNonNull(columnName, "column name is null");
 
-        // Giving priority to system access control
-        final String columnMasking = systemAccessControl.get().applyColumnMasking(identity, tableName.asCatalogSchemaTableName(), columnName);
-        if (columnMasking != null) {
-            return columnMasking;
-        }
+        ImmutableList.Builder<ViewExpression> filters = ImmutableList.builder();
+
         CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
-        if (entry == null) {
-            return null;
+        if (entry != null) {
+            entry.getAccessControl().getColumnMask(entry.getTransactionHandle(transactionId), identity, tableName.asSchemaTableName(), columnName, type).ifPresent(filters::add);
         }
-        return entry.getAccessControl().applyColumnMasking(entry.getTransactionHandle(transactionId), identity, tableName.asSchemaTableName(), columnName);
+
+        systemAccessControl.get().getColumnMask(identity, tableName.asCatalogSchemaTableName(), columnName, type).ifPresent(filters::add);
+
+        return filters.build();
     }
 
     @Override

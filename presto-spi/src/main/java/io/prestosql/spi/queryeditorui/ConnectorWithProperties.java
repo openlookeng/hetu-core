@@ -13,11 +13,12 @@
  * limitations under the License.
  */
 
-package io.prestosql.queryeditorui.protocol;
+package io.prestosql.spi.queryeditorui;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,13 +34,19 @@ public class ConnectorWithProperties
 
     @JsonProperty
     private boolean propertiesEnabled;
+
     @JsonProperty
     private boolean catalogConfigFilesEnabled;
+
     @JsonProperty
     private boolean globalConfigFilesEnabled;
 
     @JsonProperty
-    private List<Properties> connectorProperties;
+    private List<Properties> connectorProperties = new ArrayList<>();
+
+    private String docLink;
+
+    private String configLink;
 
     public ConnectorWithProperties()
     {
@@ -59,6 +66,56 @@ public class ConnectorWithProperties
         this.catalogConfigFilesEnabled = catalogConfigFilesEnabled;
         this.globalConfigFilesEnabled = globalConfigFilesEnabled;
         this.connectorProperties = requireNonNull(connectorProperties, "Properties is null");
+    }
+
+    public void setConnectorName(String connectorName)
+    {
+        this.connectorName = requireNonNull(connectorName, "connectorName is null");
+    }
+
+    public void setConnectorLabel(Optional<String> connectorLabel)
+    {
+        this.connectorLabel = requireNonNull(connectorLabel, "connectorLabel is null");
+    }
+
+    public void setPropertiesEnabled(boolean propertiesEnabled)
+    {
+        this.propertiesEnabled = propertiesEnabled;
+    }
+
+    public void setCatalogConfigFilesEnabled(boolean catalogConfigFilesEnabled)
+    {
+        this.catalogConfigFilesEnabled = catalogConfigFilesEnabled;
+    }
+
+    public void setGlobalConfigFilesEnabled(boolean globalConfigFilesEnabled)
+    {
+        this.globalConfigFilesEnabled = globalConfigFilesEnabled;
+    }
+
+    public void addProperties(Properties properties)
+    {
+        this.connectorProperties.add(properties);
+    }
+
+    public void setDocLink(String docLink)
+    {
+        this.docLink = docLink;
+    }
+
+    public void setConfigLink(String configLink)
+    {
+        this.configLink = configLink;
+    }
+
+    public String getDocLink()
+    {
+        return docLink;
+    }
+
+    public String getConfigLink()
+    {
+        return configLink;
     }
 
     @JsonProperty
@@ -102,12 +159,16 @@ public class ConnectorWithProperties
 
     public static class Properties
     {
-        private final String name;
-        private final String value;
-        private final String description;
-        private final Optional<String> type;
-        private final Optional<Boolean> required;
-        private final Optional<Boolean> readOnly;
+        private String name;
+        private String value;
+        private String description;
+        private Optional<String> type;
+        private Optional<Boolean> required;
+        private Optional<Boolean> readOnly;
+
+        public Properties()
+        {
+        }
 
         @JsonCreator
         public Properties(
@@ -123,6 +184,36 @@ public class ConnectorWithProperties
             this.description = description;
             this.type = type;
             this.required = required;
+            this.readOnly = readOnly;
+        }
+
+        public void setName(String name)
+        {
+            this.name = name;
+        }
+
+        public void setValue(String value)
+        {
+            this.value = value;
+        }
+
+        public void setDescription(String description)
+        {
+            this.description = description;
+        }
+
+        public void setType(Optional<String> type)
+        {
+            this.type = type;
+        }
+
+        public void setRequired(Optional<Boolean> required)
+        {
+            this.required = required;
+        }
+
+        public void setReadOnly(Optional<Boolean> readOnly)
+        {
             this.readOnly = readOnly;
         }
 

@@ -70,6 +70,7 @@ CarbonData连接器安全需要的属性在[CarbonData配置属性](./carbondata
 | `hive.hdfs.presto.keytab`| HDFS客户端keytab位置。| | 
 | `hive.collect-column-statistics-on-write`| 启用写入时自动收集列级统计信息。详见[表统计](./hive.md#表统计信息)。| `true`| 
 | `carbondata.vacuum-service-threads`| 指定自动清理的线程数。最小值为1。| 2| 
+| `carbondata.auto-vacuum-enabled`          | 对CarbonData表启用自动清理。如需在引擎侧启用自动清理，请在协调节点的config.properties中添加`auto-vacuum.enabled=true`。 | false    |
 
 ## Hive Thrift元存储配置属性说明
 
@@ -88,18 +89,18 @@ CarbonData连接器在写入数据时，总是收集基本的统计信息（`num
 
 | 列类型| Null数量| 不同值数量| 最小值/最大值|
 |----------|----------|----------|----------|
-| `SMALLINT`完成| Y| Y| Y|
-| `INTEGER`完成| Y| Y| Y|
-| `BIGINT`完成| Y| Y| Y|
-| `DOUBLE`完成| Y| Y| Y|
-| `REAL`完成| Y| Y| Y|
-| `DECIMAL`完成| Y| Y| Y|
-| `DATE`完成| Y| Y| Y|
-| `TIMESTAMP`完成| Y| Y| N|
-| `VARCHAR`完成| Y| Y| N|
-| `CHAR`完成| Y| Y| N|
-| `VARBINARY`完成| Y| N| N|
-| `BOOLEAN`完成| Y| Y| N|
+| `SMALLINT`| Y| Y| Y|
+| `INTEGER`| Y| Y| Y|
+| `BIGINT`| Y| Y| Y|
+| `DOUBLE`| Y| Y| Y|
+| `REAL`| Y| Y| Y|
+| `DECIMAL`| Y| Y| Y|
+| `DATE`| Y| Y| Y|
+| `TIMESTAMP`| Y| Y| N|
+| `VARCHAR`| Y| Y| N|
+| `CHAR`| Y| Y| N|
+| `VARBINARY`| Y| N| N|
+| `BOOLEAN`| Y| Y| N|
 
 ## 自动清理
 

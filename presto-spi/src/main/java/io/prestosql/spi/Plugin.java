@@ -19,6 +19,7 @@ import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 import io.prestosql.spi.resourcegroups.ResourceGroupConfigurationManagerFactory;
 import io.prestosql.spi.security.PasswordAuthenticatorFactory;
 import io.prestosql.spi.security.SystemAccessControlFactory;
@@ -30,6 +31,7 @@ import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
 
 import java.io.File;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
@@ -120,6 +122,11 @@ public interface Plugin
     default Iterable<IndexFactory> getIndexFactories()
     {
         return emptyList();
+    }
+
+    default Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        return Optional.empty();
     }
 
     default void setExternalFunctionsDir(File externalFuncsDir)

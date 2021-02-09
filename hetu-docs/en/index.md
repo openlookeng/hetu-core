@@ -40,6 +40,7 @@ headless: true
     - [Horizontal Scaling]({{< relref "./docs/admin/horizontal-scaling.md" >}})
     - [Dynamic Filtering]({{< relref "./docs/admin/dynamic-filters.md" >}})
     - [State store]({{< relref "./docs/admin/state-store.md" >}})
+    - [Meta Store]({{< relref "./docs/admin/meta-store.md" >}})
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
 
 - [Query Optimizer]("#")

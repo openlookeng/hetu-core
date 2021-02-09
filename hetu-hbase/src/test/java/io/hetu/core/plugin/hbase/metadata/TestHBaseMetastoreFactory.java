@@ -34,7 +34,7 @@ public class TestHBaseMetastoreFactory
     /**
      * testHBaseMetastoreFactoryHetuMetastore
      */
-    @Test
+    @Test(expectedExceptions = NullPointerException.class)
     public void testHBaseMetastoreFactoryHetuMetastore()
     {
         HBaseConfig hBConf = new HBaseConfig();

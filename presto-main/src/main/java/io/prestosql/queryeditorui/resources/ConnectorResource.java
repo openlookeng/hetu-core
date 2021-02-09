@@ -14,9 +14,6 @@
  */
 package io.prestosql.queryeditorui.resources;
 
-import com.google.inject.Inject;
-import io.prestosql.queryeditorui.protocol.Connector;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.queryeditorui.store.connectors.ConnectorCache;
 
 import javax.servlet.http.HttpServletRequest;
@@ -27,25 +24,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import java.util.List;
-
 @Path("/api/connectors")
 public class ConnectorResource
 {
-    private final ConnectorCache connectorCache;
-
-    @Inject
-    public ConnectorResource(ConnectorCache connectorCache)
-    {
-        this.connectorCache = connectorCache;
-    }
-
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Response getConnectors(@Context HttpServletRequest servletRequest)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
-        List<Connector> lk = connectorCache.getConnectors(user);
-        return Response.ok(lk).build();
+        return Response.ok(ConnectorCache.getConnectors()).build();
     }
 }

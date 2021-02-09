@@ -256,9 +256,10 @@ public class BooleanSelectiveColumnReader
         }
 
         int streamPosition = 0;
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         if (dataStream == null && presentStream != null) {
             streamPosition = readAllNulls(positions, positionCount);
-            if (filters != null && filters.get(0).testNull() && accumulator != null) {
+            if (checkNulls && accumulator != null) {
                 accumulator.set(positions[0], streamPosition);
             }
         }
@@ -279,7 +280,8 @@ public class BooleanSelectiveColumnReader
                         if (outputRequired) {
                             nulls[outputPositionCount] = true;
                         }
-                        if (accumulator != null) {
+
+                        if (accumulator != null && checkNulls) {
                             accumulator.set(position);
                         }
 

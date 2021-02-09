@@ -41,16 +41,18 @@ public class TestHBaseSplit
                         "rowKey",
                         TestUtils.createHBaseTableHandle(),
                         new ArrayList<HostAddress>(1),
-                        "startrow",
-                        "endrow",
+                        "startRow",
+                        "endRow",
                         new HashMap<>(),
-                        true);
+                        0,
+                        true,
+                        "testSnapShot");
 
         assertEquals(0, split.getRanges().size());
         assertEquals(TestUtils.createHBaseTableHandle(), split.getTableHandle());
         assertEquals(true, split.isRemotelyAccessible());
         assertEquals("rowKey", split.getRowKeyName());
-        assertEquals("endrow", split.getEndRow());
+        assertEquals("endRow", split.getEndRow());
         assertEquals(true, split.isRandomSplit());
         assertEquals(0, split.getAddresses().size());
     }

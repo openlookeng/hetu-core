@@ -26,15 +26,13 @@ import io.airlift.http.server.HttpServerConfig;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.client.SocketChannelSocketFactory;
-import io.prestosql.connector.DataCenterConnectorManager;
-import io.prestosql.metadata.CatalogManager;
 import io.prestosql.queryeditorui.execution.ClientSessionFactory;
 import io.prestosql.queryeditorui.execution.ExecutionClient;
 import io.prestosql.queryeditorui.execution.QueryInfoClient;
 import io.prestosql.queryeditorui.execution.QueryRunner.QueryRunnerFactory;
-import io.prestosql.queryeditorui.metadata.ColumnCache;
-import io.prestosql.queryeditorui.metadata.PreviewTableCache;
-import io.prestosql.queryeditorui.metadata.SchemaCache;
+import io.prestosql.queryeditorui.metadata.ColumnService;
+import io.prestosql.queryeditorui.metadata.PreviewTableService;
+import io.prestosql.queryeditorui.metadata.SchemaService;
 import io.prestosql.queryeditorui.output.PersistentJobOutputFactory;
 import io.prestosql.queryeditorui.output.builders.OutputBuilderFactory;
 import io.prestosql.queryeditorui.output.persistors.CSVPersistorFactory;
@@ -44,13 +42,12 @@ import io.prestosql.queryeditorui.protocol.ExecutionStatus.ExecutionSuccess;
 import io.prestosql.queryeditorui.resources.ConnectorResource;
 import io.prestosql.queryeditorui.resources.FilesResource;
 import io.prestosql.queryeditorui.resources.LoginResource;
+import io.prestosql.queryeditorui.resources.MetadataResource;
 import io.prestosql.queryeditorui.resources.QueryResource;
 import io.prestosql.queryeditorui.resources.ResultsPreviewResource;
-import io.prestosql.queryeditorui.resources.TablesResource;
 import io.prestosql.queryeditorui.resources.UIExecuteResource;
 import io.prestosql.queryeditorui.resources.UserResource;
 import io.prestosql.queryeditorui.security.UiAuthenticator;
-import io.prestosql.queryeditorui.store.connectors.ConnectorCache;
 import io.prestosql.queryeditorui.store.files.ExpiringFileStore;
 import io.prestosql.queryeditorui.store.history.JobHistoryStore;
 import io.prestosql.queryeditorui.store.history.LocalJobHistoryStore;
@@ -70,8 +67,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -103,11 +98,14 @@ public class QueryEditorUIModule
         jaxrsBinder(binder).bind(FilesResource.class);
         jaxrsBinder(binder).bind(QueryResource.class);
         jaxrsBinder(binder).bind(ResultsPreviewResource.class);
-        jaxrsBinder(binder).bind(TablesResource.class);
+        jaxrsBinder(binder).bind(MetadataResource.class);
         jaxrsBinder(binder).bind(ConnectorResource.class);
         jaxrsBinder(binder).bind(LoginResource.class);
         jaxrsBinder(binder).bind(UserResource.class);
 
+        binder.bind(SchemaService.class).in(Scopes.SINGLETON);
+        binder.bind(ColumnService.class).in(Scopes.SINGLETON);
+        binder.bind(PreviewTableService.class).in(Scopes.SINGLETON);
         binder.bind(ExecutionClient.class).in(Scopes.SINGLETON);
         binder.bind(PersistentJobOutputFactory.class).in(Scopes.SINGLETON);
         binder.bind(JobHistoryStore.class).to(LocalJobHistoryStore.class).in(Scopes.SINGLETON);
@@ -233,57 +231,9 @@ public class QueryEditorUIModule
         return new QueryInfoClient(httpClient);
     }
 
-    @Singleton
-    @Provides
-    public SchemaCache provideSchemaCache(QueryRunnerFactory queryRunnerFactory,
-            CatalogManager catalogManager,
-            DataCenterConnectorManager dataCenterConnectorManager,
-            @Named("hetu") ExecutorService executorService,
-            QueryEditorConfig config)
-    {
-        final SchemaCache cache = new SchemaCache(queryRunnerFactory, executorService, config.getSchemaCacheExpiryMin());
-        if (config.isPopulateSchemaCacheOnStartup()) {
-            cache.populateCache(catalogManager, dataCenterConnectorManager);
-        }
-        return cache;
-    }
-
-    @Singleton
-    @Provides
-    public ColumnCache provideColumnCache(QueryRunnerFactory queryRunnerFactory,
-            @Named("hetu") ExecutorService executorService,
-            QueryEditorConfig config)
-    {
-        return new ColumnCache(queryRunnerFactory, executorService, config.getSchemaCacheExpiryMin());
-    }
-
-    @Singleton
-    @Provides
-    public PreviewTableCache providePreviewTableCache(QueryRunnerFactory queryRunnerFactory,
-            @Named("hetu") ExecutorService executorService,
-            QueryEditorConfig config)
-    {
-        return new PreviewTableCache(queryRunnerFactory,
-                executorService, config.getPreviewTableCacheExpiryMin());
-    }
-
-    @Singleton
-    @Named("hetu")
-    @Provides
-    public ExecutorService provideCompleterExecutorService()
-    {
-        return Executors.newCachedThreadPool(SchemaCache.daemonThreadsNamed("presto-%d"));
-    }
-
     @Provides
     public QueryStore provideQueryStore(QueryEditorConfig queryEditorConfig) throws IOException
     {
         return new InMemoryQueryStore(new File(queryEditorConfig.getFeaturedQueriesPath()), new File(queryEditorConfig.getUserQueriesPath()));
-    }
-
-    @Provides
-    public ConnectorCache provideConnectorCache(QueryEditorConfig queryEditorConfig) throws IOException
-    {
-        return new ConnectorCache(new File(queryEditorConfig.getConnectorsListPath()));
     }
 }

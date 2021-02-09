@@ -22,6 +22,8 @@ import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
 import io.prestosql.spi.security.SystemAccessControl;
 import io.prestosql.spi.security.SystemAccessControlFactory;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.security.Principal;
 import java.util.List;
@@ -262,19 +264,19 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
-    public String applyRowLevelFiltering(Identity identity, CatalogSchemaTableName table)
-    {
-        return null;
-    }
-
-    @Override
-    public String applyColumnMasking(Identity identity, CatalogSchemaTableName asCatalogSchemaTableName, String columnName)
-    {
-        return null;
-    }
-
-    @Override
     public void checkCanAccessNodeInfo(Identity identity)
     {
+    }
+
+    @Override
+    public Optional<ViewExpression> getRowFilter(Identity identity, CatalogSchemaTableName tableName)
+    {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ViewExpression> getColumnMask(Identity identity, CatalogSchemaTableName tableName, String columnName, Type type)
+    {
+        return Optional.empty();
     }
 }

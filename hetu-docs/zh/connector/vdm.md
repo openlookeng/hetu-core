@@ -17,9 +17,13 @@ VDM使用openLooKeng元存储存储其数据库信息。信息可以存储在HDF
 因此必须先配置VDM元数据的存储方式。
 * 下面是使用RDBMS作为VDM元数据的示例，创建`etc/hetu-metastore.properties`：
 ```
+# the type of metastore storage
 hetu.metastore.type=jdbc
+# jdbc connection address of database
 hetu.metastore.db.url=jdbc:mysql://....
+# the user name of the database
 hetu.metastore.db.user=root
+# the password of database     
 hetu.metastore.db.password=123456
 ```
 * 下面是使用HDFS作为元数据存储的实例，创建`etc/hetu-metastore.properties`：
@@ -34,7 +38,7 @@ hetu.metastore.db.password=123456
 hetu.metastore.type=hetufilesystem
 # profile name of hetu file system
 hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
-#the path of metastore storage in the hetu file system
+# the path of metastore storage in the hetu file system
 hetu.metastore.hetufilesystem.path=/etc/openlookeng/metastore
 ```    
 可以从[文件系统](../develop/filesystem.md )中获取更多的文件系统相关的信息
@@ -75,7 +79,7 @@ VDM数据源也可以通过动态目录API进行管理。有关更多信息，�
 | 查询模式下的所有视图| `show tables`|
 | 创建/更新视图| `create [or replace] view`|
 | 删除视图| `drop view`|
-| 按视图查询数据| `select * from view`|
+| 按视图查询数据| `select`|
 | 查询视图创建信息| `show create view`|
-| 查询视图列信息| `desc view`|
-
+| 查询视图列信息| `describe`|
+有关更多信息，参见[SQL语法介绍](../sql/_index.md)。

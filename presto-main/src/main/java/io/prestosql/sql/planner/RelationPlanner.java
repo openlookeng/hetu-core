@@ -89,6 +89,7 @@ import io.prestosql.type.TypeCoercion;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -99,6 +100,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.analyzer.SemanticExceptions.notSupportedException;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
@@ -172,8 +174,61 @@ class RelationPlanner
         }
 
         List<Symbol> outputSymbols = outputSymbolsBuilder.build();
-        PlanNode root = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols, columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0);
-        return new RelationPlan(root, scope, outputSymbols);
+        boolean isDeleteTarget = analysis.isDeleteTarget(createQualifiedObjectName(session, node, node.getName()));
+        PlanNode root = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols, columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, isDeleteTarget);
+        RelationPlan tableScan = new RelationPlan(root, scope, outputSymbols);
+        tableScan = addRowFilters(node, tableScan);
+        tableScan = addColumnMasks(node, tableScan);
+        return tableScan;
+    }
+
+    private RelationPlan addRowFilters(Table node, RelationPlan plan)
+    {
+        PlanBuilder planBuilder = initializePlanBuilder(plan);
+        for (Expression filter : analysis.getRowFilters(node)) {
+            planBuilder = subqueryPlanner.handleSubqueries(planBuilder, filter, filter);
+
+            planBuilder = planBuilder.withNewRoot(new FilterNode(
+                    idAllocator.getNextId(),
+                    planBuilder.getRoot(),
+                    castToRowExpression(planBuilder.rewrite(filter))));
+        }
+
+        return new RelationPlan(planBuilder.getRoot(), plan.getScope(), plan.getFieldMappings());
+    }
+
+    private RelationPlan addColumnMasks(Table table, RelationPlan plan)
+    {
+        Map<String, List<Expression>> columnMasks = analysis.getColumnMasks(table);
+
+        PlanNode root = plan.getRoot();
+        List<Symbol> mappings = plan.getFieldMappings();
+
+        TranslationMap translations = new TranslationMap(plan, analysis, lambdaDeclarationToSymbolMap);
+        translations.setFieldMappings(mappings);
+
+        PlanBuilder planBuilder = new PlanBuilder(translations, root, analysis.getParameters());
+
+        for (int i = 0; i < plan.getDescriptor().getAllFieldCount(); i++) {
+            Field field = plan.getDescriptor().getFieldByIndex(i);
+
+            for (Expression mask : columnMasks.getOrDefault(field.getName().get(), ImmutableList.of())) {
+                planBuilder = subqueryPlanner.handleSubqueries(planBuilder, mask, mask);
+
+                Map<Symbol, RowExpression> assignments = new LinkedHashMap<>();
+                for (Symbol symbol : root.getOutputSymbols()) {
+                    assignments.put(symbol, castToRowExpression(toSymbolReference(symbol)));
+                }
+                assignments.put(mappings.get(i), castToRowExpression(translations.rewrite(mask)));
+
+                planBuilder = planBuilder.withNewRoot(new ProjectNode(
+                        idAllocator.getNextId(),
+                        planBuilder.getRoot(),
+                        Assignments.copyOf(assignments)));
+            }
+        }
+
+        return new RelationPlan(planBuilder.getRoot(), plan.getScope(), mappings);
     }
 
     @Override

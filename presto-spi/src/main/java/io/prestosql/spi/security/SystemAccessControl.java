@@ -17,6 +17,7 @@ import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.type.Type;
 
 import java.security.Principal;
 import java.util.Collections;
@@ -441,26 +442,6 @@ public interface SystemAccessControl
     }
 
     /**
-     * Check if identity and table combination has some row level filtering
-     *
-     * @return {@link io.prestosql.sql.tree.Expression} as string. Null if no row filters are present
-     */
-    default String applyRowLevelFiltering(Identity identity, CatalogSchemaTableName table)
-    {
-        return null;
-    }
-
-    /**
-     * Check if identity, table and column has some column making enabled
-     *
-     * @return {@link io.prestosql.sql.tree.Expression} as string. Null if no column filters are present
-     */
-    default String applyColumnMasking(Identity identity, CatalogSchemaTableName asCatalogSchemaTableName, String columnName)
-    {
-        return null;
-    }
-
-    /**
      * Check if identity is allowed to access or modify node info.
      *
      * @throws AccessDeniedException if not allowed
@@ -468,5 +449,30 @@ public interface SystemAccessControl
     default void checkCanAccessNodeInfo(Identity identity)
     {
         denyAccessNodeInfo();
+    }
+
+    /**
+     * Get a row filter associated with the given table and identity.
+     *
+     * The filter must be a scalar SQL expression of boolean type over the columns in the table.
+     *
+     * @return the filter, or {@link Optional#empty()} if not applicable
+     */
+    default Optional<ViewExpression> getRowFilter(Identity identity, CatalogSchemaTableName tableName)
+    {
+        return Optional.empty();
+    }
+
+    /**
+     * Get a column mask associated with the given table, column and identity.
+     *
+     * The mask must be a scalar SQL expression of a type coercible to the type of the column being masked. The expression
+     * must be written in terms of columns in the table.
+     *
+     * @return the mask, or {@link Optional#empty()} if not applicable
+     */
+    default Optional<ViewExpression> getColumnMask(Identity identity, CatalogSchemaTableName tableName, String columnName, Type type)
+    {
+        return Optional.empty();
     }
 }

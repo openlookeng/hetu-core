@@ -53,5 +53,9 @@ For ORC files, the ORC row data cache provides an efficient method to cache freq
 #### Execution Plan Cache
 The execution plan is cached after the first query, rather than discarded after each query request, thereby reducing the preprocessing time and resources required for subsequent queries. By caching these plans, time-consuming plan generation steps can be skipped.
 
+## Obtaining the Design Document
+
+Click [here](https://openlookeng.slite.com/p/channel/EDMAZKydV2MsM5trxJPmLv#) to obtain the design document.
+
 ## Next Steps
 [Developer Guide](hetu-docs/en/develop/_index.md)

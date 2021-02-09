@@ -142,6 +142,15 @@ public class FloatSelectiveColumnReader
 
         ensureValuesCapacity(outputRequired, positionCount, nullsAllowed && presentStream != null, positions);
 
+        if (filters != null) {
+            if (outputPositions == null || outputPositions.length < positionCount) {
+                outputPositions = new int[positionCount];
+            }
+        }
+        else {
+            outputPositions = positions;
+        }
+
         // account memory used by values, nulls and outputPositions
         systemMemoryContext.setBytes(getRetainedSizeInBytes());
 
@@ -182,15 +191,6 @@ public class FloatSelectiveColumnReader
                     nulls = new boolean[capacity];
                 }
             }
-        }
-
-        if (filter != null) {
-            if (outputPositions == null || outputPositions.length < capacity) {
-                outputPositions = new int[capacity];
-            }
-        }
-        else {
-            outputPositions = positions;
         }
     }
 
@@ -237,6 +237,7 @@ public class FloatSelectiveColumnReader
             throws IOException
     {
         int streamPosition = 0;
+        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             if (position > streamPosition) {
@@ -249,7 +250,7 @@ public class FloatSelectiveColumnReader
                     if (outputRequired) {
                         nulls[outputPositionCount] = true;
                     }
-                    if (accumulator != null) {
+                    if (accumulator != null && checkNulls) {
                         accumulator.set(position);
                     }
                     outputPositions[outputPositionCount] = position;
@@ -259,7 +260,7 @@ public class FloatSelectiveColumnReader
             else {
                 float value = dataStream.next();
                 if ((accumulator != null && accumulator.get(position))
-                        || filters == null || filters.get(0).testFloat(value)) {
+                        || filters == null || filters.stream().anyMatch(f -> f.testFloat(value))) {
                     if (accumulator != null) {
                         accumulator.set(position);
                     }

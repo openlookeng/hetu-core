@@ -69,8 +69,23 @@ public class TestHBaseClientConf
         hcc.setUserKeytabPath("/etc/hetu/");
         assertEquals("/etc/hetu/", hcc.getUserKeytabPath());
 
+        hcc.setCoreSitePath("/etc/hetu/");
+        assertEquals("/etc/hetu/", hcc.getCoreSitePath());
+
+        hcc.setHdfsSitePath("/etc/hetu/");
+        assertEquals("/etc/hetu/", hcc.getHdfsSitePath());
+
+        hcc.setZkZnodeParent("/hbase");
+        assertEquals("/hbase", hcc.getZkZnodeParent());
+
         hcc.setDefaultValue("default");
         assertEquals("default", hcc.getDefaultValue());
+
+        hcc.setClientSideEnable(true);
+        assertEquals(true, hcc.isClientSideEnable());
+
+        hcc.setRetryCreateSnapshotNumber(10);
+        assertEquals(10, hcc.getRetryCreateSnapshotNumber());
     }
 
     /**

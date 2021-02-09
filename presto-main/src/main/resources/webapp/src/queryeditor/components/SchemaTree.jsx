@@ -45,7 +45,7 @@ function getIcon(type) {
 }
 
 function renderItem(tree, item) {
-    let style = (item.children == undefined || item.children.length == 0) ? {marginLeft: "14.5px"} : {};
+    let style = (item.children == undefined || item.children instanceof Array && item.children.length == 0) ? {marginLeft: "14.5px"} : {};
     let tableStyle = {};
     Object.assign(tableStyle, style, {cursor: "pointer"})
     let favorite = tree.isFavorite(item);
@@ -118,6 +118,11 @@ function renderItem(tree, item) {
                             <i className="icon fa fa-star valign-middle contextmenu-icons favorite"/><span>Add to Favorites</span>
                         </MenuItem>
                     }
+                    <MenuItem data={{item: item, tree: tree}} onClick={(e, data) => {
+                        tree.refreshItem(item);
+                    }}>
+                        <i className="icon fa fa-refresh valign-middle"/><span>Refresh</span>
+                    </MenuItem>
                     {item.type == dataType.CATALOG ?
                         <MenuItem data={{item: item, tree: tree}} onClick={(e, data) => {
                             tree.deleteCatalog(item);
@@ -190,36 +195,32 @@ class SchemaTree extends React.Component {
             tables: []
         }
         this.updateTree = this.updateTree.bind(this);
-        this.refresh = this.refresh.bind(this);
         this.selectTable = this.selectTable.bind(this);
         this.unselectTable = this.unselectTable.bind(this);
         this.addToFavorites = this.addToFavorites.bind(this);
         this.removeFromFavorites = this.removeFromFavorites.bind(this);
         this.isFavorite = this.isFavorite.bind(this);
+        this.reloadItem = this.reloadItem.bind(this);
         this.refreshItem = this.refreshItem.bind(this);
         this.deleteCatalog = this.deleteCatalog.bind(this);
     }
 
-    updateTree(refresh = false) {
-        clearTimeout(this.timer);
-        SchemaActions.fetchSchemas(this.state.model, refresh).then((catalogs) => {
-            return SchemaActions.fetchTables(catalogs);
-        }).then((catalogs) => {
-            let state = this.state;
-            if (refresh) {
-                state.model = [];
-                this.setState(state);
-                state = this.state;
-            }
-            state.model = catalogs;
-            this.setState(state);
-        }).then(() => {
-            this.timer = setTimeout(this.updateTree, 30000)
+    updateTree() {
+        SchemaActions.fetchSchemas(this.state.model).then((catalogs) => {
+            this.state.model = [];
+            this.setState(this.state);
+            this.state.model = catalogs;
+            this.setState(this.state);
         });
     }
 
-    refresh() {
-        this.updateTree(true)
+    refreshItem(item) {
+        SchemaActions.fetchChildren(this.state.model, item).then((catalogs) => {
+            setTimeout( () => {
+                this.state.model = [...catalogs];
+                this.setState(this.state);
+            }, 100);
+        });
     }
 
     componentDidMount() {
@@ -227,7 +228,6 @@ class SchemaTree extends React.Component {
     }
 
     componentWillUnmount() {
-        clearTimeout(this.timer)
     }
 
     getInitialModel() {
@@ -265,9 +265,8 @@ class SchemaTree extends React.Component {
                     } else {
                         alert("Error while delete catalog:" + res.message.split('\n', 1)[0]);
                     }
-
                 } else {
-                    this.refresh();
+                    this.updateTree();
                 }
             })
         }
@@ -280,7 +279,7 @@ class SchemaTree extends React.Component {
             let favoriteCatalog = _.find(this.favourites.catalogs, catalog);
             if (_.isUndefined(favoriteCatalog)) {
                 this.favourites.catalogs.push(catalog);
-                this.refreshItem(item);
+                this.reloadItem(item);
             }
             return;
         }
@@ -289,7 +288,7 @@ class SchemaTree extends React.Component {
             let favoriteSchema = _.find(this.favourites.schemas, schema);
             if (_.isUndefined(favoriteSchema)) {
                 this.favourites.schemas.push(schema);
-                this.refreshItem(item);
+                this.reloadItem(item);
             }
             return;
         }
@@ -297,7 +296,7 @@ class SchemaTree extends React.Component {
         let favoriteTable = _.find(this.favourites.tables, table);
         if (_.isUndefined(favoriteTable)) {
             this.favourites.tables.push(table);
-            this.refreshItem(item);
+            this.reloadItem(item);
         }
     }
 
@@ -324,7 +323,7 @@ class SchemaTree extends React.Component {
                 this.favourites.tables.splice(index, 1);
             }
         }
-        this.refreshItem(item);
+        this.reloadItem(item);
     }
 
     /**
@@ -365,7 +364,7 @@ class SchemaTree extends React.Component {
         return {found: false, self: false};
     }
 
-    refreshItem(item) {
+    reloadItem(item) {
         let model = this.state.model;
         this.state.model = [];
         this.setState(this.state);
@@ -378,10 +377,10 @@ class SchemaTree extends React.Component {
     renderButtons() {
         return (
             <div className={"flex flex-row"} style={{justifyContent: 'space-between'}}>
-                <AddCatalogContainer  refreshCallback={this.refresh}/>
+                <AddCatalogContainer  refreshCallback={this.updateTree}/>
                     <button className={"btn btn-default"}
                             style={{margin: "10px"}}
-                            onClick={this.refresh}>
+                            onClick={this.updateTree}>
                         <i className="fa fa-refresh" style={{top:'3px',color:'#39b0d2',marginRight:'0'}}></i>
                     </button>
             </div>

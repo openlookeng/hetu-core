@@ -17,6 +17,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.NotNull;
 
@@ -38,6 +39,10 @@ public class StaticMetastoreConfig
         return metastoreUris;
     }
 
+    @Mandatory(name = "hive.metastore.uri",
+            description = "The URI(s) of the Hive metastore to connect to using the Thrift protocol. If multiple URIs are provided, the first URI is used by default and the rest of the URIs are fallback metastores. This property is required. Example: thrift://192.0.2.3:9083 or thrift://192.0.2.3:9083,thrift://192.0.2.4:9083",
+            defaultValue = "thrift://host:port",
+            required = true)
     @Config("hive.metastore.uri")
     @ConfigDescription("Hive metastore URIs (comma separated)")
     public StaticMetastoreConfig setMetastoreUris(String uris)

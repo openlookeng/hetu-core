@@ -17,8 +17,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Module;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.ServiceLoader;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -26,6 +30,12 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.util.Objects.requireNonNull;
 
+@ConnectorConfig(connectorLabel = "Thrift : Connect to Thrift servers to integrate with external storage systems",
+        propertiesEnabled = true,
+        catalogConfigFilesEnabled = true,
+        globalConfigFilesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/thrift.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/thrift.html#configuration")
 public class ThriftPlugin
         implements Plugin
 {
@@ -61,5 +71,24 @@ public class ThriftPlugin
         ServiceLoader<ThriftPluginInfo> loader = ServiceLoader.load(ThriftPluginInfo.class, classLoader);
         List<ThriftPluginInfo> list = ImmutableList.copyOf(loader);
         return list.isEmpty() ? new ThriftPluginInfo() : getOnlyElement(list);
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = ThriftPlugin.class.getAnnotation(ConnectorConfig.class);
+        Optional<ConnectorWithProperties> connectorWithProperties = ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                ImmutableList.of());
+        if (connectorWithProperties.isPresent()) {
+            ConnectorWithProperties.Properties properties = new ConnectorWithProperties.Properties();
+            properties.setName("presto.thrift.client.addresses");
+            properties.setDescription("Location of Thrift servers");
+            properties.setValue("host1:port,host2:port");
+            properties.setRequired(Optional.of(true));
+            properties.setReadOnly(Optional.of(false));
+            properties.setType(Optional.of("string"));
+            connectorWithProperties.get().addProperties(properties);
+        }
+        return connectorWithProperties;
     }
 }

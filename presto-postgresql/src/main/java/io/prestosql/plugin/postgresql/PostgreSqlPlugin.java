@@ -13,13 +13,34 @@
  */
 package io.prestosql.plugin.postgresql;
 
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcPlugin;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.util.Arrays;
+import java.util.Optional;
+
+@ConnectorConfig(connectorLabel = "PostgreSQL : Query and create tables on an external PostgreSQL database",
+        propertiesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/postgresql.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/postgresql.html#configuration")
 public class PostgreSqlPlugin
         extends JdbcPlugin
 {
     public PostgreSqlPlugin()
     {
         super("postgresql", new PostgreSqlClientModule());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = PostgreSqlPlugin.class.getAnnotation(ConnectorConfig.class);
+        Optional<ConnectorWithProperties> connectorWithProperties = ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(BaseJdbcConfig.class.getDeclaredMethods()));
+        ConnectorUtil.addConnUrlProperty(connectorWithProperties, "jdbc:postgresql://host:port/database");
+        return connectorWithProperties;
     }
 }

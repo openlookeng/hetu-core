@@ -16,7 +16,15 @@ package io.prestosql.plugin.tpch;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.util.Optional;
+
+@ConnectorConfig(connectorLabel = "TPC-H : TPC Benchmark™ H, data is generated on the fly",
+        docLink = "https://openlookeng.io/docs/docs/connector/tpch.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/tpch.html#configuration")
 public class TpchPlugin
         implements Plugin
 {
@@ -24,5 +32,12 @@ public class TpchPlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new TpchConnectorFactory());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = TpchPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig, ImmutableList.of());
     }
 }

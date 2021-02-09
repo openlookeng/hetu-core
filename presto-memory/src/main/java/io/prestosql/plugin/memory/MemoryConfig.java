@@ -15,6 +15,7 @@ package io.prestosql.plugin.memory;
 
 import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.NotNull;
 
@@ -42,6 +43,10 @@ public class MemoryConfig
         return maxDataPerNode;
     }
 
+    @Mandatory(name = "memory.max-data-per-node",
+            description = "Define memory limit for pages stored in this connector per each node",
+            defaultValue = "128MB",
+            required = true)
     @Config("memory.max-data-per-node")
     public MemoryConfig setMaxDataPerNode(DataSize maxDataPerNode)
     {

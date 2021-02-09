@@ -93,18 +93,18 @@ When writing data, the Carbondata connector always collects basic statistics (`n
 
 | Column Type      | Null-Count | Distinct values count | Min/Max |
 | ---------------- | ---------- | --------------------- | ------- |
-| `SMALLINT `done  | Y          | Y                     | Y       |
-| `INTEGER` done   | Y          | Y                     | Y       |
-| `BIGINT` done    | Y          | Y                     | Y       |
-| `DOUBLE` done    | Y          | Y                     | Y       |
-| `REAL `done      | Y          | Y                     | Y       |
-| `DECIMAL `done   | Y          | Y                     | Y       |
-| `DATE `done      | Y          | Y                     | Y       |
-| `TIMESTAMP `done | Y          | Y                     | N       |
-| `VARCHAR` done   | Y          | Y                     | N       |
-| `CHAR `done      | Y          | Y                     | N       |
-| `VARBINARY` done | Y          | N                     | N       |
-| `BOOLEAN` done   | Y          | Y                     | N       |
+| `SMALLINT `  | Y          | Y                     | Y       |
+| `INTEGER`    | Y          | Y                     | Y       |
+| `BIGINT`     | Y          | Y                     | Y       |
+| `DOUBLE`    | Y          | Y                     | Y       |
+| `REAL `     | Y          | Y                     | Y       |
+| `DECIMAL `   | Y          | Y                     | Y       |
+| `DATE `     | Y          | Y                     | Y       |
+| `TIMESTAMP ` | Y          | Y                     | N       |
+| `VARCHAR`    | Y          | Y                     | N       |
+| `CHAR `     | Y          | Y                     | N       |
+| `VARBINARY`  | Y          | N                     | N       |
+| `BOOLEAN`    | Y          | Y                     | N       |
 
 ## Auto-cleanup
 

@@ -105,7 +105,8 @@ public class TestTypeValidator
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
                 0,
-                0);
+                0,
+                false);
     }
 
     @Test

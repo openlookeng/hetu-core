@@ -393,7 +393,8 @@ public class RowExpressionRewriteRuleSet
                             Optional.of(rewritten),
                             tableScanNode.getStrategy(),
                             tableScanNode.getReuseTableScanMappingId(),
-                            tableScanNode.getConsumerTableScanNodeCount()));
+                            tableScanNode.getConsumerTableScanNodeCount(),
+                            tableScanNode.isForDelete()));
                 }
             }
 

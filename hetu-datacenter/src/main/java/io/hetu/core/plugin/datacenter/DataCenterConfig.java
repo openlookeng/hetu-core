@@ -21,6 +21,7 @@ import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
@@ -146,6 +147,10 @@ public class DataCenterConfig
      * @param connectionUrl the connection url of data center.
      * @return DataCenterConfig object.
      */
+    @Mandatory(name = "connection-url",
+            description = "The connection URL of remote OpenLooKeng data center",
+            defaultValue = "http://host:port",
+            required = true)
     @Config("connection-url")
     public DataCenterConfig setConnectionUrl(URI connectionUrl)
     {

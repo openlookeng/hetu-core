@@ -436,16 +436,6 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("Cannot set role %s", role));
     }
 
-    public static void denyApplyRowLevelFilter(String table)
-    {
-        throw new AccessDeniedException(format("Cannot apply row level filter to %s", table));
-    }
-
-    public static void denyApplyColumnMasking(String column)
-    {
-        throw new AccessDeniedException(format("Cannot apply column masking to column: %s", column));
-    }
-
     private static Object formatExtraInfo(String extraInfo)
     {
         if (extraInfo == null || extraInfo.isEmpty()) {

@@ -19,6 +19,7 @@ import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.configuration.DefunctConfig;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
@@ -78,6 +79,10 @@ public class ElasticsearchConfig
         return host;
     }
 
+    @Mandatory(name = "elasticsearch.host",
+            description = "Elasticsearch host",
+            defaultValue = "host",
+            required = true)
     @Config("elasticsearch.host")
     public ElasticsearchConfig setHost(String host)
     {
@@ -90,6 +95,9 @@ public class ElasticsearchConfig
         return port;
     }
 
+    @Mandatory(name = "elasticsearch.port",
+            description = "Elasticsearch port",
+            defaultValue = "9200")
     @Config("elasticsearch.port")
     public ElasticsearchConfig setPort(int port)
     {
@@ -103,6 +111,9 @@ public class ElasticsearchConfig
         return defaultSchema;
     }
 
+    @Mandatory(name = "elasticsearch.default-schema-name",
+            description = "Default schema name to use",
+            defaultValue = "default")
     @Config("elasticsearch.default-schema-name")
     @ConfigDescription("Default schema name to use")
     public ElasticsearchConfig setDefaultSchema(String defaultSchema)
@@ -118,6 +129,9 @@ public class ElasticsearchConfig
         return scrollSize;
     }
 
+    @Mandatory(name = "elasticsearch.scroll-size",
+            description = "Scroll batch size",
+            defaultValue = "1000")
     @Config("elasticsearch.scroll-size")
     @ConfigDescription("Scroll batch size")
     public ElasticsearchConfig setScrollSize(int scrollSize)
@@ -132,6 +146,9 @@ public class ElasticsearchConfig
         return scrollTimeout;
     }
 
+    @Mandatory(name = "elasticsearch.scroll-timeout",
+            description = "Scroll timeout",
+            defaultValue = "1m")
     @Config("elasticsearch.scroll-timeout")
     @ConfigDescription("Scroll timeout")
     public ElasticsearchConfig setScrollTimeout(Duration scrollTimeout)
@@ -146,6 +163,9 @@ public class ElasticsearchConfig
         return requestTimeout;
     }
 
+    @Mandatory(name = "elasticsearch.request-timeout",
+            description = "Elasticsearch request timeout",
+            defaultValue = "2s")
     @Config("elasticsearch.request-timeout")
     @ConfigDescription("Elasticsearch request timeout")
     public ElasticsearchConfig setRequestTimeout(Duration requestTimeout)

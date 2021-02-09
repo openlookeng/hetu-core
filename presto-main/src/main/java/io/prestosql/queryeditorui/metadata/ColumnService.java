@@ -14,72 +14,57 @@
 package io.prestosql.queryeditorui.metadata;
 
 import com.google.common.base.Joiner;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.log.Logger;
 import io.prestosql.client.Column;
 import io.prestosql.client.QueryData;
 import io.prestosql.client.StatementClient;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
-import io.prestosql.queryeditorui.execution.BackgroundCacheLoader;
 import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
 import io.prestosql.queryeditorui.execution.QueryRunner.QueryRunnerFactory;
+import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.server.protocol.Query;
 import io.prestosql.spi.type.TypeSignature;
 import org.joda.time.Duration;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class ColumnCache
+public class ColumnService
 {
-    private static final Logger log = Logger.get(ColumnCache.class);
+    private static final Logger log = Logger.get(ColumnService.class);
     private static final Joiner FQN_JOINER = Joiner.on('.').skipNulls();
-    private final LoadingCache<String, List<Column>> tableColumnCache;
     private final QueryRunnerFactory queryRunnerFactory;
-    private final ExecutorService executor;
 
-    public ColumnCache(final QueryRunnerFactory queryRunnerFactory,
-            final ExecutorService executor, int cacheExpiryMin)
+    @Inject
+    public ColumnService(final QueryRunnerFactory queryRunnerFactory)
     {
         this.queryRunnerFactory = requireNonNull(queryRunnerFactory, "queryRunnerFactory session was null!");
-        this.executor = requireNonNull(executor, "executor was null!");
-
-        ListeningExecutorService listeningExecutor = MoreExecutors.listeningDecorator(executor);
-
-        BackgroundCacheLoader<String, List<Column>> columnLoader = new BackgroundCacheLoader<String,
-                        List<Column>>(listeningExecutor)
-        {
-            @Override
-            public List<Column> load(String fqTableName)
-            {
-                return queryColumns(format("SHOW COLUMNS FROM %s", fqTableName));
-            }
-        };
-
-        this.tableColumnCache = CacheBuilder.newBuilder()
-                .expireAfterWrite(cacheExpiryMin, TimeUnit.MINUTES)
-                .build(columnLoader);
     }
 
-    private List<Column> queryColumns(String query)
+    public List<Column> getColumns(String catalogName, String schemaName,
+            String tableName, HttpServletRequest servletRequest) throws ExecutionException
     {
-        final ImmutableList.Builder<Column> cache = ImmutableList.builder();
-        QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, "lk");
-        QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), query);
+        return queryColumns(FQN_JOINER.join(catalogName, schemaName, tableName), servletRequest);
+    }
 
+    private List<Column> queryColumns(String fqnTableName, HttpServletRequest servletRequest)
+    {
+        String user = UiAuthenticator.getUser(servletRequest);
+        String statement = format("SHOW COLUMNS FROM %s", fqnTableName);
+        QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, user);
+        QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), statement);
+
+        final ImmutableList.Builder<Column> cache = ImmutableList.builder();
         try {
             queryClient.executeWith(new Function<StatementClient, Void>() {
                 @Nullable
@@ -104,26 +89,5 @@ public class ColumnCache
         }
 
         return cache.build();
-    }
-
-    public void refreshCache()
-    {
-        tableColumnCache.invalidateAll();
-    }
-
-    public void populateCache(final String fqnTableName)
-    {
-        requireNonNull(fqnTableName, "fqnTableName is null");
-        executor.execute(() -> tableColumnCache.refresh(fqnTableName));
-    }
-
-    public List<Column> getColumns(String schemaName, String tableName) throws ExecutionException
-    {
-        return tableColumnCache.get(getFqnTableName(schemaName, tableName));
-    }
-
-    public static String getFqnTableName(String schemaName, String tableName)
-    {
-        return FQN_JOINER.join(schemaName, tableName);
     }
 }

@@ -23,6 +23,7 @@ import io.hetu.core.plugin.hbase.utils.serializers.HBaseRowSerializer;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.type.Type;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hbase.client.ClientSideRegionScanner;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 
@@ -266,7 +267,7 @@ public class HBaseRecordCursor
     @Override
     public void close()
     {
-        if (this.scanner != null) {
+        if (this.scanner != null && !(this.scanner instanceof ClientSideRegionScanner)) {
             this.scanner.close();
         }
     }

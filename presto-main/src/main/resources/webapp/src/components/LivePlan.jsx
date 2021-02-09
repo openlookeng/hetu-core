@@ -119,11 +119,11 @@ class PlanNode extends React.Component<PlanNodeProps, PlanNodeState> {
 
     render() {
         return (
-            <div style={{color: "#000"}} data-toggle="tooltip" data-placement="bottom" data-container="body" data-html="true"
+            <div style={{color: "#000", fontFamily: "Consolas"}} data-toggle="tooltip" data-placement="bottom" data-container="body" data-html="true"
                  title={"<h4>" + this.props.name + "</h4>" + this.props.identifier}>
                 <strong>{this.props.name}</strong>
                 <div>
-                    {truncateString(this.props.identifier, 35)}
+                    {truncateString(this.props.identifier, 27)}
                 </div>
             </div>
         );

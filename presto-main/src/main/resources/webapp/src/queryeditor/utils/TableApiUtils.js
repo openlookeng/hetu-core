@@ -13,10 +13,10 @@
  */
 import xhr from './xhr';
 
-const fetchColumData = (table) => xhr(`${table.url}/columns`);
+const fetchColumData = (table) => xhr(`/api/metadata/columns/${table.url}`);
 
 const fetchPreviewData = (table, partition = {}) => {
-  let url = `${table.url}/preview`;
+  let url = `/api/metadata/preview/${table.url}`;
   if (partition.name && partition.value) {
     url += '?' +
       `partitionName=${partition.name}&` +
@@ -26,7 +26,7 @@ const fetchPreviewData = (table, partition = {}) => {
   return xhr(url);
 };
 
-const fetchPartitionData = (table) => xhr(`${table.url}/partitions`);
+const fetchPartitionData = (table) => xhr(`/api/metadata/partitions/${table.url}`);
 
 export default {
   fetchTableData(table) {
@@ -45,6 +45,6 @@ export default {
   },
 
   fetchTables() {
-    return xhr('../api/table?query=a');
+    return xhr('../api/metadata/tables');
   }
 };
