@@ -130,6 +130,30 @@ public class JdbcMetadataUtil
     }
 
     /**
+     * run the transaction with lock
+     *
+     * @param jdbi     jdbi
+     * @param callback callback
+     */
+    public static void runTransactionWithLock(Jdbi jdbi, HandleConsumer<PrestoException> callback)
+    {
+        JdbcBasedLock jdbcLock = new JdbcBasedLock(jdbi);
+        try {
+            jdbcLock.lock();
+            jdbi.useTransaction(callback);
+        }
+        catch (JdbiException e) {
+            if (e.getCause() != null) {
+                throwIfInstanceOf(e.getCause(), PrestoException.class);
+            }
+            throw new PrestoException(HETU_METASTORE_CODE, "Hetu metastore operation failed.", e);
+        }
+        finally {
+            jdbcLock.unlock();
+        }
+    }
+
+    /**
      * create all metadata tables of hetu metastore
      *
      * @param tableDao table dao
@@ -152,5 +176,7 @@ public class JdbcMetadataUtil
         tableDao.createTableColumns();
         // hetu_column_params table
         tableDao.createTableColumnParameters();
+        // hetu_tab_lock table
+        tableDao.createTableLock();
     }
 }

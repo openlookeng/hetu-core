@@ -36,6 +36,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static io.hetu.core.metastore.jdbc.JdbcMetadataUtil.onDemand;
 import static io.hetu.core.metastore.jdbc.JdbcMetadataUtil.runTransaction;
+import static io.hetu.core.metastore.jdbc.JdbcMetadataUtil.runTransactionWithLock;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -71,12 +72,26 @@ public class JdbcHetuMetastore
     @Override
     public void createCatalog(CatalogEntity catalog)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
             long catalogId = transactionDao.insertCatalog(catalog);
             Optional<List<PropertyEntity>> properties = mapToList(catalog.getParameters());
             properties.ifPresent(parameters -> transactionDao.insertCatalogProperty(catalogId, parameters));
         });
+    }
+
+    @Override
+    public void createCatalogIfNotExist(CatalogEntity catalog)
+    {
+        try {
+            createCatalog(catalog);
+        }
+        catch (PrestoException e) {
+            Optional<CatalogEntity> existedCatalog = getCatalog(catalog.getName());
+            if (!(existedCatalog.isPresent() && existedCatalog.get().equals(catalog))) {
+                throw new PrestoException(HETU_METASTORE_CODE, e.getMessage(), e.getCause());
+            }
+        }
     }
 
     @Override
@@ -86,7 +101,7 @@ public class JdbcHetuMetastore
             throw new PrestoException(HETU_METASTORE_CODE, "Cannot alter a catalog's name");
         }
 
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
 
             Long catalogId = getCatalogId(transactionDao, catalogName);
@@ -103,7 +118,7 @@ public class JdbcHetuMetastore
     @Override
     public void dropCatalog(String catalogName)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
 
             Long catalogId = getCatalogId(transactionDao, catalogName);
@@ -142,13 +157,27 @@ public class JdbcHetuMetastore
     @Override
     public void createDatabase(DatabaseEntity database)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
             checkCatalogExists(transactionDao, database.getCatalogName());
             long databaseId = transactionDao.insertDatabase(database);
             Optional<List<PropertyEntity>> properties = mapToList(database.getParameters());
             properties.ifPresent(parameters -> transactionDao.insertDatabaseProperty(databaseId, parameters));
         });
+    }
+
+    @Override
+    public void createDatabaseIfNotExist(DatabaseEntity database)
+    {
+        try {
+            createDatabase(database);
+        }
+        catch (PrestoException e) {
+            Optional<DatabaseEntity> existedDatabase = getDatabase(database.getCatalogName(), database.getName());
+            if (!(existedDatabase.isPresent() && existedDatabase.get().equals(database))) {
+                throw new PrestoException(HETU_METASTORE_CODE, e.getMessage(), e.getCause());
+            }
+        }
     }
 
     @Override
@@ -159,7 +188,7 @@ public class JdbcHetuMetastore
                     format("alter database cannot cross catalog[%s,%s]", catalogName, newDatabase.getCatalogName()));
         }
 
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
 
             Long databaseId = transactionDao.getDatabaseId(catalogName, databaseName);
@@ -175,7 +204,7 @@ public class JdbcHetuMetastore
     @Override
     public void dropDatabase(String catalogName, String databaseName)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
             Long databaseId = getDatabaseId(catalogName, databaseName, transactionDao);
             transactionDao.dropDatabaseProperty(databaseId);
@@ -199,7 +228,7 @@ public class JdbcHetuMetastore
     @Override
     public void createTable(TableEntity table)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
 
             Long databaseId = getDatabaseId(table.getCatalogName(), table.getDatabaseName(), transactionDao);
@@ -213,9 +242,23 @@ public class JdbcHetuMetastore
     }
 
     @Override
+    public void createTableIfNotExist(TableEntity table)
+    {
+        try {
+            createTable(table);
+        }
+        catch (PrestoException e) {
+            Optional<TableEntity> existedTable = getTable(table.getCatalogName(), table.getDatabaseName(), table.getName());
+            if (!(existedTable.isPresent() && existedTable.get().equals(table))) {
+                throw new PrestoException(HETU_METASTORE_CODE, e.getMessage(), e.getCause());
+            }
+        }
+    }
+
+    @Override
     public void dropTable(String catalogName, String databaseName, String tableName)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
             // get table id
             Long tableId = transactionDao.getTableId(catalogName, databaseName, tableName);
@@ -237,7 +280,7 @@ public class JdbcHetuMetastore
     @Override
     public void alterTable(String catalogName, String databaseName, String oldTableName, TableEntity newTable)
     {
-        runTransaction(jdbi, handle -> {
+        runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
 
             // get table id
