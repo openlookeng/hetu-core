@@ -15,19 +15,35 @@
 package io.hetu.core.plugin.hbase.utils;
 
 import io.airlift.log.Logger;
+import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.RegionInfo;
+import org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.SnapshotProtos;
+import org.apache.hadoop.hbase.snapshot.SnapshotDescriptionUtils;
+import org.apache.hadoop.hbase.snapshot.SnapshotManifest;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static io.hetu.core.plugin.hbase.utils.Constants.HBASE_DATA_TYPE_NAME_LIST;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Utils
@@ -37,6 +53,8 @@ import static io.hetu.core.plugin.hbase.utils.Constants.HBASE_DATA_TYPE_NAME_LIS
 public class Utils
 {
     private static final Logger LOG = Logger.get(Utils.class);
+
+    private static final String KRB5_CONF_KEY = "java.security.krb5.conf";
 
     private Utils() {}
 
@@ -111,5 +129,80 @@ public class Utils
     {
         File file = new File(path);
         return file.exists();
+    }
+
+    /**
+     * generate hbase configuration
+     *
+     * @param hbaseConfig hbaseConfig
+     * @return hbase configuration
+     */
+    public static Configuration generateHBaseConfig(HBaseConfig hbaseConfig) throws IOException
+    {
+        Configuration conf = HBaseConfiguration.create();
+        conf.set("hbase.zookeeper.quorum", hbaseConfig.getZkQuorum());
+        conf.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
+        conf.set("hbase.cluster.distributed", "true");
+        conf.addResource(new Path(hbaseConfig.getCoreSitePath()));
+        conf.addResource(new Path(hbaseConfig.getHdfsSitePath()));
+        conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+        if (Constants.HDFS_AUTHENTICATION_KERBEROS.equals(hbaseConfig.getKerberos())) {
+            String keyTab = requireNonNull(hbaseConfig.getUserKeytabPath(), "kerberos authentication was enabled but no keytab found ");
+            String krb5 = requireNonNull(hbaseConfig.getKrb5ConfPath(), "kerberos authentication was enabled but no krb5.conf found ");
+            String principle = requireNonNull(hbaseConfig.getPrincipalUsername(), "kerberos authentication was enabled but no principle found ");
+
+            System.setProperty(KRB5_CONF_KEY, krb5);
+            UserGroupInformation.setConfiguration(conf);
+            UserGroupInformation.loginUserFromKeytab(principle, keyTab);
+        }
+        return conf;
+    }
+
+    /**
+     * read the snapshot, get region infos.
+     *
+     * @param snapshotName snapshot name
+     * @return region info list
+     * @throws IOException IOException
+     */
+    public static List<RegionInfo> getRegionInfos(String snapshotName, HBaseConfig hbaseConfig)
+    {
+        try {
+            Configuration conf = generateHBaseConfig(hbaseConfig);
+            Path root = new Path(hbaseConfig.getZkZnodeParent());
+            FileSystem fs = FileSystem.get(conf);
+            Path snapshotDir = SnapshotDescriptionUtils.getCompletedSnapshotDir(snapshotName, root);
+            SnapshotProtos.SnapshotDescription snapshotDesc = SnapshotDescriptionUtils.readSnapshotInfo(fs, snapshotDir);
+            SnapshotManifest manifest = SnapshotManifest.open(conf, fs, snapshotDir, snapshotDesc);
+
+            return getRegionInfoFromManifest(manifest);
+        }
+        catch (IOException ex) {
+            LOG.error("get region info error: " + ex.getMessage(), ex);
+            throw new UncheckedIOException("get region info error: " + snapshotName, ex);
+        }
+    }
+
+    /**
+     * get region infos from manifest.
+     *
+     * @param manifest manifest
+     * @return region info list
+     */
+    public static List<RegionInfo> getRegionInfoFromManifest(SnapshotManifest manifest)
+    {
+        List<RegionInfo> regionInfos = new ArrayList<>();
+        List<SnapshotProtos.SnapshotRegionManifest> regionManifests = manifest.getRegionManifests();
+        if (regionManifests == null) {
+            throw new IllegalArgumentException("Snapshot seems empty");
+        }
+        for (SnapshotProtos.SnapshotRegionManifest regionManifest : regionManifests) {
+            RegionInfo hri = ProtobufUtil.toRegionInfo(regionManifest.getRegionInfo());
+            if (hri.isOffline() && (hri.isSplit() || hri.isSplitParent())) {
+                continue;
+            }
+            regionInfos.add(hri);
+        }
+        return regionInfos;
     }
 }

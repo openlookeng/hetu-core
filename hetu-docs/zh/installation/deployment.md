@@ -24,16 +24,33 @@ openLooKeng需要一个*数据*目录来存储日志等。我们建议在安装�
 节点属性文件`etc/node.properties`包含每个节点特有的配置。*节点*是机器上已安装的openLooKeng的单个实例。该文件通常在首次安装openLooKeng时由部署系统创建。下面是最基本的`etc/node.properties`：
 
 ``` properties
-node.environment=production
-node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
-node.data-dir=/var/openlookeng/data
+node.environment=openlookeng
+node.launcher-log-file=/opt/openlookeng/hetu-server-1.1.0/log/launch.log
+node.server-log-file=/opt/openlookeng/hetu-server-1.1.0/log/server.log
+catalog.config-dir=/opt/openlookeng/hetu-server-1.1.0/etc/catalog
+node.data-dir=/opt/openlookeng/hetu-server-1.1.0/data
+plugin.dir=/opt/openlookeng/hetu-server-1.1.0/plugin
 ```
 
 上述属性说明如下：
 
 - `node.environment`：环境名称。同一集群内所有openLooKeng节点的环境名称必须相同。
-- `node.id`：openLooKeng安装的唯一标识符。该属性对于每个节点必须唯一。在openLooKeng的重启或升级过程中，此标识符应该保持一致。如果在一台机器上运行多个openLooKeng安装（即同一机器上多个节点），每个安装必须有一个唯一的标识符。
+
 - `node.data-dir`：数据目录的位置（文件系统路径）。openLooKeng将在这里存储日志和其他数据。
+
+- `node.launcher-log-file`: launch.log文件。此日志由启动器创建，连接到服务器的stdout和stderr流。此日志将包含一些在初始化服务器日志记录时发生的日志消息，以及JVM产生的任何错误或诊断信息。
+
+- `node.server-log-file`: server.log文件。这是openLooKeng使用的主要日志文件。如果服务器在初始化期间失败，此日志通常会包含相关信息。此日志会自动轮转和压缩。
+
+- `catalog.config-dir`: 创建目录属性文件来注册目录。openLooKeng通过连接器访问数据，连接器挂载在目录中。
+
+- `plugin.dir`: plugin目录位置。
+
+  注：具体路径根据openLooKeng实际安装路径修改，比如例子中openLooKeng的安装路径为：/opt/openlookeng/hetu-server-1.1.0/。
+
+### JVM配置
+
+JVM配置文件etc/jvm.config包含用于启动Java虚拟机的命令行选项列表。文件的格式是一个选项列表，每行一个选项。这些选项不由shell解释，因此包含空格或其他特殊字符的选项不应被引用。
 
 ### JVM配置
 
@@ -51,10 +68,10 @@ JVM配置文件`etc/jvm.config`包含用于启动Java虚拟机的命令行选项
 -XX:+ExitOnOutOfMemoryError
 -XX:+UseGCOverheadLimit
 -XX:+HeapDumpOnOutOfMemoryError
--XX:ReservedCodeCacheSize=512M
--Djdk.attach.allowAttachSelf=true
--Djdk.nio.maxCachedBufferSize=2000000
+-XX:+ExitOnOutOfMemoryError
 ```
+
+参数中Xmx大小为服务器可用内存的70%（建议值，availableMem*70%）。
 
 由于`OutOfMemoryError`通常会使JVM处于不一致的状态，因此我们编写一个堆转储（用于调试），并在出现这种情况时强制终止进程。
 
@@ -69,8 +86,9 @@ coordinator=true
 node-scheduler.include-coordinator=false
 http-server.http.port=8080
 query.max-memory=50GB
-query.max-memory-per-node=1GB
-query.max-total-memory-per-node=2GB
+query.max-total-memory=50GB
+query.max-memory-per-node=10GB
+query.max-total-memory-per-node=10GB
 discovery-server.enabled=true
 discovery.uri=http://example.net:8080
 ```
@@ -81,8 +99,9 @@ discovery.uri=http://example.net:8080
 coordinator=false
 http-server.http.port=8080
 query.max-memory=50GB
-query.max-memory-per-node=1GB
-query.max-total-memory-per-node=2GB
+query.max-total-memory=50GB
+query.max-memory-per-node=10GB
+query.max-total-memory-per-node=10GB
 discovery.uri=http://example.net:8080
 ```
 
@@ -92,23 +111,24 @@ discovery.uri=http://example.net:8080
 coordinator=true
 node-scheduler.include-coordinator=true
 http-server.http.port=8080
-query.max-memory=5GB
-query.max-memory-per-node=1GB
-query.max-total-memory-per-node=2GB
+query.max-memory=50GB
+query.max-total-memory=50GB
+query.max-memory-per-node=10GB
+query.max-total-memory-per-node=10GB
 discovery-server.enabled=true
 discovery.uri=http://example.net:8080
 ```
 
-这些属性需要一些解释：
+上述属性说明如下：
 
 - `coordinator`：允许此openLooKeng实例充当协调节点（接受来自客户端的查询并管理查询执行）。
-- `node-scheduler.include-coordinator`：允许在协调节点上调度工作。对于较大的集群，协调节点上的处理工作会影响查询性能，因为机器的资源不能用于调度、管理和监视查询执行的关键任务。
+- `node-scheduler.include-coordinator`：允许在协调节点上调度工作。对于较大的集群，协调节点上的处理工作会影响查询性能，因为机器的资源不能用于调度、管理和监视查询执行的关键任务。当部署单节点环境时，该参数置为true。
 - `http-server.http.port`：指定HTTP服务器的端口号。openLooKeng使用HTTP进行所有内部和外部通信。
-- `query.max-memory`：查询可能使用的最大分布式内存量。
-- `query.max-memory-per-node`：查询在任何一台机器上可能使用的最大用户内存量。
-- `query.max-total-memory-per-node`：一个查询在任意一台机器上可以使用的最大用户和系统内存量，其中系统内存是读取器、写入器和网络缓冲区等在执行期间使用的内存。
+- `query.max-memory`：查询可能使用的最大分布式内存量。该参数为N*query.max-memory-per-node，其中N为工作节点数量。
+- `query.max-memory-per-node`：查询在任何一台机器上可能使用的最大用户内存量。该参数为JVM配置中Xmx的70%（建议值）。
+- `query.max-total-memory-per-node`：一个查询在任意一台机器上可以使用的最大用户和系统内存量，其中系统内存是读取器、写入器和网络缓冲区等在执行期间使用的内存。该参数为JVM配置中Xmx的70%（建议值）。
 - `discovery-server.enabled`：openLooKeng使用Discovery服务查找集群中的所有节点。每个openLooKeng实例在启动时都会将自己注册到Discovery服务。为了简化部署并避免运行额外的服务，openLooKeng协调节点可以运行Discovery服务的嵌入式版本。该版本与openLooKeng共用HTTP服务器，因此使用相同端口。
-- `discovery.uri`：Discovery服务器的URI。由于我们已经在openLooKeng协调节点中启用了Discovery的嵌入式版本，因此这应该是openLooKeng协调节点的URI。替换`example.net:8080`以匹配openLooKeng协调器的主机和端口。该URI不能以斜杠结尾。
+- `discovery.uri`：Discovery服务器的URI。由于我们已经在openLooKeng协调节点中启用了Discovery的嵌入式版本，因此这应该是openLooKeng协调节点的URI。替换`example.net:8080`以匹配openLooKeng协调器的主机和端口。该URI不能以斜杠结尾。例如openLooKeng协调器ip为127.0.0.1，port为8080，discovery.uri=http://127.0.0.1:8080。
 
 可以设置以下属性：
 

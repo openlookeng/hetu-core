@@ -24,6 +24,7 @@ import io.hetu.core.plugin.hbase.metadata.HBaseTable;
 import io.hetu.core.plugin.hbase.security.HBaseKerberosAuthentication;
 import io.hetu.core.plugin.hbase.utils.Constants;
 import io.hetu.core.plugin.hbase.utils.HBaseErrorCode;
+import io.hetu.core.plugin.hbase.utils.StartAndEndKey;
 import io.hetu.core.plugin.hbase.utils.Utils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -54,6 +55,7 @@ import java.io.IOException;
 import java.security.InvalidParameterException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -62,6 +64,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -143,6 +146,16 @@ public class HBaseConnection
     public String getDefaultValue()
     {
         return this.hbaseConfig.getDefaultValue();
+    }
+
+    /**
+     * getHbaseConfig
+     *
+     * @return HBaseConfig
+     */
+    public HBaseConfig getHbaseConfig()
+    {
+        return hbaseConfig;
     }
 
     private void authenticate()
@@ -638,8 +651,27 @@ public class HBaseConnection
                 }
             }
         }
+
+        List<StartAndEndKey> allRanges = Arrays.stream(table.getSplitByChar().get().split(","))
+                .map(StartAndEndKey::new).collect(Collectors.toList());
+        int rangeLength = 0;
+        for (StartAndEndKey allRange : allRanges) {
+            rangeLength += (Math.abs(allRange.getEnd() - allRange.getStart()) + 1);
+        }
+        if (rangeLength > Constants.START_END_KEYS_COUNT) {
+            this.getHbaseAdmin().createTable(htd);
+            return;
+        }
+
+        List<byte[]> splitKeys = new ArrayList<>();
+        allRanges.forEach(range -> {
+            for (char index = range.getStart(); index <= range.getEnd(); index += 1) {
+                splitKeys.add(String.valueOf(index).getBytes());
+            }
+        });
+
         // create table
-        this.getHbaseAdmin().createTable(htd);
+        this.getHbaseAdmin().createTable(htd, splitKeys.toArray(new byte[][] {new byte[] {0}}));
     }
 
     /**

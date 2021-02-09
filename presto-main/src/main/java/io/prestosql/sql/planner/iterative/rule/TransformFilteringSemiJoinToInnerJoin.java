@@ -28,8 +28,10 @@ import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.tree.Expression;
@@ -98,6 +100,13 @@ public class TransformFilteringSemiJoinToInnerJoin
     public Result apply(FilterNode filterNode, Captures captures, Context context)
     {
         SemiJoinNode semiJoin = captures.get(SEMI_JOIN);
+
+        // Do no transform semi-join in context of DELETE
+        if (PlanNodeSearcher.searchFrom(semiJoin.getSource(), context.getLookup())
+                .where(node -> node instanceof TableScanNode && ((TableScanNode) node).isForDelete())
+                .matches()) {
+            return Result.empty();
+        }
 
         Symbol semiJoinSymbol = semiJoin.getSemiJoinOutput();
         Predicate<Expression> isSemiJoinSymbol = expression -> expression.equals(SymbolUtils.toSymbolReference(semiJoinSymbol));

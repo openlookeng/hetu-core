@@ -820,7 +820,8 @@ public class TestCostCalculator
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
                 0,
-                0);
+                0,
+                false);
     }
 
     private PlanNode project(String id, PlanNode source, String symbol, Expression expression)

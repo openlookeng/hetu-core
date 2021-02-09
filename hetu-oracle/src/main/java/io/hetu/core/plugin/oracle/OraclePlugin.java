@@ -15,14 +15,24 @@
 
 package io.hetu.core.plugin.oracle;
 
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcPlugin;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
+
+import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * OraclePlugin
  *
  * @since 2019-07-06
  */
-
+@ConnectorConfig(connectorLabel = "Oracle : Query and create tables on an external Oracle database",
+        propertiesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/oracle.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/oracle.html#configuration")
 public class OraclePlugin
         extends JdbcPlugin
 {
@@ -33,5 +43,15 @@ public class OraclePlugin
     {
         // name of the connector and the module implementation
         super("oracle", new OracleClientModule());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = OraclePlugin.class.getAnnotation(ConnectorConfig.class);
+        Optional<ConnectorWithProperties> connectorWithProperties = ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(BaseJdbcConfig.class.getDeclaredMethods()));
+        ConnectorUtil.addConnUrlProperty(connectorWithProperties, "jdbc:oracle:thin:@host:port/ORCLCDB");
+        return connectorWithProperties;
     }
 }

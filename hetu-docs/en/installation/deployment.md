@@ -23,16 +23,29 @@ Create an `etc` directory inside the installation directory. This will hold the 
 The node properties file, `etc/node.properties`, contains configuration specific to each node. A *node* is a single installed instance of openLooKeng on a machine. This file is typically created by the deployment system when openLooKeng is first installed. The following is a minimal `etc/node.properties`:
 
 ``` properties
-node.environment=production
-node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
-node.data-dir=/var/openlookeng/data
+node.environment=openlookeng
+node.launcher-log-file=/opt/openlookeng/hetu-server-1.1.0/log/launch.log
+node.server-log-file=/opt/openlookeng/hetu-server-1.1.0/log/server.log
+catalog.config-dir=/opt/openlookeng/hetu-server-1.1.0/etc/catalog
+node.data-dir=/opt/openlookeng/hetu-server-1.1.0/data
+plugin.dir=/opt/openlookeng/hetu-server-1.1.0/plugin
 ```
 
 The above properties are described below:
 
--   `node.environment`: The name of the environment. All openLooKeng nodes in a cluster must have the same environment name.
--   `node.id`: The unique identifier for this installation of openLooKeng. This must be unique for every node. This identifier should remain consistent across reboots or upgrades of openLooKeng. If running multiple installations of openLooKeng on a single machine (i.e. multiple nodes on the same machine), each installation must have a unique identifier.
--   `node.data-dir`: The location (filesystem path) of the data directory. openLooKeng will store logs and other data here.
+- `node.environment`: The name of the environment. All openLooKeng nodes in a cluster must have the same environment name.
+
+- `node.data-dir`: The location (filesystem path) of the data directory. openLooKeng will store logs and other data here.
+
+- `node.launcher-log-file`: launch.log. This log is created by the launcher and is connected to the stdout and stderr streams of the server. It will contain a few log messages that occur while the server logging is being initialized and any errors or diagnostics produced by the JVM.
+
+- `node.server-log-file`: server.log. This is the main log file used by openLooKeng. It will typically contain the relevant information if the server fails during initialization. It is automatically rotated and compressed.
+
+- `catalog.config-dir`: openLooKeng accesses data via *connectors*, which are mounted in catalogs. Catalogs are registered by creating a catalog properties file in the `etc/catalog` directory.
+
+- `plugin.dir`: The location  of the plugin directory.
+
+  Note: The specific path is modified according to the actual installation path of openLooKeng. For example, the installation path of openLooKeng in the example is: /opt/openlookeng/hetu-server-1.1.0/.
 
 ### JVM Config
 
@@ -50,10 +63,10 @@ The following provides a good starting point for creating `etc/jvm.config`:
 -XX:+ExitOnOutOfMemoryError
 -XX:+UseGCOverheadLimit
 -XX:+HeapDumpOnOutOfMemoryError
--XX:ReservedCodeCacheSize=512M
--Djdk.attach.allowAttachSelf=true
--Djdk.nio.maxCachedBufferSize=2000000
+-XX:+ExitOnOutOfMemoryError
 ```
+
+The Xmx size in the parameter is 70% of the available memory of the server (recommended value, availableMem*70%).
 
 Because an `OutOfMemoryError` will typically leave the JVM in an inconsistent state, we write a heap dump (for debugging) and forcibly terminate the process when this occurs.
 
@@ -68,8 +81,9 @@ coordinator=true
 node-scheduler.include-coordinator=false
 http-server.http.port=8080
 query.max-memory=50GB
-query.max-memory-per-node=1GB
-query.max-total-memory-per-node=2GB
+query.max-total-memory=50GB
+query.max-memory-per-node=10GB
+query.max-total-memory-per-node=10GB
 discovery-server.enabled=true
 discovery.uri=http://example.net:8080
 ```
@@ -80,8 +94,9 @@ The following is a minimal configuration for the workers:
 coordinator=false
 http-server.http.port=8080
 query.max-memory=50GB
-query.max-memory-per-node=1GB
-query.max-total-memory-per-node=2GB
+query.max-total-memory=50GB
+query.max-memory-per-node=10GB
+query.max-total-memory-per-node=10GB
 discovery.uri=http://example.net:8080
 ```
 
@@ -91,9 +106,10 @@ Alternatively, if you are setting up a single machine for testing that will func
 coordinator=true
 node-scheduler.include-coordinator=true
 http-server.http.port=8080
-query.max-memory=5GB
-query.max-memory-per-node=1GB
-query.max-total-memory-per-node=2GB
+query.max-memory=50GB
+query.max-total-memory=50GB
+query.max-memory-per-node=10GB
+query.max-total-memory-per-node=10GB
 discovery-server.enabled=true
 discovery.uri=http://example.net:8080
 ```
@@ -103,11 +119,11 @@ These properties require some explanation:
 -   `coordinator`: Allow this openLooKeng instance to function as a coordinator (accept queries from clients and manage query execution).
 -   `node-scheduler.include-coordinator`: Allow scheduling work on the coordinator. For larger clusters, processing work on the coordinator can impact query performance because the machine\'s resources are not available for the critical task of scheduling, managing and monitoring query execution.
 -   `http-server.http.port`: Specifies the port for the HTTP server. openLooKeng uses HTTP for all communication, internal and external.
--   `query.max-memory`: The maximum amount of distributed memory that a query may use.
--   `query.max-memory-per-node`: The maximum amount of user memory that a query may use on any one machine.
--   `query.max-total-memory-per-node`: The maximum amount of user and system memory that a query may use on any one machine, where system memory is the memory used during execution by readers, writers, and network buffers, etc.
+-   `query.max-memory`: The maximum amount of distributed memory that a query may use. The parameter is N*query.max-memory-per-node, where N is the number of working nodes.
+-   `query.max-memory-per-node`: The maximum amount of user memory that a query may use on any one machine. This parameter is 70% (recommended value) of Xmx in the JVM configuration.
+-   `query.max-total-memory-per-node`: The maximum amount of user and system memory that a query may use on any one machine, where system memory is the memory used during execution by readers, writers, and network buffers, etc. This parameter is 70% (recommended value) of Xmx in the JVM configuration.
 -   `discovery-server.enabled`: openLooKeng uses the Discovery service to find all the nodes in the cluster. Every openLooKeng instance will register itself with the Discovery service on startup. In order to simplify deployment and avoid running an additional service, the openLooKeng coordinator can run an embedded version of the Discovery service. It shares the HTTP server with openLooKeng and thus uses the same port.
--   `discovery.uri`: The URI to the Discovery server. Because we have enabled the embedded version of Discovery in the openLooKeng coordinator, this should be the URI of the openLooKeng coordinator. Replace `example.net:8080` to match the host and port of the openLooKeng coordinator. This URI must not end in a slash.
+-   `discovery.uri`: The URI to the Discovery server. Because we have enabled the embedded version of Discovery in the openLooKeng coordinator, this should be the URI of the openLooKeng coordinator. Replace `example.net:8080` to match the host and port of the openLooKeng coordinator. This URI must not end in a slash. For example, the openLooKeng coordinator ip is 127.0.0.1, the port is 8080, and discovery.uri=http://127.0.0.1:8080.
 
 The following properties may be set:
 

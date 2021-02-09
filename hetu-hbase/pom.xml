@@ -155,6 +155,62 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-server</artifactId>
+            <version>${version.hbase}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>jersey-server</artifactId>
+                    <groupId>org.glassfish.jersey.core</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jersey-container-servlet-core</artifactId>
+                    <groupId>org.glassfish.jersey.containers</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jaxb-api</artifactId>
+                    <groupId>javax.xml.bind</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hk2-locator</artifactId>
+                    <groupId>org.glassfish.hk2</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jersey-common</artifactId>
+                    <groupId>org.glassfish.jersey.core</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hadoop-hdfs</artifactId>
+                    <groupId>org.apache.hadoop</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hadoop-common</artifactId>
+                    <groupId>org.apache.hadoop</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hadoop-mapreduce-client-core</artifactId>
+                    <groupId>org.apache.hadoop</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hadoop-auth</artifactId>
+                    <groupId>org.apache.hadoop</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hadoop-annotations</artifactId>
+                    <groupId>org.apache.hadoop</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>commons-logging</artifactId>
+                    <groupId>commons-logging</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-protocol-shaded</artifactId>
+            <version>${version.hbase}</version>
+        </dependency>
+        <dependency>
             <artifactId>jackson-databind</artifactId>
             <exclusions>
                 <exclusion>

@@ -26,6 +26,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
+import io.prestosql.queryeditorui.store.connectors.ConnectorCache;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
@@ -260,6 +261,7 @@ public class PluginManager
         for (ConnectorFactory connectorFactory : plugin.getConnectorFactories()) {
             log.info("Registering connector %s", connectorFactory.getName());
             connectorManager.addConnectorFactory(connectorFactory);
+            ConnectorCache.addCatalogConfig(plugin, connectorFactory.getName());
         }
 
         for (SessionPropertyConfigurationManagerFactory sessionConfigFactory : plugin.getSessionPropertyConfigurationManagerFactories()) {

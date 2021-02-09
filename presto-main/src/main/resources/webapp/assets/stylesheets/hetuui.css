@@ -915,7 +915,6 @@ h2 {
     padding-left: 10px;*/
 }
 
-
 /* Category opener */
 
 .schema-tree .opener {
@@ -936,7 +935,12 @@ h2 {
 }
 
 .schema-tree li.category.async>.item>.opener::after {
-    content: '!';
+    content: '\f067';
+    color: gray;
+    display: block;
+    transition: all 0.25s;
+    font-size: 12px;
+    font-family: FontAwesome;
 }
 
 .schema-tree .opener:hover {

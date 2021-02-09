@@ -207,6 +207,7 @@ public class TestUtils
         properties.put("index_columns", "rowkey");
         properties.put("external", false);
         properties.put("serializer", "StringRowSerializer");
+        properties.put("split_by_char", "0~9,a~z,A~Z");
 
         return properties;
     }

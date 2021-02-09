@@ -380,7 +380,7 @@ public class TestHBase
         Map<Integer, List<Range>> ranges = new HashMap<>();
         HBaseSplit split =
                 new HBaseSplit(
-                        "rowkey", TestUtils.createHBaseTableHandle(), hostAddressList, null, null, ranges, false);
+                        "rowkey", TestUtils.createHBaseTableHandle(), hostAddressList, null, null, ranges, 0, false, null);
 
         HBaseRecordSetProvider hrsp = new HBaseRecordSetProvider(hconn);
         RecordSet rs =

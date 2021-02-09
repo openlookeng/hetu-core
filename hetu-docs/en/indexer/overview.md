@@ -110,6 +110,20 @@ Subsequent queries will utilize the index to reduce the amount of data read
  and query performance will be improved.
 
 
+## Configuration Properties
+
+| Property Name                                     | Default Value       | Required| Description|
+|---------------------------------------------------|---------------------|---------|--------------|
+| hetu.heuristicindex.filter.enabled                | false               | No      | Enables heuristic index|
+| hetu.heuristicindex.filter.cache.max-memory       | 10GB                | No      | Caching size of index files|
+| hetu.heuristicindex.filter.cache.soft-reference   | true                | No      | Enabling this property allows the GC to remove entries from the cache if memory is running low|
+| hetu.heuristicindex.filter.cache.ttl              | 24h                 | No      | The time period after which index cache expires|
+| hetu.heuristicindex.filter.cache.load-threads     | 10                  | No      | The number of threads used to load indices in parallel|
+| hetu.heuristicindex.filter.cache.loading-delay    | 10s                 | No      | The delay to wait before async loading task starts to load index cache from indexstore|
+| hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | No      | Directory under which all index files are stored|
+| hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| No      | This property defines the filesystem profile used to read and write index|
+
+
 ## Index Statements
 
 See [Heuristic Index Statements](./hindex-statements.md).

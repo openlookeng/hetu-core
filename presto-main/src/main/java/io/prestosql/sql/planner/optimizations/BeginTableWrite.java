@@ -238,7 +238,7 @@ public class BeginTableWrite
                         scan.getAssignments(),
                         scan.getEnforcedConstraint(),
                         scan.getPredicate(), scan.getStrategy(),
-                        scan.getReuseTableScanMappingId(), 0);
+                        scan.getReuseTableScanMappingId(), 0, scan.isForDelete());
             }
 
             if (node instanceof FilterNode) {

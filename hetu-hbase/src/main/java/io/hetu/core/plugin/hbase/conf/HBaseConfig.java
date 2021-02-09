@@ -15,6 +15,7 @@
 package io.hetu.core.plugin.hbase.conf;
 
 import io.airlift.configuration.Config;
+import io.prestosql.spi.function.Mandatory;
 
 /**
  * hbase.properties
@@ -23,22 +24,24 @@ import io.airlift.configuration.Config;
  */
 public class HBaseConfig
 {
-    private static final int RETRY_NUMBER = 3;
-    private static final int PAUSE_TIME = 100;
-    private int retryNumber = RETRY_NUMBER;
-    private int pauseTime = PAUSE_TIME;
+    private int retryNumber = 3; //hbase client retries to connect
+    private int pauseTime = 100;
+    private int retryCreateSnapshotNumber = 100;
     private boolean isRpcProtectionEnable; // Whether to enable hbase data communication encryption, default is false
     private String zkQuorum;
     private String zkClientPort;
     private String zkZnodeParent = "/hbase";
     private String metastoreType;
     private String defaultValue = "NULL";
+    private String hdfsSitePath;
+    private String coreSitePath;
     private String jaasConfPath; // java.security.auth.login.config: jaas.conf
     private String hbaseSitePath; // hbase-site.xml file path
     private String krb5ConfPath; // java.security.krb5.conf: krb5.conf
     private String userKeytabPath; // user.keytab file path
     private String principalUsername; // principal username
     private String kerberos;
+    private boolean isClientSideEnable; // use client side mode
 
     public int getRetryNumber()
     {
@@ -82,6 +85,28 @@ public class HBaseConfig
     public void setJaasConfPath(String jaasConfPath)
     {
         this.jaasConfPath = jaasConfPath;
+    }
+
+    @Config("hbase.hdfs.site.path")
+    public void setHdfsSitePath(String hdfsSitePath)
+    {
+        this.hdfsSitePath = hdfsSitePath;
+    }
+
+    public String getHdfsSitePath()
+    {
+        return hdfsSitePath;
+    }
+
+    @Config("hbase.core.site.path")
+    public void setCoreSitePath(String coreSitePath)
+    {
+        this.coreSitePath = coreSitePath;
+    }
+
+    public String getCoreSitePath()
+    {
+        return coreSitePath;
     }
 
     public String getHbaseSitePath()
@@ -133,6 +158,10 @@ public class HBaseConfig
         return zkQuorum;
     }
 
+    @Mandatory(name = "hbase.zookeeper.quorum",
+            description = "Zookeeper cluster address",
+            defaultValue = "host1,host2",
+            required = true)
     @Config("hbase.zookeeper.quorum")
     public void setZkQuorum(String zkQuorum)
     {
@@ -144,6 +173,10 @@ public class HBaseConfig
         return zkClientPort;
     }
 
+    @Mandatory(name = "hbase.zookeeper.property.clientPort",
+            description = "Zookeeper client port",
+            defaultValue = "2181",
+            required = true)
     @Config("hbase.zookeeper.property.clientPort")
     public void setZkClientPort(String zkClientPort)
     {
@@ -155,6 +188,9 @@ public class HBaseConfig
         return zkZnodeParent;
     }
 
+    @Mandatory(name = "hbase.zookeeper.znode.parent",
+            description = "Zookeeper znode parent of hbase",
+            defaultValue = "/hbase")
     @Config("hbase.zookeeper.znode.parent")
     public void setZkZnodeParent(String zkZnodeParent)
     {
@@ -166,6 +202,9 @@ public class HBaseConfig
         return metastoreType;
     }
 
+    @Mandatory(name = "hbase.metastore.type",
+            description = "The storage of hbase metadata",
+            defaultValue = "hetuMetastore")
     @Config("hbase.metastore.type")
     public void setMetastoreType(String metastoreType)
     {
@@ -192,5 +231,27 @@ public class HBaseConfig
     public void setDefaultValue(String defaultValue)
     {
         this.defaultValue = defaultValue;
+    }
+
+    public boolean isClientSideEnable()
+    {
+        return isClientSideEnable;
+    }
+
+    @Config("hbase.client.side.enable")
+    public void setClientSideEnable(boolean isClientSideEnable)
+    {
+        this.isClientSideEnable = isClientSideEnable;
+    }
+
+    public int getRetryCreateSnapshotNumber()
+    {
+        return retryCreateSnapshotNumber;
+    }
+
+    @Config("hbase.client.side.snapshot.retry")
+    public void setRetryCreateSnapshotNumber(int retryCreateSnapshotNumber)
+    {
+        this.retryCreateSnapshotNumber = retryCreateSnapshotNumber;
     }
 }

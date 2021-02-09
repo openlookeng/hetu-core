@@ -284,7 +284,8 @@ public class JdbcPlanOptimizer
                                     Optional.empty(),
                                     ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
                                     0,
-                                    0),
+                                    0,
+                                    false),
                             new Assignments(assignments.build())));
         }
     }

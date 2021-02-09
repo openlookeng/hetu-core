@@ -16,7 +16,15 @@ package io.prestosql.plugin.tpcds;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 
+import java.util.Optional;
+
+@ConnectorConfig(connectorLabel = "TPC-DS : TPC Benchmark™ DS, data is generated on the fly",
+        docLink = "https://openlookeng.io/docs/docs/connector/tpcds.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/tpcds.html#configuration")
 public class TpcdsPlugin
         implements Plugin
 {
@@ -24,5 +32,12 @@ public class TpcdsPlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new TpcdsConnectorFactory());
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = TpcdsPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig, ImmutableList.of());
     }
 }

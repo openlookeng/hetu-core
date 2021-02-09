@@ -145,6 +145,7 @@ import static io.prestosql.spi.util.DateTimeUtils.timeHasTimeZone;
 import static io.prestosql.spi.util.DateTimeUtils.timestampHasTimeZone;
 import static io.prestosql.sql.NodeUtils.getSortItemsFromOrderBy;
 import static io.prestosql.sql.analyzer.Analyzer.verifyNoAggregateWindowOrGroupingFunctions;
+import static io.prestosql.sql.analyzer.ExpressionTreeUtils.extractLocation;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.EXPRESSION_NOT_CONSTANT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_LITERAL;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_PARAMETER_USAGE;
@@ -1679,7 +1680,15 @@ public class ExpressionAnalyzer
             if (e.getErrorCode().getCode() == StandardErrorCode.AMBIGUOUS_FUNCTION_CALL.toErrorCode().getCode()) {
                 throw new SemanticException(SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL, node, e.getMessage());
             }
-            throw e;
+            if (e.getLocation().isPresent()) {
+                // If analysis of any of the argument types (which is done lazily to deal with lambda
+                // expressions) fails, we want to report the original reason for the failure
+                throw e;
+            }
+
+            // otherwise, it must have failed due to a missing function or other reason, so we report an error at the
+            // current location
+            throw new PrestoException(e::getErrorCode, extractLocation(node), e.getMessage(), e);
         }
     }
 

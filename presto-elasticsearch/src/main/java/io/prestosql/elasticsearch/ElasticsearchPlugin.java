@@ -17,9 +17,21 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
+
+import java.util.Arrays;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
+@ConnectorConfig(connectorLabel = "Elasticsearch: Allow access to Elasticsearch data from openLooKeng",
+        propertiesEnabled = true,
+        catalogConfigFilesEnabled = true,
+        globalConfigFilesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/elasticsearch.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/elasticsearch.html#configuration")
 public class ElasticsearchPlugin
         implements Plugin
 {
@@ -40,5 +52,13 @@ public class ElasticsearchPlugin
     public synchronized Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(connectorFactory);
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = ElasticsearchPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(ElasticsearchConfig.class.getDeclaredMethods()));
     }
 }

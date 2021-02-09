@@ -17,6 +17,8 @@ import io.prestosql.spi.security.ConnectorIdentity;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.Privilege;
+import io.prestosql.spi.security.ViewExpression;
+import io.prestosql.spi.type.Type;
 
 import java.util.Collections;
 import java.util.List;
@@ -435,22 +437,27 @@ public interface ConnectorAccessControl
     }
 
     /**
-     * Check if identity and table combination has some row level filtering
+     * Get a row filter associated with the given table and identity.
      *
-     * @return Expression as form of a string. Null if no row filters are present
+     * The filter must be a scalar SQL expression of boolean type over the columns in the table.
+     *
+     * @return the filter, or {@link Optional#empty()} if not applicable
      */
-    default String applyRowlevelFiltering(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
+    default Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName)
     {
-        return null;
+        return Optional.empty();
     }
 
     /**
-     * Check if identity and table and column has some column making enabled
+     * Get a column mask associated with the given table, column and identity.
      *
-     * @return Expression as form of a string. Null if no column filters are present
+     * The mask must be a scalar SQL expression of a type coercible to the type of the column being masked. The expression
+     * must be written in terms of columns in the table.
+     *
+     * @return the mask, or {@link Optional#empty()} if not applicable
      */
-    default String applyColumnMasking(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName, String columnName)
+    default Optional<ViewExpression> getColumnMask(ConnectorTransactionHandle transactionHandle, Identity identity, SchemaTableName tableName, String columnName, Type type)
     {
-        return null;
+        return Optional.empty();
     }
 }
