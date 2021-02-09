@@ -848,7 +848,7 @@ public final class SqlFormatter
                 builder.append("IF NOT EXISTS ");
             }
             builder.append(formatName(node.getIndexName()));
-            builder.append("USING ");
+            builder.append(" USING ");
             builder.append(format(node.getIndexType()));
             builder.append(" ON ");
             builder.append(formatName(node.getTableName()));

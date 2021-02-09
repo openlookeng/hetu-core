@@ -145,5 +145,30 @@
             <artifactId>fastutil</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-hive-hadoop2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-main</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-tpch</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-tests</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-hive</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
