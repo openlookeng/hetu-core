@@ -322,10 +322,18 @@ public class PushPredicateIntoTableScan
         // * Short of implementing the previous bullet point, the current order of non-deterministic expressions
         //   and non-TupleDomain-expressible expressions should be retained. Changing the order can lead
         //   to failures of previously successful queries.
-        RowExpression resultingPredicate = RowExpressionUtils.combineConjuncts(
-                domainTranslator.toPredicate(remainingFilter.transform(assignments::get), planSymbolAllocator.getSymbols()),
-                logicalRowExpressions.filterNonDeterministicConjuncts(predicate),
-                decomposedPredicate.getRemainingExpression());
+        RowExpression resultingPredicate;
+        if (remainingFilter.isAll() && newTable.getConnectorHandle().hasDisjunctFiltersPushdown()) {
+            resultingPredicate = RowExpressionUtils.combineConjuncts(
+                    domainTranslator.toPredicate(remainingFilter.transform(assignments::get), planSymbolAllocator.getSymbols()),
+                    logicalRowExpressions.filterNonDeterministicConjuncts(predicate));
+        }
+        else {
+            resultingPredicate = RowExpressionUtils.combineConjuncts(
+                    domainTranslator.toPredicate(remainingFilter.transform(assignments::get), planSymbolAllocator.getSymbols()),
+                    logicalRowExpressions.filterNonDeterministicConjuncts(predicate),
+                    decomposedPredicate.getRemainingExpression());
+        }
 
         if (!TRUE_CONSTANT.equals(resultingPredicate)) {
             return Optional.of(new FilterNode(idAllocator.getNextId(), tableScan, resultingPredicate));
