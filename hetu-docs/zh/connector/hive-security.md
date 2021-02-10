@@ -69,6 +69,7 @@ Hive连接器对这些服务的访问是在属性文件中配置的，该文件�
 | `hive.metastore.service.principal`| Hive元存储服务的Kerberos主体。|
 | `hive.metastore.client.principal`| openLooKeng在连接到Hive元存储服务时将使用的Kerberos主体。|
 | `hive.metastore.client.keytab`| Hive元存储客户端keytab位置。|
+| `hive.metastore.krb5.conf.path`| Kerberos配置文件位置。|
 
 #### `hive.metastore.authentication.type`
 
@@ -110,6 +111,12 @@ keytab文件的路径，该文件包含由`hive.metastore.client.principal`指�
 
 此属性是可选的；无默认值。
 
+#### `hive.metastore.krb5.conf.path`
+
+Kerberos配置文件的路径。该文件必须可由运行openLooKeng的操作系统用户读取。
+
+此属性是可选的；无默认值。
+
 #### `NONE`身份验证配置示例
 
 ``` properties
@@ -126,6 +133,7 @@ hive.metastore.thrift.impersonation.enabled=true
 hive.metastore.service.principal=hive/hive-metastore-host.example.com@EXAMPLE.COM
 hive.metastore.client.principal=openlk@EXAMPLE.COM
 hive.metastore.client.keytab=/etc/openlookeng/hive.keytab
+hive.metastore.krb5.conf.path=/etc/openlookeng/krb5.conf
 ```
 
 当Hive元存储Thrift服务的身份验证类型为`KERBEROS`时，openLooKeng将作为属性`hive.metastore.client.principal`指定的Kerberos主体进行连接。openLooKeng将使用`hive.metastore.client.keytab`属性指定的keytab对主体进行身份验证，并将验证元存储的标识是否与`hive.metastore.service.principal`匹配。
