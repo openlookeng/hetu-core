@@ -62,19 +62,17 @@ public interface Index
      * @param values a map of columnName-columnValues
      * @return whether the values are successfully added
      */
-    //boolean addValues(Map<String, List<Object>> values) throws IOException;
-    boolean addValues(List<Pair<String, List<Object>>> values) throws IOException;
+    boolean addValues(List<Pair<String, List<Object>>> values)
+            throws IOException;
 
     /**
-     * Add a list of Key-Value pairs to the index. Only map-like Indexes will support this operation.
-     * For example Bloom Index just requires a list of values, whereas a Btree Index requires Key-Value pairs
-     * to be added.
-     *
+     * Add a list of value->symbol pairs to index, for example, 3 -> "ORCFile1"
+     * <p>
      * If the list contains duplicate keys, the value of the first occurrence is used.
-     * @param keyValues an ordered list of KeyValues to add to index, sorted ascending on Keys
-     * @return true if operation was successful
+     *
+     * @param pairs an ordered list of KeyValues to add to index, sorted ascending on Keys
      */
-    default boolean addKeyValues(List<Pair<String, List<KeyValue>>> keyValues) throws IOException
+    default void addKeyValues(List<Pair<String, List<Pair<Comparable<? extends Comparable<?>>, String>>>> pairs)
     {
         throw new UnsupportedOperationException("This index does not support adding Key-Value pairs.");
     }
@@ -97,9 +95,10 @@ public interface Index
      *
      * @param expression the expression to apply
      * @return the Iterator of positions that matches the expression result
-     *         {@code null} if the index does not support lookUp operation
+     * {@code null} if the index does not support lookUp operation
      */
-    default <I> Iterator<I> lookUp(Object expression) throws UnsupportedOperationException
+    default <T extends Comparable<T>> Iterator<T> lookUp(Object expression)
+            throws UnsupportedOperationException
     {
         return null;
     }

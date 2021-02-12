@@ -189,15 +189,7 @@ public class IndexCache
         }
 
         List<IndexMetadata> indices = new LinkedList<>();
-        if (partitions.isEmpty()) {
-            String filterKeyPath = table + "/" + column + "/" + indexType;
-            IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
-            List<IndexMetadata> result = loadIndex(filterKey);
-            if (result != null) {
-                indices.addAll(result);
-            }
-        }
-        else {
+        if (!partitions.isEmpty()) {
             for (String partition : partitions) {
                 String filterKeyPath = table + "/" + column + "/" + indexType + "/" + partition;
                 IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
@@ -206,7 +198,20 @@ public class IndexCache
                     indices.addAll(result);
                 }
             }
+
+            if (!indices.isEmpty()) {
+                // if partition-level index exists, return. otherwise keep loading table-level index
+                return indices;
+            }
         }
+
+        String filterKeyPath = table + "/" + column + "/" + indexType;
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
+        List<IndexMetadata> result = loadIndex(filterKey);
+        if (result != null) {
+            indices.addAll(result);
+        }
+
         return indices;
     }
 

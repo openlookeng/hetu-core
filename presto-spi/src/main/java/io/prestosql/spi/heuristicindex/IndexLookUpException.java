@@ -12,25 +12,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.heuristicindex.util;
 
-import java.util.Map;
+package io.prestosql.spi.heuristicindex;
 
-public class SerializationUtils
+public class IndexLookUpException
+        extends Exception
 {
-    private SerializationUtils()
+    public IndexLookUpException()
     {
-    }
-
-    public static String serializeMap(Map<String, ?> input)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-        input.forEach((key, value) -> {
-            stringBuilder.append(key);
-            stringBuilder.append(":");
-            stringBuilder.append(value);
-            stringBuilder.append(",");
-        });
-        return stringBuilder.toString();
     }
 }

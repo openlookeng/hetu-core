@@ -478,7 +478,7 @@ public class TestHindex
         catch (AssertionError e) {
             assertNotEquals(condition, "key2 = 11");
             assertTrue(e.getCause().toString().contains("line 1:1: Unsupported WHERE expression." +
-                    " Only in-predicate/equality-expression are supportede.g. partition=1, partition in (1,2)"));
+                    " Only in-predicate/equality-expressions are supported e.g. partition=1 or partition=2/partition in (1,2)"));
         }
     }
 
