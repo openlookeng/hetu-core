@@ -144,6 +144,17 @@ public class IndexRecord
         return this.properties.stream().anyMatch(property -> property.startsWith(INPROGRESS_PROPERTY_KEY));
     }
 
+    public String getProperty(String key)
+    {
+        for (String property : properties) {
+            if (property.toLowerCase(Locale.ROOT).startsWith(key.toLowerCase(Locale.ROOT))) {
+                String[] entry = property.split("=");
+                return entry[1];
+            }
+        }
+        return null;
+    }
+
     @Override
     public boolean equals(Object o)
     {

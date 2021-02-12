@@ -106,6 +106,7 @@
 | hetu.heuristicindex.filter.cache.loading-delay    | 10s                 | 否    | 在异步加载索引到缓存前等待的时长|
 | hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | 否    | 所有索引文件存储的目录|
 | hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
+| hetu.heuristicindex.filter.cache.preload.indices  |                     | 否    | 在服务器启动时预加载指定名称的索引(用逗号分隔), 当值为`ALL`时将预载入全部索引|
 
 索引功能现使用Hetu Metastore管理元数据。请参阅 [Hetu Metastore](../admin/meta-store.md) 获取关于如何配置的更多信息。
 

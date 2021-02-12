@@ -153,6 +153,10 @@ public class PrestoServer
             // State Store
             launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
             injector.getInstance(StateStoreProvider.class).loadStateStore();
+            // preload index (on coordinator only)
+            if (injector.getInstance(ServerConfig.class).isCoordinator()) {
+                injector.getInstance(HeuristicIndexerManager.class).preloadIndex();
+            }
             // register dynamic filter listener
             registerStateStoreListeners(
                     injector.getInstance(StateStoreListenerManager.class),

@@ -52,7 +52,8 @@ public class TestHetuConfig
                 .setDataCenterConsumerTimeout(new Duration(10, TimeUnit.MINUTES))
                 .setSplitCacheMapEnabled(false)
                 .setSplitCacheStateUpdateInterval(new Duration(2, TimeUnit.SECONDS))
-                .setTraceStackVisible(false));
+                .setTraceStackVisible(false)
+                .setIndexToPreload(null));
     }
 
     @Test
@@ -81,6 +82,7 @@ public class TestHetuConfig
                 .put("hetu.split-cache-map.enabled", "true")
                 .put("hetu.split-cache-map.state-update-interval", "5s")
                 .put("stack-trace-visible", "true")
+                .put("hetu.heuristicindex.filter.cache.preload-indices", "idx1,idx2")
                 .build();
 
         HetuConfig expected = new HetuConfig()
@@ -105,7 +107,8 @@ public class TestHetuConfig
                 .setDataCenterConsumerTimeout(new Duration(5, TimeUnit.MINUTES))
                 .setSplitCacheMapEnabled(true)
                 .setSplitCacheStateUpdateInterval(new Duration(5, TimeUnit.SECONDS))
-                .setTraceStackVisible(true);
+                .setTraceStackVisible(true)
+                .setIndexToPreload("idx1,idx2");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

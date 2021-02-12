@@ -42,6 +42,7 @@ public class HetuConfig
     private Boolean indexCacheSoftReference = Boolean.TRUE;
     private String indexStoreUri = "/opt/hetu/indices/";
     private String indexStoreFileSystemProfile = "local-config-default";
+    private String indexToPreload;
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
     private Boolean enableMultipleCoordinator = Boolean.FALSE;
     private Duration stateUpdateInterval = new Duration(100, TimeUnit.MILLISECONDS);
@@ -113,6 +114,19 @@ public class HetuConfig
     public HetuConfig setIndexCacheTTL(Duration indexCacheTTL)
     {
         this.indexCacheTTL = indexCacheTTL;
+        return this;
+    }
+
+    public String getIndexToPreload()
+    {
+        return indexToPreload;
+    }
+
+    @Config(HetuConstant.FILTER_CACHE_PRELOAD_INDICES)
+    @ConfigDescription("Comma separated list of index names to preload when server starts, or ALL to load all indices")
+    public HetuConfig setIndexToPreload(String indices)
+    {
+        this.indexToPreload = indices;
         return this;
     }
 

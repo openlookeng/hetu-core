@@ -227,7 +227,6 @@ public interface Index
 
     default void close() throws IOException
     {
-        return;
     }
 
     enum Level

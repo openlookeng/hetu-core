@@ -21,10 +21,10 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
-import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
@@ -33,6 +33,9 @@ import io.prestosql.spi.service.PropertyService;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,6 +47,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.HetuConstant.KILOBYTE;
+import static io.prestosql.spi.heuristicindex.IndexCacheKey.LAST_MODIFIED_TIME_PLACE_HOLDER;
 
 public class IndexCache
 {
@@ -67,14 +71,18 @@ public class IndexCache
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
             executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
             CacheBuilder<IndexCacheKey, List<IndexMetadata>> cacheBuilder = CacheBuilder.newBuilder()
-                    .removalListener(e -> ((List<IndexMetadata>) e.getValue()).stream().forEach(i -> {
+                    .removalListener(e -> {
                         try {
-                            i.getIndex().close();
+                            if (!((IndexCacheKey) e.getKey()).skipCloseIndex()) {
+                                for (IndexMetadata i : ((List<IndexMetadata>) e.getValue())) {
+                                    i.getIndex().close();
+                                }
+                            }
                         }
                         catch (IOException ioException) {
-                            LOG.debug(ioException, "Failed to close index " + i);
+                            LOG.debug(ioException, "Failed to close index:", e);
                         }
-                    }))
+                    })
                     .expireAfterWrite(PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_TTL).toMillis(), TimeUnit.MILLISECONDS)
                     .maximumWeight(PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_MAX_MEMORY))
                     .weigher((indexCacheKey, indices) -> {
@@ -125,6 +133,59 @@ public class IndexCache
             }, loadDelay, refreshRate, TimeUnit.MILLISECONDS);
             cache = cacheBuilder.build(loader);
         }
+    }
+
+    public void preloadIndex(String table, String column, String type, Index.Level level)
+    {
+        String filterKeyPath = table + "/" + column + "/" + type;
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, level);
+        filterKey.setNoCloseFlag(true);
+        executor.schedule(() -> {
+            List<IndexMetadata> allLoaded;
+            try {
+                // Load index for the whole table with dummy last modified time first
+                allLoaded = cache.get(filterKey);
+                // Then 1. replace the filterKey with the actual last modified time read from index
+                // 2. for PARTITION and STRIPE index, the loaded whole table index should also be broken to stripe/partition indices
+                switch (level) {
+                    case STRIPE:
+                        // break index key from table/column/type to several table/column/type/split-path
+                        for (IndexMetadata index : allLoaded) {
+                            String indexUri = index.getUri();
+                            IndexCacheKey newKey = new IndexCacheKey(filterKeyPath + indexUri, index.getLastModifiedTime());
+                            cache.asMap().putIfAbsent(newKey, new ArrayList<>());
+                            cache.asMap().get(newKey).add(index);
+                        }
+                        cache.invalidate(filterKey);
+                        break;
+                    case PARTITION:
+                        // break index key from table/column/type to several table/column/type/partition
+                        for (IndexMetadata index : allLoaded) {
+                            Path indexUri = Paths.get(index.getUri());
+                            String partition = null;
+                            // get partition name from path if present
+                            for (int i = indexUri.getNameCount() - 1; i >= 0; i--) {
+                                if (indexUri.getName(i).toString().contains("=")) {
+                                    partition = indexUri.getName(i).toString();
+                                    break;
+                                }
+                            }
+                            if (partition != null) {
+                                IndexCacheKey newKey = new IndexCacheKey(filterKeyPath + "/" + partition, index.getLastModifiedTime());
+                                cache.asMap().putIfAbsent(newKey, new ArrayList<>());
+                                cache.asMap().get(newKey).add(index);
+                            }
+                        }
+                        cache.invalidate(filterKey);
+                        break;
+                    case TABLE:
+                        // no need to break index, and lastModifiedTime is not used for TABLE level. no need to do anything
+                }
+            }
+            catch (ExecutionException e) {
+                LOG.debug("Failed to load into cache: " + filterKey, e);
+            }
+        }, 0, TimeUnit.MILLISECONDS);
     }
 
     public List<IndexMetadata> getIndices(String table, String column, Split split)
@@ -192,7 +253,7 @@ public class IndexCache
         if (!partitions.isEmpty()) {
             for (String partition : partitions) {
                 String filterKeyPath = table + "/" + column + "/" + indexType + "/" + partition;
-                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
+                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION);
                 List<IndexMetadata> result = loadIndex(filterKey);
                 if (result != null) {
                     indices.addAll(result);
@@ -206,7 +267,7 @@ public class IndexCache
         }
 
         String filterKeyPath = table + "/" + column + "/" + indexType;
-        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION.name());
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.TABLE);
         List<IndexMetadata> result = loadIndex(filterKey);
         if (result != null) {
             indices.addAll(result);
