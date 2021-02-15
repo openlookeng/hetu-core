@@ -15,10 +15,7 @@ package io.prestosql.operator;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
-import io.prestosql.execution.TaskId;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
@@ -81,13 +78,13 @@ public class HashAggregationOmniOperator
                 for (int cidx = 0; cidx < page.getChannelCount(); cidx++) {
                     LongVec vec = (LongVec) page.getBlock(cidx).getValuesVec();
                     long value = vec.get(ridx);
-                    buffers[cidx].set(totalRowCount, value);
+                    ((LongVec) buffers[cidx]).set(totalRowCount, value);
                 }
                 totalRowCount++;
             }
         }
 
-        public Vec<?>[] getBuffers()
+        public Vec[] getBuffers()
         {
             return buffers;
         }
@@ -145,7 +142,7 @@ public class HashAggregationOmniOperator
         omniWork.process();
     }
 
-    public Page toResult(Vec<?>[] omniExecutionResult)
+    public Page toResult(Vec[] omniExecutionResult)
     {
         List<Type> builderType = new ArrayList<>();
         builderType.add(BigintType.BIGINT);
@@ -153,7 +150,7 @@ public class HashAggregationOmniOperator
 
         long start1 = System.currentTimeMillis();
 
-        Vec<?>[] vecs = omniExecutionResult;
+        Vec[] vecs = omniExecutionResult;
         int size = vecs[0].size();
 
         boolean[] valueIsNull = new boolean[size];
@@ -179,9 +176,8 @@ public class HashAggregationOmniOperator
         }
         if (finishing && omniWork.isFinished()) {
             finished = true;
-            Vec<?>[] result = omniWork.getResult();
+            Vec[] result = omniWork.getResult();
             return toResult(result);
-
         }
 
         return null;

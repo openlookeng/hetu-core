@@ -23,13 +23,13 @@ import nova.hetu.omnicache.vector.VecType;
 import static com.google.common.base.Preconditions.checkState;
 
 public final class HashAggregationOmniWork<O>
-        implements Work<Vec<?>[]>
+        implements Work<Vec[]>
 {
 
     OmniRuntime omniRuntime;
     String compileID;
     private boolean finished;
-    private Vec<?>[] result;
+    private Vec[] result;
     private Page page;
     String omniKey;
     VecType[] outTypes;
@@ -50,8 +50,10 @@ public final class HashAggregationOmniWork<O>
         inputData[1] = (LongVec) page.getBlock(1).getValuesVec();
 
         System.out.println("before omni execute-------");
+        LongVec column0 = (LongVec) inputData[0];
+        LongVec column1 = (LongVec) inputData[1];
         for (int i = 0; i < inputData[0].size(); i++) {
-            System.out.println(inputData[0].get(i) + " " + inputData[1].get(i));
+            System.out.println(column0.get(i) + " " + column1.get(i));
         }
 
         int rowNum = page.getPositionCount();
@@ -65,19 +67,21 @@ public final class HashAggregationOmniWork<O>
     }
 
     @Override
-    public Vec<?>[] getResult()
+    public Vec[] getResult()
     {
         checkState(finished, "process has not finished");
         long start = System.currentTimeMillis();
 
-        result = (Vec<?>[]) omniRuntime.execute(compileID, omniKey, null, 0, outTypes, OmniOpStep.FINAL);
-        Vec<?>[] vecs = result;
+        result = (Vec[]) omniRuntime.execute(compileID, omniKey, null, 0, outTypes, OmniOpStep.FINAL);
+        Vec[] vecs = result;
 
         System.out.println("after omni execute-------");
+        LongVec column0 = (LongVec) vecs[0];
+        LongVec column1 = (LongVec) vecs[1];
         for (int i = 0; i < vecs[0].size(); i++) {
-            System.out.println(vecs[0].get(i) + " " + vecs[1].get(i));
+            System.out.println(column0.get(i) + " " + column1.get(i));
         }
-        System.out.println("omni runtime final execute:"+ (System.currentTimeMillis() - start));
+        System.out.println("omni runtime final execute:" + (System.currentTimeMillis() - start));
         return result;
     }
 
