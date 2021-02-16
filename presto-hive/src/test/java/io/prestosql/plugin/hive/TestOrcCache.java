@@ -69,99 +69,45 @@ public class TestOrcCache
     }
 
     @Test
-    public void testCacheTableOnBooleanColumn()
+    public void testCacheTableOnAllColumnTypes()
     {
         SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _boolean = true");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_boolean = true)"));
         assertQueryOrdered("SELECT id, _boolean FROM all_types WHERE _boolean = true", "VALUES (0, true)");
-    }
-
-    @Test
-    public void testCacheTableOnTinyIntColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _tinyint = 0");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_tinyint = 0)"));
         assertQueryOrdered("SELECT id, _tinyint FROM all_types WHERE _tinyint = 0", "VALUES (0, 0)");
-    }
-
-    @Test
-    public void testCacheTableOnSmallIntColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _smallint = 0");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_smallint = 0)"));
         assertQueryOrdered("SELECT id, _smallint FROM all_types WHERE _smallint = 0", "VALUES (0, 0)");
-    }
-
-    @Test
-    public void testCacheTableOnIntegerColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _integer = 0");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_integer = 0)"));
         assertQueryOrdered("SELECT id, _integer FROM all_types WHERE _integer = 0", "VALUES (0, 0)");
-    }
-
-    @Test
-    public void testCacheTableOnBigIntColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _bigint = 0");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_bigint = 0)"));
         assertQueryOrdered("SELECT id, _bigint FROM all_types WHERE _bigint = 0", "VALUES (0, 0)");
-    }
-
-    @Test
-    public void testCacheTableOnFloatColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _float > FLOAT '6e-2'");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_float > FLOAT '6e-2')"));
         assertQueryOrdered("SELECT id, _float FROM all_types WHERE _float > FLOAT '6e-2'", "VALUES (0, 2E-1)");
-    }
-
-    @Test
-    public void testCacheTableOnDoubleColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _double = DOUBLE '0.2'");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_double = DOUBLE '0.2')"));
         assertQueryOrdered("SELECT id, _double FROM all_types WHERE _double = DOUBLE '0.2'", "VALUES (0, 0.2)");
-    }
-
-    @Test
-    public void testCacheTableOnDateColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _date = DATE '1995-10-09'");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_date = DATE '1995-10-09')"));
         assertQueryOrdered("SELECT id, _date FROM all_types WHERE _date = DATE '1995-10-09'", "VALUES (0, '1995-10-09')");
-    }
-
-    @Test
-    public void testCacheTableOnTimeStampColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _timestamp = TIMESTAMP '1995-10-09 00:00:00'");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_timestamp = TIMESTAMP '1995-10-09 00:00:00')"));
         assertQueryOrdered("SELECT id, _timestamp FROM all_types WHERE _timestamp = TIMESTAMP '1995-10-09 00:00:00'", "VALUES (0, '1995-10-09 00:00:00')");
-    }
-
-    @Test
-    public void testCacheTableOnVarcharColumn()
-    {
-        SplitCacheMap splitCacheMap = SplitCacheMap.getInstance();
 
         assertQuerySucceeds("CACHE TABLE all_types WHERE _varchar = 'jiahao'");
         assertTrue(splitCacheMap.tableCacheInfoMap().get("hive.tpch.all_types").showPredicates().contains("(_varchar = 'jiahao')"));
