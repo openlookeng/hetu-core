@@ -16,22 +16,22 @@ package io.prestosql.spi.heuristicindex;
 
 public class Pair<K, V>
 {
-    private final K first;
-    private final V second;
+    private final K key;
+    private final V value;
 
     public Pair(K key, V value)
     {
-        this.first = key;
-        this.second = value;
+        this.key = key;
+        this.value = value;
     }
 
     public K getFirst()
     {
-        return this.first;
+        return this.key;
     }
 
     public V getSecond()
     {
-        return this.second;
+        return this.value;
     }
 }

@@ -16,16 +16,18 @@
 package io.hetu.core.heuristicindex.filter;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.common.algorithm.SequenceUtils;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.IndexFilter;
+import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -84,9 +86,45 @@ public class HeuristicIndexFilter
     }
 
     @Override
-    public <I> Iterator<I> lookUp(Object expression)
+    public <I extends Comparable<I>> Iterator<I> lookUp(Object expression)
+            throws IndexLookUpException
     {
-        return Collections.emptyIterator();
+        if (expression instanceof CallExpression) {
+            return lookUpAll((RowExpression) expression);
+        }
+        if (expression instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) expression;
+            switch (specialForm.getForm()) {
+                case IN:
+                case BETWEEN:
+                    return lookUpAll((RowExpression) expression);
+                case AND:
+                    Iterator<I> iteratorAnd1 = lookUp(specialForm.getArguments().get(0));
+                    Iterator<I> iteratorAnd2 = lookUp(specialForm.getArguments().get(1));
+
+                    if (iteratorAnd1 == null && iteratorAnd2 == null) {
+                        return null;
+                    }
+                    else if (iteratorAnd1 == null) {
+                        return iteratorAnd2;
+                    }
+                    else if (iteratorAnd2 == null) {
+                        return iteratorAnd1;
+                    }
+                    else {
+                        return SequenceUtils.intersect(iteratorAnd1, iteratorAnd2);
+                    }
+                case OR:
+                    Iterator<I> iteratorOr1 = lookUp(specialForm.getArguments().get(0));
+                    Iterator<I> iteratorOr2 = lookUp(specialForm.getArguments().get(1));
+                    if (iteratorOr1 == null || iteratorOr2 == null) {
+                        throw new IndexLookUpException();
+                    }
+                    return SequenceUtils.union(iteratorOr1, iteratorOr2);
+            }
+        }
+
+        throw new IndexLookUpException();
     }
 
     // Apply the indices on the expression. Currently only ComparisonExpression is supported
@@ -127,5 +165,37 @@ public class HeuristicIndexFilter
 
         // None of the index matches the expression
         return false;
+    }
+
+    private <T extends Comparable<T>> Iterator<T> lookUpAll(RowExpression expression)
+    {
+        RowExpression varRef = null;
+
+        if (expression instanceof CallExpression) {
+            varRef = ((CallExpression) expression).getArguments().get(0);
+        }
+
+        if (expression instanceof SpecialForm &&
+                (((SpecialForm) expression).getForm() == SpecialForm.Form.BETWEEN || ((SpecialForm) expression).getForm() == SpecialForm.Form.IN)) {
+            varRef = ((SpecialForm) expression).getArguments().get(0);
+        }
+
+        if (!(varRef instanceof VariableReferenceExpression)) {
+            return null;
+        }
+
+        List<IndexMetadata> selectedIndex = HeuristicIndexSelector.select(expression, indices.get(((VariableReferenceExpression) varRef).getName()));
+
+        if (selectedIndex.isEmpty()) {
+            return null;
+        }
+
+        List<Iterator<T>> iterators = new ArrayList<>(selectedIndex.size());
+
+        for (IndexMetadata indexMetadata : selectedIndex) {
+            iterators.add((indexMetadata.getIndex()).lookUp(expression));
+        }
+
+        return SequenceUtils.union(iterators);
     }
 }

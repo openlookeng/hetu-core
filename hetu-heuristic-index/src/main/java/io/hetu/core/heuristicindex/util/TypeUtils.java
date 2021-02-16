@@ -60,7 +60,7 @@ public class TypeUtils
         }
     }
 
-    public static Comparator getComparator(String type)
+    public static Comparator<kotlin.Pair<? extends Comparable<?>, ?>> getComparator(String type)
     {
         switch (type) {
             case "long":
@@ -69,14 +69,9 @@ public class TypeUtils
             case "String":
             case "int":
             case "Integer":
-                return new Comparator<kotlin.Pair>() {
-                    @Override
-                    public int compare(kotlin.Pair o, kotlin.Pair t1)
-                    {
-                        return ((Comparable) o.getFirst()).compareTo((Comparable) t1.getFirst());
-                    }
-                };
+                return (o1, o2) -> ((Comparable) o1.getFirst()).compareTo(o2.getFirst());
         }
+
         throw new RuntimeException("Type is not supported");
     }
 

@@ -25,6 +25,7 @@ import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
@@ -51,10 +52,13 @@ import java.util.concurrent.TimeUnit;
 
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.heuristicindex.SplitFiltering.getAllColumns;
+import static io.prestosql.heuristicindex.SplitFiltering.rangeSearch;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 public class TestSplitFiltering
 {
@@ -90,9 +94,9 @@ public class TestSplitFiltering
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
         HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
-        SplitFiltering.Tuple<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
-        List<Split> filteredSplits = SplitFiltering.getFilteredSplit(pair.first,
-                SplitFiltering.getFullyQualifiedName(stage), pair.second, nextSplits, indexerManager);
+        Pair<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
+        List<Split> filteredSplits = SplitFiltering.getFilteredSplit(pair.getFirst(),
+                SplitFiltering.getFullyQualifiedName(stage), pair.getSecond(), nextSplits, indexerManager);
         assertNotNull(filteredSplits);
         assertEquals(filteredSplits.size(), 4);
     }
@@ -191,5 +195,39 @@ public class TestSplitFiltering
         Set<String> columns = new HashSet<>();
         getAllColumns(expression, columns, new HashMap<>());
         assertEquals(columns, expected);
+    }
+
+    @Test
+    public void testRangeSearch()
+    {
+        List<Pair<Long, Long>> input = new ArrayList<>(20);
+        input.add(new Pair<>(1L, 5L));
+        input.add(new Pair<>(5L, 18L));
+        input.add(new Pair<>(30L, 50L));
+        input.add(new Pair<>(70L, 80L));
+        input.add(new Pair<>(100L, 200L));
+        input.add(new Pair<>(201L, 250L));
+        input.add(new Pair<>(29999L, 30000L));
+        input.add(new Pair<>(32000L, 50000L));
+        input.add(new Pair<>(50000L, 50001L));
+        input.add(new Pair<>(600000L, 700000L));
+        input.add(new Pair<>(100000000L, 200000000L));
+        input.add(new Pair<>(250000000L, 300000000L));
+        input.add(new Pair<>(400000000L, 410000000L));
+        input.add(new Pair<>(412000000L, 413000000L));
+        input.add(new Pair<>(1000000000000L, 2000000000000L));
+
+        assertTrue(rangeSearch(input, new Pair<>(1L, 5L)));
+        assertTrue(rangeSearch(input, new Pair<>(18L, 20L)));
+        assertFalse(rangeSearch(input, new Pair<>(19L, 25L)));
+        assertTrue(rangeSearch(input, new Pair<>(200L, 201L)));
+        assertTrue(rangeSearch(input, new Pair<>(0L, 50000000L)));
+        assertTrue(rangeSearch(input, new Pair<>(29999L, 30000L)));
+        assertFalse(rangeSearch(input, new Pair<>(50002L, 599999L)));
+        assertTrue(rangeSearch(input, new Pair<>(700000L, 200000000L)));
+        assertFalse(rangeSearch(input, new Pair<>(2000000000001L, 3000000000000L)));
+        assertFalse(rangeSearch(input, new Pair<>(410000002L, 411900000L)));
+        assertTrue(rangeSearch(input, new Pair<>(50000L, 50000000L)));
+        assertTrue(rangeSearch(input, new Pair<>(1500000000000L, 1800000000000L)));
     }
 }

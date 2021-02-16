@@ -30,4 +30,9 @@ public class HeuristicIndexSelector
     {
         return candidates;
     }
+
+    public static IndexMetadata pickOne(RowExpression exception, List<IndexMetadata> candidates)
+    {
+        return candidates.get(0);
+    }
 }

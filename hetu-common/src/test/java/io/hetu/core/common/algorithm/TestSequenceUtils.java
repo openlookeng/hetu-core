@@ -18,6 +18,7 @@ package io.hetu.core.common.algorithm;
 import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -33,15 +34,16 @@ public class TestSequenceUtils
     List<Integer> l3 = ImmutableList.of(5);
     Iterator<Integer> emptyIterator = Collections.emptyIterator();
 
-    private static void assertIteratorSame(Iterator iterator1, Iterator iterator2)
+    private static <T1, T2> void assertIteratorSame(Iterator<T1> iterator1, Iterator<T2> iterator2)
     {
         while (iterator1.hasNext()) {
             assertTrue(iterator2.hasNext());
-            assertEquals(iterator2.next(), iterator1.next());
+            T1 v1 = iterator1.next();
+            T2 v2 = iterator2.next();
+            System.out.println(v1 + "---" + v2);
+            assertEquals(v1, v2);
         }
-        if (iterator2.hasNext()) {
-            System.out.println(iterator2.next());
-        }
+        System.out.println();
         assertFalse(iterator2.hasNext());
     }
 
@@ -72,5 +74,33 @@ public class TestSequenceUtils
                 ImmutableList.of().iterator());
         assertIteratorSame(SequenceUtils.intersect(ImmutableList.of(l1.iterator(), l2.iterator(), l3.iterator(), emptyIterator)),
                 ImmutableList.of().iterator());
+    }
+
+    @Test
+    public void testRepeatingValues()
+    {
+        List<String> l = new ArrayList<>(10000);
+        for (int i = 0; i < 10000; i++) {
+            l.add(String.valueOf(10000));
+        }
+        Iterator<String> it = SequenceUtils.union(ImmutableList.of(l.iterator()));
+        // detect stack overflow
+        while (it.hasNext()) {
+            it.next();
+        }
+    }
+
+    @Test
+    public void testDupAsEnd()
+    {
+        List<Integer> i1 = ImmutableList.of(1, 4, 5, 5, 7, 7, 7);
+        List<Integer> i2 = ImmutableList.of(2, 2, 2, 3, 5, 5, 5);
+        List<Integer> i3 = ImmutableList.of(6, 6, 6, 6);
+        List<Integer> i4 = ImmutableList.of(3);
+
+        assertIteratorSame(SequenceUtils.union(ImmutableList.of(i1.iterator(), i2.iterator(), i3.iterator(), i4.iterator())),
+                ImmutableList.of(1, 2, 3, 4, 5, 6, 7).iterator());
+        assertIteratorSame(SequenceUtils.merge(ImmutableList.of(i1.iterator(), i2.iterator(), i3.iterator(), i4.iterator()), true),
+                ImmutableList.of(1, 2, 2, 2, 3, 3, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7).iterator());
     }
 }

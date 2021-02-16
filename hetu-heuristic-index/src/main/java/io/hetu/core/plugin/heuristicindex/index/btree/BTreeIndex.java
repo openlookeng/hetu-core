@@ -16,16 +16,17 @@ package io.hetu.core.plugin.heuristicindex.index.btree;
 
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
+import io.hetu.core.heuristicindex.PartitionIndexWriter;
 import io.hetu.core.heuristicindex.util.TypeUtils;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
-import io.prestosql.spi.heuristicindex.KeyValue;
+import io.prestosql.spi.heuristicindex.Pair;
+import io.prestosql.spi.heuristicindex.SerializationUtils;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
-import kotlin.Pair;
 import org.apache.commons.compress.utils.IOUtils;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
@@ -43,6 +44,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
@@ -54,6 +57,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 import static io.hetu.core.heuristicindex.util.TypeUtils.getComparator;
@@ -66,12 +70,13 @@ public class BTreeIndex
     private static final String KEY_TYPE = "__hetu__keytype";
     private static final String VALUE_TYPE = "__hetu__valuetype";
 
-    protected BTreeMap dataMap;
+    protected Map<String, String> symbolTable;
+    protected BTreeMap<Object, String> dataMap;
     protected AtomicBoolean isDBCreated = new AtomicBoolean(false);
     protected BTreeMap<String, String> properties;
     protected DB db;
     protected File file;
-    protected Set<Pair> source;
+    protected Set<kotlin.Pair<? extends Comparable<?>, String>> source;
     protected String keyType;
     protected String valueType;
 
@@ -160,33 +165,30 @@ public class BTreeIndex
     }
 
     @Override
-    public boolean addValues(List<io.prestosql.spi.heuristicindex.Pair<String, List<Object>>> values)
-            throws IOException
+    public boolean addValues(List<Pair<String, List<Object>>> values)
     {
         throw new UnsupportedOperationException("AddValues is not supported for BTree. Use addKeyValues()");
     }
 
     @Override
-    public boolean addKeyValues(List<io.prestosql.spi.heuristicindex.Pair<String, List<KeyValue>>> input)
-            throws IOException
+    public void addKeyValues(List<Pair<String, List<Pair<Comparable<? extends Comparable<?>>, String>>>> input)
     {
         if (!isDBCreated.get()) {
             setupDB();
         }
         if (source == null) {
-            keyType = TypeUtils.extractType(input.get(0).getSecond().get(0).getKey());
-            valueType = TypeUtils.extractType(input.get(0).getSecond().get(0).getValue());
+            keyType = TypeUtils.extractType(input.get(0).getSecond().get(0).getFirst());
+            valueType = TypeUtils.extractType(input.get(0).getSecond().get(0).getSecond());
             source = new TreeSet<>(getComparator(keyType));
         }
         if (input.size() == 1) {
-            for (KeyValue keyValue : input.get(0).getSecond()) {
-                source.add(new Pair(keyValue.getKey(), keyValue.getValue()));
+            for (Pair<Comparable<? extends Comparable<?>>, String> pair : input.get(0).getSecond()) {
+                source.add(new kotlin.Pair<Comparable<? extends Comparable<?>>, String>(pair.getFirst(), pair.getSecond()));
             }
         }
         else {
             throw new UnsupportedOperationException("Composite B Tree index is not supported");
         }
-        return true;
     }
 
     @Override
@@ -216,9 +218,9 @@ public class BTreeIndex
     }
 
     @Override
-    public <I> Iterator<I> lookUp(Object expression)
+    public Iterator<String> lookUp(Object expression)
     {
-        List result = new ArrayList();
+        List<String> result = new ArrayList<>();
 
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
@@ -230,24 +232,24 @@ public class BTreeIndex
                 switch (operator) {
                     case EQUAL:
                         if (dataMap.containsKey(key)) {
-                            result.add(dataMap.get(key));
+                            result.addAll(translateSymbols(dataMap.get(key)));
                         }
                         break;
                     case LESS_THAN:
-                        ConcurrentNavigableMap concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, false);
-                        result.addAll(concurrentNavigableMap.values());
+                        ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, false);
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
                         break;
                     case LESS_THAN_OR_EQUAL:
                         concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, true);
-                        result.addAll(concurrentNavigableMap.values());
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
                         break;
                     case GREATER_THAN:
                         concurrentNavigableMap = dataMap.subMap(key, false, dataMap.lastKey(), true);
-                        result.addAll(concurrentNavigableMap.values());
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
                         break;
                     case GREATER_THAN_OR_EQUAL:
                         concurrentNavigableMap = dataMap.subMap(key, true, dataMap.lastKey(), true);
-                        result.addAll(concurrentNavigableMap.values());
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
                         break;
                 }
             }
@@ -258,20 +260,24 @@ public class BTreeIndex
                 case BETWEEN:
                     Object left = extractSingleValue((ConstantExpression) specialForm.getArguments().get(1));
                     Object right = extractSingleValue((ConstantExpression) specialForm.getArguments().get(2));
-                    ConcurrentNavigableMap concurrentNavigableMap = dataMap.subMap(left, true, right, true);
-                    result.addAll(concurrentNavigableMap.values());
+                    ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(left, true, right, true);
+                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                    break;
                 case IN:
                     for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
                         Object key = extractSingleValue((ConstantExpression) exp);
                         if (dataMap.containsKey(key)) {
-                            result.add(dataMap.get(key));
+                            result.addAll(translateSymbols(dataMap.get(key)));
                         }
                     }
+                    break;
             }
         }
         else {
             throw new UnsupportedOperationException("Expression not supported");
         }
+
+        result.sort(String::compareTo);
         return result.iterator();
     }
 
@@ -300,6 +306,10 @@ public class BTreeIndex
             IOUtils.copy(new SnappyInputStream(in), out);
         }
         setupDB();
+        Properties properties = getProperties();
+        if (properties.getProperty(PartitionIndexWriter.SYMBOL_TABLE_KEY_NAME) != null) {
+            this.symbolTable = SerializationUtils.deserializeMap(properties.getProperty(PartitionIndexWriter.SYMBOL_TABLE_KEY_NAME), s -> s, s -> s);
+        }
         return this;
     }
 
@@ -314,5 +324,10 @@ public class BTreeIndex
         String parentDir = file.getParent();
         file.delete();
         java.nio.file.Files.deleteIfExists(Paths.get(parentDir));
+    }
+
+    private List<String> translateSymbols(String dataMapLookUpRes)
+    {
+        return Arrays.stream(dataMapLookUpRes.split(",")).map(res -> symbolTable != null ? symbolTable.get(res) : res).collect(Collectors.toList());
     }
 }

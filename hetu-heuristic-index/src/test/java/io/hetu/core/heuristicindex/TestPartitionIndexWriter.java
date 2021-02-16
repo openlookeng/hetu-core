@@ -62,7 +62,8 @@ public class TestPartitionIndexWriter
         connectorMetadata.setProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION, String.valueOf(System.currentTimeMillis()));
         connectorMetadata.setProperty(HetuConstant.DATASOURCE_FILE_PATH, "hdfs://testable/testcolumn/cp=123121/file1");
         connectorMetadata.setProperty(HetuConstant.DATASOURCE_STRIPE_OFFSET, "3");
-        PartitionIndexWriter indexWriter = new PartitionIndexWriter(createIndexMetadata, connectorMetadata, fileSystemClient, Paths.get("/tmp"));
+        connectorMetadata.setProperty(HetuConstant.DATASOURCE_STRIPE_LENGTH, "100");
+        PartitionIndexWriter indexWriter = new PartitionIndexWriter(createIndexMetadata, fileSystemClient, Paths.get("/tmp"));
         Map<String, List<Object>> valuesMap = new HashMap<>();
         List<Object> values = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
@@ -70,14 +71,14 @@ public class TestPartitionIndexWriter
         }
         valuesMap.put("testcolumne", values);
         indexWriter.addData(valuesMap, connectorMetadata);
-        Map<Object, String> result = indexWriter.getDataMap();
+        Map<Comparable<? extends Comparable<?>>, String> result = indexWriter.getDataMap();
         assertEquals(10, result.size());
         assertEquals(1, indexWriter.getSymbolTable().size());
     }
 
     @Test
     public void testAddValueMultThread()
-            throws IOException, InterruptedException
+            throws InterruptedException
     {
         List<Map.Entry<String, Type>> columns = new ArrayList<>();
         List<String> partitions = Arrays.asList("partition1");
@@ -95,17 +96,19 @@ public class TestPartitionIndexWriter
         connectorMetadata1.setProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION, String.valueOf(System.currentTimeMillis()));
         connectorMetadata1.setProperty(HetuConstant.DATASOURCE_FILE_PATH, "hdfs://testable/testcolumn/cp=123121/file1");
         connectorMetadata1.setProperty(HetuConstant.DATASOURCE_STRIPE_OFFSET, "3");
+        connectorMetadata1.setProperty(HetuConstant.DATASOURCE_STRIPE_LENGTH, "100");
         Properties connectorMetadata2 = new Properties();
         connectorMetadata2.setProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION, String.valueOf(System.currentTimeMillis()));
         connectorMetadata2.setProperty(HetuConstant.DATASOURCE_FILE_PATH, "hdfs://testable/testcolumn/cp=123121/file2");
         connectorMetadata2.setProperty(HetuConstant.DATASOURCE_STRIPE_OFFSET, "3");
-        PartitionIndexWriter indexWriter = new PartitionIndexWriter(createIndexMetadata, connectorMetadata1, fileSystemClient, Paths.get("/tmp"));
+        connectorMetadata2.setProperty(HetuConstant.DATASOURCE_STRIPE_LENGTH, "100");
+        PartitionIndexWriter indexWriter = new PartitionIndexWriter(createIndexMetadata, fileSystemClient, Paths.get("/tmp"));
         ExecutorService executorService = Executors.newFixedThreadPool(2);
         CountDownLatch latch = new CountDownLatch(2);
         executorService.submit(new TestDriver(indexWriter, connectorMetadata1, latch));
         executorService.submit(new TestDriver(indexWriter, connectorMetadata2, latch));
-        latch.await(1, TimeUnit.SECONDS);
-        Map<Object, String> result = indexWriter.getDataMap();
+        latch.await(5, TimeUnit.SECONDS);
+        Map<Comparable<? extends Comparable<?>>, String> result = indexWriter.getDataMap();
         assertEquals(10, result.size());
         assertEquals(2, indexWriter.getSymbolTable().size());
     }

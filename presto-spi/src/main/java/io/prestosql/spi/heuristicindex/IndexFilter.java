@@ -37,6 +37,8 @@ public interface IndexFilter
      * @param expression the expression used to lookup the result. e.g. col_a = 10 OR col_b < 5
      * @param <I> type to mark the positions. e.g. Integer for row number
      * @return the matching positions according to the indices saved.
+     * @throws IndexLookUpException when lookUp() runs into issues and can't determine if a value is there. It is recommended that the caller perform no filtering in this case.
      */
-    public <I> Iterator<I> lookUp(Object expression);
+    <I extends Comparable<I>> Iterator<I> lookUp(Object expression)
+            throws IndexLookUpException;
 }

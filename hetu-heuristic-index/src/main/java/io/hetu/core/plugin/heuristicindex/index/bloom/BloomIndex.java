@@ -29,7 +29,6 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Function;
 
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCallExpEqual;
 
@@ -47,14 +46,6 @@ public class BloomIndex
     private BloomFilter filter;
     private double fpp = DEFAULT_FPP;
     private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
-    Function<Object, Boolean> matchFunction = new Function<Object, Boolean>()
-    {
-        @Override
-        public Boolean apply(Object object)
-        {
-            return filter.test(object.toString().getBytes());
-        }
-    };
 
     @Override
     public String getId()
@@ -94,7 +85,7 @@ public class BloomIndex
         }
         else if (expression instanceof CallExpression) {
             // test ComparisonExpression matching
-            return matchCallExpEqual(expression, matchFunction);
+            return matchCallExpEqual(expression, object -> filter.test(object.toString().getBytes()));
         }
 
         throw new UnsupportedOperationException("Expression not supported by " + ID + " index.");
@@ -162,7 +153,7 @@ public class BloomIndex
      *  get range value, if it is slice, we should change it to string
      * </pre>
      *
-     * @param object   value
+     * @param object value
      * @param javaType value java type
      * @return string
      */
