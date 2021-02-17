@@ -23,6 +23,7 @@ import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.type.Type;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -44,6 +45,7 @@ import static io.prestosql.spi.function.Signature.unmangleOperator;
 import static io.prestosql.spi.relation.SpecialForm.Form.AND;
 import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
@@ -313,6 +315,17 @@ public class RowExpressionUtils
             }
         }
         return expressions;
+    }
+
+    public static CallExpression simplePredicate(OperatorType operatorType, String name, Type type, Object value)
+    {
+        Signature sig = internalOperator(operatorType, BOOLEAN.getTypeSignature(), type.getTypeSignature());
+        VariableReferenceExpression varRef = new VariableReferenceExpression(name, VARCHAR);
+        ConstantExpression constantExpression = new ConstantExpression(value, type);
+        List<RowExpression> arguments = new ArrayList<>(2);
+        arguments.add(varRef);
+        arguments.add(constantExpression);
+        return new CallExpression(sig, BOOLEAN, arguments);
     }
 
     /**

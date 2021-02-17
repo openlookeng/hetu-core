@@ -22,12 +22,14 @@ import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexFilter;
+import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.heuristicindex.Pair;
+import io.prestosql.spi.heuristicindex.SerializationUtils;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -42,10 +44,12 @@ import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.utils.RangeUtil;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,24 +58,23 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static io.prestosql.spi.function.OperatorType.IS_DISTINCT_FROM;
+import static io.prestosql.spi.heuristicindex.SerializationUtils.deserializeStripeSymbol;
 
 public class SplitFiltering
 {
     private static final Logger LOG = Logger.get(SplitFiltering.class);
     private static final AtomicLong totalSplitsProcessed = new AtomicLong();
     private static final AtomicLong splitsFiltered = new AtomicLong();
-    private static final List<String> INDEX_ORDER = ImmutableList.of("MINMAX", "BLOOM");
-    private static final Set<String> PARTITION_INDEX_TYPES = Sets.newHashSet("BTREE");
-    private static final String SYMBOL_TABLE_KEY_NAME = "__hetu__symboltable";
-    private static final String LAST_MODIFIED_KEY_NAME = "__hetu__lastmodified";
+    private static final List<String> FORWARD_INDEX = ImmutableList.of("MINMAX", "BLOOM");
+    private static final Set<String> INVERTED_INDEX = Sets.newHashSet("BTREE");
     private static final String MAX_MODIFIED_TIME = "__hetu__maxmodifiedtime";
+    private static final String TABLE_LEVEL_KEY = "__index__is__table__level__";
     private static IndexCache indexCache;
 
     private SplitFiltering()
@@ -101,7 +104,7 @@ public class SplitFiltering
         String fullQualifiedTableName = tableName.get();
         long initialSplitsSize = allSplits.size();
 
-        List<IndexRecord> indexRecords = null;
+        List<IndexRecord> indexRecords;
         try {
             indexRecords = heuristicIndexerManager.getIndexClient().getAllIndexRecords();
         }
@@ -111,37 +114,37 @@ public class SplitFiltering
         }
         Set<String> referencedColumns = new HashSet<>();
         getAllColumns(expression.get(), referencedColumns, assignments);
-        List<IndexRecord> partitionIndexRecords = new ArrayList<>();
-        List<IndexRecord> nonPartitionIndexRecords = new ArrayList<>();
+        List<IndexRecord> forwardIndexRecords = new ArrayList<>();
+        List<IndexRecord> invertedIndexRecords = new ArrayList<>();
         for (IndexRecord indexRecord : indexRecords) {
             if (indexRecord.table.equalsIgnoreCase(fullQualifiedTableName)) {
                 List<String> columnsInIndex = Arrays.asList(indexRecord.columns);
                 for (String column : referencedColumns) {
                     if (columnsInIndex.contains(column)) {
-                        if (PARTITION_INDEX_TYPES.contains(indexRecord.indexType.toUpperCase())) {
-                            partitionIndexRecords.add(indexRecord);
+                        if (INVERTED_INDEX.contains(indexRecord.indexType.toUpperCase())) {
+                            forwardIndexRecords.add(indexRecord);
                         }
                         else {
-                            nonPartitionIndexRecords.add(indexRecord);
+                            invertedIndexRecords.add(indexRecord);
                         }
                     }
                 }
             }
         }
-        List<Split> splitsToReturn = new ArrayList<>();
-        if (partitionIndexRecords.isEmpty() && nonPartitionIndexRecords.isEmpty()) {
+        List<Split> splitsToReturn;
+        if (forwardIndexRecords.isEmpty() && invertedIndexRecords.isEmpty()) {
             return allSplits;
         }
-        else if (!partitionIndexRecords.isEmpty() && nonPartitionIndexRecords.isEmpty()) {
-            splitsToReturn = filterUsingPartitionIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+        else if (!forwardIndexRecords.isEmpty() && invertedIndexRecords.isEmpty()) {
+            splitsToReturn = filterUsingInvertedIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
         }
-        else if (!nonPartitionIndexRecords.isEmpty() && partitionIndexRecords.isEmpty()) {
-            splitsToReturn = filterUsingStripeIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+        else if (!invertedIndexRecords.isEmpty() && forwardIndexRecords.isEmpty()) {
+            splitsToReturn = filterUsingForwardIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
         }
         else {
             // filter using both indexes and return the smallest set of splits.
-            List<Split> splitsToReturn1 = filterUsingPartitionIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
-            List<Split> splitsToReturn2 = filterUsingStripeIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            List<Split> splitsToReturn1 = filterUsingInvertedIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            List<Split> splitsToReturn2 = filterUsingForwardIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
             splitsToReturn = splitsToReturn1.size() < splitsToReturn2.size() ? splitsToReturn1 : splitsToReturn2;
         }
 
@@ -153,7 +156,7 @@ public class SplitFiltering
         return splitsToReturn;
     }
 
-    private static List<Split> filterUsingStripeIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingForwardIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
     {
         return inputSplits.parallelStream()
                 .filter(split -> {
@@ -171,17 +174,12 @@ public class SplitFiltering
                         // with respect to their SplitStart
                         Map<String, List<IndexMetadata>> indexGroupMap = new HashMap<>();
                         for (IndexMetadata splitIndex : splitIndices) {
-                            List<IndexMetadata> indexGroup = indexGroupMap.get(splitIndex.getIndex().getId());
-                            if (indexGroup == null) {
-                                indexGroup = new ArrayList<>();
-                                indexGroupMap.put(splitIndex.getIndex().getId(), indexGroup);
-                            }
-
+                            List<IndexMetadata> indexGroup = indexGroupMap.computeIfAbsent(splitIndex.getIndex().getId(), k -> new ArrayList<>());
                             insert(indexGroup, splitIndex);
                         }
 
                         List<String> sortedIndexTypeKeys = new LinkedList<>(indexGroupMap.keySet());
-                        sortedIndexTypeKeys.sort(Comparator.comparingInt(e -> INDEX_ORDER.contains(e) ? INDEX_ORDER.indexOf(e) : Integer.MAX_VALUE));
+                        sortedIndexTypeKeys.sort(Comparator.comparingInt(e -> FORWARD_INDEX.contains(e) ? FORWARD_INDEX.indexOf(e) : Integer.MAX_VALUE));
 
                         for (String indexTypeKey : sortedIndexTypeKeys) {
                             List<IndexMetadata> validIndices = indexGroupMap.get(indexTypeKey);
@@ -203,136 +201,122 @@ public class SplitFiltering
                 .collect(Collectors.toList());
     }
 
-    private static List<Split> filterUsingPartitionIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingInvertedIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
     {
         try {
-            long maxLastUpdated = 0L;
+            Map<String, Long> inputMaxLastUpdated = new HashMap<>();
+            Map<String, Long> indexMaxLastUpdated = new HashMap<>();
             Map<String, List<Split>> partitionSplitMap = new HashMap<>();
+
             for (Split split : inputSplits) {
                 String filePathStr = split.getConnectorSplit().getFilePath();
+                String indexKey = getPartitionKeyOrElse(filePathStr, TABLE_LEVEL_KEY);
+
                 long lastUpdated = split.getConnectorSplit().getLastModifiedTime();
-                if (lastUpdated > maxLastUpdated) {
-                    maxLastUpdated = lastUpdated;
+                if (!inputMaxLastUpdated.containsKey(indexKey) || lastUpdated > inputMaxLastUpdated.get(indexKey)) {
+                    inputMaxLastUpdated.put(indexKey, lastUpdated);
                 }
-                String partition = getPartitionFromPath(filePathStr);
-                if (!partitionSplitMap.containsKey(partition)) {
-                    partitionSplitMap.put(partition, new ArrayList<>());
+                if (!partitionSplitMap.containsKey(indexKey)) {
+                    partitionSplitMap.put(indexKey, new ArrayList<>());
                 }
-                partitionSplitMap.get(partition).add(split);
+                partitionSplitMap.get(indexKey).add(split);
             }
+
             // Split is not compliant to table structure. Return all the splits
             if (partitionSplitMap.isEmpty()) {
                 return inputSplits;
             }
 
-            List<Split> result = new ArrayList<>();
-            boolean filtered = false;
+            Map<String, List<IndexMetadata>> allIndices = new HashMap<>(); // col -> list of all indices on this column (all partitions)
+
+            // index loading and verification
             for (String column : referencedColumns) {
                 List<IndexMetadata> indexMetadataList = new ArrayList<>();
-                for (String indexType : PARTITION_INDEX_TYPES) {
-                    List<IndexMetadata> output = indexCache.getIndices(fullQualifiedTableName, column, indexType, partitionSplitMap.keySet(), maxLastUpdated);
-                    if (output != null && !output.isEmpty()) {
-                        indexMetadataList.addAll(output);
-                    }
+
+                for (String indexType : INVERTED_INDEX) {
+                    indexMetadataList.addAll(indexCache.getIndices(fullQualifiedTableName, column, indexType,
+                            partitionSplitMap.keySet(), Collections.max(inputMaxLastUpdated.values())));
                 }
 
-                Map<String, PartitionIndexHolder> partitionIndexHolderMap = new HashMap<>();
-                if (indexMetadataList != null && !indexMetadataList.isEmpty()) {
-                    for (IndexMetadata indexMetadata : indexMetadataList) {
-                        Map<String, String> outputMap = new HashMap<>();
-                        Index index = indexMetadata.getIndex();
-                        String partition = getPartitionFromPath(indexMetadata.getUri());
-                        Iterator iterator = index.lookUp(expression);
-                        Properties properties = index.getProperties();
-                        String symbolTableStr = properties.getProperty(SYMBOL_TABLE_KEY_NAME);
-                        Map<String, String> symbolTable = deserializePropertyToMapString(symbolTableStr);
-                        Map<String, Long> lastUpdateTable = deserializePropertyToMapLong(properties.getProperty(LAST_MODIFIED_KEY_NAME));
-                        long maxLastUpdate = Long.parseLong(properties.getProperty(MAX_MODIFIED_TIME));
-                        while (iterator.hasNext()) {
-                            String output = iterator.next().toString();
-                            Map<String, String> map = deserializePropertyToMapString(output);
-                            outputMap.putAll(map);
-                        }
-                        partitionIndexHolderMap.putIfAbsent(partition, new PartitionIndexHolder(index, partition, symbolTable, lastUpdateTable, outputMap, maxLastUpdate));
-                    }
+                // If any of the split contains data which is modified after the index was created, return without filtering
+                for (IndexMetadata index : indexMetadataList) {
+                    String partitionKey = getPartitionKeyOrElse(index.getUri(), TABLE_LEVEL_KEY);
+                    long lastModifiedTime = Long.parseLong(index.getIndex().getProperties().getProperty(MAX_MODIFIED_TIME));
+                    indexMaxLastUpdated.put(partitionKey, lastModifiedTime);
+                }
 
-                    // Start filtering
-                    if (!partitionIndexHolderMap.isEmpty()) {
-                        for (Map.Entry<String, List<Split>> entry : partitionSplitMap.entrySet()) {
-                            String partition = entry.getKey();
-                            if (partitionIndexHolderMap.containsKey(partition)) {
-                                PartitionIndexHolder partitionIndexHolder = partitionIndexHolderMap.get(partition);
-                                Map<String, String> outputMap = partitionIndexHolder.getResultMap();
-                                for (Split split : entry.getValue()) {
-                                    ConnectorSplit connectorSplit = split.getConnectorSplit();
-                                    String filePathStr = connectorSplit.getFilePath();
-                                    String fileName = Paths.get(filePathStr).getFileName().toString();
-                                    Map<String, String> symbolTable = partitionIndexHolder.getSymbolTable();
-                                    if (symbolTable.containsKey(fileName)) {
-                                        if (partitionIndexHolder.getLastUpdated().get(fileName) < connectorSplit.getLastModifiedTime()) {
-                                            result.add(split);
-                                        }
-                                        else {
-                                            if (outputMap.containsKey(symbolTable.get(fileName))) {
-                                                result.add(split);
-                                            }
-                                        }
-                                    }
-                                    else {
-                                        if (partitionIndexHolder.getMaxLastUpdate() < connectorSplit.getLastModifiedTime()) {
-                                            // this is a new split added after index creation
-                                            LOG.warn("Looks like index is stale. We found new file" + connectorSplit.getFilePath());
-                                            result.add(split);
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                result.addAll(entry.getValue());
+                allIndices.put(column, indexMetadataList);
+            }
+
+            // lookup index
+            IndexFilter filter = indexerManager.getIndexFilter(allIndices);
+            Iterator<String> iterator = filter.lookUp(expression);
+            if (iterator == null) {
+                throw new IndexLookUpException();
+            }
+            Map<String, List<Pair<Long, Long>>> lookUpResults = new HashMap<>(); // all positioned looked up from index, organized by file path
+            while (iterator.hasNext()) {
+                SerializationUtils.LookUpResult parsedLookUpResult = deserializeStripeSymbol(iterator.next());
+                if (!lookUpResults.containsKey(parsedLookUpResult.filepath)) {
+                    lookUpResults.put(parsedLookUpResult.filepath, new ArrayList<>());
+                }
+                lookUpResults.get(parsedLookUpResult.filepath).add(parsedLookUpResult.stripe);
+            }
+
+            // filtering
+            List<Split> filteredSplits = new ArrayList<>();
+            for (Map.Entry<String, List<Split>> entry : partitionSplitMap.entrySet()) {
+                String partitionKey = entry.getKey();
+
+                if (!indexMaxLastUpdated.containsKey(partitionKey) // the partition is not indexed by its own partition's index
+                        && indexMaxLastUpdated.size() != 1 // or a table-level index)
+                        && !indexMaxLastUpdated.containsKey(TABLE_LEVEL_KEY)) {
+                    filteredSplits.addAll(entry.getValue());
+                }
+                else {
+                    long indexLastModifiedTimeOfThisPartition = indexMaxLastUpdated.size() == 1 && indexMaxLastUpdated.containsKey(TABLE_LEVEL_KEY) ?
+                            indexMaxLastUpdated.get(TABLE_LEVEL_KEY) : indexMaxLastUpdated.get(partitionKey);
+
+                    for (Split split : entry.getValue()) {
+                        String filePathStr = new URI(split.getConnectorSplit().getFilePath()).getPath();
+                        if (split.getConnectorSplit().getLastModifiedTime() > indexLastModifiedTimeOfThisPartition) {
+                            filteredSplits.add(split);
+                        }
+                        else if (lookUpResults.containsKey(filePathStr)) {
+                            Pair<Long, Long> targetRange = new Pair<>(split.getConnectorSplit().getStartIndex(),
+                                    split.getConnectorSplit().getEndIndex());
+
+                            // do stripe matching: check if [targetStart, targetEnd] has any overlapping with the matching stripes
+                            // first sort matching stripes, e.g. (5,10), (18,25), (30,35), (35, 40)
+                            // then do binary search for both start and end of the target
+                            List<Pair<Long, Long>> stripes = lookUpResults.get(filePathStr);
+                            stripes.sort(Comparator.comparingLong(Pair::getFirst));
+                            if (rangeSearch(stripes, targetRange)) {
+                                filteredSplits.add(split);
                             }
                         }
-                        filtered = true;
                     }
                 }
             }
-            return filtered ? result : inputSplits;
+
+            return filteredSplits;
         }
         catch (Exception e) {
-            //warning any exception in split filtering continue with all splits.
             LOG.debug("Exception occurred while filtering. Returning original splits", e);
             return inputSplits;
         }
     }
 
-    private static String getPartitionFromPath(String filePathStr)
+    /**
+     * Get the name of the partition which holds this split.
+     * <p>
+     * If the table is not partitioned (no partition key found in path) then return the given string
+     */
+    private static String getPartitionKeyOrElse(String filePathStr, String defaultString)
     {
         Path filePath = Paths.get(filePathStr);
-        String partitionName = filePath.getName(filePath.getNameCount() - 2).toString();
-        return partitionName;
-    }
-
-    private static Map<String, String> deserializePropertyToMapString(String property)
-    {
-        String[] keyValPairs = property.split(",");
-        Map<String, String> result = new HashMap<>();
-        for (String pair : keyValPairs) {
-            if (pair.contains(":")) {
-                String[] keyVal = pair.split(":");
-                result.put(keyVal[0], keyVal[1]);
-            }
-        }
-        return result;
-    }
-
-    private static Map<String, Long> deserializePropertyToMapLong(String property)
-    {
-        String[] keyValPairs = property.split(",");
-        Map<String, Long> result = new HashMap<>();
-        for (String pair : keyValPairs) {
-            String[] keyVal = pair.split(":");
-            result.put(keyVal[0], Long.parseLong(keyVal[1]));
-        }
-        return result;
+        String strInPartitionPlace = filePath.getName(filePath.getNameCount() - 2).toString();
+        return strInPartitionPlace.contains("=") ? strInPartitionPlace : defaultString;
     }
 
     /**
@@ -486,12 +470,12 @@ public class SplitFiltering
      * @param stage stage object
      * @return Pair of: Expression and a column name assignment map
      */
-    public static Tuple<Optional<RowExpression>, Map<Symbol, ColumnHandle>> getExpression(SqlStageExecution stage)
+    public static Pair<Optional<RowExpression>, Map<Symbol, ColumnHandle>> getExpression(SqlStageExecution stage)
     {
         List<PlanNode> filterNodeOptional = getFilterNode(stage);
 
         if (filterNodeOptional.size() == 0) {
-            return new Tuple<>(Optional.empty(), new HashMap<>());
+            return new Pair<>(Optional.empty(), new HashMap<>());
         }
 
         if (filterNodeOptional.get(0) instanceof FilterNode) {
@@ -500,23 +484,23 @@ public class SplitFiltering
                 TableScanNode tableScanNode = (TableScanNode) filterNode.getSource();
                 if (tableScanNode.getPredicate().isPresent()
                         && isSupportedExpression(tableScanNode.getPredicate().get())) { /* if total filter is not supported use the filterNode */
-                    return new Tuple<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
+                    return new Pair<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
                 }
 
-                return new Tuple<>(Optional.of(filterNode.getPredicate()), tableScanNode.getAssignments());
+                return new Pair<>(Optional.of(filterNode.getPredicate()), tableScanNode.getAssignments());
             }
 
-            return new Tuple<>(Optional.empty(), new HashMap<>());
+            return new Pair<>(Optional.empty(), new HashMap<>());
         }
 
         if (filterNodeOptional.get(0) instanceof TableScanNode) {
             TableScanNode tableScanNode = (TableScanNode) filterNodeOptional.get(0);
             if (tableScanNode.getPredicate().isPresent()) {
-                return new Tuple<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
+                return new Pair<>(tableScanNode.getPredicate(), tableScanNode.getAssignments());
             }
         }
 
-        return new Tuple<>(Optional.empty(), new HashMap<>());
+        return new Pair<>(Optional.empty(), new HashMap<>());
     }
 
     public static Optional<String> getFullyQualifiedName(SqlStageExecution stage)
@@ -609,15 +593,38 @@ public class SplitFiltering
         }
     }
 
-    public static class Tuple<T1, T2>
+    /**
+     * Search to find if a target range has any overlap with the given list of ranges
+     *
+     * @param ranges a list of sorted ranges (inclusive)
+     * @param target a target range (inclusive)
+     * @return if the target range has any overlap with the range list (inclusive)
+     */
+    public static boolean rangeSearch(List<Pair<Long, Long>> ranges, Pair<Long, Long> target)
     {
-        public final T1 first;
-        public final T2 second;
+        int start = 0;
+        int end = ranges.size() - 1;
 
-        public Tuple(T1 v1, T2 v2)
-        {
-            first = v1;
-            second = v2;
+        while (start + 1 < end) {
+            int mid = start + end >>> 1;
+            if (ranges.get(mid).getFirst().equals(target.getFirst())) {
+                return true;
+            }
+            else if (ranges.get(mid).getFirst() < target.getFirst()) {
+                start = mid;
+            }
+            else {
+                end = mid;
+            }
+        }
+
+        if (target.getFirst() < ranges.get(start).getFirst()) {
+            return target.getSecond() >= ranges.get(start).getFirst() ||
+                    (start > 0 && target.getFirst() <= ranges.get(start - 1).getSecond());
+        }
+        else {
+            return target.getFirst() <= ranges.get(start).getSecond() ||
+                    (start + 1 < ranges.size() && ranges.get(start + 1).getFirst() <= target.getSecond() && ranges.get(start + 1).getSecond() >= target.getFirst());
         }
     }
 }

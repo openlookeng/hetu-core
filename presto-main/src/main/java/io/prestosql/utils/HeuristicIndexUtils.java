@@ -63,8 +63,8 @@ public class HeuristicIndexUtils
             }
         }
 
-        throw new ParsingException("Unsupported WHERE expression. Only in-predicate/equality-expression are supported" +
-                "e.g. partition=1, partition in (1,2)");
+        throw new ParsingException("Unsupported WHERE expression. Only in-predicate/equality-expressions are supported " +
+                "e.g. partition=1 or partition=2/partition in (1,2)");
     }
 
     private static String parseSpecialPartitionValues(String rightVal)

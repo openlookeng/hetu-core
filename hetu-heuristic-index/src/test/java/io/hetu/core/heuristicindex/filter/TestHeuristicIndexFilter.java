@@ -19,28 +19,24 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
 import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.Pair;
-import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.InListExpression;
-import io.prestosql.sql.tree.InPredicate;
-import io.prestosql.sql.tree.LogicalBinaryExpression;
-import io.prestosql.sql.tree.LongLiteral;
-import io.prestosql.sql.tree.StringLiteral;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.sql.RowExpressionUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.Collections;
 
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN_OR_EQUAL;
+import static io.prestosql.spi.sql.RowExpressionUtils.simplePredicate;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -73,29 +69,26 @@ public class TestHeuristicIndexFilter
     @Test
     public void testFilterWithBloomIndices()
     {
-        Expression expression1 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("a")),
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("b")));
-        Expression expression2 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("a")),
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("e")));
-        Expression expression3 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.OR,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("e")),
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("c")));
-        Expression expression4 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.OR,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("e")),
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("f")));
-        Expression expression5 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("d")),
-                new LogicalBinaryExpression(LogicalBinaryExpression.Operator.OR,
-                        new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new StringLiteral("e")),
-                        new InPredicate(new SymbolReference("testColumn"),
-                                new InListExpression(ImmutableList.of(new StringLiteral("a"), new StringLiteral("f"))))));
+        RowExpression expression1 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "a"),
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "b"));
+        RowExpression expression2 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "a"),
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e"));
+        RowExpression expression3 = RowExpressionUtils.or(
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e"),
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "c"));
+        RowExpression expression4 = RowExpressionUtils.or(
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e"),
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "f"));
+        RowExpression expression5 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "d"),
+                RowExpressionUtils.or(
+                        simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e"),
+                        new SpecialForm(SpecialForm.Form.IN, BOOLEAN,
+                                new VariableReferenceExpression("testColumn", VARCHAR),
+                                new ConstantExpression("a", VARCHAR),
+                                new ConstantExpression("f", VARCHAR))));
 
         HeuristicIndexFilter filter = new HeuristicIndexFilter(ImmutableMap.of("testColumn", ImmutableList.of(
                 new IndexMetadata(bloomIndex1, "testTable", new String[] {"testColumn"}, null, null, 0, 0),
@@ -111,31 +104,30 @@ public class TestHeuristicIndexFilter
     @Test
     public void testFilterWithMinMaxIndices()
     {
-        Expression expression1 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new LongLiteral("8")),
-                new InPredicate(new SymbolReference("testColumn"),
-                        new InListExpression(ImmutableList.of(new LongLiteral("20"), new LongLiteral("80")))));
-        Expression expression2 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new LongLiteral("5")),
-                new ComparisonExpression(EQUAL, new SymbolReference("testColumn"), new LongLiteral("20")));
-        Expression expression3 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(GREATER_THAN_OR_EQUAL, new SymbolReference("testColumn"), new LongLiteral("2")),
-                new ComparisonExpression(LESS_THAN_OR_EQUAL, new SymbolReference("testColumn"), new LongLiteral("10")));
-        Expression expression4 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.AND,
-                new ComparisonExpression(GREATER_THAN, new SymbolReference("testColumn"), new LongLiteral("8")),
-                new ComparisonExpression(LESS_THAN, new SymbolReference("testColumn"), new LongLiteral("20")));
-        Expression expression5 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.OR,
-                new ComparisonExpression(GREATER_THAN, new SymbolReference("testColumn"), new LongLiteral("200")),
-                new ComparisonExpression(LESS_THAN, new SymbolReference("testColumn"), new LongLiteral("0")));
-        Expression expression6 = new LogicalBinaryExpression(
-                LogicalBinaryExpression.Operator.OR,
-                new ComparisonExpression(LESS_THAN, new SymbolReference("testColumn"), new LongLiteral("0")),
-                new BetweenPredicate(new SymbolReference("testColumn"), new LongLiteral("5"), new LongLiteral("15")));
+        RowExpression expression1 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.EQUAL, "testColumn", BIGINT, 8L),
+                new SpecialForm(SpecialForm.Form.IN, BOOLEAN,
+                        new VariableReferenceExpression("testColumn", VARCHAR),
+                        new ConstantExpression(20L, BIGINT),
+                        new ConstantExpression(80L, BIGINT)));
+        RowExpression expression2 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.EQUAL, "testColumn", BIGINT, 5L),
+                simplePredicate(OperatorType.EQUAL, "testColumn", BIGINT, 20L));
+        RowExpression expression3 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.GREATER_THAN_OR_EQUAL, "testColumn", BIGINT, 2L),
+                simplePredicate(OperatorType.LESS_THAN_OR_EQUAL, "testColumn", BIGINT, 10L));
+        RowExpression expression4 = RowExpressionUtils.and(
+                simplePredicate(OperatorType.GREATER_THAN, "testColumn", BIGINT, 8L),
+                simplePredicate(OperatorType.LESS_THAN, "testColumn", BIGINT, 20L));
+        RowExpression expression5 = RowExpressionUtils.or(
+                simplePredicate(OperatorType.GREATER_THAN, "testColumn", BIGINT, 200L),
+                simplePredicate(OperatorType.LESS_THAN, "testColumn", BIGINT, 0L));
+        RowExpression expression6 = RowExpressionUtils.or(
+                simplePredicate(OperatorType.LESS_THAN, "testColumn", BIGINT, 0L),
+                new SpecialForm(SpecialForm.Form.BETWEEN, BOOLEAN,
+                        new VariableReferenceExpression("testColumn", VARCHAR),
+                        new ConstantExpression(5L, BIGINT),
+                        new ConstantExpression(15L, BIGINT)));
 
         HeuristicIndexFilter filter = new HeuristicIndexFilter(ImmutableMap.of("testColumn", ImmutableList.of(
                 new IndexMetadata(minMaxIndex1, "testTable", new String[] {"testColumn"}, null, null, 0, 0),
