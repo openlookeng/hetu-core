@@ -129,7 +129,7 @@ public class MinMaxIndex
                     case GREATER_THAN_OR_EQUAL:
                         return value.compareTo(max) < 0 || value.compareTo(max) == 0;
                     default:
-                        throw new IllegalArgumentException("Unsupported operator " + operator);
+                        throw new UnsupportedOperationException("Unsupported operator " + operator);
                 }
             }
         }

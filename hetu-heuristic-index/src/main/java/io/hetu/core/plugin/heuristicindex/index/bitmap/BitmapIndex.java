@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.Marker;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.SortedRangeSet;
 import org.apache.commons.io.IOUtils;
@@ -28,7 +29,6 @@ import org.mapdb.DBMaker;
 import org.mapdb.Serializer;
 import org.mapdb.serializer.GroupSerializer;
 import org.mapdb.serializer.SerializerCompressionWrapper;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.xerial.snappy.SnappyInputStream;
@@ -53,6 +53,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.hetu.core.heuristicindex.util.TypeUtils.getNativeValue;
@@ -184,6 +185,26 @@ public class BitmapIndex
         return lookUp(expression).hasNext();
     }
 
+    private RoaringBitmap lookUpSingle(Object lookupValue)
+    {
+        try {
+            Object objValue = btree.get(lookupValue);
+
+            if (objValue == null) {
+                return null;
+            }
+
+            byte[] value = (byte[]) objValue;
+            ByteBuffer bb = ByteBuffer.wrap(value);
+            ImmutableRoaringBitmap bitmap = new ImmutableRoaringBitmap(bb);
+            RoaringBitmap roaringBitmap = new RoaringBitmap(bitmap);
+            return roaringBitmap;
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Override
     public Iterator<Integer> lookUp(Object expression)
     {
@@ -194,56 +215,74 @@ public class BitmapIndex
             List<Range> ranges = ((SortedRangeSet) (predicate.getValues())).getOrderedRanges();
             Class<?> javaType = predicate.getValues().getType().getJavaType();
 
-            if (ranges.size() != 1) {
-                throw new UnsupportedOperationException("Bitmap only supports single equality expressions");
-            }
-
-            Object lookupValue = null;
-            for (Range range : ranges) {
-                // unique value(for example: id=1, id in (1,2)), bound: EXACTLY
-                if (range.isSingleValue()) {
-                    lookupValue = getNativeValue(range.getSingleValue());
-                    break;
-                }
-                else {
-                    throw new UnsupportedOperationException("Bitmap only supports single equality expressions");
-                }
-            }
-
             try {
-                Object objValue = getBtreeReadOptimized().get(lookupValue);
+                btree = getBtreeReadOptimized();
+                ArrayList<RoaringBitmap> allMatches = new ArrayList<>();
+                for (Range range : ranges) {
+                    if (range.isSingleValue()) {
+                        // unique value(for example: id=1, id in (1,2) (IN operator gives single exact values one by one)), bound: EXACTLY
+                        RoaringBitmap bitmap = lookUpSingle(getNativeValue(range.getSingleValue()));
+                        if (bitmap != null) {
+                            allMatches.add(bitmap);
+                        }
+                    }
+                    else {
+                        // <, <=, >=, >, BETWEEN
+                        boolean highBoundless = range.getHigh().isUpperUnbounded();
+                        boolean lowBoundless = range.getLow().isLowerUnbounded();
+                        ConcurrentNavigableMap<Object, String> concurrentNavigableMap = null;
 
-                if (objValue == null) {
-                    return Collections.emptyIterator();
+                        if (highBoundless && !lowBoundless) {
+                            // >= or >
+                            Object low = range.getLow().getValue();
+                            Object high = btree.lastKey();
+                            boolean fromInclusive = range.getLow().getBound().equals(Marker.Bound.EXACTLY);
+                            if (btree.comparator().compare(low, high) > 0) {
+                                Object temp = low;
+                                low = high;
+                                high = temp;
+                            }
+                            concurrentNavigableMap = btree.subMap(low, fromInclusive, high, true);
+                        }
+                        else if (!highBoundless && lowBoundless) {
+                            // <= or <
+                            Object low = btree.firstKey();
+                            Object high = range.getHigh().getValue();
+                            boolean toInclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
+                            if (btree.comparator().compare(low, high) > 0) {
+                                Object temp = low;
+                                low = high;
+                                high = temp;
+                            }
+                            concurrentNavigableMap = btree.subMap(low, true, high, toInclusive);
+                        }
+                        else if (!highBoundless && !lowBoundless) {
+                            // BETWEEN
+                            Object low = range.getHigh().getValue();
+                            Object high = range.getLow().getValue();
+                            if (btree.comparator().compare(low, high) > 0) {
+                                Object temp = low;
+                                low = high;
+                                high = temp;
+                            }
+                            concurrentNavigableMap = btree.subMap(low, true, high, true);
+                        }
+                        else {
+                            // This case, combined gives a range of boundless for both high and low end
+                            throw new UnsupportedOperationException("No use for bitmap index as all values are matched due to no bounds.");
+                        }
+
+                        for (Object i : concurrentNavigableMap.keySet()) {
+                            RoaringBitmap bitmap = lookUpSingle(getNativeValue(i));
+                            allMatches.add(bitmap);
+                        }
+                    }
                 }
 
-                byte[] value = (byte[]) objValue;
-                ByteBuffer bb = ByteBuffer.wrap(value);
-                ImmutableRoaringBitmap bitmap = new ImmutableRoaringBitmap(bb);
-
-                PeekableIntIterator iterator = bitmap.getIntIterator();
-
-                if (iterator == null) {
-                    return Collections.emptyIterator();
-                }
-
-                return new Iterator<Integer>()
-                {
-                    @Override
-                    public boolean hasNext()
-                    {
-                        return iterator.hasNext();
-                    }
-
-                    @Override
-                    public Integer next()
-                    {
-                        return iterator.next();
-                    }
-                };
+                return RoaringBitmap.or(allMatches.iterator()).iterator();
             }
             catch (Exception e) {
-                throw new RuntimeException(e);
+                throw new UnsupportedOperationException("Unsupported expression type.", e);
             }
         }
         else {

@@ -34,7 +34,7 @@ public class TestHindexFailure
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         // Create index
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
@@ -47,7 +47,7 @@ public class TestHindexFailure
         }
         assertQueryFails("DROP INDEX hive", "line 1:1: Index 'hive' does not exist");
         assertQueryFails("DROP INDEX HDFS", "line 1:1: Index 'hdfs' does not exist");
-        assertQueryFails("DROP INDEX test", "line 1:1: Index 'test' does not exist");
+        assertQueryFails("DROP INDEX TEST", "line 1:1: Index 'test' does not exist");
         assertQueryFails("DROP INDEX wrongtest", "line 1:1: Index 'wrongtest' does not exist");
         String[] table = tableName.split("\\.");
         assertQueryFails("DROP INDEX " + table[2], "line 1:1: Index '" + table[2] + "' does not exist");
@@ -63,7 +63,7 @@ public class TestHindexFailure
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         // Create index
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
@@ -85,7 +85,7 @@ public class TestHindexFailure
     public void testMultipleSameIndexCreation(String indexType, String queryVariable)
     {
         String tableName = getNewTableName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         String indexName1 = getNewIndexName();
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
@@ -120,7 +120,7 @@ public class TestHindexFailure
             throws IllegalStateException
     {
         String tableName = getNewTableName();
-        tableName = createEmptyTable(tableName);
+        createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
@@ -292,7 +292,7 @@ public class TestHindexFailure
     public void testIndexWithoutColumnCreation(String indexType)
     {
         String tableName = getNewTableName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
         // Error of "line 1:115: mismatched input ')'. Expecting: <identifier>" exists
         // But code style does not allow ) to exist inside a string without having ( before it.
 
@@ -318,7 +318,7 @@ public class TestHindexFailure
             throws SemanticException
     {
         String tableName = getNewTableName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         String indexName = getNewIndexName();
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
@@ -339,10 +339,10 @@ public class TestHindexFailure
             throws ParsingException
     {
         String tableName = getNewTableName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         String indexName = getNewIndexName();
         assertQueryFails("CREATE INDEX " + indexName + " USING wrong_filter ON " + tableName + " (id)",
-                "line 1:59: mismatched input 'wrong_filter'. Expecting: '.', 'USING'");
+                "line 1:26: mismatched input 'wrong_filter'. Expecting: '.', 'USING'");
     }
 }
