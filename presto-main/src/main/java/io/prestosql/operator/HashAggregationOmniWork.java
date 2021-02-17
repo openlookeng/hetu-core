@@ -72,13 +72,12 @@ public final class HashAggregationOmniWork<O>
         checkState(finished, "process has not finished");
         long start = System.currentTimeMillis();
 
-        result = (Vec[]) omniRuntime.execute(compileID, omniKey, null, 0, outTypes, OmniOpStep.FINAL);
-        Vec[] vecs = result;
+        result = (Vec[]) omniRuntime.getResults(omniKey, outTypes);
 
         System.out.println("after omni execute-------");
-        LongVec column0 = (LongVec) vecs[0];
-        LongVec column1 = (LongVec) vecs[1];
-        for (int i = 0; i < vecs[0].size(); i++) {
+        LongVec column0 = (LongVec) result[0];
+        LongVec column1 = (LongVec) result[1];
+        for (int i = 0; i < result[0].size(); i++) {
             System.out.println(column0.get(i) + " " + column1.get(i));
         }
         System.out.println("omni runtime final execute:" + (System.currentTimeMillis() - start));
