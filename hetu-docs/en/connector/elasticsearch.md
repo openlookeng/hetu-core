@@ -83,7 +83,7 @@ This property is optional; the default is 1m.
 
 ### `elasticsearch.security`
 
-Allows setting password security to authenticate to Elasticsearch.
+Set the authentication type to connect to Elasticsearch. For now, only support `PASSWORD`.
 
 ### `elasticsearch.auth.user`
 
@@ -122,6 +122,14 @@ This property is optional.
 The key password for the trust store specified by elasticsearch.tls.truststore-path.
 
 This property is optional.
+
+Example:
+
+``` properties
+elasticsearch.tls.enabled=true
+elasticsearch.tls.keystore-path=/etc/elasticsearch/openLooKeng.jks
+elasticsearch.tls.keystore-password=keystore_password
+```
 
 Data Types
 --------

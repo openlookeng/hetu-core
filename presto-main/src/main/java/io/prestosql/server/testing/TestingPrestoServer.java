@@ -52,6 +52,7 @@ import io.prestosql.execution.TaskManager;
 import io.prestosql.execution.resourcegroups.InternalResourceGroupManager;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.memory.LocalMemoryManager;
 import io.prestosql.metadata.AllNodes;
@@ -142,6 +143,7 @@ public class TestingPrestoServer
     private final ProcedureTester procedureTester;
     private final Optional<InternalResourceGroupManager<?>> resourceGroupManager;
     private final SplitManager splitManager;
+    private final HeuristicIndexerManager heuristicIndexerManager;
     private final PageSourceManager pageSourceManager;
     private final NodePartitioningManager nodePartitioningManager;
     private final ConnectorPlanOptimizerManager planOptimizerManager;
@@ -297,6 +299,8 @@ public class TestingPrestoServer
         connectorManager = injector.getInstance(ConnectorManager.class);
 
         hetuMetaStoreManager = injector.getInstance(HetuMetaStoreManager.class);
+
+        heuristicIndexerManager = injector.getInstance(HeuristicIndexerManager.class);
 
         server = injector.getInstance(TestingHttpServer.class);
         catalogManager = injector.getInstance(CatalogManager.class);
@@ -570,6 +574,11 @@ public class TestingPrestoServer
     {
         checkState(coordinator, "not a coordinator");
         return clusterMemoryManager;
+    }
+
+    public HeuristicIndexerManager getHeuristicIndexerManager()
+    {
+        return this.heuristicIndexerManager;
     }
 
     public NodeStateChangeHandler getNodeStateChangeHandler()

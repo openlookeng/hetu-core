@@ -77,7 +77,7 @@ elasticsearch.default-schema-name=default
 
 ### `elasticsearch.security`
 
-连接Elasticsearch启用密码认证。
+配置连接Elasticsearch的认证类型。目前仅支持`PASSWORD`。
 
 ### `elasticsearch.auth.user`
 
@@ -115,6 +115,14 @@ Elasticsearch连接器提供了额外安全选项支持开启了TLS的Elasticsea
 此属性定义了trust store文件的密码。
 
 此属性是可选的。
+
+示例：
+
+``` properties
+elasticsearch.tls.enabled=true
+elasticsearch.tls.keystore-path=/etc/elasticsearch/openLooKeng.jks
+elasticsearch.tls.keystore-password=keystore_password
+```
 
 Data Types
 --------

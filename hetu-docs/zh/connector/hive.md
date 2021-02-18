@@ -127,6 +127,7 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.metastore.client.principal`| openLooKeng在连接到Hive元存储服务时将使用的Kerberos主体。|
 | `hive.metastore.client.keytab`| Hive元存储客户端keytab位置。|
 | `hive.metastore.thrift.is-role-name-case-sensitive`| 角色名是否区分大小写，默认值为false。|
+| `hive.metastore.krb5.conf.path`| Kerberos配置文件位置。|
 
 ## AWS Glue目录配置属性
 
