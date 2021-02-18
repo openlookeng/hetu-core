@@ -138,6 +138,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.metastore.client.principal`                   | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
 | `hive.metastore.client.keytab`                      | Hive metastore client keytab location.                       |
 | `hive.metastore.thrift.is-role-name-case-sensitive` | whether the role name to be Case-Sensitive or not, default value false. |
+| `hive.metastore.krb5.conf.path`                     | The Kerberos configuration file location. |
 
 
 

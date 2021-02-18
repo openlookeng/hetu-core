@@ -78,6 +78,7 @@ In a Kerberized Hadoop cluster, openLooKeng connects to the Hive metastore Thrif
 | `hive.metastore.service.principal`            | The Kerberos principal of the Hive metastore service.        |
 | `hive.metastore.client.principal`             | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
 | `hive.metastore.client.keytab`                | Hive metastore client keytab location.                       |
+| `hive.metastore.krb5.conf.path`               | The Kerberos configuration file location.                    |
 
 #### `hive.metastore.authentication.type`
 
@@ -127,6 +128,11 @@ The path to the keytab file that contains a key for the principal specified by  
 
 This property is optional; no default value.
 
+#### `hive.metastore.krb5.conf.path`
+The path of Kerberos configuration file. This file must be readable by the operating system user running openLooKeng.
+
+This property is optional; no default value.
+
 #### Example configuration with `NONE` authentication
 
 ``` properties
@@ -143,6 +149,7 @@ hive.metastore.thrift.impersonation.enabled=true
 hive.metastore.service.principal=hive/hive-metastore-host.example.com@EXAMPLE.COM
 hive.metastore.client.principal=openlk@EXAMPLE.COM
 hive.metastore.client.keytab=/etc/openlookeng/hive.keytab
+hive.metastore.krb5.conf.path=/etc/openlookeng/krb5.conf
 ```
 
 When the authentication type for the Hive metastore Thrift service is `KERBEROS`, openLooKeng will connect as the Kerberos principal specified by the property `hive.metastore.client.principal`. openLooKeng will authenticate this principal using the keytab specified by the `hive.metastore.client.keytab` property, and will verify that the identity of the metastore matches `hive.metastore.service.principal`.
