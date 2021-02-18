@@ -64,6 +64,17 @@ public class HetuMetastoreCache
     }
 
     @Override
+    public void createCatalogIfNotExist(CatalogEntity catalog)
+    {
+        try {
+            delegate.createCatalogIfNotExist(catalog);
+        }
+        finally {
+            catalogsCache.invalidateAll();
+        }
+    }
+
+    @Override
     public void alterCatalog(String catalogName, CatalogEntity newCatalog)
     {
         try {
@@ -122,6 +133,17 @@ public class HetuMetastoreCache
     {
         try {
             delegate.createDatabase(database);
+        }
+        finally {
+            databasesCache.invalidate(database.getCatalogName());
+        }
+    }
+
+    @Override
+    public void createDatabaseIfNotExist(DatabaseEntity database)
+    {
+        try {
+            delegate.createDatabaseIfNotExist(database);
         }
         finally {
             databasesCache.invalidate(database.getCatalogName());
@@ -190,6 +212,18 @@ public class HetuMetastoreCache
     {
         try {
             delegate.createTable(table);
+        }
+        finally {
+            String key = table.getCatalogName() + "." + table.getDatabaseName();
+            tablesCache.invalidate(key);
+        }
+    }
+
+    @Override
+    public void createTableIfNotExist(TableEntity table)
+    {
+        try {
+            delegate.createTableIfNotExist(table);
         }
         finally {
             String key = table.getCatalogName() + "." + table.getDatabaseName();
