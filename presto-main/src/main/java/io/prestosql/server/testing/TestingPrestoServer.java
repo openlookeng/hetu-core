@@ -429,9 +429,15 @@ public class TestingPrestoServer
     }
 
     public void loadMetastore()
-            throws Exception
+            throws IOException
     {
-        hetuMetaStoreManager.loadHetuMetatstore(new FileSystemClientManager());
+        hetuMetaStoreManager.loadHetuMetastore(new FileSystemClientManager());
+    }
+
+    public void loadMetastore(Map<String, String> config)
+            throws IOException
+    {
+        hetuMetaStoreManager.loadHetuMetastore(new FileSystemClientManager(), config);
     }
 
     public CatalogName createCatalog(String catalogName, String connectorName)

@@ -26,6 +26,7 @@ import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.metastore.HetuMetastore;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
@@ -44,7 +45,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.prestosql.spi.heuristicindex.IndexRecord.COLUMN_DELIMITER;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -57,15 +57,15 @@ public class HeuristicIndexClient
 {
     private static final Logger LOG = Logger.get(HeuristicIndexClient.class);
 
-    private HetuFileSystemClient fs;
-    private Path root;
-    private IndexRecordManager indexRecordManager;
+    private final IndexRecordManager indexRecordManager;
+    private final HetuFileSystemClient fs;
+    private final Path root;
 
-    public HeuristicIndexClient(HetuFileSystemClient fs, Path root)
+    public HeuristicIndexClient(HetuFileSystemClient fs, HetuMetastore metastore, Path root)
     {
         this.fs = fs;
         this.root = root;
-        this.indexRecordManager = new IndexRecordManager(fs, root);
+        this.indexRecordManager = new IndexRecordManager(metastore);
     }
 
     @Override
@@ -241,7 +241,7 @@ public class HeuristicIndexClient
             throws IOException
     {
         IndexRecord indexRecord = indexRecordManager.lookUpIndexRecord(indexName);
-        Path toDelete = root.resolve(indexRecord.table).resolve(String.join(COLUMN_DELIMITER, indexRecord.columns)).resolve(indexRecord.indexType);
+        Path toDelete = root.resolve(indexRecord.qualifiedTable).resolve(String.join(",", indexRecord.columns)).resolve(indexRecord.indexType);
 
         if (!fs.exists(toDelete)) {
             indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);

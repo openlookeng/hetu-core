@@ -350,7 +350,7 @@ public class LocalQueryRunner
         NodeInfo nodeInfo = new NodeInfo("test");
         FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
-        heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager);
+        heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.connectorManager = new ConnectorManager(
                 hetuMetaStoreManager,
                 metadata,

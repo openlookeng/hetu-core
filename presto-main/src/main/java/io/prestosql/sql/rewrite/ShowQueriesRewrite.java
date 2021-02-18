@@ -656,7 +656,7 @@ final class ShowQueriesRewrite
             }
             else {
                 for (IndexRecord record : indexRecords) {
-                    QualifiedObjectName indexFullName = QualifiedObjectName.valueOf(record.table);
+                    QualifiedObjectName indexFullName = QualifiedObjectName.valueOf(record.qualifiedTable);
                     accessControl.checkCanShowIndex(session.getRequiredTransactionId(), session.getIdentity(), indexFullName);
                 }
             }
@@ -688,7 +688,7 @@ final class ShowQueriesRewrite
                 rows.add(row(
                         new StringLiteral(v.name),
                         new StringLiteral(v.user),
-                        new StringLiteral(v.table),
+                        new StringLiteral(v.qualifiedTable),
                         new StringLiteral(String.join(",", v.columns)),
                         new StringLiteral(v.indexType),
                         new StringLiteral(partitionsStrToDisplay.toString()),

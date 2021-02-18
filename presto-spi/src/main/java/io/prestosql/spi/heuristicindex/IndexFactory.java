@@ -16,6 +16,7 @@ package io.prestosql.spi.heuristicindex;
 
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.metastore.HetuMetastore;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -40,10 +41,11 @@ public interface IndexFactory
      * Creates an IndexClient configured with the IndexStore using the provided filesystem client and root folder.
      *
      * @param fs filesystem client to read index
+     * @param metastore
      * @param root path to the index root folder
      * @return An IndexClient which has the IndexStore configured
      */
-    public IndexClient getIndexClient(HetuFileSystemClient fs, Path root);
+    public IndexClient getIndexClient(HetuFileSystemClient fs, HetuMetastore metastore, Path root);
 
     public IndexFilter getIndexFilter(Map<String, List<IndexMetadata>> indices);
 }

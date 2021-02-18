@@ -20,6 +20,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
@@ -105,7 +106,7 @@ public class TestSetRoleTask
                 executor,
                 metadata,
                 WarningCollector.NOOP);
-        new SetRoleTask().execute(setRole, transactionManager, metadata, accessControl, stateMachine, ImmutableList.of(), new HeuristicIndexerManager(new FileSystemClientManager()));
+        new SetRoleTask().execute(setRole, transactionManager, metadata, accessControl, stateMachine, ImmutableList.of(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()));
         QueryInfo queryInfo = stateMachine.getQueryInfo(Optional.empty());
         assertEquals(queryInfo.getSetRoles(), expected);
     }
