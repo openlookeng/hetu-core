@@ -33,6 +33,7 @@ import nova.hetu.omnicache.runtime.OmniRuntime;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -61,18 +62,27 @@ public class HashAggregationOmniBenchmark
         List<Type> dataTypes = new ArrayList<>();
         dataTypes.add(BIGINT);
         dataTypes.add(BIGINT);
+        dataTypes.add(BIGINT);
+        dataTypes.add(BIGINT);
         PageBuilder pb = PageBuilder.withMaxPageSize(Integer.MAX_VALUE, dataTypes);
-        BlockBuilder key = pb.getBlockBuilder(0);
-        BlockBuilder value = pb.getBlockBuilder(1);
-        for (int idx = 0; idx < 4; idx++) {
-            key.writeLong(idx % 2);
-            value.writeLong(idx);
-            pb.declarePosition();
+        BlockBuilder group1 = pb.getBlockBuilder(0);
+        BlockBuilder group2 = pb.getBlockBuilder(1);
+        BlockBuilder sum1 = pb.getBlockBuilder(2);
+        BlockBuilder sum2 = pb.getBlockBuilder(3);
+
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                group1.writeLong(i);
+                group2.writeLong(j);
+                sum1.writeLong(i);
+                sum2.writeLong(j);
+                pb.declarePosition();
+            }
         }
         inputPage = pb.build();
 
         List<Page> inputPages = new ArrayList<>();
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 3; i++) {
             inputPages.add(inputPage);
         }
         inputPagesIterator = inputPages.iterator();
@@ -192,18 +202,28 @@ public class HashAggregationOmniBenchmark
         //omni
         long start = System.currentTimeMillis();
         omniRuntime = new OmniRuntime();
-        String code = "|k:vec[i64],v:vec[i64]|" +
-                "let rs = tovec(result(for(zip(k,v),dictmerger[i64,i64,+],|b,i,n| merge(b,{n.$0,n.$1}))));" +
-                "let k = result(for(rs,appender[i64],|b,i,n| merge(b,n.$0)));" +
-                "let v = result(for(rs,appender[i64],|b,i,n| merge(b,n.$1)));" +
-                "{k,v}";
+//        String code = "|k:vec[i64],v:vec[i64]|" +
+//                "let rs = tovec(result(for(zip(k,v),dictmerger[i64,i64,+],|b,i,n| merge(b,{n.$0,n.$1}))));" +
+//                "let k = result(for(rs,appender[i64],|b,i,n| merge(b,n.$0)));" +
+//                "let v = result(for(rs,appender[i64],|b,i,n| merge(b,n.$1)));" +
+////                "{k,v}";
+//        String code = "|v0 :vec[vec[i64]], v1: vec[vec[i64]], v2: vec[vec[f64]], v3: vec[vec[f64]]|let sum_dict_ = for(zip(v0, v1, v2, v3), dictmerger[{i64,i64}, {f64, f64},+], |b,i,n|for(zip(n.0,n.1, n.2,n.3), b, |b_, i_, m|merge(b, {{m.0,m.1}, {m.2,m.3}})));let dict_0_1 = tovec(result(sum_dict_));let k0 = result(for(dict_0_1, appender[i64], |b, i, n| merge(b, n.0.0)));let k1 = result(for(dict_0_1, appender[i64], |b, i, n| merge(b, n.0.1)));let sum_1 = result(for(dict_0_1, appender[f64], |b, i, n| merge(b, n.1.0)));let sum_2 = result(for(dict_0_1, appender[f64], |b, i, n| merge(b, n.1.1)));{k0, k1, sum_1, sum_2}";
 
+        String code = "|v0 :vec[vec[i64]], v1: vec[vec[i64]], v2: vec[vec[f64]], v3: vec[vec[f64]]|" +
+                "let sum_dict_ = for(zip(v0, v1, v2, v3), dictmerger[{i64,i64}, {f64, f64},+], |b,i,n| " +
+                "for(zip(n.$0, n.$1, n.$2, n.$3), b, |b_, i_, m|" +
+                "merge(b, {{m.$0, m.$1}, {m.$2, m.$3}})));" +
+                "let dict_0_1 = tovec(result(sum_dict_));" +
+                "let k0 = result( for (dict_0_1, appender[i64], |b, i, n | merge(b, n.$0.$0)));" +
+                "let k1 = result( for (dict_0_1, appender[i64], |b, i, n | merge(b, n.$0.$1)));" +
+                "let sum_1 = result( for (dict_0_1, appender[f64], |b, i, n | merge(b, n.$1.$0)));" +
+                "let sum_2 = result( for (dict_0_1, appender[f64], |b, i, n | merge(b, n.$1.$1)));" +
+                "{k0, k1, sum_1, sum_2}";
         compileID = omniRuntime.compile(code);
         long end = System.currentTimeMillis();
         System.out.println("omni compile time: " + (end - start));
 
-
-        HashAggregationOmniOperator.HashAggregationOmniOperatorFactory aggregationOperator = new HashAggregationOmniOperator.HashAggregationOmniOperatorFactory(omniRuntime, compileID);
+        HashAggregationOmniOperator.HashAggregationOmniOperatorFactory aggregationOperator = new HashAggregationOmniOperator.HashAggregationOmniOperatorFactory(1, new PlanNodeId("1"), omniRuntime, Collections.singletonList(compileID));
         System.out.println("create hash op fac execute time: " + (System.currentTimeMillis() - start));
 
         return ImmutableList.of(tableScanOperator, aggregationOperator);

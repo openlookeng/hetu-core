@@ -106,6 +106,11 @@ public class DoubleArrayBlock
     }
 
     @Override
+    public DoubleVec getValues(){
+        return values;
+    }
+
+    @Override
     public long getSizeInBytes()
     {
         return sizeInBytes;

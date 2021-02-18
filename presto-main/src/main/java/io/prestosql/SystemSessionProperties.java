@@ -149,6 +149,7 @@ public final class SystemSessionProperties
     public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
     public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
     public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
+    public static final String OMNI_CACHE_ENABLED = "omni_cache_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -167,8 +168,8 @@ public final class SystemSessionProperties
     {
         sessionProperties = ImmutableList.of(
                 booleanProperty(
-                        "omni",
-                        "omnicache enable",
+                        "omni_cache_enabled",
+                        "omni cache enabled",
                         true,
                         false),
                 stringProperty(
@@ -1206,6 +1207,11 @@ public final class SystemSessionProperties
     public static int getSpillOperatorThresholdReuseExchange(Session session)
     {
         return session.getSystemProperty(SPILL_THRESHOLD_REUSE_TABLESCAN, Integer.class);
+    }
+
+    public static Boolean getOmniCacheEnabled(Session session)
+    {
+        return session.getSystemProperty(OMNI_CACHE_ENABLED, Boolean.class);
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()

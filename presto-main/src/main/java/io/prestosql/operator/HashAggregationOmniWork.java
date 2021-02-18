@@ -14,27 +14,39 @@
 package io.prestosql.operator;
 
 import io.prestosql.spi.Page;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.block.DoubleArrayBlock;
+import io.prestosql.spi.block.LongArrayBlock;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.Type;
 import nova.hetu.omnicache.runtime.OmniOpStep;
 import nova.hetu.omnicache.runtime.OmniRuntime;
+import nova.hetu.omnicache.vector.DoubleVec;
+import nova.hetu.omnicache.vector.IntVec;
 import nova.hetu.omnicache.vector.LongVec;
 import nova.hetu.omnicache.vector.Vec;
 import nova.hetu.omnicache.vector.VecType;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 import static com.google.common.base.Preconditions.checkState;
 
 public final class HashAggregationOmniWork<O>
-        implements Work<Vec[]>
+        implements Work<Page>
 {
 
     OmniRuntime omniRuntime;
-    String compileID;
+    List<String> compileID;
     private boolean finished;
     private Vec[] result;
     private Page page;
     String omniKey;
     VecType[] outTypes;
 
-    public HashAggregationOmniWork(Page page, OmniRuntime omniRuntime, String compileID, String omniKey)
+    public HashAggregationOmniWork(Page page, OmniRuntime omniRuntime, List<String> compileID, String omniKey)
     {
         this.page = page;
         this.omniRuntime = omniRuntime;
@@ -45,43 +57,60 @@ public final class HashAggregationOmniWork<O>
     @Override
     public boolean process()
     {
-        Vec[] inputData = new Vec[2];
-        inputData[0] = (LongVec) page.getBlock(0).getValuesVec();
-        inputData[1] = (LongVec) page.getBlock(1).getValuesVec();
-
-        System.out.println("before omni execute-------");
-        LongVec column0 = (LongVec) inputData[0];
-        LongVec column1 = (LongVec) inputData[1];
-        for (int i = 0; i < inputData[0].size(); i++) {
-            System.out.println(column0.get(i) + " " + column1.get(i));
+        int channelCount = page.getChannelCount();
+        Vec[] inputData = new Vec[channelCount];
+        for (int i = 0; i < channelCount; i++) {
+            inputData[i] = page.getBlock(i).getValues();
         }
-
+//        LongVec
+//
         int rowNum = page.getPositionCount();
 
-        outTypes = new VecType[] {VecType.LONG, VecType.LONG};
+        outTypes = new VecType[] {VecType.LONG, VecType.LONG, VecType.LONG, VecType.LONG};
 
-        omniRuntime.execute(compileID, omniKey, inputData, rowNum, outTypes, OmniOpStep.INTERMEDIATE);
+        if (inputData[channelCount - 1] instanceof LongVec) {
+            omniRuntime.execute(compileID.get(0), omniKey, inputData, rowNum, outTypes, OmniOpStep.INTERMEDIATE);
+        }
+        else {
+            omniRuntime.execute(compileID.get(1), omniKey, inputData, rowNum, outTypes, OmniOpStep.INTERMEDIATE);
+        }
 
         finished = true;
         return true;
     }
 
     @Override
-    public Vec[] getResult()
+    public Page getResult()
     {
         checkState(finished, "process has not finished");
-        long start = System.currentTimeMillis();
 
         result = (Vec[]) omniRuntime.getResults(omniKey, outTypes);
 
-        System.out.println("after omni execute-------");
-        LongVec column0 = (LongVec) result[0];
-        LongVec column1 = (LongVec) result[1];
-        for (int i = 0; i < result[0].size(); i++) {
-            System.out.println(column0.get(i) + " " + column1.get(i));
+        return toResult(result);
+    }
+
+    public Page toResult(Vec[] omniExecutionResult)
+    {
+        int positionCount = omniExecutionResult[0].size();
+        int chanelCount = omniExecutionResult.length;
+
+        boolean[] valueIsNull = new boolean[positionCount];
+        for (int i = 0; i < positionCount; i++) {
+            valueIsNull[i] = false;
         }
-        System.out.println("omni runtime final execute:" + (System.currentTimeMillis() - start));
-        return result;
+        Block[] blocks = new Block[chanelCount];
+        for (int i = 0; i < chanelCount; i++) {
+            if (omniExecutionResult[i] instanceof DoubleVec) {
+                blocks[i] = new DoubleArrayBlock(positionCount, Optional.of(valueIsNull), ((DoubleVec) omniExecutionResult[i]));
+            }
+            else {
+                blocks[i] = new LongArrayBlock(positionCount, Optional.of(valueIsNull), (LongVec) omniExecutionResult[i]);
+            }
+        }
+
+        Page page = new Page(blocks);
+
+        return page;
     }
 
     public boolean isFinished()

@@ -107,6 +107,11 @@ public class IntArrayBlock
     }
 
     @Override
+    public IntVec getValues(){
+        return values;
+    }
+
+    @Override
     public long getSizeInBytes()
     {
         return sizeInBytes;

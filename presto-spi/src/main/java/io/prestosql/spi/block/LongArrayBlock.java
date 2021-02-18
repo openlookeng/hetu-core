@@ -111,7 +111,7 @@ public class LongArrayBlock
     }
 
     @Override
-    public LongVec getValuesVec()
+    public LongVec getValues()
     {
         return values;
     }

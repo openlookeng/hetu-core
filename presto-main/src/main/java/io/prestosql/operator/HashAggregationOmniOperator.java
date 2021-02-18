@@ -16,17 +16,13 @@ package io.prestosql.operator;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.block.LongArrayBlock;
-import io.prestosql.spi.type.BigintType;
-import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 import nova.hetu.omnicache.runtime.OmniRuntime;
 import nova.hetu.omnicache.vector.LongVec;
 import nova.hetu.omnicache.vector.Vec;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -36,7 +32,7 @@ public class HashAggregationOmniOperator
 {
     OperatorContext operatorContext;
     //omni
-    String compileID;
+    List<String> compileID;
     OmniRuntime omniRuntime;
 
     private boolean finishing;
@@ -44,50 +40,15 @@ public class HashAggregationOmniOperator
     // for yield when memory is not available
 //    private Work<?> unfinishedWork;
 
-    private OmniPageContainer omniPageContainer;
     HashAggregationOmniWork<Object> omniWork;
     private String omniKey;
 
-    public HashAggregationOmniOperator(OperatorContext operatorContext, OmniRuntime omniRuntime, String compileID)
+    public HashAggregationOmniOperator(OperatorContext operatorContext, OmniRuntime omniRuntime, List<String> compileID)
     {
         this.operatorContext = operatorContext;
-        int driverId = this.operatorContext.getDriverContext().getDriverId();
-        String taskId = this.operatorContext.getDriverContext().getTaskId().getFullId();
-        this.omniKey = taskId + driverId;
+        this.omniKey= UUID.randomUUID().toString()+"-"+operatorContext.getDriverContext().getPipelineContext().getTaskId();
         this.omniRuntime = omniRuntime;
         this.compileID = compileID;
-    }
-
-    private static class OmniPageContainer
-    {
-        private final int capacity = 128 * 1024 * 1024;
-        private Vec[] buffers;
-        private int totalRowCount = 0;
-
-        public OmniPageContainer(int length)
-        {
-            buffers = new Vec[length];
-            for (int idx = 0; idx < length; idx++) {
-                buffers[idx] = new LongVec(capacity);
-            }
-        }
-
-        public void appendPage(Page page)
-        {
-            for (int ridx = 0; ridx < page.getPositionCount(); ridx++) {
-                for (int cidx = 0; cidx < page.getChannelCount(); cidx++) {
-                    LongVec vec = (LongVec) page.getBlock(cidx).getValuesVec();
-                    long value = vec.get(ridx);
-                    ((LongVec) buffers[cidx]).set(totalRowCount, value);
-                }
-                totalRowCount++;
-            }
-        }
-
-        public Vec[] getBuffers()
-        {
-            return buffers;
-        }
     }
 
     @Override
@@ -142,42 +103,22 @@ public class HashAggregationOmniOperator
         omniWork.process();
     }
 
-    public Page toResult(Vec[] omniExecutionResult)
-    {
-        List<Type> builderType = new ArrayList<>();
-        builderType.add(BigintType.BIGINT);
-        builderType.add(BigintType.BIGINT);
-
-        long start1 = System.currentTimeMillis();
-
-        Vec[] vecs = omniExecutionResult;
-        int size = vecs[0].size();
-
-        boolean[] valueIsNull = new boolean[size];
-        for (int i = 0; i < size; i++) {
-            valueIsNull[i] = false;
-        }
-        LongArrayBlock[] longArrayBlocks = new LongArrayBlock[2];
-        longArrayBlocks[0] = new LongArrayBlock(size, Optional.of(valueIsNull), (LongVec) vecs[0]);
-        longArrayBlocks[1] = new LongArrayBlock(size, Optional.of(valueIsNull), (LongVec) vecs[1]);
-//            longArrayBlocks[2] = new LongArrayBlock(size, Optional.of(valueIsNull), (LongVec) vecs[1]);
-        Page page = new Page(longArrayBlocks);
-
-        long end1 = System.currentTimeMillis();
-        System.out.println("get omni result: " + (end1 - start1));
-        return page;
-    }
-
     @Override
     public Page getOutput()
     {
         if (finished) {
             return null;
         }
-        if (finishing && omniWork.isFinished()) {
-            finished = true;
-            Vec[] result = omniWork.getResult();
-            return toResult(result);
+        if (finishing) {
+            if (omniWork == null) {
+                finished = true;
+                return null;
+            }
+            if (omniWork != null && omniWork.isFinished()) {
+                finished = true;
+                return omniWork.getResult();
+            }
+
         }
 
         return null;
@@ -199,10 +140,14 @@ public class HashAggregationOmniOperator
             implements OperatorFactory
     {
         OmniRuntime omniRuntime;
-        String compileID;
+        List<String> compileID;
+        int operatorId;
+        PlanNodeId planNodeId;
 
-        public HashAggregationOmniOperatorFactory(OmniRuntime omniRuntime, String compileID)
+        public HashAggregationOmniOperatorFactory(int operatorId, PlanNodeId planNodeId, OmniRuntime omniRuntime, List<String> compileID)
         {
+            this.operatorId = operatorId;
+            this.planNodeId = planNodeId;
             this.omniRuntime = omniRuntime;
             this.compileID = compileID;
         }
@@ -210,8 +155,7 @@ public class HashAggregationOmniOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-//            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, "BenchmarkSource");
-            OperatorContext operatorContext = driverContext.addOperatorContext(1, new PlanNodeId("1"), "BenchmarkSource");
+            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, HashAggregationOmniOperator.class.getSimpleName());
             HashAggregationOmniOperator hashAggregationOperator = new HashAggregationOmniOperator(operatorContext, omniRuntime, compileID);
             return hashAggregationOperator;
         }

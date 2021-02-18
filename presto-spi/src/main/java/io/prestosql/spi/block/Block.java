@@ -15,6 +15,7 @@ package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
 import io.prestosql.spi.util.BloomFilter;
+import nova.hetu.omnicache.vector.Vec;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.function.BiConsumer;
@@ -25,12 +26,12 @@ import static io.prestosql.spi.block.DictionaryId.randomDictionaryId;
 
 public interface Block<T>
 {
-    default Object getValuesVec()
+    default Vec getValues()
     {
         throw new UnsupportedOperationException();
     }
 
-    default Object setValuesVec()
+    default Object setValues()
     {
         throw new UnsupportedOperationException();
     }
