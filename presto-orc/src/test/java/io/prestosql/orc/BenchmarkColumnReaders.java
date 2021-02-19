@@ -1094,7 +1094,7 @@ public class BenchmarkColumnReaders
     {
         Options options = new OptionsBuilder()
                 .verbosity(VerboseMode.NORMAL)
-                .include(".*" + BenchmarkColumnReaders.class.getSimpleName() + ".*")
+                .include(".*" + BenchmarkColumnReaders.class.getSimpleName() + ".readSliceDirectNoNull")
                 .build();
 
         new Runner(options).run();

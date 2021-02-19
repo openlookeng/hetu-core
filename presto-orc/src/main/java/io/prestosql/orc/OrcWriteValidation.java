@@ -365,7 +365,6 @@ public class OrcWriteValidation
         requireNonNull(name, "name is null");
         requireNonNull(actualColumnStatistics, "actualColumnStatistics is null");
         requireNonNull(expectedColumnStatistics, "expectedColumnStatistics is null");
-
         if (actualColumnStatistics.getNumberOfValues() != expectedColumnStatistics.getNumberOfValues()) {
             throw new OrcCorruptionException(orcDataSourceId, "Write validation failed: unexpected number of values in %s statistics", name);
         }
