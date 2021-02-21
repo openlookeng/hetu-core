@@ -22,12 +22,18 @@ public class PreviewResponse
 {
     private final List<Map<String, String>> columns;
     private final List<List<String>> data;
+    private final Integer total;
+    private final String fileName;
 
     public PreviewResponse(List<Map<String, String>> columns,
-                           List<List<String>> data)
+                           List<List<String>> data,
+                           Integer total,
+                           String fileName)
     {
         this.columns = columns;
         this.data = data;
+        this.total = total;
+        this.fileName = fileName;
     }
 
     @JsonProperty
@@ -40,5 +46,17 @@ public class PreviewResponse
     public List<List<String>> getData()
     {
         return data;
+    }
+
+    @JsonProperty
+    public int getTotal()
+    {
+        return total;
+    }
+
+    @JsonProperty
+    public String getFileName()
+    {
+        return fileName;
     }
 }

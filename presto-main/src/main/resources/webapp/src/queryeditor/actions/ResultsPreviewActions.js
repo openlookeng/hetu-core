@@ -24,8 +24,8 @@ class ResultsPreviewActions {
     );
   }
 
-  loadResultsPreview(file) {
-    ResultsPreviewApiUtils.loadResultsPreview(file).then((results) => {
+  loadResultsPreview(file, pageNum) {
+    ResultsPreviewApiUtils.loadResultsPreview(file, pageNum).then((results) => {
       this.actions.receivedResultsPreview(results);
     }).catch(logError);
   }

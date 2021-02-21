@@ -247,9 +247,10 @@ function selectTable(table, e) {
 }
 
 function previewQueryResult(file, query, e) {
+  let pageNum = 1;
   e.preventDefault();
   ResultsPreviewActions.selectPreviewQuery(query);
-  ResultsPreviewActions.loadResultsPreview(file);
+  ResultsPreviewActions.loadResultsPreview(file, pageNum);
   TabActions.selectTab(TabConstants.RESULTS_PREVIEW);
 }
 
