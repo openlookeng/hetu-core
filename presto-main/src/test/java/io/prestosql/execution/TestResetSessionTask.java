@@ -22,6 +22,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
@@ -113,7 +114,7 @@ public class TestResetSessionTask
                 accessControl,
                 stateMachine,
                 emptyList(),
-                new HeuristicIndexerManager(new FileSystemClientManager())));
+                new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
 
         Set<String> sessionProperties = stateMachine.getResetSessionProperties();
         assertEquals(sessionProperties, ImmutableSet.of("catalog.baz"));

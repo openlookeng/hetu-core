@@ -373,7 +373,7 @@ public abstract class AbstractTestQueryFramework
                 queryRunner.getStatsCalculator(),
                 costCalculator,
                 ImmutableMap.of(),
-                new HeuristicIndexerManager(null));
+                new HeuristicIndexerManager(null, null));
     }
 
     protected static void skipTestUnless(boolean requirement)

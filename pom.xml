@@ -1373,6 +1373,11 @@
                 <artifactId>guava</artifactId>
                 <version>26.0-jre</version>
             </dependency>
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>2.5</version>
+            </dependency>
 
             <!--jetty manual upgrade of version start-->
             <dependency>

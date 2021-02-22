@@ -117,7 +117,7 @@ public class SplitFiltering
         List<IndexRecord> forwardIndexRecords = new ArrayList<>();
         List<IndexRecord> invertedIndexRecords = new ArrayList<>();
         for (IndexRecord indexRecord : indexRecords) {
-            if (indexRecord.table.equalsIgnoreCase(fullQualifiedTableName)) {
+            if (indexRecord.qualifiedTable.equalsIgnoreCase(fullQualifiedTableName)) {
                 List<String> columnsInIndex = Arrays.asList(indexRecord.columns);
                 for (String column : referencedColumns) {
                     if (columnsInIndex.contains(column)) {

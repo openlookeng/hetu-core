@@ -59,7 +59,7 @@ public class DropIndexTask
                 throw new SemanticException(MISSING_INDEX, statement, "Index '%s' does not exist", indexName);
             }
 
-            QualifiedObjectName fullObjectName = QualifiedObjectName.valueOf(record.table);
+            QualifiedObjectName fullObjectName = QualifiedObjectName.valueOf(record.qualifiedTable);
             Session session = stateMachine.getSession();
             accessControl.checkCanDropIndex(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
 

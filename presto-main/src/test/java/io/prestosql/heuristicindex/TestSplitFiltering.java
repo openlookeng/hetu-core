@@ -21,6 +21,7 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.Split;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -93,7 +94,7 @@ public class TestSplitFiltering
         mockSplits.add(new Split(new CatalogName("bogus_catalog"), mock3, Lifespan.taskWide()));
 
         SplitSource.SplitBatch nextSplits = new SplitSource.SplitBatch(mockSplits, true);
-        HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
+        HeuristicIndexerManager indexerManager = new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
         Pair<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
         List<Split> filteredSplits = SplitFiltering.getFilteredSplit(pair.getFirst(),
                 SplitFiltering.getFullyQualifiedName(stage), pair.getSecond(), nextSplits, indexerManager);

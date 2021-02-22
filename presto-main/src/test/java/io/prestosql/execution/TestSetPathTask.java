@@ -19,6 +19,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.PrestoException;
@@ -115,6 +116,6 @@ public class TestSetPathTask
                 accessControl,
                 stateMachine,
                 emptyList(),
-                new HeuristicIndexerManager(new FileSystemClientManager())));
+                new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
     }
 }

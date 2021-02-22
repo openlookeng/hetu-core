@@ -132,4 +132,16 @@ public interface MetadataTableDao
             + " FOREIGN KEY (column_id) REFERENCES hetu_tab_cols (id)\n"
             + ")")
     void createTableColumnParameters();
+
+    /**
+     * create table of lock
+     */
+    @SqlUpdate("CREATE TABLE IF NOT EXISTS hetu_tab_lock (\n"
+            + "id BIGINT NOT NULL AUTO_INCREMENT,\n"
+            + "resource INT NOT NULL,\n"
+            + "description VARCHAR(128) NOT NULL,\n"
+            + "PRIMARY KEY (id),\n"
+            + "UNIQUE (resource)\n"
+            + ")")
+    void createTableLock();
 }

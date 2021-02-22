@@ -17,7 +17,10 @@ package io.hetu.core.heuristicindex;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastore;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.metastore.HetuMetastore;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -46,8 +49,9 @@ public class TestHeuristicIndexClient
             assertTrue(new File(indexTypeFolder, "testIndex.index").createNewFile());
 
             HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
+            HetuMetastore testMetaStore = new HetuFsMetastore(new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath("/tmp/test"), fs);
 
-            HeuristicIndexClient client = new HeuristicIndexClient(fs, folder.getRoot().toPath());
+            HeuristicIndexClient client = new HeuristicIndexClient(fs, testMetaStore, folder.getRoot().toPath());
 //            client.deleteIndex(tableName, new String[] {"testColumn"}, "bloom");
 //
 //            assertFalse(indexTypeFolder.exists());

@@ -444,4 +444,27 @@ public interface JdbcMetadataDao
      */
     @SqlUpdate("DELETE FROM hetu_tab_cols WHERE table_id = :tableId")
     int dropColumn(@Bind("tableId") long tableId);
+
+    /**
+     * get lock
+     */
+    @SqlUpdate("INSERT INTO hetu_tab_lock (\n"
+            + "  resource, description)\n"
+            + "VALUES (\n"
+            + "  1, 'lock')")
+    void tryLock();
+
+    /**
+     * release lock
+     */
+    @SqlUpdate("DELETE FROM hetu_tab_lock WHERE resource=1")
+    void releaseLock();
+
+    /**
+     * get lock id
+     *
+     * @return lock id
+     */
+    @SqlQuery("SELECT id FROM hetu_tab_lock WHERE resource=1")
+    Long getLockId();
 }

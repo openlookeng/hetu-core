@@ -252,7 +252,7 @@ public class IndexCache
 
     private void evictFromCache(IndexRecord record)
     {
-        String recordInCacheKey = String.format("%s/%s/%s", record.table, String.join(",", record.columns), record.indexType);
+        String recordInCacheKey = String.format("%s/%s/%s", record.qualifiedTable, String.join(",", record.columns), record.indexType);
         for (IndexCacheKey key : cache.asMap().keySet()) {
             if (key.getPath().startsWith(recordInCacheKey)) {
                 cache.invalidate(key);
