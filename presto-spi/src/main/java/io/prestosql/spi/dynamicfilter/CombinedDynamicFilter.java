@@ -16,51 +16,49 @@ package io.prestosql.spi.dynamicfilter;
 
 import io.prestosql.spi.connector.ColumnHandle;
 
-import java.util.Set;
+import static com.google.common.base.Verify.verify;
 
-public class HashSetDynamicFilter
+/**
+ * This is a DynamicFilter to combine multiple filters on same column handle.
+ */
+public class CombinedDynamicFilter
         extends DynamicFilter
 {
-    protected Set valueSet;
+    private DynamicFilter filter1;
+    private DynamicFilter filter2;
 
-    public HashSetDynamicFilter(String filterId, ColumnHandle columnHandle, Set valueSet, Type type)
+    public CombinedDynamicFilter(ColumnHandle columnHandle, DynamicFilter filter1, DynamicFilter filter2)
     {
         super();
-        this.valueSet = valueSet;
+        verify(columnHandle.equals(filter1.columnHandle) && columnHandle.equals(filter2.columnHandle),
+                "Mismatched column handles; Expected: "
+                        + columnHandle + ", f1: " + filter1.columnHandle + ", f2:" + filter2.columnHandle);
         this.columnHandle = columnHandle;
-        this.filterId = filterId;
-        this.type = type;
-    }
-
-    public Set getSetValues()
-    {
-        return valueSet;
+        this.filter1 = filter1;
+        this.filter2 = filter2;
     }
 
     @Override
     public boolean contains(Object value)
     {
-        return valueSet.contains(value);
+        return filter1.contains(value) && filter2.contains(value);
     }
 
     @Override
     public long getSize()
     {
-        return valueSet.size();
+        return filter1.getSize() + filter2.getSize();
     }
 
     @Override
     public DynamicFilter clone()
     {
-        DynamicFilter clone = new HashSetDynamicFilter(filterId, columnHandle, valueSet, type);
-        clone.setMax(max);
-        clone.setMax(min);
-        return clone;
+        return new CombinedDynamicFilter(getColumnHandle(), filter1.clone(), filter2.clone());
     }
 
     @Override
     public boolean isEmpty()
     {
-        return valueSet.size() == 0;
+        return filter1.isEmpty() && filter2.isEmpty();
     }
 }

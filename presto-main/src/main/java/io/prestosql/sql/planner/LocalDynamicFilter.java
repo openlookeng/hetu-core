@@ -77,7 +77,7 @@ public class LocalDynamicFilter
     private final DynamicFilter.Type type;
     // If any partial dynamic filter is discarded due to too large
     private boolean isIncomplete;
-    private SettableFuture<Map<Symbol, Set>> dynamicFilterResultFuture;
+    private SettableFuture<Map<String, Set>> dynamicFilterResultFuture;
     // Number of partitions left to be processed.
     private int partitionsLeft;
     // The resulting predicate for local dynamic filtering.
@@ -235,12 +235,10 @@ public class LocalDynamicFilter
         // See the comment at TupleDomain::columnWiseUnion() for more details.
         if (partitionsLeft == 0) {
             // No more partitions are left to be processed.
-            Map<Symbol, Set> dynamicFilterResult = new HashMap<>();
+            Map<String, Set> dynamicFilterResult = new HashMap<>();
             if (!isIncomplete) {
                 for (Map.Entry<String, Set> entry : result.entrySet()) {
-                    for (Symbol probeSymbol : probeSymbols.get(entry.getKey())) {
-                        dynamicFilterResult.put(probeSymbol, entry.getValue());
-                    }
+                    dynamicFilterResult.put(entry.getKey(), entry.getValue());
                 }
                 addPartialFilterToStateStore();
             }
@@ -309,7 +307,7 @@ public class LocalDynamicFilter
         return buildChannels;
     }
 
-    public ListenableFuture<Map<Symbol, Set>> getDynamicFilterResultFuture()
+    public ListenableFuture<Map<String, Set>> getDynamicFilterResultFuture()
     {
         return dynamicFilterResultFuture;
     }

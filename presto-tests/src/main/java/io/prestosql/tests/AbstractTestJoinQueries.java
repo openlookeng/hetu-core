@@ -203,7 +203,7 @@ public class AbstractTestJoinQueries
                 "SELECT COUNT(*) FROM " +
                 "(SELECT orderkey FROM lineitem WHERE orderkey < 1000) a " +
                 "JOIN " +
-                "(SELECT orderkey FROM orders WHERE orderkey < 2000) b " +
+                "(SELECT orderkey FROM orders) b " +
                 "ON NOT (a.orderkey <= b.orderkey)");
     }
 

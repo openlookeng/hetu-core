@@ -109,6 +109,11 @@ public class ComparisonExpression
         return Objects.hash(operator, left, right);
     }
 
+    public ComparisonExpression flip()
+    {
+        return new ComparisonExpression(operator.flip(), right, left);
+    }
+
     public enum Operator
     {
         EQUAL("="),

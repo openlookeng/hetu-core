@@ -29,6 +29,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.planner.FunctionCallBuilder;
+import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.StringLiteral;
@@ -37,6 +38,7 @@ import io.prestosql.sql.tree.SymbolReference;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -54,10 +56,16 @@ public final class DynamicFilters
 
     public static Expression createDynamicFilterExpression(Metadata metadata, String id, Type inputType, SymbolReference input)
     {
+        return createDynamicFilterExpression(metadata, id, inputType, input, Optional.empty());
+    }
+
+    public static Expression createDynamicFilterExpression(Metadata metadata, String id, Type inputType, SymbolReference input, Optional<Expression> filter)
+    {
         return new FunctionCallBuilder(metadata)
                 .setName(QualifiedName.of(Function.NAME))
                 .addArgument(VarcharType.VARCHAR, new StringLiteral(id))
                 .addArgument(inputType, input)
+                .setFilter(filter)
                 .build();
     }
 
@@ -113,7 +121,40 @@ public final class DynamicFilters
         checkArgument(firstArgument instanceof ConstantExpression, "firstArgument is expected to be an instance of ConstantExpression: %s", firstArgument.getClass().getSimpleName());
         Object firstArgumentValue = ((ConstantExpression) firstArgument).getValue();
         String id = (firstArgumentValue instanceof String) ? (String) (firstArgumentValue) : ((Slice) (firstArgumentValue)).toStringUtf8();
-        return Optional.of(new Descriptor(id, arguments.get(1)));
+        return Optional.of(new Descriptor(id, arguments.get(1))); /* Fixme(Nitin): Resolve the filter expression from the dynamic filter */
+    }
+
+    public static Optional<Predicate<List>> createDynamicFilterPredicate(Optional<Expression> filter)
+    {
+        if (filter.isPresent()) {
+            return Optional.of((values) -> {
+                //TODO-VINAY Need to implement filter evaluation with more generic code using generated code.
+                Object probeValue = values.get(0);
+                Object buildValue = values.get(1);
+                if (filter.get() instanceof ComparisonExpression) {
+                    ComparisonExpression comparisonExpression = (ComparisonExpression) filter.get();
+                    Long probeLiteral = (Long) probeValue;
+                    Long buildLiteral = (Long) buildValue;
+                    if (comparisonExpression.getOperator() == ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL) {
+                        return probeLiteral.compareTo(buildLiteral) >= 0;
+                    }
+                    else if (comparisonExpression.getOperator() == ComparisonExpression.Operator.LESS_THAN_OR_EQUAL) {
+                        return probeLiteral.compareTo(buildLiteral) <= 0;
+                    }
+                    else if (comparisonExpression.getOperator() == ComparisonExpression.Operator.LESS_THAN) {
+                        return probeLiteral.compareTo(buildLiteral) < 0;
+                    }
+                    else if (comparisonExpression.getOperator() == ComparisonExpression.Operator.GREATER_THAN) {
+                        return probeLiteral.compareTo(buildLiteral) > 0;
+                    }
+                }
+                else {
+                    throw new IllegalArgumentException("Unsupported filter type for dynamic filter :" + filter.get());
+                }
+                return true;
+            });
+        }
+        return Optional.empty();
     }
 
     public static class ExtractResult
@@ -142,11 +183,18 @@ public final class DynamicFilters
     {
         private final String id;
         private final RowExpression input;
+        private final Optional<Expression> filter; // TODO(nitin) conflict check
 
         public Descriptor(String id, RowExpression input)
         {
+            this(id, input, Optional.empty());
+        }
+
+        public Descriptor(String id, RowExpression input, Optional<Expression> filter)
+        {
             this.id = requireNonNull(id, "id is null");
             this.input = requireNonNull(input, "input is null");
+            this.filter = requireNonNull(filter, "filter is null");
         }
 
         public String getId()
@@ -157,6 +205,11 @@ public final class DynamicFilters
         public RowExpression getInput()
         {
             return input;
+        }
+
+        public Optional<Expression> getFilter()
+        {
+            return filter;
         }
 
         @Override
@@ -170,13 +223,14 @@ public final class DynamicFilters
             }
             Descriptor that = (Descriptor) o;
             return Objects.equals(id, that.id) &&
-                    Objects.equals(input, that.input);
+                    Objects.equals(input, that.input) &&
+                    Objects.equals(filter, that.filter);
         }
 
         @Override
         public int hashCode()
         {
-            return Objects.hash(id, input);
+            return Objects.hash(id, input, filter);
         }
 
         @Override
@@ -185,6 +239,7 @@ public final class DynamicFilters
             return toStringHelper(this)
                     .add("id", id)
                     .add("input", input)
+                    .add("filter", filter)
                     .toString();
         }
     }
