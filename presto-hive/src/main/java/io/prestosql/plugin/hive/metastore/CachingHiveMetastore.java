@@ -29,6 +29,7 @@ import io.prestosql.plugin.hive.HivePartition;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.RoleGrant;
@@ -94,26 +95,29 @@ public class CachingHiveMetastore
     private final LoadingCache<String, Optional<String>> configValuesCache;
     private final LoadingCache<UserTableKey, Set<HivePrivilegeInfo>> coulumnPrivilegesCache;
     private final LoadingCache<UserTableKey, Set<HivePrivilegeInfo>> schemaPrivilegesCache;
+    private final boolean skipCache;
 
     @Inject
-    public CachingHiveMetastore(@ForCachingHiveMetastore HiveMetastore delegate, @ForCachingHiveMetastore Executor executor, HiveConfig hiveConfig)
+    public CachingHiveMetastore(@ForCachingHiveMetastore HiveMetastore delegate, @ForCachingHiveMetastore Executor executor, HiveConfig hiveConfig, NodeManager nodeManager)
     {
         this(
                 delegate,
                 executor,
                 hiveConfig.getMetastoreCacheTtl(),
                 hiveConfig.getMetastoreRefreshInterval(),
-                hiveConfig.getMetastoreCacheMaximumSize());
+                hiveConfig.getMetastoreCacheMaximumSize(),
+                !(nodeManager.getCurrentNode().isCoordinator() || hiveConfig.getWorkerMetaStoreCacheEnabled()));
     }
 
-    public CachingHiveMetastore(HiveMetastore delegate, Executor executor, Duration cacheTtl, Duration refreshInterval, long maximumSize)
+    public CachingHiveMetastore(HiveMetastore delegate, Executor executor, Duration cacheTtl, Duration refreshInterval, long maximumSize, boolean skipCache)
     {
         this(
                 delegate,
                 executor,
                 OptionalLong.of(cacheTtl.toMillis()),
                 refreshInterval.toMillis() >= cacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(refreshInterval.toMillis()),
-                maximumSize);
+                maximumSize,
+                skipCache);
     }
 
     public static CachingHiveMetastore memoizeMetastore(HiveMetastore delegate, long maximumSize)
@@ -123,13 +127,16 @@ public class CachingHiveMetastore
                 newDirectExecutorService(),
                 OptionalLong.empty(),
                 OptionalLong.empty(),
-                maximumSize);
+                maximumSize,
+                false);
     }
 
-    private CachingHiveMetastore(HiveMetastore delegate, Executor executor, OptionalLong expiresAfterWriteMillis, OptionalLong refreshMills, long maximumSize)
+    private CachingHiveMetastore(HiveMetastore delegate, Executor executor, OptionalLong expiresAfterWriteMillis, OptionalLong refreshMills, long maximumSize, boolean skipCache)
     {
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(executor, "executor is null");
+
+        this.skipCache = skipCache;
 
         databaseNamesCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllDatabases), executor));
@@ -259,6 +266,10 @@ public class CachingHiveMetastore
     @Override
     public Optional<Database> getDatabase(String databaseName)
     {
+        if (skipCache) {
+            return this.delegate.getDatabase(databaseName);
+        }
+
         return get(databaseCache, databaseName);
     }
 
@@ -270,6 +281,10 @@ public class CachingHiveMetastore
     @Override
     public List<String> getAllDatabases()
     {
+        if (skipCache) {
+            return this.delegate.getAllDatabases();
+        }
+
         return get(databaseNamesCache, "");
     }
 
@@ -282,6 +297,10 @@ public class CachingHiveMetastore
     public Optional<Table> getTable(HiveIdentity identity, String databaseName, String tableName)
     {
         identity = updateIdentity(identity);
+        if (skipCache) {
+            return delegate.getTable(identity, databaseName, tableName);
+        }
+
         return get(tableCache, new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
     }
 
@@ -299,6 +318,9 @@ public class CachingHiveMetastore
     @Override
     public PartitionStatistics getTableStatistics(HiveIdentity identity, String databaseName, String tableName)
     {
+        if (skipCache) {
+            return delegate.getTableStatistics(identity, databaseName, tableName);
+        }
         return get(tableStatisticsCache, new WithIdentity<>(updateIdentity(identity), HiveTableName.hiveTableName(databaseName, tableName)));
     }
 
@@ -313,6 +335,13 @@ public class CachingHiveMetastore
         List<WithIdentity<HivePartitionName>> partitions = partitionNames.stream()
                 .map(partitionName -> new WithIdentity<>(updateIdentity(identity), HivePartitionName.hivePartitionName(databaseName, tableName, partitionName)))
                 .collect(toImmutableList());
+
+        if (skipCache) {
+            return loadPartitionColumnStatistics(partitions).entrySet()
+                    .stream()
+                    .collect(toImmutableMap(entry -> entry.getKey().getKey().getPartitionName().get(), Entry::getValue));
+        }
+
         Map<WithIdentity<HivePartitionName>, PartitionStatistics> statistics = getAll(partitionStatisticsCache, partitions);
         return statistics.entrySet()
                 .stream()
@@ -380,6 +409,9 @@ public class CachingHiveMetastore
     @Override
     public Optional<List<String>> getAllTables(String databaseName)
     {
+        if (skipCache) {
+            return delegate.getAllTables(databaseName);
+        }
         return get(tableNamesCache, databaseName);
     }
 
@@ -391,6 +423,9 @@ public class CachingHiveMetastore
     @Override
     public Optional<List<String>> getAllViews(String databaseName)
     {
+        if (skipCache) {
+            return delegate.getAllViews(databaseName);
+        }
         return get(viewNamesCache, databaseName);
     }
 
@@ -576,6 +611,10 @@ public class CachingHiveMetastore
     public Optional<Partition> getPartition(HiveIdentity identity, String databaseName, String tableName, List<String> partitionValues)
     {
         identity = updateIdentity(identity);
+        if (skipCache) {
+            return delegate.getPartition(identity, databaseName, tableName, partitionValues);
+        }
+
         WithIdentity<HivePartitionName> name = new WithIdentity<>(identity, hivePartitionName(databaseName, tableName, partitionValues));
         return get(partitionCache, name);
     }
@@ -584,6 +623,9 @@ public class CachingHiveMetastore
     public Optional<List<String>> getPartitionNames(HiveIdentity identity, String databaseName, String tableName)
     {
         identity = updateIdentity(identity);
+        if (skipCache) {
+            return delegate.getPartitionNames(identity, databaseName, tableName);
+        }
         return get(partitionNamesCache, new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
     }
 
@@ -596,6 +638,10 @@ public class CachingHiveMetastore
     public Optional<List<String>> getPartitionNamesByParts(HiveIdentity identity, String databaseName, String tableName, List<String> parts)
     {
         identity = updateIdentity(identity);
+        if (skipCache) {
+            return delegate.getPartitionNamesByParts(identity, databaseName, tableName, parts);
+        }
+
         return get(partitionFilterCache, new WithIdentity<>(identity, PartitionFilter.partitionFilter(databaseName, tableName, parts)));
     }
 
@@ -611,6 +657,11 @@ public class CachingHiveMetastore
     @Override
     public Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames)
     {
+        if (skipCache) {
+            HiveIdentity identity1 = updateIdentity(identity);
+            return delegate.getPartitionsByNames(identity1, databaseName, tableName, partitionNames);
+        }
+
         Iterable<WithIdentity<HivePartitionName>> names = transform(partitionNames, name -> new WithIdentity<>(updateIdentity(identity), HivePartitionName.hivePartitionName(databaseName, tableName, name)));
 
         Map<WithIdentity<HivePartitionName>, Optional<Partition>> all = getAll(partitionCache, names);
@@ -719,6 +770,9 @@ public class CachingHiveMetastore
     @Override
     public Set<String> listRoles()
     {
+        if (skipCache) {
+            return delegate.listRoles();
+        }
         return get(rolesCache, "");
     }
 
@@ -752,6 +806,9 @@ public class CachingHiveMetastore
     @Override
     public Set<RoleGrant> listRoleGrants(HivePrincipal principal)
     {
+        if (skipCache) {
+            return delegate.listRoleGrants(principal);
+        }
         return get(roleGrantsCache, principal);
     }
 
@@ -802,12 +859,18 @@ public class CachingHiveMetastore
     @Override
     public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, HivePrincipal principal)
     {
+        if (skipCache) {
+            return delegate.listTablePrivileges(databaseName, tableName, principal);
+        }
         return get(tablePrivilegesCache, new UserTableKey(principal, databaseName, tableName));
     }
 
     @Override
     public Optional<String> getConfigValue(String name)
     {
+        if (skipCache) {
+            return delegate.getConfigValue(name);
+        }
         return get(configValuesCache, name);
     }
 
@@ -934,6 +997,10 @@ public class CachingHiveMetastore
     public Set<HivePrivilegeInfo> listSchemaPrivileges(String databaseName, String tableName,
                                                        HivePrincipal principal)
     {
+        if (skipCache) {
+            return delegate.listSchemaPrivileges(databaseName, tableName, principal);
+        }
+
         return get(schemaPrivilegesCache, new UserTableKey(principal, databaseName, tableName));
     }
 
@@ -950,6 +1017,10 @@ public class CachingHiveMetastore
     public Set<HivePrivilegeInfo> listColumnPrivileges(String databaseName, String tableName, String columnName,
                                                        HivePrincipal principal)
     {
+        if (skipCache) {
+            return delegate.listColumnPrivileges(databaseName, tableName, columnName, principal);
+        }
+
         return get(coulumnPrivilegesCache, new UserTableKey(principal, databaseName, tableName, columnName));
     }
 

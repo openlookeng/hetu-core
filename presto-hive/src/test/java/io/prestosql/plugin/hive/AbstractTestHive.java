@@ -716,7 +716,7 @@ public abstract class AbstractTestHive
                 executor,
                 Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
-                10000);
+                10000, false);
 
         setup(databaseName, hiveConfig, metastore);
     }

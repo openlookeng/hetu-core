@@ -215,6 +215,8 @@ public class HiveConfig
 
     private int maxNumbSplitsToGroup = 1;
 
+    private boolean workerMetaStoreCacheEnabled;
+
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
     {
@@ -1777,5 +1779,17 @@ public class HiveConfig
     {
         this.maxNumbSplitsToGroup = maxNumbSplitsToGroup;
         return this;
+    }
+
+    @Config("hive.worker-metastore-cache-enabled")
+    public HiveConfig setWorkerMetaStoreCacheEnabled(boolean isEnabled)
+    {
+        this.workerMetaStoreCacheEnabled = isEnabled;
+        return this;
+    }
+
+    public boolean getWorkerMetaStoreCacheEnabled()
+    {
+        return this.workerMetaStoreCacheEnabled;
     }
 }
