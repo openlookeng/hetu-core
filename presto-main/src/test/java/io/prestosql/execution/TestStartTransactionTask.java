@@ -22,6 +22,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
@@ -85,7 +86,7 @@ public class TestStartTransactionTask
         assertFalse(stateMachine.getSession().getTransactionId().isPresent());
 
         assertPrestoExceptionThrownBy(
-                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()))))
+                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()))))
                 .hasErrorCode(INCOMPATIBLE_CLIENT);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -105,7 +106,7 @@ public class TestStartTransactionTask
         QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
 
         assertPrestoExceptionThrownBy(
-                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()))))
+                () -> getFutureValue((Future<?>) new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()))))
                 .hasErrorCode(NOT_SUPPORTED);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -124,7 +125,7 @@ public class TestStartTransactionTask
         QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
         assertFalse(stateMachine.getSession().getTransactionId().isPresent());
 
-        getFutureValue(new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
+        getFutureValue(new StartTransactionTask().execute(new StartTransaction(ImmutableList.of()), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
@@ -150,7 +151,7 @@ public class TestStartTransactionTask
                 new AllowAllAccessControl(),
                 stateMachine,
                 emptyList(),
-                new HeuristicIndexerManager(new FileSystemClientManager())));
+                new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
@@ -179,7 +180,7 @@ public class TestStartTransactionTask
                         new AllowAllAccessControl(),
                         stateMachine,
                         emptyList(),
-                        new HeuristicIndexerManager(new FileSystemClientManager()))))
+                        new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()))))
                 .hasErrorCode(INVALID_TRANSACTION_MODE);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -206,7 +207,7 @@ public class TestStartTransactionTask
                         new AllowAllAccessControl(),
                         stateMachine,
                         emptyList(),
-                        new HeuristicIndexerManager(new FileSystemClientManager()))))
+                        new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()))))
                 .hasErrorCode(INVALID_TRANSACTION_MODE);
 
         assertTrue(transactionManager.getAllTransactionInfos().isEmpty());
@@ -239,7 +240,7 @@ public class TestStartTransactionTask
                 new AllowAllAccessControl(),
                 stateMachine,
                 emptyList(),
-                new HeuristicIndexerManager(new FileSystemClientManager())));
+                new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
 

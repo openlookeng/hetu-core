@@ -20,6 +20,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.sql.tree.Rollback;
@@ -70,7 +71,7 @@ public class TestRollbackTask
         assertTrue(stateMachine.getSession().getTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
 
-        getFutureValue(new RollbackTask().execute(new Rollback(), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
+        getFutureValue(new RollbackTask().execute(new Rollback(), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
 
@@ -87,7 +88,7 @@ public class TestRollbackTask
         QueryStateMachine stateMachine = createQueryStateMachine("ROLLBACK", session, transactionManager);
 
         assertPrestoExceptionThrownBy(
-                () -> getFutureValue((Future<?>) new RollbackTask().execute(new Rollback(), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()))))
+                () -> getFutureValue((Future<?>) new RollbackTask().execute(new Rollback(), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()))))
                 .hasErrorCode(NOT_IN_TRANSACTION);
 
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId());
@@ -106,7 +107,7 @@ public class TestRollbackTask
                 .build();
         QueryStateMachine stateMachine = createQueryStateMachine("ROLLBACK", session, transactionManager);
 
-        getFutureValue(new RollbackTask().execute(new Rollback(), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager())));
+        getFutureValue(new RollbackTask().execute(new Rollback(), transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
         assertTrue(stateMachine.getQueryInfo(Optional.empty()).isClearTransactionId()); // Still issue clear signal
         assertFalse(stateMachine.getQueryInfo(Optional.empty()).getStartedTransactionId().isPresent());
 

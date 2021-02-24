@@ -32,6 +32,7 @@ import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.operator.LookupJoinOperators;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.index.IndexJoinLookupStats;
@@ -135,7 +136,7 @@ public final class TaskTestUtils
 
         SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
         StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
-        HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager());
+        HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
 
         return new LocalExecutionPlanner(
                 metadata,

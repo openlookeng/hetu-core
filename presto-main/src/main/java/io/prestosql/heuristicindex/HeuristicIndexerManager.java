@@ -18,6 +18,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -26,6 +27,7 @@ import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexWriter;
+import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.testing.NoOpIndexClient;
 import io.prestosql.testing.NoOpIndexWriter;
@@ -42,23 +44,26 @@ import java.util.Properties;
 public class HeuristicIndexerManager
 {
     private final FileSystemClientManager fileSystemClientManager;
+    private final HetuMetaStoreManager hetuMetaStoreManager;
     private static IndexFactory factory;
     private static final Logger LOG = Logger.get(HeuristicIndexerManager.class);
 
     private Path root;
     private HetuFileSystemClient fs;
+    private HetuMetastore metastore;
     private IndexClient indexClient = new NoOpIndexClient();
     private IndexWriter indexWriter = new NoOpIndexWriter();
 
-    public static HeuristicIndexerManager getNoOpHeuristicIndexerManager()
-    {
-        return new HeuristicIndexerManager(new FileSystemClientManager());
-    }
-
     @Inject
-    public HeuristicIndexerManager(FileSystemClientManager fileSystemClientManager)
+    public HeuristicIndexerManager(FileSystemClientManager fileSystemClientManager, HetuMetaStoreManager hetuMetaStoreManager)
     {
         this.fileSystemClientManager = fileSystemClientManager;
+        this.hetuMetaStoreManager = hetuMetaStoreManager;
+    }
+
+    public static HeuristicIndexerManager getNoOpHeuristicIndexerManager()
+    {
+        return new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
     }
 
     public void loadIndexFactories(IndexFactory indexFactory)
@@ -112,8 +117,13 @@ public class HeuristicIndexerManager
                 String fileLastModifiedTimeSample = Files.getLastModifiedTime(Paths.get(System.getProperty("user.dir"))).toString();
                 checkFilesystemTimePrecision(fileLastModifiedTimeSample);
             }
+            metastore = hetuMetaStoreManager.getHetuMetastore();
+            if (metastore == null) {
+                throw new IllegalStateException("Hetu metastore is not properly configured. Heuristic indexer needs it to manage index metadata. " +
+                        "Please check documentation for how to set it up.");
+            }
             if (factory != null) {
-                indexClient = factory.getIndexClient(fs, root);
+                indexClient = factory.getIndexClient(fs, metastore, root);
             }
         }
     }

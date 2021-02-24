@@ -15,11 +15,19 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.testing.mysql.TestingMySqlServer;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastore;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreConfig;
+import io.hetu.core.metastore.jdbc.JdbcHetuMetastore;
+import io.hetu.core.metastore.jdbc.JdbcMetastoreConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.metastore.HetuMetastore;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -28,104 +36,91 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
 
 public class TestIndexRecordManager
 {
     private static final HetuFileSystemClient FILE_SYSTEM_CLIENT = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(System.getProperty("java.io.tmpdir")));
+    private HetuMetastore testMetastore1;
+    private HetuMetastore testMetastore2;
+    private TestingMySqlServer mysqlServer;
 
-    @Test
-    public void testIndexRecordExpire()
-            throws IOException
+    @BeforeClass
+    public void setup()
+            throws Exception
+    {
+        mysqlServer = new TestingMySqlServer("test", "mysql", "metastore1", "metastore2");
+        testMetastore1 = new JdbcHetuMetastore(new JdbcMetastoreConfig()
+                .setDbUrl(mysqlServer.getJdbcUrl("metastore1"))
+                .setDbUser(mysqlServer.getUser())
+                .setDbPassword(mysqlServer.getPassword()));
+        testMetastore2 = new JdbcHetuMetastore(new JdbcMetastoreConfig()
+                .setDbUrl(mysqlServer.getJdbcUrl("metastore2"))
+                .setDbUser(mysqlServer.getUser())
+                .setDbPassword(mysqlServer.getPassword()));
+    }
+
+    @Test(timeOut = 30000)
+    public void testConcurrentMultipleManagers()
+            throws IOException, InterruptedException
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager indexRecordManager1 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-            IndexRecordManager indexRecordManager2 = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
 
-            indexRecordManager1.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
-            List<IndexRecord> original1 = indexRecordManager1.getIndexRecords();
-            List<IndexRecord> original2 = indexRecordManager2.getIndexRecords();
-            assertEquals(original2.size(), 1);
-            assertEquals(original1, original2);
+            Random random = new Random();
+            // 6 entries will be created by different threads in parallel, in which the first four will be deleted also in parallel
+            String[] names = new String[] {"a", "b", "c", "d", "e", "f"};
+            Thread[] threads = new Thread[10];
 
-            List<IndexRecord> beforeadd1 = indexRecordManager1.getIndexRecords();
-            indexRecordManager2.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList(), Arrays.asList("cp=1"));
-            List<IndexRecord> added2 = indexRecordManager2.getIndexRecords();
-            assertEquals(added2.size(), 2);
+            for (int i = 0; i < 6; i++) {
+                int finalI = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        new IndexRecordManager(testMetastore1)
+                                .addIndexRecord(names[finalI], "testUser", "c.s.t", new String[] {"testColumn"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                threads[i].start();
+            }
 
-            indexRecordManager2.deleteIndexRecord("2", Collections.emptyList());
-            List<IndexRecord> deleted1 = indexRecordManager1.getIndexRecords();
-            List<IndexRecord> deleted2 = indexRecordManager2.getIndexRecords();
-            assertEquals(deleted2.size(), 1);
-            assertEquals(deleted1, deleted2);
+            for (int i = 6; i < 10; i++) {
+                int finalI = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore1);
+                        while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
+                            Thread.sleep(random.nextInt(100));
+                        }
+                        indexRecordManager.deleteIndexRecord(names[finalI - 6], Collections.emptyList());
+                    }
+                    catch (IOException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                threads[i].start();
+            }
 
-            assertSame(original1, beforeadd1);
-            assertNotSame(original1, deleted1);
+            for (Thread thread : threads) {
+                thread.join();
+            }
+
+            IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore1);
+            assertEquals(indexRecordManager.getIndexRecords().size(), 2);
+            assertNull(indexRecordManager.lookUpIndexRecord(names[0]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[1]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[2]));
+            assertNull(indexRecordManager.lookUpIndexRecord(names[3]));
+            assertNotNull(indexRecordManager.lookUpIndexRecord(names[4]));
+            assertNotNull(indexRecordManager.lookUpIndexRecord(names[5]));
         }
     }
-
-//    @Test(timeOut = 30000)
-//    public void testConcurrentMultipleManagers()
-//            throws IOException, InterruptedException
-//    {
-//        try (TempFolder folder = new TempFolder()) {
-//            folder.create();
-//
-//            // 6 entries will be created by different threads in parallel, in which the first four will be deleted also in parallel
-//            String[] names = new String[] {"a", "b", "c", "d", "e", "f"};
-//            Thread[] threads = new Thread[10];
-//
-//            for (int i = 0; i < 6; i++) {
-//                int finalI = i;
-//                threads[i] = new Thread(() -> {
-//                    try {
-//                        new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath())
-//                                .addIndexRecord(names[finalI], "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
-//                    }
-//                    catch (IOException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                });
-//                threads[i].start();
-//            }
-//
-//            for (int i = 6; i < 10; i++) {
-//                int finalI = i;
-//                threads[i] = new Thread(() -> {
-//                    try {
-//                        IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-//                        while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
-//                            Thread.sleep(50L);
-//                        }
-//                        indexRecordManager.deleteIndexRecord(names[finalI - 6], Collections.emptyList());
-//                    }
-//                    catch (IOException | InterruptedException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                });
-//                threads[i].start();
-//            }
-//
-//            for (Thread thread : threads) {
-//                thread.join();
-//            }
-//
-//            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-//            assertEquals(indexRecordManager.getIndexRecords().size(), 2);
-//            assertNull(indexRecordManager.lookUpIndexRecord(names[0]));
-//            assertNull(indexRecordManager.lookUpIndexRecord(names[1]));
-//            assertNull(indexRecordManager.lookUpIndexRecord(names[2]));
-//            assertNull(indexRecordManager.lookUpIndexRecord(names[3]));
-//            assertNotNull(indexRecordManager.lookUpIndexRecord(names[4]));
-//            assertNotNull(indexRecordManager.lookUpIndexRecord(names[5]));
-//        }
-//    }
 
     @Test(timeOut = 20000)
     public void testConcurrentSingleManager()
@@ -134,7 +129,8 @@ public class TestIndexRecordManager
         try (TempFolder folder = new TempFolder()) {
             folder.create();
 
-            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            Random random = new Random();
+            IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore2);
 
             // 6 entries will be created by different threads in parallel, in which the first four will be deleted also in parallel
             String[] names = new String[] {"a", "b", "c", "d", "e", "f"};
@@ -144,7 +140,7 @@ public class TestIndexRecordManager
                 int finalI = i;
                 threads[i] = new Thread(() -> {
                     try {
-                        indexRecordManager.addIndexRecord(names[finalI], "u", "t", new String[] {"c"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
+                        indexRecordManager.addIndexRecord(names[finalI], "u", "c.s.t", new String[] {"c"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
                     }
                     catch (IOException e) {
                         throw new RuntimeException(e);
@@ -158,7 +154,7 @@ public class TestIndexRecordManager
                 threads[i] = new Thread(() -> {
                     try {
                         while (indexRecordManager.lookUpIndexRecord(names[finalI - 6]) == null) {
-                            Thread.sleep(50L);
+                            Thread.sleep(random.nextInt(100));
                         }
                         indexRecordManager.deleteIndexRecord(names[finalI - 6], Collections.emptyList());
                     }
@@ -189,9 +185,13 @@ public class TestIndexRecordManager
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
-            indexRecordManager.addIndexRecord("1", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
-            indexRecordManager.addIndexRecord("2", "testUser", "testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
+            HetuMetastore testMetaStore = new HetuFsMetastore(
+                    new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath(folder.getRoot().getPath()),
+                    FILE_SYSTEM_CLIENT);
+
+            IndexRecordManager indexRecordManager = new IndexRecordManager(testMetaStore);
+            indexRecordManager.addIndexRecord("1", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
+            indexRecordManager.addIndexRecord("2", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList(), Arrays.asList("cp=1"));
             assertNotNull(indexRecordManager.lookUpIndexRecord("1"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 2);
 
@@ -218,10 +218,20 @@ public class TestIndexRecordManager
     public void testAddAndLookUp()
             throws IOException
     {
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "MINMAX", Collections.emptyList(), Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn", "testColumn2"}, "MINMAX", Collections.emptyList(), Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "MINMAX", Collections.emptyList(), ImmutableList.of("12"));
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testTable", new String[] {"testColumn"}, "MINMAX", Collections.emptyList(), ImmutableList.of("12", "123"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {
+                "testColumn"}, "A", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn",
+                "testColumn2"}, "B", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {
+                "testColumn"}, "C", Collections.emptyList(), ImmutableList.of("12"));
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {
+                "testColumn"}, "D", Collections.emptyList(), ImmutableList.of("12", "123"));
+    }
+
+    @AfterClass
+    public void cleanUp()
+    {
+        mysqlServer.close();
     }
 
     private void testIndexRecordAddLookUpHelper(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
@@ -229,7 +239,11 @@ public class TestIndexRecordManager
     {
         try (TempFolder folder = new TempFolder()) {
             folder.create();
-            IndexRecordManager indexRecordManager = new IndexRecordManager(FILE_SYSTEM_CLIENT, folder.getRoot().toPath());
+            HetuMetastore testMetaStore = new HetuFsMetastore(
+                    new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath(folder.getRoot().getPath()),
+                    FILE_SYSTEM_CLIENT);
+
+            IndexRecordManager indexRecordManager = new IndexRecordManager(testMetaStore);
             IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
             indexRecordManager.addIndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
 

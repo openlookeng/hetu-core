@@ -78,6 +78,8 @@ public class TestHetuFsMetastore
     private final String typeInt = "bigint";
     private final String typeVarchar = "array(varchar(32))";
 
+    private boolean testResult = true;
+
     /**
      * setUp
      *
@@ -179,6 +181,44 @@ public class TestHetuFsMetastore
 
         metastore.dropCatalog(vdm.getName());
         metastore.dropCatalog(vdm1.getName());
+    }
+
+    /**
+     * test create catalog parallel
+     */
+    @Test
+    public void testCreateCatalogParallel()
+            throws InterruptedException
+    {
+        Map<String, String> properties = ImmutableMap.<String, String>builder().build();
+        CatalogEntity catalog = CatalogEntity.builder()
+                .setCatalogName("catalog100")
+                .setOwner("root1")
+                .setComment(Optional.of("create catalog parallel"))
+                .setParameters(properties)
+                .setCreateTime(System.currentTimeMillis())
+                .build();
+
+        testResult = true;
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.createCatalogIfNotExist(catalog);
+                }
+                catch (PrestoException e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertTrue(testResult);
+        metastore.dropCatalog(catalog.getName());
     }
 
     /**
@@ -371,6 +411,53 @@ public class TestHetuFsMetastore
     }
 
     /**
+     * test alter catalog parallel
+     */
+    @Test
+    public void testAlterCatalogParallel()
+            throws InterruptedException
+    {
+        Map<String, String> properties = ImmutableMap.<String, String>builder().build();
+        CatalogEntity catalog = CatalogEntity.builder()
+                .setCatalogName("catalog200")
+                .setOwner("root1")
+                .setComment(Optional.of("create catalog"))
+                .setParameters(properties)
+                .setCreateTime(System.currentTimeMillis())
+                .build();
+        metastore.createCatalog(catalog);
+
+        CatalogEntity newCatalog = CatalogEntity.builder()
+                .setCatalogName("catalog200")
+                .setOwner("root9")
+                .setComment(Optional.of("alter catalog parallel"))
+                .setParameters(properties)
+                .setCreateTime(System.currentTimeMillis())
+                .build();
+
+        testResult = true;
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.alterCatalog(catalog.getName(), newCatalog);
+                }
+                catch (PrestoException e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertTrue(testResult);
+        metastore.dropCatalog(catalog.getName());
+    }
+
+    /**
      * test create database
      */
     @Test
@@ -408,6 +495,48 @@ public class TestHetuFsMetastore
         catch (PrestoException e) {
             assertEquals(e.getErrorCode(), NOT_FOUND.toErrorCode());
         }
+    }
+
+    /**
+     * test create database parallel
+     */
+    @Test
+    public void testCreateDatabaseParallel()
+            throws InterruptedException
+    {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("desc", "vschema")
+                .build();
+
+        DatabaseEntity database = DatabaseEntity.builder()
+                .setCatalogName(defaultCatalog.getName())
+                .setDatabaseName("database100")
+                .setOwner("root9")
+                .setComment(Optional.of("Hetu create database."))
+                .setCreateTime(System.currentTimeMillis())
+                .setParameters(properties)
+                .build();
+
+        testResult = true;
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.createDatabaseIfNotExist(database);
+                }
+                catch (PrestoException e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertTrue(testResult);
+        metastore.dropDatabase(database.getCatalogName(), database.getName());
     }
 
     /**
@@ -618,6 +747,58 @@ public class TestHetuFsMetastore
     }
 
     /**
+     * test alter database parallel
+     */
+    @Test
+    public void testAlterDatabaseParallel()
+            throws InterruptedException
+    {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("desc", "vschema")
+                .build();
+
+        DatabaseEntity database = DatabaseEntity.builder()
+                .setCatalogName(defaultCatalog.getName())
+                .setDatabaseName("database200")
+                .setOwner("root9")
+                .setComment(Optional.of("Hetu create database."))
+                .setCreateTime(System.currentTimeMillis())
+                .setParameters(properties)
+                .build();
+        metastore.createDatabase(database);
+
+        DatabaseEntity newDatabase = DatabaseEntity.builder()
+                .setCatalogName(defaultCatalog.getName())
+                .setDatabaseName("database200")
+                .setOwner("root10")
+                .setComment(Optional.of("alter database parallel"))
+                .setCreateTime(System.currentTimeMillis())
+                .setParameters(properties)
+                .build();
+
+        testResult = true;
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.alterDatabase(database.getCatalogName(), database.getName(), newDatabase);
+                }
+                catch (PrestoException e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertTrue(testResult);
+        metastore.dropDatabase(database.getCatalogName(), database.getName());
+    }
+
+    /**
      * test get table
      */
     @Test
@@ -781,6 +962,44 @@ public class TestHetuFsMetastore
     }
 
     /**
+     * test create table parallel
+     */
+    @Test
+    public void testCreateTableParallel()
+            throws InterruptedException
+    {
+        String tableName = "table100";
+        SchemaTableName schemaTableName = new SchemaTableName(defaultDatabase.getName(), tableName);
+        TableEntity tableEntity = TableEntity.builder()
+                .setCatalogName(defaultDatabase.getCatalogName())
+                .setDatabaseName(defaultDatabase.getName())
+                .setTableName(schemaTableName.getTableName())
+                .setTableType(TableEntityType.TABLE.toString())
+                .build();
+
+        testResult = true;
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.createTableIfNotExist(tableEntity);
+                }
+                catch (PrestoException e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertTrue(testResult);
+        metastore.dropTable(tableEntity.getCatalogName(), tableEntity.getDatabaseName(), tableName);
+    }
+
+    /**
      * test drop table
      */
     @Test
@@ -862,6 +1081,52 @@ public class TestHetuFsMetastore
                 newTable.getDatabaseName(), newTable.getName());
         assertTrue(newTable1.isPresent());
         assertTableEquals(newTable1.get(), newTable);
+    }
+
+    /**
+     * test alter table parallel
+     */
+    @Test
+    public void testAlterTableParallel()
+            throws InterruptedException
+    {
+        String tableName = "table200";
+        TableEntity tableEntity1 = TableEntity.builder()
+                .setCatalogName(defaultDatabase.getCatalogName())
+                .setDatabaseName(defaultDatabase.getName())
+                .setTableName(tableName)
+                .setTableType(TableEntityType.TABLE.toString())
+                .build();
+        metastore.createTable(tableEntity1);
+
+        TableEntity tableEntity2 = TableEntity.builder()
+                .setCatalogName(defaultDatabase.getCatalogName())
+                .setDatabaseName(defaultDatabase.getName())
+                .setTableName(tableName)
+                .setTableType(TableEntityType.TABLE.toString())
+                .setComment("alter table parallel")
+                .build();
+
+        testResult = true;
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.alterTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName, tableEntity2);
+                }
+                catch (PrestoException e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertTrue(testResult);
+        metastore.dropTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName);
     }
 
     /**

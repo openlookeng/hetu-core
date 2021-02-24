@@ -169,6 +169,20 @@ public class HetuFsMetastore
     }
 
     @Override
+    public void createCatalogIfNotExist(CatalogEntity catalog)
+    {
+        try {
+            createCatalog(catalog);
+        }
+        catch (PrestoException e) {
+            Optional<CatalogEntity> existedCatalog = getCatalog(catalog.getName());
+            if (!(existedCatalog.isPresent() && existedCatalog.get().equals(catalog))) {
+                throw new PrestoException(HETU_METASTORE_CODE, e.getMessage(), e.getCause());
+            }
+        }
+    }
+
+    @Override
     public void alterCatalog(String catalogName, CatalogEntity newCatalog)
     {
         checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
@@ -328,6 +342,20 @@ public class HetuFsMetastore
                 throw new PrestoException(HETU_METASTORE_CODE, e);
             }
         });
+    }
+
+    @Override
+    public void createDatabaseIfNotExist(DatabaseEntity database)
+    {
+        try {
+            createDatabase(database);
+        }
+        catch (PrestoException e) {
+            Optional<DatabaseEntity> existedDatabase = getDatabase(database.getCatalogName(), database.getName());
+            if (!(existedDatabase.isPresent() && existedDatabase.get().equals(database))) {
+                throw new PrestoException(HETU_METASTORE_CODE, e.getMessage(), e.getCause());
+            }
+        }
     }
 
     @Override
@@ -529,6 +557,20 @@ public class HetuFsMetastore
                 throw new PrestoException(HETU_METASTORE_CODE, e);
             }
         });
+    }
+
+    @Override
+    public void createTableIfNotExist(TableEntity table)
+    {
+        try {
+            createTable(table);
+        }
+        catch (PrestoException e) {
+            Optional<TableEntity> existedTable = getTable(table.getCatalogName(), table.getDatabaseName(), table.getName());
+            if (!(existedTable.isPresent() && existedTable.get().equals(table))) {
+                throw new PrestoException(HETU_METASTORE_CODE, e.getMessage(), e.getCause());
+            }
+        }
     }
 
     @Override

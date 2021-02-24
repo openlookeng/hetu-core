@@ -23,6 +23,7 @@ import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.metastore.HetuMetastore;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
@@ -63,28 +64,34 @@ public class HetuMetaStoreManager
         }
     }
 
-    public void loadHetuMetatstore(FileSystemClientManager fileSystemClientManager)
-            throws Exception
+    public void loadHetuMetastore(FileSystemClientManager fileSystemClientManager, Map<String, String> config)
+            throws IOException
+    {
+        // create hetu metastore
+        hetuMetastoreType = config.getOrDefault(HETU_METASTORE_TYPE_PROPERTY_NAME, HETU_METASTORE_TYPE_DEFAULT_VALUE);
+        config.remove(HETU_METASTORE_TYPE_PROPERTY_NAME);
+        HetuMetaStoreFactory hetuMetaStoreFactory = hetuMetastoreFactories.get(hetuMetastoreType);
+        checkState(hetuMetaStoreFactory != null, "hetuMetaStoreFactory %s is not registered", hetuMetaStoreFactory);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(HetuMetaStoreFactory.class.getClassLoader())) {
+            HetuFileSystemClient client = null;
+            if (HETU_METASTORE_TYPE_HETU_FILE_SYSTEM.equals(hetuMetastoreType)) {
+                String profileName = config.get(HETU_METASTORE_HETU_FILE_SYSTEM_PROFILE_NAME);
+                client = fileSystemClientManager.getFileSystemClient(profileName, Paths.get("/"));
+            }
+            hetuMetastore = hetuMetaStoreFactory.create(hetuMetastoreType, ImmutableMap.copyOf(config), client);
+        }
+
+        LOG.info("-- Loaded Hetu Metastore %s --", hetuMetastoreType);
+    }
+
+    public void loadHetuMetastore(FileSystemClientManager fileSystemClientManager)
+            throws IOException
     {
         LOG.info("-- Loading Hetu Metastore --");
         if (HETUMETASTORE_CONFIG_FILE.exists()) {
             // load configuration
             Map<String, String> config = new HashMap<>(loadPropertiesFrom(HETUMETASTORE_CONFIG_FILE.getPath()));
-            // create hetu metastore
-            hetuMetastoreType = config.getOrDefault(HETU_METASTORE_TYPE_PROPERTY_NAME, HETU_METASTORE_TYPE_DEFAULT_VALUE);
-            config.remove(HETU_METASTORE_TYPE_PROPERTY_NAME);
-            HetuMetaStoreFactory hetuMetaStoreFactory = hetuMetastoreFactories.get(hetuMetastoreType);
-            checkState(hetuMetaStoreFactory != null, "hetuMetaStoreFactory %s is not registered", hetuMetaStoreFactory);
-            try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(HetuMetaStoreFactory.class.getClassLoader())) {
-                HetuFileSystemClient client = null;
-                if (HETU_METASTORE_TYPE_HETU_FILE_SYSTEM.equals(hetuMetastoreType)) {
-                    String profileName = config.get(HETU_METASTORE_HETU_FILE_SYSTEM_PROFILE_NAME);
-                    client = fileSystemClientManager.getFileSystemClient(profileName, Paths.get("/"));
-                }
-                hetuMetastore = hetuMetaStoreFactory.create(hetuMetastoreType, ImmutableMap.copyOf(config), client);
-            }
-
-            LOG.info("-- Loaded Hetu Metastore %s --", hetuMetastoreType);
+            loadHetuMetastore(fileSystemClientManager, config);
         }
     }
 

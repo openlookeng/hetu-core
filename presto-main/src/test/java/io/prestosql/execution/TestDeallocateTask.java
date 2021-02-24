@@ -19,6 +19,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.security.AllowAllAccessControl;
@@ -91,7 +92,7 @@ public class TestDeallocateTask
                 metadata,
                 WarningCollector.NOOP);
         Deallocate deallocate = new Deallocate(new Identifier(statementName));
-        new DeallocateTask().execute(deallocate, transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager()));
+        new DeallocateTask().execute(deallocate, transactionManager, metadata, new AllowAllAccessControl(), stateMachine, emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()));
         return stateMachine.getDeallocatedPreparedStatements();
     }
 }

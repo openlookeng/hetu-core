@@ -16,24 +16,91 @@
 package io.hetu.core.heuristicindex.util;
 
 import io.airlift.slice.Slice;
+import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.BooleanType;
+import io.prestosql.spi.type.CharType;
+import io.prestosql.spi.type.DecimalType;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.RealType;
+import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+import java.sql.Timestamp;
 import java.util.Comparator;
+import java.util.Locale;
+
+import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
+import static java.lang.Float.intBitsToFloat;
 
 public class TypeUtils
 {
     private TypeUtils() {}
 
-    public static Object extractSingleValue(ConstantExpression constantExpression)
+    private static final String CAST_OPERATOR = "$operator$cast";
+
+    public static Object extractSingleValue(RowExpression rowExpression)
     {
-        Type type = constantExpression.getType();
-        Object value = constantExpression.getValue();
-        if (value instanceof Slice) {
-            return ((Slice) value).toStringUtf8();
+        if (rowExpression instanceof CallExpression) {
+            CallExpression callExpression = (CallExpression) rowExpression;
+            Signature signature = callExpression.getSignature();
+            String name = signature.getName().toLowerCase(Locale.ENGLISH);
+
+            if (name.equals(CAST_OPERATOR)) {
+                return extractSingleValue(callExpression.getArguments().get(0));
+            }
         }
-        return value;
+        else if (rowExpression instanceof ConstantExpression) {
+            ConstantExpression constant = (ConstantExpression) rowExpression;
+            Type type = constant.getType();
+
+            if (type instanceof BigintType || type instanceof TinyintType || type instanceof SmallintType || type instanceof IntegerType) {
+                return constant.getValue();
+            }
+            else if (type instanceof BooleanType) {
+                return constant.getValue();
+            }
+            else if (type instanceof DoubleType) {
+                return constant.getValue();
+            }
+            else if (type instanceof RealType) {
+                Long number = (Long) constant.getValue();
+                return intBitsToFloat(number.intValue());
+            }
+            else if (type instanceof VarcharType || type instanceof CharType) {
+                if (constant.getValue() instanceof Slice) {
+                    return ((Slice) constant.getValue()).toStringUtf8();
+                }
+                return constant.getValue();
+            }
+            else if (type instanceof DecimalType) {
+                DecimalType decimalType = (DecimalType) type;
+                if (decimalType.isShort()) {
+                    checkState(constant.getValue() instanceof Long);
+                    return new BigDecimal(BigInteger.valueOf((Long) constant.getValue()), decimalType.getScale(), new MathContext(decimalType.getPrecision()));
+                }
+                checkState(constant.getValue() instanceof Slice);
+                Slice value = (Slice) constant.getValue();
+                return new BigDecimal(decodeUnscaledValue(value), decimalType.getScale(), new MathContext(decimalType.getPrecision()));
+            }
+            else if (type instanceof TimestampType) {
+                Long time = (Long) constant.getValue();
+                return new Timestamp(time);
+            }
+        }
+
+        throw new UnsupportedOperationException("Not Implemented Exception: " + rowExpression.toString());
     }
 
     public static Object getNativeValue(Object object)

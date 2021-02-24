@@ -36,6 +36,13 @@ public interface HetuMetastore
     void createCatalog(CatalogEntity catalog);
 
     /**
+     * create catalog if not exist
+     *
+     * @param catalog catalog
+     */
+    void createCatalogIfNotExist(CatalogEntity catalog);
+
+    /**
      * alter the catalog entity in hetu metastore,
      * Currently only the owner,type,comment and parameters of the database can be changed.
      *
@@ -72,6 +79,13 @@ public interface HetuMetastore
      * @param database database
      */
     void createDatabase(DatabaseEntity database);
+
+    /**
+     * create database if not exist
+     *
+     * @param database database
+     */
+    void createDatabaseIfNotExist(DatabaseEntity database);
 
     /**
      * alter the database entity in hetu metastore,
@@ -114,6 +128,13 @@ public interface HetuMetastore
      * @param table table
      */
     void createTable(TableEntity table);
+
+    /**
+     * create table if not exist
+     *
+     * @param table table
+     */
+    void createTableIfNotExist(TableEntity table);
 
     /**
      * drop table

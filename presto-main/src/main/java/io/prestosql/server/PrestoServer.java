@@ -137,7 +137,7 @@ public class PrestoServer
             injector.getInstance(PluginManager.class).loadPlugins();
             FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
             fileSystemClientManager.loadFactoryConfigs();
-            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetatstore(fileSystemClientManager);
+            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager);
             injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogStore.class).loadCatalogStores(fileSystemClientManager);

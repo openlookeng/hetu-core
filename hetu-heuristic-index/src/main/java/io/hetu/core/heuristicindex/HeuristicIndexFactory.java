@@ -31,6 +31,7 @@ import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexWriter;
+import io.prestosql.spi.metastore.HetuMetastore;
 
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
@@ -78,13 +79,13 @@ public class HeuristicIndexFactory
     }
 
     @Override
-    public IndexClient getIndexClient(HetuFileSystemClient fs, Path root)
+    public IndexClient getIndexClient(HetuFileSystemClient fs, HetuMetastore metastore, Path root)
     {
         requireNonNull(root, "No root path specified");
 
         LOG.debug("Creating IndexClient with given filesystem client with root path %s", root);
 
-        return new HeuristicIndexClient(fs, root);
+        return new HeuristicIndexClient(fs, metastore, root);
     }
 
     @Override

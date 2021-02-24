@@ -702,7 +702,7 @@ public class DataCenterConfig
      * @return DataCenterConfig object
      */
     @Config("dc.query.pushdown.module")
-    @ConfigDescription("query push down module [FULL_PUSDOWN/BASE_PUSHDOWN]")
+    @ConfigDescription("query push down module [FULL_PUSHDOWN/BASE_PUSHDOWN]")
     public DataCenterConfig setQueryPushDownModule(JdbcPushDownModule queryPushDownModule)
     {
         this.queryPushDownModule = queryPushDownModule;
