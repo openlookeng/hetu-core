@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -72,11 +73,14 @@ public class InMemoryQueryStore
     }
 
     @Override
-    public List<SavedQuery> getSavedQueries(String user)
+    public List<SavedQuery> getSavedQueries(Optional<String> user)
     {
-        return featuredQueries.stream()
-                .filter(q -> q.getUser().equals(user))
-                .collect(Collectors.toList());
+        if (user.isPresent()) {
+            return featuredQueries.stream()
+                    .filter(q -> q.getUser().equals(user.get()))
+                    .collect(Collectors.toList());
+        }
+        return featuredQueries.stream().collect(Collectors.toList());
     }
 
     @Override

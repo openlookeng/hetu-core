@@ -16,56 +16,60 @@ package io.prestosql.queryeditorui.resources;
 import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
 import io.prestosql.queryeditorui.store.files.ExpiringFileStore;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.ServerConfig;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.util.Optional;
 
 @Path("/api/files")
 public class FilesResource
 {
     private final ExpiringFileStore fileStore;
+    private final AccessControl accessControl;
+    private final ServerConfig serverConfig;
 
     @Inject
-    public FilesResource(ExpiringFileStore fileStore)
+    public FilesResource(ExpiringFileStore fileStore, AccessControl accessControl, ServerConfig serverConfig)
     {
         this.fileStore = fileStore;
+        this.accessControl = accessControl;
+        this.serverConfig = serverConfig;
     }
 
     @GET
     @Path("/{fileName}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response getFile(@PathParam("fileName") String fileName)
+    public Response getFile(@PathParam("fileName") String fileName,
+                            @Context HttpServletRequest servletRequest)
     {
-        final File file = fileStore.get(fileName);
+        // if the user is admin, don't filter results by user.
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
 
+        final File file = fileStore.get(fileName, filterUser);
         if (file == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         else {
-            return Response.ok(new StreamingOutput()
+            return Response.ok((StreamingOutput) output ->
             {
-                @Override
-                public void write(OutputStream output)
-                        throws IOException, WebApplicationException
-                {
-                    // TODO: Make this use chunked encoding?
-                    try (FileInputStream inputStream = new FileInputStream(file)) {
-                        ByteStreams.copy(inputStream, output);
-                    }
-                    finally {
-                        output.close();
-                    }
+                try (FileInputStream inputStream = new FileInputStream(file)) {
+                    ByteStreams.copy(inputStream, output);
+                }
+                finally {
+                    output.close();
                 }
             }).build();
         }

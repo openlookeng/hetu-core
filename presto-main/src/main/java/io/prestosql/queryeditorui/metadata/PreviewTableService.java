@@ -21,12 +21,10 @@ import io.prestosql.client.StatementClient;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
 import org.joda.time.Duration;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -49,14 +47,13 @@ public class PreviewTableService
     }
 
     public List<List<Object>> getPreview(String catalogName, String schemaName,
-            String tableName, HttpServletRequest servletRequest) throws ExecutionException
+            String tableName, String user) throws ExecutionException
     {
-        return queryRows(FQN_JOINER.join(catalogName, schemaName, tableName), servletRequest);
+        return queryRows(FQN_JOINER.join(catalogName, schemaName, tableName), user);
     }
 
-    private List<List<Object>> queryRows(String fqnTableName, HttpServletRequest servletRequest)
+    private List<List<Object>> queryRows(String fqnTableName, String user)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
         String statement = format("SELECT * FROM %s LIMIT %d", fqnTableName, PREVIEW_LIMIT);
         QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, user);
         QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), statement);

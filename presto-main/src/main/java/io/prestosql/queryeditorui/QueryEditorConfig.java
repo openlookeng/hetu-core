@@ -28,6 +28,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 public class QueryEditorConfig
 {
     private boolean isRunningEmbeded = true;
+    private boolean allowInsecureOverHttp;
     private String coordinatorUri;
     private String featuredQueriesPath = "etc/featured_queries.json";
     private String userQueriesPath = "etc/user_queries.json";
@@ -36,6 +37,17 @@ public class QueryEditorConfig
     private Optional<String> sharedSecret = Optional.empty();
     private Duration sessionTimeout = new Duration(1, DAYS);
     private Duration executionTimeout = new Duration(15, MINUTES);
+
+    public boolean isAllowInsecureOverHttp()
+    {
+        return allowInsecureOverHttp;
+    }
+
+    @Config("hetu.queryeditor-ui.allow-insecure-over-http")
+    public void setAllowInsecureOverHttp(boolean allowInsecureOverHttp)
+    {
+        this.allowInsecureOverHttp = allowInsecureOverHttp;
+    }
 
     public int getMaxResultCount()
     {

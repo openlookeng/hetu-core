@@ -21,6 +21,9 @@ import io.prestosql.queryeditorui.metadata.PreviewTableService;
 import io.prestosql.queryeditorui.metadata.SchemaService;
 import io.prestosql.queryeditorui.protocol.CatalogSchema;
 import io.prestosql.queryeditorui.protocol.Table;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.HttpRequestSessionContext;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -39,16 +42,19 @@ public class MetadataResource
 {
     private final SchemaService schemaService;
     private final ColumnService columnService;
+    private final AccessControl accessControl;
     private final PreviewTableService previewTableService;
 
     @Inject
     public MetadataResource(
             final SchemaService schemaService,
             final ColumnService columnService,
+            final AccessControl accessControl,
             final PreviewTableService previewTableService)
     {
         this.schemaService = schemaService;
         this.columnService = columnService;
+        this.accessControl = accessControl;
         this.previewTableService = previewTableService;
     }
 
@@ -60,7 +66,8 @@ public class MetadataResource
             @PathParam("schema") String schemaName,
             @Context HttpServletRequest servletRequest)
     {
-        ImmutableList<Table> result = schemaService.queryTables(catalogName, schemaName, servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        ImmutableList<Table> result = schemaService.queryTables(catalogName, schemaName, user);
         return Response.ok(result).build();
     }
 
@@ -74,7 +81,8 @@ public class MetadataResource
             @Context HttpServletRequest servletRequest)
             throws ExecutionException
     {
-        List<Column> columnList = columnService.getColumns(catalogName, schemaName, tableName, servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        List<Column> columnList = columnService.getColumns(catalogName, schemaName, tableName, user);
         return Response.ok(columnList).build();
     }
 
@@ -88,7 +96,8 @@ public class MetadataResource
             @Context HttpServletRequest servletRequest)
             throws ExecutionException
     {
-        List<List<Object>> preview = previewTableService.getPreview(catalogName, schemaName, tableName, servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        List<List<Object>> preview = previewTableService.getPreview(catalogName, schemaName, tableName, user);
         return Response.ok(preview).build();
     }
 
@@ -99,7 +108,8 @@ public class MetadataResource
             @Context HttpServletRequest servletRequest)
             throws ExecutionException
     {
-        ImmutableList<CatalogSchema> result = schemaService.querySchemas(servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        ImmutableList<CatalogSchema> result = schemaService.querySchemas(user);
         return Response.ok(result).build();
     }
 
@@ -111,7 +121,8 @@ public class MetadataResource
             @Context HttpServletRequest servletRequest)
             throws ExecutionException
     {
-        CatalogSchema catalogSchema = schemaService.querySchemas(catalogName, servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        CatalogSchema catalogSchema = schemaService.querySchemas(catalogName, user);
         return Response.ok(catalogSchema).build();
     }
 }

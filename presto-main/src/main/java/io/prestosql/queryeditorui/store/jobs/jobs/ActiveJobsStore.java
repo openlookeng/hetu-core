@@ -15,6 +15,7 @@ package io.prestosql.queryeditorui.store.jobs.jobs;
 
 import io.prestosql.queryeditorui.protocol.Job;
 
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -28,7 +29,7 @@ public interface ActiveJobsStore
      * @param user The user to retrieve jobs for.
      * @return All currently running jobs for this user.
      */
-    Set<Job> getJobsForUser(String user);
+    Set<Job> getJobsForUser(Optional<String> user);
 
     /**
      * Mark a job as having started.

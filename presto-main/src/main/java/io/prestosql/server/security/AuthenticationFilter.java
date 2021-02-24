@@ -15,6 +15,7 @@ package io.prestosql.server.security;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.queryeditorui.QueryEditorConfig;
 import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.server.InternalAuthenticationManager;
 import io.prestosql.server.security.Authenticator.AuthenticatedPrincipal;
@@ -53,13 +54,18 @@ public class AuthenticationFilter
     private final List<Authenticator> authenticators;
     private final InternalAuthenticationManager internalAuthenticationManager;
     private final WebUIAuthenticator uiAuthenticator;
+    private final QueryEditorConfig config;
 
     @Inject
-    public AuthenticationFilter(List<Authenticator> authenticators, InternalAuthenticationManager internalAuthenticationManager, WebUIAuthenticator uiAuthenticator)
+    public AuthenticationFilter(List<Authenticator> authenticators,
+                InternalAuthenticationManager internalAuthenticationManager,
+                WebUIAuthenticator uiAuthenticator,
+                QueryEditorConfig config)
     {
         this.authenticators = ImmutableList.copyOf(authenticators);
         this.internalAuthenticationManager = requireNonNull(internalAuthenticationManager, "internalAuthenticationManager is null");
         this.uiAuthenticator = uiAuthenticator;
+        this.config = config;
     }
 
     @Override
@@ -85,13 +91,13 @@ public class AuthenticationFilter
             return;
         }
 
-        // skip authentication if non-secure or not configured
-        if (!request.isSecure() || authenticators.isEmpty()) {
-            nextFilter.doFilter(request, response);
-            return;
-        }
-
         if (isWebUi(request)) {
+            // asset files, vendor files and disable page are always visible
+            if (isSkipAuth(request)) {
+                nextFilter.doFilter(request, response);
+                return;
+            }
+
             Optional<String> authenticatedUser = uiAuthenticator.getAuthenticatedUsername(request);
             if (authenticatedUser.isPresent()) {
                 // if the authenticated user is requesting the login page, send them directly to the ui
@@ -105,18 +111,31 @@ public class AuthenticationFilter
                 return;
             }
 
+            AccessType accessType = getAccessType(request, authenticators, config);
+            if (accessType.equals(AccessType.DISABLE)) {
+                // redirect to disable page
+                response.sendRedirect(UiAuthenticator.DISABLED_LOCATION);
+                return;
+            }
+
             // skip authentication for login/logout page
-            if (isSkipAuth(request)) {
+            if (isLoginLogout(request)) {
                 nextFilter.doFilter(request, response);
                 return;
             }
 
-            if (needRedirect(request, authenticators)) {
+            if (accessType.equals(AccessType.REDIRECT)) {
                 // redirect to login page
                 URI redirectUri = UiAuthenticator.buildLoginFormURI(URI.create(request.getRequestURI()));
                 response.sendRedirect(redirectUri.toString());
                 return;
             }
+        }
+
+        // skip authentication if non-secure or not configured
+        if (!request.isSecure() || authenticators.isEmpty()) {
+            nextFilter.doFilter(request, response);
+            return;
         }
 
         // try to authenticate, collecting errors and authentication headers
@@ -155,30 +174,46 @@ public class AuthenticationFilter
         response.sendError(SC_UNAUTHORIZED, Joiner.on(" | ").join(messages));
     }
 
-    public static boolean needRedirect(HttpServletRequest request, final List<Authenticator> authenticators)
+    public static AccessType getAccessType(HttpServletRequest request,
+                final List<Authenticator> authenticators,
+                QueryEditorConfig config)
     {
-        boolean pwdAuthentication = false;
-        boolean kerberosAuthentication = false;
+        // secured requests
+        if (request.isSecure()) {
+            boolean pwdAuthentication = false;
+            boolean kerberosAuthentication = false;
 
-        for (Authenticator authenticator : authenticators) {
-            if (authenticator instanceof PasswordAuthenticator) {
-                pwdAuthentication = true;
+            for (Authenticator authenticator : authenticators) {
+                if (authenticator instanceof PasswordAuthenticator) {
+                    pwdAuthentication = true;
+                }
+                else if (authenticator instanceof KerberosAuthenticator) {
+                    kerberosAuthentication = true;
+                }
             }
-            else if (authenticator instanceof KerberosAuthenticator) {
-                kerberosAuthentication = true;
+
+            // Don't enable pwdAuthentication or kerberosAuthentication
+            if (!pwdAuthentication && !kerberosAuthentication) {
+                return AccessType.DISABLE;
             }
-        }
 
-        // Only use PasswordAuthenticator, all pages needs to redirect to login page
-        if (pwdAuthentication && !kerberosAuthentication) {
-            return true;
-        }
+            // request path "/" needs to redirect to login page
+            if (isWebUri(request)) {
+                return AccessType.REDIRECT;
+            }
 
-        // If request path is web uri : "/" and enable kerberos or ldap authenticator, request path "/" needs to redirect to login page
-        if (isWebUri(request) && (pwdAuthentication || kerberosAuthentication)) {
-            return true;
+            // Support kerberos login. When enable kerberosAuthentication, don't need to redirect to login page
+            if (kerberosAuthentication) {
+                return AccessType.DIRECT;
+            }
+
+            return AccessType.REDIRECT;
         }
-        return false;
+        // unsecured requests support username-only authentication
+        if (config.isAllowInsecureOverHttp()) {
+            return AccessType.REDIRECT;
+        }
+        return AccessType.DISABLE;
     }
 
     public static boolean isWebUri(HttpServletRequest request)
@@ -198,14 +233,20 @@ public class AuthenticationFilter
         return isWebUi;
     }
 
-    private boolean isSkipAuth(HttpServletRequest request)
+    private boolean isLoginLogout(HttpServletRequest request)
     {
         String pathInfo = request.getPathInfo();
         return pathInfo.matches("/ui/login.html.*") ||
-                pathInfo.matches("/ui/assets/.*") ||
-                pathInfo.matches("/ui/vendor/.*") ||
                 pathInfo.matches("/ui/api/login.*") && request.getMethod().equals("POST") ||
                 pathInfo.matches("/ui/api/logout.*") && request.getMethod().equals("POST");
+    }
+
+    private boolean isSkipAuth(HttpServletRequest request)
+    {
+        String pathInfo = request.getPathInfo();
+        return pathInfo.matches("/ui/disabled.html.*") ||
+                pathInfo.matches("/ui/assets/.*") ||
+                pathInfo.matches("/ui/vendor/.*");
     }
 
     private static ServletRequest withPrincipal(HttpServletRequest request, Principal principal)
@@ -233,5 +274,10 @@ public class AuthenticationFilter
         try (InputStream inputStream = request.getInputStream()) {
             copy(inputStream, nullOutputStream());
         }
+    }
+
+    private enum AccessType
+    {
+        DISABLE, REDIRECT, DIRECT;
     }
 }

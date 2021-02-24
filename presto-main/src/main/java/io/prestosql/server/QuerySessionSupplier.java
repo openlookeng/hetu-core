@@ -16,6 +16,7 @@ package io.prestosql.server;
 import io.prestosql.Session;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.sql.SqlEnvironmentConfig;
@@ -61,14 +62,7 @@ public class QuerySessionSupplier
     {
         Identity identity = context.getIdentity();
         accessControl.checkCanSetUser(identity.getPrincipal(), identity.getUser());
-
-        // authenticated identity is not present for HTTP or authentication is not setup
-        context.getAuthenticatedIdentity().ifPresent(authenticatedIdentity -> {
-            // only check impersonation is authenticated user is not the same as the explicitly set user
-            if (!authenticatedIdentity.getUser().equals(identity.getUser())) {
-                accessControl.checkCanImpersonateUser(authenticatedIdentity, identity.getUser());
-            }
-        });
+        AccessControlUtil.checkCanImpersonateUser(accessControl, context);
 
         SessionBuilder sessionBuilder = Session.builder(sessionPropertyManager)
                 .setQueryId(queryId)

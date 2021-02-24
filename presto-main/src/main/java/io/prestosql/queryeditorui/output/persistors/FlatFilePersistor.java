@@ -49,7 +49,7 @@ public class FlatFilePersistor
         File file = outputBuilder.build();
 
         try {
-            fileStore.addFile(file.getName(), file);
+            fileStore.addFile(file.getName(), job.getUser(), file);
         }
         catch (IOException e) {
             LOG.error("Caught error adding file to local store", e);

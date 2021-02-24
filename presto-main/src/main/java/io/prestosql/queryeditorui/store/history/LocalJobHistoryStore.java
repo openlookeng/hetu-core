@@ -24,7 +24,9 @@ import io.prestosql.queryeditorui.protocol.Table;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.stream.Collectors;
 
 public class LocalJobHistoryStore
         implements JobHistoryStore
@@ -82,38 +84,20 @@ public class LocalJobHistoryStore
     }
 
     @Override
-    public List<Job> getRecentlyRun(long maxResults)
+    public List<Job> getRecentlyRunForUser(Optional<String> user, long maxResults, Table table1, Table... otherTables)
     {
-        final ImmutableList.Builder<Job> builder = ImmutableList.builder();
-        long added = 0;
-
-        for (Iterator<Job> job = historyCache.descendingIterator(); job.hasNext(); ) {
-            if (added + 1 > maxResults) {
-                break;
-            }
-
-            builder.add(job.next());
-            added += 1;
-        }
-
-        return builder.build();
+        return getRecentlyRunForUser(user, maxResults, Lists.asList(table1, otherTables));
     }
 
     @Override
-    public List<Job> getRecentlyRun(long maxResults, Table table1, Table... otherTables)
-    {
-        return getRecentlyRun(maxResults, Lists.asList(table1, otherTables));
-    }
-
-    @Override
-    public List<Job> getRecentlyRunForUser(String user, long maxResults)
+    public List<Job> getRecentlyRunForUser(Optional<String> user, long maxResults)
     {
         final ImmutableList.Builder<Job> builder = ImmutableList.builder();
         long added = 0;
 
         for (Iterator<Job> job = historyCache.descendingIterator(); job.hasNext(); ) {
             Job nextJob = job.next();
-            if (!nextJob.getUser().equals(user)) {
+            if (user.isPresent() && !nextJob.getUser().equals(user.get())) {
                 continue;
             }
             if (added + 1 > maxResults) {
@@ -128,13 +112,7 @@ public class LocalJobHistoryStore
     }
 
     @Override
-    public List<Job> getRecentlyRunForUser(String user, long maxResults, Iterable<Table> tables)
-    {
-        return null;
-    }
-
-    @Override
-    public List<Job> getRecentlyRun(long maxResults, Iterable<Table> tables)
+    public List<Job> getRecentlyRunForUser(Optional<String> user, long maxResults, Iterable<Table> tables)
     {
         final ImmutableList.Builder<Job> builder = ImmutableList.builder();
         long added = 0;
@@ -142,12 +120,16 @@ public class LocalJobHistoryStore
         for (Map.Entry<Table, EvictingDeque<Job>> entry : tableHistoryCache.getAllPresent(tables).entrySet()) {
             EvictingDeque<Job> deque = entry.getValue();
             if (deque != null) {
-                final int dequeSize = deque.size();
+                List<Job> filteredJob = deque.stream().collect(Collectors.toList());
+                if (user.isPresent()) {
+                    filteredJob = deque.stream().filter(job -> job.getUser().equals(user.get())).collect(Collectors.toList());
+                }
+                final int dequeSize = filteredJob.size();
                 if (added + dequeSize > maxResults) {
                     break;
                 }
                 else {
-                    builder.addAll(deque);
+                    builder.addAll(filteredJob);
                     added += dequeSize;
                 }
             }

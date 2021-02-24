@@ -125,15 +125,14 @@
 </div>
 
 <script>
-    var hidePassword = false; // This value will be replaced
-
     var redirectPath = window.location.search.substring(1);
     if (redirectPath.indexOf('&') !== -1) {
         redirectPath = redirectPath.substring(0, redirectPath.indexOf('&'));
     }
     $("#redirectPath").val(redirectPath);
 
-    if (hidePassword) {
+    if (window.location.protocol !== 'https:') {
+        $(".login-form .radio-Group").hide();
         $("#password")
             .prop('required', false)
             .prop('placeholder', 'Password not allowed')

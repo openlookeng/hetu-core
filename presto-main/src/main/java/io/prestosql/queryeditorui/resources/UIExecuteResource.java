@@ -20,7 +20,9 @@ import io.prestosql.queryeditorui.execution.ExecutionClient;
 import io.prestosql.queryeditorui.protocol.ExecutionRequest;
 import io.prestosql.queryeditorui.protocol.ExecutionStatus.ExecutionError;
 import io.prestosql.queryeditorui.protocol.ExecutionStatus.ExecutionSuccess;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.HttpRequestSessionContext;
 import org.joda.time.Duration;
 
 import javax.servlet.http.HttpServletRequest;
@@ -44,12 +46,14 @@ public class UIExecuteResource
 {
     private ExecutionClient client;
     private QueryEditorConfig config;
+    private final AccessControl accessControl;
 
     @Inject
-    public UIExecuteResource(QueryEditorConfig config, ExecutionClient client)
+    public UIExecuteResource(QueryEditorConfig config, ExecutionClient client, AccessControl accessControl)
     {
         this.config = config;
         this.client = client;
+        this.accessControl = accessControl;
     }
 
     @PUT
@@ -60,7 +64,7 @@ public class UIExecuteResource
                             @Context HttpServletRequest servletRequest,
                             @Context UriInfo uri)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
         if (user != null) {
             final List<UUID> uuids = client.runQuery(
                     request,
@@ -81,7 +85,7 @@ public class UIExecuteResource
     public Response cancelQuery(@PathParam("uuid") UUID uuid,
             @Context HttpServletRequest servletRequest)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
         boolean success = client.cancelQuery(user, uuid);
         if (success) {
             return Response.ok(ImmutableList.of()).build();

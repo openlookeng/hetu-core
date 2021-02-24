@@ -13,23 +13,54 @@
  */
 package io.prestosql.server;
 
+import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 import io.airlift.units.Duration;
 import io.airlift.units.MaxDuration;
 import io.airlift.units.MinDuration;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.validation.constraints.NotNull;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class ServerConfig
 {
+    private static final String DELIMITER = ",";
+
     private boolean coordinator = true;
     private String prestoVersion = getClass().getPackage().getImplementationVersion();
     private boolean includeExceptionInResponse = true;
     private Duration gracePeriod = new Duration(2, MINUTES);
     private boolean enhancedErrorReporting = true;
     // Main coordinator TODO: remove this when main coordinator election is implemented
+
+    private final Set<String> admins = new HashSet<>();
+
+    public boolean isAdmin(String user)
+    {
+        return admins.contains(user);
+    }
+
+    public Set<String> getAdmins()
+    {
+        return ImmutableSet.copyOf(admins);
+    }
+
+    @Config("openlookeng.admins")
+    public ServerConfig setAdmins(String adminsString)
+    {
+        if (StringUtils.isEmpty(adminsString)) {
+            return this;
+        }
+        String[] adminsSplit = adminsString.split(DELIMITER);
+        Arrays.stream(adminsSplit).forEach(admin -> admins.add(admin.trim()));
+        return this;
+    }
 
     public boolean isCoordinator()
     {

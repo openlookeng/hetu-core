@@ -13,12 +13,13 @@
  * limitations under the License.
  */
 import xhrform from "./xhrform";
+import UserStore from "../stores/UserStore";
 
 export default {
     addCatalog(formData) {
         return xhrform('../v1/catalog', {
             headers: {
-                "X-Presto-User": "admin",
+                "X-Presto-User": UserStore.getCurrentUser().name,
                 "Accept": "application/json"
             },
             method: 'post',
