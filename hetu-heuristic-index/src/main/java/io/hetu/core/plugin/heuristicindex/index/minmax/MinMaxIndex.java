@@ -22,7 +22,6 @@ import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -116,8 +115,7 @@ public class MinMaxIndex
             Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
             if (operatorOptional.isPresent()) {
                 OperatorType operator = operatorOptional.get();
-                ConstantExpression constExp = (ConstantExpression) callExp.getArguments().get(1);
-                Comparable value = (Comparable) extractSingleValue(constExp);
+                Comparable value = (Comparable) extractSingleValue(callExp.getArguments().get(1));
                 switch (operator) {
                     case EQUAL:
                         return (value.compareTo(min) > 0 || value.compareTo(min) == 0)

@@ -224,8 +224,7 @@ public class BTreeIndex
 
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
-            ConstantExpression constExp = (ConstantExpression) callExp.getArguments().get(1);
-            Object key = extractSingleValue(constExp);
+            Object key = extractSingleValue(callExp.getArguments().get(1));
             Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
             if (operatorOptional.isPresent()) {
                 OperatorType operator = operatorOptional.get();
