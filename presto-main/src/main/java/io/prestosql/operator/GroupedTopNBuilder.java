@@ -17,6 +17,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.Page;
@@ -24,6 +26,9 @@ import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.ints.IntIterator;
@@ -32,13 +37,17 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -54,7 +63,9 @@ import static java.util.Objects.requireNonNull;
 /**
  * This class finds the top N rows defined by {@param comparator} for each group specified by {@param groupByHash}.
  */
+@RestorableConfig(uncapturedFields = {"sourceTypes", "rankingFunction", "comparator"})
 public class GroupedTopNBuilder
+        implements Restorable
 {
     private static final long INSTANCE_SIZE = ClassLayout.parseClass(GroupedTopNBuilder.class).instanceSize();
     // compact a page when 50% of its positions are unreferenced
@@ -267,6 +278,7 @@ public class GroupedTopNBuilder
      * The actual position in the page is mutable because as pages are compacted, the position will change.
      */
     private static class Row
+            implements Restorable
     {
         private final int pageId;
         private int position;
@@ -292,6 +304,12 @@ public class GroupedTopNBuilder
             return position;
         }
 
+        private static Row restoreRow(Object state)
+        {
+            RowState myState = (RowState) state;
+            return new Row(myState.pageId, myState.position);
+        }
+
         @Override
         public String toString()
         {
@@ -300,9 +318,26 @@ public class GroupedTopNBuilder
                     .add("position", position)
                     .toString();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            RowState myState = new RowState();
+            myState.pageId = pageId;
+            myState.position = position;
+            return myState;
+        }
+
+        private static class RowState
+                implements Serializable
+        {
+            private int pageId;
+            private int position;
+        }
     }
 
     public static class PageReference
+            implements Restorable
     {
         private static final long INSTANCE_SIZE = ClassLayout.parseClass(PageReference.class).instanceSize();
 
@@ -310,6 +345,13 @@ public class GroupedTopNBuilder
         private Row[] reference;
 
         private int usedPositionCount;
+
+        //Only used to restore to a new PageReference
+        private PageReference()
+        {
+            this.page = null;
+            reference = null;
+        }
 
         public PageReference(Page page)
         {
@@ -388,6 +430,46 @@ public class GroupedTopNBuilder
         {
             return page.getRetainedSizeInBytes() + sizeOf(reference) + INSTANCE_SIZE;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            PageReferenceState myState = new PageReferenceState();
+            PagesSerde pagesSerde = (PagesSerde) serdeProvider;
+            SerializedPage serializedPage = pagesSerde.serialize(page);
+            myState.page = serializedPage.capture(serdeProvider);
+            myState.reference = new Object[reference.length];
+            for (int i = 0; i < reference.length; i++) {
+                if (reference[i] != null) {
+                    myState.reference[i] = reference[i].capture(serdeProvider);
+                }
+            }
+            myState.usedPositionCount = usedPositionCount;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            PageReferenceState myState = (PageReferenceState) state;
+            PagesSerde pagesSerde = (PagesSerde) serdeProvider;
+            this.page = pagesSerde.deserialize(SerializedPage.restoreSerializedPage(myState.page));
+            this.reference = new Row[myState.reference.length];
+            for (int i = 0; i < this.reference.length; i++) {
+                if (myState.reference[i] != null) {
+                    this.reference[i] = Row.restoreRow(myState.reference[i]);
+                }
+            }
+            this.usedPositionCount = myState.usedPositionCount;
+        }
+
+        private static class PageReferenceState
+                implements Serializable
+        {
+            private Object page;
+            private Object[] reference;
+            private int usedPositionCount;
+        }
     }
 
     // this class is for precise memory tracking
@@ -402,14 +484,17 @@ public class GroupedTopNBuilder
         }
     }
 
+    @RestorableConfig(uncapturedFields = {"size", "c", "heap"})
     private abstract static class RowHeap
             extends ObjectHeapPriorityQueue<Row>
+            implements Restorable
     {
         static final long ROW_ENTRY_SIZE = ClassLayout.parseClass(Row.class).instanceSize();
 
-        protected int topN;
+        protected final int topN;
 
         static class RowList
+                implements Restorable
         {
             List<Row> rows;
             int virtualSize;
@@ -429,6 +514,35 @@ public class GroupedTopNBuilder
             public int virtualRemoveRow()
             {
                 return --virtualSize;
+            }
+
+            @Override
+            public Object capture(BlockEncodingSerdeProvider serdeProvider)
+            {
+                RowListState myState = new RowListState();
+                myState.rows = new Object[rows.size()];
+                for (int i = 0; i < rows.size(); i++) {
+                    myState.rows[i] = rows.get(i).capture(serdeProvider);
+                }
+                myState.virtualSize = virtualSize;
+                return myState;
+            }
+
+            @Override
+            public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+            {
+                RowListState myState = (RowListState) state;
+                for (int i = 0; i < myState.rows.length; i++) {
+                    this.rows.add(Row.restoreRow(myState.rows[i]));
+                }
+                this.virtualSize = myState.virtualSize;
+            }
+
+            static class RowListState
+                    implements Serializable
+            {
+                private Object[] rows;
+                private int virtualSize;
             }
         }
 
@@ -498,6 +612,39 @@ public class GroupedTopNBuilder
         public long getEstimatedSizeInBytes()
         {
             return INSTANCE_SIZE + sizeOf(heap) + size * ROW_ENTRY_SIZE;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            RowNumberRowHeapState myState = new RowNumberRowHeapState();
+            myState.heap = new Object[super.size()];
+            Row[] temp = new Row[super.size()];
+            for (int i = 0; i < myState.heap.length; i++) {
+                Row row = dequeue();
+                temp[i] = row;
+                myState.heap[i] = row.capture(serdeProvider);
+            }
+            for (int i = 0; i < temp.length; i++) {
+                enqueue(temp[i]);
+            }
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            RowNumberRowHeapState myState = (RowNumberRowHeapState) state;
+            super.clear();
+            for (int i = 0; i < myState.heap.length; i++) {
+                enqueue(Row.restoreRow(myState.heap[i]));
+            }
+        }
+
+        private static class RowNumberRowHeapState
+                implements Serializable
+        {
+            private Object[] heap;
         }
     }
 
@@ -576,8 +723,47 @@ public class GroupedTopNBuilder
             // Inaccurate memory statistics, excluding TreeMap
             return INSTANCE_SIZE + sizeOf(heap) + size() * ROW_ENTRY_SIZE;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            DenseRankRowHeapState myState = new DenseRankRowHeapState();
+            myState.rowMaps = new HashMap<>();
+            for (Map.Entry<Row, List<Row>> entry : rowMaps.entrySet()) {
+                Object[] rowList = new Object[entry.getValue().size()];
+                for (int i = 0; i < entry.getValue().size(); i++) {
+                    rowList[i] = entry.getValue().get(i).capture(serdeProvider);
+                }
+                myState.rowMaps.put(entry.getKey().capture(serdeProvider), rowList);
+            }
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            DenseRankRowHeapState myState = (DenseRankRowHeapState) state;
+            this.clear();
+            for (Map.Entry<Object, Object[]> entry : myState.rowMaps.entrySet()) {
+                Row row = Row.restoreRow(entry.getKey());
+                List<Row> rowList = new ArrayList<>();
+                this.rowMaps.put(row, rowList);
+                for (int i = 0; i < entry.getValue().length; i++) {
+                    rowList.add(Row.restoreRow(entry.getValue()[i]));
+                }
+                super.enqueue(row);
+            }
+            super.trim();
+        }
+
+        private static class DenseRankRowHeapState
+                implements Serializable
+        {
+            Map<Object, Object[]> rowMaps;
+        }
     }
 
+    @RestorableConfig(stateClassName = "RankRowHeapState")
     private static class RankRowHeap
             extends RowHeap
     {
@@ -631,14 +817,50 @@ public class GroupedTopNBuilder
             // Inaccurate memory statistics, excluding TreeMap
             return INSTANCE_SIZE + sizeOf(heap) + size() * ROW_ENTRY_SIZE;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            RankRowHeapState myState = new RankRowHeapState();
+            myState.rowMaps = new HashMap<>();
+            for (Map.Entry<Row, RowList> entry : rowMaps.entrySet()) {
+                myState.rowMaps.put(entry.getKey().capture(serdeProvider), entry.getValue().capture(serdeProvider));
+            }
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            RankRowHeapState myState = (RankRowHeapState) state;
+            this.clear();
+            for (Map.Entry<Object, Object> entry : myState.rowMaps.entrySet()) {
+                Row row = Row.restoreRow(entry.getKey());
+                RowList rowList = new RowList();
+                rowList.restore(entry.getValue(), serdeProvider);
+                this.rowMaps.put(row, rowList);
+                if (rowList.virtualSize > 0) {
+                    for (int i = 0; i < rowList.rows.size(); i++) {
+                        super.enqueue(rowList.rows.get(i));
+                    }
+                }
+            }
+        }
+
+        private static class RankRowHeapState
+                implements Serializable
+        {
+            private Map<Object, Object> rowMaps;
+        }
     }
 
     private interface RankingNumberBuilder
+            extends Restorable
     {
         int generateRankingNumber(Row currentRow, boolean isNewGroup);
     }
 
-    private class RowNumberBuilder
+    private static class RowNumberBuilder
             implements RankingNumberBuilder
     {
         private int previousRowNumber;
@@ -654,9 +876,22 @@ public class GroupedTopNBuilder
             }
             return previousRowNumber;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            return previousRowNumber;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            this.previousRowNumber = (int) state;
+        }
     }
 
-    private class RankNumberBuilder
+    @RestorableConfig(uncapturedFields = {"comparator"})
+    private static class RankNumberBuilder
             implements RankingNumberBuilder
     {
         private final Comparator<Row> comparator;
@@ -685,9 +920,37 @@ public class GroupedTopNBuilder
             previousRow = row;
             return previousRowNumber;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            RankNumberBuilderState myState = new RankNumberBuilderState();
+            myState.previousRow = previousRow.capture(serdeProvider);
+            myState.previousRowNumber = previousRowNumber;
+            myState.currentCount = currentCount;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            RankNumberBuilderState myState = (RankNumberBuilderState) state;
+            this.previousRow = Row.restoreRow(myState.previousRow);
+            this.previousRowNumber = myState.previousRowNumber;
+            this.currentCount = myState.currentCount;
+        }
+
+        private static class RankNumberBuilderState
+                implements Serializable
+        {
+            private Object previousRow;
+            private int previousRowNumber;
+            private int currentCount;
+        }
     }
 
-    private class DenseRankNumberBuilder
+    @RestorableConfig(uncapturedFields = {"comparator"})
+    private static class DenseRankNumberBuilder
             implements RankingNumberBuilder
     {
         private final Comparator<Row> comparator;
@@ -712,6 +975,30 @@ public class GroupedTopNBuilder
             }
             previousRow = row;
             return previousRowNumber;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            DenseRankNumberBuilderState myState = new DenseRankNumberBuilderState();
+            myState.previousRow = previousRow.capture(serdeProvider);
+            myState.previousRowNumber = previousRowNumber;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            DenseRankNumberBuilderState myState = (DenseRankNumberBuilderState) state;
+            this.previousRow = Row.restoreRow(myState.previousRow);
+            this.previousRowNumber = myState.previousRowNumber;
+        }
+
+        private static class DenseRankNumberBuilderState
+                implements Serializable
+        {
+            private Object previousRow;
+            private int previousRowNumber;
         }
     }
 
@@ -837,5 +1124,79 @@ public class GroupedTopNBuilder
             }
             return null;
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupedTopNBuilderState myState = new GroupedTopNBuilderState();
+        myState.groupByHash = groupByHash.capture(serdeProvider);
+        Function<Object, Object> captureFunction = arrayContent -> ((Restorable) arrayContent).capture(serdeProvider);
+        myState.groupedRows = groupedRows.capture(captureFunction);
+        myState.pageReferences = pageReferences.capture(captureFunction);
+        myState.emptyPageReferenceSlots = new int[emptyPageReferenceSlots.size()];
+        for (int i = 0; i < myState.emptyPageReferenceSlots.length; i++) {
+            myState.emptyPageReferenceSlots[i] = emptyPageReferenceSlots.dequeueInt();
+            emptyPageReferenceSlots.enqueue(myState.emptyPageReferenceSlots[i]);
+        }
+        myState.memorySizeInBytes = memorySizeInBytes;
+        myState.currentPageCount = currentPageCount;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupedTopNBuilderState myState = (GroupedTopNBuilderState) state;
+        this.groupByHash.restore(myState.groupByHash, serdeProvider);
+
+        Function<Object, Object> pageReferencesRestore = (content -> {
+            PageReference reference = new PageReference();
+            reference.restore(content, serdeProvider);
+            return reference;
+        });
+        this.pageReferences.restore(pageReferencesRestore, myState.pageReferences);
+
+        Function<Object, Object> groupedRowsRestore = (content -> {
+            RowHeap rowHeap = null;
+            if (this.rankingFunction.isPresent()) {
+                if (this.rankingFunction.get() == RankingFunction.RANK) {
+                    rowHeap = new RankRowHeap(this.comparator, this.topN);
+                }
+                else if (this.rankingFunction.get() == RankingFunction.DENSE_RANK) {
+                    rowHeap = new DenseRankRowHeap(this.comparator, this.topN);
+                }
+                else if (this.rankingFunction.get() == RankingFunction.ROW_NUMBER) {
+                    rowHeap = new RowNumberRowHeap(this.comparator, this.topN);
+                }
+            }
+            else {
+                rowHeap = new RowNumberRowHeap(this.comparator, this.topN);
+            }
+
+            if (rowHeap != null) {
+                rowHeap.restore(content, serdeProvider);
+            }
+            return rowHeap;
+        });
+        this.groupedRows.restore(groupedRowsRestore, myState.groupedRows);
+
+        this.emptyPageReferenceSlots.clear();
+        for (int i = 0; i < myState.emptyPageReferenceSlots.length; i++) {
+            emptyPageReferenceSlots.enqueue(myState.emptyPageReferenceSlots[i]);
+        }
+        this.memorySizeInBytes = myState.memorySizeInBytes;
+        this.currentPageCount = myState.currentPageCount;
+    }
+
+    private static class GroupedTopNBuilderState
+            implements Serializable
+    {
+        private Object groupByHash;
+        private Object groupedRows;
+        private Object pageReferences;
+        private int[] emptyPageReferenceSlots;
+        private long memorySizeInBytes;
+        private int currentPageCount;
     }
 }

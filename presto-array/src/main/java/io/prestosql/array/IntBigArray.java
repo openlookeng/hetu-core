@@ -14,8 +14,11 @@
 package io.prestosql.array;
 
 import io.airlift.slice.SizeOf;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.Arrays;
 
 import static io.airlift.slice.SizeOf.sizeOfIntArray;
@@ -23,6 +26,7 @@ import static io.airlift.slice.SizeOf.sizeOfIntArray;
 // Note: this code was forked from fastutil (http://fastutil.di.unimi.it/)
 // Copyright (C) 2010-2013 Sebastiano Vigna
 public final class IntBigArray
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(IntBigArray.class).instanceSize();
     private static final long SIZE_OF_SEGMENT = sizeOfIntArray(BigArrays.SEGMENT_SIZE);
@@ -159,5 +163,38 @@ public final class IntBigArray
     public void sort(int from, int to, IntComparator comparator)
     {
         IntBigArrays.quickSort(array, from, to, comparator);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        IntBigArrayState myState = new IntBigArrayState();
+        int[][] capturedArray = new int[this.array.length][];
+        for (int i = 0; i < this.array.length; i++) {
+            if (this.array[i] != null) {
+                capturedArray[i] = this.array[i].clone();
+            }
+        }
+        myState.array = capturedArray;
+        myState.capacity = capacity;
+        myState.segments = segments;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        IntBigArrayState myState = (IntBigArrayState) state;
+        this.array = myState.array;
+        this.capacity = myState.capacity;
+        this.segments = myState.segments;
+    }
+
+    private static class IntBigArrayState
+            implements Serializable
+    {
+        private int[][] array;
+        private int capacity;
+        private int segments;
     }
 }

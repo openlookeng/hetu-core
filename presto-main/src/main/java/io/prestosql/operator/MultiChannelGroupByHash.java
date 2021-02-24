@@ -16,6 +16,10 @@ package io.prestosql.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -24,11 +28,15 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -51,6 +59,8 @@ import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 // This implementation assumes arrays used in the hash are always a power of 2
+@RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy", "channelBuilders",
+        "inputHashChannel", "hashGenerator", "updateMemory"})
 public class MultiChannelGroupByHash
         implements GroupByHash
 {
@@ -498,10 +508,8 @@ public class MultiChannelGroupByHash
                 // data channel is dictionary encoded but hash channel is not
                 return false;
             }
-            if (!((DictionaryBlock) inputHashBlock).getDictionarySourceId().equals(inputDataBlock.getDictionarySourceId())) {
-                // dictionarySourceIds of data block and hash block do not match
-                return false;
-            }
+            // dictionarySourceIds of data block and hash block do not match
+            return ((DictionaryBlock) inputHashBlock).getDictionarySourceId().equals(inputDataBlock.getDictionarySourceId());
         }
 
         return true;
@@ -529,6 +537,7 @@ public class MultiChannelGroupByHash
     }
 
     private static final class DictionaryLookBack
+            implements Restorable
     {
         private final Block dictionary;
         private final int[] processed;
@@ -558,6 +567,34 @@ public class MultiChannelGroupByHash
         public void setProcessed(int position, int groupId)
         {
             processed[position] = groupId;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            DictionaryLookBackState myState = new DictionaryLookBackState();
+            SliceOutput sliceOutput = new DynamicSliceOutput(0);
+            serdeProvider.getBlockEncodingSerde().writeBlock(sliceOutput, this.dictionary);
+            myState.dictionary = sliceOutput.getUnderlyingSlice().getBytes();
+            myState.processed = Arrays.copyOf(processed, processed.length);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            DictionaryLookBackState myState = (DictionaryLookBackState) state;
+            int[] stored = myState.processed;
+            for (int i = 0; i < this.processed.length; i++) {
+                this.processed[i] = stored[i];
+            }
+        }
+
+        private static class DictionaryLookBackState
+                implements Serializable
+        {
+            private byte[] dictionary;
+            private int[] processed;
         }
     }
 
@@ -690,8 +727,9 @@ public class MultiChannelGroupByHash
         }
     }
 
+    @RestorableConfig(uncapturedFields = {"this$0", "page"})
     private class GetNonDictionaryGroupIdsWork
-            implements Work<GroupByIdBlock>
+            implements Work<GroupByIdBlock>, Restorable
     {
         private final BlockBuilder blockBuilder;
         private final Page page;
@@ -737,6 +775,33 @@ public class MultiChannelGroupByHash
             finished = true;
             return new GroupByIdBlock(nextGroupId, blockBuilder.build());
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GetNonDictionaryGroupIdsWorkState myState = new GetNonDictionaryGroupIdsWorkState();
+            myState.blockBuilder = blockBuilder.capture(serdeProvider);
+            myState.finished = finished;
+            myState.lastPosition = lastPosition;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GetNonDictionaryGroupIdsWorkState myState = (GetNonDictionaryGroupIdsWorkState) state;
+            this.blockBuilder.restore(myState.blockBuilder, serdeProvider);
+            this.finished = myState.finished;
+            this.lastPosition = myState.lastPosition;
+        }
+    }
+
+    private static class GetNonDictionaryGroupIdsWorkState
+            implements Serializable
+    {
+        private Object blockBuilder;
+        private boolean finished;
+        private int lastPosition;
     }
 
     private class GetDictionaryGroupIdsWork
@@ -845,5 +910,88 @@ public class MultiChannelGroupByHash
                             BIGINT.createFixedSizeBlockBuilder(1).writeLong(groupId).build(),
                             page.getPositionCount()));
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        MultiChannelGroupByHashState myState = new MultiChannelGroupByHashState();
+        myState.currentPageBuilder = currentPageBuilder.capture(serdeProvider);
+
+        myState.completedPagesMemorySize = completedPagesMemorySize;
+
+        myState.hashCapacity = hashCapacity;
+        myState.maxFill = maxFill;
+        myState.mask = mask;
+        myState.groupAddressByHash = Arrays.copyOf(groupAddressByHash, groupAddressByHash.length);
+        myState.groupIdsByHash = Arrays.copyOf(groupIdsByHash, groupIdsByHash.length);
+        myState.rawHashByHashPosition = Arrays.copyOf(rawHashByHashPosition, rawHashByHashPosition.length);
+        myState.groupAddressByGroupId = groupAddressByGroupId.capture(serdeProvider);
+
+        myState.nextGroupId = nextGroupId;
+        if (dictionaryLookBack != null) {
+            myState.dictionaryLookBack = dictionaryLookBack.capture(serdeProvider);
+        }
+        myState.hashCollisions = hashCollisions;
+        myState.expectedHashCollisions = expectedHashCollisions;
+        myState.preallocatedMemoryInBytes = preallocatedMemoryInBytes;
+        myState.currentPageSizeInBytes = currentPageSizeInBytes;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MultiChannelGroupByHashState myState = (MultiChannelGroupByHashState) state;
+        this.currentPageBuilder.restore(myState.currentPageBuilder, serdeProvider);
+
+        this.completedPagesMemorySize = myState.completedPagesMemorySize;
+
+        this.hashCapacity = myState.hashCapacity;
+        this.maxFill = myState.maxFill;
+        this.mask = myState.mask;
+        this.groupAddressByHash = myState.groupAddressByHash;
+        this.groupIdsByHash = myState.groupIdsByHash;
+        this.rawHashByHashPosition = myState.rawHashByHashPosition;
+
+        this.groupAddressByGroupId.restore(myState.groupAddressByGroupId, serdeProvider);
+
+        this.nextGroupId = myState.nextGroupId;
+        if (myState.dictionaryLookBack != null) {
+            Slice input = Slices.wrappedBuffer(((DictionaryLookBack.DictionaryLookBackState) myState.dictionaryLookBack).dictionary);
+            this.dictionaryLookBack = new DictionaryLookBack(serdeProvider.getBlockEncodingSerde().readBlock(input.getInput()));
+            this.dictionaryLookBack.restore(myState.dictionaryLookBack, serdeProvider);
+        }
+        else {
+            this.dictionaryLookBack = null;
+        }
+        this.hashCollisions = myState.hashCollisions;
+        this.expectedHashCollisions = myState.expectedHashCollisions;
+        this.preallocatedMemoryInBytes = myState.preallocatedMemoryInBytes;
+        this.currentPageSizeInBytes = myState.currentPageSizeInBytes;
+    }
+
+    private static class MultiChannelGroupByHashState
+            implements Serializable
+    {
+        private Object currentPageBuilder;
+
+        private long completedPagesMemorySize;
+
+        private int hashCapacity;
+        private int maxFill;
+        private int mask;
+        private long[] groupAddressByHash;
+        private int[] groupIdsByHash;
+        private byte[] rawHashByHashPosition;
+
+        private Object groupAddressByGroupId;
+
+        private int nextGroupId;
+        private Object dictionaryLookBack;
+        private long hashCollisions;
+        private double expectedHashCollisions;
+        private long preallocatedMemoryInBytes;
+        private long currentPageSizeInBytes;
     }
 }

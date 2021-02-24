@@ -16,8 +16,12 @@ package io.prestosql.spi;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +31,9 @@ import static java.lang.String.format;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"types"})
 public class PageBuilder
+        implements Restorable
 {
     // We choose default initial size to be 8 for PageBuilder and BlockBuilder
     // so the underlying data is larger than the object overhead, and the size is power of 2.
@@ -178,5 +184,39 @@ public class PageBuilder
         if (!expression) {
             throw new IllegalArgumentException(errorMessage);
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        PageBuilderState myState = new PageBuilderState();
+        Object[] blockBuildersSnapshot = new Object[blockBuilders.length];
+        for (int i = 0; i < blockBuilders.length; i++) {
+            blockBuildersSnapshot[i] = blockBuilders[i].capture(serdeProvider);
+        }
+        myState.blockBuilders = blockBuildersSnapshot;
+        myState.pageBuilderStatus = pageBuilderStatus.capture(serdeProvider);
+        myState.declaredPositions = declaredPositions;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        PageBuilderState myState = (PageBuilderState) state;
+        Object[] blockBuilderSnapshot = myState.blockBuilders;
+        for (int i = 0; i < blockBuilderSnapshot.length; i++) {
+            this.blockBuilders[i].restore(blockBuilderSnapshot[i], serdeProvider);
+        }
+        this.pageBuilderStatus.restore(myState.pageBuilderStatus, serdeProvider);
+        this.declaredPositions = myState.declaredPositions;
+    }
+
+    private static class PageBuilderState
+            implements Serializable
+    {
+        private Object[] blockBuilders;
+        private Object pageBuilderStatus;
+        private int declaredPositions;
     }
 }

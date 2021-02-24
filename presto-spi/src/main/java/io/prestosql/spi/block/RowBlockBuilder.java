@@ -14,15 +14,18 @@
 
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.calculateBlockResetSize;
 import static io.prestosql.spi.block.RowBlock.createRowBlockInternal;
@@ -280,5 +283,52 @@ public class RowBlockBuilder<T>
             newBlockBuilders[i] = fieldBlockBuilders[i].newBlockBuilderLike(blockBuilderStatus);
         }
         return new RowBlockBuilder(blockBuilderStatus, newBlockBuilders, new int[newSize + 1], new boolean[newSize]);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        RowBlockBuilderState myState = new RowBlockBuilderState();
+        if (this.blockBuilderStatus != null) {
+            myState.blockBuilderStatus = blockBuilderStatus.capture(serdeProvider);
+        }
+        myState.positionCount = positionCount;
+        myState.fieldBlockOffsets = fieldBlockOffsets;
+        myState.rowIsNull = rowIsNull;
+        myState.fieldBlockBuilders = new Object[fieldBlockBuilders.length];
+        for (int i = 0; i < fieldBlockBuilders.length; i++) {
+            myState.fieldBlockBuilders[i] = fieldBlockBuilders[i].capture(serdeProvider);
+        }
+        myState.currentEntryOpened = currentEntryOpened;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        RowBlockBuilderState myState = (RowBlockBuilderState) state;
+        checkState((this.blockBuilderStatus != null) == (myState.blockBuilderStatus != null));
+        if (this.blockBuilderStatus != null) {
+            this.blockBuilderStatus.restore(myState.blockBuilderStatus, serdeProvider);
+        }
+        this.positionCount = myState.positionCount;
+        this.fieldBlockOffsets = myState.fieldBlockOffsets;
+        this.rowIsNull = myState.rowIsNull;
+        checkState(this.fieldBlockBuilders.length == myState.fieldBlockBuilders.length);
+        for (int i = 0; i < this.fieldBlockBuilders.length; i++) {
+            this.fieldBlockBuilders[i].restore(myState.fieldBlockBuilders[i], serdeProvider);
+        }
+        this.currentEntryOpened = myState.currentEntryOpened;
+    }
+
+    private static class RowBlockBuilderState
+            implements Serializable
+    {
+        private Object blockBuilderStatus;
+        private int positionCount;
+        private int[] fieldBlockOffsets;
+        private boolean[] rowIsNull;
+        private Object[] fieldBlockBuilders;
+        private boolean currentEntryOpened;
     }
 }

@@ -13,8 +13,11 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
@@ -22,6 +25,7 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class BlockBuilderStatus
+        implements Restorable
 {
     public static final int INSTANCE_SIZE = deepInstanceSize(BlockBuilderStatus.class);
 
@@ -79,5 +83,29 @@ public class BlockBuilderStatus
             }
         }
         return size;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockBuilderStatusState myState = new BlockBuilderStatusState();
+        myState.pageBuilderStatus = pageBuilderStatus.capture(serdeProvider);
+        myState.currentSize = currentSize;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockBuilderStatusState myState = (BlockBuilderStatusState) state;
+        this.pageBuilderStatus.restore(myState.pageBuilderStatus, serdeProvider);
+        this.currentSize = myState.currentSize;
+    }
+
+    private static class BlockBuilderStatusState
+            implements Serializable
+    {
+        private Object pageBuilderStatus;
+        private int currentSize;
     }
 }

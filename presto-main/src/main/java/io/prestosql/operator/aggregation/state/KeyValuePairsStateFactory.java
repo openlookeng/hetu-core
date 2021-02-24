@@ -16,8 +16,14 @@ package io.prestosql.operator.aggregation.state;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.aggregation.KeyValuePairs;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
@@ -57,6 +63,7 @@ public class KeyValuePairsStateFactory
         return GroupedState.class;
     }
 
+    @RestorableConfig(uncapturedFields = {"keyType", "valueType"})
     public static class GroupedState
             extends AbstractGroupedAccumulatorState
             implements KeyValuePairsState
@@ -122,10 +129,44 @@ public class KeyValuePairsStateFactory
         {
             return INSTANCE_SIZE + size + pairs.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedStateState myState = new GroupedStateState();
+            myState.size = size;
+            myState.baseState = super.capture(serdeProvider);
+            Function<Object, Object> pairsCapture = content -> ((KeyValuePairs) content).capture(serdeProvider);
+            myState.pairs = pairs.capture(pairsCapture);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedStateState myState = (GroupedStateState) state;
+            this.size = myState.size;
+            super.restore(myState.baseState, serdeProvider);
+            Function<Object, Object> pairsRestore = content -> {
+                KeyValuePairs pair = new KeyValuePairs(keyType, valueType);
+                pair.restore(content, serdeProvider);
+                return pair;
+            };
+            this.pairs.restore(pairsRestore, myState.pairs);
+        }
+
+        private static class GroupedStateState
+                implements Serializable
+        {
+            private long size;
+            private Object baseState;
+            private Object pairs;
+        }
     }
 
+    @RestorableConfig(uncapturedFields = {"keyType", "valueType"})
     public static class SingleState
-            implements KeyValuePairsState
+            implements KeyValuePairsState, Restorable
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleState.class).instanceSize();
         private final Type keyType;
@@ -175,6 +216,29 @@ public class KeyValuePairsStateFactory
                 estimatedSize += pair.estimatedInMemorySize();
             }
             return estimatedSize;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (this.pair != null) {
+                return pair.capture(serdeProvider);
+            }
+            return null;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (state != null) {
+                if (this.pair == null) {
+                    this.pair = new KeyValuePairs(keyType, valueType);
+                }
+                this.pair.restore(state, serdeProvider);
+            }
+            else {
+                this.pair = null;
+            }
         }
     }
 }

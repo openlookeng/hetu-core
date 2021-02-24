@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,20 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi;
+package io.prestosql.spi.snapshot;
 
-import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.block.BlockEncodingSerde;
 
-public interface PageIndexer
-        extends Restorable
+public interface BlockEncodingSerdeProvider
 {
-    /**
-     * Returns the unique index of each position value.
-     */
-    int[] indexPage(Page page);
-
-    /**
-     * Returns maximum index value returned.
-     */
-    int getMaxIndex();
+    BlockEncodingSerde getBlockEncodingSerde();
 }

@@ -26,6 +26,7 @@ import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
@@ -43,6 +44,8 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 import static java.lang.Math.max;
 
+//TODO-cp-I2EATR should be covered in supporting spill, unsupported for now
+@RestorableConfig(unsupported = true)
 public class SpillableHashAggregationBuilder
         implements HashAggregationBuilder
 {

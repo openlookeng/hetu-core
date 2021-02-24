@@ -14,10 +14,16 @@
 package io.prestosql.operator.aggregation.state;
 
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.UNSCALED_DECIMAL_128_SLICE_LENGTH;
 import static java.util.Objects.requireNonNull;
@@ -98,10 +104,42 @@ public class LongDecimalWithOverflowStateFactory
         {
             return INSTANCE_SIZE + unscaledDecimals.sizeOf() + overflows.sizeOf() + numberOfElements * SingleLongDecimalWithOverflowState.SIZE;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedLongDecimalWithOverflowStateState myState = new GroupedLongDecimalWithOverflowStateState();
+            Function<Object, Object> unscaledDecimalsCapture = content -> ((Slice) content).getBytes();
+            myState.unscaledDecimals = unscaledDecimals.capture(unscaledDecimalsCapture);
+            myState.overflows = overflows.capture(serdeProvider);
+            myState.numberOfElements = numberOfElements;
+            myState.baseState = super.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedLongDecimalWithOverflowStateState myState = (GroupedLongDecimalWithOverflowStateState) state;
+            Function<Object, Object> unscaledDecimalsRestore = content -> Slices.wrappedBuffer((byte[]) content);
+            this.unscaledDecimals.restore(unscaledDecimalsRestore, myState.unscaledDecimals);
+            this.overflows.restore(myState.overflows, serdeProvider);
+            this.numberOfElements = myState.numberOfElements;
+            super.restore(myState.baseState, serdeProvider);
+        }
+
+        private static class GroupedLongDecimalWithOverflowStateState
+                implements Serializable
+        {
+            private Object unscaledDecimals;
+            private Object overflows;
+            private long numberOfElements;
+            private Object baseState;
+        }
     }
 
     public static class SingleLongDecimalWithOverflowState
-            implements LongDecimalWithOverflowState
+            implements LongDecimalWithOverflowState, Restorable
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleLongDecimalWithOverflowState.class).instanceSize();
         public static final int SIZE = ClassLayout.parseClass(Slice.class).instanceSize() + UNSCALED_DECIMAL_128_SLICE_LENGTH;
@@ -140,6 +178,37 @@ public class LongDecimalWithOverflowStateFactory
                 return INSTANCE_SIZE;
             }
             return INSTANCE_SIZE + SIZE;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleLongDecimalWithOverflowStateState myState = new SingleLongDecimalWithOverflowStateState();
+            if (this.unscaledDecimal != null) {
+                myState.unscaledDecimal = unscaledDecimal.getBytes();
+            }
+            myState.overflow = overflow;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleLongDecimalWithOverflowStateState myState = (SingleLongDecimalWithOverflowStateState) state;
+            if (myState.unscaledDecimal == null) {
+                this.unscaledDecimal = null;
+            }
+            else {
+                this.unscaledDecimal = Slices.wrappedBuffer(myState.unscaledDecimal);
+            }
+            this.overflow = myState.overflow;
+        }
+
+        private static class SingleLongDecimalWithOverflowStateState
+                implements Serializable
+        {
+            private byte[] unscaledDecimal;
+            private long overflow;
         }
     }
 }

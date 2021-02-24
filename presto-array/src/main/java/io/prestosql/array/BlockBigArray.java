@@ -14,9 +14,16 @@
 package io.prestosql.array;
 
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
+
+@RestorableConfig(uncapturedFields = {"trackedObjects"})
 public final class BlockBigArray
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(BlockBigArray.class).instanceSize();
     private final ObjectBigArray<Block> array;
@@ -96,5 +103,29 @@ public final class BlockBigArray
     public void ensureCapacity(long length)
     {
         array.ensureCapacity(length);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockBigArrayState myState = new BlockBigArrayState();
+        myState.array = array.captureBlockBigArray(serdeProvider);
+        myState.sizeOfBlocks = sizeOfBlocks;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockBigArrayState myState = (BlockBigArrayState) state;
+        this.array.restoreBlockBigArray(myState.array, serdeProvider);
+        this.sizeOfBlocks = myState.sizeOfBlocks;
+    }
+
+    private static class BlockBigArrayState
+            implements Serializable
+    {
+        private Object array;
+        private long sizeOfBlocks;
     }
 }

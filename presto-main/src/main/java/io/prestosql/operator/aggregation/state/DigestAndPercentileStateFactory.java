@@ -13,11 +13,17 @@
  */
 package io.prestosql.operator.aggregation.state;
 
+import io.airlift.slice.Slices;
 import io.airlift.stats.QuantileDigest;
 import io.prestosql.array.DoubleBigArray;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
@@ -100,10 +106,42 @@ public class DigestAndPercentileStateFactory
         {
             return INSTANCE_SIZE + size + digests.sizeOf() + percentiles.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedDigestAndPercentileStateState myState = new GroupedDigestAndPercentileStateState();
+            Function<Object, Object> digestsCapture = content -> ((QuantileDigest) content).serialize().getBytes();
+            myState.digests = digests.capture(digestsCapture);
+            myState.percentiles = percentiles.capture(serdeProvider);
+            myState.size = size;
+            myState.baseState = super.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedDigestAndPercentileStateState myState = (GroupedDigestAndPercentileStateState) state;
+            Function<Object, Object> digestsRestore = content -> new QuantileDigest(Slices.wrappedBuffer((byte[]) content));
+            this.digests.restore(digestsRestore, myState.digests);
+            this.percentiles.restore(myState.percentiles, serdeProvider);
+            this.size = myState.size;
+            super.restore(myState.baseState, serdeProvider);
+        }
+
+        private static class GroupedDigestAndPercentileStateState
+                implements Serializable
+        {
+            private Object digests;
+            private Object percentiles;
+            private long size;
+            private Object baseState;
+        }
     }
 
     public static class SingleDigestAndPercentileState
-            implements DigestAndPercentileState
+            implements DigestAndPercentileState, Restorable
     {
         public static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleDigestAndPercentileState.class).instanceSize();
         private QuantileDigest digest;
@@ -147,6 +185,37 @@ public class DigestAndPercentileStateFactory
                 estimatedSize += digest.estimatedInMemorySizeInBytes();
             }
             return estimatedSize;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleDigestAndPercentileStateState myState = new SingleDigestAndPercentileStateState();
+            if (this.digest != null) {
+                myState.digest = digest.serialize().getBytes();
+            }
+            myState.percentile = percentile;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleDigestAndPercentileStateState myState = (SingleDigestAndPercentileStateState) state;
+            if (myState.digest != null) {
+                this.digest = new QuantileDigest(Slices.wrappedBuffer(myState.digest));
+            }
+            else {
+                this.digest = null;
+            }
+            this.percentile = myState.percentile;
+        }
+
+        private static class SingleDigestAndPercentileStateState
+                implements Serializable
+        {
+            private byte[] digest;
+            private double percentile;
         }
     }
 }

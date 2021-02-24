@@ -17,12 +17,14 @@ import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.aggregation.state.AbstractGroupedAccumulatorState;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import static io.prestosql.type.TypeUtils.expectedValueSize;
 
 @Deprecated
+@RestorableConfig(unsupported = true)
 public class LegacyGroupedMultimapAggregationState
         extends AbstractGroupedAccumulatorState
         implements MultimapAggregationState

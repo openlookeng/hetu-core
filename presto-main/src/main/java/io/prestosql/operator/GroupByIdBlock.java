@@ -13,11 +13,18 @@
  */
 package io.prestosql.operator;
 
+import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.BlockEncodingSerde;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.function.BiConsumer;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -25,7 +32,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
 public class GroupByIdBlock<T>
-        implements Block<T>
+        implements Block<T>, Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupByIdBlock.class).instanceSize();
 
@@ -225,5 +232,30 @@ public class GroupByIdBlock<T>
     public Block getLoadedBlock()
     {
         return block.getLoadedBlock();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupByIdBlockState myState = new GroupByIdBlockState();
+        myState.groupCount = groupCount;
+        SliceOutput sliceOutput = new DynamicSliceOutput(0);
+        serdeProvider.getBlockEncodingSerde().writeBlock(sliceOutput, block);
+        myState.block = sliceOutput.getUnderlyingSlice().getBytes();
+        return myState;
+    }
+
+    public static GroupByIdBlock restoreGroupedIdBlock(Object state, BlockEncodingSerde serde)
+    {
+        GroupByIdBlockState myState = (GroupByIdBlockState) state;
+        Slice sliceInput = Slices.wrappedBuffer(myState.block);
+        return new GroupByIdBlock(myState.groupCount, serde.readBlock(sliceInput.getInput()));
+    }
+
+    private static class GroupByIdBlockState
+            implements Serializable
+    {
+        private long groupCount;
+        private byte[] block;
     }
 }

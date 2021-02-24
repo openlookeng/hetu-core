@@ -20,6 +20,7 @@ import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -82,6 +83,8 @@ public class MergePages
                 memoryContext.newLocalMemoryContext(MergePages.class.getSimpleName())));
     }
 
+    // This is only used by table scan operators, so don't need to participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private static class MergePagesTransformation
             implements WorkProcessor.Transformation<Page, Page>
     {

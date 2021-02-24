@@ -13,7 +13,11 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+
 public class PageBuilderStatus
+        implements Restorable
 {
     public static final int DEFAULT_MAX_PAGE_SIZE_IN_BYTES = 1024 * 1024;
 
@@ -72,5 +76,17 @@ public class PageBuilderStatus
         buffer.append(", currentSize=").append(currentSize);
         buffer.append('}');
         return buffer.toString();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return currentSize;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        this.currentSize = (long) state;
     }
 }

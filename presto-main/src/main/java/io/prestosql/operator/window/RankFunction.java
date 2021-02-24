@@ -16,6 +16,9 @@ package io.prestosql.operator.window;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.RankingWindowFunction;
 import io.prestosql.spi.function.WindowFunctionSignature;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+
+import java.io.Serializable;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
 
@@ -44,5 +47,32 @@ public class RankFunction
             count++;
         }
         BIGINT.writeLong(output, rank);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        RankFunctionState myState = new RankFunctionState();
+        myState.rank = rank;
+        myState.count = count;
+        myState.baseState = super.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        RankFunctionState myState = (RankFunctionState) state;
+        this.count = myState.count;
+        this.rank = myState.rank;
+        super.restore(myState.baseState, serdeProvider);
+    }
+
+    private static class RankFunctionState
+            implements Serializable
+    {
+        private long rank;
+        private long count;
+        private Object baseState;
     }
 }

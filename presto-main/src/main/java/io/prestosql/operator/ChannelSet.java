@@ -17,9 +17,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +32,9 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"hashChannels"})
 public class ChannelSet
+        implements Restorable
 {
     private final GroupByHash hash;
     private final boolean containsNull;
@@ -76,7 +82,9 @@ public class ChannelSet
         return hash.contains(position, page, hashChannels, rawHash);
     }
 
+    @RestorableConfig(uncapturedFields = {"nullBlockPage"})
     public static class ChannelSetBuilder
+            implements Restorable
     {
         private static final int[] HASH_CHANNELS = {0};
 
@@ -136,5 +144,44 @@ public class ChannelSet
         {
             return hash.getCapacity();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            ChannelSetBuilderState myState = new ChannelSetBuilderState();
+            myState.hash = hash.capture(serdeProvider);
+            myState.operatorContext = operatorContext.capture(serdeProvider);
+            myState.localMemoryContext = localMemoryContext.getBytes();
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            ChannelSetBuilderState myState = (ChannelSetBuilderState) state;
+            this.hash.restore(myState.hash, serdeProvider);
+            this.operatorContext.restore(myState.operatorContext, serdeProvider);
+            this.localMemoryContext.setBytes(myState.localMemoryContext);
+        }
+
+        private static class ChannelSetBuilderState
+                implements Serializable
+        {
+            private Object hash;
+            private Object operatorContext;
+            private long localMemoryContext;
+        }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return hash.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        this.hash.restore(state, serdeProvider);
     }
 }

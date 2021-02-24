@@ -15,13 +15,20 @@ package io.prestosql.operator.aggregation;
 
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.SizeOf.sizeOf;
 
+@RestorableConfig(uncapturedFields = {"comparator", "type"})
 public class TypedHeap
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(TypedHeap.class).instanceSize();
 
@@ -43,6 +50,23 @@ public class TypedHeap
         this.capacity = capacity;
         this.heapIndex = new int[capacity];
         this.heapBlockBuilder = type.createBlockBuilder(null, capacity);
+    }
+
+    private TypedHeap(BlockComparator comparator, Type type, Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        this.comparator = comparator;
+        this.type = type;
+        TypedHeapState myState = (TypedHeapState) state;
+        this.capacity = myState.capacity;
+        this.positionCount = myState.positionCount;
+        this.heapIndex = myState.heapIndex;
+        this.heapBlockBuilder = type.createBlockBuilder(null, capacity);
+        this.heapBlockBuilder.restore(myState.heapBlockBuilder, serdeProvider);
+    }
+
+    public static TypedHeap restoreTypedHeap(BlockComparator comparator, Type type, Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        return new TypedHeap(comparator, type, state, serdeProvider);
     }
 
     public int getCapacity()
@@ -176,5 +200,25 @@ public class TypedHeap
             heapIndex[i] = i;
         }
         heapBlockBuilder = newHeapBlockBuilder;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        TypedHeapState myState = new TypedHeapState();
+        myState.capacity = capacity;
+        myState.positionCount = positionCount;
+        myState.heapIndex = heapIndex.clone();
+        myState.heapBlockBuilder = heapBlockBuilder.capture(serdeProvider);
+        return myState;
+    }
+
+    private static class TypedHeapState
+            implements Serializable
+    {
+        private int capacity;
+        private int positionCount;
+        private int[] heapIndex;
+        private Object heapBlockBuilder;
     }
 }

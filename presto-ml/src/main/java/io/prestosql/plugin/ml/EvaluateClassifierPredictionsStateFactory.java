@@ -16,10 +16,14 @@ package io.prestosql.plugin.ml;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.function.GroupedAccumulatorState;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 public class EvaluateClassifierPredictionsStateFactory
         implements AccumulatorStateFactory<EvaluateClassifierPredictionsState>
@@ -51,7 +55,7 @@ public class EvaluateClassifierPredictionsStateFactory
     }
 
     public static class GroupedEvaluateClassifierPredictionsState
-            implements GroupedAccumulatorState, EvaluateClassifierPredictionsState
+            implements GroupedAccumulatorState, EvaluateClassifierPredictionsState, Restorable
     {
         private final ObjectBigArray<Map<String, Integer>> truePositives = new ObjectBigArray<>();
         private final ObjectBigArray<Map<String, Integer>> falsePositives = new ObjectBigArray<>();
@@ -114,10 +118,45 @@ public class EvaluateClassifierPredictionsStateFactory
         {
             return memoryUsage + truePositives.sizeOf() + falsePositives.sizeOf() + falseNegatives.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedEvaluateClassifierPredictionsStateState myState = new GroupedEvaluateClassifierPredictionsStateState();
+            Function<Object, Object> captureFunction = content -> content;
+            myState.truePositives = truePositives.capture(captureFunction);
+            myState.falsePositives = falsePositives.capture(captureFunction);
+            myState.falseNegatives = falseNegatives.capture(captureFunction);
+            myState.groupId = groupId;
+            myState.memoryUsage = memoryUsage;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedEvaluateClassifierPredictionsStateState myState = (GroupedEvaluateClassifierPredictionsStateState) state;
+            Function<Object, Object> restoreFunction = content -> content;
+            this.truePositives.restore(restoreFunction, myState.truePositives);
+            this.falsePositives.restore(restoreFunction, myState.falsePositives);
+            this.falseNegatives.restore(restoreFunction, myState.falseNegatives);
+            this.groupId = myState.groupId;
+            this.memoryUsage = myState.memoryUsage;
+        }
+
+        private static class GroupedEvaluateClassifierPredictionsStateState
+                implements Serializable
+        {
+            private Object truePositives;
+            private Object falsePositives;
+            private Object falseNegatives;
+            private long groupId;
+            private long memoryUsage;
+        }
     }
 
     public static class SingleEvaluateClassifierPredictionsState
-            implements EvaluateClassifierPredictionsState
+            implements EvaluateClassifierPredictionsState, Restorable
     {
         private final Map<String, Integer> truePositives = new HashMap<>();
         private final Map<String, Integer> falsePositives = new HashMap<>();
@@ -152,6 +191,39 @@ public class EvaluateClassifierPredictionsStateFactory
         public Map<String, Integer> getFalseNegatives()
         {
             return falseNegatives;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleEvaluateClassifierPredictionsStateState myState = new SingleEvaluateClassifierPredictionsStateState();
+            myState.truePositives = truePositives;
+            myState.falsePositives = falsePositives;
+            myState.falseNegatives = falseNegatives;
+            myState.memoryUsage = memoryUsage;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleEvaluateClassifierPredictionsStateState myState = (SingleEvaluateClassifierPredictionsStateState) state;
+            this.truePositives.clear();
+            this.truePositives.putAll(myState.truePositives);
+            this.falsePositives.clear();
+            this.falsePositives.putAll(myState.falsePositives);
+            this.falseNegatives.clear();
+            this.falseNegatives.putAll(myState.falseNegatives);
+            this.memoryUsage = myState.memoryUsage;
+        }
+
+        private static class SingleEvaluateClassifierPredictionsStateState
+                implements Serializable
+        {
+            private Map<String, Integer> truePositives;
+            private Map<String, Integer> falsePositives;
+            private Map<String, Integer> falseNegatives;
+            private int memoryUsage;
         }
     }
 }

@@ -18,9 +18,12 @@ import io.prestosql.Session;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +32,7 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 
 public class MarkDistinctHash
+        implements Restorable
 {
     private final GroupByHash groupByHash;
     private long nextDistinctId;
@@ -71,5 +75,29 @@ public class MarkDistinctHash
     public int getCapacity()
     {
         return groupByHash.getCapacity();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        MarkDistinctHashState myState = new MarkDistinctHashState();
+        myState.groupByHash = groupByHash.capture(serdeProvider);
+        myState.nextDistinctId = nextDistinctId;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MarkDistinctHashState myState = (MarkDistinctHashState) state;
+        this.groupByHash.restore(myState.groupByHash, serdeProvider);
+        this.nextDistinctId = myState.nextDistinctId;
+    }
+
+    private static class MarkDistinctHashState
+            implements Serializable
+    {
+        private Object groupByHash;
+        private long nextDistinctId;
     }
 }

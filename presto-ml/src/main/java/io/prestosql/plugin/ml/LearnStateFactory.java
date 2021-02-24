@@ -16,15 +16,23 @@ package io.prestosql.plugin.ml;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.array.SliceBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.function.GroupedAccumulatorState;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import libsvm.svm_parameter;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class LearnStateFactory
         implements AccumulatorStateFactory<LearnState>
@@ -57,7 +65,7 @@ public class LearnStateFactory
     }
 
     public static class GroupedLearnState
-            implements GroupedAccumulatorState, LearnState
+            implements GroupedAccumulatorState, LearnState, Restorable
     {
         private final ObjectBigArray<List<Double>> labelsArray = new ObjectBigArray<>();
         private final ObjectBigArray<List<FeatureVector>> featureVectorsArray = new ObjectBigArray<>();
@@ -146,10 +154,54 @@ public class LearnStateFactory
         {
             size += value;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedLearnStateState myState = new GroupedLearnStateState();
+            Function<Object, Object> labelsArrayCapture = content -> ((List<Double>) content).stream().toArray(Double[]::new);
+            myState.labelsArray = labelsArray.capture(labelsArrayCapture);
+            Function<Object, Object> featureVectorsArrayCapture = content -> ((List<FeatureVector>) content).stream().map(vector -> vector.capture(serdeProvider)).toArray();
+            myState.featureVectorsArray = featureVectorsArray.capture(featureVectorsArrayCapture);
+            myState.parametersArray = parametersArray.capture(serdeProvider);
+            myState.labelEnumeration = labelEnumeration;
+            myState.groupId = groupId;
+            myState.nextLabel = nextLabel;
+            myState.size = size;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedLearnStateState myState = (GroupedLearnStateState) state;
+            Function<Object, Object> labelsArrayRestore = content -> Arrays.stream((Double[]) content).collect(Collectors.toList());
+            this.labelsArray.restore(labelsArrayRestore, myState.labelsArray);
+            Function<Object, Object> featureVectorsArrayRestore = content -> Arrays.stream(((Map<Integer, Double>[]) content)).map(FeatureVector::new).collect(Collectors.toList());
+            this.featureVectorsArray.restore(featureVectorsArrayRestore, myState.featureVectorsArray);
+            this.parametersArray.restore(myState.parametersArray, serdeProvider);
+            this.labelEnumeration.clear();
+            this.labelEnumeration.putAll(myState.labelEnumeration);
+            this.groupId = myState.groupId;
+            this.nextLabel = myState.nextLabel;
+            this.size = myState.size;
+        }
+
+        private static class GroupedLearnStateState
+                implements Serializable
+        {
+            private Object labelsArray;
+            private Object featureVectorsArray;
+            private Object parametersArray;
+            private BiMap<String, Integer> labelEnumeration;
+            private long groupId;
+            private int nextLabel;
+            private long size;
+        }
     }
 
     public static class SingleLearnState
-            implements LearnState
+            implements LearnState, Restorable
     {
         private final List<Double> labels = new ArrayList<>();
         private final List<FeatureVector> featureVectors = new ArrayList<>();
@@ -208,6 +260,54 @@ public class LearnStateFactory
         public void addMemoryUsage(long value)
         {
             size += value;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleLearnStateState myState = new SingleLearnStateState();
+            myState.labels = labels.stream().toArray(Double[]::new);
+            myState.featureVectors = featureVectors.stream().map(vector -> vector.capture(serdeProvider)).toArray();
+            myState.labelEnumeration = labelEnumeration;
+            myState.nextLabel = nextLabel;
+            if (this.parameters != null) {
+                myState.parameters = parameters.getBytes();
+            }
+            myState.size = size;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleLearnStateState myState = (SingleLearnStateState) state;
+            this.labels.clear();
+            labels.addAll(Arrays.asList(myState.labels));
+            this.featureVectors.clear();
+            for (int i = 0; i < myState.featureVectors.length; i++) {
+                this.featureVectors.add(new FeatureVector((Map<Integer, Double>) myState.featureVectors[i]));
+            }
+            this.labelEnumeration.clear();
+            this.labelEnumeration.putAll(myState.labelEnumeration);
+            this.nextLabel = myState.nextLabel;
+            if (myState.parameters == null) {
+                this.parameters = null;
+            }
+            else {
+                this.parameters = Slices.wrappedBuffer(myState.parameters);
+            }
+            this.size = myState.size;
+        }
+
+        private static class SingleLearnStateState
+                implements Serializable
+        {
+            private Double[] labels;
+            private Object[] featureVectors;
+            private BiMap<String, Integer> labelEnumeration;
+            private int nextLabel;
+            private byte[] parameters;
+            private long size;
         }
     }
 }

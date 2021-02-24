@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.AbstractIntComparator;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -34,6 +35,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 public class NumericHistogram
+        implements Serializable
 {
     private static final byte FORMAT_TAG = 0;
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(NumericHistogram.class).instanceSize();

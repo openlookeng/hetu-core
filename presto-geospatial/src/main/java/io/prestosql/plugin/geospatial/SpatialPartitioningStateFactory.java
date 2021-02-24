@@ -20,10 +20,14 @@ import io.prestosql.array.ObjectBigArray;
 import io.prestosql.geospatial.Rectangle;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.function.GroupedAccumulatorState;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 import static java.lang.Math.toIntExact;
 
@@ -55,7 +59,7 @@ public class SpatialPartitioningStateFactory
     }
 
     public static final class GroupedSpatialPartitioningState
-            implements GroupedAccumulatorState, SpatialPartitioningState
+            implements GroupedAccumulatorState, SpatialPartitioningState, Restorable
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupedSpatialPartitioningState.class).instanceSize();
         private static final int ENVELOPE_SIZE = toIntExact(new Envelope(1, 2, 3, 4).estimateMemorySize());
@@ -144,10 +148,57 @@ public class SpatialPartitioningStateFactory
             envelopes.ensureCapacity(size);
             samples.ensureCapacity(size);
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedSpatialPartitioningStateState myState = new GroupedSpatialPartitioningStateState();
+            myState.groupId = groupId;
+            myState.partitionCounts = partitionCounts.capture(serdeProvider);
+            myState.counts = counts.capture(serdeProvider);
+            Function<Object, Object> envelopesCapture = content -> content;
+            myState.envelopes = envelopes.capture(envelopesCapture);
+            Function<Object, Object> samplesCapture = content -> {
+                List<Rectangle> list = (List<Rectangle>) content;
+                List<Rectangle> capturedList = new ArrayList<>(list);
+                return capturedList;
+            };
+            myState.samples = samples.capture(samplesCapture);
+            myState.envelopeCount = envelopeCount;
+            myState.samplesCount = samplesCount;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedSpatialPartitioningStateState myState = (GroupedSpatialPartitioningStateState) state;
+            this.groupId = myState.groupId;
+            this.partitionCounts.restore(myState.partitionCounts, serdeProvider);
+            this.counts.restore(myState.counts, serdeProvider);
+            Function<Object, Object> envelopesRestore = content -> content;
+            this.envelopes.restore(envelopesRestore, myState.envelopes);
+            Function<Object, Object> samplesRestore = content -> content;
+            this.samples.restore(samplesRestore, myState.samples);
+            this.envelopeCount = myState.envelopeCount;
+            this.samplesCount = myState.samplesCount;
+        }
+
+        private static class GroupedSpatialPartitioningStateState
+                implements Serializable
+        {
+            private long groupId;
+            private Object partitionCounts;
+            private Object counts;
+            private Object envelopes;
+            private Object samples;
+            private int envelopeCount;
+            private int samplesCount;
+        }
     }
 
     public static final class SingleSpatialPartitioningState
-            implements SpatialPartitioningState
+            implements SpatialPartitioningState, Restorable
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleSpatialPartitioningState.class).instanceSize();
 
@@ -208,6 +259,38 @@ public class SpatialPartitioningStateFactory
         public long getEstimatedSize()
         {
             return INSTANCE_SIZE + (envelope != null ? envelope.estimateMemorySize() * (1 + samples.size()) : 0);
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleSpatialPartitioningStateState myState = new SingleSpatialPartitioningStateState();
+            myState.partitionCount = partitionCount;
+            myState.count = count;
+            if (envelope != null) {
+                myState.envelope = envelope;
+            }
+            myState.samples = samples;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleSpatialPartitioningStateState myState = (SingleSpatialPartitioningStateState) state;
+            this.partitionCount = myState.partitionCount;
+            this.count = myState.count;
+            this.envelope = myState.envelope;
+            this.samples = myState.samples;
+        }
+
+        private static class SingleSpatialPartitioningStateState
+                implements Serializable
+        {
+            private int partitionCount;
+            private long count;
+            private Rectangle envelope;
+            private List<Rectangle> samples;
         }
     }
 }

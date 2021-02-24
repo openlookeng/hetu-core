@@ -17,15 +17,19 @@ import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.util.Collections.emptyIterator;
 import static java.util.Objects.requireNonNull;
@@ -34,6 +38,7 @@ import static java.util.Objects.requireNonNull;
  * Returns the top N rows from the source sorted according to the specified ordering in the keyChannelIndex channel.
  */
 public class TopNProcessor
+        implements Restorable
 {
     private final LocalMemoryContext localUserMemoryContext;
 
@@ -102,5 +107,42 @@ public class TopNProcessor
     {
         requireNonNull(topNBuilder, "topNBuilder is null");
         localUserMemoryContext.setBytes(topNBuilder.getEstimatedSizeInBytes());
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        TopNProcessorState myState = new TopNProcessorState();
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        if (topNBuilder != null) {
+            myState.topNBuilder = topNBuilder.capture(serdeProvider);
+        }
+        else {
+            myState.outputIterator = true;
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        TopNProcessorState myState = (TopNProcessorState) state;
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        if (myState.outputIterator) {
+            this.outputIterator = emptyIterator();
+            this.topNBuilder = null;
+        }
+        else {
+            checkState(this.topNBuilder != null);
+            this.topNBuilder.restore(myState.topNBuilder, serdeProvider);
+        }
+    }
+
+    private static class TopNProcessorState
+            implements Serializable
+    {
+        private long localUserMemoryContext;
+        private Object topNBuilder;
+        private boolean outputIterator;
     }
 }

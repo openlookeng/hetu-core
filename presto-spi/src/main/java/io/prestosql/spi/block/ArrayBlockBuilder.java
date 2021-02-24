@@ -13,14 +13,17 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.ArrayBlock.createArrayBlockInternal;
 import static io.prestosql.spi.block.BlockUtil.calculateBlockResetSize;
@@ -36,7 +39,7 @@ public class ArrayBlockBuilder<T>
     private int positionCount;
 
     @Nullable
-    private BlockBuilderStatus blockBuilderStatus;
+    private final BlockBuilderStatus blockBuilderStatus;
     private boolean initialized;
     private int initialEntryCount;
 
@@ -280,5 +283,60 @@ public class ArrayBlockBuilder<T>
         sb.append("positionCount=").append(getPositionCount());
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        ArrayBlockBuilderState myState = new ArrayBlockBuilderState();
+        myState.positionCount = positionCount;
+        if (blockBuilderStatus != null) {
+            myState.blockBuilderStatus = blockBuilderStatus.capture(serdeProvider);
+        }
+        myState.initialized = initialized;
+        myState.initialEntryCount = initialEntryCount;
+        myState.offsets = offsets;
+        myState.valueIsNull = valueIsNull;
+        myState.hasNullValue = hasNullValue;
+        myState.values = values.capture(serdeProvider);
+        myState.currentEntryOpened = currentEntryOpened;
+        myState.retainedSizeInBytes = retainedSizeInBytes;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        ArrayBlockBuilderState myState = (ArrayBlockBuilderState) state;
+        this.positionCount = myState.positionCount;
+        checkState((this.blockBuilderStatus != null) == (myState.blockBuilderStatus != null));
+        if (this.blockBuilderStatus != null) {
+            this.blockBuilderStatus.restore(myState.blockBuilderStatus, serdeProvider);
+        }
+        this.initialized = myState.initialized;
+        this.initialEntryCount = myState.initialEntryCount;
+        this.offsets = myState.offsets;
+        this.valueIsNull = myState.valueIsNull;
+        this.hasNullValue = myState.hasNullValue;
+        this.values.restore(myState.values, serdeProvider);
+        this.currentEntryOpened = myState.currentEntryOpened;
+        this.retainedSizeInBytes = myState.retainedSizeInBytes;
+    }
+
+    private static class ArrayBlockBuilderState
+            implements Serializable
+    {
+        private int positionCount;
+        private Object blockBuilderStatus;
+        private boolean initialized;
+        private int initialEntryCount;
+        private int[] offsets;
+        private boolean[] valueIsNull;
+        private boolean hasNullValue;
+
+        private Object values;
+        private boolean currentEntryOpened;
+
+        private long retainedSizeInBytes;
     }
 }

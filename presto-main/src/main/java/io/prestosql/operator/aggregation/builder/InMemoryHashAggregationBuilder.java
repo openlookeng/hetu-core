@@ -35,12 +35,16 @@ import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Step;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 import it.unimi.dsi.fastutil.ints.AbstractIntIterator;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntIterators;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -52,8 +56,9 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"updateMemory"})
 public class InMemoryHashAggregationBuilder
-        implements HashAggregationBuilder
+        implements HashAggregationBuilder, Restorable
 {
     private final GroupByHash groupByHash;
     private final List<Aggregator> aggregators;
@@ -337,6 +342,7 @@ public class InMemoryHashAggregationBuilder
     }
 
     private static class Aggregator
+            implements Restorable
     {
         private final GroupedAccumulator aggregation;
         private AggregationNode.Step step;
@@ -409,6 +415,30 @@ public class InMemoryHashAggregationBuilder
         {
             return aggregation.getIntermediateType();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            AggregatorState myState = new AggregatorState();
+            myState.step = step.toString();
+            myState.aggregation = aggregation.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            AggregatorState myState = (AggregatorState) state;
+            step = AggregationNode.Step.valueOf(myState.step);
+            aggregation.restore(myState.aggregation, serdeProvider);
+        }
+
+        private static class AggregatorState
+                implements Serializable
+        {
+            private String step;
+            private Object aggregation;
+        }
     }
 
     public static List<Type> toTypes(List<? extends Type> groupByType, Step step, List<AccumulatorFactory> factories, Optional<Integer> hashChannel)
@@ -422,5 +452,38 @@ public class InMemoryHashAggregationBuilder
             types.add(new Aggregator(factory, step, Optional.empty()).getType());
         }
         return types.build();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        InMemoryHashAggregationBuilderState myState = new InMemoryHashAggregationBuilderState();
+        myState.groupByHash = groupByHash.capture(serdeProvider);
+        List<Object> aggregators = new ArrayList<>();
+        for (Aggregator aggregator : this.aggregators) {
+            aggregators.add(aggregator.capture(serdeProvider));
+        }
+        myState.aggregators = aggregators;
+        myState.full = full;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        InMemoryHashAggregationBuilderState myState = (InMemoryHashAggregationBuilderState) state;
+        this.groupByHash.restore(myState.groupByHash, serdeProvider);
+        for (int i = 0; i < this.aggregators.size(); i++) {
+            this.aggregators.get(i).restore(myState.aggregators.get(i), serdeProvider);
+        }
+        this.full = myState.full;
+    }
+
+    private static class InMemoryHashAggregationBuilderState
+            implements Serializable
+    {
+        private Object groupByHash;
+        private List<Object> aggregators;
+        private boolean full;
     }
 }

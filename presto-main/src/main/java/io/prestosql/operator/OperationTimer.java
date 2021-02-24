@@ -13,9 +13,13 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -106,6 +110,7 @@ class OperationTimer
 
     @ThreadSafe
     static class OperationTiming
+            implements Restorable
     {
         private final AtomicLong calls = new AtomicLong();
         private final AtomicLong wallNanos = new AtomicLong();
@@ -141,6 +146,33 @@ class OperationTimer
                     .add("wallNanos", wallNanos)
                     .add("cpuNanos", cpuNanos)
                     .toString();
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            OperationTimingState myState = new OperationTimingState();
+            myState.calls = calls.get();
+            myState.wallNanos = wallNanos.get();
+            myState.cpuNanos = cpuNanos.get();
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            OperationTimingState myState = (OperationTimingState) state;
+            this.calls.set(myState.calls);
+            this.wallNanos.set(myState.wallNanos);
+            this.cpuNanos.set(myState.cpuNanos);
+        }
+
+        private static class OperationTimingState
+                implements Serializable
+        {
+            private long calls;
+            private long wallNanos;
+            private long cpuNanos;
         }
     }
 }

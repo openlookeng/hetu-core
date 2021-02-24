@@ -15,15 +15,19 @@
 package io.prestosql.spi.block;
 
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.MapType;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.block.BlockUtil.calculateBlockResetSize;
@@ -32,6 +36,7 @@ import static java.lang.String.format;
 import static java.lang.System.arraycopy;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"mapType"})
 public class MapBlockBuilder<T>
         extends AbstractMapBlock<T>
         implements BlockBuilder<Block<T>>
@@ -478,5 +483,52 @@ public class MapBlockBuilder<T>
     static int computePosition(long hashcode, int hashTableSize)
     {
         return (int) ((Integer.toUnsignedLong(Long.hashCode(hashcode)) * hashTableSize) >> 32);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        MapBlockBuilderState myState = new MapBlockBuilderState();
+        if (this.blockBuilderStatus != null) {
+            myState.blockBuilderStatus = blockBuilderStatus.capture(serdeProvider);
+        }
+        myState.positionCount = positionCount;
+        myState.offsets = offsets;
+        myState.mapIsNull = mapIsNull;
+        myState.keyBlockBuilder = keyBlockBuilder.capture(serdeProvider);
+        myState.valueBlockBuilder = valueBlockBuilder.capture(serdeProvider);
+        myState.hashTables = hashTables;
+        myState.currentEntryOpened = currentEntryOpened;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MapBlockBuilderState myState = (MapBlockBuilderState) state;
+        checkState((this.blockBuilderStatus != null) == (myState.blockBuilderStatus != null));
+        if (this.blockBuilderStatus != null) {
+            this.blockBuilderStatus.restore(myState.blockBuilderStatus, serdeProvider);
+        }
+        this.positionCount = myState.positionCount;
+        this.offsets = myState.offsets;
+        this.mapIsNull = myState.mapIsNull;
+        this.keyBlockBuilder.restore(myState.keyBlockBuilder, serdeProvider);
+        this.valueBlockBuilder.restore(myState.valueBlockBuilder, serdeProvider);
+        this.hashTables = myState.hashTables;
+        this.currentEntryOpened = myState.currentEntryOpened;
+    }
+
+    private static class MapBlockBuilderState
+            implements Serializable
+    {
+        private Object blockBuilderStatus;
+        private int positionCount;
+        private int[] offsets;
+        private boolean[] mapIsNull;
+        private Object keyBlockBuilder;
+        private Object valueBlockBuilder;
+        private int[] hashTables;
+        private boolean currentEntryOpened;
     }
 }

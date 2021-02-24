@@ -16,11 +16,13 @@ package io.prestosql.spi.statistics;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
 public class ColumnStatisticMetadata
+        implements Serializable
 {
     private final String columnName;
     private final ColumnStatisticType statisticType;

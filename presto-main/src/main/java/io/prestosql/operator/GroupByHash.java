@@ -17,6 +17,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.prestosql.Session;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
@@ -28,6 +29,7 @@ import static io.prestosql.operator.UpdateMemory.NOOP;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 
 public interface GroupByHash
+        extends Restorable
 {
     static GroupByHash createGroupByHash(
             Session session,

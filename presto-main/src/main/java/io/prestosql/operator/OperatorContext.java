@@ -28,6 +28,9 @@ import io.prestosql.operator.OperationTimer.OperationTiming;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
@@ -59,7 +62,14 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * Not thread-safe. Only {@link #getOperatorStats()}, {@link #getNestedOperatorStats()}
  * and revocable-memory-related operations are thread-safe.
  */
+//TODO-cp-I2DSGQ: remove when operatorContext is actually supported.
+@RestorableConfig(uncapturedFields = {"planNodeId", "driverContext", "executor", "physicalInputDataSize", "physicalInputPositions",
+        "internalNetworkInputDataSize", "internalNetworkPositions", "addInputTiming", "inputDataSize", "inputPositions", "getOutputTiming", "outputDataSize", "outputPositions",
+        "physicalWrittenDataSize", "memoryFuture", "revocableMemoryFuture", "blockedMonitor", "blockedWallNanos", "finishTiming", "spillContext", "infoSupplier",
+        "nestedOperatorStatsSupplier", "peakUserMemoryReservation", "peakSystemMemoryReservation", "peakRevocableMemoryReservation", "peakTotalMemoryReservation",
+        "memoryRevokingRequested", "memoryRevocationRequestListener", "operatorMemoryContext"})
 public class OperatorContext
+        implements Restorable
 {
     private final int operatorId;
     private final PlanNodeId planNodeId;
@@ -735,5 +745,17 @@ public class OperatorContext
     public MemoryTrackingContext getOperatorMemoryContext()
     {
         return operatorMemoryContext;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return 0; // TODO-cp-I2DSGQ: implement
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        // TODO-cp-I2DSGQ: implement
     }
 }

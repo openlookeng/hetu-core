@@ -18,6 +18,7 @@ import io.prestosql.operator.GroupByIdBlock;
 import io.prestosql.operator.Work;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageIndexer;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
@@ -71,5 +72,17 @@ public class GroupByHashPageIndexer
     public int getMaxIndex()
     {
         return hash.getGroupCount() - 1;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return hash.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        hash.restore(state, serdeProvider);
     }
 }

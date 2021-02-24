@@ -13,10 +13,16 @@
  */
 package io.prestosql.operator.aggregation.state;
 
+import io.airlift.slice.Slices;
 import io.airlift.stats.QuantileDigest;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
@@ -85,10 +91,39 @@ public class QuantileDigestStateFactory
         {
             return INSTANCE_SIZE + size + qdigests.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedQuantileDigestStateState myState = new GroupedQuantileDigestStateState();
+            myState.size = size;
+            myState.baseState = super.capture(serdeProvider);
+            Function<Object, Object> qdigestsCapture = content -> ((QuantileDigest) content).serialize().getBytes();
+            myState.qdigests = qdigests.capture(qdigestsCapture);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedQuantileDigestStateState myState = (GroupedQuantileDigestStateState) state;
+            this.size = myState.size;
+            super.restore(myState.baseState, serdeProvider);
+            Function<Object, Object> qdigestsRestore = content -> new QuantileDigest(Slices.wrappedBuffer((byte[]) content));
+            this.qdigests.restore(qdigestsRestore, myState.qdigests);
+        }
+
+        private static class GroupedQuantileDigestStateState
+                implements Serializable
+        {
+            private long size;
+            private Object baseState;
+            private Object qdigests;
+        }
     }
 
     public static class SingleQuantileDigestState
-            implements QuantileDigestState
+            implements QuantileDigestState, Restorable
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleQuantileDigestState.class).instanceSize();
         private QuantileDigest qdigest;
@@ -119,6 +154,26 @@ public class QuantileDigestStateFactory
                 estimatedSize += qdigest.estimatedInMemorySizeInBytes();
             }
             return estimatedSize;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (this.qdigest != null) {
+                return qdigest.serialize().getBytes();
+            }
+            return null;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (state != null) {
+                this.qdigest = new QuantileDigest(Slices.wrappedBuffer((byte[]) state));
+            }
+            else {
+                this.qdigest = null;
+            }
         }
     }
 }

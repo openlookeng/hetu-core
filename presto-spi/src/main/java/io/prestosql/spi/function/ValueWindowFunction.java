@@ -14,10 +14,16 @@
 package io.prestosql.spi.function;
 
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+@RestorableConfig(uncapturedFields = {"windowIndex"})
 public abstract class ValueWindowFunction
         implements WindowFunction
 {
+    // Snapshot: all windowIndex operations revolves around pagesIndex which is passed in and captured/restored outside
+    // windowIndex fields in all window functions are reset when WindowPartition is created(see WindowPartition line 71)
+    // so it doesn't need to be captured.
     protected WindowIndex windowIndex;
 
     private int currentPosition;
@@ -56,4 +62,16 @@ public abstract class ValueWindowFunction
      * @param currentPosition the current position for this row
      */
     public abstract void processRow(BlockBuilder output, int frameStart, int frameEnd, int currentPosition);
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return currentPosition;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        this.currentPosition = (int) state;
+    }
 }

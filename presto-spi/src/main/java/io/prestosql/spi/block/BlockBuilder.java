@@ -14,9 +14,10 @@
 package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
+import io.prestosql.spi.snapshot.Restorable;
 
 public interface BlockBuilder<T>
-        extends Block<T>
+        extends Block<T>, Restorable
 {
     /**
      * Write a byte to the current entry;

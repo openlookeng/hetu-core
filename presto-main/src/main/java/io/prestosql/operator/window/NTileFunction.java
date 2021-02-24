@@ -16,7 +16,9 @@ package io.prestosql.operator.window;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.RankingWindowFunction;
 import io.prestosql.spi.function.WindowFunctionSignature;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
@@ -71,5 +73,29 @@ public class NTileFunction
 
         // Shift the remaining rows to account for the remainder rows.
         return (currentRow - remainderRows) / rowsPerBucket;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        NTileFunctionState myState = new NTileFunctionState();
+        myState.rowCount = rowCount;
+        myState.baseState = super.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        NTileFunctionState myState = (NTileFunctionState) state;
+        this.rowCount = myState.rowCount;
+        super.restore(myState.baseState, serdeProvider);
+    }
+
+    private static class NTileFunctionState
+            implements Serializable
+    {
+        private int rowCount;
+        private Object baseState;
     }
 }

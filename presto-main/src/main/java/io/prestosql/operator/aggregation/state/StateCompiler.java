@@ -36,11 +36,15 @@ import io.prestosql.array.IntBigArray;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.array.SliceBigArray;
 import io.prestosql.operator.aggregation.GroupedAccumulator;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.function.AccumulatorStateMetadata;
 import io.prestosql.spi.function.AccumulatorStateSerializer;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.CallSiteBinder;
@@ -80,6 +84,7 @@ import static io.airlift.bytecode.expression.BytecodeExpressions.constantNumber;
 import static io.airlift.bytecode.expression.BytecodeExpressions.defaultValue;
 import static io.airlift.bytecode.expression.BytecodeExpressions.equal;
 import static io.airlift.bytecode.expression.BytecodeExpressions.getStatic;
+import static io.airlift.bytecode.expression.BytecodeExpressions.invokeStatic;
 import static io.airlift.bytecode.expression.BytecodeExpressions.newInstance;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -413,7 +418,8 @@ public class StateCompiler
                 a(PUBLIC, FINAL),
                 makeClassName("Single" + clazz.getSimpleName()),
                 type(Object.class),
-                type(clazz));
+                type(clazz),
+                type(Restorable.class));
 
         FieldDefinition instanceSize = generateInstanceSize(definition);
 
@@ -438,6 +444,65 @@ public class StateCompiler
 
         constructor.getBody()
                 .ret();
+
+        /**
+         public Object capture(BlockEncodingSerdeProvider serdeProvider)
+         {
+         List<Object> stateValues = new ArrayList<>();
+         BlockEncodingSerde captureBlockEncodingSerde = serdeProvider.getBlockEncodingSerde();
+         Object obj;
+
+         obj = SnapshotUtils.captureHelper(xxxValue, serdeProvider);
+         stateValues.add(obj);
+         .
+         .
+         .
+         }
+         **/
+
+        Parameter captureSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
+        MethodDefinition capture = definition.declareMethod(a(PUBLIC), "capture", type(Object.class), captureSerdeProvider);
+        Variable myState = capture.getScope().declareVariable(List.class, "myState");
+        capture.getBody().append(myState.set(newInstance(ArrayList.class)));
+        Variable captureBlockEncodingSerde = capture.getScope().declareVariable(BlockEncodingSerde.class, "captureBlockEncodingSerde");
+        capture.getBody().append(captureBlockEncodingSerde.set(captureSerdeProvider.invoke("getBlockEncodingSerde", BlockEncodingSerde.class)));
+        Variable obj = capture.getScope().declareVariable(Object.class, "obj");
+
+        for (int i = 1; i < definition.getFields().size(); i++) {
+            capture.getBody().append(obj.set(invokeStatic(SnapshotUtils.class, "captureHelper", Object.class, capture.getThis().getField(definition.getFields().get(i)).cast(Object.class), captureSerdeProvider)));
+            capture.getBody().append(myState.invoke("add", boolean.class, obj));
+        }
+
+        capture.getBody().append(myState.ret());
+
+        /**
+         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+         {
+         BlockEncodingSerde restoreBlockEncodingSerde = serdeProvider.getBlockEncodingSerde();
+         List<Object> restoreState = (List) state;
+         Object value;
+
+         Then it's setting value to be equal to elements in restoreState list.
+         If the field we're restoring is a block, restore the block from byte[], and set the field to the new block using the field's setter.
+         If the field is a slice, call Slices.wrappedBuffer(byte[]) to restore slice, assign it to field by using field's setter.
+         If the field is anything else, use the field's setter.
+         }
+         **/
+        Parameter state = arg("state", Object.class);
+        Parameter restoreSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
+        MethodDefinition restore = definition.declareMethod(a(PUBLIC), "restore", type(void.class), state, restoreSerdeProvider);
+        Variable restoreBlockEncodingSerde = restore.getScope().declareVariable(BlockEncodingSerde.class, "restoreBlockEncodingSerde");
+        restore.getBody().append(restoreBlockEncodingSerde.set(restoreSerdeProvider.invoke("getBlockEncodingSerde", BlockEncodingSerde.class)));
+        Variable restoreState = restore.getScope().declareVariable(List.class, "restoreState");
+        restore.getBody().append(restoreState.set(state.cast(List.class)));
+        Variable value = restore.getScope().declareVariable(Object.class, "value");
+
+        for (int i = 0; i < fields.size(); i++) {
+            restore.getBody().append(value.set(restoreState.invoke("get", Object.class, constantInt(i))));
+            restore.getBody().append(value.set(invokeStatic(SnapshotUtils.class, "restoreHelper", Object.class, value, constantClass(fields.get(i).getType()), restoreSerdeProvider)));
+            restore.getBody().append(restore.getThis().invoke(fields.get(i).getSetterName(), void.class, value.cast(fields.get(i).getType())));
+        }
+        restore.getBody().ret();
 
         return defineClass(definition, clazz, classLoader);
     }
@@ -464,7 +529,8 @@ public class StateCompiler
                 makeClassName("Grouped" + clazz.getSimpleName()),
                 type(AbstractGroupedAccumulatorState.class),
                 type(clazz),
-                type(GroupedAccumulator.class));
+                type(GroupedAccumulator.class),
+                type(Restorable.class));
 
         FieldDefinition instanceSize = generateInstanceSize(definition);
 
@@ -504,6 +570,44 @@ public class StateCompiler
 
         // return size
         body.append(size.ret());
+
+        /**
+         public Object capture(BlockEncodingSerdeProvider serdeProvider)
+         {
+            call xxxBigArray's individual capture method and add returned Object to myState list.
+         }
+         **/
+        //Generate capture
+        Parameter captureSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
+        MethodDefinition capture = definition.declareMethod(a(PUBLIC), "capture", type(Object.class), captureSerdeProvider);
+        Variable myState = capture.getScope().declareVariable(List.class, "myState");
+        capture.getBody().append(myState.set(newInstance(ArrayList.class)));
+        for (int i = 1; i < definition.getFields().size(); i++) {
+            capture.getBody().append(myState.invoke("add", boolean.class, capture.getThis().getField(definition.getFields().get(i)).invoke("capture", Object.class, captureSerdeProvider)));
+        }
+        capture.getBody().append(myState.invoke("add", boolean.class, capture.getThis().invoke("getGroupId", long.class).cast(Object.class)));
+        capture.getBody().append(myState.ret());
+
+        /**
+         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+         {
+            cast state class to list, loop through list and call restore on individual xxxBigArray using list content as state.
+         }
+         **/
+        //Generate restore
+        Parameter state = arg("state", Object.class);
+        Parameter restoreSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
+        MethodDefinition restore = definition.declareMethod(a(PUBLIC), "restore", type(void.class), state, restoreSerdeProvider);
+        Variable restoreState = restore.getScope().declareVariable(List.class, "restoreState");
+        restore.getBody().append(restoreState.set(state.cast(List.class)));
+        Variable listPosition = restore.getScope().declareVariable(int.class, "listPosition");
+        restore.getBody().append(listPosition.set(constantInt(0)));
+        for (int i = 1; i < definition.getFields().size(); i++) {
+            restore.getBody().append(restore.getThis().getField(definition.getFields().get(i)).invoke("restore", void.class, restoreState.invoke("get", Object.class, listPosition), restoreSerdeProvider));
+            restore.getBody().append(listPosition.increment());
+        }
+        restore.getBody().append(restore.getThis().invoke("setGroupId", void.class, restoreState.invoke("get", Object.class, listPosition).cast(long.class)));
+        restore.getBody().ret();
 
         return defineClass(definition, clazz, classLoader);
     }
