@@ -17,7 +17,7 @@ import io.airlift.json.JsonCodec;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputInfo;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 import org.testng.annotations.Test;
 
 import java.util.Optional;

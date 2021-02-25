@@ -15,11 +15,11 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.tree.FunctionCall;
 import org.testng.annotations.Test;
@@ -28,6 +28,9 @@ import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.ENABLE_INTERMEDIATE_AGGREGATIONS;
 import static io.prestosql.SystemSessionProperties.TASK_CONCURRENCY;
+import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
+import static io.prestosql.spi.plan.AggregationNode.Step.INTERMEDIATE;
+import static io.prestosql.spi.plan.AggregationNode.Step.PARTIAL;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anySymbol;
@@ -36,9 +39,6 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.globalAggrega
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.FINAL;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.INTERMEDIATE;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.PARTIAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
@@ -316,7 +316,7 @@ public class TestAddIntermediateAggregations
                                     p.gatheringExchange(
                                             ExchangeNode.Scope.REMOTE,
                                             p.project(
-                                                    Assignments.identity(p.symbol("b")),
+                                                    Assignments.of(p.symbol("b"), p.variable("b")),
                                                     p.aggregation(ap -> ap.globalGrouping()
                                                             .step(AggregationNode.Step.PARTIAL)
                                                             .addAggregation(p.symbol("b"), expression("count(a)"), ImmutableList.of(BIGINT))

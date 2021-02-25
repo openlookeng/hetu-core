@@ -32,27 +32,30 @@ import io.prestosql.cost.StatsCalculator;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinNode.DistributionType;
+import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.planner.EqualityInference;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.RuleStatsRecorder;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.JoinNode.DistributionType;
-import io.prestosql.sql.planner.plan.JoinNode.EquiJoinClause;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
-import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
@@ -80,22 +83,23 @@ import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.getJoinDistributionType;
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
 import static io.prestosql.SystemSessionProperties.getMaxReorderedJoins;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
-import static io.prestosql.sql.planner.DeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.EqualityInference.createEqualityInference;
 import static io.prestosql.sql.planner.EqualityInference.nonInferrableConjuncts;
+import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.iterative.rule.DetermineJoinDistributionType.canReplicate;
 import static io.prestosql.sql.planner.iterative.rule.HintedReorderJoins.HintedReorderJoinsRule.JoinEnumerationResult.INFINITE_COST_RESULT;
 import static io.prestosql.sql.planner.iterative.rule.HintedReorderJoins.HintedReorderJoinsRule.JoinEnumerationResult.UNKNOWN_COST_RESULT;
 import static io.prestosql.sql.planner.iterative.rule.HintedReorderJoins.HintedReorderJoinsRule.MultiJoinNode.toMultiJoinNode;
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
-import static io.prestosql.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.plan.Patterns.join;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static java.util.Objects.requireNonNull;
@@ -119,9 +123,9 @@ public class HintedReorderJoins
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        return SimplePlanRewriter.rewriteWith(new PreRuleOptimizer(session, types, symbolAllocator, idAllocator, warningCollector),
+        return SimplePlanRewriter.rewriteWith(new PreRuleOptimizer(session, types, planSymbolAllocator, idAllocator, warningCollector),
                 plan);
     }
 
@@ -130,22 +134,22 @@ public class HintedReorderJoins
     {
         private final Session session;
         private final TypeProvider types;
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
         private final PlanNodeIdAllocator idAllocator;
         private final WarningCollector warningCollector;
         private Set<PlanNode> optimizableSources;
 
-        private PreRuleOptimizer(Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+        private PreRuleOptimizer(Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
         {
             this.session = session;
             this.types = types;
-            this.symbolAllocator = symbolAllocator;
+            this.planSymbolAllocator = planSymbolAllocator;
             this.idAllocator = idAllocator;
             this.warningCollector = warningCollector;
         }
 
         @Override
-        protected PlanNode visitPlan(PlanNode node, RewriteContext<Void> context)
+        public PlanNode visitPlan(PlanNode node, RewriteContext<Void> context)
         {
             if (optimizableSources != null && optimizableSources.contains(node)) {
                 // this node is already considered as part of the highest level join
@@ -175,7 +179,7 @@ public class HintedReorderJoins
             return new IterativeOptimizer(stats,
                     statsCalculator,
                     costCalculator,
-                    ImmutableSet.of(new HintedReorderJoinsRule(costComparator))).optimize(planNode, session, types, symbolAllocator, idAllocator, warningCollector);
+                    ImmutableSet.of(new HintedReorderJoinsRule(costComparator))).optimize(planNode, session, types, planSymbolAllocator, idAllocator, warningCollector);
         }
     }
 
@@ -208,7 +212,9 @@ public class HintedReorderJoins
             }
 
             JoinNode joinNode = (JoinNode) node;
-            if (joinNode.getType() != INNER || !isDeterministic(joinNode.getFilter().orElse(TRUE_LITERAL)) || joinNode.getDistributionType().isPresent()) {
+            if (joinNode.getType() != INNER
+                    || !isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL))
+                    || joinNode.getDistributionType().isPresent()) {
                 sources.add(node);
                 return;
             }
@@ -217,7 +223,7 @@ public class HintedReorderJoins
             flattenNode(joinNode.getLeft(), limit - 1);
             flattenNode(joinNode.getRight(), limit);
             joinNode.getCriteria().stream()
-                    .map(JoinNode.EquiJoinClause::toExpression)
+                    .map(JoinNodeUtils::toExpression)
                     .forEach(filters::add);
         }
 
@@ -237,7 +243,7 @@ public class HintedReorderJoins
         private static final Pattern<JoinNode> PATTERN = join().matching(
                 joinNode -> !joinNode.getDistributionType().isPresent()
                         && joinNode.getType() == INNER
-                        && isDeterministic(joinNode.getFilter().orElse(TRUE_LITERAL)));
+                        && isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL)));
 
         private final CostComparator costComparator;
 
@@ -480,7 +486,7 @@ public class HintedReorderJoins
                                 right,
                                 joinConditions,
                                 sortedOutputSymbols,
-                                joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)),
+                                joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)).map(OriginalExpressionUtils::castToRowExpression),
                                 Optional.empty(),
                                 Optional.empty(),
                                 Optional.empty(),
@@ -525,7 +531,7 @@ public class HintedReorderJoins
                             .forEach(predicates::add);
                     Expression filter = combineConjuncts(predicates.build());
                     if (!TRUE_LITERAL.equals(filter)) {
-                        planNode = new FilterNode(idAllocator.getNextId(), planNode, filter);
+                        planNode = new FilterNode(idAllocator.getNextId(), planNode, castToRowExpression(filter));
                     }
                     return createJoinEnumerationResult(planNode);
                 }
@@ -542,8 +548,8 @@ public class HintedReorderJoins
 
             private static EquiJoinClause toEquiJoinClause(ComparisonExpression equality, Set<Symbol> leftSymbols)
             {
-                Symbol leftSymbol = Symbol.from(equality.getLeft());
-                Symbol rightSymbol = Symbol.from(equality.getRight());
+                Symbol leftSymbol = SymbolUtils.from(equality.getLeft());
+                Symbol rightSymbol = SymbolUtils.from(equality.getRight());
                 EquiJoinClause equiJoinClause = new EquiJoinClause(leftSymbol, rightSymbol);
                 return leftSymbols.contains(leftSymbol) ? equiJoinClause : equiJoinClause.flip();
             }
@@ -708,7 +714,9 @@ public class HintedReorderJoins
                     }
 
                     JoinNode joinNode = (JoinNode) resolved;
-                    if (joinNode.getType() != INNER || !isDeterministic(joinNode.getFilter().orElse(TRUE_LITERAL)) || joinNode.getDistributionType().isPresent()) {
+                    if (joinNode.getType() != INNER
+                            || !isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL))
+                            || joinNode.getDistributionType().isPresent()) {
                         sources.add(node);
                         return;
                     }
@@ -717,9 +725,9 @@ public class HintedReorderJoins
                     flattenNode(joinNode.getLeft(), limit - 1);
                     flattenNode(joinNode.getRight(), limit);
                     joinNode.getCriteria().stream()
-                            .map(EquiJoinClause::toExpression)
+                            .map(JoinNodeUtils::toExpression)
                             .forEach(filters::add);
-                    joinNode.getFilter().ifPresent(filters::add);
+                    joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).ifPresent(filters::add);
                 }
 
                 MultiJoinNode toMultiJoinNode()
@@ -800,7 +808,7 @@ public class HintedReorderJoins
         }
 
         private static class TableNameExtractor
-                extends PlanVisitor<Void, StringBuilder>
+                extends InternalPlanVisitor<Void, StringBuilder>
         {
             private final Lookup lookup;
             private String pattern = "";
@@ -818,7 +826,7 @@ public class HintedReorderJoins
             }
 
             @Override
-            protected Void visitPlan(PlanNode node, StringBuilder context)
+            public Void visitPlan(PlanNode node, StringBuilder context)
             {
                 node = lookup.resolve(node);
                 for (PlanNode source : node.getSources()) {

@@ -16,7 +16,7 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import io.prestosql.sql.planner.DeterminismEvaluator;
+import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionRewriter;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
@@ -124,7 +124,7 @@ public class ExtractCommonPredicatesExpressionRewriter
          */
         private static Expression distributeIfPossible(LogicalBinaryExpression expression)
         {
-            if (!DeterminismEvaluator.isDeterministic(expression)) {
+            if (!ExpressionDeterminismEvaluator.isDeterministic(expression)) {
                 // Do not distribute boolean expressions if there are any non-deterministic elements
                 // TODO: This can be optimized further if non-deterministic elements are not repeated
                 return expression;
@@ -168,7 +168,7 @@ public class ExtractCommonPredicatesExpressionRewriter
         private static Set<Expression> filterDeterministicPredicates(List<Expression> predicates)
         {
             return predicates.stream()
-                    .filter(DeterminismEvaluator::isDeterministic)
+                    .filter(ExpressionDeterminismEvaluator::isDeterministic)
                     .collect(toSet());
         }
 

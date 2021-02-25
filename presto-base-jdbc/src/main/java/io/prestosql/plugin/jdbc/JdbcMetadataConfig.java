@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 public class JdbcMetadataConfig
 {
     private boolean allowDropTable;
-
     // added by Hetu for metadata caching
     private Duration metadataCacheTtl = new Duration(1, TimeUnit.SECONDS); // metadata cache eviction time
     private long metadataCacheMaximumSize = 10000; // metadata cache max size

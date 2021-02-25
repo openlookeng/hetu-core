@@ -14,7 +14,7 @@
 package io.prestosql.execution;
 
 import io.airlift.json.JsonCodec;
-import io.prestosql.connector.CatalogName;
+import io.prestosql.spi.connector.CatalogName;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

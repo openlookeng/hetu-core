@@ -15,79 +15,92 @@
 
 package io.hetu.core.heuristicindex.util;
 
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.prestosql.sql.tree.BooleanLiteral;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.DecimalLiteral;
-import io.prestosql.sql.tree.DoubleLiteral;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.GenericLiteral;
-import io.prestosql.sql.tree.LongLiteral;
-import io.prestosql.sql.tree.StringLiteral;
-import io.prestosql.sql.tree.TimeLiteral;
-import io.prestosql.sql.tree.TimestampLiteral;
+import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.BooleanType;
+import io.prestosql.spi.type.CharType;
+import io.prestosql.spi.type.DecimalType;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.RealType;
+import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TinyintType;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
 import java.sql.Timestamp;
-import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.Locale;
+
+import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
+import static java.lang.Float.intBitsToFloat;
 
 public class TypeUtils
 {
-    private static final Logger LOG = Logger.get(TypeUtils.class);
-
     private TypeUtils() {}
 
-    public static Object extractSingleValue(Expression expression)
+    private static final String CAST_OPERATOR = "$operator$cast";
+
+    public static Object extractSingleValue(RowExpression rowExpression)
     {
-        if (expression instanceof Cast) {
-            return extractSingleValue(((Cast) expression).getExpression());
-        }
-        else if (expression instanceof BooleanLiteral) {
-            return ((BooleanLiteral) expression).getValue();
-        }
-        else if (expression instanceof DecimalLiteral) {
-            String value = ((DecimalLiteral) expression).getValue();
-            return new BigDecimal(value);
-        }
-        else if (expression instanceof DoubleLiteral) {
-            return ((DoubleLiteral) expression).getValue();
-        }
-        else if (expression instanceof LongLiteral) {
-            return ((LongLiteral) expression).getValue();
-        }
-        else if (expression instanceof StringLiteral) {
-            return ((StringLiteral) expression).getValue();
-        }
-        else if (expression instanceof TimeLiteral) {
-            return ((TimeLiteral) expression).getValue();
-        }
-        else if (expression instanceof TimestampLiteral) {
-            String value = ((TimestampLiteral) expression).getValue();
-            return Timestamp.valueOf(value).getTime();
-        }
-        else if (expression instanceof GenericLiteral) {
-            GenericLiteral genericLiteral = (GenericLiteral) expression;
+        if (rowExpression instanceof CallExpression) {
+            CallExpression callExpression = (CallExpression) rowExpression;
+            Signature signature = callExpression.getSignature();
+            String name = signature.getName().toLowerCase(Locale.ENGLISH);
 
-            if (genericLiteral.getType().equalsIgnoreCase("bigint")) {
-                return Long.valueOf(genericLiteral.getValue());
+            if (name.equals(CAST_OPERATOR)) {
+                return extractSingleValue(callExpression.getArguments().get(0));
             }
-            else if (genericLiteral.getType().equalsIgnoreCase("real")) {
-                return (long) Float.floatToIntBits(Float.parseFloat(genericLiteral.getValue()));
+        }
+        else if (rowExpression instanceof ConstantExpression) {
+            ConstantExpression constant = (ConstantExpression) rowExpression;
+            Type type = constant.getType();
+
+            if (type instanceof BigintType || type instanceof TinyintType || type instanceof SmallintType || type instanceof IntegerType) {
+                return constant.getValue();
             }
-            else if (genericLiteral.getType().equalsIgnoreCase("tinyint")) {
-                return Byte.valueOf(genericLiteral.getValue()).longValue();
+            else if (type instanceof BooleanType) {
+                return constant.getValue();
             }
-            else if (genericLiteral.getType().equalsIgnoreCase("smallint")) {
-                return Short.valueOf(genericLiteral.getValue()).longValue();
+            else if (type instanceof DoubleType) {
+                return constant.getValue();
             }
-            else if (genericLiteral.getType().equalsIgnoreCase("date")) {
-                return LocalDate.parse(genericLiteral.getValue()).toEpochDay();
+            else if (type instanceof RealType) {
+                Long number = (Long) constant.getValue();
+                return intBitsToFloat(number.intValue());
+            }
+            else if (type instanceof VarcharType || type instanceof CharType) {
+                if (constant.getValue() instanceof Slice) {
+                    return ((Slice) constant.getValue()).toStringUtf8();
+                }
+                return constant.getValue();
+            }
+            else if (type instanceof DecimalType) {
+                DecimalType decimalType = (DecimalType) type;
+                if (decimalType.isShort()) {
+                    checkState(constant.getValue() instanceof Long);
+                    return new BigDecimal(BigInteger.valueOf((Long) constant.getValue()), decimalType.getScale(), new MathContext(decimalType.getPrecision()));
+                }
+                checkState(constant.getValue() instanceof Slice);
+                Slice value = (Slice) constant.getValue();
+                return new BigDecimal(decodeUnscaledValue(value), decimalType.getScale(), new MathContext(decimalType.getPrecision()));
+            }
+            else if (type instanceof TimestampType) {
+                Long time = (Long) constant.getValue();
+                return new Timestamp(time);
             }
         }
 
-        throw new UnsupportedOperationException("Not Implemented Exception: " + expression.toString());
+        throw new UnsupportedOperationException("Not Implemented Exception: " + rowExpression.toString());
     }
 
     public static Object getNativeValue(Object object)

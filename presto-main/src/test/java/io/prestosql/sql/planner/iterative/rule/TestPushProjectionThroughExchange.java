@@ -16,15 +16,14 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.sql.planner.OrderingScheme;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.tree.ArithmeticBinaryExpression;
-import io.prestosql.sql.tree.LongLiteral;
-import io.prestosql.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.exchange;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
@@ -32,6 +31,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.sort;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
+import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.tree.SortItem.NullOrdering.FIRST;
 import static io.prestosql.sql.tree.SortItem.Ordering.ASCENDING;
 
@@ -44,7 +44,7 @@ public class TestPushProjectionThroughExchange
         tester().assertThat(new PushProjectionThroughExchange())
                 .on(p ->
                         p.project(
-                                Assignments.of(p.symbol("x"), new LongLiteral("3")),
+                                Assignments.of(p.symbol("x"), constant(3L, BIGINT)),
                                 p.values(p.symbol("a"))))
                 .doesNotFire();
     }
@@ -60,8 +60,8 @@ public class TestPushProjectionThroughExchange
 
                     return p.project(
                             Assignments.builder()
-                                    .put(a, a.toSymbolReference())
-                                    .put(b, b.toSymbolReference())
+                                    .put(a, p.variable(a.getName()))
+                                    .put(b, p.variable(b.getName()))
                                     .build(),
                             p.exchange(e -> e
                                     .addSource(p.values(a, b, c))
@@ -83,8 +83,8 @@ public class TestPushProjectionThroughExchange
                     Symbol x = p.symbol("x");
                     return p.project(
                             Assignments.of(
-                                    x, new LongLiteral("3"),
-                                    c2, new SymbolReference("c")),
+                                    x, constant(3L, BIGINT),
+                                    c2, p.variable("c")),
                             p.exchange(e -> e
                                     .addSource(
                                             p.values(a))
@@ -120,9 +120,9 @@ public class TestPushProjectionThroughExchange
                     Symbol hTimes5 = p.symbol("h_times_5");
                     return p.project(
                             Assignments.builder()
-                                    .put(aTimes5, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, new SymbolReference("a"), new LongLiteral("5")))
-                                    .put(bTimes5, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, new SymbolReference("b"), new LongLiteral("5")))
-                                    .put(hTimes5, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, new SymbolReference("h"), new LongLiteral("5")))
+                                    .put(aTimes5, p.binaryOperation(OperatorType.MULTIPLY, p.variable("a"), constant(5L, BIGINT)))
+                                    .put(bTimes5, p.binaryOperation(OperatorType.MULTIPLY, p.variable("b"), constant(5L, BIGINT)))
+                                    .put(hTimes5, p.binaryOperation(OperatorType.MULTIPLY, p.variable("h"), constant(5L, BIGINT)))
                                     .build(),
                             p.exchange(e -> e
                                     .addSource(
@@ -164,9 +164,9 @@ public class TestPushProjectionThroughExchange
                     OrderingScheme orderingScheme = new OrderingScheme(ImmutableList.of(sortSymbol), ImmutableMap.of(sortSymbol, SortOrder.ASC_NULLS_FIRST));
                     return p.project(
                             Assignments.builder()
-                                    .put(aTimes5, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, new SymbolReference("a"), new LongLiteral("5")))
-                                    .put(bTimes5, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, new SymbolReference("b"), new LongLiteral("5")))
-                                    .put(hTimes5, new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, new SymbolReference("h"), new LongLiteral("5")))
+                                    .put(aTimes5, p.binaryOperation(OperatorType.MULTIPLY, p.variable("a"), constant(5L, BIGINT)))
+                                    .put(bTimes5, p.binaryOperation(OperatorType.MULTIPLY, p.variable("b"), constant(5L, BIGINT)))
+                                    .put(hTimes5, p.binaryOperation(OperatorType.MULTIPLY, p.variable("h"), constant(5L, BIGINT)))
                                     .build(),
                             p.exchange(e -> e
                                     .addSource(

@@ -19,24 +19,25 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.ExceptNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.IntersectNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.SetOperationNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.ExpressionUtils;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.ExceptNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.IntersectNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.SetOperationNode;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
-import io.prestosql.sql.planner.plan.UnionNode;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -51,11 +52,14 @@ import java.util.Optional;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.concat;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
+import static io.prestosql.spi.plan.AggregationNode.Step;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.sourceSymbolMap;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
@@ -121,15 +125,15 @@ public class ImplementIntersectAndExceptAsUnion
         implements PlanOptimizer
 {
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
         requireNonNull(types, "types is null");
-        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
-        return SimplePlanRewriter.rewriteWith(new Rewriter(idAllocator, symbolAllocator), plan);
+        return SimplePlanRewriter.rewriteWith(new Rewriter(idAllocator, planSymbolAllocator), plan);
     }
 
     private static class Rewriter
@@ -138,12 +142,12 @@ public class ImplementIntersectAndExceptAsUnion
         private static final String MARKER = "marker";
         private static final Signature COUNT_AGGREGATION = new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN));
         private final PlanNodeIdAllocator idAllocator;
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
 
-        private Rewriter(PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator)
+        private Rewriter(PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator)
         {
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
-            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
+            this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         }
 
         @Override
@@ -200,7 +204,7 @@ public class ImplementIntersectAndExceptAsUnion
         {
             ImmutableList.Builder<Symbol> symbolsBuilder = ImmutableList.builder();
             for (int i = 0; i < count; i++) {
-                symbolsBuilder.add(symbolAllocator.newSymbol(nameHint, type));
+                symbolsBuilder.add(planSymbolAllocator.newSymbol(nameHint, type));
             }
             return symbolsBuilder.build();
         }
@@ -209,7 +213,7 @@ public class ImplementIntersectAndExceptAsUnion
         {
             ImmutableList.Builder<PlanNode> result = ImmutableList.builder();
             for (int i = 0; i < nodes.size(); i++) {
-                result.add(appendMarkers(nodes.get(i), i, markers, node.sourceSymbolMap(i)));
+                result.add(appendMarkers(nodes.get(i), i, markers, sourceSymbolMap(node, i)));
             }
             return result.build();
         }
@@ -219,14 +223,14 @@ public class ImplementIntersectAndExceptAsUnion
             Assignments.Builder assignments = Assignments.builder();
             // add existing intersect symbols to projection
             for (Map.Entry<Symbol, SymbolReference> entry : projections.entrySet()) {
-                Symbol symbol = symbolAllocator.newSymbol(entry.getKey().getName(), symbolAllocator.getTypes().get(entry.getKey()));
-                assignments.put(symbol, entry.getValue());
+                Symbol symbol = planSymbolAllocator.newSymbol(entry.getKey().getName(), planSymbolAllocator.getTypes().get(entry.getKey()));
+                assignments.put(symbol, castToRowExpression(entry.getValue()));
             }
 
             // add extra marker fields to the projection
             for (int i = 0; i < markers.size(); ++i) {
                 Expression expression = (i == markerIndex) ? TRUE_LITERAL : new Cast(new NullLiteral(), StandardTypes.BOOLEAN);
-                assignments.put(symbolAllocator.newSymbol(markers.get(i).getName(), BOOLEAN), expression);
+                assignments.put(planSymbolAllocator.newSymbol(markers.get(i).getName(), BOOLEAN), castToRowExpression(expression));
             }
 
             return new ProjectNode(idAllocator.getNextId(), source, assignments.build());
@@ -252,7 +256,7 @@ public class ImplementIntersectAndExceptAsUnion
                 Symbol output = aggregationOutputs.get(i);
                 aggregations.put(output, new Aggregation(
                         COUNT_AGGREGATION,
-                        ImmutableList.of(markers.get(i).toSymbolReference()),
+                        ImmutableList.of(castToRowExpression(toSymbolReference(markers.get(i)))),
                         false,
                         Optional.empty(),
                         Optional.empty(),
@@ -272,20 +276,21 @@ public class ImplementIntersectAndExceptAsUnion
         private FilterNode addFilterForIntersect(AggregationNode aggregation)
         {
             ImmutableList<Expression> predicates = aggregation.getAggregations().keySet().stream()
-                    .map(column -> new ComparisonExpression(GREATER_THAN_OR_EQUAL, column.toSymbolReference(), new GenericLiteral("BIGINT", "1")))
+                    .map(column -> new ComparisonExpression(GREATER_THAN_OR_EQUAL, toSymbolReference(column), new GenericLiteral("BIGINT", "1")))
                     .collect(toImmutableList());
-            return new FilterNode(idAllocator.getNextId(), aggregation, ExpressionUtils.and(predicates));
+            return new FilterNode(idAllocator.getNextId(), aggregation, castToRowExpression(ExpressionUtils.and(predicates)));
         }
 
         private FilterNode addFilterForExcept(AggregationNode aggregation, Symbol firstSource, List<Symbol> remainingSources)
         {
             ImmutableList.Builder<Expression> predicatesBuilder = ImmutableList.builder();
-            predicatesBuilder.add(new ComparisonExpression(GREATER_THAN_OR_EQUAL, firstSource.toSymbolReference(), new GenericLiteral("BIGINT", "1")));
+            predicatesBuilder.add(new ComparisonExpression(GREATER_THAN_OR_EQUAL, toSymbolReference(firstSource), new GenericLiteral("BIGINT", "1")));
             for (Symbol symbol : remainingSources) {
-                predicatesBuilder.add(new ComparisonExpression(EQUAL, symbol.toSymbolReference(), new GenericLiteral("BIGINT", "0")));
+                predicatesBuilder.add(new ComparisonExpression(EQUAL, toSymbolReference(symbol), new GenericLiteral("BIGINT", "0")));
             }
 
-            return new FilterNode(idAllocator.getNextId(), aggregation, ExpressionUtils.and(predicatesBuilder.build()));
+            return new FilterNode(idAllocator.getNextId(), aggregation,
+                    castToRowExpression(ExpressionUtils.and(predicatesBuilder.build())));
         }
 
         private ProjectNode project(PlanNode node, List<Symbol> columns)
@@ -293,7 +298,7 @@ public class ImplementIntersectAndExceptAsUnion
             return new ProjectNode(
                     idAllocator.getNextId(),
                     node,
-                    Assignments.identity(columns));
+                    AssignmentUtils.identityAsSymbolReferences(columns));
         }
     }
 }

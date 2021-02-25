@@ -26,33 +26,38 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.ResolvedIndex;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.plan.WindowNode.Function;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.sql.planner.DomainTranslator;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.sql.expression.Types;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.SortNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.planner.plan.WindowNode;
-import io.prestosql.sql.planner.plan.WindowNode.Function;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
-import io.prestosql.sql.tree.WindowFrame;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -65,6 +70,10 @@ import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
+import static io.prestosql.sql.planner.plan.AssignmentUtils.identityAsSymbolReferences;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
@@ -80,27 +89,27 @@ public class IndexJoinOptimizer
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider type, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider type, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
-        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
-        return SimplePlanRewriter.rewriteWith(new Rewriter(symbolAllocator, idAllocator, metadata, session), plan, null);
+        return SimplePlanRewriter.rewriteWith(new Rewriter(planSymbolAllocator, idAllocator, metadata, session), plan, null);
     }
 
     private static class Rewriter
             extends SimplePlanRewriter<Void>
     {
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
         private final PlanNodeIdAllocator idAllocator;
         private final Metadata metadata;
         private final Session session;
 
-        private Rewriter(SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session)
+        private Rewriter(PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session)
         {
-            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
+            this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
             this.session = requireNonNull(session, "session is null");
@@ -119,7 +128,7 @@ public class IndexJoinOptimizer
                 Optional<PlanNode> leftIndexCandidate = IndexSourceRewriter.rewriteWithIndex(
                         leftRewritten,
                         ImmutableSet.copyOf(leftJoinSymbols),
-                        symbolAllocator,
+                        planSymbolAllocator,
                         idAllocator,
                         metadata,
                         session);
@@ -132,7 +141,7 @@ public class IndexJoinOptimizer
                 Optional<PlanNode> rightIndexCandidate = IndexSourceRewriter.rewriteWithIndex(
                         rightRewritten,
                         ImmutableSet.copyOf(rightJoinSymbols),
-                        symbolAllocator,
+                        planSymbolAllocator,
                         idAllocator,
                         metadata,
                         session);
@@ -155,14 +164,15 @@ public class IndexJoinOptimizer
 
                         if (indexJoinNode != null) {
                             if (node.getFilter().isPresent()) {
-                                indexJoinNode = new FilterNode(idAllocator.getNextId(), indexJoinNode, node.getFilter().get());
+                                indexJoinNode = new FilterNode(idAllocator.getNextId(),
+                                        indexJoinNode, node.getFilter().get());
                             }
 
                             if (!indexJoinNode.getOutputSymbols().equals(node.getOutputSymbols())) {
                                 indexJoinNode = new ProjectNode(
                                         idAllocator.getNextId(),
                                         indexJoinNode,
-                                        Assignments.identity(node.getOutputSymbols()));
+                                        identityAsSymbolReferences(node.getOutputSymbols()));
                             }
 
                             return indexJoinNode;
@@ -204,7 +214,7 @@ public class IndexJoinOptimizer
                 result = new ProjectNode(
                         idAllocator.getNextId(),
                         result,
-                        Assignments.identity(expectedOutputs));
+                        AssignmentUtils.identityAsSymbolReferences(expectedOutputs));
             }
             return result;
         }
@@ -226,17 +236,17 @@ public class IndexJoinOptimizer
     private static class IndexSourceRewriter
             extends SimplePlanRewriter<IndexSourceRewriter.Context>
     {
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
         private final PlanNodeIdAllocator idAllocator;
         private final Metadata metadata;
-        private final DomainTranslator domainTranslator;
+        private final ExpressionDomainTranslator domainTranslator;
         private final Session session;
 
-        private IndexSourceRewriter(SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session)
+        private IndexSourceRewriter(PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session)
         {
             this.metadata = requireNonNull(metadata, "metadata is null");
-            this.domainTranslator = new DomainTranslator(new LiteralEncoder(metadata));
-            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
+            this.domainTranslator = new ExpressionDomainTranslator(new LiteralEncoder(metadata));
+            this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "symbolAllocator is null");
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.session = requireNonNull(session, "session is null");
         }
@@ -244,13 +254,13 @@ public class IndexJoinOptimizer
         public static Optional<PlanNode> rewriteWithIndex(
                 PlanNode planNode,
                 Set<Symbol> lookupSymbols,
-                SymbolAllocator symbolAllocator,
+                PlanSymbolAllocator planSymbolAllocator,
                 PlanNodeIdAllocator idAllocator,
                 Metadata metadata,
                 Session session)
         {
             AtomicBoolean success = new AtomicBoolean();
-            IndexSourceRewriter indexSourceRewriter = new IndexSourceRewriter(symbolAllocator, idAllocator, metadata, session);
+            IndexSourceRewriter indexSourceRewriter = new IndexSourceRewriter(planSymbolAllocator, idAllocator, metadata, session);
             PlanNode rewritten = SimplePlanRewriter.rewriteWith(indexSourceRewriter, planNode, new Context(lookupSymbols, success));
             if (success.get()) {
                 return Optional.of(rewritten);
@@ -273,11 +283,11 @@ public class IndexJoinOptimizer
 
         private PlanNode planTableScan(TableScanNode node, Expression predicate, Context context)
         {
-            DomainTranslator.ExtractionResult decomposedPredicate = DomainTranslator.fromPredicate(
+            ExpressionDomainTranslator.ExtractionResult decomposedPredicate = ExpressionDomainTranslator.fromPredicate(
                     metadata,
                     session,
                     predicate,
-                    symbolAllocator.getTypes());
+                    planSymbolAllocator.getTypes());
 
             TupleDomain<ColumnHandle> simplifiedConstraint = decomposedPredicate.getTupleDomain()
                     .transform(node.getAssignments()::get)
@@ -315,7 +325,7 @@ public class IndexJoinOptimizer
 
             if (!resultingPredicate.equals(TRUE_LITERAL)) {
                 // todo it is likely we end up with redundant filters here because the predicate push down has already been run... the fix is to run predicate push down again
-                source = new FilterNode(idAllocator.getNextId(), source, resultingPredicate);
+                source = new FilterNode(idAllocator.getNextId(), source, castToRowExpression(resultingPredicate));
             }
             context.markSuccess();
             return source;
@@ -327,8 +337,9 @@ public class IndexJoinOptimizer
             // Rewrite the lookup symbols in terms of only the pre-projected symbols that have direct translations
             Set<Symbol> newLookupSymbols = context.get().getLookupSymbols().stream()
                     .map(node.getAssignments()::get)
+                    .map(OriginalExpressionUtils::castToExpression)
                     .filter(SymbolReference.class::isInstance)
-                    .map(Symbol::from)
+                    .map(SymbolUtils::from)
                     .collect(toImmutableSet());
 
             if (newLookupSymbols.isEmpty()) {
@@ -342,7 +353,7 @@ public class IndexJoinOptimizer
         public PlanNode visitFilter(FilterNode node, RewriteContext<Context> context)
         {
             if (node.getSource() instanceof TableScanNode) {
-                return planTableScan((TableScanNode) node.getSource(), node.getPredicate(), context.get());
+                return planTableScan((TableScanNode) node.getSource(), castToExpression(node.getPredicate()), context.get());
             }
 
             return context.defaultRewrite(node, new Context(context.get().getLookupSymbols(), context.get().getSuccess()));
@@ -367,7 +378,7 @@ public class IndexJoinOptimizer
             // Only RANGE frame type currently supported for aggregation functions because it guarantees the
             // same value for each peer group.
             // ROWS frame type requires the ordering to be fully deterministic (e.g. deterministically sorted on all columns)
-            if (node.getFrames().stream().map(WindowNode.Frame::getType).anyMatch(type -> type != WindowFrame.Type.RANGE)) { // TODO: extract frames of type RANGE and allow optimization on them
+            if (node.getFrames().stream().map(WindowNode.Frame::getType).anyMatch(type -> type != Types.WindowFrameType.RANGE)) { // TODO: extract frames of type RANGE and allow optimization on them
                 return node;
             }
 
@@ -476,10 +487,10 @@ public class IndexJoinOptimizer
         }
 
         private static class Visitor
-                extends PlanVisitor<Map<Symbol, Symbol>, Set<Symbol>>
+                extends InternalPlanVisitor<Map<Symbol, Symbol>, Set<Symbol>>
         {
             @Override
-            protected Map<Symbol, Symbol> visitPlan(PlanNode node, Set<Symbol> lookupSymbols)
+            public Map<Symbol, Symbol> visitPlan(PlanNode node, Set<Symbol> lookupSymbols)
             {
                 throw new UnsupportedOperationException("Node not expected to be part of Index pipeline: " + node);
             }
@@ -488,7 +499,21 @@ public class IndexJoinOptimizer
             public Map<Symbol, Symbol> visitProject(ProjectNode node, Set<Symbol> lookupSymbols)
             {
                 // Map from output Symbols to source Symbols
-                Map<Symbol, Symbol> directSymbolTranslationOutputMap = Maps.transformValues(Maps.filterValues(node.getAssignments().getMap(), SymbolReference.class::isInstance), Symbol::from);
+                Map<Symbol, Symbol> directSymbolTranslationOutputMap = new HashMap<>();
+                for (Map.Entry<Symbol, RowExpression> entry : node.getAssignments().getMap().entrySet()) {
+                    if (isExpression(entry.getValue())) {
+                        Expression expression = castToExpression(entry.getValue());
+                        if (expression instanceof SymbolReference) {
+                            directSymbolTranslationOutputMap.put(entry.getKey(), SymbolUtils.from(expression));
+                        }
+                    }
+                    else {
+                        if (entry.getValue() instanceof VariableReferenceExpression) {
+                            directSymbolTranslationOutputMap.put(entry.getKey(), new Symbol(((VariableReferenceExpression) entry.getValue()).getName()));
+                        }
+                    }
+                }
+
                 Map<Symbol, Symbol> outputToSourceMap = lookupSymbols.stream()
                         .filter(directSymbolTranslationOutputMap.keySet()::contains)
                         .collect(toImmutableMap(identity(), directSymbolTranslationOutputMap::get));

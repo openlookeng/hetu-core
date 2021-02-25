@@ -15,15 +15,22 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.tree.FunctionCall;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 
+import static io.prestosql.spi.function.Signature.internalOperator;
+import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
@@ -31,7 +38,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.globalAggrega
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
-import static io.prestosql.sql.planner.plan.AggregationNode.Step.SINGLE;
+import static io.prestosql.sql.relational.Expressions.constant;
 
 public class TestSingleDistinctAggregationToGroupBy
         extends BaseRuleTest
@@ -83,6 +90,8 @@ public class TestSingleDistinctAggregationToGroupBy
     @Test
     public void testDistinctWithFilter()
     {
+        Signature moreThan = internalOperator(OperatorType.GREATER_THAN, BOOLEAN, ImmutableList.of(BIGINT, BIGINT));
+        CallExpression filterExpression = new CallExpression(moreThan, BOOLEAN, ImmutableList.of(new VariableReferenceExpression("input2", BIGINT), constant(10L, BIGINT)));
         tester().assertThat(new SingleDistinctAggregationToGroupBy())
                 .on(p -> p.aggregation(builder -> builder
                         .globalGrouping()
@@ -90,9 +99,9 @@ public class TestSingleDistinctAggregationToGroupBy
                         .source(
                                 p.project(
                                         Assignments.builder()
-                                                .putIdentity(p.symbol("input1"))
-                                                .putIdentity(p.symbol("input2"))
-                                                .put(p.symbol("filter1"), expression("input2 > 0"))
+                                                .put(p.symbol("input1"), p.variable("input1"))
+                                                .put(p.symbol("input2"), p.variable("input2"))
+                                                .put(p.symbol("filter1"), filterExpression)
                                                 .build(),
                                         p.values(
                                                 p.symbol("input1"),

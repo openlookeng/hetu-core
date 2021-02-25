@@ -16,10 +16,11 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import java.util.List;
@@ -30,6 +31,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.planner.ExpressionExtractor.extractExpressions;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
@@ -66,8 +68,8 @@ final class SemiJoinMatcher
         checkState(shapeMatches(node), "Plan testing framework error: shapeMatches returned false in detailMatches in %s", this.getClass().getName());
 
         SemiJoinNode semiJoinNode = (SemiJoinNode) node;
-        if (!(symbolAliases.get(sourceSymbolAlias).equals(semiJoinNode.getSourceJoinSymbol().toSymbolReference()) &&
-                symbolAliases.get(filteringSymbolAlias).equals(semiJoinNode.getFilteringSourceJoinSymbol().toSymbolReference()))) {
+        if (!(symbolAliases.get(sourceSymbolAlias).equals(toSymbolReference(semiJoinNode.getSourceJoinSymbol())) &&
+                symbolAliases.get(filteringSymbolAlias).equals(toSymbolReference(semiJoinNode.getFilteringSourceJoinSymbol())))) {
             return NO_MATCH;
         }
 
@@ -90,11 +92,11 @@ final class SemiJoinMatcher
                         .filter(descriptor -> descriptor.getId().equals(dynamicFilterId))
                         .collect(toImmutableList());
                 boolean sourceSymbolsMatch = matchingDescriptors.stream()
-                        .map(descriptor -> Symbol.from(descriptor.getInput()))
-                        .allMatch(sourceSymbol -> symbolAliases.get(sourceSymbolAlias).equals(sourceSymbol.toSymbolReference()));
+                        .map(descriptor -> new Symbol(((VariableReferenceExpression) descriptor.getInput()).getName()))
+                        .allMatch(sourceSymbol -> symbolAliases.get(sourceSymbolAlias).equals(toSymbolReference(sourceSymbol)));
 
                 if (!matchingDescriptors.isEmpty() && sourceSymbolsMatch) {
-                    return match(outputAlias, semiJoinNode.getSemiJoinOutput().toSymbolReference());
+                    return match(outputAlias, toSymbolReference(semiJoinNode.getSemiJoinOutput()));
                 }
                 return NO_MATCH;
             }
@@ -103,7 +105,7 @@ final class SemiJoinMatcher
             }
         }
 
-        return match(outputAlias, semiJoinNode.getSemiJoinOutput().toSymbolReference());
+        return match(outputAlias, toSymbolReference(semiJoinNode.getSemiJoinOutput()));
     }
 
     @Override

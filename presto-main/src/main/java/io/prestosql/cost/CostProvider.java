@@ -13,7 +13,7 @@
  */
 package io.prestosql.cost;
 
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
 
 public interface CostProvider
 {

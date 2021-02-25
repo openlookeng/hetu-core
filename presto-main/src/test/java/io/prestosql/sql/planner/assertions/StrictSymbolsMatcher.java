@@ -16,8 +16,9 @@ package io.prestosql.sql.planner.assertions;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -43,7 +44,7 @@ public class StrictSymbolsMatcher
     {
         return expectedAliases.stream()
                 .map(symbolAliases::get)
-                .map(Symbol::from)
+                .map(SymbolUtils::from)
                 .collect(toImmutableSet());
     }
 

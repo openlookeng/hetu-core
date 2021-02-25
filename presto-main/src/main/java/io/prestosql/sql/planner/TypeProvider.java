@@ -14,6 +14,7 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 
 import java.util.Collections;

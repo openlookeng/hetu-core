@@ -14,15 +14,15 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.assertions.ExpressionMatcher;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
 import org.testng.annotations.Test;
 
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.castToRowExpression;
 
 public class TestInlineProjections
         extends BaseRuleTest
@@ -34,19 +34,19 @@ public class TestInlineProjections
                 .on(p ->
                         p.project(
                                 Assignments.builder()
-                                        .put(p.symbol("identity"), expression("symbol")) // identity
-                                        .put(p.symbol("multi_complex_1"), expression("complex + 1")) // complex expression referenced multiple times
-                                        .put(p.symbol("multi_complex_2"), expression("complex + 2")) // complex expression referenced multiple times
-                                        .put(p.symbol("multi_literal_1"), expression("literal + 1")) // literal referenced multiple times
-                                        .put(p.symbol("multi_literal_2"), expression("literal + 2")) // literal referenced multiple times
-                                        .put(p.symbol("single_complex"), expression("complex_2 + 2")) // complex expression reference only once
-                                        .put(p.symbol("try"), expression("try(complex / literal)"))
+                                        .put(p.symbol("identity"), castToRowExpression("symbol")) // identity
+                                        .put(p.symbol("multi_complex_1"), castToRowExpression("complex + 1")) // complex expression referenced multiple times
+                                        .put(p.symbol("multi_complex_2"), castToRowExpression("complex + 2")) // complex expression referenced multiple times
+                                        .put(p.symbol("multi_literal_1"), castToRowExpression("literal + 1")) // literal referenced multiple times
+                                        .put(p.symbol("multi_literal_2"), castToRowExpression("literal + 2")) // literal referenced multiple times
+                                        .put(p.symbol("single_complex"), castToRowExpression("complex_2 + 2")) // complex expression reference only once
+                                        .put(p.symbol("try"), castToRowExpression("try(complex / literal)"))
                                         .build(),
                                 p.project(Assignments.builder()
-                                                .put(p.symbol("symbol"), expression("x"))
-                                                .put(p.symbol("complex"), expression("x * 2"))
-                                                .put(p.symbol("literal"), expression("1"))
-                                                .put(p.symbol("complex_2"), expression("x - 1"))
+                                                .put(p.symbol("symbol"), castToRowExpression("x"))
+                                                .put(p.symbol("complex"), castToRowExpression("x * 2"))
+                                                .put(p.symbol("literal"), castToRowExpression("1"))
+                                                .put(p.symbol("complex_2"), castToRowExpression("x - 1"))
                                                 .build(),
                                         p.values(p.symbol("x")))))
                 .matches(
@@ -73,9 +73,9 @@ public class TestInlineProjections
         tester().assertThat(new InlineProjections())
                 .on(p ->
                         p.project(
-                                Assignments.of(p.symbol("output"), expression("value")),
+                                Assignments.of(p.symbol("output"), castToRowExpression("value")),
                                 p.project(
-                                        Assignments.identity(p.symbol("value")),
+                                        Assignments.of(p.symbol("value"), p.variable("value")),
                                         p.values(p.symbol("value")))))
                 .doesNotFire();
     }
@@ -86,9 +86,9 @@ public class TestInlineProjections
         tester().assertThat(new InlineProjections())
                 .on(p ->
                         p.project(
-                                Assignments.identity(p.symbol("fromOuterScope"), p.symbol("value")),
+                                Assignments.of(p.symbol("fromOuterScope"), p.variable("fromOuterScope"), p.symbol("value"), p.variable("value")),
                                 p.project(
-                                        Assignments.identity(p.symbol("value")),
+                                        Assignments.of(p.symbol("value"), p.variable("value")),
                                         p.values(p.symbol("value")))))
                 .doesNotFire();
     }

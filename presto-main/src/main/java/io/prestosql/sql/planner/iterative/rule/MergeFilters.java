@@ -16,13 +16,15 @@ package io.prestosql.sql.planner.iterative.rule;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.FilterNode;
 
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
 import static io.prestosql.sql.planner.plan.Patterns.source;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 public class MergeFilters
         implements Rule<FilterNode>
@@ -47,6 +49,9 @@ public class MergeFilters
                 new FilterNode(
                         parent.getId(),
                         child.getSource(),
-                        combineConjuncts(child.getPredicate(), parent.getPredicate())));
+                        castToRowExpression(
+                                combineConjuncts(
+                                        castToExpression(child.getPredicate()),
+                                        castToExpression(parent.getPredicate())))));
     }
 }

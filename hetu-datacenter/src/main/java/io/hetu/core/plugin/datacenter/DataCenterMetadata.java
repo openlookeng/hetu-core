@@ -32,13 +32,9 @@ import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
-import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.TableNotFoundException;
-import io.prestosql.spi.sql.SqlQueryWriter;
 import io.prestosql.spi.statistics.TableStatistics;
-import io.prestosql.spi.type.Type;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -243,49 +239,6 @@ public class DataCenterMetadata
                 OptionalLong.of(limit));
 
         return Optional.of(new LimitApplicationResult<>(handle, true));
-    }
-
-    @Override
-    public Optional<SubQueryApplicationResult<ConnectorTableHandle>> applySubQuery(ConnectorSession session,
-            ConnectorTableHandle handle, String subQuery, Map<String, Type> types)
-    {
-        if (!isQueryPushDownEnabled || subQuery.getBytes(StandardCharsets.ISO_8859_1).length >= maxRemoteHeaderSize) {
-            return Optional.empty();
-        }
-
-        // If the subQuery pushed down to the connector, table name, limit or predicate push downs are not necessary
-        // Therefore, either of the table name can be used for the new TableHandle as long as the subQuery is valid
-        requireNonNull(subQuery, "cannot apply null sub-query");
-        DataCenterTableHandle tableHandle = (DataCenterTableHandle) handle;
-
-        // If we can get the columns from the sub-query, it should be able to push sub-query down
-        List<DataCenterColumn> columns = dataCenterClient.getColumns(subQuery);
-        if (columns.isEmpty()) {
-            return Optional.empty();
-        }
-        DataCenterTableHandle newTableHandle = new DataCenterTableHandle(tableHandle.getCatalogName(),
-                tableHandle.getSchemaName(), tableHandle.getTableName(), OptionalLong.empty(), subQuery);
-
-        ImmutableMap.Builder<String, ColumnHandle> columnHandleBuilder = new ImmutableMap.Builder<>();
-        ImmutableMap.Builder<String, Type> typesBuilder = new ImmutableMap.Builder<>();
-
-        columns.forEach(column -> {
-            columnHandleBuilder.put(column.getName(),
-                    new DataCenterColumnHandle(column.getName(), column.getType(), 0));
-            typesBuilder.put(column.getName(), column.getType());
-        });
-
-        return Optional.of(
-                new SubQueryApplicationResult<>(newTableHandle, columnHandleBuilder.build(), typesBuilder.build()));
-    }
-
-    @Override
-    public Optional<SqlQueryWriter> getSqlQueryWriter()
-    {
-        if (!isQueryPushDownEnabled) {
-            return Optional.empty();
-        }
-        return Optional.of(new DataCenterSqlQueryWriter());
     }
 
     @Override

@@ -50,7 +50,7 @@ public class QueryBuilder
     private static final String ALWAYS_FALSE = "1=0";
 
     private final String identifierQuote;
-    private boolean isPushSubQueryDown;
+    private boolean isPushDown;
 
     private static class TypeAndValue
     {
@@ -86,10 +86,10 @@ public class QueryBuilder
         this.identifierQuote = requireNonNull(identifierQuote, "identifierQuote is null");
     }
 
-    public QueryBuilder(String identifierQuote, boolean isPushSubQueryDown)
+    public QueryBuilder(String identifierQuote, boolean isPushDown)
     {
         this(identifierQuote);
-        this.isPushSubQueryDown = isPushSubQueryDown;
+        this.isPushDown = isPushDown;
     }
 
     public PreparedStatement buildSql(
@@ -125,8 +125,8 @@ public class QueryBuilder
         if (!isNullOrEmpty(schema)) {
             sql.append(quote(schema)).append('.');
         }
-        if (isPushSubQueryDown) {
-            sql.append(table);
+        if (isPushDown) {
+            sql.append("(").append(table).append(") pushdown");
         }
         else {
             sql.append(quote(table));

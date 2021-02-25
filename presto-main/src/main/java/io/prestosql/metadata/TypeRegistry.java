@@ -79,7 +79,7 @@ import static io.prestosql.type.setdigest.SetDigestType.SET_DIGEST;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
-final class TypeRegistry
+public final class TypeRegistry
 {
     private final ConcurrentMap<TypeSignature, Type> types = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ParametricType> parametricTypes = new ConcurrentHashMap<>();

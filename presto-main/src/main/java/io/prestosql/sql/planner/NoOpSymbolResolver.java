@@ -13,6 +13,10 @@
  */
 package io.prestosql.sql.planner;
 
+import io.prestosql.spi.plan.Symbol;
+
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+
 public class NoOpSymbolResolver
         implements SymbolResolver
 {
@@ -21,6 +25,6 @@ public class NoOpSymbolResolver
     @Override
     public Object getValue(Symbol symbol)
     {
-        return symbol.toSymbolReference();
+        return toSymbolReference(symbol);
     }
 }

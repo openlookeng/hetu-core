@@ -15,8 +15,10 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import org.testng.annotations.Test;
 
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 
 public class TestRemoveTrivialFilters
@@ -46,7 +48,7 @@ public class TestRemoveTrivialFilters
                         p.expression("FALSE"),
                         p.values(
                                 ImmutableList.of(p.symbol("a")),
-                                ImmutableList.of(p.expressions("1")))))
+                                ImmutableList.of(PlanBuilder.constantExpressions(BIGINT, 1L)))))
                 .matches(values("a"));
     }
 }

@@ -14,19 +14,19 @@
 package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.Range;
-import io.prestosql.sql.planner.iterative.GroupReference;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.LimitNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.OffsetNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.sql.planner.iterative.Lookup.noLookup;
@@ -76,7 +76,7 @@ public final class QueryCardinalityUtil
     }
 
     private static final class CardinalityExtractorPlanVisitor
-            extends PlanVisitor<Range<Long>, Void>
+            extends InternalPlanVisitor<Range<Long>, Void>
     {
         private final Lookup lookup;
 
@@ -86,7 +86,7 @@ public final class QueryCardinalityUtil
         }
 
         @Override
-        protected Range<Long> visitPlan(PlanNode node, Void context)
+        public Range<Long> visitPlan(PlanNode node, Void context)
         {
             return Range.atLeast(0L);
         }

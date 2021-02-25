@@ -49,9 +49,9 @@ import static io.prestosql.spi.function.OperatorType.NOT_EQUAL;
 import static io.prestosql.spi.function.OperatorType.XX_HASH_64;
 import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static io.prestosql.spi.type.DateType.DATE;
-import static io.prestosql.util.DateTimeUtils.parseDate;
-import static io.prestosql.util.DateTimeUtils.printDate;
-import static io.prestosql.util.DateTimeZoneIndex.getChronology;
+import static io.prestosql.spi.util.DateTimeUtils.parseDate;
+import static io.prestosql.spi.util.DateTimeUtils.printDate;
+import static io.prestosql.spi.util.DateTimeZoneIndex.getChronology;
 
 public final class DateOperators
 {

@@ -13,6 +13,8 @@
  */
 package io.prestosql.sql.planner.plan;
 
+import io.prestosql.spi.plan.PlanNode;
+
 import java.util.List;
 
 public class ChildReplacer

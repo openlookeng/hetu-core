@@ -19,9 +19,9 @@ import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.SymbolAllocator;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.utils.OptimizerUtils;
 
 import java.util.Optional;
@@ -48,7 +48,7 @@ public interface Rule<T>
 
         PlanNodeIdAllocator getIdAllocator();
 
-        SymbolAllocator getSymbolAllocator();
+        PlanSymbolAllocator getSymbolAllocator();
 
         Session getSession();
 

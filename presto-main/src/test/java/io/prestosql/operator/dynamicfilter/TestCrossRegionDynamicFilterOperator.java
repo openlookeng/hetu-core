@@ -19,13 +19,13 @@ import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.spi.util.BloomFilter;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;

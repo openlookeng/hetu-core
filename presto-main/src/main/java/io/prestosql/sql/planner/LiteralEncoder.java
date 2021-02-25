@@ -25,6 +25,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.scalar.VarbinaryFunctions;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
@@ -59,6 +60,8 @@ import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.relational.Expressions.constant;
+import static io.prestosql.sql.relational.Expressions.constantNull;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -70,6 +73,22 @@ public final class LiteralEncoder
     public LiteralEncoder(Metadata metadata)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
+    }
+
+    // Unlike toExpression, toRowExpression should be very straightforward given object is serializable
+    public static RowExpression toRowExpression(Object object, Type type)
+    {
+        requireNonNull(type, "type is null");
+
+        if (object instanceof RowExpression) {
+            return (RowExpression) object;
+        }
+
+        if (object == null) {
+            return constantNull(type);
+        }
+
+        return constant(object, type);
     }
 
     public List<Expression> toExpressions(List<?> objects, List<? extends Type> types)

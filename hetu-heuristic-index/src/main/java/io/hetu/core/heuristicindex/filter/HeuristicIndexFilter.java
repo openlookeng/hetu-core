@@ -15,26 +15,22 @@
 
 package io.hetu.core.heuristicindex.filter;
 
+import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.algorithm.SequenceUtils;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.Cast;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.InListExpression;
-import io.prestosql.sql.tree.InPredicate;
-import io.prestosql.sql.tree.LogicalBinaryExpression;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.LESS_THAN_OR_EQUAL;
 
 public class HeuristicIndexFilter
         implements IndexFilter
@@ -50,44 +46,38 @@ public class HeuristicIndexFilter
     public boolean matches(Object expression)
     {
         // Only push ComparisonExpression to the actual indices
-        if (expression instanceof ComparisonExpression) {
-            return matchAny((ComparisonExpression) expression);
+        if (expression instanceof CallExpression) {
+            return matchAny((CallExpression) expression);
         }
 
-        if (expression instanceof BetweenPredicate) {
-            BetweenPredicate betweenPredicate = (BetweenPredicate) expression;
-            ComparisonExpression left = new ComparisonExpression(GREATER_THAN_OR_EQUAL, betweenPredicate.getValue(), betweenPredicate.getMin());
-            ComparisonExpression right = new ComparisonExpression(LESS_THAN_OR_EQUAL, betweenPredicate.getValue(), betweenPredicate.getMax());
-            return matches(left) && matches(right);
-        }
-
-        if (expression instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) expression;
-            LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
-            if (operator == LogicalBinaryExpression.Operator.AND) {
-                return matches(lbExpression.getLeft()) && matches(lbExpression.getRight());
-            }
-            else if (operator == LogicalBinaryExpression.Operator.OR) {
-                return matches(lbExpression.getLeft()) || matches(lbExpression.getRight());
-            }
-            else {
-                throw new IllegalArgumentException("Unsupported logical expression type: " + operator);
-            }
-        }
-
-        if (expression instanceof InPredicate) {
-            Expression valueList = ((InPredicate) expression).getValueList();
-            if (valueList instanceof InListExpression) {
-                InListExpression inListExpression = (InListExpression) valueList;
-                for (Expression expr : inListExpression.getValues()) {
-                    ComparisonExpression oneValueCompExp = new ComparisonExpression(
-                            ComparisonExpression.Operator.EQUAL, ((InPredicate) expression).getValue(), expr);
-                    if (matchAny(oneValueCompExp)) {
-                        return true;
+        if (expression instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) expression;
+            switch (specialForm.getForm()) {
+                case BETWEEN:
+                    Signature sigLeft = Signature.internalOperator(OperatorType.GREATER_THAN_OR_EQUAL,
+                            specialForm.getType().getTypeSignature(),
+                            specialForm.getArguments().get(1).getType().getTypeSignature());
+                    Signature sigRight = Signature.internalOperator(OperatorType.LESS_THAN_OR_EQUAL,
+                            specialForm.getType().getTypeSignature(),
+                            specialForm.getArguments().get(2).getType().getTypeSignature());
+                    CallExpression left = new CallExpression(sigLeft, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)));
+                    CallExpression right = new CallExpression(sigRight, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)));
+                    return matches(left) && matches(right);
+                case IN:
+                    Signature sigEqual = Signature.internalOperator(OperatorType.EQUAL,
+                            specialForm.getType().getTypeSignature(),
+                            specialForm.getArguments().get(1).getType().getTypeSignature());
+                    for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
+                        if (matches(new CallExpression(sigEqual, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), exp)))) {
+                            return true;
+                        }
                     }
-                }
-                // None of the values in the IN-valueList matches any index
-                return false;
+                    // None of the values in the IN-valueList matches any index
+                    return false;
+                case AND:
+                    return matches(specialForm.getArguments().get(0)) && matches(specialForm.getArguments().get(1));
+                case OR:
+                    return matches(specialForm.getArguments().get(0)) || matches(specialForm.getArguments().get(1));
             }
         }
 
@@ -99,65 +89,58 @@ public class HeuristicIndexFilter
     public <I extends Comparable<I>> Iterator<I> lookUp(Object expression)
             throws IndexLookUpException
     {
-        if (expression instanceof ComparisonExpression || expression instanceof InPredicate || expression instanceof BetweenPredicate) {
-            return lookUpAll((Expression) expression);
+        if (expression instanceof CallExpression) {
+            return lookUpAll((RowExpression) expression);
         }
+        if (expression instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) expression;
+            switch (specialForm.getForm()) {
+                case IN:
+                case BETWEEN:
+                    return lookUpAll((RowExpression) expression);
+                case AND:
+                    Iterator<I> iteratorAnd1 = lookUp(specialForm.getArguments().get(0));
+                    Iterator<I> iteratorAnd2 = lookUp(specialForm.getArguments().get(1));
 
-        if (expression instanceof LogicalBinaryExpression) {
-            LogicalBinaryExpression lbExpression = (LogicalBinaryExpression) expression;
-            LogicalBinaryExpression.Operator operator = lbExpression.getOperator();
-            if (operator == LogicalBinaryExpression.Operator.AND) {
-                Iterator<I> iterator1 = lookUp(lbExpression.getLeft());
-                Iterator<I> iterator2 = lookUp(lbExpression.getRight());
-
-                if (iterator1 == null && iterator2 == null) {
-                    return null;
-                }
-                else if (iterator1 == null) {
-                    return iterator2;
-                }
-                else if (iterator2 == null) {
-                    return iterator1;
-                }
-                else {
-                    return SequenceUtils.intersect(iterator1, iterator2);
-                }
-            }
-            else if (operator == LogicalBinaryExpression.Operator.OR) {
-                Iterator<I> iterator1 = lookUp(lbExpression.getLeft());
-                Iterator<I> iterator2 = lookUp(lbExpression.getRight());
-                if (iterator1 == null || iterator2 == null) {
-                    throw new IndexLookUpException();
-                }
-                return SequenceUtils.union(iterator1, iterator2);
+                    if (iteratorAnd1 == null && iteratorAnd2 == null) {
+                        return null;
+                    }
+                    else if (iteratorAnd1 == null) {
+                        return iteratorAnd2;
+                    }
+                    else if (iteratorAnd2 == null) {
+                        return iteratorAnd1;
+                    }
+                    else {
+                        return SequenceUtils.intersect(iteratorAnd1, iteratorAnd2);
+                    }
+                case OR:
+                    Iterator<I> iteratorOr1 = lookUp(specialForm.getArguments().get(0));
+                    Iterator<I> iteratorOr2 = lookUp(specialForm.getArguments().get(1));
+                    if (iteratorOr1 == null || iteratorOr2 == null) {
+                        throw new IndexLookUpException();
+                    }
+                    return SequenceUtils.union(iteratorOr1, iteratorOr2);
             }
         }
 
         throw new IndexLookUpException();
     }
 
-    private static Expression extractExpression(Expression expression)
-    {
-        if (expression instanceof Cast) {
-            // extract the inner expression for CAST expressions
-            return extractExpression(((Cast) expression).getExpression());
-        }
-        else {
-            return expression;
-        }
-    }
-
     // Apply the indices on the expression. Currently only ComparisonExpression is supported
-    private boolean matchAny(ComparisonExpression compExp)
+    private boolean matchAny(CallExpression callExp)
     {
-        Expression left = extractExpression(compExp.getLeft());
-
-        if (!(left instanceof SymbolReference)) {
+        if (callExp.getArguments().size() != 2) {
             return true;
         }
+        RowExpression varRef = callExp.getArguments().get(0);
 
-        String columnName = ((SymbolReference) left).getName();
-        List<IndexMetadata> selectedIndices = HeuristicIndexSelector.select(compExp, indices.get(columnName));
+        if (!(varRef instanceof VariableReferenceExpression)) {
+            return true;
+        }
+        String columnName = ((VariableReferenceExpression) varRef).getName();
+
+        List<IndexMetadata> selectedIndices = HeuristicIndexSelector.select(callExp, indices.get(columnName));
 
         if (selectedIndices == null || selectedIndices.isEmpty()) {
             return true;
@@ -170,7 +153,7 @@ public class HeuristicIndexFilter
             }
 
             try {
-                if (indexMetadata.getIndex().matches(compExp)) {
+                if (indexMetadata.getIndex().matches(callExp)) {
                     return true;
                 }
             }
@@ -184,27 +167,24 @@ public class HeuristicIndexFilter
         return false;
     }
 
-    private <T extends Comparable<T>> Iterator<T> lookUpAll(Expression expression)
+    private <T extends Comparable<T>> Iterator<T> lookUpAll(RowExpression expression)
     {
-        Expression left = null;
+        RowExpression varRef = null;
 
-        if (expression instanceof ComparisonExpression) {
-            left = extractExpression(((ComparisonExpression) expression).getLeft());
+        if (expression instanceof CallExpression) {
+            varRef = ((CallExpression) expression).getArguments().get(0);
         }
 
-        if (expression instanceof BetweenPredicate) {
-            left = extractExpression(((BetweenPredicate) expression).getValue());
+        if (expression instanceof SpecialForm &&
+                (((SpecialForm) expression).getForm() == SpecialForm.Form.BETWEEN || ((SpecialForm) expression).getForm() == SpecialForm.Form.IN)) {
+            varRef = ((SpecialForm) expression).getArguments().get(0);
         }
 
-        if (expression instanceof InPredicate) {
-            left = extractExpression(((InPredicate) expression).getValue());
-        }
-
-        if (!(left instanceof SymbolReference)) {
+        if (!(varRef instanceof VariableReferenceExpression)) {
             return null;
         }
 
-        List<IndexMetadata> selectedIndex = HeuristicIndexSelector.select(expression, indices.get(((SymbolReference) left).getName()));
+        List<IndexMetadata> selectedIndex = HeuristicIndexSelector.select(expression, indices.get(((VariableReferenceExpression) varRef).getName()));
 
         if (selectedIndex.isEmpty()) {
             return null;

@@ -23,17 +23,20 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.BigintType;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.GenericLiteral;
@@ -119,7 +122,7 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         }
 
         //Only in case of IN predicate this optimization makes sense.
-        Expression expression = getOnlyElement(node.getSubqueryAssignments().getExpressions());
+        Expression expression = OriginalExpressionUtils.castToExpression(getOnlyElement(node.getSubqueryAssignments().getExpressions()));
         if (!(expression instanceof InPredicate)) {
             return Result.empty();
         }
@@ -149,7 +152,7 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         }
 
         FilterNode filter = (FilterNode) source;
-        Expression predicate = filter.getPredicate();
+        Expression predicate = OriginalExpressionUtils.castToExpression(filter.getPredicate());
         List<SymbolReference> allPredicateSymbols = new ArrayList<>();
         getAllSymbols(predicate, allPredicateSymbols);
 
@@ -191,9 +194,10 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         TableScanNode tableToUse = leftTable.getOutputSymbols().contains(getOnlyElement(projectNode.getOutputSymbols())) ?
                 leftTable : rightTable;
         //Use non-projected column for aggregation
-        List<Expression> aggregationSymbols = allPredicateSymbols.stream()
-                .filter(s -> tableToUse.getOutputSymbols().contains(Symbol.from(s)))
-                .filter(s -> !projectNode.getOutputSymbols().contains(Symbol.from(s)))
+        List<RowExpression> aggregationSymbols = allPredicateSymbols.stream()
+                .filter(s -> tableToUse.getOutputSymbols().contains(SymbolUtils.from(s)))
+                .filter(s -> !projectNode.getOutputSymbols().contains(SymbolUtils.from(s)))
+                .map(OriginalExpressionUtils::castToRowExpression)
                 .collect(Collectors.toList());
 
         //Create aggregation
@@ -225,9 +229,9 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         //Filter rows with count < 1 from aggregation results to match the NOT_EQUALS clause in original query.
         FilterNode filterNode = new FilterNode(context.getIdAllocator().getNextId(),
                 aggregationNode,
-                new ComparisonExpression(ComparisonExpression.Operator.GREATER_THAN,
-                        countSymbol.toSymbolReference(),
-                        new GenericLiteral("BIGINT", "1")));
+                OriginalExpressionUtils.castToRowExpression(new ComparisonExpression(ComparisonExpression.Operator.GREATER_THAN,
+                        SymbolUtils.toSymbolReference(countSymbol),
+                        new GenericLiteral("BIGINT", "1"))));
         //Project the aggregated+filtered rows.
         ProjectNode transformedSubquery = new ProjectNode(projectNode.getId(), filterNode, projectNode.getAssignments());
         return Optional.of(transformedSubquery);
@@ -251,7 +255,7 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
                     ((LogicalBinaryExpression) predicate).getRight() instanceof ComparisonExpression)) {
                 return false;
             }
-            SymbolReference projected = getOnlyElement(projectNode.getOutputSymbols()).toSymbolReference();
+            SymbolReference projected = SymbolUtils.toSymbolReference(getOnlyElement(projectNode.getOutputSymbols()));
             ComparisonExpression leftPredicate = (ComparisonExpression) ((LogicalBinaryExpression) predicate).getLeft();
             ComparisonExpression rightPredicate = (ComparisonExpression) ((LogicalBinaryExpression) predicate).getRight();
             if (leftPredicate.getChildren().contains(projected) &&

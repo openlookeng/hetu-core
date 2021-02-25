@@ -17,16 +17,17 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.LongLiteral;
 
 import java.util.Map;
 
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isScalar;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -60,7 +61,7 @@ public class PruneCountAggregationOverScalar
             }
         }
         if (!assignments.isEmpty() && isScalar(parent.getSource(), context.getLookup())) {
-            return Result.ofPlanNode(new ValuesNode(parent.getId(), parent.getOutputSymbols(), ImmutableList.of(ImmutableList.of(new LongLiteral("1")))));
+            return Result.ofPlanNode(new ValuesNode(parent.getId(), parent.getOutputSymbols(), ImmutableList.of(ImmutableList.of(castToRowExpression(new LongLiteral("1"))))));
         }
         return Result.empty();
     }

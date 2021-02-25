@@ -19,12 +19,12 @@ import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.JoinNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 
 import java.util.ArrayList;

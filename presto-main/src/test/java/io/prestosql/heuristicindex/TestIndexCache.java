@@ -16,10 +16,10 @@ package io.prestosql.heuristicindex;
 
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexMetadata;

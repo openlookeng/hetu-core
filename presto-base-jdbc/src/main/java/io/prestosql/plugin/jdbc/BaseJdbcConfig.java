@@ -18,6 +18,7 @@ import io.airlift.configuration.ConfigDescription;
 import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.spi.function.Mandatory;
 
 import javax.annotation.Nullable;
@@ -53,6 +54,10 @@ public class BaseJdbcConfig
     private boolean jmxEnabled = true;
     // Hetu: JDBC fetch size configuration
     private int fetchSize;
+    // Hetu: JDBC query push down enable
+    private boolean pushDownEnable = true;
+    // Hetu: JDBC push down module
+    private JdbcPushDownModule pushDownModule = JdbcPushDownModule.DEFAULT;
 
     public boolean isLifo()
     {
@@ -371,6 +376,32 @@ public class BaseJdbcConfig
     public BaseJdbcConfig setFetchSize(int fetchSize)
     {
         this.fetchSize = fetchSize;
+        return this;
+    }
+
+    public boolean isPushDownEnable()
+    {
+        return pushDownEnable;
+    }
+
+    @Config("jdbc.pushdown-enabled")
+    @ConfigDescription("Allow jdbc pushDown")
+    public BaseJdbcConfig setPushDownEnable(boolean pushDownEnable)
+    {
+        this.pushDownEnable = pushDownEnable;
+        return this;
+    }
+
+    public JdbcPushDownModule getPushDownModule()
+    {
+        return this.pushDownModule;
+    }
+
+    @Config("jdbc.pushdown-module")
+    @ConfigDescription("jdbc query push down module in [FULL_PUSHDOWN, BASE_PUSHDOWN]")
+    public BaseJdbcConfig setPushDownModule(JdbcPushDownModule pushDownModule)
+    {
+        this.pushDownModule = pushDownModule;
         return this;
     }
 }

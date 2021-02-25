@@ -15,7 +15,7 @@ package io.prestosql.operator;
 
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.UpdatablePageSource;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.Optional;
 import java.util.function.Supplier;

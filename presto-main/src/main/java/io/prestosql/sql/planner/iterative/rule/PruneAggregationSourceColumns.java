@@ -16,10 +16,10 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.Streams;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
 
 import java.util.Set;
 import java.util.stream.Stream;

@@ -15,10 +15,10 @@ package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
 import io.prestosql.operator.window.RankingFunction;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
-import io.prestosql.sql.planner.plan.FilterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 

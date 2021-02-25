@@ -62,6 +62,12 @@ public class StatisticsAwareJdbcClient
         return delegate;
     }
 
+    @Override
+    public String getIdentifierQuote()
+    {
+        return delegate.getIdentifierQuote();
+    }
+
     @Managed
     @Flatten
     public JdbcClientStats getStats()

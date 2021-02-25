@@ -16,7 +16,6 @@
 package io.hetu.core.plugin.carbondata.integrationtest;
 
 import com.google.gson.Gson;
-import io.hetu.core.plugin.carbondata.CarbondataMetadata;
 import io.hetu.core.plugin.carbondata.server.HetuTestServer;
 import io.prestosql.hive.$internal.au.com.bytecode.opencsv.CSVReader;
 import org.apache.carbondata.common.logging.LogServiceFactory;
@@ -33,7 +32,6 @@ import org.apache.carbondata.core.metadata.schema.table.TableInfo;
 import org.apache.carbondata.core.mutate.SegmentUpdateDetails;
 import org.apache.carbondata.core.reader.ThriftReader;
 import org.apache.carbondata.core.statusmanager.LoadMetadataDetails;
-import org.apache.carbondata.core.statusmanager.SegmentStatusManager;
 import org.apache.carbondata.core.util.CarbonProperties;
 import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
@@ -51,10 +49,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.ParseException;
@@ -68,8 +63,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestCarbonAllDataType
@@ -107,8 +102,8 @@ public class TestCarbonAllDataType
         map.put("carbondata.minor-vacuum-seg-count", "4");
         map.put("carbondata.major-vacuum-seg-size", "1");
 
-        if (!FileFactory.isFileExist( storePath + "/carbon.store")) {
-            FileFactory.mkdirs( storePath + "/carbon.store");
+        if (!FileFactory.isFileExist(storePath + "/carbon.store")) {
+            FileFactory.mkdirs(storePath + "/carbon.store");
         }
 
         hetuServer.startServer("testdb", map);
@@ -146,7 +141,7 @@ public class TestCarbonAllDataType
     {
         List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT COUNT(*) AS RESULT FROM testdb.testtable");
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
-            add(new HashMap<String, Object>() {{    put("RESULT", 11); }});
+            add(new HashMap<String, Object>() {{put("RESULT", 11); }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
@@ -812,7 +807,8 @@ public class TestCarbonAllDataType
     }
 
     @Test
-    public void testSegmentDelete() throws SQLException {
+    public void testSegmentDelete() throws SQLException
+    {
         hetuServer.execute("CREATE TABLE testdb.segmentdelete(a int, b tinyint)");
         hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (10, tinyint '1'),(11, tinyint '2'),(12, tinyint '3')");
         hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (13, tinyint '1'),(14, tinyint '2'),(15, tinyint '3')");
@@ -852,7 +848,8 @@ public class TestCarbonAllDataType
     /*
         Returns true if "Marked for Delete" is present in both tableupdatestatus and tablestatus file
     */
-    private boolean checkStatusFileForDeleteMarked(String tableName, int updateNumber, int segmentNumber) throws SQLException {
+    private boolean checkStatusFileForDeleteMarked(String tableName, int updateNumber, int segmentNumber) throws SQLException
+    {
         try {
             File dir = new File(storePath + "/carbon.store/testdb/" + tableName + "/Metadata");
             File[] tableUpdateStatusFiles = dir.listFiles((d, name) -> name.startsWith("tableupdatestatus"));
@@ -909,7 +906,8 @@ public class TestCarbonAllDataType
             hetuServer.execute("VACUUM TABLE testdb.mytesttable2");
             assertEquals(FileFactory.isFileExist(storePath +
                     "/carbon.store/testdb/mytesttable2/Fact/Part0/Segment_0.1", false), true);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             hetuServer.execute("DROP TABLE if exists testdb.mytesttable2");
             e.printStackTrace();
         }

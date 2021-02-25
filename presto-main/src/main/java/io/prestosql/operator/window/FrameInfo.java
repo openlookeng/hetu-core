@@ -13,8 +13,7 @@
  */
 package io.prestosql.operator.window;
 
-import io.prestosql.sql.tree.FrameBound;
-import io.prestosql.sql.tree.WindowFrame;
+import io.prestosql.spi.sql.expression.Types;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -24,17 +23,17 @@ import static java.util.Objects.requireNonNull;
 
 public class FrameInfo
 {
-    private final WindowFrame.Type type;
-    private final FrameBound.Type startType;
+    private final Types.WindowFrameType type;
+    private final Types.FrameBoundType startType;
     private final int startChannel;
-    private final FrameBound.Type endType;
+    private final Types.FrameBoundType endType;
     private final int endChannel;
 
     public FrameInfo(
-            WindowFrame.Type type,
-            FrameBound.Type startType,
+            Types.WindowFrameType type,
+            Types.FrameBoundType startType,
             Optional<Integer> startChannel,
-            FrameBound.Type endType,
+            Types.FrameBoundType endType,
             Optional<Integer> endChannel)
     {
         this.type = requireNonNull(type, "type is null");
@@ -44,12 +43,12 @@ public class FrameInfo
         this.endChannel = requireNonNull(endChannel, "endChannel is null").orElse(-1);
     }
 
-    public WindowFrame.Type getType()
+    public Types.WindowFrameType getType()
     {
         return type;
     }
 
-    public FrameBound.Type getStartType()
+    public Types.FrameBoundType getStartType()
     {
         return startType;
     }
@@ -59,7 +58,7 @@ public class FrameInfo
         return startChannel;
     }
 
-    public FrameBound.Type getEndType()
+    public Types.FrameBoundType getEndType()
     {
         return endType;
     }

@@ -18,8 +18,8 @@ import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.tree.FunctionCall;
 
 import java.util.LinkedList;

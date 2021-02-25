@@ -21,27 +21,29 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.sql.expression.Types.FrameBoundType;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.GenericLiteral;
-import io.prestosql.sql.tree.WindowFrame;
 
 import java.util.Optional;
 
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.Patterns.limit;
 import static io.prestosql.sql.planner.plan.Patterns.source;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 /**
  * Transforms:
@@ -84,10 +86,10 @@ public class ImplementLimitWithTies
                 ImmutableList.of());
 
         WindowNode.Frame frame = new WindowNode.Frame(
-                WindowFrame.Type.RANGE,
-                FrameBound.Type.UNBOUNDED_PRECEDING,
+                WindowFrameType.RANGE,
+                FrameBoundType.UNBOUNDED_PRECEDING,
                 Optional.empty(),
-                FrameBound.Type.CURRENT_ROW,
+                FrameBoundType.CURRENT_ROW,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
@@ -109,15 +111,16 @@ public class ImplementLimitWithTies
         FilterNode filterNode = new FilterNode(
                 context.getIdAllocator().getNextId(),
                 windowNode,
-                new ComparisonExpression(
-                        ComparisonExpression.Operator.LESS_THAN_OR_EQUAL,
-                        rankSymbol.toSymbolReference(),
-                        new GenericLiteral("BIGINT", Long.toString(parent.getCount()))));
+                castToRowExpression(
+                    new ComparisonExpression(
+                            ComparisonExpression.Operator.LESS_THAN_OR_EQUAL,
+                            toSymbolReference(rankSymbol),
+                            new GenericLiteral("BIGINT", Long.toString(parent.getCount())))));
 
         ProjectNode projectNode = new ProjectNode(
                 context.getIdAllocator().getNextId(),
                 filterNode,
-                Assignments.identity(parent.getOutputSymbols()));
+                AssignmentUtils.identityAsSymbolReferences(parent.getOutputSymbols()));
 
         return Result.ofPlanNode(projectNode);
     }

@@ -16,10 +16,9 @@ package io.hetu.core.plugin.heuristicindex.index.minmax;
 
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.Pair;
-import io.prestosql.sql.parser.ParsingOptions;
-import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.tree.Expression;
+import io.prestosql.spi.relation.RowExpression;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -28,11 +27,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
-import static io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL;
+import static io.prestosql.spi.sql.RowExpressionUtils.simplePredicate;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -47,11 +47,11 @@ public class TestMinMaxIndex
         List<Object> minmaxValues = ImmutableList.of(1L, 10L, 100L, 1000L);
         minMaxIndex.addValues(Collections.singletonList(new Pair<>("testColumn", minmaxValues)));
 
-        Expression expression1 = new SqlParser().createExpression("(testColumn < 0)", new ParsingOptions());
-        Expression expression2 = new SqlParser().createExpression("(testColumn = 1)", new ParsingOptions());
-        Expression expression3 = new SqlParser().createExpression("(testColumn > 10)", new ParsingOptions());
-        Expression expression4 = new SqlParser().createExpression("(testColumn > 1000)", new ParsingOptions());
-        Expression expression5 = new SqlParser().createExpression("(testColumn <= 1)", new ParsingOptions());
+        RowExpression expression1 = simplePredicate(OperatorType.LESS_THAN, "testColumn", BIGINT, 0L);
+        RowExpression expression2 = simplePredicate(OperatorType.EQUAL, "testColumn", BIGINT, 1L);
+        RowExpression expression3 = simplePredicate(OperatorType.GREATER_THAN, "testColumn", BIGINT, 10L);
+        RowExpression expression4 = simplePredicate(OperatorType.GREATER_THAN, "testColumn", BIGINT, 1000L);
+        RowExpression expression5 = simplePredicate(OperatorType.LESS_THAN_OR_EQUAL, "testColumn", BIGINT, 1L);
 
         assertFalse(minMaxIndex.matches(expression1));
         assertTrue(minMaxIndex.matches(expression2));
@@ -63,78 +63,50 @@ public class TestMinMaxIndex
     @Test
     public void testContains()
     {
-        testContainsHelper(0L, 100L, 100, 101);
-        testContainsHelper(0L, 100L, 50, -50);
-        testContainsHelper(BigDecimal.valueOf(-0.1), BigDecimal.valueOf(10.9), -0.1, 11.0);
-        testContainsHelper(BigDecimal.valueOf(-0.1), BigDecimal.valueOf(10.9), 2.11, -0.111);
-        testContainsHelper("a", "y", "'a'", "'z'");
-        testContainsHelper("a", "y", "'h'", "'H'");
+        testHelper(OperatorType.EQUAL, 0L, 100L, 100L, 101L);
+        testHelper(OperatorType.EQUAL, 0L, 100L, 50L, -50L);
+        testHelper(OperatorType.EQUAL, -0.1, 10.9, -0.1, 11.0);
+        testHelper(OperatorType.EQUAL, -0.1, 10.9, 2.11, -0.111);
+        testHelper(OperatorType.EQUAL, "a", "y", "a", "z");
+        testHelper(OperatorType.EQUAL, "a", "y", "h", "H");
     }
 
-    void testContainsHelper(Comparable min, Comparable max, Comparable containsValue, Comparable doesNotContainValue)
+    void testHelper(OperatorType operator, Comparable min, Comparable max, Comparable trueVal, Comparable falseVal)
     {
         MinMaxIndex index = new MinMaxIndex(min, max);
-        assertTrue(index.matches(new SqlParser().createExpression(String.format("(testColumn = %s)", containsValue.toString()), new ParsingOptions(AS_DECIMAL))));
-        assertFalse(index.matches(new SqlParser().createExpression(String.format("(testColumn = %s)", doesNotContainValue.toString()), new ParsingOptions(AS_DECIMAL))));
+        assertTrue(index.matches(simplePredicate(operator, "testColumn", DOUBLE, trueVal)));
+        assertFalse(index.matches(simplePredicate(operator, "testColumn", DOUBLE, falseVal)));
     }
 
     @Test
     public void testGreaterThan()
     {
-        testGreaterThanHelper(0L, 100L, 50, 101);
-        testGreaterThanHelper(0L, 100L, 0, 100);
-    }
-
-    void testGreaterThanHelper(Comparable min, Comparable max, Comparable greaterThanValue, Comparable notGreaterThanValue)
-    {
-        MinMaxIndex index = new MinMaxIndex(min, max);
-        assertTrue(index.matches(new SqlParser().createExpression(String.format("(testColumn > %s)", greaterThanValue.toString()), new ParsingOptions(AS_DECIMAL))));
-        assertFalse(index.matches(new SqlParser().createExpression(String.format("(testColumn > %s)", notGreaterThanValue.toString()), new ParsingOptions(AS_DECIMAL))));
+        testHelper(OperatorType.GREATER_THAN, 0L, 100L, 50L, 101L);
+        testHelper(OperatorType.GREATER_THAN, 0L, 100L, 0L, 100L);
     }
 
     @Test
     public void testGreaterThanEqual()
     {
-        testGreaterThanEqualHelper(0L, 100L, 50, 101);
-        testGreaterThanEqualHelper(0L, 100L, 0, 101);
-        testGreaterThanEqualHelper(0L, 100L, 100, 101);
-    }
-
-    void testGreaterThanEqualHelper(Comparable min, Comparable max, Comparable greaterThanEqualValue, Comparable notGreaterThanEqualValue)
-    {
-        MinMaxIndex index = new MinMaxIndex(min, max);
-        assertTrue(index.matches(new SqlParser().createExpression(String.format("(testColumn >= %s)", greaterThanEqualValue.toString()), new ParsingOptions(AS_DECIMAL))));
-        assertFalse(index.matches(new SqlParser().createExpression(String.format("(testColumn >= %s)", notGreaterThanEqualValue.toString()), new ParsingOptions(AS_DECIMAL))));
+        testHelper(OperatorType.GREATER_THAN_OR_EQUAL, 0L, 100L, 50L, 101L);
+        testHelper(OperatorType.GREATER_THAN_OR_EQUAL, 0L, 100L, 0L, 101L);
+        testHelper(OperatorType.GREATER_THAN_OR_EQUAL, 0L, 100L, 100L, 101L);
     }
 
     @Test
     public void testLessThan()
     {
-        testLessThanHelper(20L, 1000L, 25, 5);
-        testLessThanHelper(-10L, 1000L, -1, -15);
-        testLessThanHelper(-10L, 1000L, -9, -10);
-    }
-
-    void testLessThanHelper(Comparable min, Comparable max, Comparable lessThanValue, Comparable notLessThanValue)
-    {
-        MinMaxIndex index = new MinMaxIndex(min, max);
-        assertTrue(index.matches(new SqlParser().createExpression(String.format("(testColumn < %s)", lessThanValue.toString()), new ParsingOptions(AS_DECIMAL))));
-        assertFalse(index.matches(new SqlParser().createExpression(String.format("(testColumn < %s)", notLessThanValue.toString()), new ParsingOptions(AS_DECIMAL))));
+        testHelper(OperatorType.LESS_THAN, 20L, 1000L, 25L, 5L);
+        testHelper(OperatorType.LESS_THAN, -10L, 1000L, -1L, -15L);
+        testHelper(OperatorType.LESS_THAN, -10L, 1000L, -9L, -10L);
     }
 
     @Test
     public void testLessThanEqual()
     {
-        testLessThanEqualHelper(20L, 1000L, 25, 5);
-        testLessThanEqualHelper(-10L, 1000L, -10, -15);
-        testLessThanEqualHelper(-10L, 1000L, -9, -11);
-    }
-
-    void testLessThanEqualHelper(Comparable min, Comparable max, Comparable lessThanEqualValue, Comparable notLessThanEqualValue)
-    {
-        MinMaxIndex index = new MinMaxIndex(min, max);
-        assertTrue(index.matches(new SqlParser().createExpression(String.format("(testColumn <= %s)", lessThanEqualValue.toString()), new ParsingOptions(AS_DECIMAL))));
-        assertFalse(index.matches(new SqlParser().createExpression(String.format("(testColumn <= %s)", notLessThanEqualValue.toString()), new ParsingOptions(AS_DECIMAL))));
+        testHelper(OperatorType.LESS_THAN_OR_EQUAL, 20L, 1000L, 25L, 5L);
+        testHelper(OperatorType.LESS_THAN_OR_EQUAL, -10L, 1000L, -10L, -15L);
+        testHelper(OperatorType.LESS_THAN_OR_EQUAL, -10L, 1000L, -9L, -11L);
     }
 
     @Test

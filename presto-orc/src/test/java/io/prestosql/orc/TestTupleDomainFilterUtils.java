@@ -19,11 +19,12 @@ import com.google.common.collect.Iterables;
 import io.airlift.slice.Slices;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.DomainTranslator;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.Cast;
@@ -268,64 +269,64 @@ public class TestTupleDomainFilterUtils
         return TupleDomainFilterUtils.toFilter(domain);
     }
 
-    private DomainTranslator.ExtractionResult fromPredicate(Expression originalPredicate)
+    private ExpressionDomainTranslator.ExtractionResult fromPredicate(Expression originalPredicate)
     {
-        return DomainTranslator.fromPredicate(metadata, TEST_SESSION, originalPredicate, TYPES);
+        return ExpressionDomainTranslator.fromPredicate(metadata, TEST_SESSION, originalPredicate, TYPES);
     }
 
     private static ComparisonExpression equal(Symbol symbol, Expression expression)
     {
-        return equal(symbol.toSymbolReference(), expression);
+        return equal(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static ComparisonExpression notEqual(Symbol symbol, Expression expression)
     {
-        return notEqual(symbol.toSymbolReference(), expression);
+        return notEqual(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static ComparisonExpression greaterThan(Symbol symbol, Expression expression)
     {
-        return greaterThan(symbol.toSymbolReference(), expression);
+        return greaterThan(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static ComparisonExpression greaterThanOrEqual(Symbol symbol, Expression expression)
     {
-        return greaterThanOrEqual(symbol.toSymbolReference(), expression);
+        return greaterThanOrEqual(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static ComparisonExpression lessThan(Symbol symbol, Expression expression)
     {
-        return lessThan(symbol.toSymbolReference(), expression);
+        return lessThan(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static ComparisonExpression lessThanOrEqual(Symbol symbol, Expression expression)
     {
-        return lessThanOrEqual(symbol.toSymbolReference(), expression);
+        return lessThanOrEqual(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static ComparisonExpression isDistinctFrom(Symbol symbol, Expression expression)
     {
-        return isDistinctFrom(symbol.toSymbolReference(), expression);
+        return isDistinctFrom(SymbolUtils.toSymbolReference(symbol), expression);
     }
 
     private static Expression isNotNull(Symbol symbol)
     {
-        return isNotNull(symbol.toSymbolReference());
+        return isNotNull(SymbolUtils.toSymbolReference(symbol));
     }
 
     private static IsNullPredicate isNull(Symbol symbol)
     {
-        return new IsNullPredicate(symbol.toSymbolReference());
+        return new IsNullPredicate(SymbolUtils.toSymbolReference(symbol));
     }
 
     private InPredicate in(Symbol symbol, List<?> values)
     {
-        return in(symbol.toSymbolReference(), TYPES.get(symbol), values);
+        return in(SymbolUtils.toSymbolReference(symbol), TYPES.get(symbol), values);
     }
 
     private static BetweenPredicate between(Symbol symbol, Expression min, Expression max)
     {
-        return new BetweenPredicate(symbol.toSymbolReference(), min, max);
+        return new BetweenPredicate(SymbolUtils.toSymbolReference(symbol), min, max);
     }
 
     private static Expression isNotNull(Expression expression)

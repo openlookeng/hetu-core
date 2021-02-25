@@ -20,8 +20,8 @@ import io.airlift.slice.Slice;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.util.BloomFilter;
-import io.prestosql.sql.tree.ComparisonExpression;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCompExpEqual;
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCallExpEqual;
 
 /**
  * Bloom index implementation
@@ -83,9 +83,9 @@ public class BloomIndex
                 return getFilter().test(rangeValueToString(predicate.getSingleValue(), javaType).getBytes());
             }
         }
-        else if (expression instanceof ComparisonExpression) {
+        else if (expression instanceof CallExpression) {
             // test ComparisonExpression matching
-            return matchCompExpEqual(expression, object -> filter.test(object.toString().getBytes()));
+            return matchCallExpEqual(expression, object -> filter.test(object.toString().getBytes()));
         }
 
         throw new UnsupportedOperationException("Expression not supported by " + ID + " index.");

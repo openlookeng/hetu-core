@@ -15,10 +15,10 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
 import org.testng.annotations.Test;
 
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -29,6 +29,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.limit;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
+import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.assignment;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestTransformExistsApplyToLateralJoin
@@ -56,7 +57,7 @@ public class TestTransformExistsApplyToLateralJoin
         tester().assertThat(new TransformExistsApplyToLateralNode(tester().getMetadata()))
                 .on(p ->
                         p.apply(
-                                Assignments.of(p.symbol("b", BOOLEAN), expression("EXISTS(SELECT TRUE)")),
+                                assignment(p.symbol("b", BOOLEAN), expression("EXISTS(SELECT TRUE)")),
                                 ImmutableList.of(),
                                 p.values(),
                                 p.values()))
@@ -75,7 +76,7 @@ public class TestTransformExistsApplyToLateralJoin
         tester().assertThat(new TransformExistsApplyToLateralNode(tester().getMetadata()))
                 .on(p ->
                         p.apply(
-                                Assignments.of(p.symbol("b", BOOLEAN), expression("EXISTS(SELECT TRUE)")),
+                                assignment(p.symbol("b", BOOLEAN), expression("EXISTS(SELECT TRUE)")),
                                 ImmutableList.of(p.symbol("corr")),
                                 p.values(p.symbol("corr")),
                                 p.project(Assignments.of(),

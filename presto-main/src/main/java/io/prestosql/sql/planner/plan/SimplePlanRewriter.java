@@ -13,6 +13,8 @@
  */
 package io.prestosql.sql.planner.plan;
 
+import io.prestosql.spi.plan.PlanNode;
+
 import java.util.List;
 
 import static com.google.common.base.Verify.verify;
@@ -20,7 +22,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 
 public abstract class SimplePlanRewriter<C>
-        extends PlanVisitor<PlanNode, SimplePlanRewriter.RewriteContext<C>>
+        extends InternalPlanVisitor<PlanNode, SimplePlanRewriter.RewriteContext<C>>
 {
     public static <C> PlanNode rewriteWith(SimplePlanRewriter<C> rewriter, PlanNode node)
     {
@@ -33,7 +35,7 @@ public abstract class SimplePlanRewriter<C>
     }
 
     @Override
-    protected PlanNode visitPlan(PlanNode node, RewriteContext<C> context)
+    public PlanNode visitPlan(PlanNode node, RewriteContext<C> context)
     {
         return context.defaultRewrite(node, context.get());
     }

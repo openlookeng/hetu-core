@@ -20,21 +20,23 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -58,13 +60,17 @@ import java.util.Set;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.matching.Pattern.nonEmpty;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.ExpressionUtils.or;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.plan.AssignmentUtils.identityAsSymbolReferences;
 import static io.prestosql.sql.planner.plan.Patterns.Apply.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.applyNode;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -108,7 +114,7 @@ public class TransformCorrelatedInPredicateToJoin
         if (subqueryAssignments.size() != 1) {
             return Result.empty();
         }
-        Expression assignmentExpression = getOnlyElement(subqueryAssignments.getExpressions());
+        Expression assignmentExpression = castToExpression(getOnlyElement(subqueryAssignments.getExpressions()));
         if (!(assignmentExpression instanceof InPredicate)) {
             return Result.empty();
         }
@@ -125,7 +131,7 @@ public class TransformCorrelatedInPredicateToJoin
             Symbol inPredicateOutputSymbol,
             Lookup lookup,
             PlanNodeIdAllocator idAllocator,
-            SymbolAllocator symbolAllocator)
+            PlanSymbolAllocator planSymbolAllocator)
     {
         Optional<Decorrelated> decorrelated = new DecorrelatingVisitor(lookup, apply.getCorrelation())
                 .decorrelate(apply.getSubquery());
@@ -140,7 +146,7 @@ public class TransformCorrelatedInPredicateToJoin
                 inPredicateOutputSymbol,
                 decorrelated.get(),
                 idAllocator,
-                symbolAllocator);
+                planSymbolAllocator);
 
         return Result.ofPlanNode(projection);
     }
@@ -151,7 +157,7 @@ public class TransformCorrelatedInPredicateToJoin
             Symbol inPredicateOutputSymbol,
             Decorrelated decorrelated,
             PlanNodeIdAllocator idAllocator,
-            SymbolAllocator symbolAllocator)
+            PlanSymbolAllocator planSymbolAllocator)
     {
         Expression correlationCondition = and(decorrelated.getCorrelatedPredicates());
         PlanNode decorrelatedBuildSource = decorrelated.getDecorrelatedNode();
@@ -159,35 +165,35 @@ public class TransformCorrelatedInPredicateToJoin
         AssignUniqueId probeSide = new AssignUniqueId(
                 idAllocator.getNextId(),
                 apply.getInput(),
-                symbolAllocator.newSymbol("unique", BIGINT));
+                planSymbolAllocator.newSymbol("unique", BIGINT));
 
-        Symbol buildSideKnownNonNull = symbolAllocator.newSymbol("buildSideKnownNonNull", BIGINT);
+        Symbol buildSideKnownNonNull = planSymbolAllocator.newSymbol("buildSideKnownNonNull", BIGINT);
         ProjectNode buildSide = new ProjectNode(
                 idAllocator.getNextId(),
                 decorrelatedBuildSource,
                 Assignments.builder()
-                        .putIdentities(decorrelatedBuildSource.getOutputSymbols())
-                        .put(buildSideKnownNonNull, bigint(0))
+                        .putAll(identityAsSymbolReferences(decorrelatedBuildSource.getOutputSymbols()))
+                        .put(buildSideKnownNonNull, castToRowExpression(bigint(0)))
                         .build());
 
-        Symbol probeSideSymbol = Symbol.from(inPredicate.getValue());
-        Symbol buildSideSymbol = Symbol.from(inPredicate.getValueList());
+        Symbol probeSideSymbol = SymbolUtils.from(inPredicate.getValue());
+        Symbol buildSideSymbol = SymbolUtils.from(inPredicate.getValueList());
 
         Expression joinExpression = and(
                 or(
-                        new IsNullPredicate(probeSideSymbol.toSymbolReference()),
-                        new ComparisonExpression(ComparisonExpression.Operator.EQUAL, probeSideSymbol.toSymbolReference(), buildSideSymbol.toSymbolReference()),
-                        new IsNullPredicate(buildSideSymbol.toSymbolReference())),
+                        new IsNullPredicate(toSymbolReference(probeSideSymbol)),
+                        new ComparisonExpression(ComparisonExpression.Operator.EQUAL, toSymbolReference(probeSideSymbol), toSymbolReference(buildSideSymbol)),
+                        new IsNullPredicate(toSymbolReference(buildSideSymbol))),
                 correlationCondition);
 
         JoinNode leftOuterJoin = leftOuterJoin(idAllocator, probeSide, buildSide, joinExpression);
 
-        Symbol matchConditionSymbol = symbolAllocator.newSymbol("matchConditionSymbol", BOOLEAN);
+        Symbol matchConditionSymbol = planSymbolAllocator.newSymbol("matchConditionSymbol", BOOLEAN);
         Expression matchCondition = and(
                 isNotNull(probeSideSymbol),
                 isNotNull(buildSideSymbol));
 
-        Symbol nullMatchConditionSymbol = symbolAllocator.newSymbol("nullMatchConditionSymbol", BOOLEAN);
+        Symbol nullMatchConditionSymbol = planSymbolAllocator.newSymbol("nullMatchConditionSymbol", BOOLEAN);
         Expression nullMatchCondition = and(
                 isNotNull(buildSideKnownNonNull),
                 not(matchCondition));
@@ -196,13 +202,13 @@ public class TransformCorrelatedInPredicateToJoin
                 idAllocator.getNextId(),
                 leftOuterJoin,
                 Assignments.builder()
-                        .putIdentities(leftOuterJoin.getOutputSymbols())
-                        .put(matchConditionSymbol, matchCondition)
-                        .put(nullMatchConditionSymbol, nullMatchCondition)
+                        .putAll(AssignmentUtils.identityAsSymbolReferences(leftOuterJoin.getOutputSymbols()))
+                        .put(matchConditionSymbol, castToRowExpression(matchCondition))
+                        .put(nullMatchConditionSymbol, castToRowExpression(nullMatchCondition))
                         .build());
 
-        Symbol countMatchesSymbol = symbolAllocator.newSymbol("countMatches", BIGINT);
-        Symbol countNullMatchesSymbol = symbolAllocator.newSymbol("countNullMatches", BIGINT);
+        Symbol countMatchesSymbol = planSymbolAllocator.newSymbol("countMatches", BIGINT);
+        Symbol countNullMatchesSymbol = planSymbolAllocator.newSymbol("countNullMatches", BIGINT);
 
         AggregationNode aggregation = new AggregationNode(
                 idAllocator.getNextId(),
@@ -227,8 +233,8 @@ public class TransformCorrelatedInPredicateToJoin
                 idAllocator.getNextId(),
                 aggregation,
                 Assignments.builder()
-                        .putIdentities(apply.getInput().getOutputSymbols())
-                        .put(inPredicateOutputSymbol, inPredicateEquivalent)
+                        .putAll(identityAsSymbolReferences(apply.getInput().getOutputSymbols()))
+                        .put(inPredicateOutputSymbol, castToRowExpression(inPredicateEquivalent))
                         .build());
     }
 
@@ -244,7 +250,7 @@ public class TransformCorrelatedInPredicateToJoin
                         .addAll(probeSide.getOutputSymbols())
                         .addAll(buildSide.getOutputSymbols())
                         .build(),
-                Optional.of(joinExpression),
+                Optional.of(castToRowExpression(joinExpression)),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -267,7 +273,7 @@ public class TransformCorrelatedInPredicateToJoin
     {
         return new ComparisonExpression(
                 ComparisonExpression.Operator.GREATER_THAN,
-                symbol.toSymbolReference(),
+                toSymbolReference(symbol),
                 bigint(value));
     }
 
@@ -278,7 +284,7 @@ public class TransformCorrelatedInPredicateToJoin
 
     private static Expression isNotNull(Symbol symbol)
     {
-        return new IsNotNullPredicate(symbol.toSymbolReference());
+        return new IsNotNullPredicate(toSymbolReference(symbol));
     }
 
     private static Expression bigint(long value)
@@ -295,7 +301,7 @@ public class TransformCorrelatedInPredicateToJoin
     }
 
     private static class DecorrelatingVisitor
-            extends PlanVisitor<Optional<Decorrelated>, PlanNode>
+            extends InternalPlanVisitor<Optional<Decorrelated>, PlanNode>
     {
         private final Lookup lookup;
         private final Set<Symbol> correlation;
@@ -329,8 +335,8 @@ public class TransformCorrelatedInPredicateToJoin
                         .flatMap(AstUtils::preOrder)
                         .filter(SymbolReference.class::isInstance)
                         .map(SymbolReference.class::cast)
-                        .filter(symbolReference -> !correlation.contains(Symbol.from(symbolReference)))
-                        .forEach(symbolReference -> assignments.putIdentity(Symbol.from(symbolReference)));
+                        .filter(symbolReference -> !correlation.contains(SymbolUtils.from(symbolReference)))
+                        .forEach(symbolReference -> assignments.putAll(identityAsSymbolReferences(SymbolUtils.from(symbolReference))));
 
                 return new Decorrelated(
                         decorrelated.getCorrelatedPredicates(),
@@ -350,13 +356,13 @@ public class TransformCorrelatedInPredicateToJoin
                             ImmutableList.<Expression>builder()
                                     .addAll(decorrelated.getCorrelatedPredicates())
                                     // No need to retain uncorrelated conditions, predicate push down will push them back
-                                    .add(node.getPredicate())
+                                    .add(castToExpression(node.getPredicate()))
                                     .build(),
                             decorrelated.getDecorrelatedNode()));
         }
 
         @Override
-        protected Optional<Decorrelated> visitPlan(PlanNode node, PlanNode reference)
+        public Optional<Decorrelated> visitPlan(PlanNode node, PlanNode reference)
         {
             if (isCorrelatedRecursively(node)) {
                 return Optional.empty();

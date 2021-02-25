@@ -50,10 +50,10 @@ import static io.prestosql.spi.function.OperatorType.SUBTRACT;
 import static io.prestosql.spi.function.OperatorType.XX_HASH_64;
 import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
+import static io.prestosql.spi.util.DateTimeUtils.parseTimestampWithoutTimeZone;
+import static io.prestosql.spi.util.DateTimeUtils.printTimestampWithoutTimeZone;
+import static io.prestosql.spi.util.DateTimeZoneIndex.getChronology;
 import static io.prestosql.type.DateTimeOperators.modulo24Hour;
-import static io.prestosql.util.DateTimeUtils.parseTimestampWithoutTimeZone;
-import static io.prestosql.util.DateTimeUtils.printTimestampWithoutTimeZone;
-import static io.prestosql.util.DateTimeZoneIndex.getChronology;
 
 public final class TimestampOperators
 {

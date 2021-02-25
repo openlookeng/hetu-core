@@ -16,7 +16,7 @@
 package io.hetu.core.heuristicindex.filter;
 
 import io.prestosql.spi.heuristicindex.IndexMetadata;
-import io.prestosql.sql.tree.Expression;
+import io.prestosql.spi.relation.RowExpression;
 
 import java.util.List;
 
@@ -26,12 +26,12 @@ public class HeuristicIndexSelector
     {
     }
 
-    public static List<IndexMetadata> select(Expression expression, List<IndexMetadata> candidates)
+    public static List<IndexMetadata> select(RowExpression expression, List<IndexMetadata> candidates)
     {
         return candidates;
     }
 
-    public static IndexMetadata pickOne(Expression exception, List<IndexMetadata> candidates)
+    public static IndexMetadata pickOne(RowExpression exception, List<IndexMetadata> candidates)
     {
         return candidates.get(0);
     }

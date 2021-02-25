@@ -19,17 +19,18 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.PlanNodeDecorrelator;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CoalesceExpression;
@@ -43,12 +44,15 @@ import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.spi.plan.AggregationNode.globalAggregation;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.sql.planner.plan.AggregationNode.globalAggregation;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.LateralJoinNode.Type.INNER;
 import static io.prestosql.sql.planner.plan.LateralJoinNode.Type.LEFT;
 import static io.prestosql.sql.planner.plan.Patterns.applyNode;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN;
 import static java.util.Objects.requireNonNull;
@@ -100,7 +104,7 @@ public class TransformExistsApplyToLateralNode
             return Result.empty();
         }
 
-        Expression expression = getOnlyElement(parent.getSubqueryAssignments().getExpressions());
+        Expression expression = castToExpression(getOnlyElement(parent.getSubqueryAssignments().getExpressions()));
         if (!(expression instanceof ExistsPredicate)) {
             return Result.empty();
         }
@@ -119,8 +123,8 @@ public class TransformExistsApplyToLateralNode
         Symbol subqueryTrue = context.getSymbolAllocator().newSymbol("subqueryTrue", BOOLEAN);
 
         Assignments.Builder assignments = Assignments.builder();
-        assignments.putIdentities(applyNode.getInput().getOutputSymbols());
-        assignments.put(exists, new CoalesceExpression(ImmutableList.of(subqueryTrue.toSymbolReference(), BooleanLiteral.FALSE_LITERAL)));
+        assignments.putAll(AssignmentUtils.identityAsSymbolReferences(applyNode.getInput().getOutputSymbols()));
+        assignments.put(exists, castToRowExpression(new CoalesceExpression(ImmutableList.of(toSymbolReference(subqueryTrue), BooleanLiteral.FALSE_LITERAL))));
 
         PlanNode subquery = new ProjectNode(
                 context.getIdAllocator().getNextId(),
@@ -129,7 +133,7 @@ public class TransformExistsApplyToLateralNode
                         applyNode.getSubquery(),
                         1L,
                         false),
-                Assignments.of(subqueryTrue, TRUE_LITERAL));
+                Assignments.of(subqueryTrue, castToRowExpression(TRUE_LITERAL)));
 
         PlanNodeDecorrelator decorrelator = new PlanNodeDecorrelator(context.getIdAllocator(), context.getLookup());
         if (!decorrelator.decorrelateFilters(subquery, applyNode.getCorrelation()).isPresent()) {
@@ -173,7 +177,7 @@ public class TransformExistsApplyToLateralNode
                                 AggregationNode.Step.SINGLE,
                                 Optional.empty(),
                                 Optional.empty()),
-                        Assignments.of(exists, new ComparisonExpression(GREATER_THAN, count.toSymbolReference(), new Cast(new LongLiteral("0"), BIGINT.toString())))),
+                        Assignments.of(exists, castToRowExpression(new ComparisonExpression(GREATER_THAN, toSymbolReference(count), new Cast(new LongLiteral("0"), BIGINT.toString()))))),
                 parent.getCorrelation(),
                 INNER,
                 TRUE_LITERAL,

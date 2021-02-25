@@ -16,14 +16,17 @@ package io.prestosql.sql.planner.sanity;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.analyzer.ExpressionTreeUtils;
 import io.prestosql.sql.planner.ExpressionExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.Identifier;
 
 import java.util.List;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 public final class NoIdentifierLeftChecker
         implements PlanSanityChecker.Checker
@@ -31,7 +34,13 @@ public final class NoIdentifierLeftChecker
     @Override
     public void validate(PlanNode plan, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
-        List<Identifier> identifiers = ExpressionTreeUtils.extractExpressions(ExpressionExtractor.extractExpressions(plan), Identifier.class);
+        List<Identifier> identifiers = ExpressionTreeUtils.extractExpressions(
+                ExpressionExtractor.extractExpressions(plan)
+                        .stream()
+                        .filter(OriginalExpressionUtils::isExpression)
+                        .map(OriginalExpressionUtils::castToExpression)
+                        .collect(toImmutableList()),
+                Identifier.class);
         if (!identifiers.isEmpty()) {
             throw new IllegalStateException("Unexpected identifier in logical plan: " + identifiers.get(0));
         }

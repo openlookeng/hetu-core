@@ -26,18 +26,19 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.operator.DynamicFilterSourceOperator;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 
 import java.util.HashMap;
@@ -82,7 +83,7 @@ public class LocalDynamicFilter
     // The resulting predicate for local dynamic filtering.
     private Map<String, Set> result = new HashMap<>();
 
-    private DynamicFilterDataType dynamicFilterDataType;
+    private FeaturesConfig.DynamicFilterDataType dynamicFilterDataType;
     private final double bloomFilterFpp;
     private final StateStoreProvider stateStoreProvider;
     private final TaskId taskId;
@@ -96,7 +97,7 @@ public class LocalDynamicFilter
     }
 
     public LocalDynamicFilter(Multimap<String, Symbol> probeSymbols, Map<String, Integer> buildChannels, int partitionCount,
-                              DynamicFilter.Type filterType, DynamicFilterDataType dataType,
+                              DynamicFilter.Type filterType, FeaturesConfig.DynamicFilterDataType dataType,
                               double bloomFilterFpp, TaskId taskId, StateStoreProvider stateStoreProvider)
     {
         this.probeSymbols = requireNonNull(probeSymbols, "probeSymbols is null");
@@ -180,14 +181,14 @@ public class LocalDynamicFilter
         return Optional.of(new LocalDynamicFilter(probeSymbols, buildChannels, 1, type, session, taskId, stateStoreProvider));
     }
 
-    private static void mapProbeSymbols(Expression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
+    private static void mapProbeSymbols(RowExpression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
     {
         DynamicFilters.ExtractResult extractResult = extractDynamicFilters(predicate);
         for (Descriptor descriptor : extractResult.getDynamicConjuncts()) {
-            if (descriptor.getInput() instanceof SymbolReference) {
+            if (descriptor.getInput() instanceof VariableReferenceExpression) {
                 // Add descriptors that match the local dynamic filter (from the current join node).
                 if (joinDynamicFilters.contains(descriptor.getId())) {
-                    Symbol probeSymbol = Symbol.from(descriptor.getInput());
+                    Symbol probeSymbol = new Symbol(((VariableReferenceExpression) descriptor.getInput()).getName());
                     log.debug("Adding dynamic filter %s: %s", descriptor, probeSymbol);
                     probeSymbols.put(descriptor.getId(), probeSymbol);
                 }

@@ -16,12 +16,12 @@ package io.prestosql.testing;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.Session.SessionBuilder;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.system.StaticSystemTablesProvider;
 import io.prestosql.connector.system.SystemTablesMetadata;
 import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
@@ -32,8 +32,8 @@ import io.prestosql.sql.SqlPath;
 
 import java.util.Optional;
 
-import static io.prestosql.connector.CatalogName.createInformationSchemaCatalogName;
-import static io.prestosql.connector.CatalogName.createSystemTablesCatalogName;
+import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
+import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
 import static java.util.Locale.ENGLISH;
 
 public final class TestingSession

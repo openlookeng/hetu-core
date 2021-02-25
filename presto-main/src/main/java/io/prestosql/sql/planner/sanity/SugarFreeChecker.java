@@ -17,11 +17,10 @@ import com.google.common.collect.ImmutableList.Builder;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.sql.planner.ExpressionExtractor;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.tree.AtTimeZone;
 import io.prestosql.sql.tree.CurrentPath;
 import io.prestosql.sql.tree.CurrentUser;
@@ -42,7 +41,7 @@ public final class SugarFreeChecker
     @Override
     public void validate(PlanNode planNode, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
-        ExpressionExtractor.forEachExpression(planNode, SugarFreeChecker::validate);
+//        ExpressionExtractor.forEachExpression(planNode, SugarFreeChecker::validate);
     }
 
     private static void validate(Expression expression)

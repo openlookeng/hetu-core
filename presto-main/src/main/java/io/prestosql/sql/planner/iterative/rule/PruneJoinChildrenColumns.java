@@ -16,10 +16,11 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 
 import java.util.Set;
 
@@ -49,6 +50,7 @@ public class PruneJoinChildrenColumns
                 .addAll(joinNode.getOutputSymbols())
                 .addAll(
                         joinNode.getFilter()
+                                .map(OriginalExpressionUtils::castToExpression)
                                 .map(SymbolsExtractor::extractUnique)
                                 .orElse(ImmutableSet.of()))
                 .build();
