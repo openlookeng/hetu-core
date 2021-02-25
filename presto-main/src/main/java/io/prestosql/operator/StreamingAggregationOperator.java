@@ -15,16 +15,22 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,6 +41,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"groupByTypes", "groupByChannels", "accumulatorFactories", "pagesHashStrategy", "outputPages", "snapshotState"})
 public class StreamingAggregationOperator
         implements Operator
 {
@@ -99,6 +106,8 @@ public class StreamingAggregationOperator
     private Page currentGroup;
     private boolean finishing;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public StreamingAggregationOperator(OperatorContext operatorContext, List<Type> sourceTypes, List<Type> groupByTypes, List<Integer> groupByChannels, Step step, List<AccumulatorFactory> accumulatorFactories, JoinCompiler joinCompiler)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
@@ -119,6 +128,7 @@ public class StreamingAggregationOperator
                         sourceTypes.stream()
                                 .map(type -> ImmutableList.<Block>of())
                                 .collect(toImmutableList()), OptionalInt.empty());
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     private List<Aggregator> setupAggregates(Step step, List<AccumulatorFactory> accumulatorFactories)
@@ -157,6 +167,12 @@ public class StreamingAggregationOperator
     {
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
 
         processInput(page);
         updateMemoryUsage();
@@ -266,11 +282,24 @@ public class StreamingAggregationOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!outputPages.isEmpty()) {
             return outputPages.removeFirst();
         }
 
         return null;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -293,5 +322,56 @@ public class StreamingAggregationOperator
     public boolean isFinished()
     {
         return finishing && outputPages.isEmpty() && currentGroup == null && pageBuilder.isEmpty();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        StreamingAggregationOperatorState myState = new StreamingAggregationOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.systemMemoryContext = systemMemoryContext.getBytes();
+        myState.userMemoryContext = userMemoryContext.getBytes();
+        myState.aggregates = new Object[aggregates.size()];
+        for (int i = 0; i < aggregates.size(); i++) {
+            myState.aggregates[i] = aggregates.get(i).capture(serdeProvider);
+        }
+        myState.pageBuilder = pageBuilder.capture(serdeProvider);
+        if (currentGroup != null) {
+            SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(currentGroup);
+            myState.currentGroup = serializedPage.capture(serdeProvider);
+        }
+        myState.finishing = finishing;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        StreamingAggregationOperatorState myState = (StreamingAggregationOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.systemMemoryContext.setBytes(myState.systemMemoryContext);
+        this.userMemoryContext.setBytes(myState.userMemoryContext);
+        for (int i = 0; i < aggregates.size(); i++) {
+            aggregates.get(i).restore(myState.aggregates[i], serdeProvider);
+        }
+        this.pageBuilder.restore(myState.pageBuilder, serdeProvider);
+        this.currentGroup = null;
+        if (myState.currentGroup != null) {
+            SerializedPage serializedPage = SerializedPage.restoreSerializedPage(myState.currentGroup);
+            this.currentGroup = ((PagesSerde) serdeProvider).deserialize(serializedPage);
+        }
+        this.finishing = myState.finishing;
+    }
+
+    private static class StreamingAggregationOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long systemMemoryContext;
+        private long userMemoryContext;
+        private Object[] aggregates;
+        private Object pageBuilder;
+        private Object currentGroup;
+        private boolean finishing;
     }
 }

@@ -19,10 +19,14 @@ import io.prestosql.execution.QueryPerformanceFetcher;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -31,6 +35,7 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.planprinter.PlanPrinter.textDistributedPlan;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"queryPerformanceFetcher", "metadata", "finishing", "snapshotState"})
 public class ExplainAnalyzeOperator
         implements Operator
 {
@@ -86,6 +91,8 @@ public class ExplainAnalyzeOperator
     private boolean finishing;
     private boolean outputConsumed;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public ExplainAnalyzeOperator(
             OperatorContext operatorContext,
             QueryPerformanceFetcher queryPerformanceFetcher,
@@ -96,6 +103,7 @@ public class ExplainAnalyzeOperator
         this.queryPerformanceFetcher = requireNonNull(queryPerformanceFetcher, "queryPerformanceFetcher is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.verbose = verbose;
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, null) : null;
     }
 
     @Override
@@ -127,12 +135,24 @@ public class ExplainAnalyzeOperator
     {
         checkState(needsInput());
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
         // Ignore the input
     }
 
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!finishing) {
             return null;
         }
@@ -151,6 +171,12 @@ public class ExplainAnalyzeOperator
 
         outputConsumed = true;
         return new Page(builder.build());
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private boolean hasFinalStageInfo(StageInfo stageInfo)
@@ -193,5 +219,29 @@ public class ExplainAnalyzeOperator
         if (add && !rootStage.getStageId().equals(stageId)) {
             collector.add(rootStage);
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        ExplainAnalyzeOperatorState myState = new ExplainAnalyzeOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.outputConsumed = outputConsumed;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        ExplainAnalyzeOperatorState myState = (ExplainAnalyzeOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.outputConsumed = myState.outputConsumed;
+    }
+
+    private static class ExplainAnalyzeOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private boolean outputConsumed;
     }
 }

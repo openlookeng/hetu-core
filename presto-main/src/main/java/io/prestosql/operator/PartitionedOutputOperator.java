@@ -28,6 +28,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.predicate.NullableValue;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.util.Mergeable;
 
@@ -45,8 +46,9 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"pagePreprocessor", "snapshotState"})
 public class PartitionedOutputOperator
-        implements Operator
+        implements SinkOperator
 {
     public static class PartitionedOutputFactory
             implements OutputFactory

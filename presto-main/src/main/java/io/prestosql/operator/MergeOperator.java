@@ -19,10 +19,14 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.RemoteSplit;
 import io.prestosql.sql.gen.OrderingCompiler;
@@ -34,6 +38,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -42,8 +47,10 @@ import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static io.prestosql.util.MoreLists.mappedCopy;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"sourceId", "exchangeClientSupplier", "comparator", "outputChannels", "outputTypes", "blockedOnSplits", "pageProducers", "closer", "closed",
+        "clients", "snapshotState", "mergedPages", "inputChannels"})
 public class MergeOperator
-        implements SourceOperator, Closeable
+        implements SourceOperator, Closeable, MultiInputRestorable
 {
     public static class MergeOperatorFactory
             implements SourceOperatorFactory
@@ -128,6 +135,8 @@ public class MergeOperator
     private WorkProcessor<Page> mergedPages;
     private boolean closed;
 
+    private final MultiInputSnapshotState snapshotState;
+
     public MergeOperator(
             OperatorContext operatorContext,
             PlanNodeId sourceId,
@@ -144,6 +153,7 @@ public class MergeOperator
         this.comparator = requireNonNull(comparator, "comparator is null");
         this.outputChannels = requireNonNull(outputChannels, "outputChannels is null");
         this.outputTypes = requireNonNull(outputTypes, "outputTypes is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? MultiInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -220,20 +230,15 @@ public class MergeOperator
     }
 
     @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException(getClass().getName() + " can not take input");
-    }
-
-    @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (closed || mergedPages == null || !mergedPages.process() || mergedPages.isFinished()) {
             return null;
         }
@@ -241,6 +246,18 @@ public class MergeOperator
         Page page = mergedPages.getResult();
         operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
+    @Override
+    public Optional<Set<String>> getInputChannels()
+    {
+        return Optional.empty();
     }
 
     @Override
@@ -253,5 +270,16 @@ public class MergeOperator
         catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return 0;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
     }
 }

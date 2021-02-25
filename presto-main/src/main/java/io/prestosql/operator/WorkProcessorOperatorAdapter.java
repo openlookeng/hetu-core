@@ -16,19 +16,27 @@ package io.prestosql.operator;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
 import io.prestosql.memory.context.MemoryTrackingContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
+
+import java.io.Serializable;
 
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"pages", "snapshotState"})
 public class WorkProcessorOperatorAdapter
         implements Operator
 {
     private final OperatorContext operatorContext;
     private final AdapterWorkProcessorOperator workProcessorOperator;
     private final WorkProcessor<Page> pages;
+    private final SingleInputSnapshotState snapshotState;
 
     public interface AdapterWorkProcessorOperator
-            extends WorkProcessorOperator
+            extends WorkProcessorOperator, Restorable
     {
         boolean needsInput();
 
@@ -49,6 +57,7 @@ public class WorkProcessorOperatorAdapter
     public WorkProcessorOperatorAdapter(OperatorContext operatorContext, AdapterWorkProcessorOperatorFactory workProcessorOperatorFactory)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         this.workProcessorOperator = requireNonNull(workProcessorOperatorFactory, "workProcessorOperatorFactory is null")
                 .create(
                         operatorContext.getSession(),
@@ -85,12 +94,25 @@ public class WorkProcessorOperatorAdapter
     @Override
     public void addInput(Page page)
     {
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         workProcessorOperator.addInput(page);
     }
 
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!pages.process()) {
             return null;
         }
@@ -100,6 +122,12 @@ public class WorkProcessorOperatorAdapter
         }
 
         return pages.getResult();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -119,5 +147,29 @@ public class WorkProcessorOperatorAdapter
             throws Exception
     {
         workProcessorOperator.close();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        WorkProcessorOperatorAdapterState myState = new WorkProcessorOperatorAdapterState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.workProcessorOperator = workProcessorOperator.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        WorkProcessorOperatorAdapterState myState = (WorkProcessorOperatorAdapterState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.workProcessorOperator.restore(myState.workProcessorOperator, serdeProvider);
+    }
+
+    private static class WorkProcessorOperatorAdapterState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object workProcessorOperator;
     }
 }

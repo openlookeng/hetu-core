@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,32 +14,20 @@
  */
 package io.prestosql.operator;
 
-import io.prestosql.metadata.Split;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.connector.UpdatablePageSource;
-import io.prestosql.spi.plan.PlanNodeId;
 
-import java.util.Optional;
-import java.util.function.Supplier;
-
-public interface SourceOperator
+public interface SinkOperator
         extends Operator
 {
     @Override
-    default void addInput(Page page)
+    default Page getOutput()
     {
-        throw new UnsupportedOperationException(getClass().getName() + " can not take input");
+        return null;
     }
 
     @Override
-    default boolean needsInput()
+    default Page pollMarker()
     {
-        return false;
+        return null;
     }
-
-    PlanNodeId getSourceId();
-
-    Supplier<Optional<UpdatablePageSource>> addSplit(Split split);
-
-    void noMoreSplits();
 }

@@ -20,6 +20,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.io.Closeable;
@@ -33,6 +34,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+// TODO-cp-I2TJ3G: will add snapshot support later
+@RestorableConfig(unsupported = true)
 public class CommonTableExpressionOperator
         implements Operator, Closeable
 {
@@ -78,8 +81,8 @@ public class CommonTableExpressionOperator
         private final DataSize minOutputPageSize;
         private final int minOutputPageRowCount;
         private boolean closed;
-        private Set<PlanNodeId> parents = new HashSet<>();
-        private CommonTableExecutionContext cteCtx;
+        private final Set<PlanNodeId> parents = new HashSet<>();
+        private final CommonTableExecutionContext cteCtx;
         private final AtomicInteger operatorCounter = new AtomicInteger(0);
 
         public CommonTableExpressionOperatorFactory(
@@ -192,6 +195,13 @@ public class CommonTableExpressionOperator
             }
         }
 
+        return null;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        //TODO-cp-I2TJ3G: Operator currently not supported for Snapshot
         return null;
     }
 

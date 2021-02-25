@@ -21,6 +21,7 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.OutputFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(unsupported = true)
 public class NullOutputOperator
         implements Operator
 {
@@ -112,6 +114,12 @@ public class NullOutputOperator
 
     @Override
     public Page getOutput()
+    {
+        return null;
+    }
+
+    @Override
+    public Page pollMarker()
     {
         return null;
     }

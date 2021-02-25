@@ -18,14 +18,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +42,8 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"outputChannels", "types", "groupByHash", "inputPage", "maxRowsPerPartition",
+        "selectedRowPageBuilder", "unfinishedWork", "snapshotState"})
 public class RowNumberOperator
         implements Operator
 {
@@ -133,6 +139,8 @@ public class RowNumberOperator
     // for yield when memory is not available
     private Work<GroupByIdBlock> unfinishedWork;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public RowNumberOperator(
             OperatorContext operatorContext,
             List<Type> sourceTypes,
@@ -165,6 +173,8 @@ public class RowNumberOperator
             int[] channels = Ints.toArray(partitionChannels);
             this.groupByHash = Optional.of(createGroupByHash(partitionTypes, channels, hashChannel, expectedPositions, isDictionaryAggregationEnabled(operatorContext.getSession()), joinCompiler, this::updateMemoryReservation));
         }
+
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -208,6 +218,13 @@ public class RowNumberOperator
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
         checkState(!hasUnfinishedInput());
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         inputPage = page;
         if (groupByHash.isPresent()) {
             unfinishedWork = groupByHash.get().getGroupIds(inputPage);
@@ -219,6 +236,13 @@ public class RowNumberOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (unfinishedWork != null && !processUnfinishedWork()) {
             return null;
         }
@@ -238,6 +262,12 @@ public class RowNumberOperator
         inputPage = null;
         updateMemoryReservation();
         return outputPage;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private boolean hasUnfinishedInput()
@@ -356,5 +386,45 @@ public class RowNumberOperator
     public int getCapacity()
     {
         return groupByHash.map(GroupByHash::getCapacity).orElse(0);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        RowNumberOperatorState myState = new RowNumberOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.finishing = finishing;
+        if (partitionIds != null) {
+            myState.partitionIds = partitionIds.capture(serdeProvider);
+        }
+        myState.partitionRowCount = partitionRowCount.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        RowNumberOperatorState myState = (RowNumberOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.finishing = myState.finishing;
+        if (myState.partitionIds != null) {
+            this.partitionIds.restore(myState.partitionIds, serdeProvider);
+        }
+        else {
+            this.partitionIds = null;
+        }
+        this.partitionRowCount.restore(myState.partitionRowCount, serdeProvider);
+    }
+
+    private static class RowNumberOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long localUserMemoryContext;
+        private boolean finishing;
+        private Object partitionIds;
+        private Object partitionRowCount;
     }
 }

@@ -19,11 +19,15 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.geospatial.KdbTreeUtils;
 import io.prestosql.geospatial.Rectangle;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +38,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"pagesSpatialIndexFactory", "outputChannels", "radiusChannel", "partitionChannel", "spatialRelationshipTest",
+        "filterFunctionFactory", "partitions", "indexNotNeeded", "snapshotState", "finished", "finishing"})
 public class SpatialIndexBuilderOperator
-        implements Operator
+        implements SinkOperator
 {
     @FunctionalInterface
     public interface SpatialPredicate
@@ -150,6 +156,8 @@ public class SpatialIndexBuilderOperator
     private boolean finishing;
     private boolean finished;
 
+    private final SingleInputSnapshotState snapshotState;
+
     private SpatialIndexBuilderOperator(
             OperatorContext operatorContext,
             PagesSpatialIndexFactory pagesSpatialIndexFactory,
@@ -177,6 +185,7 @@ public class SpatialIndexBuilderOperator
         this.partitionChannel = requireNonNull(partitionChannel, "partitionChannel is null");
 
         this.partitions = requireNonNull(partitions, "partitions is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -197,6 +206,12 @@ public class SpatialIndexBuilderOperator
         requireNonNull(page, "page is null");
         checkState(!isFinished(), "Operator is already finished");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         index.addPage(page);
 
         if (!localUserMemoryContext.trySetBytes((index.getEstimatedSize().toBytes()))) {
@@ -205,12 +220,6 @@ public class SpatialIndexBuilderOperator
         }
 
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
-    }
-
-    @Override
-    public Page getOutput()
-    {
-        return null;
     }
 
     @Override
@@ -256,5 +265,32 @@ public class SpatialIndexBuilderOperator
     {
         index.clear();
         localUserMemoryContext.setBytes(index.getEstimatedSize().toBytes());
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SpatialIndexBuilderOperatorState myState = new SpatialIndexBuilderOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.index = index.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SpatialIndexBuilderOperatorState myState = (SpatialIndexBuilderOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.index.restore(myState.index, serdeProvider);
+    }
+
+    private static class SpatialIndexBuilderOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long localUserMemoryContext;
+        private Object index;
     }
 }

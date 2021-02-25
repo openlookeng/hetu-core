@@ -27,11 +27,14 @@ import io.prestosql.operator.WorkProcessor.Transformation;
 import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.operator.window.FramedWindowFunction;
 import io.prestosql.operator.window.WindowPartition;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
@@ -58,6 +61,8 @@ import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"outputTypes", "outputChannels",
+        "windowFunctions", "driverWindowInfo", "outputPages", "pageBuffer", "snapshotState", "pagesIndexToWindowPartitions"})
 public class WindowOperator
         implements Operator
 {
@@ -194,6 +199,8 @@ public class WindowOperator
     private final WorkProcessor<Page> outputPages;
     private final PageBuffer pageBuffer = new PageBuffer();
 
+    private final SingleInputSnapshotState snapshotState;
+
     public WindowOperator(
             OperatorContext operatorContext,
             List<Type> sourceTypes,
@@ -224,6 +231,7 @@ public class WindowOperator
         checkArgument(preSortedChannelPrefix <= sortChannels.size(), "Cannot have more pre-sorted channels than specified sorted channels");
         checkArgument(preSortedChannelPrefix == 0 || ImmutableSet.copyOf(preGroupedChannels).equals(ImmutableSet.copyOf(partitionChannels)), "preSortedChannelPrefix can only be greater than zero if all partition channels are pre-grouped");
 
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         this.operatorContext = operatorContext;
         this.outputChannels = Ints.toArray(outputChannels);
         this.windowFunctions = windowFunctionDefinitions.stream()
@@ -350,12 +358,25 @@ public class WindowOperator
     @Override
     public void addInput(Page page)
     {
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         pageBuffer.add(page);
     }
 
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!outputPages.process()) {
             return null;
         }
@@ -365,6 +386,12 @@ public class WindowOperator
         }
 
         return outputPages.getResult();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -379,7 +406,10 @@ public class WindowOperator
         spillablePagesToPagesIndexes.get().finishRevokeMemory();
     }
 
+    @RestorableConfig(uncapturedFields = {"preGroupedPartitionHashStrategy",
+            "unGroupedPartitionHashStrategy", "preSortedPartitionHashStrategy", "peerGroupHashStrategy", "preGroupedPartitionChannels"})
     private static class PagesIndexWithHashStrategies
+            implements Restorable
     {
         final PagesIndex pagesIndex;
         final PagesHashStrategy preGroupedPartitionHashStrategy;

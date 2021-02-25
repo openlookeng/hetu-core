@@ -25,6 +25,7 @@ import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.OrderingCompiler;
 
@@ -37,6 +38,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static java.util.Objects.requireNonNull;
 
+// This operator's state will not be captured, because markers are received before any data pages
+@RestorableConfig(unsupported = true)
 public class LocalMergeSourceOperator
         implements Operator
 {
@@ -168,6 +171,12 @@ public class LocalMergeSourceOperator
         Page page = mergedPages.getResult();
         operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null;
     }
 
     @Override

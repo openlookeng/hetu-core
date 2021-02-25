@@ -17,15 +17,19 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.OrderingCompiler;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +45,8 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"sortChannels", "sortOrder", "outputChannels", "sourceTypes", "spillerFactory",
+        "orderingCompiler", "spiller", "spillInProgress", "finishMemoryRevoke", "sortedPages", "state", "snapshotState"})
 public class OrderByOperator
         implements Operator
 {
@@ -162,6 +168,8 @@ public class OrderByOperator
 
     private State state = State.NEEDS_INPUT;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public OrderByOperator(
             OperatorContext operatorContext,
             List<Type> sourceTypes,
@@ -189,6 +197,7 @@ public class OrderByOperator
         this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
         this.orderingCompiler = requireNonNull(orderingCompiler, "orderingCompiler is null");
         checkArgument(!spillEnabled || spillerFactory.isPresent(), "Spiller Factory is not present when spill is enabled");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -255,6 +264,12 @@ public class OrderByOperator
         requireNonNull(page, "page is null");
         checkSuccess(spillInProgress, "spilling failed");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         pageIndex.addPage(page);
         updateMemoryUsage();
     }
@@ -263,6 +278,14 @@ public class OrderByOperator
     public Page getOutput()
     {
         checkSuccess(spillInProgress, "spilling failed");
+
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (state != State.HAS_OUTPUT) {
             return null;
         }
@@ -283,6 +306,12 @@ public class OrderByOperator
             blocks[i] = nextPage.getBlock(outputChannels[i]);
         }
         return new Page(nextPage.getPositionCount(), blocks);
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -381,5 +410,36 @@ public class OrderByOperator
         pageIndex.clear();
         sortedPages = null;
         spiller.ifPresent(Spiller::close);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        OrderByOperatorState myState = new OrderByOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.revocableMemoryContext = revocableMemoryContext.getBytes();
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.pageIndex = pageIndex.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        OrderByOperatorState myState = (OrderByOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.revocableMemoryContext.setBytes(myState.revocableMemoryContext);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.pageIndex.restore(myState.pageIndex, serdeProvider);
+    }
+
+    private static class OrderByOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long revocableMemoryContext;
+        private long localUserMemoryContext;
+
+        private Object pageIndex;
     }
 }

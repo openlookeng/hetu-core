@@ -20,14 +20,18 @@ import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.planner.TypeProvider;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +39,7 @@ import java.util.Map;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"symbols", "dynamicFilterCacheManager", "columns", "finished", "currentPage", "snapshotState"})
 public class CrossRegionDynamicFilterOperator
         implements Operator
 {
@@ -45,7 +50,9 @@ public class CrossRegionDynamicFilterOperator
     private final List<String> columns;
     private boolean finished;
     private Page currentPage;
-    private Map<Integer, BloomFilter> bloomFilterMap = new HashMap<>();
+    private final Map<Integer, BloomFilter> bloomFilterMap = new HashMap<>();
+
+    private final SingleInputSnapshotState snapshotState;
 
     public CrossRegionDynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, DynamicFilterCacheManager dynamicFilterCacheManager, List<String> columns)
     {
@@ -54,6 +61,7 @@ public class CrossRegionDynamicFilterOperator
         this.dynamicFilterCacheManager = dynamicFilterCacheManager;
         this.symbols = symbols;
         this.columns = columns;
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, null) : null;
     }
 
     @Override
@@ -76,6 +84,12 @@ public class CrossRegionDynamicFilterOperator
             return;
         }
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         updateBloomFilter();
 
         if (!bloomFilterMap.isEmpty()) {
@@ -89,9 +103,22 @@ public class CrossRegionDynamicFilterOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         Page page = currentPage;
         currentPage = null;
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -138,6 +165,31 @@ public class CrossRegionDynamicFilterOperator
         catch (Throwable e) {
             // ignore any exception and error
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        CrossRegionDynamicFilterOperatorState myState = new CrossRegionDynamicFilterOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.bloomFilterMap = bloomFilterMap;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        CrossRegionDynamicFilterOperatorState myState = (CrossRegionDynamicFilterOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.bloomFilterMap.clear();
+        this.bloomFilterMap.putAll(myState.bloomFilterMap);
+    }
+
+    private static class CrossRegionDynamicFilterOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Map<Integer, BloomFilter> bloomFilterMap;
     }
 
     public static class CrossRegionDynamicFilterOperatorFactory

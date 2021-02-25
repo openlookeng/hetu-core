@@ -15,8 +15,11 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.util.Iterator;
 import java.util.List;
@@ -24,6 +27,7 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"pages", "position", "snapshotState"})
 public class ValuesOperator
         implements Operator
 {
@@ -65,6 +69,7 @@ public class ValuesOperator
 
     private final OperatorContext operatorContext;
     private final Iterator<Page> pages;
+    private final SingleInputSnapshotState snapshotState;
 
     public ValuesOperator(OperatorContext operatorContext, List<Page> pages)
     {
@@ -73,6 +78,7 @@ public class ValuesOperator
         requireNonNull(pages, "pages is null");
 
         this.pages = ImmutableList.copyOf(pages).iterator();
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -116,5 +122,23 @@ public class ValuesOperator
             operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
         }
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return operatorContext.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        operatorContext.restore(state, serdeProvider);
     }
 }

@@ -17,8 +17,11 @@ import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
+import io.prestosql.operator.SinkOperator;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -26,8 +29,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
+//TODO-cp-I38S9O: Operator currently not supported for Snapshot
+@RestorableConfig(unsupported = true)
 public class PagesIndexBuilderOperator
-        implements Operator
+        implements SinkOperator
 {
     public static class PagesIndexBuilderOperatorFactory
             implements OperatorFactory
@@ -107,16 +112,15 @@ public class PagesIndexBuilderOperator
         requireNonNull(page, "page is null");
         checkState(!isFinished(), "Operator is already finished");
 
+        //TODO-cp-I38S9O: Operator currently not supported for Snapshot
+        if (page instanceof MarkerPage) {
+            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
+        }
+
         if (!indexSnapshotBuilder.tryAddPage(page)) {
             finish();
             return;
         }
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
-    }
-
-    @Override
-    public Page getOutput()
-    {
-        return null;
     }
 }

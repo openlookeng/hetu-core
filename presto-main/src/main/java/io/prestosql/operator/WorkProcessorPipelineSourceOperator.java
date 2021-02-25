@@ -28,6 +28,7 @@ import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import javax.annotation.Nullable;
 
@@ -50,6 +51,8 @@ import static io.prestosql.operator.WorkProcessor.ProcessState.Type.FINISHED;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+// Table scan operators do not participate in snapshotting
+@RestorableConfig(unsupported = true)
 public class WorkProcessorPipelineSourceOperator
         implements SourceOperator
 {
@@ -363,18 +366,6 @@ public class WorkProcessorPipelineSourceOperator
     }
 
     @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public Page getOutput()
     {
         if (!pages.process()) {
@@ -386,6 +377,12 @@ public class WorkProcessorPipelineSourceOperator
         }
 
         return pages.getResult();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null; // No marker in source pipeline
     }
 
     @Override
@@ -433,6 +430,8 @@ public class WorkProcessorPipelineSourceOperator
         finish();
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private class Splits
             implements WorkProcessor.Process<Split>
     {

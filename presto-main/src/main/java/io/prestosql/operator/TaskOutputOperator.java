@@ -18,10 +18,14 @@ import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.execution.buffer.OutputBuffer;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.function.Function;
 
@@ -30,8 +34,9 @@ import static io.prestosql.execution.buffer.PageSplitterUtil.splitPage;
 import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"outputBuffer", "pagePreprocessor", "serde", "snapshotState"})
 public class TaskOutputOperator
-        implements Operator
+        implements SinkOperator
 {
     public static class TaskOutputFactory
             implements OutputFactory
@@ -90,6 +95,7 @@ public class TaskOutputOperator
     private final OperatorContext operatorContext;
     private final OutputBuffer outputBuffer;
     private final Function<Page, Page> pagePreprocessor;
+    private final SingleInputSnapshotState snapshotState;
     private final PagesSerde serde;
     private boolean finished;
 
@@ -99,6 +105,7 @@ public class TaskOutputOperator
         this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
         this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
         this.serde = requireNonNull(serdeFactory, "serdeFactory is null").createPagesSerde();
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -136,6 +143,13 @@ public class TaskOutputOperator
     public void addInput(Page page)
     {
         requireNonNull(page, "page is null");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                page = snapshotState.nextMarker();
+            }
+        }
+
         if (page.getPositionCount() == 0) {
             return;
         }
@@ -151,8 +165,26 @@ public class TaskOutputOperator
     }
 
     @Override
-    public Page getOutput()
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
-        return null;
+        TaskOutputOperatorState myState = new TaskOutputOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.finished = finished;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        TaskOutputOperatorState myState = (TaskOutputOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.finished = myState.finished;
+    }
+
+    private static class TaskOutputOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private boolean finished;
     }
 }

@@ -14,11 +14,15 @@
 package io.prestosql.operator;
 
 import io.prestosql.execution.TaskId;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -26,6 +30,8 @@ import static com.google.common.base.Verify.verify;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
+// When a marker is received (needsInput returns true), inputPage must be null
+@RestorableConfig(uncapturedFields = {"snapshotState", "inputPage"})
 public class AssignUniqueIdOperator
         implements Operator
 {
@@ -74,6 +80,7 @@ public class AssignUniqueIdOperator
     }
 
     private final OperatorContext operatorContext;
+    private final SingleInputSnapshotState snapshotState;
     private boolean finishing;
     private final AtomicLong rowIdPool;
     private final long uniqueValueMask;
@@ -85,6 +92,7 @@ public class AssignUniqueIdOperator
     public AssignUniqueIdOperator(OperatorContext operatorContext, AtomicLong rowIdPool)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         this.rowIdPool = requireNonNull(rowIdPool, "rowIdPool is null");
 
         TaskId fullTaskId = operatorContext.getDriverContext().getTaskId();
@@ -127,6 +135,12 @@ public class AssignUniqueIdOperator
     @Override
     public void addInput(Page page)
     {
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
         checkState(inputPage == null);
@@ -136,6 +150,13 @@ public class AssignUniqueIdOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (inputPage == null) {
             return null;
         }
@@ -143,6 +164,12 @@ public class AssignUniqueIdOperator
         Page outputPage = processPage();
         inputPage = null;
         return outputPage;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private Page processPage()
@@ -162,5 +189,38 @@ public class AssignUniqueIdOperator
             BIGINT.writeLong(block, uniqueValueMask | rowId);
         }
         return block.build();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        AssignUniqueIdOperatorState myState = new AssignUniqueIdOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.finishing = finishing;
+        myState.rowIdPool = rowIdPool.get();
+        myState.rowIdCounter = rowIdCounter;
+        myState.maxRowIdCounterValue = maxRowIdCounterValue;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        AssignUniqueIdOperatorState myState = (AssignUniqueIdOperatorState) state;
+        operatorContext.restore(myState.operatorContext, serdeProvider);
+        finishing = myState.finishing;
+        rowIdPool.set(myState.rowIdPool);
+        rowIdCounter = myState.rowIdCounter;
+        maxRowIdCounterValue = myState.maxRowIdCounterValue;
+    }
+
+    private static class AssignUniqueIdOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private boolean finishing;
+        private long rowIdPool;
+        private long rowIdCounter;
+        private long maxRowIdCounterValue;
     }
 }

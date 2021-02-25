@@ -14,27 +14,32 @@
 package io.prestosql.operator;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.split.RemoteSplit;
 
 import java.io.Closeable;
 import java.net.URI;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"snapshotState", "sourceId", "exchangeClient"})
 public class ExchangeOperator
-        implements SourceOperator, Closeable
+        implements SourceOperator, MultiInputRestorable, Closeable
 {
     public static final CatalogName REMOTE_CONNECTOR_ID = new CatalogName("$remote");
 
@@ -44,7 +49,6 @@ public class ExchangeOperator
         private final int operatorId;
         private final PlanNodeId sourceId;
         private final ExchangeClientSupplier exchangeClientSupplier;
-        private final PagesSerdeFactory serdeFactory;
         private ExchangeClient exchangeClient;
         private boolean closed;
 
@@ -57,7 +61,6 @@ public class ExchangeOperator
             this.operatorId = operatorId;
             this.sourceId = sourceId;
             this.exchangeClientSupplier = exchangeClientSupplier;
-            this.serdeFactory = serdeFactory;
         }
 
         @Override
@@ -78,7 +81,6 @@ public class ExchangeOperator
             return new ExchangeOperator(
                     operatorContext,
                     sourceId,
-                    serdeFactory.createPagesSerde(),
                     exchangeClient);
         }
 
@@ -90,20 +92,21 @@ public class ExchangeOperator
     }
 
     private final OperatorContext operatorContext;
+    private final MultiInputSnapshotState snapshotState;
     private final PlanNodeId sourceId;
     private final ExchangeClient exchangeClient;
-    private final PagesSerde serde;
 
     public ExchangeOperator(
             OperatorContext operatorContext,
             PlanNodeId sourceId,
-            PagesSerde serde,
             ExchangeClient exchangeClient)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sourceId = requireNonNull(sourceId, "sourceId is null");
         this.exchangeClient = requireNonNull(exchangeClient, "exchangeClient is null");
-        this.serde = requireNonNull(serde, "serde is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled()
+                ? MultiInputSnapshotState.forOperator(this, operatorContext)
+                : null;
 
         operatorContext.setInfoSupplier(exchangeClient::getStatus);
     }
@@ -161,18 +164,6 @@ public class ExchangeOperator
     }
 
     @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException(getClass().getName() + " can not take input");
-    }
-
-    @Override
     public Page getOutput()
     {
         SerializedPage page = exchangeClient.pollPage();
@@ -182,15 +173,39 @@ public class ExchangeOperator
 
         operatorContext.recordNetworkInput(page.getSizeInBytes(), page.getPositionCount());
 
-        Page deserializedPage = serde.deserialize(page);
+        Page deserializedPage = operatorContext.getDriverContext().getSerde().deserialize(page);
         operatorContext.recordProcessedInput(deserializedPage.getSizeInBytes(), page.getPositionCount());
 
         return deserializedPage;
     }
 
     @Override
+    public Page pollMarker()
+    {
+        return null;
+    }
+
+    @Override
     public void close()
     {
         exchangeClient.close();
+    }
+
+    @Override
+    public Optional<Set<String>> getInputChannels()
+    {
+        return Optional.empty();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return operatorContext.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        operatorContext.restore(state, serdeProvider);
     }
 }

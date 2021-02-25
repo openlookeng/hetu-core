@@ -17,12 +17,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +36,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"inputPage", "unfinishedWork", "snapshotState"})
 public class MarkDistinctOperator
         implements Operator
 {
@@ -97,6 +102,8 @@ public class MarkDistinctOperator
     // for yield when memory is not available
     private Work<Block> unfinishedWork;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public MarkDistinctOperator(OperatorContext operatorContext, List<Type> types, List<Integer> markDistinctChannels, Optional<Integer> hashChannel, JoinCompiler joinCompiler)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
@@ -110,6 +117,7 @@ public class MarkDistinctOperator
         }
         this.markDistinctHash = new MarkDistinctHash(operatorContext.getSession(), distinctTypes.build(), Ints.toArray(markDistinctChannels), hashChannel, joinCompiler, this::updateMemoryReservation);
         this.localUserMemoryContext = operatorContext.localUserMemoryContext();
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -142,6 +150,12 @@ public class MarkDistinctOperator
         requireNonNull(page, "page is null");
         checkState(needsInput());
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         inputPage = page;
 
         unfinishedWork = markDistinctHash.markDistinctRows(page);
@@ -151,6 +165,13 @@ public class MarkDistinctOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (unfinishedWork == null) {
             return null;
         }
@@ -167,6 +188,12 @@ public class MarkDistinctOperator
 
         updateMemoryReservation();
         return outputPage;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private boolean hasUnfinishedInput()
@@ -195,5 +222,35 @@ public class MarkDistinctOperator
     public int getCapacity()
     {
         return markDistinctHash.getCapacity();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        MarkDistinctOperatorState myState = new MarkDistinctOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.markDistinctHash = markDistinctHash.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.finishing = finishing;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MarkDistinctOperatorState myState = (MarkDistinctOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.markDistinctHash.restore(myState.markDistinctHash, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.finishing = myState.finishing;
+    }
+
+    private static class MarkDistinctOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object markDistinctHash;
+        private long localUserMemoryContext;
+        private boolean finishing;
     }
 }

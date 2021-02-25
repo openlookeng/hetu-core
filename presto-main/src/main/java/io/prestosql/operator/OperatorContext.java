@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.execution.TaskId;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -62,7 +63,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * Not thread-safe. Only {@link #getOperatorStats()}, {@link #getNestedOperatorStats()}
  * and revocable-memory-related operations are thread-safe.
  */
-//TODO-cp-I2DSGQ: remove when operatorContext is actually supported.
+//TODO-cp-I2DSGQ: update when operatorContext is actually supported.
 @RestorableConfig(uncapturedFields = {"planNodeId", "driverContext", "executor", "physicalInputDataSize", "physicalInputPositions",
         "internalNetworkInputDataSize", "internalNetworkPositions", "addInputTiming", "inputDataSize", "inputPositions", "getOutputTiming", "outputDataSize", "outputPositions",
         "physicalWrittenDataSize", "memoryFuture", "revocableMemoryFuture", "blockedMonitor", "blockedWallNanos", "finishTiming", "spillContext", "infoSupplier",
@@ -117,6 +118,7 @@ public class OperatorContext
     private Runnable memoryRevocationRequestListener;
 
     private final MemoryTrackingContext operatorMemoryContext;
+    private final boolean snapshotEnabled;
 
     public OperatorContext(
             int operatorId,
@@ -139,6 +141,8 @@ public class OperatorContext
         this.revocableMemoryFuture.get().set(null);
         this.operatorMemoryContext = requireNonNull(operatorMemoryContext, "operatorMemoryContext is null");
         operatorMemoryContext.initializeLocalMemoryContexts(operatorType);
+
+        this.snapshotEnabled = false;
     }
 
     public int getOperatorId()
@@ -745,6 +749,28 @@ public class OperatorContext
     public MemoryTrackingContext getOperatorMemoryContext()
     {
         return operatorMemoryContext;
+    }
+
+    /**
+     * Whether the query is resumable, i.e. it supports checkpointing.
+     *
+     * @return true if query is resumable; false otherwise
+     */
+    public boolean isSnapshotEnabled()
+    {
+        return snapshotEnabled;
+    }
+
+    public String getUniqueId()
+    {
+        TaskId taskId = driverContext.getTaskId();
+        return String.format("%s_%02d_%d_%d_%02d_%02d",
+                taskId.getQueryId().getId(),
+                taskId.getStageId().getId(),
+                taskId.getId(),
+                driverContext.getPipelineContext().getPipelineId(),
+                driverContext.getDriverId(),
+                getOperatorId());
     }
 
     @Override

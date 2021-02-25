@@ -42,6 +42,7 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.PipelineExecutionStrategy;
+import io.prestosql.operator.SinkOperator;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
 import io.prestosql.operator.StageExecutionDescriptor;
@@ -56,6 +57,7 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.SpillSpaceTracker;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
@@ -791,6 +793,7 @@ public class TestSqlTaskExecution
             return pauser;
         }
 
+        @RestorableConfig(unsupported = true)
         public class TestingScanOperator
                 implements SourceOperator
         {
@@ -875,18 +878,6 @@ public class TestSqlTaskExecution
             }
 
             @Override
-            public boolean needsInput()
-            {
-                return false;
-            }
-
-            @Override
-            public void addInput(Page page)
-            {
-                throw new UnsupportedOperationException(getClass().getName() + " can not take input");
-            }
-
-            @Override
             public Page getOutput()
             {
                 if (split == null) {
@@ -897,6 +888,12 @@ public class TestSqlTaskExecution
                 Page result = new Page(createStringSequenceBlock(split.getBegin(), split.getEnd()));
                 finish();
                 return result;
+            }
+
+            @Override
+            public Page pollMarker()
+            {
+                return null;
             }
         }
     }
@@ -967,8 +964,9 @@ public class TestSqlTaskExecution
             return pauser;
         }
 
+        @RestorableConfig(unsupported = true)
         public class TestingBuildOperator
-                implements Operator
+                implements SinkOperator
         {
             private final OperatorContext operatorContext;
             private final Lifespan lifespan;
@@ -1026,12 +1024,6 @@ public class TestSqlTaskExecution
             public void addInput(Page page)
             {
                 pages.add(page);
-            }
-
-            @Override
-            public Page getOutput()
-            {
-                return null;
             }
         }
     }
@@ -1103,6 +1095,7 @@ public class TestSqlTaskExecution
             return pauser;
         }
 
+        @RestorableConfig(unsupported = true)
         public class TestingCrossJoinOperator
                 implements Operator
         {
@@ -1177,6 +1170,12 @@ public class TestSqlTaskExecution
                     buildStates.get(lifespan).decrementPendingLookupCount();
                 }
                 return result;
+            }
+
+            @Override
+            public Page pollMarker()
+            {
+                return null;
             }
         }
     }

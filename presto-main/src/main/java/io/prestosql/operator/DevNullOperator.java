@@ -15,6 +15,9 @@ package io.prestosql.operator;
 
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+
+import java.io.Serializable;
 
 import static java.util.Objects.requireNonNull;
 
@@ -83,6 +86,12 @@ public class DevNullOperator
     }
 
     @Override
+    public Page pollMarker()
+    {
+        return null;
+    }
+
+    @Override
     public void finish()
     {
         finished = true;
@@ -92,5 +101,29 @@ public class DevNullOperator
     public boolean isFinished()
     {
         return finished;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        DevNullOperatorState myState = new DevNullOperatorState();
+        myState.context = context.capture(serdeProvider);
+        myState.finished = finished;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        DevNullOperatorState myState = (DevNullOperatorState) state;
+        this.context.restore(myState.context, serdeProvider);
+        this.finished = myState.finished;
+    }
+
+    private static class DevNullOperatorState
+            implements Serializable
+    {
+        private Object context;
+        private boolean finished;
     }
 }

@@ -36,6 +36,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spiller.SpillSpaceTracker;
 import io.prestosql.testing.LocalQueryRunner;
 import io.prestosql.testing.PageConsumerOperator.PageConsumerOutputFactory;
@@ -351,6 +352,7 @@ public class TestMemoryPools
         return false;
     }
 
+    @RestorableConfig(unsupported = true)
     private static class RevocableMemoryOperator
             implements Operator
     {
@@ -419,6 +421,12 @@ public class TestMemoryPools
                 finish();
             }
             return new Page(10);
+        }
+
+        @Override
+        public Page pollMarker()
+        {
+            return null;
         }
     }
 }

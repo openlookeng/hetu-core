@@ -21,7 +21,10 @@ import io.prestosql.operator.LookupJoinOperators.JoinType;
 import io.prestosql.operator.LookupSourceProvider.LookupSourceLease;
 import io.prestosql.operator.PartitionedConsumption.Partition;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpiller;
 import io.prestosql.spiller.PartitioningSpiller.PartitioningSpillResult;
@@ -30,6 +33,7 @@ import io.prestosql.spiller.PartitioningSpillerFactory;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -41,6 +45,7 @@ import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.concurrent.MoreFutures.checkSuccess;
 import static io.airlift.concurrent.MoreFutures.getDone;
@@ -48,8 +53,13 @@ import static io.prestosql.operator.LookupJoinOperators.JoinType.FULL_OUTER;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
 import static java.lang.String.format;
 import static java.util.Collections.emptyIterator;
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"probeTypes", "joinProbeFactory", "afterClose", "hashGenerator", "lookupSourceFactory",
+        "partitioningSpillerFactory", "lookupSourceProviderFuture", "lookupSourceProvider", "probe", "outputPage", "spiller",
+        "partitionGenerator", "spillInProgress", "savedRows", "unspilling", "currentPartition",
+        "unspilledLookupSource", "unspilledInputPages", "snapshotState"})
 public class LookupJoinOperator
         implements Operator
 {
@@ -96,6 +106,8 @@ public class LookupJoinOperator
     private Optional<ListenableFuture<Supplier<LookupSource>>> unspilledLookupSource = Optional.empty();
     private Iterator<Page> unspilledInputPages = emptyIterator();
 
+    private final SingleInputSnapshotState snapshotState;
+
     public LookupJoinOperator(
             OperatorContext operatorContext,
             List<Type> probeTypes,
@@ -127,6 +139,7 @@ public class LookupJoinOperator
         operatorContext.setInfoSupplier(this.statisticsCounter);
 
         this.pageBuilder = new LookupJoinPageBuilder(buildOutputTypes);
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -207,6 +220,12 @@ public class LookupJoinOperator
     {
         requireNonNull(spillInfoSnapshot, "spillInfoSnapshot is null");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         if (spillInfoSnapshot.hasSpilled()) {
             page = spillAndMaskSpilledPositions(page, spillInfoSnapshot.getSpillMask());
             if (page.getPositionCount() == 0) {
@@ -265,6 +284,13 @@ public class LookupJoinOperator
     {
         // TODO introduce explicit state (enum), like in HBO
 
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!spillInProgress.isDone()) {
             /*
              * We cannot produce output when there is some previous input spilling. This is because getOutput() may result in additional portion of input being spilled
@@ -322,6 +348,12 @@ public class LookupJoinOperator
         // because we will flush a page whenever we reach the probe end
         verify(probe != null || pageBuilder.isEmpty());
         return null;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private void tryUnspillNext()
@@ -686,5 +718,81 @@ public class LookupJoinOperator
         // Before updating the probe flush the current page
         buildPage();
         probe = null;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        LookupJoinOperatorState myState = new LookupJoinOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.statisticsCounter = statisticsCounter.capture(serdeProvider);
+        myState.pageBuilder = pageBuilder.capture(serdeProvider);
+        myState.inputPageSpillEpoch = inputPageSpillEpoch;
+        myState.closed = closed;
+        myState.finishing = finishing;
+        myState.finished = finished;
+        myState.joinPosition = joinPosition;
+        myState.joinSourcePositions = joinSourcePositions;
+        myState.currentProbePositionProducedRow = currentProbePositionProducedRow;
+        myState.partitionedConsumption = partitionedConsumption != null ? true : false;
+        myState.lookupPartitions = lookupPartitions != null ? true : false;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        LookupJoinOperatorState myState = (LookupJoinOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.statisticsCounter.restore(myState.statisticsCounter, serdeProvider);
+        this.pageBuilder.restore(myState.pageBuilder, serdeProvider);
+
+        this.inputPageSpillEpoch = myState.inputPageSpillEpoch;
+        this.closed = myState.closed;
+        this.finishing = myState.finishing;
+        this.finished = myState.finished;
+
+        this.joinPosition = myState.joinPosition;
+        this.joinSourcePositions = myState.joinSourcePositions;
+        this.currentProbePositionProducedRow = myState.currentProbePositionProducedRow;
+        if (myState.partitionedConsumption) {
+            this.partitionedConsumption = immediateFuture(new PartitionedConsumption<>(
+                    1,
+                    emptyList(),
+                    i -> {
+                        throw new UnsupportedOperationException();
+                    },
+                    i -> {}));
+        }
+        else {
+            this.partitionedConsumption = null;
+        }
+        if (myState.lookupPartitions && this.partitionedConsumption.isDone()) {
+            this.lookupPartitions = getDone(this.partitionedConsumption).beginConsumption();
+        }
+        else {
+            this.lookupPartitions = null;
+        }
+    }
+
+    private static class LookupJoinOperatorState
+            implements Serializable
+    {
+        //TODO-cp-I2EATR: Work to be done for spilled situations
+        private Object operatorContext;
+        private Object statisticsCounter;
+        private Object pageBuilder;
+
+        private long inputPageSpillEpoch;
+        private boolean closed;
+        private boolean finishing;
+        private boolean finished;
+        private long joinPosition;
+        private int joinSourcePositions;
+        private boolean currentProbePositionProducedRow;
+
+        private boolean partitionedConsumption;
+
+        private boolean lookupPartitions;
     }
 }

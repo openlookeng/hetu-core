@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.split.EmptySplit;
@@ -148,6 +149,8 @@ public class TableScanWorkProcessorOperator
         splitToPages.close();
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private static class SplitToPages
             implements WorkProcessor.Transformation<Split, WorkProcessor<Page>>
     {
@@ -308,6 +311,8 @@ public class TableScanWorkProcessorOperator
         }
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private static class ConnectorPageSourceToPages
             implements WorkProcessor.Process<Page>
     {

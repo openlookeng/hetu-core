@@ -22,6 +22,7 @@ import io.airlift.stats.CounterStat;
 import io.airlift.stats.GcMonitor;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.TaskId;
@@ -32,6 +33,7 @@ import io.prestosql.memory.QueryContext;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
+import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
@@ -106,6 +108,9 @@ public class TaskContext
 
     private final PlanNodeId consumerId;
 
+    private final PagesSerdeFactory serdeFactory;
+    private final TaskSnapshotManager snapshotManager;
+
     public static TaskContext createTaskContext(
             QueryContext queryContext,
             TaskStateMachine taskStateMachine,
@@ -119,7 +124,7 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, null, null);
         taskContext.initialize();
         return taskContext;
     }
@@ -134,7 +139,9 @@ public class TaskContext
             boolean perOperatorCpuTimerEnabled,
             boolean cpuTimerEnabled,
             OptionalInt totalPartitions,
-            PlanNodeId consumerId)
+            PlanNodeId consumerId,
+            PagesSerdeFactory serdeFactory,
+            TaskSnapshotManager snapshotManager)
     {
         this.taskStateMachine = requireNonNull(taskStateMachine, "taskStateMachine is null");
         this.gcMonitor = requireNonNull(gcMonitor, "gcMonitor is null");
@@ -149,6 +156,8 @@ public class TaskContext
         this.cpuTimerEnabled = cpuTimerEnabled;
         this.totalPartitions = requireNonNull(totalPartitions, "totalPartitions is null");
         this.consumerId = consumerId;
+        this.serdeFactory = serdeFactory;
+        this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
     }
 
     // the state change listener is added here in a separate initialize() method
@@ -167,6 +176,11 @@ public class TaskContext
     public OptionalInt getTotalPartitions()
     {
         return totalPartitions;
+    }
+
+    public TaskSnapshotManager getSnapshotManager()
+    {
+        return snapshotManager;
     }
 
     public PipelineContext addPipelineContext(int pipelineId, boolean inputPipeline, boolean outputPipeline, boolean partitioned)
@@ -582,5 +596,10 @@ public class TaskContext
     public int getTaskCount()
     {
         return queryContext.getTaskCount();
+    }
+
+    public PagesSerdeFactory getSerdeFactory()
+    {
+        return serdeFactory;
     }
 }

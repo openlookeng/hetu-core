@@ -16,13 +16,17 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -32,6 +36,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Group input data and produce a single block for each sequence of identical values.
  */
+@RestorableConfig(uncapturedFields = {"snapshotState"})
 public class AggregationOperator
         implements Operator
 {
@@ -90,6 +95,8 @@ public class AggregationOperator
 
     private State state = State.NEEDS_INPUT;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public AggregationOperator(OperatorContext operatorContext, Step step, List<AccumulatorFactory> accumulatorFactories, boolean useSystemMemory)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
@@ -106,6 +113,7 @@ public class AggregationOperator
             builder.add(new Aggregator(accumulatorFactory, step));
         }
         aggregates = builder.build();
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -147,6 +155,12 @@ public class AggregationOperator
         checkState(needsInput(), "Operator is already finishing");
         requireNonNull(page, "page is null");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         long memorySize = 0;
         for (Aggregator aggregate : aggregates) {
             aggregate.processPage(page);
@@ -163,6 +177,13 @@ public class AggregationOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (state != State.HAS_OUTPUT) {
             return null;
         }
@@ -183,5 +204,50 @@ public class AggregationOperator
 
         state = State.FINISHED;
         return pageBuilder.build();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        AggregationOperatorState myState = new AggregationOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.systemMemoryContext = systemMemoryContext.getBytes();
+        myState.userMemoryContext = userMemoryContext.getBytes();
+        myState.aggregates = new Object[aggregates.size()];
+        for (int i = 0; i < aggregates.size(); i++) {
+            myState.aggregates[i] = aggregates.get(i).capture(serdeProvider);
+        }
+        myState.state = state.toString();
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        AggregationOperatorState myState = (AggregationOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.systemMemoryContext.setBytes(myState.systemMemoryContext);
+        this.userMemoryContext.setBytes(myState.userMemoryContext);
+        for (int i = 0; i < aggregates.size(); i++) {
+            aggregates.get(i).restore(myState.aggregates[i], serdeProvider);
+        }
+        this.state = State.valueOf(myState.state);
+    }
+
+    private static class AggregationOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long systemMemoryContext;
+        private long userMemoryContext;
+        //each element is another Object[] that is the state of all fields of state_0 that's worth capturing
+        private Object[] aggregates;
+        private String state;
     }
 }

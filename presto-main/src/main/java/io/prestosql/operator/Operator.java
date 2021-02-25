@@ -16,9 +16,10 @@ package io.prestosql.operator;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.Restorable;
 
 public interface Operator
-        extends AutoCloseable
+        extends AutoCloseable, Restorable
 {
     ListenableFuture<?> NOT_BLOCKED = Futures.immediateFuture(null);
 
@@ -40,6 +41,17 @@ public interface Operator
     boolean needsInput();
 
     /**
+     * For Snapshot - Only be called when {@link #needsInput} returns false,
+     * to determine if marker pages are allowed.
+     * Most operators should return {@code false}. Join operators
+     * may return true when they are blocked by the "right" side.
+     */
+    default boolean allowMarker()
+    {
+        return false;
+    }
+
+    /**
      * Adds an input page to the operator.  This method will only be called if
      * {@code needsInput()} returns true.
      */
@@ -50,6 +62,11 @@ public interface Operator
      * available, return null.
      */
     Page getOutput();
+
+    /**
+     * For Snapshot - If next output is a marker page, then return it, otherwise return null
+     */
+    Page pollMarker();
 
     /**
      * After calling this method operator should revoke all reserved revocable memory.
@@ -98,5 +115,17 @@ public interface Operator
     default void close()
             throws Exception
     {
+    }
+
+    /**
+     * When tasks and operators need to be cancelled so they can be rescheduled to resume query execution,
+     * then call this function, so operators can clear their states differently from "close".
+     * Default implementation invokes close(). Operators that require special handling for resuming,
+     * e.g. TableWriterOperator, should override this function.
+     */
+    default void cancelToResume()
+            throws Exception
+    {
+        close();
     }
 }

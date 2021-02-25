@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.PageSourceProvider;
 import io.prestosql.testing.MaterializedResult;
@@ -359,6 +360,7 @@ public class TestDriver
         return new PageConsumerOperator(driverContext.addOperatorContext(1, new PlanNodeId("test"), "sink"), resultBuilder::page, Function.identity());
     }
 
+    @RestorableConfig(unsupported = true)
     private static class BrokenOperator
             implements Operator, Closeable
     {
@@ -456,6 +458,12 @@ public class TestDriver
         public Page getOutput()
         {
             waitForUnlock();
+            return null;
+        }
+
+        @Override
+        public Page pollMarker()
+        {
             return null;
         }
 

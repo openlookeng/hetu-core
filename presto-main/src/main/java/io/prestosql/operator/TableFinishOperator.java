@@ -20,11 +20,14 @@ import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.operator.OperationTimer.OperationTiming;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
@@ -43,6 +46,7 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+@RestorableConfig(uncapturedFields = {"tableFinisher", "descriptor", "outputMetadata", "snapshotState"})
 public class TableFinishOperator
         implements Operator
 {
@@ -117,6 +121,8 @@ public class TableFinishOperator
     private final OperationTiming statisticsTiming = new OperationTiming();
     private final boolean statisticsCpuTimerEnabled;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public TableFinishOperator(
             OperatorContext operatorContext,
             TableFinisher tableFinisher,
@@ -129,7 +135,7 @@ public class TableFinishOperator
         this.statisticsAggregationOperator = requireNonNull(statisticsAggregationOperator, "statisticsAggregationOperator is null");
         this.descriptor = requireNonNull(descriptor, "descriptor is null");
         this.statisticsCpuTimerEnabled = statisticsCpuTimerEnabled;
-
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         operatorContext.setInfoSupplier(this::getInfo);
     }
 
@@ -181,6 +187,12 @@ public class TableFinishOperator
     {
         requireNonNull(page, "page is null");
         checkState(state == State.RUNNING, "Operator is %s", state);
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
 
         Block rowCountBlock = page.getBlock(ROW_COUNT_CHANNEL);
         Block fragmentBlock = page.getBlock(FRAGMENT_CHANNEL);
@@ -269,6 +281,13 @@ public class TableFinishOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!isBlocked().isDone()) {
             return null;
         }
@@ -302,6 +321,12 @@ public class TableFinishOperator
         page.declarePosition();
         BIGINT.writeLong(page.getBlockBuilder(0), rowCount);
         return page.build();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private ComputedStatistics getComputedStatistics(Page page, int position)
@@ -342,5 +367,17 @@ public class TableFinishOperator
     public interface TableFinisher
     {
         Optional<ConnectorOutputMetadata> finishTable(Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return operatorContext.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        operatorContext.restore(state, serdeProvider);
     }
 }

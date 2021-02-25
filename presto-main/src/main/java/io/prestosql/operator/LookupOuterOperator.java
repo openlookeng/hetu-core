@@ -208,6 +208,12 @@ public class LookupOuterOperator
     }
 
     @Override
+    public Page pollMarker()
+    {
+        return null;
+    }
+
+    @Override
     public void close()
     {
         if (closed) {
