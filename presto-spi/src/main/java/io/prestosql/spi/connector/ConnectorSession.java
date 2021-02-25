@@ -88,9 +88,13 @@ public interface ConnectorSession
      * If enabled and supported by the connector, Pages read by the connector will include metadata about the Page.
      * For example, the Hive connector could include info such as the ORC filepath which the Page
      * was read from.
-     * @return
      */
     default void setPageMetadataEnabled(boolean enabled)
     {
+    }
+
+    default boolean isSnapshotEnabled()
+    {
+        return false;
     }
 }

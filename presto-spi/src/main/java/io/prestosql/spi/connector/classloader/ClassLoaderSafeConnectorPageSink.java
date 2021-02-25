@@ -21,6 +21,8 @@ import io.prestosql.spi.connector.ConnectorPageSourceProvider;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.util.Collection;
 import java.util.List;
@@ -28,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"classLoader"})
 public class ClassLoaderSafeConnectorPageSink
         implements ConnectorPageSink
 {
@@ -97,13 +100,37 @@ public class ClassLoaderSafeConnectorPageSink
     }
 
     @Override
+    public void cancelToResume()
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.cancelToResume();
+        }
+    }
+
+    @Override
     public VacuumResult vacuum(ConnectorPageSourceProvider pageSourceProvider,
-                               ConnectorTransactionHandle transactionHandle,
-                               ConnectorTableHandle connectorTableHandle,
-                               List<ConnectorSplit> splits)
+            ConnectorTransactionHandle transactionHandle,
+            ConnectorTableHandle connectorTableHandle,
+            List<ConnectorSplit> splits)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.vacuum(pageSourceProvider, transactionHandle, connectorTableHandle, splits);
+        }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.capture(serdeProvider);
+        }
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.restore(state, serdeProvider);
         }
     }
 }
