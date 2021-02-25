@@ -122,13 +122,15 @@ public class MockRemoteTaskFactory
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), ImmutableList.of(symbol)),
                 ungroupedExecution(),
                 StatsAndCosts.empty(),
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
 
         ImmutableMultimap.Builder<PlanNodeId, Split> initialSplits = ImmutableMultimap.builder();
         for (Split sourceSplit : splits) {
             initialSplits.put(sourceId, sourceSplit);
         }
-        return createRemoteTask(TEST_SESSION, taskId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST), partitionedSplitCountTracker, true);
+        return createRemoteTask(TEST_SESSION, taskId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST), partitionedSplitCountTracker, true, Optional.empty());
     }
 
     @Override
@@ -141,7 +143,7 @@ public class MockRemoteTaskFactory
             OptionalInt totalPartitions,
             OutputBuffers outputBuffers,
             PartitionedSplitCountTracker partitionedSplitCountTracker,
-            boolean summarizeTaskInfo)
+            boolean summarizeTaskInfo, Optional<PlanNodeId> parent)
     {
         return new MockRemoteTask(taskId, fragment, node.getNodeIdentifier(), executor, scheduledExecutor, initialSplits, totalPartitions, partitionedSplitCountTracker);
     }
@@ -195,7 +197,7 @@ public class MockRemoteTaskFactory
                     scheduledExecutor,
                     new DataSize(1, MEGABYTE),
                     spillSpaceTracker);
-            this.taskContext = queryContext.addTaskContext(taskStateMachine, TEST_SESSION, true, true, totalPartitions);
+            this.taskContext = queryContext.addTaskContext(taskStateMachine, TEST_SESSION, true, true, totalPartitions, Optional.empty());
 
             this.location = URI.create("fake://task/" + taskId);
 

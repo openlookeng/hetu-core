@@ -20,6 +20,7 @@ import io.prestosql.SessionRepresentation;
 import io.prestosql.execution.TaskSource;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ public class TaskUpdateRequest
     private final List<TaskSource> sources;
     private final OutputBuffers outputIds;
     private final OptionalInt totalPartitions;
+    private final Optional<PlanNodeId> consumerId;
 
     @JsonCreator
     public TaskUpdateRequest(
@@ -46,7 +48,8 @@ public class TaskUpdateRequest
             @JsonProperty("fragment") Optional<PlanFragment> fragment,
             @JsonProperty("sources") List<TaskSource> sources,
             @JsonProperty("outputIds") OutputBuffers outputIds,
-            @JsonProperty("totalPartitions") OptionalInt totalPartitions)
+            @JsonProperty("totalPartitions") OptionalInt totalPartitions,
+            @JsonProperty("consumerId")Optional<PlanNodeId> consumerPlanNodeId)
     {
         requireNonNull(session, "session is null");
         requireNonNull(extraCredentials, "credentials is null");
@@ -61,6 +64,7 @@ public class TaskUpdateRequest
         this.sources = ImmutableList.copyOf(sources);
         this.outputIds = outputIds;
         this.totalPartitions = totalPartitions;
+        this.consumerId = consumerPlanNodeId;
     }
 
     @JsonProperty
@@ -97,6 +101,12 @@ public class TaskUpdateRequest
     public OptionalInt getTotalPartitions()
     {
         return totalPartitions;
+    }
+
+    @JsonProperty
+    public Optional<PlanNodeId> getConsumerId()
+    {
+        return consumerId;
     }
 
     @Override

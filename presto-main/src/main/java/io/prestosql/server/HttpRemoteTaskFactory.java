@@ -45,6 +45,7 @@ import org.weakref.jmx.Nested;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -134,14 +135,14 @@ public class HttpRemoteTaskFactory
 
     @Override
     public RemoteTask createRemoteTask(Session session,
-            TaskId taskId,
-            InternalNode node,
-            PlanFragment fragment,
-            Multimap<PlanNodeId, Split> initialSplits,
-            OptionalInt totalPartitions,
-            OutputBuffers outputBuffers,
-            PartitionedSplitCountTracker partitionedSplitCountTracker,
-            boolean summarizeTaskInfo)
+                                       TaskId taskId,
+                                       InternalNode node,
+                                       PlanFragment fragment,
+                                       Multimap<PlanNodeId, Split> initialSplits,
+                                       OptionalInt totalPartitions,
+                                       OutputBuffers outputBuffers,
+                                       PartitionedSplitCountTracker partitionedSplitCountTracker,
+                                       boolean summarizeTaskInfo, Optional<PlanNodeId> parent)
     {
         return new HttpRemoteTask(session,
                 taskId,
@@ -164,6 +165,7 @@ public class HttpRemoteTaskFactory
                 taskUpdateRequestCodec,
                 partitionedSplitCountTracker,
                 stats,
-                isBinaryEncoding);
+                isBinaryEncoding,
+                parent);
     }
 }

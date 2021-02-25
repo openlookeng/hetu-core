@@ -300,7 +300,8 @@ public abstract class AbstractOperatorBenchmark
                         session,
                         false,
                         false,
-                        OptionalInt.empty());
+                        OptionalInt.empty(),
+                        Optional.empty());
 
         CpuTimer cpuTimer = new CpuTimer();
         Map<String, Long> executionStats = execute(taskContext);

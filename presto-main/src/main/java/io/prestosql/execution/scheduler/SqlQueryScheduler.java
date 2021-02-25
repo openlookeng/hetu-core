@@ -52,6 +52,7 @@ import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.planner.StageExecutionPlan;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
+import io.prestosql.sql.planner.plan.RemoteSourceNode;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -127,6 +128,8 @@ public class SqlQueryScheduler
     private final DynamicFilterService dynamicFilterService;
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final Session session;
+
+    private final Set<PlanFragmentId> visitedPlanFrags = new HashSet<>();
 
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
@@ -206,6 +209,7 @@ public class SqlQueryScheduler
         Map<PartitioningHandle, NodePartitionMap> partitioningCache = new HashMap<>();
 
         OutputBufferId rootBufferId = Iterables.getOnlyElement(rootOutputBuffers.getBuffers().keySet());
+        visitedPlanFrags.add(plan.getFragment().getId());
         List<SqlStageExecution> stages = createStages(
                 (fragmentId, tasks, noMoreExchangeLocations) -> updateQueryOutputLocations(queryStateMachine, rootBufferId, tasks, noMoreExchangeLocations),
                 new AtomicInteger(),
@@ -425,6 +429,11 @@ public class SqlQueryScheduler
 
         ImmutableSet.Builder<SqlStageExecution> childStagesBuilder = ImmutableSet.builder();
         for (StageExecutionPlan subStagePlan : plan.getSubStages()) {
+            if (visitedPlanFrags.contains(subStagePlan.getFragment().getId())) {
+                continue;
+            }
+
+            visitedPlanFrags.add(subStagePlan.getFragment().getId());
             List<SqlStageExecution> subTree = createStages(
                     stage::addExchangeLocations,
                     nextStageId,
@@ -446,6 +455,10 @@ public class SqlQueryScheduler
 
             SqlStageExecution childStage = subTree.get(0);
             childStagesBuilder.add(childStage);
+            Optional<RemoteSourceNode> parentNode = plan.getFragment().getRemoteSourceNodes().stream().filter(x -> x.getSourceFragmentIds().contains(childStage.getFragment().getId())).findAny();
+
+            checkArgument(parentNode.isPresent(), "Couldn't find parent of a CTE node");
+            childStage.setParentId(parentNode.get().getId());
         }
         Set<SqlStageExecution> childStages = childStagesBuilder.build();
         stage.addStateChangeListener(newState -> {

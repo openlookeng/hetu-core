@@ -23,6 +23,7 @@ import io.prestosql.metadata.Split;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
 
+import java.util.Optional;
 import java.util.OptionalInt;
 
 import static java.util.Objects.requireNonNull;
@@ -48,7 +49,8 @@ public class MemoryTrackingRemoteTaskFactory
             OptionalInt totalPartitions,
             OutputBuffers outputBuffers,
             PartitionedSplitCountTracker partitionedSplitCountTracker,
-            boolean summarizeTaskInfo)
+            boolean summarizeTaskInfo,
+            Optional<PlanNodeId> parent)
     {
         RemoteTask task = remoteTaskFactory.createRemoteTask(session,
                 taskId,
@@ -58,7 +60,8 @@ public class MemoryTrackingRemoteTaskFactory
                 totalPartitions,
                 outputBuffers,
                 partitionedSplitCountTracker,
-                summarizeTaskInfo);
+                summarizeTaskInfo,
+                parent);
 
         task.addStateChangeListener(new UpdatePeakMemory(stateMachine));
         return task;

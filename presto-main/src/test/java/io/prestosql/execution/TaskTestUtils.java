@@ -112,6 +112,8 @@ public final class TaskTestUtils
                     .withBucketToPartition(Optional.of(new int[1])),
             ungroupedExecution(),
             StatsAndCosts.empty(),
+            Optional.empty(),
+            Optional.empty(),
             Optional.empty());
 
     public static LocalExecutionPlanner createTestingPlanner()
@@ -174,7 +176,7 @@ public final class TaskTestUtils
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)
     {
-        return sqlTask.updateTask(TEST_SESSION, Optional.of(PLAN_FRAGMENT), taskSources, outputBuffers, OptionalInt.empty());
+        return sqlTask.updateTask(TEST_SESSION, Optional.of(PLAN_FRAGMENT), taskSources, outputBuffers, OptionalInt.empty(), Optional.empty(), null);
     }
 
     public static SplitMonitor createTestSplitMonitor()

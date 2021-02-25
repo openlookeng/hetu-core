@@ -22,6 +22,7 @@ import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.MemoryPoolAssignmentsRequest;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Optional;
@@ -83,7 +84,7 @@ public interface TaskManager
      * Updates the task plan, sources and output buffers.  If the task does not
      * already exist, is is created and then updated.
      */
-    TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions);
+    TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer);
 
     /**
      * Cancels a task.  If the task does not already exist, is is created and then
