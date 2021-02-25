@@ -49,6 +49,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -246,6 +247,18 @@ public class SqlQueryManager
             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Query %s already registered", queryExecution.getQueryId()));
         }
 
+        if (isIndexCreationQuery(queryExecution.getQueryInfo())) {
+            queryExecution.addStateChangeListener(state -> {
+                try {
+                    queryMonitor.indexCreationStateChangeEvent(state, queryExecution.getQueryInfo());
+                }
+                finally {
+                    // execution MUST be added to the expiration queue or there will be a leak
+                    queryTracker.expireQuery(queryExecution.getQueryId());
+                }
+            });
+        }
+
         queryExecution.addFinalQueryInfoListener(finalQueryInfo -> {
             try {
                 queryMonitor.queryCompletedEvent(finalQueryInfo);
@@ -420,5 +433,10 @@ public class SqlQueryManager
             // UI related queries need not take up the history space.
             queryTracker.removeQuery(queryId);
         }
+    }
+
+    private boolean isIndexCreationQuery(QueryInfo queryInfo)
+    {
+        return queryInfo.getQuery().toUpperCase(Locale.ROOT).startsWith("CREATE INDEX");
     }
 }

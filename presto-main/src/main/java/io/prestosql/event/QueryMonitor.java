@@ -28,10 +28,12 @@ import io.prestosql.execution.Column;
 import io.prestosql.execution.ExecutionFailureInfo;
 import io.prestosql.execution.Input;
 import io.prestosql.execution.QueryInfo;
+import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.execution.TaskState;
+import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.operator.OperatorStats;
@@ -63,6 +65,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static io.prestosql.execution.QueryState.FAILED;
 import static io.prestosql.execution.QueryState.QUEUED;
 import static io.prestosql.sql.planner.planprinter.PlanPrinter.textDistributedPlan;
 import static java.lang.Math.max;
@@ -86,6 +89,7 @@ public class QueryMonitor
     private final SessionPropertyManager sessionPropertyManager;
     private final Metadata metadata;
     private final int maxJsonLimit;
+    private final HeuristicIndexerManager heuristicIndexerManager;
 
     @Inject
     public QueryMonitor(
@@ -98,7 +102,8 @@ public class QueryMonitor
             NodeVersion nodeVersion,
             SessionPropertyManager sessionPropertyManager,
             Metadata metadata,
-            QueryMonitorConfig config)
+            QueryMonitorConfig config,
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
         this.stageInfoCodec = requireNonNull(stageInfoCodec, "stageInfoCodec is null");
@@ -111,6 +116,7 @@ public class QueryMonitor
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.maxJsonLimit = toIntExact(requireNonNull(config, "config is null").getMaxOutputStageJsonSize().toBytes());
+        this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
     public void queryCreatedEvent(BasicQueryInfo queryInfo)
@@ -179,6 +185,13 @@ public class QueryMonitor
                 ofEpochMilli(queryInfo.getQueryStats().getEndTime().getMillis())));
 
         logQueryTimeline(queryInfo);
+    }
+
+    public void indexCreationStateChangeEvent(QueryState state, QueryInfo queryInfo)
+    {
+        if (state == FAILED) {
+            heuristicIndexerManager.cleanUpIndexRecord(queryInfo);
+        }
     }
 
     public void queryCompletedEvent(QueryInfo queryInfo)
