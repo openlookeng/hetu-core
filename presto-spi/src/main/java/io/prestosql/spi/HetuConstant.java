@@ -29,6 +29,7 @@ public class HetuConstant
     public static final String FILTER_CACHE_LOADING_DELAY = "hetu.heuristicindex.filter.cache.loading-delay";
     public static final String FILTER_CACHE_TTL = "hetu.heuristicindex.filter.cache.ttl";
     public static final String FILTER_CACHE_SOFT_REFERENCE = "hetu.heuristicindex.filter.cache.soft-reference";
+    public static final String FILTER_CACHE_PRELOAD_INDICES = "hetu.heuristicindex.filter.cache.preload-indices";
     public static final String INDEXSTORE_URI = "hetu.heuristicindex.indexstore.uri";
     public static final String INDEXSTORE_FILESYSTEM_PROFILE = "hetu.heuristicindex.indexstore.filesystem.profile";
     public static final String DATA_CENTER_CONNECTOR_NAME = "dc";

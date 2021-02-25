@@ -16,7 +16,7 @@ package io.prestosql.plugin.hive.util;
 
 import com.google.common.cache.CacheLoader;
 import com.google.inject.Inject;
-import io.hetu.core.common.heuristicindex.IndexCacheKey;
+import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexNotCreatedException;

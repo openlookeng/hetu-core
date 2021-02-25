@@ -18,11 +18,13 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
-import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFilter;
 import io.prestosql.spi.heuristicindex.IndexLookUpException;
@@ -56,6 +58,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -75,6 +78,8 @@ public class SplitFiltering
     private static final Set<String> INVERTED_INDEX = Sets.newHashSet("BTREE");
     private static final String MAX_MODIFIED_TIME = "__hetu__maxmodifiedtime";
     private static final String TABLE_LEVEL_KEY = "__index__is__table__level__";
+    private static final String PRELOAD_ALL_KEY = "ALL";
+
     private static IndexCache indexCache;
 
     private SplitFiltering()
@@ -86,6 +91,38 @@ public class SplitFiltering
         if (indexCache == null) {
             CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new IndexCacheLoader(indexClient);
             indexCache = new IndexCache(cacheLoader, indexClient);
+        }
+    }
+
+    public static void preloadCache(IndexClient indexClient, List<String> preloadIndexNames)
+            throws IOException
+    {
+        if (indexCache == null) {
+            initCache(indexClient);
+        }
+
+        List<IndexRecord> indexToPreload = new ArrayList<>(preloadIndexNames.size());
+
+        if (preloadIndexNames.contains(PRELOAD_ALL_KEY)) {
+            indexToPreload = indexClient.getAllIndexRecords();
+            LOG.info("Preloading all indices : " + indexToPreload.stream().map(r -> r.name).collect(Collectors.joining(",")));
+        }
+        else {
+            for (String indexName : preloadIndexNames) {
+                IndexRecord record = indexClient.lookUpIndexRecord(indexName);
+                if (record != null) {
+                    indexToPreload.add(indexClient.lookUpIndexRecord(indexName));
+                }
+                else {
+                    LOG.info("Index " + indexName + " is not found. Preloading skipped.");
+                }
+            }
+        }
+
+        for (IndexRecord record : indexToPreload) {
+            LOG.info("Preloading index for split filtering: " + record);
+            Index.Level indexLevel = Index.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+            indexCache.preloadIndex(record.qualifiedTable, String.join(",", record.columns), record.indexType, indexLevel);
         }
     }
 

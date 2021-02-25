@@ -347,7 +347,7 @@ public class HeuristicIndexClient
         String column = indexKeyPath.subpath(1, 2).toString();
         List<IndexMetadata> result = new ArrayList<>();
         if (fs.exists(absolutePath)) {
-            List<Path> paths = fs.list(absolutePath).collect(Collectors.toList());
+            List<Path> paths = fs.walk(absolutePath).filter(p -> !fs.isDirectory(p)).collect(Collectors.toList());
             for (Path filePath : paths) {
                 BTreeIndex index = new BTreeIndex();
                 InputStream inputStream = fs.newInputStream(filePath);

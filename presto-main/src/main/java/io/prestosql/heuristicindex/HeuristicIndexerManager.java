@@ -39,6 +39,7 @@ import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +128,25 @@ public class HeuristicIndexerManager
             }
             if (factory != null) {
                 indexClient = factory.getIndexClient(fs, metastore, root);
+            }
+        }
+    }
+
+    public void preloadIndex()
+            throws IOException
+    {
+        if (indexClient != null) {
+            if (PropertyService.containsProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES)) {
+                String preloadNames = PropertyService.getStringProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES);
+                List<String> preloadNameList = Arrays.asList(preloadNames.split(","));
+                if (!preloadNameList.isEmpty()) {
+                    try {
+                        SplitFiltering.preloadCache(indexClient, preloadNameList);
+                    }
+                    catch (Exception e) {
+                        LOG.info("Error preloading index: " + e);
+                    }
+                }
             }
         }
     }

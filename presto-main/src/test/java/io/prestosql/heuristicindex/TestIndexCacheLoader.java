@@ -14,8 +14,8 @@
  */
 package io.prestosql.heuristicindex;
 
-import io.hetu.core.common.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.HetuConstant;
+import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.service.PropertyService;

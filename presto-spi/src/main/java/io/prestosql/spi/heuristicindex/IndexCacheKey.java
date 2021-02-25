@@ -12,22 +12,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.common.heuristicindex;
+package io.prestosql.spi.heuristicindex;
 
 import java.util.Objects;
 
 public class IndexCacheKey
 {
-    private String path;
-    private long lastModifiedTime;
-    private String indexLevel = "STRIPE";
+    public static final long LAST_MODIFIED_TIME_PLACE_HOLDER = 0;
+
+    private final String path;
+    private final long lastModifiedTime;
+    private final Index.Level indexLevel;
+    private boolean noCloseFlag;
 
     /**
-     * @param path             path to the file the index files should be read for
+     * @param path path to the file the index files should be read for
      * @param lastModifiedTime lastModifiedTime of the file, used to validate the indexes
-     * @param indexLevel       see Index.Level in presto-spi
+     * @param indexLevel see Index.Level in presto-spi
      */
-    public IndexCacheKey(String path, long lastModifiedTime, String indexLevel)
+    public IndexCacheKey(String path, long lastModifiedTime, Index.Level indexLevel)
     {
         this.path = path;
         this.lastModifiedTime = lastModifiedTime;
@@ -42,7 +45,7 @@ public class IndexCacheKey
      */
     public IndexCacheKey(String path, long lastModifiedTime)
     {
-        this(path, lastModifiedTime, "STRIPE");
+        this(path, lastModifiedTime, Index.Level.STRIPE);
     }
 
     public String getPath()
@@ -55,9 +58,19 @@ public class IndexCacheKey
         return lastModifiedTime;
     }
 
-    public String getIndexLevel()
+    public Index.Level getIndexLevel()
     {
         return this.indexLevel;
+    }
+
+    public void setNoCloseFlag(boolean flag)
+    {
+        this.noCloseFlag = true;
+    }
+
+    public boolean skipCloseIndex()
+    {
+        return noCloseFlag;
     }
 
     // only the path should be used as the key
