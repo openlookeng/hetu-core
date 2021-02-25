@@ -299,7 +299,13 @@ public class DynamicFilterService
         }
         if (node instanceof JoinNode) {
             JoinNode joinNode = (JoinNode) node;
-            registerTasksHelper(node, joinNode.getCriteria().get(0).getRight(), joinNode.getDynamicFilters(), taskIds, workers, stateMachine);
+            List<JoinNode.EquiJoinClause> criterias = joinNode.getCriteria();
+            if (!criterias.isEmpty()) {
+                registerTasksHelper(node, criterias.get(0).getRight(), joinNode.getDynamicFilters(), taskIds, workers, stateMachine);
+            }
+            else {
+                log.warn("registerTasks is empty");
+            }
         }
         else if (node instanceof SemiJoinNode) {
             SemiJoinNode semiJoinNode = (SemiJoinNode) node;
