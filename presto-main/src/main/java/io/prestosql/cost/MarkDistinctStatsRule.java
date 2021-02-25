@@ -16,10 +16,10 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 
 import java.util.Collection;
 import java.util.Optional;

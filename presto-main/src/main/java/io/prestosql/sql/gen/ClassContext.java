@@ -17,7 +17,7 @@ package io.prestosql.sql.gen;
 import io.airlift.bytecode.BytecodeBlock;
 import io.airlift.bytecode.ClassDefinition;
 import io.airlift.bytecode.Scope;
-import io.prestosql.sql.relational.SpecialForm;
+import io.prestosql.spi.relation.SpecialForm;
 
 public class ClassContext
 {

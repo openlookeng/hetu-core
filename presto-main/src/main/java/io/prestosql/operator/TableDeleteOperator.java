@@ -16,12 +16,12 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.OptionalLong;

@@ -19,18 +19,21 @@ import io.prestosql.Session;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.SymbolAllocator;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.CoalesceExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NullLiteral;
@@ -46,13 +49,15 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.SystemSessionProperties.shouldPushAggregationThroughJoin;
 import static io.prestosql.matching.Capture.newCapture;
+import static io.prestosql.spi.plan.AggregationNode.globalAggregation;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.planner.ExpressionSymbolInliner.inlineSymbols;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.optimizations.DistinctOutputQueryUtil.isDistinct;
-import static io.prestosql.sql.planner.plan.AggregationNode.globalAggregation;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static io.prestosql.sql.planner.plan.Patterns.join;
 import static io.prestosql.sql.planner.plan.Patterns.source;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 /**
  * This optimizer pushes aggregations below outer joins when: the aggregation
@@ -219,12 +224,12 @@ public class PushAggregationThroughOuterJoin
     // of an aggregation over a single null row is one or zero rather than null. In order to ensure correct results,
     // we add a coalesce function with the output of the new outer join and the agggregation performed over a single
     // null row.
-    private Optional<PlanNode> coalesceWithNullAggregation(AggregationNode aggregationNode, PlanNode outerJoin, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
+    private Optional<PlanNode> coalesceWithNullAggregation(AggregationNode aggregationNode, PlanNode outerJoin, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
     {
         // Create an aggregation node over a row of nulls.
         Optional<MappedAggregationInfo> aggregationOverNullInfoResultNode = createAggregationOverNull(
                 aggregationNode,
-                symbolAllocator,
+                planSymbolAllocator,
                 idAllocator,
                 lookup);
 
@@ -259,29 +264,30 @@ public class PushAggregationThroughOuterJoin
         Assignments.Builder assignmentsBuilder = Assignments.builder();
         for (Symbol symbol : outerJoin.getOutputSymbols()) {
             if (aggregationNode.getAggregations().containsKey(symbol)) {
-                assignmentsBuilder.put(symbol, new CoalesceExpression(symbol.toSymbolReference(), sourceAggregationToOverNullMapping.get(symbol).toSymbolReference()));
+                assignmentsBuilder.put(symbol, castToRowExpression(
+                        new CoalesceExpression(toSymbolReference(symbol), toSymbolReference(sourceAggregationToOverNullMapping.get(symbol)))));
             }
             else {
-                assignmentsBuilder.put(symbol, symbol.toSymbolReference());
+                assignmentsBuilder.put(symbol, castToRowExpression(toSymbolReference(symbol)));
             }
         }
         return Optional.of(new ProjectNode(idAllocator.getNextId(), crossJoin, assignmentsBuilder.build()));
     }
 
-    private Optional<MappedAggregationInfo> createAggregationOverNull(AggregationNode referenceAggregation, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
+    private Optional<MappedAggregationInfo> createAggregationOverNull(AggregationNode referenceAggregation, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
     {
         // Create a values node that consists of a single row of nulls.
         // Map the output symbols from the referenceAggregation's source
         // to symbol references for the new values node.
         NullLiteral nullLiteral = new NullLiteral();
         ImmutableList.Builder<Symbol> nullSymbols = ImmutableList.builder();
-        ImmutableList.Builder<Expression> nullLiterals = ImmutableList.builder();
+        ImmutableList.Builder<RowExpression> nullLiterals = ImmutableList.builder();
         ImmutableMap.Builder<Symbol, SymbolReference> sourcesSymbolMappingBuilder = ImmutableMap.builder();
         for (Symbol sourceSymbol : referenceAggregation.getSource().getOutputSymbols()) {
-            nullLiterals.add(nullLiteral);
-            Symbol nullSymbol = symbolAllocator.newSymbol(nullLiteral, symbolAllocator.getTypes().get(sourceSymbol));
+            nullLiterals.add(castToRowExpression(nullLiteral));
+            Symbol nullSymbol = planSymbolAllocator.newSymbol(nullLiteral, planSymbolAllocator.getTypes().get(sourceSymbol));
             nullSymbols.add(nullSymbol);
-            sourcesSymbolMappingBuilder.put(sourceSymbol, nullSymbol.toSymbolReference());
+            sourcesSymbolMappingBuilder.put(sourceSymbol, toSymbolReference(nullSymbol));
         }
         ValuesNode nullRow = new ValuesNode(
                 idAllocator.getNextId(),
@@ -305,13 +311,15 @@ public class PushAggregationThroughOuterJoin
             Aggregation overNullAggregation = new Aggregation(
                     aggregation.getSignature(),
                     aggregation.getArguments().stream()
+                            .map(OriginalExpressionUtils::castToExpression)
                             .map(argument -> inlineSymbols(sourcesSymbolMapping, argument))
+                            .map(OriginalExpressionUtils::castToRowExpression)
                             .collect(toImmutableList()),
                     aggregation.isDistinct(),
                     aggregation.getFilter(),
                     aggregation.getOrderingScheme(),
                     aggregation.getMask());
-            Symbol overNullSymbol = symbolAllocator.newSymbol(overNullAggregation.getSignature().getName(), symbolAllocator.getTypes().get(aggregationSymbol));
+            Symbol overNullSymbol = planSymbolAllocator.newSymbol(overNullAggregation.getSignature().getName(), planSymbolAllocator.getTypes().get(aggregationSymbol));
             aggregationsOverNullBuilder.put(overNullSymbol, overNullAggregation);
             aggregationsSymbolMappingBuilder.put(aggregationSymbol, overNullSymbol);
         }
@@ -333,9 +341,9 @@ public class PushAggregationThroughOuterJoin
 
     private static boolean isUsingSymbols(AggregationNode.Aggregation aggregation, Set<Symbol> sourceSymbols)
     {
-        List<Expression> functionArguments = aggregation.getArguments();
+        List<Expression> functionArguments = aggregation.getArguments().stream().map(OriginalExpressionUtils::castToExpression).collect(toImmutableList());
         return sourceSymbols.stream()
-                .map(Symbol::toSymbolReference)
+                .map(SymbolUtils::toSymbolReference)
                 .anyMatch(functionArguments::contains);
     }
 

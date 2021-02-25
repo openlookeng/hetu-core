@@ -29,17 +29,35 @@ import io.prestosql.spi.connector.ConstantProperty;
 import io.prestosql.spi.connector.GroupingProperty;
 import io.prestosql.spi.connector.LocalProperty;
 import io.prestosql.spi.connector.SortingProperty;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupIdNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.NullableValue;
+import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.relation.DomainTranslator;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.DomainTranslator;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.ExpressionInterpreter;
 import io.prestosql.sql.planner.NoOpSymbolResolver;
-import io.prestosql.sql.planner.OrderingScheme;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.RowExpressionInterpreter;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.ActualProperties.Global;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
@@ -48,18 +66,11 @@ import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.GroupIdNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.MarkDistinctNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -68,14 +79,11 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.sql.tree.CoalesceExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NodeRef;
@@ -96,6 +104,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.SystemSessionProperties.planWithTableNodePartitioning;
 import static io.prestosql.spi.predicate.TupleDomain.extractFixedValues;
+import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.ARBITRARY_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.optimizations.ActualProperties.Global.arbitraryPartition;
@@ -105,6 +114,8 @@ import static io.prestosql.sql.planner.optimizations.ActualProperties.Global.sin
 import static io.prestosql.sql.planner.optimizations.ActualProperties.Global.streamPartitionedOn;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 
@@ -143,7 +154,7 @@ public class PropertyDerivations
     }
 
     private static class Visitor
-            extends PlanVisitor<ActualProperties, List<ActualProperties>>
+            extends InternalPlanVisitor<ActualProperties, List<ActualProperties>>
     {
         private final Metadata metadata;
         private final Session session;
@@ -159,7 +170,7 @@ public class PropertyDerivations
         }
 
         @Override
-        protected ActualProperties visitPlan(PlanNode node, List<ActualProperties> inputProperties)
+        public ActualProperties visitPlan(PlanNode node, List<ActualProperties> inputProperties)
         {
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }
@@ -608,15 +619,30 @@ public class PropertyDerivations
         {
             ActualProperties properties = Iterables.getOnlyElement(inputProperties);
 
-            DomainTranslator.ExtractionResult decomposedPredicate = DomainTranslator.fromPredicate(
-                    metadata,
-                    session,
-                    node.getPredicate(),
-                    types);
-
             Map<Symbol, NullableValue> constants = new HashMap<>(properties.getConstants());
-            constants.putAll(extractFixedValues(decomposedPredicate.getTupleDomain()).orElse(ImmutableMap.of()));
+            if (isExpression(node.getPredicate())) {
+                ExpressionDomainTranslator.ExtractionResult decomposedPredicate = ExpressionDomainTranslator.fromPredicate(
+                        metadata,
+                        session,
+                        castToExpression(node.getPredicate()),
+                        types);
 
+                constants.putAll(extractFixedValues(decomposedPredicate.getTupleDomain()).orElse(ImmutableMap.of()));
+            }
+            else {
+                RowExpressionDomainTranslator.ExtractionResult decomposedPredicate =
+                        (new RowExpressionDomainTranslator(metadata)).fromPredicate(
+                                session.toConnectorSession(),
+                                node.getPredicate(), DomainTranslator.BASIC_COLUMN_EXTRACTOR);
+                TupleDomain<VariableReferenceExpression> tupleDomain = decomposedPredicate.getTupleDomain();
+                Map<Symbol, Domain> symDomain = new HashMap<>();
+                if (!tupleDomain.isNone()) {
+                    tupleDomain.getDomains().get().entrySet().forEach(entry -> {
+                        symDomain.put(new Symbol(entry.getKey().getName()), entry.getValue());
+                    });
+                    constants.putAll(extractFixedValues(TupleDomain.withColumnDomains(symDomain)).orElse(ImmutableMap.of()));
+                }
+            }
             return ActualProperties.builderFrom(properties)
                     .constants(constants)
                     .build();
@@ -627,34 +653,48 @@ public class PropertyDerivations
         {
             ActualProperties properties = Iterables.getOnlyElement(inputProperties);
 
-            Map<Symbol, Symbol> identities = computeIdentityTranslations(node.getAssignments().getMap());
-
-            ActualProperties translatedProperties = properties.translate(column -> Optional.ofNullable(identities.get(column)), expression -> rewriteExpression(node.getAssignments().getMap(), expression));
+            ActualProperties translatedProperties = properties.translateRowExpression(node.getAssignments().getMap(), types);
 
             // Extract additional constants
             Map<Symbol, NullableValue> constants = new HashMap<>();
-            for (Map.Entry<Symbol, Expression> assignment : node.getAssignments().entrySet()) {
-                Expression expression = assignment.getValue();
+            for (Map.Entry<Symbol, RowExpression> assignment : node.getAssignments().entrySet()) {
+                RowExpression expression = assignment.getValue();
+                Symbol output = assignment.getKey();
 
-                Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, types, expression);
-                Type type = requireNonNull(expressionTypes.get(NodeRef.of(expression)));
-                ExpressionInterpreter optimizer = ExpressionInterpreter.expressionOptimizer(expression, metadata, session, expressionTypes);
-                // TODO:
-                // We want to use a symbol resolver that looks up in the constants from the input subplan
-                // to take advantage of constant-folding for complex expressions
-                // However, that currently causes errors when those expressions operate on arrays or row types
-                // ("ROW comparison not supported for fields with null elements", etc)
-                Object value = optimizer.optimize(NoOpSymbolResolver.INSTANCE);
+                if (isExpression(expression)) {
+                    Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, types, castToExpression(expression));
+                    Type type = requireNonNull(expressionTypes.get(NodeRef.of(castToExpression(expression))));
+                    ExpressionInterpreter optimizer = ExpressionInterpreter.expressionOptimizer(castToExpression(expression), metadata, session, expressionTypes);
+                    // TODO:
+                    // We want to use a symbol resolver that looks up in the constants from the input subplan
+                    // to take advantage of constant-folding for complex expressions
+                    // However, that currently causes errors when those expressions operate on arrays or row types
+                    // ("ROW comparison not supported for fields with null elements", etc)
+                    Object value = optimizer.optimize(NoOpSymbolResolver.INSTANCE);
 
-                if (value instanceof SymbolReference) {
-                    Symbol symbol = Symbol.from((SymbolReference) value);
-                    NullableValue existingConstantValue = constants.get(symbol);
-                    if (existingConstantValue != null) {
+                    if (value instanceof SymbolReference) {
+                        Symbol symbol = SymbolUtils.from((SymbolReference) value);
+                        NullableValue existingConstantValue = constants.get(symbol);
+                        if (existingConstantValue != null) {
+                            constants.put(assignment.getKey(), new NullableValue(type, value));
+                        }
+                    }
+                    else if (!(value instanceof Expression)) {
                         constants.put(assignment.getKey(), new NullableValue(type, value));
                     }
                 }
-                else if (!(value instanceof Expression)) {
-                    constants.put(assignment.getKey(), new NullableValue(type, value));
+                else {
+                    Object value = new RowExpressionInterpreter(expression, metadata, session.toConnectorSession(), OPTIMIZED).optimize();
+
+                    if (value instanceof VariableReferenceExpression) {
+                        NullableValue existingConstantValue = constants.get(value);
+                        if (existingConstantValue != null) {
+                            constants.put(output, new NullableValue(expression.getType(), value));
+                        }
+                    }
+                    else if (!(value instanceof RowExpression)) {
+                        constants.put(output, new NullableValue(expression.getType(), value));
+                    }
                 }
             }
             constants.putAll(translatedProperties.getConstants());
@@ -807,7 +847,7 @@ public class PropertyDerivations
             Map<Symbol, Symbol> inputToOutput = new HashMap<>();
             for (Map.Entry<Symbol, Expression> assignment : assignments.entrySet()) {
                 if (assignment.getValue() instanceof SymbolReference) {
-                    inputToOutput.put(Symbol.from(assignment.getValue()), assignment.getKey());
+                    inputToOutput.put(SymbolUtils.from(assignment.getValue()), assignment.getKey());
                 }
             }
             return inputToOutput;

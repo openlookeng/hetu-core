@@ -28,12 +28,13 @@ import io.prestosql.matching.Capture;
 import io.prestosql.matching.Match;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.RuleStatsRecorder;
-import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.utils.OptimizerUtils;
 
 import java.util.Iterator;
@@ -85,13 +86,13 @@ public class IterativeOptimizer
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         // only disable new rules if we have legacy rules to fall back to
         if (!SystemSessionProperties.isNewOptimizerEnabled(session) && !legacyRules.isEmpty()) {
             for (PlanOptimizer optimizer : legacyRules) {
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, plan)) {
-                    plan = optimizer.optimize(plan, session, symbolAllocator.getTypes(), symbolAllocator, idAllocator,
+                    plan = optimizer.optimize(plan, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
                         warningCollector);
                 }
             }
@@ -103,7 +104,7 @@ public class IterativeOptimizer
         Lookup lookup = Lookup.from(planNode -> Stream.of(memo.resolve(planNode)));
 
         Duration timeout = SystemSessionProperties.getOptimizerTimeout(session);
-        Context context = new Context(memo, lookup, idAllocator, symbolAllocator, System.nanoTime(), timeout.toMillis(), session, warningCollector);
+        Context context = new Context(memo, lookup, idAllocator, planSymbolAllocator, System.nanoTime(), timeout.toMillis(), session, warningCollector);
         exploreGroup(memo.getRootGroup(), context);
 
         return memo.extract();
@@ -208,8 +209,8 @@ public class IterativeOptimizer
 
     private Rule.Context ruleContext(Context context)
     {
-        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, Optional.of(context.memo), context.lookup, context.session, context.symbolAllocator.getTypes());
-        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(context.memo), context.session, context.symbolAllocator.getTypes());
+        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, Optional.of(context.memo), context.lookup, context.session, context.planSymbolAllocator.getTypes());
+        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(context.memo), context.session, context.planSymbolAllocator.getTypes());
 
         return new Rule.Context()
         {
@@ -226,9 +227,9 @@ public class IterativeOptimizer
             }
 
             @Override
-            public SymbolAllocator getSymbolAllocator()
+            public PlanSymbolAllocator getSymbolAllocator()
             {
-                return context.symbolAllocator;
+                return context.planSymbolAllocator;
             }
 
             @Override
@@ -268,7 +269,7 @@ public class IterativeOptimizer
         private final Memo memo;
         private final Lookup lookup;
         private final PlanNodeIdAllocator idAllocator;
-        private final SymbolAllocator symbolAllocator;
+        private final PlanSymbolAllocator planSymbolAllocator;
         private final long startTimeInNanos;
         private final long timeoutInMilliseconds;
         private final Session session;
@@ -278,7 +279,7 @@ public class IterativeOptimizer
                 Memo memo,
                 Lookup lookup,
                 PlanNodeIdAllocator idAllocator,
-                SymbolAllocator symbolAllocator,
+                PlanSymbolAllocator planSymbolAllocator,
                 long startTimeInNanos,
                 long timeoutInMilliseconds,
                 Session session,
@@ -289,7 +290,7 @@ public class IterativeOptimizer
             this.memo = memo;
             this.lookup = lookup;
             this.idAllocator = idAllocator;
-            this.symbolAllocator = symbolAllocator;
+            this.planSymbolAllocator = planSymbolAllocator;
             this.startTimeInNanos = startTimeInNanos;
             this.timeoutInMilliseconds = timeoutInMilliseconds;
             this.session = session;

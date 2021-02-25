@@ -37,9 +37,9 @@ import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlNullable;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.function.TypeParameter;
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.type.FunctionType;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;

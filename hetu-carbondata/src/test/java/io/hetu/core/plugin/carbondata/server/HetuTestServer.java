@@ -111,7 +111,8 @@ public class HetuTestServer
         boolean result = false;
         try {
             result = statement.execute(query);
-        } catch (SQLException e) {
+        }
+        catch (SQLException e) {
             logger.error("Exception Occured: " + e.getMessage() + "\n Failed Query: " + query);
             throw e;
         }
@@ -125,7 +126,8 @@ public class HetuTestServer
         try {
             ResultSet rs = statement.executeQuery(query);
             return convertResultSetToList(rs);
-        } catch (SQLException e) {
+        }
+        catch (SQLException e) {
             logger.error("Exception Occured: " + e.getMessage() + "\n Failed Query: " + query);
             throw e;
         }
@@ -167,7 +169,8 @@ public class HetuTestServer
 
         if (StringUtils.isEmpty(dbName)) {
             url = "jdbc:presto://localhost:" + port + "/carbondata/default";
-        } else {
+        }
+        else {
             url = "jdbc:presto://localhost:" + port + "/carbondata/" + dbName;
         }
 
@@ -190,13 +193,14 @@ public class HetuTestServer
             Map<String, String> carbonPropertiesLocationDisabled = ImmutableMap.<String, String>builder()
                     .putAll(this.carbonProperties)
                     .put("carbon.unsafe.working.memory.in.mb", "512")
-                    .put("hive.table-creates-with-location-allowed","false")
+                    .put("hive.table-creates-with-location-allowed", "false")
                     .build();
 
             // CreateCatalog will create a catalog for CarbonData in etc/catalog.
             queryRunner.createCatalog(carbonDataCatalog, carbonDataConnector, carbonProperties);
             queryRunner.createCatalog(carbonDataCatalogLocationDisabled, carbonDataConnector, carbonPropertiesLocationDisabled);
-        } catch (RuntimeException e) {
+        }
+        catch (RuntimeException e) {
             queryRunner.close();
             throw e;
         }
@@ -210,7 +214,8 @@ public class HetuTestServer
         queryRunner.createCatalog("hive", "hive", hiveProperties);
     }
 
-    public CatalogManager getCatalog() {
+    public CatalogManager getCatalog()
+    {
         return queryRunner.getCatalogManager();
     }
 }

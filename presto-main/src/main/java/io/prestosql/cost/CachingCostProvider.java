@@ -15,10 +15,10 @@ package io.prestosql.cost;
 
 import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.iterative.GroupReference;
 import io.prestosql.sql.planner.iterative.Memo;
-import io.prestosql.sql.planner.plan.PlanNode;
 
 import java.util.IdentityHashMap;
 import java.util.Map;

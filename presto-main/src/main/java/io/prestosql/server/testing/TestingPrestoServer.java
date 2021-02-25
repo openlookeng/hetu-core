@@ -38,7 +38,6 @@ import io.airlift.jmx.testing.TestingJmxModule;
 import io.airlift.json.JsonModule;
 import io.airlift.node.testing.TestingNodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.dispatcher.DispatchManager;
@@ -75,9 +74,11 @@ import io.prestosql.server.ShutdownAction;
 import io.prestosql.server.security.ServerSecurityModule;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.SplitManager;
 import io.prestosql.sql.parser.SqlParserOptions;
+import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.statestore.EmbeddedStateStoreLauncher;
@@ -145,6 +146,7 @@ public class TestingPrestoServer
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final PageSourceManager pageSourceManager;
     private final NodePartitioningManager nodePartitioningManager;
+    private final ConnectorPlanOptimizerManager planOptimizerManager;
     private final ClusterMemoryManager clusterMemoryManager;
     private final LocalMemoryManager localMemoryManager;
     private final InternalNodeManager nodeManager;
@@ -313,6 +315,7 @@ public class TestingPrestoServer
             queryManager = (SqlQueryManager) injector.getInstance(QueryManager.class);
             resourceGroupManager = Optional.of(injector.getInstance(InternalResourceGroupManager.class));
             nodePartitioningManager = injector.getInstance(NodePartitioningManager.class);
+            planOptimizerManager = injector.getInstance(ConnectorPlanOptimizerManager.class);
             clusterMemoryManager = injector.getInstance(ClusterMemoryManager.class);
             statsCalculator = injector.getInstance(StatsCalculator.class);
         }
@@ -321,6 +324,7 @@ public class TestingPrestoServer
             queryManager = null;
             resourceGroupManager = Optional.empty();
             nodePartitioningManager = null;
+            planOptimizerManager = null;
             clusterMemoryManager = null;
             statsCalculator = null;
         }
@@ -560,6 +564,11 @@ public class TestingPrestoServer
     public NodePartitioningManager getNodePartitioningManager()
     {
         return nodePartitioningManager;
+    }
+
+    public ConnectorPlanOptimizerManager getPlanOptimizerManager()
+    {
+        return planOptimizerManager;
     }
 
     public LocalMemoryManager getLocalMemoryManager()

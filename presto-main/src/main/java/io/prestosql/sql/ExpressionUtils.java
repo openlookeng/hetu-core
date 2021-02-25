@@ -15,8 +15,8 @@ package io.prestosql.sql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import io.prestosql.sql.planner.DeterminismEvaluator;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -41,6 +41,7 @@ import java.util.function.Predicate;
 
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.IS_DISTINCT_FROM;
@@ -233,12 +234,12 @@ public final class ExpressionUtils
 
     public static Expression filterDeterministicConjuncts(Expression expression)
     {
-        return filterConjuncts(expression, DeterminismEvaluator::isDeterministic);
+        return filterConjuncts(expression, ExpressionDeterminismEvaluator::isDeterministic);
     }
 
     public static Expression filterNonDeterministicConjuncts(Expression expression)
     {
-        return filterConjuncts(expression, not(DeterminismEvaluator::isDeterministic));
+        return filterConjuncts(expression, not(ExpressionDeterminismEvaluator::isDeterministic));
     }
 
     public static Expression filterConjuncts(Expression expression, Predicate<Expression> predicate)
@@ -274,7 +275,7 @@ public final class ExpressionUtils
 
                 ImmutableList.Builder<Expression> nullConjuncts = ImmutableList.builder();
                 for (Symbol symbol : symbols) {
-                    nullConjuncts.add(new IsNullPredicate(symbol.toSymbolReference()));
+                    nullConjuncts.add(new IsNullPredicate(toSymbolReference(symbol)));
                 }
 
                 resultDisjunct.add(and(nullConjuncts.build()));
@@ -294,7 +295,7 @@ public final class ExpressionUtils
 
         ImmutableList.Builder<Expression> result = ImmutableList.builder();
         for (Expression expression : expressions) {
-            if (!DeterminismEvaluator.isDeterministic(expression)) {
+            if (!ExpressionDeterminismEvaluator.isDeterministic(expression)) {
                 result.add(expression);
             }
             else if (!seen.contains(expression)) {

@@ -17,15 +17,18 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.SymbolMapper;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.planner.plan.TopNNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.SymbolReference;
 
@@ -36,6 +39,9 @@ import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.topN;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
+import static io.prestosql.sql.relational.ProjectNodeUtils.isIdentity;
 
 /**
  * Transforms:
@@ -61,7 +67,7 @@ public final class PushTopNThroughProject
                     .with(source().matching(
                             project()
                                     // do not push topN through identity projection which could be there for column pruning purposes
-                                    .matching(projectNode -> !projectNode.isIdentity())
+                                    .matching(projectNode -> !isIdentity(projectNode))
                                     .capturedAs(PROJECT_CHILD)
                                     // do not push topN between projection and table scan so that they can be merged into a PageProcessor
                                     .with(source().matching(node -> !(node instanceof TableScanNode)))));
@@ -99,11 +105,20 @@ public final class PushTopNThroughProject
     {
         SymbolMapper.Builder mapper = SymbolMapper.builder();
         for (Symbol symbol : symbols) {
-            Expression expression = assignments.get(symbol);
-            if (!(expression instanceof SymbolReference)) {
-                return Optional.empty();
+            if (isExpression(assignments.get(symbol))) {
+                Expression expression = castToExpression(assignments.get(symbol));
+                if (!(expression instanceof SymbolReference)) {
+                    return Optional.empty();
+                }
+                mapper.put(symbol, SymbolUtils.from(expression));
             }
-            mapper.put(symbol, Symbol.from(expression));
+            else {
+                RowExpression expression = assignments.get(symbol);
+                if (!(expression instanceof VariableReferenceExpression)) {
+                    return Optional.empty();
+                }
+                mapper.put(symbol, new Symbol(((VariableReferenceExpression) expression).getName()));
+            }
         }
         return Optional.of(mapper.build());
     }

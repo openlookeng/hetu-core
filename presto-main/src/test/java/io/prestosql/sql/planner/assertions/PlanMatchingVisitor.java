@@ -16,24 +16,26 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.iterative.GroupReference;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.assertions.MatchResult.NO_MATCH;
 import static io.prestosql.sql.planner.assertions.MatchResult.match;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 final class PlanMatchingVisitor
-        extends PlanVisitor<MatchResult, PlanMatchPattern>
+        extends InternalPlanVisitor<MatchResult, PlanMatchPattern>
 {
     private final Metadata metadata;
     private final Session session;
@@ -64,7 +66,7 @@ final class PlanMatchingVisitor
         for (List<Symbol> inputs : allInputs) {
             Assignments.Builder assignments = Assignments.builder();
             for (int i = 0; i < inputs.size(); ++i) {
-                assignments.put(outputs.get(i), inputs.get(i).toSymbolReference());
+                assignments.put(outputs.get(i), castToRowExpression(toSymbolReference(inputs.get(i))));
             }
             newAliases = newAliases.updateAssignments(assignments.build());
         }
@@ -95,7 +97,7 @@ final class PlanMatchingVisitor
     }
 
     @Override
-    protected MatchResult visitPlan(PlanNode node, PlanMatchPattern pattern)
+    public MatchResult visitPlan(PlanNode node, PlanMatchPattern pattern)
     {
         List<PlanMatchingState> states = pattern.shapeMatches(node);
 

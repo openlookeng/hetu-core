@@ -22,7 +22,7 @@ import io.prestosql.operator.OperatorStats;
 import io.prestosql.operator.PipelineStats;
 import io.prestosql.operator.TaskStats;
 import io.prestosql.operator.WindowInfo;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.ArrayList;
 import java.util.HashMap;

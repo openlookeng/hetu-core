@@ -14,14 +14,14 @@
 package io.prestosql.operator.project;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.relational.CallExpression;
-import io.prestosql.sql.relational.ConstantExpression;
-import io.prestosql.sql.relational.InputReferenceExpression;
-import io.prestosql.sql.relational.LambdaDefinitionExpression;
-import io.prestosql.sql.relational.RowExpression;
-import io.prestosql.sql.relational.RowExpressionVisitor;
-import io.prestosql.sql.relational.SpecialForm;
-import io.prestosql.sql.relational.VariableReferenceExpression;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.InputReferenceExpression;
+import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.RowExpressionVisitor;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 
 import java.util.ArrayList;
 import java.util.HashMap;

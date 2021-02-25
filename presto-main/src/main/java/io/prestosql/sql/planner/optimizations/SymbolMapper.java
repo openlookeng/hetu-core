@@ -15,22 +15,28 @@ package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.expressions.RowExpressionRewriter;
+import io.prestosql.expressions.RowExpressionTreeRewriter;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.sql.planner.OrderingScheme;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.PartitioningScheme;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.planner.plan.TopNNode;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionRewriter;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
@@ -44,25 +50,69 @@ import java.util.Set;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static io.prestosql.sql.planner.plan.AggregationNode.groupingSets;
+import static io.prestosql.spi.plan.AggregationNode.groupingSets;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class SymbolMapper
 {
-    private final Map<Symbol, Symbol> mapping;
+    private final Map<String, String> mapping;
+    private TypeProvider types;
 
-    public SymbolMapper(Map<Symbol, Symbol> mapping)
+    public SymbolMapper(Map<String, String> mapping, TypeProvider types)
     {
-        this.mapping = ImmutableMap.copyOf(requireNonNull(mapping, "mapping is null"));
+        requireNonNull(mapping, "mapping is null");
+        this.mapping = mapping;
+        this.types = types;
+    }
+
+    public void setTypes(TypeProvider types)
+    {
+        this.types = types;
+    }
+
+    public TypeProvider getTypes()
+    {
+        return types;
     }
 
     public Symbol map(Symbol symbol)
     {
-        Symbol canonical = symbol;
+        String canonical = symbol.getName();
         while (mapping.containsKey(canonical) && !mapping.get(canonical).equals(canonical)) {
             canonical = mapping.get(canonical);
         }
-        return canonical;
+        return new Symbol(canonical);
+    }
+
+    public VariableReferenceExpression map(VariableReferenceExpression variable)
+    {
+        String canonical = variable.getName();
+        while (mapping.containsKey(canonical) && !mapping.get(canonical).equals(canonical)) {
+            canonical = mapping.get(canonical);
+        }
+        if (canonical.equals(variable.getName())) {
+            return variable;
+        }
+        return new VariableReferenceExpression(canonical, types.get(new Symbol(canonical)));
+    }
+
+    public RowExpression map(RowExpression value)
+    {
+        if (isExpression(value)) {
+            return castToRowExpression(map(castToExpression(value)));
+        }
+        return RowExpressionTreeRewriter.rewriteWith(new RowExpressionRewriter<Void>()
+        {
+            @Override
+            public RowExpression rewriteVariableReference(VariableReferenceExpression variable, Void context, RowExpressionTreeRewriter<Void> treeRewriter)
+            {
+                return map(variable);
+            }
+        }, value);
     }
 
     public Expression map(Expression value)
@@ -72,8 +122,8 @@ public class SymbolMapper
             @Override
             public Expression rewriteSymbolReference(SymbolReference node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
             {
-                Symbol canonical = map(Symbol.from(node));
-                return canonical.toSymbolReference();
+                Symbol canonical = map(SymbolUtils.from(node));
+                return toSymbolReference(canonical);
             }
         }, value);
     }
@@ -253,16 +303,27 @@ public class SymbolMapper
 
     public static class Builder
     {
-        private final ImmutableMap.Builder<Symbol, Symbol> mappings = ImmutableMap.builder();
+        private final ImmutableMap.Builder<String, String> mappings = ImmutableMap.builder();
+        private TypeProvider types;
 
         public SymbolMapper build()
         {
-            return new SymbolMapper(mappings.build());
+            return new SymbolMapper(mappings.build(), types);
+        }
+
+        public void put(Symbol from, VariableReferenceExpression to)
+        {
+            mappings.put(from.getName(), to.getName());
         }
 
         public void put(Symbol from, Symbol to)
         {
-            mappings.put(from, to);
+            mappings.put(from.getName(), to.getName());
+        }
+
+        public void putTypes(TypeProvider types)
+        {
+            this.types = types;
         }
     }
 }

@@ -14,9 +14,9 @@
 package io.prestosql.operator;
 
 import io.prestosql.operator.JoinProbe.JoinProbeFactory;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpillerFactory;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import javax.inject.Inject;
 

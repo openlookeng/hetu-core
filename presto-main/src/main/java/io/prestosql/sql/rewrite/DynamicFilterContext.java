@@ -15,10 +15,10 @@
 package io.prestosql.sql.rewrite;
 
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.SymbolsExtractor;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,11 +33,11 @@ public class DynamicFilterContext
     private final List<DynamicFilters.Descriptor> descriptors;
     private Map<String, String> filterIds = new HashMap<>();
 
-    public DynamicFilterContext(List<DynamicFilters.Descriptor> descriptors)
+    public DynamicFilterContext(List<DynamicFilters.Descriptor> descriptors, Map<Integer, Symbol> layOut)
     {
         this.descriptors = descriptors;
 
-        initFilterIds();
+        initFilterIds(layOut);
     }
 
     /**
@@ -61,15 +61,15 @@ public class DynamicFilterContext
         return ImmutableSet.copyOf(filterIds.values());
     }
 
-    private void initFilterIds()
+    private void initFilterIds(Map<Integer, Symbol> layOut)
     {
         for (DynamicFilters.Descriptor dynamicFilter : descriptors) {
-            if (dynamicFilter.getInput() instanceof SymbolReference) {
-                String colName = ((SymbolReference) dynamicFilter.getInput()).getName();
+            if (dynamicFilter.getInput() instanceof VariableReferenceExpression) {
+                String colName = ((VariableReferenceExpression) dynamicFilter.getInput()).getName();
                 filterIds.putIfAbsent(colName, dynamicFilter.getId());
             }
             else {
-                List<Symbol> symbolList = SymbolsExtractor.extractAll(dynamicFilter.getInput());
+                List<Symbol> symbolList = SymbolsExtractor.extractAll(dynamicFilter.getInput(), layOut);
                 for (Symbol symbol : symbolList) {
                     //FIXME: KEN: is it possible to override?
                     filterIds.putIfAbsent(symbol.getName(), dynamicFilter.getId());

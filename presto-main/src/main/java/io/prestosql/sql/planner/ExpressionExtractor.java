@@ -14,51 +14,50 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.planner.iterative.GroupReference;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.AggregationNode.Aggregation;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
 import java.util.function.Consumer;
 
-import static io.prestosql.sql.planner.iterative.Lookup.noLookup;
 import static java.util.Objects.requireNonNull;
 
 public final class ExpressionExtractor
 {
-    public static List<Expression> extractExpressions(PlanNode plan)
+    public static List<RowExpression> extractExpressions(PlanNode plan)
     {
-        return extractExpressions(plan, noLookup());
+        return extractExpressions(plan, Lookup.noLookup());
     }
 
-    public static List<Expression> extractExpressions(PlanNode plan, Lookup lookup)
+    public static List<RowExpression> extractExpressions(PlanNode plan, Lookup lookup)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(lookup, "lookup is null");
 
-        ImmutableList.Builder<Expression> expressionsBuilder = ImmutableList.builder();
+        ImmutableList.Builder<RowExpression> expressionsBuilder = ImmutableList.builder();
         plan.accept(new Visitor(true, lookup), expressionsBuilder::add);
         return expressionsBuilder.build();
     }
 
-    public static List<Expression> extractExpressionsNonRecursive(PlanNode plan)
+    public static List<RowExpression> extractExpressionsNonRecursive(PlanNode plan)
     {
-        ImmutableList.Builder<Expression> expressionsBuilder = ImmutableList.builder();
-        plan.accept(new Visitor(false, noLookup()), expressionsBuilder::add);
+        ImmutableList.Builder<RowExpression> expressionsBuilder = ImmutableList.builder();
+        plan.accept(new Visitor(false, Lookup.noLookup()), expressionsBuilder::add);
         return expressionsBuilder.build();
     }
 
-    public static void forEachExpression(PlanNode plan, Consumer<Expression> expressionConsumer)
+    public static void forEachExpression(PlanNode plan, Consumer<RowExpression> expressionConsumer)
     {
-        plan.accept(new Visitor(true, noLookup()), expressionConsumer);
+        plan.accept(new Visitor(true, Lookup.noLookup()), expressionConsumer);
     }
 
     private ExpressionExtractor()
@@ -66,7 +65,7 @@ public final class ExpressionExtractor
     }
 
     private static class Visitor
-            extends SimplePlanVisitor<Consumer<Expression>>
+            extends SimplePlanVisitor<Consumer<RowExpression>>
     {
         private final boolean recursive;
         private final Lookup lookup;
@@ -78,7 +77,7 @@ public final class ExpressionExtractor
         }
 
         @Override
-        protected Void visitPlan(PlanNode node, Consumer<Expression> context)
+        public Void visitPlan(PlanNode node, Consumer<RowExpression> context)
         {
             if (recursive) {
                 return super.visitPlan(node, context);
@@ -87,13 +86,13 @@ public final class ExpressionExtractor
         }
 
         @Override
-        public Void visitGroupReference(GroupReference node, Consumer<Expression> context)
+        public Void visitGroupReference(GroupReference node, Consumer<RowExpression> context)
         {
             return lookup.resolve(node).accept(this, context);
         }
 
         @Override
-        public Void visitAggregation(AggregationNode node, Consumer<Expression> context)
+        public Void visitAggregation(AggregationNode node, Consumer<RowExpression> context)
         {
             for (Aggregation aggregation : node.getAggregations().values()) {
                 aggregation.getArguments().forEach(context);
@@ -102,35 +101,35 @@ public final class ExpressionExtractor
         }
 
         @Override
-        public Void visitFilter(FilterNode node, Consumer<Expression> context)
+        public Void visitFilter(FilterNode node, Consumer<RowExpression> context)
         {
             context.accept(node.getPredicate());
             return super.visitFilter(node, context);
         }
 
         @Override
-        public Void visitProject(ProjectNode node, Consumer<Expression> context)
+        public Void visitProject(ProjectNode node, Consumer<RowExpression> context)
         {
             node.getAssignments().getExpressions().forEach(context);
             return super.visitProject(node, context);
         }
 
         @Override
-        public Void visitJoin(JoinNode node, Consumer<Expression> context)
+        public Void visitJoin(JoinNode node, Consumer<RowExpression> context)
         {
             node.getFilter().ifPresent(context);
             return super.visitJoin(node, context);
         }
 
         @Override
-        public Void visitValues(ValuesNode node, Consumer<Expression> context)
+        public Void visitValues(ValuesNode node, Consumer<RowExpression> context)
         {
             node.getRows().forEach(row -> row.forEach(context));
             return super.visitValues(node, context);
         }
 
         @Override
-        public Void visitApply(ApplyNode node, Consumer<Expression> context)
+        public Void visitApply(ApplyNode node, Consumer<RowExpression> context)
         {
             node.getSubqueryAssignments().getExpressions().forEach(context);
             return super.visitApply(node, context);

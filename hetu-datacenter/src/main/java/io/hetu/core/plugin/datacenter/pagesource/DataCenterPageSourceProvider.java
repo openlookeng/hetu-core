@@ -57,7 +57,7 @@ public class DataCenterPageSourceProvider
 
     private final OkHttpClient httpClient;
 
-    private TypeManager typeManager;
+    private final TypeManager typeManager;
 
     /**
      * Constructor of data center page source provider.
@@ -91,7 +91,7 @@ public class DataCenterPageSourceProvider
 
         sql.append(" FROM ");
 
-        if (tableHandler.getSubQuery() == null || "".equals(tableHandler.getSubQuery())) {
+        if (tableHandler.getPushDownSql() == null || "".equals(tableHandler.getPushDownSql())) {
             if (!isNullOrEmpty(catalog)) {
                 sql.append(catalog).append('.');
             }
@@ -102,7 +102,7 @@ public class DataCenterPageSourceProvider
             sql.append(table);
         }
         else {
-            sql.append(tableHandler.getSubQuery());
+            sql.append("(").append(tableHandler.getPushDownSql()).append(") pushdown");
         }
 
         if (limit.isPresent()) {

@@ -13,6 +13,7 @@
  */
 package io.prestosql.type;
 
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.ParameterKind;
 import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
@@ -22,7 +23,7 @@ import io.prestosql.spi.type.TypeParameter;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.prestosql.type.FunctionType.NAME;
+import static io.prestosql.spi.type.FunctionType.NAME;
 import static java.util.stream.Collectors.toList;
 
 public final class FunctionParametricType

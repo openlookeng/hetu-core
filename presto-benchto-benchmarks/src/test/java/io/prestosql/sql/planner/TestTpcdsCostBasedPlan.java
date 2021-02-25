@@ -66,7 +66,7 @@ public class TestTpcdsCostBasedPlan
     @Override
     protected Stream<String> getQueryResourcePaths()
     {
-        return IntStream.range(1, 100)
+        return IntStream.range(22, 23)
                 .boxed()
                 .flatMap(i -> {
                     String queryId = format("q%02d", i);

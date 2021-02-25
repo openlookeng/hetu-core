@@ -15,12 +15,12 @@ package io.prestosql.sql.planner.assertions;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.OrderBy;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SortItem;
+import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.WindowFrame;
 
 import java.util.List;
@@ -97,7 +97,7 @@ class FunctionCallProvider
         if (!orderBy.isEmpty()) {
             orderByClause = Optional.of(new OrderBy(orderBy.stream()
                     .map(item -> new SortItem(
-                            Symbol.from(aliases.get(item.getField())).toSymbolReference(),
+                            new SymbolReference(aliases.get(item.getField()).getName()),
                             item.getOrdering(),
                             item.getNullOrdering()))
                     .collect(Collectors.toList())));

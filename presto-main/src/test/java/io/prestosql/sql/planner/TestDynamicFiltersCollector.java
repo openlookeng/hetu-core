@@ -26,11 +26,12 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.TestingColumnHandle;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.MockStateMap;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.listener.StateStoreListenerManager;
@@ -46,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.SystemSessionProperties.DYNAMIC_FILTERING_DATA_TYPE;
 import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.utils.DynamicFilterUtils.MERGED_DYNAMIC_FILTERS;
 import static io.prestosql.utils.DynamicFilterUtils.createKey;
@@ -96,8 +98,8 @@ public class TestDynamicFiltersCollector
                 dynamicFilterCacheManager);
         TableScanNode tableScan = mock(TableScanNode.class);
         when(tableScan.getAssignments()).thenReturn(ImmutableMap.of(new Symbol(columnName), columnHandle));
-        List<DynamicFilters.Descriptor> dynamicFilterDescriptors = ImmutableList.of(new DynamicFilters.Descriptor(filterId, new SymbolReference(columnName)));
-        collector.initContext(dynamicFilterDescriptors);
+        List<DynamicFilters.Descriptor> dynamicFilterDescriptors = ImmutableList.of(new DynamicFilters.Descriptor(filterId, new VariableReferenceExpression(columnName, BIGINT)));
+        collector.initContext(dynamicFilterDescriptors, SymbolUtils.toLayOut(tableScan.getOutputSymbols()));
 
         assertTrue(collector.getDynamicFilters(tableScan).isEmpty(), "there should be no dynamic filter available");
 

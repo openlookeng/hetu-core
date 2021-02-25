@@ -17,6 +17,7 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionRewriter;
@@ -26,7 +27,6 @@ import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.TryExpression;
-import io.prestosql.type.FunctionType;
 
 import java.util.Map;
 
@@ -36,7 +36,7 @@ public class DesugarTryExpressionRewriter
 {
     private DesugarTryExpressionRewriter() {}
 
-    public static Expression rewrite(Expression expression, Metadata metadata, TypeAnalyzer typeAnalyzer, Session session, SymbolAllocator symbolAllocator)
+    public static Expression rewrite(Expression expression, Metadata metadata, TypeAnalyzer typeAnalyzer, Session session, PlanSymbolAllocator planSymbolAllocator)
     {
         if (expression instanceof SymbolReference) {
             return expression;
@@ -44,7 +44,7 @@ public class DesugarTryExpressionRewriter
 
         Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(
                 session,
-                symbolAllocator.getTypes(),
+                planSymbolAllocator.getTypes(),
                 expression);
 
         return ExpressionTreeRewriter.rewriteWith(new Visitor(metadata, expressionTypes), expression);

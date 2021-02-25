@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
 import io.prestosql.cost.CostCalculator;
@@ -29,14 +28,25 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.NewTableLayout;
 import io.prestosql.metadata.QualifiedObjectName;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.TableMetadata;
-import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.Type;
@@ -48,24 +58,18 @@ import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.planner.StatisticsAggregationPlanner.TableStatisticAggregation;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.AggregationNode;
-import io.prestosql.sql.planner.plan.Assignments;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
-import io.prestosql.sql.planner.plan.LimitNode;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTargetReference;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.Analyze;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -79,7 +83,6 @@ import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.IfExpression;
 import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.LambdaArgumentDeclaration;
-import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NullLiteral;
@@ -108,16 +111,18 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
-import static io.prestosql.sql.planner.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
 import static io.prestosql.sql.planner.plan.TableWriterNode.InsertReference;
 import static io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
 import static io.prestosql.sql.planner.sanity.PlanSanityChecker.DISTRIBUTED_PLAN_SANITY_CHECKER;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -134,7 +139,7 @@ public class LogicalPlanner
     private final Session session;
     private final List<PlanOptimizer> planOptimizers;
     private final PlanSanityChecker planSanityChecker;
-    protected final SymbolAllocator symbolAllocator = new SymbolAllocator();
+    protected final PlanSymbolAllocator planSymbolAllocator = new PlanSymbolAllocator();
     private final Metadata metadata;
     private final TypeCoercion typeCoercion;
     private final TypeAnalyzer typeAnalyzer;
@@ -172,7 +177,7 @@ public class LogicalPlanner
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.typeCoercion = new TypeCoercion(metadata::getType);
         this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
-        this.statisticsAggregationPlanner = new StatisticsAggregationPlanner(symbolAllocator, metadata);
+        this.statisticsAggregationPlanner = new StatisticsAggregationPlanner(planSymbolAllocator, metadata);
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
@@ -187,12 +192,12 @@ public class LogicalPlanner
     {
         PlanNode root = planStatement(analysis, analysis.getStatement());
 
-        planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, symbolAllocator.getTypes(), warningCollector);
+        planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(), warningCollector);
 
         if (stage.ordinal() >= Stage.OPTIMIZED.ordinal()) {
             for (PlanOptimizer optimizer : planOptimizers) {
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, root)) {
-                    root = optimizer.optimize(root, session, symbolAllocator.getTypes(), symbolAllocator, idAllocator,
+                    root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
                         warningCollector);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                 }
@@ -201,10 +206,10 @@ public class LogicalPlanner
 
         if (stage.ordinal() >= Stage.OPTIMIZED_AND_VALIDATED.ordinal()) {
             // make sure we produce a valid plan after optimizations run. This is mainly to catch programming errors
-            planSanityChecker.validateFinalPlan(root, session, metadata, typeAnalyzer, symbolAllocator.getTypes(), warningCollector);
+            planSanityChecker.validateFinalPlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(), warningCollector);
         }
 
-        TypeProvider types = symbolAllocator.getTypes();
+        TypeProvider types = planSymbolAllocator.getTypes();
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session, types);
         return new Plan(root, types, StatsAndCosts.create(root, statsProvider, costProvider));
@@ -214,8 +219,8 @@ public class LogicalPlanner
     {
         if (statement instanceof CreateTableAsSelect && analysis.isCreateTableAsSelectNoOp()) {
             checkState(analysis.getCreateTableDestination().isPresent(), "Table destination is missing");
-            Symbol symbol = symbolAllocator.newSymbol("rows", BIGINT);
-            PlanNode source = new ValuesNode(idAllocator.getNextId(), ImmutableList.of(symbol), ImmutableList.of(ImmutableList.of(new LongLiteral("0"))));
+            Symbol symbol = planSymbolAllocator.newSymbol("rows", BIGINT);
+            PlanNode source = new ValuesNode(idAllocator.getNextId(), ImmutableList.of(symbol), ImmutableList.of(ImmutableList.of(new ConstantExpression(0L, BIGINT))));
             return new OutputNode(idAllocator.getNextId(), source, ImmutableList.of("rows"), ImmutableList.of(symbol));
         }
         return createOutputPlan(planStatementWithoutOutput(analysis, statement), analysis);
@@ -261,7 +266,7 @@ public class LogicalPlanner
         RelationPlan underlyingPlan = planStatementWithoutOutput(analysis, statement.getStatement());
         PlanNode root = underlyingPlan.getRoot();
         Scope scope = analysis.getScope(statement);
-        Symbol outputSymbol = symbolAllocator.newSymbol(scope.getRelationType().getFieldByIndex(0));
+        Symbol outputSymbol = planSymbolAllocator.newSymbol(scope.getRelationType().getFieldByIndex(0));
         root = new ExplainAnalyzeNode(idAllocator.getNextId(), root, outputSymbol, statement.isVerbose());
         return new RelationPlan(root, scope, ImmutableList.of(outputSymbol));
     }
@@ -277,7 +282,7 @@ public class LogicalPlanner
         ImmutableMap.Builder<String, Symbol> columnNameToSymbol = ImmutableMap.builder();
         TableMetadata tableMetadata = metadata.getTableMetadata(session, targetTable);
         for (ColumnMetadata column : tableMetadata.getColumns()) {
-            Symbol symbol = symbolAllocator.newSymbol(column.getName(), column.getType());
+            Symbol symbol = planSymbolAllocator.newSymbol(column.getName(), column.getType());
             tableScanOutputs.add(symbol);
             symbolToColumnHandle.put(symbol, columnHandles.get(column.getName()));
             columnNameToSymbol.put(column.getName(), symbol);
@@ -304,7 +309,7 @@ public class LogicalPlanner
                         Optional.empty(),
                         Optional.empty()),
                 new StatisticsWriterNode.WriteStatisticsReference(targetTable),
-                symbolAllocator.newSymbol("rows", BIGINT),
+                planSymbolAllocator.newSymbol("rows", BIGINT),
                 tableStatisticsMetadata.getTableStatistics().contains(ROW_COUNT),
                 tableStatisticAggregation.getDescriptor());
         return new RelationPlan(planNode, analysis.getScope(analyzeStatement), planNode.getOutputSymbols());
@@ -361,23 +366,23 @@ public class LogicalPlanner
             if (column.isHidden()) {
                 continue;
             }
-            Symbol output = symbolAllocator.newSymbol(column.getName(), column.getType());
+            Symbol output = planSymbolAllocator.newSymbol(column.getName(), column.getType());
             int index = insert.getColumns().indexOf(columns.get(column.getName()));
             if (index < 0) {
                 Expression cast = new Cast(new NullLiteral(), column.getType().getTypeSignature().toString());
-                assignments.put(output, cast);
+                assignments.put(output, castToRowExpression(cast));
             }
             else {
                 Symbol input = plan.getSymbol(index);
                 Type tableType = column.getType();
-                Type queryType = symbolAllocator.getTypes().get(input);
+                Type queryType = planSymbolAllocator.getTypes().get(input);
 
                 if (queryType.equals(tableType) || typeCoercion.isTypeOnlyCoercion(queryType, tableType)) {
-                    assignments.put(output, input.toSymbolReference());
+                    assignments.put(output, castToRowExpression(toSymbolReference(input)));
                 }
                 else {
-                    Expression cast = noTruncationCast(input.toSymbolReference(), queryType, tableType);
-                    assignments.put(output, cast);
+                    Expression cast = noTruncationCast(toSymbolReference(input), queryType, tableType);
+                    assignments.put(output, castToRowExpression(cast));
                 }
             }
         }
@@ -486,7 +491,7 @@ public class LogicalPlanner
 
             TableStatisticAggregation result = statisticsAggregationPlanner.createStatisticsAggregation(statisticsMetadata, columnToSymbolMap);
 
-            StatisticAggregations.Parts aggregations = result.getAggregations().createPartialAggregations(symbolAllocator, metadata);
+            StatisticAggregations.Parts aggregations = result.getAggregations().createPartialAggregations(planSymbolAllocator, metadata);
 
             // partial aggregation is run within the TableWriteOperator to calculate the statistics for
             // the data consumed by the TableWriteOperator
@@ -498,8 +503,8 @@ public class LogicalPlanner
                     idAllocator.getNextId(),
                     source,
                     target,
-                    symbolAllocator.newSymbol("partialrows", BIGINT),
-                    symbolAllocator.newSymbol("fragment", VARBINARY),
+                    planSymbolAllocator.newSymbol("partialrows", BIGINT),
+                    planSymbolAllocator.newSymbol("fragment", VARBINARY),
                     symbols,
                     columnNames,
                     partitioningScheme,
@@ -510,7 +515,7 @@ public class LogicalPlanner
                     idAllocator.getNextId(),
                     writerNode,
                     target,
-                    symbolAllocator.newSymbol("rows", BIGINT),
+                    planSymbolAllocator.newSymbol("rows", BIGINT),
                     Optional.of(aggregations.getFinalAggregation()),
                     Optional.of(result.getDescriptor()));
 
@@ -523,15 +528,15 @@ public class LogicalPlanner
                         idAllocator.getNextId(),
                         source,
                         target,
-                        symbolAllocator.newSymbol("partialrows", BIGINT),
-                        symbolAllocator.newSymbol("fragment", VARBINARY),
+                        planSymbolAllocator.newSymbol("partialrows", BIGINT),
+                        planSymbolAllocator.newSymbol("fragment", VARBINARY),
                         symbols,
                         columnNames,
                         partitioningScheme,
                         Optional.empty(),
                         Optional.empty()),
                 target,
-                symbolAllocator.newSymbol("rows", BIGINT),
+                planSymbolAllocator.newSymbol("rows", BIGINT),
                 Optional.empty(),
                 Optional.empty());
         return new RelationPlan(commitNode, analysis.getRootScope(), commitNode.getOutputSymbols());
@@ -541,7 +546,7 @@ public class LogicalPlanner
     {
         TableHandle handle = analysis.getTableHandle(node.getTable());
         if (handle.getConnectorHandle().isDeleteAsInsertSupported()) {
-            QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+            QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
                         .planDeleteRowAsInsert(node);
 
             RelationPlan plan = deletePlan.getPlan();
@@ -551,18 +556,19 @@ public class LogicalPlanner
             String catalogName = handle.getCatalogName().getCatalogName();
             TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session,
                     catalogName, tableMetadata.getMetadata());
+            Optional<Expression> constraint = deletePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(deletePlan.getPredicate().get())) : Optional.empty();
             return createTableWriterPlan(
                     analysis,
                     plan,
-                    new TableWriterNode.DeleteAsInsertReference(handle, deletePlan.getPredicate(), deletePlan.getColumnAssignments()),
+                    new TableWriterNode.DeleteAsInsertReference(handle, constraint, deletePlan.getColumnAssignments()),
                     deletePlan.getColumNames(),
                     newTableLayout,
                     statisticsMetadata);
         }
         else {
-            DeleteNode deleteNode = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+            DeleteNode deleteNode = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
                     .plan(node);
-            TableFinishNode commitNode = new TableFinishNode(idAllocator.getNextId(), deleteNode, deleteNode.getTarget(), symbolAllocator.newSymbol("rows", BIGINT),
+            TableFinishNode commitNode = new TableFinishNode(idAllocator.getNextId(), deleteNode, deleteNode.getTarget(), planSymbolAllocator.newSymbol("rows", BIGINT),
                     Optional.empty(), Optional.empty());
             return new RelationPlan(commitNode, analysis.getScope(node), commitNode.getOutputSymbols());
         }
@@ -570,7 +576,7 @@ public class LogicalPlanner
 
     private RelationPlan createUpdatePlan(Analysis analysis, Update updateStatement)
     {
-        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
                 .plan(updateStatement);
         RelationPlan plan = updatePlan.getPlan();
         Analysis.Update update = analysis.getUpdate().get();
@@ -578,11 +584,11 @@ public class LogicalPlanner
         Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, update.getTarget());
         String catalogName = update.getTarget().getCatalogName().getCatalogName();
         TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
-
+        Optional<Expression> constraint = updatePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(updatePlan.getPredicate().get())) : Optional.empty();
         return createTableWriterPlan(
                 analysis,
                 plan,
-                new TableWriterNode.UpdateReference(update.getTarget(), updatePlan.getPredicate(), updatePlan.getColumnAssignments()),
+                new TableWriterNode.UpdateReference(update.getTarget(), constraint, updatePlan.getColumnAssignments()),
                 updatePlan.getColumNames(),
                 newTableLayout,
                 statisticsMetadata);
@@ -600,14 +606,14 @@ public class LogicalPlanner
 
         List<Symbol> symbols = columns.stream()
                 .filter(column -> !column.isHidden())
-                .map(c -> symbolAllocator.newSymbol(c.getName(), c.getType()))
+                .map(c -> planSymbolAllocator.newSymbol(c.getName(), c.getType()))
                 .collect(Collectors.toList());
 
         ColumnHandle rowIdHandle = metadata.getUpdateRowIdColumnHandle(session, handle);
         ColumnMetadata rowIdColumnMetadata = metadata.getColumnMetadata(session, handle, rowIdHandle);
 
         Type rowIdType = rowIdColumnMetadata.getType();
-        Symbol rowIdSymbol = symbolAllocator.newSymbol("$rowId", rowIdType);
+        Symbol rowIdSymbol = planSymbolAllocator.newSymbol("$rowId", rowIdType);
         symbols.add(rowIdSymbol);
         columnNames.add(rowIdHandle.getColumnName());
 
@@ -643,7 +649,7 @@ public class LogicalPlanner
 
             TableStatisticAggregation result = statisticsAggregationPlanner.createStatisticsAggregation(statisticsMetadata, columnToSymbolMap);
 
-            StatisticAggregations.Parts aggregations = result.getAggregations().createPartialAggregations(symbolAllocator, metadata);
+            StatisticAggregations.Parts aggregations = result.getAggregations().createPartialAggregations(planSymbolAllocator, metadata);
 
             // partial aggregation is run within the VacuumTableOperator to calculate the statistics for
             // the data consumed by the VacuumTableOperator
@@ -658,8 +664,8 @@ public class LogicalPlanner
         VacuumTableNode vacuumTableNode = new VacuumTableNode(idAllocator.getNextId(),
                 handle,
                 target,
-                symbolAllocator.newSymbol("partialrows", BIGINT),
-                symbolAllocator.newSymbol("fragment", VARBINARY),
+                planSymbolAllocator.newSymbol("partialrows", BIGINT),
+                planSymbolAllocator.newSymbol("fragment", VARBINARY),
                 node.getPartition().orElse(""),
                 node.isFull(),
                 symbols,
@@ -670,7 +676,7 @@ public class LogicalPlanner
                 idAllocator.getNextId(),
                 vacuumTableNode,
                 target,
-                symbolAllocator.newSymbol("rows", BIGINT),
+                planSymbolAllocator.newSymbol("rows", BIGINT),
                 finalStatisticsAggregation,
                 finalStatisticsAggregationDescriptor);
 
@@ -700,7 +706,7 @@ public class LogicalPlanner
 
     private RelationPlan createRelationPlan(Analysis analysis, Node node)
     {
-        return new RelationPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
+        return new RelationPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
                 .process(node, null);
     }
 
@@ -732,7 +738,7 @@ public class LogicalPlanner
         return columns.build();
     }
 
-    private static Map<NodeRef<LambdaArgumentDeclaration>, Symbol> buildLambdaDeclarationToSymbolMap(Analysis analysis, SymbolAllocator symbolAllocator)
+    private static Map<NodeRef<LambdaArgumentDeclaration>, Symbol> buildLambdaDeclarationToSymbolMap(Analysis analysis, PlanSymbolAllocator planSymbolAllocator)
     {
         Map<NodeRef<LambdaArgumentDeclaration>, Symbol> resultMap = new LinkedHashMap<>();
         for (Entry<NodeRef<Expression>, Type> entry : analysis.getTypes().entrySet()) {
@@ -743,7 +749,7 @@ public class LogicalPlanner
             if (resultMap.containsKey(lambdaArgumentDeclaration)) {
                 continue;
             }
-            resultMap.put(lambdaArgumentDeclaration, symbolAllocator.newSymbol(lambdaArgumentDeclaration.getNode(), entry.getValue()));
+            resultMap.put(lambdaArgumentDeclaration, planSymbolAllocator.newSymbol(lambdaArgumentDeclaration.getNode(), entry.getValue()));
         }
         return resultMap;
     }

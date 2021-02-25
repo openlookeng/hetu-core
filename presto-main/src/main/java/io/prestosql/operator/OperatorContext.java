@@ -27,7 +27,7 @@ import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.OperationTimer.OperationTiming;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;

@@ -25,15 +25,15 @@ import io.airlift.bytecode.instruction.LabelNode;
 import io.airlift.bytecode.instruction.VariableInstruction;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.relational.RowExpression;
-import io.prestosql.sql.relational.SpecialForm;
 
 import java.util.List;
 
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantFalse;
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantTrue;
-import static io.prestosql.sql.relational.SpecialForm.Form.WHEN;
+import static io.prestosql.spi.relation.SpecialForm.Form.WHEN;
 
 public class SwitchCodeGenerator
         implements BytecodeGenerator

@@ -19,7 +19,7 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.io.Closeable;
 import java.util.Iterator;

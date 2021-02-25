@@ -24,9 +24,9 @@ import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.OrderingCompiler;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.io.IOException;
 import java.util.List;

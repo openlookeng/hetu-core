@@ -17,7 +17,8 @@ package io.hetu.core.plugin.hana;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
-import io.hetu.core.plugin.hana.rewrite.HanaSqlQueryWriter;
+import io.hetu.core.plugin.hana.optimization.HanaPushDownParameter;
+import io.hetu.core.plugin.hana.optimization.HanaQueryGenerator;
 import io.prestosql.plugin.jdbc.BaseJdbcClient;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ColumnMapping;
@@ -29,13 +30,16 @@ import io.prestosql.plugin.jdbc.JdbcSplit;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.StatsCollecting;
+import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
+import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.SuppressFBWarnings;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
-import io.prestosql.spi.sql.SqlQueryWriter;
+import io.prestosql.spi.relation.RowExpressionService;
+import io.prestosql.spi.sql.QueryGenerator;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.Type;
@@ -87,7 +91,7 @@ public class HanaClient
     /**
      * If disabled, do not accept sub-query push down.
      */
-    private final boolean isQueryPushDownEnabled;
+    private final JdbcPushDownModule pushDownModule;
 
     /**
      * constructor
@@ -102,7 +106,7 @@ public class HanaClient
         super(config, "", connectionFactory);
         tableTypes = hanaConfig.getTableTypes().split(",");
         schemaPattern = hanaConfig.getSchemaPattern();
-        isQueryPushDownEnabled = hanaConfig.isQueryPushDownEnabled();
+        this.pushDownModule = config.getPushDownModule();
         this.hanaConfig = hanaConfig;
     }
 
@@ -240,22 +244,16 @@ public class HanaClient
     }
 
     @Override
-    public Optional<SqlQueryWriter> getSqlQueryWriter()
+    public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
     {
-        if (!isQueryPushDownEnabled) {
-            return Optional.empty();
-        }
-        return Optional.of(new HanaSqlQueryWriter(hanaConfig));
+        HanaPushDownParameter pushDownParameter = new HanaPushDownParameter(getIdentifierQuote(), this.caseInsensitiveNameMatching, pushDownModule, hanaConfig);
+        return Optional.of(new HanaQueryGenerator(rowExpressionService, pushDownParameter));
     }
 
     @SuppressFBWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")
     @Override
     public Map<String, ColumnHandle> getColumns(ConnectorSession session, String sql, Map<String, Type> types)
     {
-        if (!isQueryPushDownEnabled) {
-            return Collections.emptyMap();
-        }
-
         try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session));
                 PreparedStatement statement = connection.prepareStatement(sql)) {
             ResultSetMetaData metadata = statement.getMetaData();

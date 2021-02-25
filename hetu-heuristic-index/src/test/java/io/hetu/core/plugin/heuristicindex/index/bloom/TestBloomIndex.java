@@ -16,13 +16,13 @@ package io.hetu.core.plugin.heuristicindex.index.bloom;
 
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.ValueSet;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.parser.ParsingOptions;
-import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.tree.Expression;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -34,6 +34,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
+import static io.prestosql.spi.sql.RowExpressionUtils.simplePredicate;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -59,8 +62,8 @@ public class TestBloomIndex
         bloomIndex.setExpectedNumOfEntries(bloomValues.size());
         bloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", bloomValues)));
 
-        Expression expression1 = new SqlParser().createExpression("(testColumn = 'a')", new ParsingOptions());
-        Expression expression2 = new SqlParser().createExpression("(testColumn = 'e')", new ParsingOptions());
+        RowExpression expression1 = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "a");
+        RowExpression expression2 = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e");
 
         assertTrue(bloomIndex.matches(expression1));
         assertFalse(bloomIndex.matches(expression2));
@@ -98,28 +101,28 @@ public class TestBloomIndex
         stringBloomIndex.setExpectedNumOfEntries(testValues.size());
         stringBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
 
-        assertTrue(mightContain(stringBloomIndex, "a"));
-        assertTrue(mightContain(stringBloomIndex, "ab"));
-        assertTrue(mightContain(stringBloomIndex, "测试"));
-        assertTrue(mightContain(stringBloomIndex, "\n"));
-        assertTrue(mightContain(stringBloomIndex, "%#!"));
-        assertTrue(mightContain(stringBloomIndex, ":dfs"));
-        assertFalse(mightContain(stringBloomIndex, "random"));
-        assertFalse(mightContain(stringBloomIndex, "abc"));
+        assertTrue(mightContain(stringBloomIndex, VARCHAR, "a"));
+        assertTrue(mightContain(stringBloomIndex, VARCHAR, "ab"));
+        assertTrue(mightContain(stringBloomIndex, VARCHAR, "测试"));
+        assertTrue(mightContain(stringBloomIndex, VARCHAR, "\n"));
+        assertTrue(mightContain(stringBloomIndex, VARCHAR, "%#!"));
+        assertTrue(mightContain(stringBloomIndex, VARCHAR, ":dfs"));
+        assertFalse(mightContain(stringBloomIndex, VARCHAR, "random"));
+        assertFalse(mightContain(stringBloomIndex, VARCHAR, "abc"));
 
         // Test with the generic type to be Object
         BloomIndex objectBloomIndex = new BloomIndex();
         testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
         objectBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
 
-        assertTrue(mightContain(objectBloomIndex, "a"));
-        assertTrue(mightContain(objectBloomIndex, "ab"));
-        assertTrue(mightContain(objectBloomIndex, "测试"));
-        assertTrue(mightContain(objectBloomIndex, "\n"));
-        assertTrue(mightContain(objectBloomIndex, "%#!"));
-        assertTrue(mightContain(objectBloomIndex, ":dfs"));
-        assertFalse(mightContain(objectBloomIndex, "random"));
-        assertFalse(mightContain(objectBloomIndex, "abc"));
+        assertTrue(mightContain(objectBloomIndex, VARCHAR, "a"));
+        assertTrue(mightContain(objectBloomIndex, VARCHAR, "ab"));
+        assertTrue(mightContain(objectBloomIndex, VARCHAR, "测试"));
+        assertTrue(mightContain(objectBloomIndex, VARCHAR, "\n"));
+        assertTrue(mightContain(objectBloomIndex, VARCHAR, "%#!"));
+        assertTrue(mightContain(objectBloomIndex, VARCHAR, ":dfs"));
+        assertFalse(mightContain(objectBloomIndex, VARCHAR, "random"));
+        assertFalse(mightContain(objectBloomIndex, VARCHAR, "abc"));
 
         // Test single insertion
         BloomIndex simpleBloomIndex = new BloomIndex();
@@ -130,14 +133,14 @@ public class TestBloomIndex
         simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("%#!"))));
         simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(":dfs"))));
 
-        assertTrue(mightContain(simpleBloomIndex, "a"));
-        assertTrue(mightContain(simpleBloomIndex, "ab"));
-        assertTrue(mightContain(simpleBloomIndex, "测试"));
-        assertTrue(mightContain(simpleBloomIndex, "\n"));
-        assertTrue(mightContain(simpleBloomIndex, "%#!"));
-        assertTrue(mightContain(simpleBloomIndex, ":dfs"));
-        assertFalse(mightContain(simpleBloomIndex, "random"));
-        assertFalse(mightContain(simpleBloomIndex, "abc"));
+        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "a"));
+        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "ab"));
+        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "测试"));
+        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "\n"));
+        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "%#!"));
+        assertTrue(mightContain(simpleBloomIndex, VARCHAR, ":dfs"));
+        assertFalse(mightContain(simpleBloomIndex, VARCHAR, "random"));
+        assertFalse(mightContain(simpleBloomIndex, VARCHAR, "abc"));
     }
 
     @Test
@@ -198,24 +201,24 @@ public class TestBloomIndex
                 readBloomIndex.deserialize(fi);
             }
             // Check the result validity
-            assertTrue(mightContain(readBloomIndex, "a"));
-            assertTrue(mightContain(readBloomIndex, "ab"));
-            assertTrue(mightContain(readBloomIndex, "测试"));
-            assertTrue(mightContain(readBloomIndex, "\n"));
-            assertTrue(mightContain(readBloomIndex, "%#!"));
-            assertTrue(mightContain(readBloomIndex, ":dfs"));
-            assertFalse(mightContain(readBloomIndex, "random"));
-            assertFalse(mightContain(readBloomIndex, "abc"));
+            assertTrue(mightContain(readBloomIndex, VARCHAR, "a"));
+            assertTrue(mightContain(readBloomIndex, VARCHAR, "ab"));
+            assertTrue(mightContain(readBloomIndex, VARCHAR, "测试"));
+            assertTrue(mightContain(readBloomIndex, VARCHAR, "\n"));
+            assertTrue(mightContain(readBloomIndex, VARCHAR, "%#!"));
+            assertTrue(mightContain(readBloomIndex, VARCHAR, ":dfs"));
+            assertFalse(mightContain(readBloomIndex, VARCHAR, "random"));
+            assertFalse(mightContain(readBloomIndex, VARCHAR, "abc"));
 
             // Load it using a weired object
             BloomIndex intBloomIndex = new BloomIndex();
             try (FileInputStream fi = new FileInputStream(testFile)) {
                 intBloomIndex.deserialize(fi);
             }
-            assertFalse(mightContain(intBloomIndex, 1));
-            assertFalse(mightContain(intBloomIndex, 0));
-            assertFalse(mightContain(intBloomIndex, 1000));
-            assertFalse(mightContain(intBloomIndex, "a".hashCode()));
+            assertFalse(mightContain(intBloomIndex, BIGINT, 1));
+            assertFalse(mightContain(intBloomIndex, BIGINT, 0));
+            assertFalse(mightContain(intBloomIndex, BIGINT, 1000));
+            assertFalse(mightContain(intBloomIndex, BIGINT, "a".hashCode()));
         }
     }
 
@@ -265,9 +268,9 @@ public class TestBloomIndex
         assertTrue(index.getMemoryUsage() > 0);
     }
 
-    private boolean mightContain(BloomIndex index, Object value)
+    private boolean mightContain(BloomIndex index, Type type, Object value)
     {
-        Expression expression = new SqlParser().createExpression(String.format("(testColumn = '%s')", value), new ParsingOptions());
+        CallExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", type, value);
         return index.matches(expression);
     }
 }

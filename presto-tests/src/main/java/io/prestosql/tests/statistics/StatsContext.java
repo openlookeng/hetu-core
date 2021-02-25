@@ -14,8 +14,8 @@
 package io.prestosql.tests.statistics;
 
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.TypeProvider;
 
 import java.util.Map;

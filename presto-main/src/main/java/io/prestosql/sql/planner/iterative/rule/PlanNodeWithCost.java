@@ -15,7 +15,7 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.cost.PlanCostEstimate;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
 
 import static java.util.Objects.requireNonNull;
 

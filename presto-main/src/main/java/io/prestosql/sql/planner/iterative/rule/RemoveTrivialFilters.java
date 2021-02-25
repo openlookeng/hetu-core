@@ -15,12 +15,13 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
 import io.prestosql.sql.tree.Expression;
 
 import static io.prestosql.sql.planner.plan.Patterns.filter;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Collections.emptyList;
@@ -39,7 +40,7 @@ public class RemoveTrivialFilters
     @Override
     public Result apply(FilterNode filterNode, Captures captures, Context context)
     {
-        Expression predicate = filterNode.getPredicate();
+        Expression predicate = castToExpression(filterNode.getPredicate());
 
         if (predicate.equals(TRUE_LITERAL)) {
             return Result.ofPlanNode(filterNode.getSource());

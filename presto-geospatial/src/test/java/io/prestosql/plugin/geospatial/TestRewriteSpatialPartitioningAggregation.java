@@ -15,11 +15,11 @@ package io.prestosql.plugin.geospatial;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.sql.planner.iterative.rule.RewriteSpatialPartitioningAggregation;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import io.prestosql.sql.planner.iterative.rule.test.RuleAssert;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import org.testng.annotations.Test;
 
 import static io.prestosql.plugin.geospatial.GeometryType.GEOMETRY;

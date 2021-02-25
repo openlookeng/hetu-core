@@ -17,8 +17,8 @@ package io.prestosql.sql.planner.assertions;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 
 import java.util.List;
@@ -58,7 +58,7 @@ public class TableWriterMatcher
         }
 
         if (!columns.stream()
-                .map(s -> Symbol.from(symbolAliases.get(s)))
+                .map(s -> SymbolUtils.from(symbolAliases.get(s)))
                 .collect(toImmutableList())
                 .equals(tableWriterNode.getColumns())) {
             return NO_MATCH;

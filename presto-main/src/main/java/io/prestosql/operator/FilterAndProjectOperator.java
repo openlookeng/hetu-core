@@ -19,8 +19,8 @@ import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.project.MergingPageOutput;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.function.Supplier;

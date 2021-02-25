@@ -16,8 +16,9 @@ package io.prestosql.utils;
 
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig;
-import io.prestosql.sql.builder.optimizer.SubQueryPushDown;
 import io.prestosql.sql.planner.SimplePlanVisitor;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
@@ -26,10 +27,9 @@ import io.prestosql.sql.planner.iterative.rule.PushLimitThroughOuterJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughUnion;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
+import io.prestosql.sql.planner.optimizations.ApplyConnectorOptimization;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
 
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
 
@@ -41,7 +41,7 @@ public class OptimizerUtils
 
     public static boolean isEnabledLegacy(PlanOptimizer optimizer, Session session)
     {
-        if (optimizer instanceof SubQueryPushDown) {
+        if (optimizer instanceof ApplyConnectorOptimization) {
             return SystemSessionProperties.isQueryPushDown(session);
         }
         if (optimizer instanceof LimitPushDown) {

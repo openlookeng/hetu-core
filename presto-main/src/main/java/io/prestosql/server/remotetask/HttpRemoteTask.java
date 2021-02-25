@@ -50,9 +50,9 @@ import io.prestosql.protocol.BaseResponse;
 import io.prestosql.protocol.Codec;
 import io.prestosql.protocol.SmileCodec;
 import io.prestosql.server.TaskUpdateRequest;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.GuardedBy;

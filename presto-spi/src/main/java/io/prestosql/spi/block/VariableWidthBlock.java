@@ -21,6 +21,8 @@ import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -263,5 +265,30 @@ public class VariableWidthBlock
             return null;
         }
         return slice.slice(offsets[position + arrayOffset], offsets[position + arrayOffset + 1] - offsets[position + arrayOffset]).getBytes();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        VariableWidthBlock other = (VariableWidthBlock) obj;
+        return Objects.equals(this.arrayOffset, other.arrayOffset) &&
+                Objects.equals(this.positionCount, other.positionCount) &&
+                Objects.equals(this.slice, other.slice) &&
+                Arrays.equals(this.offsets, other.offsets) &&
+                Arrays.equals(this.valueIsNull, other.valueIsNull) &&
+                Objects.equals(this.retainedSizeInBytes, other.retainedSizeInBytes) &&
+                Objects.equals(this.sizeInBytes, other.sizeInBytes);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(arrayOffset, positionCount, slice, Arrays.hashCode(offsets), Arrays.hashCode(valueIsNull), retainedSizeInBytes, sizeInBytes);
     }
 }

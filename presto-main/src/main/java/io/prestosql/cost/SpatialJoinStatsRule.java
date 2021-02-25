@@ -15,13 +15,18 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static io.prestosql.sql.planner.plan.Patterns.spatialJoin;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class SpatialJoinStatsRule
@@ -46,7 +51,13 @@ public class SpatialJoinStatsRule
 
         switch (node.getType()) {
             case INNER:
-                return Optional.of(statsCalculator.filterStats(crossJoinStats, node.getFilter(), session, types));
+                if (isExpression(node.getFilter())) {
+                    return Optional.of(statsCalculator.filterStats(crossJoinStats, castToExpression(node.getFilter()), session, types));
+                }
+                else {
+                    Map<Integer, Symbol> layout = SymbolUtils.toLayOut(node.getOutputSymbols());
+                    return Optional.of(statsCalculator.filterStats(crossJoinStats, node.getFilter(), session, types, layout));
+                }
             case LEFT:
                 return Optional.of(PlanNodeStatsEstimate.unknown());
             default:

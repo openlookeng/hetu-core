@@ -16,21 +16,23 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.connector.CatalogName;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
+import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.type.BooleanType;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.RuleTester;
-import io.prestosql.sql.planner.plan.AggregationNode;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.Assignments;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.ExistsPredicate;
 import io.prestosql.sql.tree.InPredicate;
@@ -78,7 +80,7 @@ public class TestTransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
     {
         tester.assertThat(new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate())
                 .on(p -> p.apply(
-                        Assignments.of(p.symbol("x"), new ExistsPredicate(new LongLiteral("1"))),
+                        Assignments.of(p.symbol("x"), OriginalExpressionUtils.castToRowExpression(new ExistsPredicate(new LongLiteral("1")))),
                         emptyList(),
                         p.values(),
                         p.values()))
@@ -118,10 +120,10 @@ public class TestTransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
                     return p.apply(
                             Assignments.of(
                                     p.symbol("x", BooleanType.BOOLEAN),
-                                    new InPredicate(new SymbolReference("y"), o1ref)),
+                                    OriginalExpressionUtils.castToRowExpression(new InPredicate(new SymbolReference("y"), o1ref))),
                             emptyList(),
                             p.values(p.symbol("y", DATE)),
-                            p.project(Assignments.identity(o1),
+                            p.project(Assignments.of(o1, OriginalExpressionUtils.castToRowExpression(SymbolUtils.toSymbolReference(o1))),
                                     p.filter(new LogicalBinaryExpression(LogicalBinaryExpression.Operator.AND,
                                                     new ComparisonExpression(ComparisonExpression.Operator.EQUAL, o1ref, o2ref),
                                                     new ComparisonExpression(ComparisonExpression.Operator.NOT_EQUAL, t1ref, t2ref)),

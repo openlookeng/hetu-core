@@ -18,9 +18,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.prestosql.operator.window.RankingFunction;
-import io.prestosql.sql.planner.OrderingScheme;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.WindowNode.Specification;
+import io.prestosql.spi.plan.OrderingScheme;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.WindowNode.Specification;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -33,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public final class TopNRankingNumberNode
-        extends PlanNode
+        extends InternalPlanNode
 {
     private final PlanNode source;
     private final Specification specification;
@@ -140,7 +142,7 @@ public final class TopNRankingNumberNode
     }
 
     @Override
-    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
+    public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitTopNRankingNumber(this, context);
     }

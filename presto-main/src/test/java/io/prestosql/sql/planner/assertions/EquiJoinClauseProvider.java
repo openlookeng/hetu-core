@@ -13,7 +13,7 @@
  */
 package io.prestosql.sql.planner.assertions;
 
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.spi.plan.JoinNode;
 
 import static java.util.Objects.requireNonNull;
 

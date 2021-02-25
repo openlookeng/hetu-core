@@ -24,15 +24,15 @@ import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.planner.LogicalPlanner;
 import io.prestosql.sql.planner.Plan;
-import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
-import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
 import io.prestosql.utils.OptimizerUtils;
 
@@ -86,7 +86,7 @@ public class HetuLogicalPlanner
     {
         PlanNode root = planStatement(analysis, analysis.getStatement());
 
-        planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, symbolAllocator.getTypes(),
+        planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(),
                 warningCollector);
 
         if (stage.ordinal() >= Stage.OPTIMIZED.ordinal()) {
@@ -97,7 +97,7 @@ public class HetuLogicalPlanner
                     if (optimizer instanceof BeginTableWrite) {
                         continue;
                     }
-                    root = optimizer.optimize(root, session, symbolAllocator.getTypes(), symbolAllocator, idAllocator,
+                    root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
                             warningCollector);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                 }
@@ -106,11 +106,11 @@ public class HetuLogicalPlanner
 
         if (stage.ordinal() >= Stage.OPTIMIZED_AND_VALIDATED.ordinal()) {
             // make sure we produce a valid plan after optimizations run. This is mainly to catch programming errors
-            planSanityChecker.validateFinalPlan(root, session, metadata, typeAnalyzer, symbolAllocator.getTypes(),
+            planSanityChecker.validateFinalPlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(),
                     warningCollector);
         }
 
-        TypeProvider types = symbolAllocator.getTypes();
+        TypeProvider types = planSymbolAllocator.getTypes();
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session,
                 types);
@@ -119,6 +119,6 @@ public class HetuLogicalPlanner
 
     public void validateCachedPlan(PlanNode planNode, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, WarningCollector warningCollector)
     {
-        planSanityChecker.validateFinalPlan(planNode, session, metadata, typeAnalyzer, symbolAllocator.getTypes(), warningCollector);
+        planSanityChecker.validateFinalPlan(planNode, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(), warningCollector);
     }
 }

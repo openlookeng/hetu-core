@@ -20,9 +20,9 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.operator.ChannelSet.ChannelSetBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;

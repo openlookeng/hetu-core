@@ -16,7 +16,8 @@ package io.prestosql.sql.planner.iterative.rule;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import org.testng.annotations.Test;
 
-import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
+import static io.prestosql.spi.plan.JoinNode.Type.INNER;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 
 public class TestCanonicalizeExpressions
@@ -45,7 +46,7 @@ public class TestCanonicalizeExpressions
     {
         CanonicalizeExpressions canonicalizeExpressions = new CanonicalizeExpressions(tester().getMetadata(), tester().getTypeAnalyzer());
         tester().assertThat(canonicalizeExpressions.joinExpressionRewrite())
-                .on(p -> p.join(INNER, p.values(), p.values(), FALSE_LITERAL))
+                .on(p -> p.join(INNER, p.values(), p.values(), castToRowExpression(FALSE_LITERAL)))
                 .doesNotFire();
     }
 }

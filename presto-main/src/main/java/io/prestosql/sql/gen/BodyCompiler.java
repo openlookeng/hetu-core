@@ -14,7 +14,7 @@
 package io.prestosql.sql.gen;
 
 import io.airlift.bytecode.ClassDefinition;
-import io.prestosql.sql.relational.RowExpression;
+import io.prestosql.spi.relation.RowExpression;
 
 import java.util.List;
 

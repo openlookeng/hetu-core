@@ -18,14 +18,15 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import io.hetu.core.heuristicindex.PartitionIndexWriter;
 import io.hetu.core.heuristicindex.util.TypeUtils;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.heuristicindex.SerializationUtils;
-import io.prestosql.sql.tree.BetweenPredicate;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.InListExpression;
-import io.prestosql.sql.tree.InPredicate;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import org.apache.commons.compress.utils.IOUtils;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
@@ -49,6 +50,7 @@ import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -220,48 +222,54 @@ public class BTreeIndex
     {
         List<String> result = new ArrayList<>();
 
-        if (expression instanceof ComparisonExpression) {
-            ComparisonExpression comparisonExpression = (ComparisonExpression) expression;
-            Object key = extractSingleValue(comparisonExpression.getRight());
-            switch (comparisonExpression.getOperator()) {
-                case EQUAL:
-                    if (dataMap.containsKey(key)) {
-                        result.addAll(translateSymbols(dataMap.get(key)));
-                    }
-                    break;
-                case LESS_THAN:
-                    ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, false);
-                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
-                    break;
-                case LESS_THAN_OR_EQUAL:
-                    concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, true);
-                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
-                    break;
-                case GREATER_THAN:
-                    concurrentNavigableMap = dataMap.subMap(key, false, dataMap.lastKey(), true);
-                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
-                    break;
-                case GREATER_THAN_OR_EQUAL:
-                    concurrentNavigableMap = dataMap.subMap(key, true, dataMap.lastKey(), true);
-                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
-                    break;
+        if (expression instanceof CallExpression) {
+            CallExpression callExp = (CallExpression) expression;
+            Object key = extractSingleValue(callExp.getArguments().get(1));
+            Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
+            if (operatorOptional.isPresent()) {
+                OperatorType operator = operatorOptional.get();
+                switch (operator) {
+                    case EQUAL:
+                        if (dataMap.containsKey(key)) {
+                            result.addAll(translateSymbols(dataMap.get(key)));
+                        }
+                        break;
+                    case LESS_THAN:
+                        ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, false);
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        break;
+                    case LESS_THAN_OR_EQUAL:
+                        concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, true);
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        break;
+                    case GREATER_THAN:
+                        concurrentNavigableMap = dataMap.subMap(key, false, dataMap.lastKey(), true);
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        break;
+                    case GREATER_THAN_OR_EQUAL:
+                        concurrentNavigableMap = dataMap.subMap(key, true, dataMap.lastKey(), true);
+                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        break;
+                }
             }
         }
-        else if (expression instanceof BetweenPredicate) {
-            BetweenPredicate betweenPredicate = (BetweenPredicate) expression;
-            Object left = extractSingleValue(betweenPredicate.getMin());
-            Object right = extractSingleValue(betweenPredicate.getMax());
-            ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(left, true, right, true);
-            result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
-        }
-        else if (expression instanceof InPredicate) {
-            InPredicate inPredicate = (InPredicate) expression;
-            InListExpression inListExpression = (InListExpression) inPredicate.getValueList();
-            for (Expression value : inListExpression.getValues()) {
-                Object key = extractSingleValue(value);
-                if (dataMap.containsKey(key)) {
-                    result.addAll(translateSymbols(dataMap.get(key)));
-                }
+        else if (expression instanceof SpecialForm) {
+            SpecialForm specialForm = (SpecialForm) expression;
+            switch (specialForm.getForm()) {
+                case BETWEEN:
+                    Object left = extractSingleValue((ConstantExpression) specialForm.getArguments().get(1));
+                    Object right = extractSingleValue((ConstantExpression) specialForm.getArguments().get(2));
+                    ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(left, true, right, true);
+                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                    break;
+                case IN:
+                    for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
+                        Object key = extractSingleValue((ConstantExpression) exp);
+                        if (dataMap.containsKey(key)) {
+                            result.addAll(translateSymbols(dataMap.get(key)));
+                        }
+                    }
+                    break;
             }
         }
         else {
@@ -269,7 +277,6 @@ public class BTreeIndex
         }
 
         result.sort(String::compareTo);
-
         return result.iterator();
     }
 

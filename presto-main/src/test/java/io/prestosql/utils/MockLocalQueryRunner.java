@@ -54,7 +54,7 @@ public class MockLocalQueryRunner
                 .setSystemProperty("task_concurrency", "1"); // these tests don't handle exchanges from local parallel
 
         sessionProperties.entrySet()
-            .forEach(entry -> sessionBuilder.setSystemProperty(entry.getKey(), entry.getValue()));
+                .forEach(entry -> sessionBuilder.setSystemProperty(entry.getKey(), entry.getValue()));
         return sessionBuilder.build();
     }
 

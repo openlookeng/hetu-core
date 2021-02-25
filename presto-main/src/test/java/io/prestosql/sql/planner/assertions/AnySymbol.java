@@ -13,8 +13,7 @@
  */
 package io.prestosql.sql.planner.assertions;
 
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.spi.plan.Symbol;
 
 class AnySymbol
         extends Symbol
@@ -29,12 +28,6 @@ class AnySymbol
     public Symbol toSymbol(SymbolAliases aliases)
     {
         return this;
-    }
-
-    @Override
-    public SymbolReference toSymbolReference()
-    {
-        return new AnySymbolReference();
     }
 
     @Override

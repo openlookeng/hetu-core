@@ -17,10 +17,10 @@ package io.prestosql.cost;
 import io.prestosql.Session;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TopNNode;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
-import io.prestosql.sql.planner.plan.TopNNode;
 
 import java.util.Optional;
 

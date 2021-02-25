@@ -20,11 +20,16 @@ import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ConstantProperty;
 import io.prestosql.spi.connector.LocalProperty;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.NullableValue;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningHandle;
-import io.prestosql.sql.planner.Symbol;
+import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.SymbolReference;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -36,13 +41,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.transform;
+import static io.prestosql.sql.planner.Partitioning.ArgumentBinding.constantBinding;
+import static io.prestosql.sql.planner.Partitioning.ArgumentBinding.expressionBinding;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.COORDINATOR_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.util.MoreLists.filteredCopy;
 import static java.util.Objects.requireNonNull;
 
@@ -214,6 +224,45 @@ public class ActualProperties
             }
         }
         return translatedConstants;
+    }
+
+    public ActualProperties translateRowExpression(Map<Symbol, RowExpression> assignments, TypeProvider types)
+    {
+        Map<Symbol, SymbolReference> inputToOutputSymbol = new HashMap<>();
+        for (Map.Entry<Symbol, RowExpression> assignment : assignments.entrySet()) {
+            RowExpression expression = assignment.getValue();
+            SymbolReference symbolReference = SymbolUtils.toSymbolReference(assignment.getKey());
+            if (isExpression(expression)) {
+                if (castToExpression(expression) instanceof SymbolReference) {
+                    inputToOutputSymbol.put(SymbolUtils.from(castToExpression(expression)), symbolReference);
+                }
+            }
+            else {
+                if (expression instanceof VariableReferenceExpression) {
+                    inputToOutputSymbol.put(new Symbol(((VariableReferenceExpression) expression).getName()), symbolReference);
+                }
+            }
+        }
+
+        Map<Symbol, Partitioning.ArgumentBinding> inputToOutputMappings =
+                inputToOutputSymbol.entrySet().stream().collect(Collectors.toMap(v -> v.getKey(), v -> expressionBinding(v.getValue())));
+        Map<Symbol, NullableValue> translatedConstants = new HashMap<>();
+        for (Map.Entry<Symbol, NullableValue> entry : constants.entrySet()) {
+            if (inputToOutputSymbol.containsKey(entry.getKey())) {
+                Symbol symbol = SymbolUtils.from(inputToOutputSymbol.get(entry.getKey()));
+                translatedConstants.put(symbol, entry.getValue());
+            }
+            else {
+                inputToOutputMappings.put(entry.getKey(), constantBinding(entry.getValue()));
+            }
+        }
+
+        return builder()
+                .global(global.translateRowExpression(inputToOutputMappings, assignments, types))
+                .local(LocalProperties.translate(localProperties,
+                        symbol -> inputToOutputSymbol.containsKey(symbol) ? Optional.of(SymbolUtils.from(inputToOutputSymbol.get(symbol))) : Optional.empty()))
+                .constants(translatedConstants)
+                .build();
     }
 
     public static class Builder
@@ -470,6 +519,14 @@ public class ActualProperties
             return new Global(
                     nodePartitioning.flatMap(partitioning -> partitioning.translate(translator)),
                     streamPartitioning.flatMap(partitioning -> partitioning.translate(translator)),
+                    nullsAndAnyReplicated);
+        }
+
+        private Global translateRowExpression(Map<Symbol, Partitioning.ArgumentBinding> inputToOutputMappings, Map<Symbol, RowExpression> assignments, TypeProvider types)
+        {
+            return new Global(
+                    nodePartitioning.flatMap(partitioning -> partitioning.translateRowExpression(inputToOutputMappings, assignments, types)),
+                    streamPartitioning.flatMap(partitioning -> partitioning.translateRowExpression(inputToOutputMappings, assignments, types)),
                     nullsAndAnyReplicated);
         }
 

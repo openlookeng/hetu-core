@@ -22,6 +22,12 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-parser</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-spi</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>javax.inject</groupId>
             <artifactId>javax.inject</artifactId>

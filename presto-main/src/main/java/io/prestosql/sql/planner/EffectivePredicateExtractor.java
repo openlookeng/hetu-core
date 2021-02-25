@@ -21,27 +21,30 @@ import com.google.common.collect.Sets;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.plan.TopNNode;
+import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.plan.AggregationNode;
+import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.LimitNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
-import io.prestosql.sql.planner.plan.ProjectNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
-import io.prestosql.sql.planner.plan.TableScanNode;
-import io.prestosql.sql.planner.plan.TopNNode;
-import io.prestosql.sql.planner.plan.UnionNode;
-import io.prestosql.sql.planner.plan.ValuesNode;
-import io.prestosql.sql.planner.plan.WindowNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NodeRef;
@@ -60,11 +63,15 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Maps.transformValues;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.expressionOrNullSymbols;
 import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
 import static io.prestosql.sql.ExpressionUtils.filterDeterministicConjuncts;
 import static io.prestosql.sql.planner.EqualityInference.createEqualityInference;
+import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.outputSymbolMap;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static java.util.Objects.requireNonNull;
@@ -77,22 +84,22 @@ import static java.util.Objects.requireNonNull;
 public class EffectivePredicateExtractor
 {
     private static final Predicate<Map.Entry<Symbol, ? extends Expression>> SYMBOL_MATCHES_EXPRESSION =
-            entry -> entry.getValue().equals(entry.getKey().toSymbolReference());
+            entry -> entry.getValue().equals(toSymbolReference(entry.getKey()));
 
     private static final Function<Map.Entry<Symbol, ? extends Expression>, Expression> ENTRY_TO_EQUALITY =
             entry -> {
-                SymbolReference reference = entry.getKey().toSymbolReference();
+                SymbolReference reference = toSymbolReference(entry.getKey());
                 Expression expression = entry.getValue();
                 // TODO: this is not correct with respect to NULLs ('reference IS NULL' would be correct, rather than 'reference = NULL')
                 // TODO: switch this to 'IS NOT DISTINCT FROM' syntax when EqualityInference properly supports it
                 return new ComparisonExpression(EQUAL, reference, expression);
             };
 
-    private final DomainTranslator domainTranslator;
+    private final ExpressionDomainTranslator domainTranslator;
     private final Metadata metadata;
     private final boolean useTableProperties;
 
-    public EffectivePredicateExtractor(DomainTranslator domainTranslator, Metadata metadata, boolean useTableProperties)
+    public EffectivePredicateExtractor(ExpressionDomainTranslator domainTranslator, Metadata metadata, boolean useTableProperties)
     {
         this.domainTranslator = requireNonNull(domainTranslator, "domainTranslator is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -105,16 +112,16 @@ public class EffectivePredicateExtractor
     }
 
     private static class Visitor
-            extends PlanVisitor<Expression, Void>
+            extends InternalPlanVisitor<Expression, Void>
     {
-        private final DomainTranslator domainTranslator;
+        private final ExpressionDomainTranslator domainTranslator;
         private final Metadata metadata;
         private final Session session;
         private final TypeProvider types;
         private final TypeAnalyzer typeAnalyzer;
         private final boolean useTableProperties;
 
-        public Visitor(DomainTranslator domainTranslator, Metadata metadata, Session session, TypeProvider types, TypeAnalyzer typeAnalyzer, boolean useTableProperties)
+        public Visitor(ExpressionDomainTranslator domainTranslator, Metadata metadata, Session session, TypeProvider types, TypeAnalyzer typeAnalyzer, boolean useTableProperties)
         {
             this.domainTranslator = requireNonNull(domainTranslator, "domainTranslator is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
@@ -125,7 +132,7 @@ public class EffectivePredicateExtractor
         }
 
         @Override
-        protected Expression visitPlan(PlanNode node, Void context)
+        public Expression visitPlan(PlanNode node, Void context)
         {
             return TRUE_LITERAL;
         }
@@ -152,7 +159,7 @@ public class EffectivePredicateExtractor
         {
             Expression underlyingPredicate = node.getSource().accept(this, context);
 
-            Expression predicate = node.getPredicate();
+            Expression predicate = castToExpression(node.getPredicate());
 
             // Remove non-deterministic conjuncts
             predicate = filterDeterministicConjuncts(predicate);
@@ -168,7 +175,7 @@ public class EffectivePredicateExtractor
                 for (int i = 0; i < node.getInputs().get(source).size(); i++) {
                     mappings.put(
                             node.getOutputSymbols().get(i),
-                            node.getInputs().get(source).get(i).toSymbolReference());
+                            toSymbolReference(node.getInputs().get(source).get(i)));
                 }
                 return mappings.entrySet();
             });
@@ -181,7 +188,7 @@ public class EffectivePredicateExtractor
 
             Expression underlyingPredicate = node.getSource().accept(this, context);
 
-            List<Expression> projectionEqualities = node.getAssignments().entrySet().stream()
+            List<Expression> projectionEqualities = transformValues(node.getAssignments().getMap(), OriginalExpressionUtils::castToExpression).entrySet().stream()
                     .filter(SYMBOL_MATCHES_EXPRESSION.negate())
                     .map(ENTRY_TO_EQUALITY)
                     .collect(toImmutableList());
@@ -246,7 +253,7 @@ public class EffectivePredicateExtractor
         @Override
         public Expression visitUnion(UnionNode node, Void context)
         {
-            return deriveCommonPredicates(node, source -> node.outputSymbolMap(source).entries());
+            return deriveCommonPredicates(node, source -> outputSymbolMap(node, source).entries());
         }
 
         @Override
@@ -256,7 +263,7 @@ public class EffectivePredicateExtractor
             Expression rightPredicate = node.getRight().accept(this, context);
 
             List<Expression> joinConjuncts = node.getCriteria().stream()
-                    .map(JoinNode.EquiJoinClause::toExpression)
+                    .map(JoinNodeUtils::toExpression)
                     .collect(toImmutableList());
 
             switch (node.getType()) {
@@ -265,7 +272,7 @@ public class EffectivePredicateExtractor
                             .add(leftPredicate)
                             .add(rightPredicate)
                             .add(combineConjuncts(joinConjuncts))
-                            .add(node.getFilter().orElse(TRUE_LITERAL))
+                            .add(node.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL))
                             .build()), node.getOutputSymbols());
                 case LEFT:
                     return combineConjuncts(ImmutableList.<Expression>builder()
@@ -300,6 +307,7 @@ public class EffectivePredicateExtractor
             // get all types in one shot -- needed for the expression optimizer below
             List<Expression> allExpressions = node.getRows().stream()
                     .flatMap(List::stream)
+                    .map(OriginalExpressionUtils::castToExpression)
                     .collect(Collectors.toList());
 
             Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(session, types, allExpressions);
@@ -314,9 +322,9 @@ public class EffectivePredicateExtractor
                 boolean hasNull = false;
                 boolean nonDeterministic = false;
                 for (int row = 0; row < node.getRows().size(); row++) {
-                    Expression value = node.getRows().get(row).get(column);
+                    Expression value = castToExpression(node.getRows().get(row).get(column));
 
-                    if (!DeterminismEvaluator.isDeterministic(value)) {
+                    if (!ExpressionDeterminismEvaluator.isDeterministic(value)) {
                         nonDeterministic = true;
                         break;
                     }
@@ -444,7 +452,7 @@ public class EffectivePredicateExtractor
 
             ImmutableList.Builder<Expression> effectiveConjuncts = ImmutableList.builder();
             for (Expression conjunct : EqualityInference.nonInferrableConjuncts(expression)) {
-                if (DeterminismEvaluator.isDeterministic(conjunct)) {
+                if (ExpressionDeterminismEvaluator.isDeterministic(conjunct)) {
                     Expression rewritten = equalityInference.rewriteExpression(conjunct, in(symbols));
                     if (rewritten != null) {
                         effectiveConjuncts.add(rewritten);

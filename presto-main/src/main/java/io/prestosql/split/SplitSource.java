@@ -14,9 +14,9 @@
 package io.prestosql.split;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 
 import java.io.Closeable;

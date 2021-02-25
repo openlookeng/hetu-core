@@ -15,14 +15,15 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.connector.CatalogName;
-import io.prestosql.metadata.TableHandle;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
+import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.Assignments;
 import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
-import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -61,7 +62,7 @@ public class TestTransformCorrelatedSingleRowSubqueryToProject
                                         ImmutableMap.of(p.symbol("l_nationkey"), new TpchColumnHandle("nationkey",
                                                 BIGINT))),
                                 p.project(
-                                        Assignments.of(p.symbol("l_expr2"), expression("l_nationkey + 1")),
+                                        Assignments.of(p.symbol("l_expr2"), OriginalExpressionUtils.castToRowExpression(expression("l_nationkey + 1"))),
                                         p.values(
                                                 ImmutableList.of(),
                                                 ImmutableList.of(

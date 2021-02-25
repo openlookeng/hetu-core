@@ -16,11 +16,12 @@ package io.prestosql.sql.planner.assertions;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.planner.Symbol;
 import io.prestosql.sql.planner.plan.ApplyNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.List;
@@ -30,6 +31,8 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static java.util.Objects.requireNonNull;
 
 public class ExpressionMatcher
@@ -54,29 +57,38 @@ public class ExpressionMatcher
     public Optional<Symbol> getAssignedSymbol(PlanNode node, Session session, Metadata metadata, SymbolAliases symbolAliases)
     {
         Optional<Symbol> result = Optional.empty();
-        ImmutableList.Builder<Expression> matchesBuilder = ImmutableList.builder();
-        Map<Symbol, Expression> assignments = getAssignments(node);
+        ImmutableList.Builder<Object> matchesBuilder = ImmutableList.builder();
+        Map<Symbol, RowExpression> assignments = getAssignments(node);
 
         if (assignments == null) {
             return result;
         }
 
-        ExpressionVerifier verifier = new ExpressionVerifier(symbolAliases);
-
-        for (Map.Entry<Symbol, Expression> assignment : assignments.entrySet()) {
-            if (verifier.process(assignment.getValue(), expression)) {
-                result = Optional.of(assignment.getKey());
-                matchesBuilder.add(assignment.getValue());
+        for (Map.Entry<Symbol, RowExpression> assignment : assignments.entrySet()) {
+            RowExpression rightValue = assignment.getValue();
+            if (isExpression(rightValue)) {
+                ExpressionVerifier verifier = new ExpressionVerifier(symbolAliases);
+                if (verifier.process(castToExpression(rightValue), expression)) {
+                    result = Optional.of(assignment.getKey());
+                    matchesBuilder.add(castToExpression(rightValue));
+                }
+            }
+            else {
+                RowExpressionVerifier verifier = new RowExpressionVerifier(symbolAliases, metadata, session, node.getOutputSymbols());
+                if (verifier.process(expression, rightValue)) {
+                    result = Optional.of(assignment.getKey());
+                    matchesBuilder.add(rightValue);
+                }
             }
         }
 
-        List<Expression> matches = matchesBuilder.build();
+        List<Object> matches = matchesBuilder.build();
         checkState(matches.size() < 2, "Ambiguous expression %s matches multiple assignments", expression,
-                (matches.stream().map(Expression::toString).collect(Collectors.joining(", "))));
+                (matches.stream().map(Object::toString).collect(Collectors.joining(", "))));
         return result;
     }
 
-    private static Map<Symbol, Expression> getAssignments(PlanNode node)
+    private static Map<Symbol, RowExpression> getAssignments(PlanNode node)
     {
         if (node instanceof ProjectNode) {
             ProjectNode projectNode = (ProjectNode) node;

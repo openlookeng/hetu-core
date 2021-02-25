@@ -26,7 +26,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
-import io.prestosql.connector.CatalogName;
 import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.metadata.InternalNode;
@@ -34,6 +33,7 @@ import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.service.PropertyService;
 
 import javax.annotation.PreDestroy;

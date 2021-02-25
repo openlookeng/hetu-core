@@ -17,14 +17,14 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
+import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.OutputNode;
-import io.prestosql.sql.planner.plan.PlanNode;
-import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import java.util.HashSet;
@@ -45,10 +45,10 @@ public class DynamicFiltersChecker
     @Override
     public void validate(PlanNode plan, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
-        plan.accept(new PlanVisitor<Set<String>, Void>()
+        plan.accept(new InternalPlanVisitor<Set<String>, Void>()
         {
             @Override
-            protected Set<String> visitPlan(PlanNode node, Void context)
+            public Set<String> visitPlan(PlanNode node, Void context)
             {
                 Set<String> consumed = new HashSet<>();
                 for (PlanNode source : node.getSources()) {

@@ -18,10 +18,10 @@ import io.prestosql.cost.StatsProvider;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
-import io.prestosql.sql.planner.plan.WindowNode;
 
 import java.util.List;
 import java.util.Map;

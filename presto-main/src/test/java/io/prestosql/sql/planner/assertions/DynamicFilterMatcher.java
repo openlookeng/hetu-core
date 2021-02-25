@@ -16,15 +16,21 @@ package io.prestosql.sql.planner.assertions;
 import com.google.common.base.Joiner;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsProvider;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.Symbol;
-import io.prestosql.sql.planner.plan.FilterNode;
-import io.prestosql.sql.planner.plan.JoinNode;
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,7 +39,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
-import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static java.util.Objects.requireNonNull;
 
 public class DynamicFilterMatcher
@@ -67,16 +72,17 @@ public class DynamicFilterMatcher
         return new MatchResult(match());
     }
 
-    public MatchResult match(FilterNode filterNode, SymbolAliases symbolAliases)
+    public MatchResult match(FilterNode filterNode, Metadata metadata, Session session, SymbolAliases symbolAliases)
     {
         checkState(this.filterNode == null, "filterNode must be null at this point");
         this.filterNode = filterNode;
         this.symbolAliases = symbolAliases;
 
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata));
         boolean staticFilterMatches = expectedStaticFilter.map(filter -> {
-            ExpressionVerifier verifier = new ExpressionVerifier(symbolAliases);
-            Expression staticFilter = combineConjuncts(extractDynamicFilters(filterNode.getPredicate()).getStaticConjuncts());
-            return verifier.process(staticFilter, filter);
+            RowExpressionVerifier verifier = new RowExpressionVerifier(symbolAliases, metadata, session, filterNode.getOutputSymbols());
+            RowExpression staticFilter = RowExpressionUtils.combineConjuncts(extractDynamicFilters(filterNode.getPredicate()).getStaticConjuncts());
+            return verifier.process(filter, staticFilter);
         }).orElse(true);
 
         return new MatchResult(match() && staticFilterMatches);
@@ -91,9 +97,9 @@ public class DynamicFilterMatcher
             return true;
         }
 
-        Map<String, Symbol> idToProbeSymbolMap = extractDynamicFilters(filterNode.getPredicate())
-                .getDynamicConjuncts().stream()
-                .collect(toImmutableMap(DynamicFilters.Descriptor::getId, filter -> Symbol.from(filter.getInput())));
+        List<DynamicFilters.Descriptor> dynamicConjuncts = extractDynamicFilters(filterNode.getPredicate()).getDynamicConjuncts();
+        Map<String, Symbol> idToProbeSymbolMap = dynamicConjuncts.stream()
+                .collect(toImmutableMap(DynamicFilters.Descriptor::getId, filter -> new Symbol(((VariableReferenceExpression) filter.getInput()).getName())));
         Map<String, Symbol> idToBuildSymbolMap = joinNode.getDynamicFilters();
 
         if (idToProbeSymbolMap == null) {
@@ -133,7 +139,7 @@ public class DynamicFilterMatcher
         if (!(node instanceof FilterNode)) {
             return new MatchResult(false);
         }
-        return match((FilterNode) node, symbolAliases);
+        return match((FilterNode) node, metadata, session, symbolAliases);
     }
 
     public Map<String, String> getJoinExpectedMappings()

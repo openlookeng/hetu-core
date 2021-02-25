@@ -41,6 +41,7 @@ import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorAccessControl;
 import io.prestosql.spi.connector.ConnectorContext;
@@ -49,16 +50,21 @@ import io.prestosql.spi.connector.ConnectorIndexProvider;
 import io.prestosql.spi.connector.ConnectorNodePartitioningProvider;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
+import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.procedure.Procedure;
+import io.prestosql.spi.relation.DeterminismEvaluator;
+import io.prestosql.spi.relation.DomainTranslator;
 import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.split.PageSinkManager;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.RecordPageSourceProvider;
 import io.prestosql.split.SplitManager;
+import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
+import io.prestosql.sql.relational.ConnectorRowExpressionService;
 import io.prestosql.transaction.TransactionManager;
 import io.prestosql.type.InternalTypeManager;
 import io.prestosql.version.EmbedVersion;
@@ -82,9 +88,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
-import static io.prestosql.connector.CatalogName.createInformationSchemaCatalogName;
-import static io.prestosql.connector.CatalogName.createSystemTablesCatalogName;
 import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
+import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
+import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -101,6 +107,7 @@ public class ConnectorManager
     private final PageSourceManager pageSourceManager;
     private final IndexManager indexManager;
     private final NodePartitioningManager nodePartitioningManager;
+    private final ConnectorPlanOptimizerManager connectorPlanOptimizerManager;
 
     private final PageSinkManager pageSinkManager;
     private final HandleResolver handleResolver;
@@ -125,6 +132,9 @@ public class ConnectorManager
     private final ServerConfig serverConfig;
     private final NodeSchedulerConfig schedulerConfig;
 
+    private final DomainTranslator domainTranslator;
+    private final DeterminismEvaluator determinismEvaluator;
+
     @Inject
     public ConnectorManager(
             HetuMetaStoreManager hetuMetaStoreManager,
@@ -135,6 +145,7 @@ public class ConnectorManager
             PageSourceManager pageSourceManager,
             IndexManager indexManager,
             NodePartitioningManager nodePartitioningManager,
+            ConnectorPlanOptimizerManager connectorPlanOptimizerManager,
             PageSinkManager pageSinkManager,
             HandleResolver handleResolver,
             InternalNodeManager nodeManager,
@@ -147,7 +158,9 @@ public class ConnectorManager
             Announcer announcer,
             ServerConfig serverConfig,
             NodeSchedulerConfig schedulerConfig,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            DomainTranslator domainTranslator,
+            DeterminismEvaluator determinismEvaluator)
     {
         this.hetuMetaStoreManager = hetuMetaStoreManager;
         this.metadataManager = metadataManager;
@@ -157,6 +170,7 @@ public class ConnectorManager
         this.pageSourceManager = pageSourceManager;
         this.indexManager = indexManager;
         this.nodePartitioningManager = nodePartitioningManager;
+        this.connectorPlanOptimizerManager = connectorPlanOptimizerManager;
         this.pageSinkManager = pageSinkManager;
         this.handleResolver = handleResolver;
         this.nodeManager = nodeManager;
@@ -170,6 +184,8 @@ public class ConnectorManager
         this.serverConfig = serverConfig;
         this.schedulerConfig = schedulerConfig;
         this.heuristicIndexerManager = heuristicIndexerManager;
+        this.domainTranslator = domainTranslator;
+        this.determinismEvaluator = determinismEvaluator;
     }
 
     @PreDestroy
@@ -338,6 +354,11 @@ public class ConnectorManager
         connector.getPartitioningProvider()
                 .ifPresent(partitioningProvider -> nodePartitioningManager.addPartitioningProvider(catalogName, partitioningProvider));
 
+        if (nodeManager.getCurrentNode().isCoordinator()) {
+            connector.getPlanOptimizerProvider()
+                    .ifPresent(planOptimizerProvider -> connectorPlanOptimizerManager.addPlanOptimizerProvider(catalogName, planOptimizerProvider));
+        }
+
         metadataManager.getProcedureRegistry().addProcedures(catalogName, connector.getProcedures());
 
         connector.getAccessControl()
@@ -376,6 +397,7 @@ public class ConnectorManager
         metadataManager.getSchemaPropertyManager().removeProperties(catalogName);
         metadataManager.getAnalyzePropertyManager().removeProperties(catalogName);
         metadataManager.getSessionPropertyManager().removeConnectorSessionProperties(catalogName);
+        connectorPlanOptimizerManager.removePlanOptimizerProvider(catalogName);
 
         MaterializedConnector materializedConnector = connectors.remove(catalogName);
         if (materializedConnector != null) {
@@ -398,7 +420,8 @@ public class ConnectorManager
                 pageSorter,
                 pageIndexerFactory,
                 hetuMetaStoreManager.getHetuMetastore(),
-                heuristicIndexerManager.getIndexClient());
+                heuristicIndexerManager.getIndexClient(),
+                new ConnectorRowExpressionService(domainTranslator, determinismEvaluator));
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
             return factory.create(catalogName.getCatalogName(), properties, context);
@@ -490,6 +513,7 @@ public class ConnectorManager
         private final Optional<ConnectorPageSinkProvider> pageSinkProvider;
         private final Optional<ConnectorIndexProvider> indexProvider;
         private final Optional<ConnectorNodePartitioningProvider> partitioningProvider;
+        private final Optional<ConnectorPlanOptimizerProvider> planOptimizerProvider;
         private final Optional<ConnectorAccessControl> accessControl;
         private final List<PropertyMetadata<?>> sessionProperties;
         private final List<PropertyMetadata<?>> tableProperties;
@@ -563,6 +587,15 @@ public class ConnectorManager
             }
             this.partitioningProvider = Optional.ofNullable(partitioningProvider);
 
+            ConnectorPlanOptimizerProvider planOptimizerProvider = null;
+            try {
+                planOptimizerProvider = connector.getConnectorPlanOptimizerProvider();
+                requireNonNull(planOptimizerProvider, format("Connector %s returned a null plan optimizer provider", catalogName));
+            }
+            catch (UnsupportedOperationException ignored) {
+            }
+            this.planOptimizerProvider = Optional.ofNullable(planOptimizerProvider);
+
             ConnectorAccessControl accessControl = null;
             try {
                 accessControl = connector.getAccessControl();
@@ -635,6 +668,11 @@ public class ConnectorManager
         public Optional<ConnectorNodePartitioningProvider> getPartitioningProvider()
         {
             return partitioningProvider;
+        }
+
+        public Optional<ConnectorPlanOptimizerProvider> getPlanOptimizerProvider()
+        {
+            return planOptimizerProvider;
         }
 
         public Optional<ConnectorAccessControl> getAccessControl()

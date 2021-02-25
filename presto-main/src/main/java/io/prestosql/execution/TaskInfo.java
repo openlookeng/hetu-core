@@ -19,7 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.execution.buffer.BufferInfo;
 import io.prestosql.execution.buffer.OutputBufferInfo;
 import io.prestosql.operator.TaskStats;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.Immutable;

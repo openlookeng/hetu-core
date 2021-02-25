@@ -22,7 +22,7 @@ import io.prestosql.operator.FilterAndProjectOperator;
 import io.prestosql.operator.OperatorStats;
 import io.prestosql.operator.TableWriterOperator;
 import io.prestosql.spi.eventlistener.StageGcStatistics;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 import org.testng.annotations.Test;
 

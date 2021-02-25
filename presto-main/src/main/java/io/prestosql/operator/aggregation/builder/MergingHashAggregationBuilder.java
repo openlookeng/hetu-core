@@ -23,9 +23,9 @@ import io.prestosql.operator.WorkProcessor.Transformation;
 import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
-import io.prestosql.sql.planner.plan.AggregationNode;
 
 import java.io.Closeable;
 import java.util.List;

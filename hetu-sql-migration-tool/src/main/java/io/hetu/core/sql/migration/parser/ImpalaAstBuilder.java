@@ -19,6 +19,8 @@ import com.google.common.collect.Lists;
 import io.hetu.core.migration.source.impala.ImpalaSqlBaseVisitor;
 import io.hetu.core.migration.source.impala.ImpalaSqlLexer;
 import io.hetu.core.migration.source.impala.ImpalaSqlParser;
+import io.prestosql.spi.sql.expression.Types.FrameBoundType;
+import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.tree.AddColumn;
@@ -2096,7 +2098,7 @@ public class ImpalaAstBuilder
     @Override
     public Node visitCurrentRowBound(ImpalaSqlParser.CurrentRowBoundContext context)
     {
-        return new FrameBound(getLocation(context), FrameBound.Type.CURRENT_ROW);
+        return new FrameBound(getLocation(context), FrameBoundType.CURRENT_ROW);
     }
 
     @Override
@@ -2340,37 +2342,37 @@ public class ImpalaAstBuilder
         throw new IllegalArgumentException("Unsupported interval field: " + token.getText());
     }
 
-    private static WindowFrame.Type getFrameType(Token type)
+    private static WindowFrameType getFrameType(Token type)
     {
         switch (type.getType()) {
             case ImpalaSqlLexer.RANGE:
-                return WindowFrame.Type.RANGE;
+                return WindowFrameType.RANGE;
             case ImpalaSqlLexer.ROWS:
-                return WindowFrame.Type.ROWS;
+                return WindowFrameType.ROWS;
         }
 
         throw new IllegalArgumentException("Unsupported frame type: " + type.getText());
     }
 
-    private static FrameBound.Type getBoundedFrameBoundType(Token token)
+    private static FrameBoundType getBoundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case ImpalaSqlLexer.PRECEDING:
-                return FrameBound.Type.PRECEDING;
+                return FrameBoundType.PRECEDING;
             case ImpalaSqlLexer.FOLLOWING:
-                return FrameBound.Type.FOLLOWING;
+                return FrameBoundType.FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());
     }
 
-    private static FrameBound.Type getUnboundedFrameBoundType(Token token)
+    private static FrameBoundType getUnboundedFrameBoundType(Token token)
     {
         switch (token.getType()) {
             case ImpalaSqlLexer.PRECEDING:
-                return FrameBound.Type.UNBOUNDED_PRECEDING;
+                return FrameBoundType.UNBOUNDED_PRECEDING;
             case ImpalaSqlLexer.FOLLOWING:
-                return FrameBound.Type.UNBOUNDED_FOLLOWING;
+                return FrameBoundType.UNBOUNDED_FOLLOWING;
         }
 
         throw new IllegalArgumentException("Unsupported bound type: " + token.getText());

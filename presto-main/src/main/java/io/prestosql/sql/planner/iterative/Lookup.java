@@ -13,7 +13,8 @@
  */
 package io.prestosql.sql.planner.iterative;
 
-import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.spi.plan.GroupReference;
+import io.prestosql.spi.plan.PlanNode;
 
 import java.util.function.Function;
 import java.util.stream.Stream;

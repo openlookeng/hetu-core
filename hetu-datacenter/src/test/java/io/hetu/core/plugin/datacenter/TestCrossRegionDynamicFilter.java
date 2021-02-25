@@ -365,7 +365,6 @@ public class TestCrossRegionDynamicFilter
         assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND NOT (orders.comment LIKE '%forges%')");
         assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND NOT (orders.comment LIKE dc.tpch.tiny.lineitem.comment)");
         assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND dc.tpch.tiny.lineitem.quantity + length(orders.comment) > 7");
-        assertQuery("SELECT COUNT(*) FROM dc.tpch.tiny.lineitem JOIN orders ON dc.tpch.tiny.lineitem.orderkey = orders.orderkey AND NULL");
     }
 
     @Test

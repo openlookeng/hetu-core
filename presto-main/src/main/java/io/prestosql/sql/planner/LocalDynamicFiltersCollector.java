@@ -25,9 +25,10 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
-import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.rewrite.DynamicFilterContext;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
@@ -81,10 +82,10 @@ public class LocalDynamicFiltersCollector
         }
     }
 
-    void initContext(List<DynamicFilters.Descriptor> descriptors)
+    void initContext(List<DynamicFilters.Descriptor> descriptors, Map<Integer, Symbol> layOut)
     {
         if (context == null) {
-            context = new DynamicFilterContext(descriptors);
+            context = new DynamicFilterContext(descriptors, layOut);
         }
     }
 

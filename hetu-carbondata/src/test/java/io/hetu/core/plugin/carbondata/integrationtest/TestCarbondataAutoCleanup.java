@@ -42,8 +42,8 @@ import java.util.Map;
 
 import static org.testng.Assert.assertEquals;
 
-public class TestCarbondataAutoCleanup {
-
+public class TestCarbondataAutoCleanup
+{
     private final Logger logger = LogServiceFactory.getLogService(TestCarbondataAutoCleanup.class.getCanonicalName());
 
     private String rootPath = new File(this.getClass().getResource("/").getPath() + "../..")
@@ -77,8 +77,8 @@ public class TestCarbondataAutoCleanup {
         map.put("carbondata.minor-vacuum-seg-count", "4");
         map.put("carbondata.major-vacuum-seg-size", "1");
 
-        if (!FileFactory.isFileExist( storePath + "/carbon.store")) {
-            FileFactory.mkdirs( storePath + "/carbon.store");
+        if (!FileFactory.isFileExist(storePath + "/carbon.store")) {
+            FileFactory.mkdirs(storePath + "/carbon.store");
         }
 
         hetuServer.startServer("testdb", map);

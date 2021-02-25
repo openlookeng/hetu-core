@@ -19,13 +19,13 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.function.LongVariableConstraint;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.TypeVariableConstraint;
+import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.NamedTypeSignature;
 import io.prestosql.spi.type.ParameterKind;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
-import io.prestosql.type.FunctionType;
 import io.prestosql.type.TypeCoercion;
 
 import java.util.Collections;
