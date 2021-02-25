@@ -55,6 +55,7 @@ import io.prestosql.split.SplitManager;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -492,6 +493,18 @@ public class DistributedExecutionPlanner
         public Map<PlanNodeId, SplitSource> visitCreateIndex(CreateIndexNode node, Void context)
         {
             return node.getSource().accept(this, context);
+        }
+
+        /*@Override
+        public Map<PlanNodeId, SplitSource> visitCTEScan(CTEScanNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
+        }*/
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitCTEScan(CTEScanNode node, Void context)
+        {
+            return processSources(node.getSources(), context);
         }
 
         @Override

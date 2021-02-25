@@ -59,6 +59,7 @@ public class StatsCalculatorModule
         rules.add(new TopNStatsRule(normalizer));
         rules.add(new MarkDistinctStatsRule(normalizer));
         rules.add(new WindowStatsRule(normalizer));
+        rules.add(new CTEScanStatsRule(normalizer));
 
         return new ComposableStatsCalculator(rules.build());
     }

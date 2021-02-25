@@ -54,6 +54,8 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.planner.plan.Assignments;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.ChildReplacer;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -1225,6 +1227,17 @@ public class AddExchanges
         public PlanWithProperties visitLateralJoin(LateralJoinNode node, PreferredProperties preferredProperties)
         {
             throw new IllegalStateException("Unexpected node: " + node.getClass().getName());
+        }
+
+        @Override
+        public PlanWithProperties visitCTEScan(CTEScanNode node, PreferredProperties preferredProperties)
+        {
+            PlanWithProperties child = planChild(node, PreferredProperties.any());
+            PlanWithProperties cteNode = rebaseAndDeriveProperties(node, child);
+            PlanWithProperties cteNodeWithExchange = withDerivedProperties(
+                    partitionedExchange(idAllocator.getNextId(), REMOTE, cteNode.getNode(), cteNode.getNode().getOutputSymbols(), Optional.empty()),
+                    cteNode.getProperties());
+            return cteNodeWithExchange;
         }
 
         private PlanWithProperties planChild(PlanNode node, PreferredProperties preferredProperties)

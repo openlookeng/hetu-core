@@ -51,6 +51,7 @@ import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -943,6 +944,14 @@ public class PruneUnreferencedOutputs
             }
 
             return new LateralJoinNode(node.getId(), input, subquery, newCorrelation, node.getType(), node.getFilter(), node.getOriginSubquery());
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, SimplePlanRewriter.RewriteContext<Set<Symbol>> context)
+        {
+            PlanNode source = context.rewrite(node.getSource(), ImmutableSet.copyOf(node.getOutputSymbols()));
+            node.replaceChildren(ImmutableList.of(source));
+            return node;
         }
     }
 }

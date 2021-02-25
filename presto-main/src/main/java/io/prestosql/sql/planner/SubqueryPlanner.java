@@ -44,6 +44,7 @@ import io.prestosql.sql.tree.LambdaArgumentDeclaration;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NotExpression;
+import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.QuantifiedComparisonExpression;
 import io.prestosql.sql.tree.QuantifiedComparisonExpression.Quantifier;
 import io.prestosql.sql.tree.Query;
@@ -81,6 +82,8 @@ class SubqueryPlanner
     private final Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap;
     private final Metadata metadata;
     private final Session session;
+    private final Map<QualifiedName, Integer> namedSubPlan;
+    private final UniqueIdAllocator uniqueIdAllocator;
 
     SubqueryPlanner(
             Analysis analysis,
@@ -88,7 +91,9 @@ class SubqueryPlanner
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
-            Session session)
+            Session session,
+            Map<QualifiedName, Integer> namedSubPlan,
+            UniqueIdAllocator uniqueIdAllocator)
     {
         requireNonNull(analysis, "analysis is null");
         requireNonNull(planSymbolAllocator, "symbolAllocator is null");
@@ -103,6 +108,8 @@ class SubqueryPlanner
         this.lambdaDeclarationToSymbolMap = lambdaDeclarationToSymbolMap;
         this.metadata = metadata;
         this.session = session;
+        this.namedSubPlan = namedSubPlan;
+        this.uniqueIdAllocator = uniqueIdAllocator;
     }
 
     public PlanBuilder handleSubqueries(PlanBuilder builder, Collection<Expression> expressions, Node node)
@@ -485,7 +492,7 @@ class SubqueryPlanner
 
     private PlanBuilder createPlanBuilder(Node node)
     {
-        RelationPlan relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+        RelationPlan relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator)
                 .process(node, null);
         TranslationMap translations = new TranslationMap(relationPlan, analysis, lambdaDeclarationToSymbolMap);
 

@@ -48,6 +48,7 @@ import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -189,6 +190,17 @@ public class PredicatePushDown
                 rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, castToRowExpression(context.get()));
             }
             return rewrittenNode;
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Expression> context)
+        {
+            if (dynamicFiltering) {
+                return context.defaultRewrite(node, context.get());
+            }
+            else {
+                return visitPlan(node, context);
+            }
         }
 
         @Override

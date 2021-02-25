@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -466,6 +467,12 @@ public class DriverContext
     private static long nanosBetween(long start, long end)
     {
         return max(0, end - start);
+    }
+
+    @VisibleForTesting
+    public Executor getNotificationExecutor()
+    {
+        return notificationExecutor;
     }
 
     private class BlockedMonitor

@@ -30,6 +30,7 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.iterative.rule.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.iterative.rule.AddExchangesBelowPartialAggregationOverGroupIdRuleSet;
 import io.prestosql.sql.planner.iterative.rule.AddIntermediateAggregations;
 import io.prestosql.sql.planner.iterative.rule.CanonicalizeExpressions;
@@ -151,6 +152,7 @@ import io.prestosql.sql.planner.optimizations.MetadataQueryOptimizer;
 import io.prestosql.sql.planner.optimizations.OptimizeMixedDistinctAggregations;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.optimizations.PredicatePushDown;
+import io.prestosql.sql.planner.optimizations.PruneCTENodes;
 import io.prestosql.sql.planner.optimizations.PruneUnreferencedOutputs;
 import io.prestosql.sql.planner.optimizations.ReplicateSemiJoinInDelete;
 import io.prestosql.sql.planner.optimizations.RowExpressionPredicatePushDown;
@@ -246,6 +248,7 @@ public class PlanOptimizers
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
 
+        builder.add(new PruneCTENodes(false, false));
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(
                 new MergeFilters());
 
@@ -513,6 +516,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())),
                 new MetadataQueryOptimizer(metadata),
+                new PruneCTENodes(true, true),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
@@ -634,6 +638,11 @@ public class PlanOptimizers
         builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new RowExpressionPredicatePushDown(metadata, typeAnalyzer, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
         builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
         builder.add(simplifyRowExpressionOptimizer); // Should be always run after PredicatePushDown
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableSet.of(new AddExchangeAboveCTENode())));
         builder.add(projectionRowExpressionPushDown);
         builder.add(inlineProjections);
         builder.add(new UnaliasSymbolReferences(metadata)); // Run unalias after merging projections to simplify projections more efficiently

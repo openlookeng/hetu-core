@@ -32,6 +32,7 @@ import io.prestosql.memory.QueryContext;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -103,6 +104,8 @@ public class TaskContext
 
     private final MemoryTrackingContext taskMemoryContext;
 
+    private final PlanNodeId consumerId;
+
     public static TaskContext createTaskContext(
             QueryContext queryContext,
             TaskStateMachine taskStateMachine,
@@ -113,9 +116,10 @@ public class TaskContext
             MemoryTrackingContext taskMemoryContext,
             boolean perOperatorCpuTimerEnabled,
             boolean cpuTimerEnabled,
-            OptionalInt totalPartitions)
+            OptionalInt totalPartitions,
+            PlanNodeId consumerId)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId);
         taskContext.initialize();
         return taskContext;
     }
@@ -129,7 +133,8 @@ public class TaskContext
             MemoryTrackingContext taskMemoryContext,
             boolean perOperatorCpuTimerEnabled,
             boolean cpuTimerEnabled,
-            OptionalInt totalPartitions)
+            OptionalInt totalPartitions,
+            PlanNodeId consumerId)
     {
         this.taskStateMachine = requireNonNull(taskStateMachine, "taskStateMachine is null");
         this.gcMonitor = requireNonNull(gcMonitor, "gcMonitor is null");
@@ -143,6 +148,7 @@ public class TaskContext
         this.perOperatorCpuTimerEnabled = perOperatorCpuTimerEnabled;
         this.cpuTimerEnabled = cpuTimerEnabled;
         this.totalPartitions = requireNonNull(totalPartitions, "totalPartitions is null");
+        this.consumerId = consumerId;
     }
 
     // the state change listener is added here in a separate initialize() method
@@ -561,5 +567,20 @@ public class TaskContext
     public QueryContext getQueryContext()
     {
         return queryContext;
+    }
+
+    public PlanNodeId getConsumerId()
+    {
+        return consumerId;
+    }
+
+    public Executor getNotificationExecutor()
+    {
+        return notificationExecutor;
+    }
+
+    public int getTaskCount()
+    {
+        return queryContext.getTaskCount();
     }
 }

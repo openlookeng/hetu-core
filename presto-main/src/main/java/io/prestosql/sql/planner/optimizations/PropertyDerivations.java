@@ -60,6 +60,7 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.ActualProperties.Global;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -796,6 +797,15 @@ public class PropertyDerivations
         public ActualProperties visitCreateIndex(CreateIndexNode node, List<ActualProperties> inputProperties)
         {
             return Iterables.getOnlyElement(inputProperties);
+        }
+
+        @Override
+        public ActualProperties visitCTEScan(CTEScanNode node, List<ActualProperties> inputProperties)
+        {
+            ActualProperties properties = Iterables.getOnlyElement(inputProperties);
+            return ActualProperties.builderFrom(properties)
+                    .local(LocalProperties.grouped(node.getOutputSymbols()))
+                    .build();
         }
 
         private Global deriveGlobalProperties(TableProperties layout, Map<ColumnHandle, Symbol> assignments, Map<ColumnHandle, NullableValue> constants)

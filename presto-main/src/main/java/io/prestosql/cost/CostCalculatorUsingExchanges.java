@@ -33,6 +33,7 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
@@ -341,6 +342,13 @@ public class CostCalculatorUsingExchanges
             // or in CostCalculatorWithEstimatedExchanges#CostEstimator#visitUnion
             // This stub is needed just to avoid the cumulative cost being set to unknown
             return costForStreaming(node, LocalCostEstimate.zero());
+        }
+
+        @Override
+        public PlanCostEstimate visitCTEScan(CTEScanNode node, Void context)
+        {
+            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node).getOutputSizeInBytes(node.getOutputSymbols(), types));
+            return costForStreaming(node, localCost);
         }
 
         private PlanCostEstimate costForSource(PlanNode node, LocalCostEstimate localCost)

@@ -23,7 +23,9 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -66,12 +68,20 @@ public class StatsAndCosts
                 .depthFirstPreOrder(root);
         ImmutableMap.Builder<PlanNodeId, PlanNodeStatsEstimate> filteredStats = ImmutableMap.builder();
         ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> filteredCosts = ImmutableMap.builder();
+        Set<PlanNodeId> visitedPlanNodeId = new HashSet<>();
         for (PlanNode node : planIterator) {
-            if (stats.containsKey(node.getId())) {
-                filteredStats.put(node.getId(), stats.get(node.getId()));
+            PlanNodeId id = node.getId();
+            if (visitedPlanNodeId.contains(id)) {
+                // This can happen only incase of CTE reuse optimization.
+                continue;
             }
-            if (costs.containsKey(node.getId())) {
-                filteredCosts.put(node.getId(), costs.get(node.getId()));
+
+            visitedPlanNodeId.add(id);
+            if (stats.containsKey(id)) {
+                filteredStats.put(id, stats.get(id));
+            }
+            if (costs.containsKey(id)) {
+                filteredCosts.put(id, costs.get(id));
             }
         }
         return new StatsAndCosts(filteredStats.build(), filteredCosts.build());
@@ -83,9 +93,17 @@ public class StatsAndCosts
                 .depthFirstPreOrder(root);
         ImmutableMap.Builder<PlanNodeId, PlanNodeStatsEstimate> stats = ImmutableMap.builder();
         ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> costs = ImmutableMap.builder();
+        Set<PlanNodeId> visitedPlanNodeId = new HashSet<>();
         for (PlanNode node : planIterator) {
-            stats.put(node.getId(), statsProvider.getStats(node));
-            costs.put(node.getId(), costProvider.getCost(node));
+            PlanNodeId id = node.getId();
+            if (visitedPlanNodeId.contains(id)) {
+                // This can happen only incase of CTE reuse optimization.
+                continue;
+            }
+
+            visitedPlanNodeId.add(id);
+            stats.put(id, statsProvider.getStats(node));
+            costs.put(id, costProvider.getCost(node));
         }
         return new StatsAndCosts(stats.build(), costs.build());
     }

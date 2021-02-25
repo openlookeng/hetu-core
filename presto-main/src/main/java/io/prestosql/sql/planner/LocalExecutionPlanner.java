@@ -44,6 +44,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.AggregationOperator.AggregationOperatorFactory;
 import io.prestosql.operator.AssignUniqueIdOperator;
 import io.prestosql.operator.BloomFilterUtils;
+import io.prestosql.operator.CommonTableExecutionContext;
 import io.prestosql.operator.DeleteOperator.DeleteOperatorFactory;
 import io.prestosql.operator.DevNullOperator.DevNullOperatorFactory;
 import io.prestosql.operator.DriverFactory;
@@ -177,6 +178,7 @@ import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.sql.planner.optimizations.IndexJoinOptimizer;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -187,6 +189,11 @@ import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.IndexSourceNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.OutputNode;
+import io.prestosql.sql.planner.plan.PlanFragmentId;
+import io.prestosql.sql.planner.plan.PlanNode;
+import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.sql.planner.plan.PlanVisitor;
+import io.prestosql.sql.planner.plan.ProjectNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.RowNumberNode;
 import io.prestosql.sql.planner.plan.SampleNode;
@@ -223,6 +230,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -241,6 +249,8 @@ import static com.google.common.collect.Range.closedOpen;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.SystemSessionProperties.getAggregationOperatorUnspillMemoryLimit;
+import static io.prestosql.SystemSessionProperties.getCteMaxPrefetchQueueSize;
+import static io.prestosql.SystemSessionProperties.getCteMaxQueueSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
@@ -257,6 +267,7 @@ import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
 import static io.prestosql.SystemSessionProperties.isSpillReuseExchange;
 import static io.prestosql.SystemSessionProperties.isSpillWindowOperator;
 import static io.prestosql.dynamicfilter.DynamicFilterCacheManager.createCacheKey;
+import static io.prestosql.operator.CommonTableExpressionOperator.CommonTableExpressionOperatorFactory;
 import static io.prestosql.expressions.RowExpressionNodeInliner.replaceExpression;
 import static io.prestosql.operator.CreateIndexOperator.CreateIndexOperatorFactory;
 import static io.prestosql.operator.DistinctLimitOperator.DistinctLimitOperatorFactory;
@@ -415,7 +426,10 @@ public class LocalExecutionPlanner
             PartitioningScheme partitioningScheme,
             StageExecutionDescriptor stageExecutionDescriptor,
             List<PlanNodeId> partitionedSourceOrder,
-            OutputBuffer outputBuffer)
+            OutputBuffer outputBuffer,
+            Optional<PlanFragmentId> producerCTEId,
+            Optional<PlanNodeId> producerCTEParentId,
+            Map<String, CommonTableExecutionContext> cteCtx)
     {
         List<Symbol> outputLayout = partitioningScheme.getOutputLayout();
 
@@ -424,7 +438,7 @@ public class LocalExecutionPlanner
                 partitioningScheme.getPartitioning().getHandle().equals(SCALED_WRITER_DISTRIBUTION) ||
                 partitioningScheme.getPartitioning().getHandle().equals(SINGLE_DISTRIBUTION) ||
                 partitioningScheme.getPartitioning().getHandle().equals(COORDINATOR_DISTRIBUTION)) {
-            return plan(taskContext, stageExecutionDescriptor, plan, outputLayout, types, partitionedSourceOrder, new TaskOutputFactory(outputBuffer));
+            return plan(taskContext, stageExecutionDescriptor, plan, outputLayout, types, partitionedSourceOrder, new TaskOutputFactory(outputBuffer), producerCTEId, producerCTEParentId, cteCtx);
         }
 
         // We can convert the symbols directly into channels, because the root must be a sink and therefore the layout is fixed
@@ -487,7 +501,10 @@ public class LocalExecutionPlanner
                         partitioningScheme.isReplicateNullsAndAny(),
                         nullChannel,
                         outputBuffer,
-                        maxPagePartitioningBufferSize));
+                        maxPagePartitioningBufferSize),
+                producerCTEId,
+                producerCTEParentId,
+                cteCtx);
     }
 
     public LocalExecutionPlan plan(
@@ -497,10 +514,13 @@ public class LocalExecutionPlanner
             List<Symbol> outputLayout,
             TypeProvider types,
             List<PlanNodeId> partitionedSourceOrder,
-            OutputFactory outputOperatorFactory)
+            OutputFactory outputOperatorFactory,
+            Optional<PlanFragmentId> producerCTEId,
+            Optional<PlanNodeId> producerCTEParentId,
+            Map<String, CommonTableExecutionContext> cteCtx)
     {
         Session session = taskContext.getSession();
-        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, metadata, dynamicFilterCacheManager);
+        LocalExecutionPlanContext context = new LocalExecutionPlanContext(taskContext, types, metadata, dynamicFilterCacheManager, producerCTEId, producerCTEParentId, cteCtx);
 
         PhysicalOperation physicalOperation = plan.accept(new Visitor(session, stageExecutionDescriptor), context);
 
@@ -535,7 +555,7 @@ public class LocalExecutionPlanner
                 .map(LocalPlannerAware.class::cast)
                 .forEach(LocalPlannerAware::localPlannerComplete);
 
-        return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor);
+        return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor, producerCTEId);
     }
 
     private static void addLookupOuterDrivers(LocalExecutionPlanContext context)
@@ -585,10 +605,19 @@ public class LocalExecutionPlanner
         private int nextOperatorId;
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
+        private Map<PlanNodeId, OperatorFactory> cteOperationMap = new HashMap<>();
+        private Map<String, CommonTableExecutionContext> cteCtx;
+        private static Map<String, PhysicalOperation> sourceInitialized = new ConcurrentHashMap<>();
+        private final PlanNodeId consumerId;
+        private final Optional<PlanFragmentId> producerCTEId;
+        private final Optional<PlanNodeId> producerCTEParentId;
 
-        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, Metadata metadata, DynamicFilterCacheManager dynamicFilterCacheManager)
+        public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, Metadata metadata, DynamicFilterCacheManager dynamicFilterCacheManager,
+                                         Optional<PlanFragmentId> producerCTEId,
+                                         Optional<PlanNodeId> producerCTEParentId,
+                                         Map<String, CommonTableExecutionContext> cteCtx)
         {
-            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, Optional.of(metadata), dynamicFilterCacheManager), new AtomicInteger(0));
+            this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, Optional.of(metadata), dynamicFilterCacheManager), new AtomicInteger(0), producerCTEId, producerCTEParentId, cteCtx);
         }
 
         private LocalExecutionPlanContext(
@@ -597,7 +626,10 @@ public class LocalExecutionPlanner
                 List<DriverFactory> driverFactories,
                 Optional<IndexSourceContext> indexSourceContext,
                 LocalDynamicFiltersCollector dynamicFiltersCollector,
-                AtomicInteger nextPipelineId)
+                AtomicInteger nextPipelineId,
+                Optional<PlanFragmentId> producerCTEId,
+                Optional<PlanNodeId> producerCTEParentId,
+                Map<String, CommonTableExecutionContext> cteCtx)
         {
             this.taskContext = taskContext;
             this.types = types;
@@ -605,6 +637,10 @@ public class LocalExecutionPlanner
             this.indexSourceContext = indexSourceContext;
             this.dynamicFiltersCollector = dynamicFiltersCollector;
             this.nextPipelineId = nextPipelineId;
+            this.consumerId = taskContext.getConsumerId();
+            this.producerCTEId = producerCTEId;
+            this.producerCTEParentId = producerCTEParentId;
+            this.cteCtx = cteCtx;
         }
 
         public void addDriverFactory(boolean inputDriver, boolean outputDriver, List<OperatorFactory> operatorFactories, OptionalInt driverInstances, PipelineExecutionStrategy pipelineExecutionStrategy)
@@ -684,12 +720,12 @@ public class LocalExecutionPlanner
         public LocalExecutionPlanContext createSubContext()
         {
             checkState(!indexSourceContext.isPresent(), "index build plan can not have sub-contexts");
-            return new LocalExecutionPlanContext(taskContext, types, driverFactories, indexSourceContext, dynamicFiltersCollector, nextPipelineId);
+            return new LocalExecutionPlanContext(taskContext, types, driverFactories, indexSourceContext, dynamicFiltersCollector, nextPipelineId, producerCTEId, producerCTEParentId, cteCtx);
         }
 
         public LocalExecutionPlanContext createIndexSourceSubContext(IndexSourceContext indexSourceContext)
         {
-            return new LocalExecutionPlanContext(taskContext, types, driverFactories, Optional.of(indexSourceContext), dynamicFiltersCollector, nextPipelineId);
+            return new LocalExecutionPlanContext(taskContext, types, driverFactories, Optional.of(indexSourceContext), dynamicFiltersCollector, nextPipelineId, producerCTEId, producerCTEParentId, cteCtx);
         }
 
         public OptionalInt getDriverInstanceCount()
@@ -704,6 +740,46 @@ public class LocalExecutionPlanner
                 checkState(this.driverInstanceCount.getAsInt() == driverInstanceCount, "driverInstance count already set to " + this.driverInstanceCount.getAsInt());
             }
             this.driverInstanceCount = OptionalInt.of(driverInstanceCount);
+        }
+
+        public CommonTableExecutionContext getRunningTask(String cteExecutorId, Set<PlanNodeId> consumers, PhysicalOperation source)
+        {
+            checkArgument(producerCTEParentId.isPresent(), "CTE parent Id must be there");
+            if (source != null) {
+                sourceInitialized.putIfAbsent(cteExecutorId, source);
+            }
+
+            return cteCtx.computeIfAbsent(cteExecutorId, k -> new CommonTableExecutionContext(cteExecutorId, consumers,
+                                                            producerCTEParentId.get(), taskContext.getNotificationExecutor(),
+                                                            taskContext.getTaskCount(),
+                                                            getCteMaxQueueSize(getSession()),
+                                                            getCteMaxPrefetchQueueSize(getSession())));
+        }
+
+        public String getCteId(PlanNodeId cteNodeId)
+        {
+            return taskContext.getQueryContext().getQueryId().toString() + "-#-" + taskContext.getTaskId().getId() + "-#-" + cteNodeId.toString();
+        }
+
+        public PlanNodeId getConsumerId()
+        {
+            checkArgument(consumerId != null, "Consumer Id cannot be null for CTE executor!");
+            return consumerId;
+        }
+
+        public Optional<PlanFragmentId> getProducerCTEId()
+        {
+            return producerCTEId;
+        }
+
+        public Optional<PlanNodeId> getProducerCTEParentId()
+        {
+            return producerCTEParentId;
+        }
+
+        public boolean isCteInitialized(String cteId)
+        {
+            return sourceInitialized.containsKey(cteId);
         }
     }
 
@@ -727,12 +803,15 @@ public class LocalExecutionPlanner
         private final List<DriverFactory> driverFactories;
         private final List<PlanNodeId> partitionedSourceOrder;
         private final StageExecutionDescriptor stageExecutionDescriptor;
+        private final Optional<PlanFragmentId> producerCTEId;
 
-        public LocalExecutionPlan(List<DriverFactory> driverFactories, List<PlanNodeId> partitionedSourceOrder, StageExecutionDescriptor stageExecutionDescriptor)
+        public LocalExecutionPlan(List<DriverFactory> driverFactories, List<PlanNodeId> partitionedSourceOrder,
+                                    StageExecutionDescriptor stageExecutionDescriptor, Optional<PlanFragmentId> producerCTEId)
         {
             this.driverFactories = ImmutableList.copyOf(requireNonNull(driverFactories, "driverFactories is null"));
             this.partitionedSourceOrder = ImmutableList.copyOf(requireNonNull(partitionedSourceOrder, "partitionedSourceOrder is null"));
             this.stageExecutionDescriptor = requireNonNull(stageExecutionDescriptor, "stageExecutionDescriptor is null");
+            this.producerCTEId = producerCTEId;
         }
 
         public List<DriverFactory> getDriverFactories()
@@ -748,6 +827,11 @@ public class LocalExecutionPlanner
         public StageExecutionDescriptor getStageExecutionDescriptor()
         {
             return stageExecutionDescriptor;
+        }
+
+        public Optional<PlanFragmentId> getProducerCTEId()
+        {
+            return producerCTEId;
         }
     }
 
@@ -1186,6 +1270,51 @@ public class LocalExecutionPlanner
         }
 
         @Override
+        public PhysicalOperation visitCTEScan(CTEScanNode node, LocalExecutionPlanContext context)
+        {
+            CommonTableExecutionContext cteCtx;
+            List<Type> outputTypes;
+            PhysicalOperation source = null;
+
+            synchronized (this.getClass()) {
+                String cteId = context.getCteId(node.getId());
+                int stageId = context.getTaskId().getStageId().getId();
+                if (!context.isCteInitialized(cteId) && context.getProducerCTEId().isPresent()
+                            && Integer.parseInt(context.getProducerCTEId().get().toString()) == stageId) {
+                    source = node.getSource().accept(this, context);
+                }
+
+                /* Note: this should always be comming from remote node! */
+                checkArgument(context.cteOperationMap.get(node.getId()) == null, "Cte node can be only 1 in a stage");
+
+                cteCtx = context.getRunningTask(cteId, node.getConsumerPlans(), source);
+                outputTypes = getSymbolTypes(node.getOutputSymbols(), context.getTypes());
+            }
+
+            CommonTableExpressionOperatorFactory cteOperatorFactory = new CommonTableExpressionOperatorFactory(context.getNextOperatorId(),
+                    node.getId(),
+                    cteCtx,
+                    outputTypes,
+                    getFilterAndProjectMinOutputPageSize(session),
+                    getFilterAndProjectMinOutputPageRowCount(session));
+
+            cteOperatorFactory.addConsumer(context.getConsumerId());
+
+            context.cteOperationMap.put(node.getId(), cteOperatorFactory);
+            if (source == null) {
+                return new PhysicalOperation(cteOperatorFactory,
+                        makeLayout(node),
+                        context,
+                        UNGROUPED_EXECUTION);
+            }
+
+            return new PhysicalOperation(cteOperatorFactory,
+                    source.getLayout(),
+                    context,
+                    source);
+        }
+
+        @Override
         public PhysicalOperation visitCreateIndex(CreateIndexNode node, LocalExecutionPlanContext context)
         {
             PhysicalOperation source = node.getSource().accept(this, context);
@@ -1302,6 +1431,10 @@ public class LocalExecutionPlanner
                         assignments,
                         outputSymbols);
             }
+//            else if (sourceNode instanceof CTEScanNode) {
+//                CTEScanNode cteScanNode = (CTEScanNode) sourceNode;
+//                return createCTEScanFactory(cteScanNode, context, outputSymbols);
+//            }
             else {
                 // plan source
                 source = sourceNode.accept(this, context);

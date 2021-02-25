@@ -140,6 +140,8 @@ class QueryPlanner
     private final TypeCoercion typeCoercion;
     private final Session session;
     private final SubqueryPlanner subqueryPlanner;
+    private final Map<QualifiedName, Integer> namedSubPlan;
+    private final UniqueIdAllocator uniqueIdAllocator;
 
     QueryPlanner(
             Analysis analysis,
@@ -147,7 +149,9 @@ class QueryPlanner
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
-            Session session)
+            Session session,
+            Map<QualifiedName, Integer> namedSubPlan,
+            UniqueIdAllocator uniqueIdAllocator)
     {
         requireNonNull(analysis, "analysis is null");
         requireNonNull(planSymbolAllocator, "symbolAllocator is null");
@@ -164,6 +168,8 @@ class QueryPlanner
         this.typeCoercion = new TypeCoercion(metadata::getType);
         this.session = session;
         this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session);
+        this.namedSubPlan = namedSubPlan;
+        this.uniqueIdAllocator = uniqueIdAllocator;
     }
 
     public RelationPlan plan(Query query)
@@ -514,7 +520,7 @@ class QueryPlanner
 
     private PlanBuilder planQueryBody(Query query)
     {
-        RelationPlan relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+        RelationPlan relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator)
                 .process(query.getQueryBody(), null);
 
         return planBuilderFor(relationPlan);
@@ -525,7 +531,7 @@ class QueryPlanner
         RelationPlan relationPlan;
 
         if (node.getFrom().isPresent()) {
-            relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+            relationPlan = new RelationPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator)
                     .process(node.getFrom().get(), null);
         }
         else {

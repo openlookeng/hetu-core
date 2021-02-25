@@ -370,7 +370,7 @@ public class Driver
                 Operator next = activeOperators.get(i + 1);
 
                 // skip blocked operator
-                if (getBlockedFuture(current).isPresent()) {
+                if (!(current instanceof CommonTableExpressionOperator) && getBlockedFuture(current).isPresent()) {
                     continue;
                 }
 

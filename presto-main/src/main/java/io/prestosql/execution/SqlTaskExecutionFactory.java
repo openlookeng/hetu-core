@@ -19,13 +19,17 @@ import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.buffer.OutputBuffer;
 import io.prestosql.execution.executor.TaskExecutor;
 import io.prestosql.memory.QueryContext;
+import io.prestosql.operator.CommonTableExecutionContext;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.Executor;
 
@@ -60,14 +64,16 @@ public class SqlTaskExecutionFactory
         this.cpuTimerEnabled = config.isTaskCpuTimerEnabled();
     }
 
-    public SqlTaskExecution create(Session session, QueryContext queryContext, TaskStateMachine taskStateMachine, OutputBuffer outputBuffer, PlanFragment fragment, List<TaskSource> sources, OptionalInt totalPartitions)
+    public SqlTaskExecution create(Session session, QueryContext queryContext, TaskStateMachine taskStateMachine, OutputBuffer outputBuffer, PlanFragment fragment, List<TaskSource> sources, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
+                                        Map<String, CommonTableExecutionContext> cteCtx)
     {
         TaskContext taskContext = queryContext.addTaskContext(
                 taskStateMachine,
                 session,
                 perOperatorCpuTimerEnabled,
                 cpuTimerEnabled,
-                totalPartitions);
+                totalPartitions,
+                consumer);
 
         LocalExecutionPlan localExecutionPlan;
         try (SetThreadName ignored = new SetThreadName("Task-%s", taskStateMachine.getTaskId())) {
@@ -79,7 +85,10 @@ public class SqlTaskExecutionFactory
                         fragment.getPartitioningScheme(),
                         fragment.getStageExecutionDescriptor(),
                         fragment.getPartitionedSources(),
-                        outputBuffer);
+                        outputBuffer,
+                        fragment.getProducerCTEId(),
+                        fragment.getProducerCTEParentId(),
+                        cteCtx);
             }
             catch (Throwable e) {
                 // planning failed

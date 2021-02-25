@@ -76,6 +76,7 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -373,6 +374,8 @@ public class PlanPrinter
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), plan.getOutputSymbols()),
                 ungroupedExecution(),
                 StatsAndCosts.empty(),
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
         return GraphvizPrinter.printLogical(ImmutableList.of(fragment));
     }
@@ -1242,6 +1245,13 @@ public class PlanPrinter
                             node.getCorrelation(),
                             node.getFilter().equals(TRUE_LITERAL) ? "" : " " + node.getFilter()));
 
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitCTEScan(CTEScanNode node, Void context)
+        {
+            addNode(node, "CTEScan[CTE = " + node.getCteRefName() + "]");
             return processChildren(node, context);
         }
 

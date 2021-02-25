@@ -56,6 +56,7 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.VariableReferenceSymbolConverter;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -639,6 +640,12 @@ public class UnaliasSymbolReferences
             PlanNode source = context.rewrite(node.getSource());
             SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source);
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Void> context)
+        {
+            return node;
         }
 
         @Override

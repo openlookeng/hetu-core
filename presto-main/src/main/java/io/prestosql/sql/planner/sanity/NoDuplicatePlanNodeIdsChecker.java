@@ -20,6 +20,7 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +38,7 @@ public class NoDuplicatePlanNodeIdsChecker
     {
         Map<PlanNodeId, PlanNode> planNodeIds = new HashMap<>();
         searchFrom(planNode)
+                .recurseOnlyWhen(CTEScanNode::isNotCTEScanNode)
                 .findAll()
                 .forEach(node -> planNodeIds.merge(node.getId(), node, this::reportDuplicateId));
     }

@@ -40,6 +40,7 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -677,6 +678,13 @@ public class AddLocalExchanges
             PlanWithProperties index = new PlanWithProperties(node.getIndexSource(), indexStreamProperties);
 
             return rebaseAndDeriveProperties(node, ImmutableList.of(probe, index));
+        }
+
+        @Override
+        public PlanWithProperties visitCTEScan(CTEScanNode node, StreamPreferredProperties parentPreferences)
+        {
+            PlanWithProperties planWithProperties = visitPlan(node, parentPreferences);
+            return planWithProperties;
         }
 
         //
