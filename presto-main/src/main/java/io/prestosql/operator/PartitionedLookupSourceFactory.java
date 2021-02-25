@@ -22,6 +22,7 @@ import io.prestosql.operator.LookupSourceProvider.LookupSourceLease;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.Type;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -105,6 +106,21 @@ public final class PartitionedLookupSourceFactory
      * the prolong time, and other threads would not be able to insert new (cached) lookup sources in this map, harming work concurrency.
      */
     private final ConcurrentHashMap<SpillAwareLookupSourceProvider, LookupSource> suppliedLookupSources = new ConcurrentHashMap<>();
+
+    /**
+     * Snapshot: For right/full outer join, the lookup-outer operator, to receive markers
+     */
+    private LookupOuterOperator lookupOuterOperator;
+
+    /**
+     * Snapshot: If markers are received before lookup-outer operator is set, then keep them here
+     */
+    private final List<Marker> pendingMarkers = new ArrayList<>();
+
+    /**
+     * Snapshot: If resuming happened before lookupSourceSupplier is created, then store it here, and use it to initialize lookupSourceSupplier
+     */
+    private Object restoredJoinPositions;
 
     public PartitionedLookupSourceFactory(List<Type> types, List<Type> outputTypes, List<Type> hashChannelTypes, int partitionCount, Map<Symbol, Integer> layout, boolean outer)
     {
@@ -244,7 +260,7 @@ public final class PartitionedLookupSourceFactory
                 verify(!completed, "lookupSourceSupplier already exist when completing");
                 verify(!outer, "It is not possible to reset lookupSourceSupplier which is tracking for outer join");
                 verify(partitions.length > 1, "Spill occurred when only one partition");
-                lookupSourceSupplier = createPartitionedLookupSourceSupplier(ImmutableList.copyOf(partitions), hashChannelTypes, outer);
+                lookupSourceSupplier = createPartitionedLookupSourceSupplier(ImmutableList.copyOf(partitions), hashChannelTypes, outer, restoredJoinPositions);
                 closeCachedLookupSources();
             }
             else {
@@ -277,10 +293,10 @@ public final class PartitionedLookupSourceFactory
 
             if (partitionsSet != 1) {
                 List<Supplier<LookupSource>> partitions = ImmutableList.copyOf(this.partitions);
-                this.lookupSourceSupplier = createPartitionedLookupSourceSupplier(partitions, hashChannelTypes, outer);
+                this.lookupSourceSupplier = createPartitionedLookupSourceSupplier(partitions, hashChannelTypes, outer, restoredJoinPositions);
             }
             else if (outer) {
-                this.lookupSourceSupplier = createOuterLookupSourceSupplier(partitions[0]);
+                this.lookupSourceSupplier = createOuterLookupSourceSupplier(partitions[0], restoredJoinPositions);
             }
             else {
                 checkState(!spillingInfo.hasSpilled(), "Spill not supported when there is single partition");
@@ -607,6 +623,94 @@ public final class PartitionedLookupSourceFactory
         IntPredicate getSpillMask()
         {
             return spilledPartitions::contains;
+        }
+    }
+
+    private static class Marker
+    {
+        private MarkerPage markerPage;
+        private int totalDrivers;
+        private Integer driverId;
+
+        private Marker(MarkerPage markerPage, int totalDrivers, Integer driverId)
+        {
+            this.markerPage = markerPage;
+            this.totalDrivers = totalDrivers;
+            this.driverId = driverId;
+        }
+    }
+
+    @Override
+    public synchronized void setLookupOuterOperator(LookupOuterOperator operator)
+    {
+        checkState(outer && lookupOuterOperator == null, "Multiple lookup outer operators for same lookup source");
+        lookupOuterOperator = operator;
+        for (Marker marker : pendingMarkers) {
+            if (marker.driverId == null) {
+                operator.processMarkerForTableScan(marker.markerPage);
+            }
+            else {
+                operator.processMarkerForExchange(marker.markerPage, marker.totalDrivers, marker.driverId);
+            }
+        }
+    }
+
+    @Override
+    public synchronized void processMarkerForTableScanOuterJoin(MarkerPage markerPage)
+    {
+        if (lookupOuterOperator != null) {
+            lookupOuterOperator.processMarkerForTableScan(markerPage);
+        }
+        else if (outer) {
+            pendingMarkers.add(new Marker(markerPage, 0, null));
+        }
+    }
+
+    @Override
+    public synchronized void processMarkerForExchangeOuterJoin(MarkerPage markerPage, int totalDrivers, int driverId)
+    {
+        if (lookupOuterOperator != null) {
+            lookupOuterOperator.processMarkerForExchange(markerPage, totalDrivers, driverId);
+        }
+        else if (outer) {
+            pendingMarkers.add(new Marker(markerPage, totalDrivers, driverId));
+        }
+    }
+
+    @Override
+    public Object captureJoinPositions()
+    {
+        lock.readLock().lock();
+        try {
+            if (lookupSourceSupplier != null) {
+                return lookupSourceSupplier.captureJoinPositions();
+            }
+        }
+        finally {
+            lock.readLock().unlock();
+        }
+        return 0;
+    }
+
+    @Override
+    public void restoreJoinPositions(Object state)
+    {
+        if (state.getClass() == Integer.class) {
+            return; // lookupSourceSupplier was not ready when the state was capture
+        }
+
+        lock.writeLock().lock();
+        try {
+            if (lookupSourceSupplier != null) {
+                lookupSourceSupplier.restoreJoinPositions(state);
+            }
+            else {
+                // Will use this to construct the supplier
+                restoredJoinPositions = state;
+            }
+        }
+        finally {
+            lock.writeLock().unlock();
         }
     }
 }

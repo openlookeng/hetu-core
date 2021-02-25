@@ -130,13 +130,17 @@ public class HashSemiJoinOperator
     @Override
     public ListenableFuture<?> isBlocked()
     {
+        if (snapshotState != null && allowMarker()) {
+            return NOT_BLOCKED;
+        }
+
         return channelSetFuture;
     }
 
     @Override
     public boolean needsInput()
     {
-        if (finishing || outputPage != null) {
+        if (!allowMarker()) {
             return false;
         }
 
@@ -144,6 +148,12 @@ public class HashSemiJoinOperator
             channelSet = tryGetFutureValue(channelSetFuture).orElse(null);
         }
         return channelSet != null;
+    }
+
+    @Override
+    public boolean allowMarker()
+    {
+        return !finishing && outputPage == null;
     }
 
     @Override

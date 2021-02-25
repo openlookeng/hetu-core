@@ -47,6 +47,9 @@ public class LookupJoinOperatorFactory
     private final OptionalInt totalOperatorsCount;
     private final HashGenerator probeHashGenerator;
     private final PartitioningSpillerFactory partitioningSpillerFactory;
+    // Snapshot: if forked (in a pipeline that starts with a LookupOuterOperator),
+    // then LookupJoinOperator will not forward marker to LookupOuter that corresponds to this operator.
+    private final boolean forked;
 
     private boolean closed;
 
@@ -64,6 +67,7 @@ public class LookupJoinOperatorFactory
             OptionalInt probeHashChannel,
             PartitioningSpillerFactory partitioningSpillerFactory)
     {
+        this.forked = false;
         this.operatorId = operatorId;
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
         this.probeTypes = ImmutableList.copyOf(requireNonNull(probeTypes, "probeTypes is null"));
@@ -109,6 +113,7 @@ public class LookupJoinOperatorFactory
         requireNonNull(other, "other is null");
         checkArgument(!other.closed, "cannot duplicated closed OperatorFactory");
 
+        forked = true;
         operatorId = other.operatorId;
         planNodeId = other.planNodeId;
         probeTypes = other.probeTypes;
@@ -143,6 +148,7 @@ public class LookupJoinOperatorFactory
         joinBridgeManager.probeOperatorCreated(driverContext.getLifespan());
         return new LookupJoinOperator(
                 operatorContext,
+                forked,
                 probeTypes,
                 buildOutputTypes,
                 joinType,
@@ -178,5 +184,10 @@ public class LookupJoinOperatorFactory
     public Optional<OuterOperatorFactoryResult> createOuterOperatorFactory()
     {
         return outerOperatorFactoryResult;
+    }
+
+    public LookupSourceFactory getLookupSourceFactory(Lifespan lifespan)
+    {
+        return joinBridgeManager.getJoinBridge(lifespan);
     }
 }

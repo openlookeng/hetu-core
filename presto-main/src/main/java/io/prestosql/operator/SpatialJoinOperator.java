@@ -207,7 +207,13 @@ public class SpatialJoinOperator
     @Override
     public boolean needsInput()
     {
-        return !finished && pagesSpatialIndexFuture.isDone() && !pageBuilder.isFull() && probe == null;
+        return allowMarker() && pagesSpatialIndexFuture.isDone();
+    }
+
+    @Override
+    public boolean allowMarker()
+    {
+        return !finished && !pageBuilder.isFull() && probe == null;
     }
 
     @Override

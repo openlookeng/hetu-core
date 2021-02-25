@@ -124,6 +124,11 @@ public class HashBuilderOperator
 
             PartitionedLookupSourceFactory lookupSourceFactory = this.lookupSourceFactoryManager.getJoinBridge(driverContext.getLifespan());
             int partitionIndex = getAndIncrementPartitionIndex(driverContext.getLifespan());
+            // Snapshot: make driver ID and source/partition index the same, to ensure consistency before and after resuming.
+            // LocalExchangeSourceOperator also uses the same mechanism to ensure consistency.
+            if (operatorContext.isSnapshotEnabled()) {
+                partitionIndex = driverContext.getDriverId();
+            }
             verify(partitionIndex < lookupSourceFactory.partitions());
             return new HashBuilderOperator(
                     operatorContext,

@@ -160,13 +160,17 @@ public class NestedLoopJoinOperator
     @Override
     public ListenableFuture<?> isBlocked()
     {
+        if (snapshotState != null && allowMarker()) {
+            return NOT_BLOCKED;
+        }
+
         return nestedLoopJoinPagesFuture;
     }
 
     @Override
     public boolean needsInput()
     {
-        if (finishing || probePage != null) {
+        if (!allowMarker()) {
             return false;
         }
 
@@ -177,6 +181,12 @@ public class NestedLoopJoinOperator
             }
         }
         return buildPages != null;
+    }
+
+    @Override
+    public boolean allowMarker()
+    {
+        return !finishing && probePage == null;
     }
 
     @Override

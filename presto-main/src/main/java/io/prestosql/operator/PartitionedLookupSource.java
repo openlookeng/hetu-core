@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.Integer.numberOfTrailingZeros;
@@ -41,10 +42,11 @@ import static java.lang.Math.toIntExact;
 public class PartitionedLookupSource
         implements LookupSource
 {
-    public static TrackingLookupSourceSupplier createPartitionedLookupSourceSupplier(List<Supplier<LookupSource>> partitions, List<Type> hashChannelTypes, boolean outer)
+    public static TrackingLookupSourceSupplier createPartitionedLookupSourceSupplier(List<Supplier<LookupSource>> partitions,
+            List<Type> hashChannelTypes, boolean outer, Object restoredJoinPositions)
     {
         if (outer) {
-            OuterPositionTracker.Factory outerPositionTrackerFactory = new OuterPositionTracker.Factory(partitions);
+            OuterPositionTracker.Factory outerPositionTrackerFactory = new OuterPositionTracker.Factory(partitions, restoredJoinPositions);
 
             return new TrackingLookupSourceSupplier()
             {
@@ -63,6 +65,18 @@ public class PartitionedLookupSource
                 public OuterPositionIterator getOuterPositionIterator()
                 {
                     return outerPositionTrackerFactory.getOuterPositionIterator();
+                }
+
+                @Override
+                public Object captureJoinPositions()
+                {
+                    return outerPositionTrackerFactory.captureJoinPositions();
+                }
+
+                @Override
+                public void restoreJoinPositions(Object state)
+                {
+                    outerPositionTrackerFactory.restoreJoinPositions(state);
                 }
             };
         }
@@ -281,17 +295,22 @@ public class PartitionedLookupSource
             private final AtomicBoolean finished = new AtomicBoolean();
             private final AtomicLong referenceCount = new AtomicLong();
 
-            public Factory(List<Supplier<LookupSource>> partitions)
+            public Factory(List<Supplier<LookupSource>> partitions, Object restoredJoinPositions)
             {
                 this.lookupSources = partitions.stream()
                         .map(Supplier::get)
                         .toArray(LookupSource[]::new);
 
-                visitedPositions = Arrays.stream(this.lookupSources)
-                        .map(LookupSource::getJoinPositionCount)
-                        .map(Math::toIntExact)
-                        .map(boolean[]::new)
-                        .toArray(boolean[][]::new);
+                if (restoredJoinPositions != null) {
+                    visitedPositions = (boolean[][]) restoredJoinPositions;
+                }
+                else {
+                    visitedPositions = Arrays.stream(this.lookupSources)
+                            .map(LookupSource::getJoinPositionCount)
+                            .map(Math::toIntExact)
+                            .map(boolean[]::new)
+                            .toArray(boolean[][]::new);
+                }
             }
 
             public OuterPositionTracker create()
@@ -305,6 +324,20 @@ public class PartitionedLookupSource
                 verify(referenceCount.get() == 0);
                 finished.set(true);
                 return new PartitionedLookupOuterPositionIterator(lookupSources, visitedPositions);
+            }
+
+            public Object captureJoinPositions()
+            {
+                return visitedPositions;
+            }
+
+            public void restoreJoinPositions(Object state)
+            {
+                boolean[][] joinPositions = (boolean[][]) state;
+                for (int i = 0; i < joinPositions.length; i++) {
+                    checkState(joinPositions[i].length == visitedPositions[i].length);
+                    System.arraycopy(joinPositions[i], 0, visitedPositions[i], 0, joinPositions[i].length);
+                }
             }
         }
 

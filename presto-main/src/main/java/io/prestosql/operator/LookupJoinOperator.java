@@ -24,6 +24,7 @@ import io.prestosql.operator.exchange.LocalPartitionGenerator;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpiller;
@@ -64,6 +65,9 @@ public class LookupJoinOperator
         implements Operator
 {
     private final OperatorContext operatorContext;
+    // Snapshot: if forked (in a pipeline that starts with a LookupOuterOperator),
+    // then don't forward marker to LookupOuter that corresponds to this operator.
+    private final boolean forked;
     private final List<Type> probeTypes;
     private final JoinProbeFactory joinProbeFactory;
     private final Runnable afterClose;
@@ -110,6 +114,7 @@ public class LookupJoinOperator
 
     public LookupJoinOperator(
             OperatorContext operatorContext,
+            boolean forked,
             List<Type> probeTypes,
             List<Type> buildOutputTypes,
             JoinType joinType,
@@ -121,6 +126,7 @@ public class LookupJoinOperator
             PartitioningSpillerFactory partitioningSpillerFactory)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.forked = forked;
         this.probeTypes = ImmutableList.copyOf(requireNonNull(probeTypes, "probeTypes is null"));
 
         requireNonNull(joinType, "joinType is null");
@@ -191,14 +197,24 @@ public class LookupJoinOperator
             return NOT_BLOCKED;
         }
 
+        if (snapshotState != null && allowMarker()) {
+            return NOT_BLOCKED;
+        }
+
         return lookupSourceProviderFuture;
     }
 
     @Override
     public boolean needsInput()
     {
+        return allowMarker()
+                && lookupSourceProviderFuture.isDone();
+    }
+
+    @Override
+    public boolean allowMarker()
+    {
         return !finishing
-                && lookupSourceProviderFuture.isDone()
                 && spillInProgress.isDone()
                 && probe == null
                 && outputPage == null;
@@ -209,6 +225,18 @@ public class LookupJoinOperator
     {
         requireNonNull(page, "page is null");
         checkState(probe == null, "Current page has not been completely processed yet");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                // See Gitee issue Checkpoint - handle LookupOuterOperator pipelines
+                // https://gitee.com/open_lookeng/dashboard/issues?id=I2LMIW
+                // For non-table-scan pipelines with outer-join, ask lookup-outer to process marker
+                if (!forked) {
+                    lookupSourceFactory.processMarkerForExchangeOuterJoin((MarkerPage) page, lookupJoinsCount.orElse(1), operatorContext.getDriverContext().getDriverId());
+                }
+                return;
+            }
+        }
 
         checkState(tryFetchLookupSourceProvider(), "Not ready to handle input yet");
 

@@ -23,6 +23,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -31,9 +32,9 @@ import static java.util.Objects.requireNonNull;
 public final class OuterLookupSource
         implements LookupSource
 {
-    public static TrackingLookupSourceSupplier createOuterLookupSourceSupplier(Supplier<LookupSource> lookupSourceSupplier)
+    public static TrackingLookupSourceSupplier createOuterLookupSourceSupplier(Supplier<LookupSource> lookupSourceSupplier, Object restoredJoinPositions)
     {
-        return new OuterLookupSourceSupplier(lookupSourceSupplier);
+        return new OuterLookupSourceSupplier(lookupSourceSupplier, restoredJoinPositions);
     }
 
     private final LookupSource lookupSource;
@@ -151,10 +152,10 @@ public final class OuterLookupSource
         private final Supplier<LookupSource> lookupSourceSupplier;
         private final OuterPositionTracker outerPositionTracker;
 
-        public OuterLookupSourceSupplier(Supplier<LookupSource> lookupSourceSupplier)
+        public OuterLookupSourceSupplier(Supplier<LookupSource> lookupSourceSupplier, Object restoredJoinPositions)
         {
             this.lookupSourceSupplier = requireNonNull(lookupSourceSupplier, "lookupSourceSupplier is null");
-            this.outerPositionTracker = new OuterPositionTracker(lookupSourceSupplier);
+            this.outerPositionTracker = new OuterPositionTracker(lookupSourceSupplier, restoredJoinPositions);
         }
 
         @Override
@@ -166,6 +167,18 @@ public final class OuterLookupSource
         public OuterPositionIterator getOuterPositionIterator()
         {
             return outerPositionTracker.getOuterPositionIterator();
+        }
+
+        @Override
+        public Object captureJoinPositions()
+        {
+            return outerPositionTracker.captureJoinPositions();
+        }
+
+        @Override
+        public void restoreJoinPositions(Object state)
+        {
+            outerPositionTracker.restoreJoinPositions(state);
         }
     }
 
@@ -180,12 +193,16 @@ public final class OuterLookupSource
         @GuardedBy("this")
         private boolean finished;
 
-        public OuterPositionTracker(Supplier<LookupSource> lookupSourceSupplier)
+        public OuterPositionTracker(Supplier<LookupSource> lookupSourceSupplier, Object restoredJoinPositions)
         {
             this.lookupSourceSupplier = lookupSourceSupplier;
-
-            try (LookupSource lookupSource = lookupSourceSupplier.get()) {
-                this.visitedPositions = new boolean[toIntExact(lookupSource.getJoinPositionCount())];
+            if (restoredJoinPositions != null) {
+                this.visitedPositions = (boolean[]) restoredJoinPositions;
+            }
+            else {
+                try (LookupSource lookupSource = lookupSourceSupplier.get()) {
+                    this.visitedPositions = new boolean[toIntExact(lookupSource.getJoinPositionCount())];
+                }
             }
         }
 
@@ -199,6 +216,18 @@ public final class OuterLookupSource
         {
             finished = true;
             return new SharedLookupOuterPositionIterator(lookupSourceSupplier.get(), visitedPositions);
+        }
+
+        public Object captureJoinPositions()
+        {
+            return visitedPositions;
+        }
+
+        public void restoreJoinPositions(Object state)
+        {
+            boolean[] joinPositions = (boolean[]) state;
+            checkState(joinPositions.length == visitedPositions.length);
+            System.arraycopy(joinPositions, 0, visitedPositions, 0, joinPositions.length);
         }
     }
 }
