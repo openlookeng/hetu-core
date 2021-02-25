@@ -7,7 +7,7 @@ openLooKeng在查询运行时，依靠join条件以及build侧读出的数据，
 openLooKeng动态过滤主要应用于高选择性的join场景（包含针对分区表的分区裁剪以及非分区表的行过滤）。openLooKeng动态过滤当前适用于`inner join`，`semi join` 以及`right join`场景，适用于`Hive connector`，`DC connector`以及`Memory connector`。
 
 ## 使用
-openLooKeng动态过滤特性依赖于分布式缓存组件，请参考[Configuring HA](../installation/deployment-ha.md)章节配置`Hazelcast`。
+openLooKeng动态过滤特性依赖于分布式缓存组件，请参考[State Store](state-store.md)章节配置。
 
 在`/etc/config.properties`需要配置如下参数
 

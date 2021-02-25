@@ -7,8 +7,8 @@ openLooKeng generates dynamic filter conditions based on join conditions and dat
 The dynamic filtering is primarily used to optimize the highly selective join scenarios (including dynamic partition pruning for large partitioned tables and row filtering for non-partitioned tables). openLooKeng dynamic filtering is currently applicable to `inner join`, `semi join` and `right join` scenarios, only can be applied to `Hive connector`, `DC connector` and `Memory connector`.
 
 ## Usage
-openLooKeng dynamic filtering feature depends on the distributed cache component. Please refer to the section [Configuring HA](../installation/deployment-ha.md) to configure `hazelcast`.
-In `/etc/config.properties`, yhe following parameters need to be configured.
+openLooKeng dynamic filtering feature depends on the distributed cache component. Please refer to the section [State Store](state-store.md) for specific configuration on state store.
+In `/etc/config.properties`, the following parameters need to be configured.
 
 ``` properties
 enable-dynamic-filtering=true
