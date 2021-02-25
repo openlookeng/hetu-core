@@ -23,13 +23,17 @@ import io.prestosql.operator.PartitionFunction;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -45,6 +49,8 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
+@RestorableConfig(uncapturedFields = {"types", "partitionFunction", "closer",
+        "spillerFactory", "spillContext", "memoryContext", "pageBuilders"})
 public class GenericPartitioningSpiller
         implements PartitioningSpiller
 {
@@ -194,5 +200,45 @@ public class GenericPartitioningSpiller
             throws IOException
     {
         closer.close();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GenericPartitioningSpillerState myState = new GenericPartitioningSpillerState();
+        myState.spilledPartitions = spilledPartitions;
+        myState.readingStarted = readingStarted;
+        myState.spillers = new ArrayList<>(Collections.nCopies(spillers.size(), null));
+        for (int i = 0; i < spillers.size(); i++) {
+            if (spillers.get(i).isPresent()) {
+                myState.spillers.set(i, spillers.get(i).get().capture(serdeProvider));
+            }
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        GenericPartitioningSpillerState myState = (GenericPartitioningSpillerState) state;
+        this.readingStarted = myState.readingStarted;
+        for (int partition : myState.spilledPartitions) {
+            this.spilledPartitions.add(partition);
+        }
+        for (int i = 0; i < spillers.size(); i++) {
+            if (myState.spillers.get(i) != null) {
+                SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()));
+                spiller.restore(myState.spillers.get(i), serdeProvider);
+                this.spillers.set(i, Optional.of(closer.register(spiller)));
+            }
+        }
+    }
+
+    private static class GenericPartitioningSpillerState
+            implements Serializable
+    {
+        Set<Integer> spilledPartitions;
+        boolean readingStarted;
+        List<Object> spillers;
     }
 }

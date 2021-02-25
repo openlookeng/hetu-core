@@ -17,6 +17,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.operator.OperationTimer.OperationTiming;
@@ -32,6 +33,8 @@ import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -115,8 +118,8 @@ public class TableFinishOperator
     private State state = State.RUNNING;
     private long rowCount;
     private Optional<ConnectorOutputMetadata> outputMetadata = Optional.empty();
-    private final ImmutableList.Builder<Slice> fragmentBuilder = ImmutableList.builder();
-    private final ImmutableList.Builder<ComputedStatistics> computedStatisticsBuilder = ImmutableList.builder();
+    private final List<Slice> fragment = new ArrayList<>();
+    private final List<ComputedStatistics> computedStatistics = new ArrayList<>();
 
     private final OperationTiming statisticsTiming = new OperationTiming();
     private final boolean statisticsCpuTimerEnabled;
@@ -201,7 +204,7 @@ public class TableFinishOperator
                 rowCount += BIGINT.getLong(rowCountBlock, position);
             }
             if (!fragmentBlock.isNull(position)) {
-                fragmentBuilder.add(VARBINARY.getSlice(fragmentBlock, position));
+                fragment.add(VARBINARY.getSlice(fragmentBlock, position));
             }
         }
 
@@ -303,7 +306,7 @@ public class TableFinishOperator
                 return null;
             }
             for (int position = 0; position < page.getPositionCount(); position++) {
-                computedStatisticsBuilder.add(getComputedStatistics(page, position));
+                computedStatistics.add(getComputedStatistics(page, position));
             }
             return null;
         }
@@ -313,7 +316,7 @@ public class TableFinishOperator
         }
         state = State.FINISHED;
 
-        outputMetadata = tableFinisher.finishTable(fragmentBuilder.build(), computedStatisticsBuilder.build());
+        outputMetadata = tableFinisher.finishTable(ImmutableList.copyOf(fragment), ImmutableList.copyOf(computedStatistics));
 
         // output page will only be constructed once,
         // so a new PageBuilder is constructed (instead of using PageBuilder.reset)
@@ -372,12 +375,51 @@ public class TableFinishOperator
     @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
-        return operatorContext.capture(serdeProvider);
+        TableFinishOperatorState myState = new TableFinishOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.statisticsAggregationOperator = statisticsAggregationOperator.capture(serdeProvider);
+        myState.state = state.toString();
+        myState.rowCount = rowCount;
+        myState.fragment = new byte[fragment.size()][];
+        for (int i = 0; i < fragment.size(); i++) {
+            myState.fragment[i] = fragment.get(i).getBytes();
+        }
+        myState.computedStatistics = new Object[computedStatistics.size()];
+        for (int i = 0; i < computedStatistics.size(); i++) {
+            myState.computedStatistics[i] = computedStatistics.get(i).capture(serdeProvider);
+        }
+        myState.statisticsTiming = statisticsTiming.capture(serdeProvider);
+        return myState;
     }
 
     @Override
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
-        operatorContext.restore(state, serdeProvider);
+        TableFinishOperatorState myState = (TableFinishOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.statisticsAggregationOperator.restore(myState.statisticsAggregationOperator, serdeProvider);
+        this.state = State.valueOf(myState.state);
+        this.rowCount = myState.rowCount;
+        this.fragment.clear();
+        for (int i = 0; i < myState.fragment.length; i++) {
+            fragment.add(Slices.wrappedBuffer(myState.fragment[i]));
+        }
+        this.computedStatistics.clear();
+        for (int i = 0; i < myState.computedStatistics.length; i++) {
+            computedStatistics.add(ComputedStatistics.restoreComputedStatistics(myState.computedStatistics[i], serdeProvider));
+        }
+        this.statisticsTiming.restore(myState.statisticsTiming, serdeProvider);
+    }
+
+    private static class TableFinishOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object statisticsAggregationOperator;
+        private String state;
+        private long rowCount;
+        private byte[][] fragment;
+        private Object[] computedStatistics;
+        private Object statisticsTiming;
     }
 }

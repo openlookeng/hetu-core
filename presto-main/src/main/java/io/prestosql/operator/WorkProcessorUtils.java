@@ -18,16 +18,21 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.operator.WorkProcessor.Transformation;
 import io.prestosql.operator.WorkProcessor.TransformationState;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -95,28 +100,74 @@ public final class WorkProcessorUtils
         }
     }
 
+    // Snapshot: currently the work process created by this utility only captures the position in the iterator.
+    // It's assumed the caller is responsible for capturing any state inside elements in the iterator.
     static <T> WorkProcessor<T> fromIterator(Iterator<T> iterator)
     {
         requireNonNull(iterator, "iterator is null");
-        return create(() -> {
-            if (!iterator.hasNext()) {
-                return ProcessState.finished();
-            }
+        return create(
+                new WorkProcessor.Process<T>()
+                {
+                    @RestorableConfig(uncapturedFields = {"val$iterator"})
+                    private final RestorableConfig restorableConfig = null;
 
-            return ProcessState.ofResult(iterator.next());
-        });
+                    int position;
+
+                    @Override
+                    public ProcessState<T> process()
+                    {
+                        if (!iterator.hasNext()) {
+                            return ProcessState.finished();
+                        }
+
+                        position++;
+                        return ProcessState.ofResult(iterator.next());
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return position;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        this.position = (int) state;
+                        for (int i = 0; i < position; i++) {
+                            iterator.next();
+                        }
+                    }
+
+                    @Override
+                    public Object captureResult(@NotNull T result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        checkArgument(iterator instanceof WorkProcessor.RestorableIterator);
+                        return ((WorkProcessor.RestorableIterator) iterator).captureResult(result, serdeProvider);
+                    }
+
+                    @Override
+                    public T restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        checkArgument(iterator instanceof WorkProcessor.RestorableIterator);
+                        return (T) ((WorkProcessor.RestorableIterator) iterator).restoreResult(resultState, serdeProvider);
+                    }
+                });
     }
 
-    static <T> WorkProcessor<T> mergeSorted(Iterable<WorkProcessor<T>> processorIterable, Comparator<T> comparator)
+    static <T> WorkProcessor<T> mergeSorted(List<WorkProcessor<T>> processorList, Comparator<T> comparator)
     {
         requireNonNull(comparator, "comparator is null");
-        Iterator<WorkProcessor<T>> processorIterator = requireNonNull(processorIterable, "processorIterable is null").iterator();
-        checkArgument(processorIterator.hasNext(), "There must be at least one base processor");
+        checkArgument(processorList.size() > 0, "There must be at least one base processor");
         PriorityQueue<ElementAndProcessor<T>> queue = new PriorityQueue<>(2, comparing(ElementAndProcessor::getElement, comparator));
 
         return create(new WorkProcessor.Process<T>()
         {
-            WorkProcessor<T> processor = requireNonNull(processorIterator.next());
+            @RestorableConfig(stateClassName = "MergeSortedState", uncapturedFields = {"val$queue"})
+            private final RestorableConfig restorableConfig = null;
+
+            int nextProcessor;
+            WorkProcessor<T> processor = requireNonNull(processorList.get(nextProcessor++));
 
             @Override
             public ProcessState<T> process()
@@ -134,12 +185,13 @@ public final class WorkProcessorUtils
                         return ProcessState.yield();
                     }
 
-                    if (processorIterator.hasNext()) {
-                        processor = requireNonNull(processorIterator.next());
+                    if (nextProcessor < processorList.size()) {
+                        processor = requireNonNull(processorList.get(nextProcessor++));
                         continue;
                     }
 
                     if (queue.isEmpty()) {
+                        processor = null;
                         return ProcessState.finished();
                     }
 
@@ -148,7 +200,71 @@ public final class WorkProcessorUtils
                     return ProcessState.ofResult(elementAndProcessor.getElement());
                 }
             }
+
+            @Override
+            public Object capture(BlockEncodingSerdeProvider serdeProvider)
+            {
+                MergeSortedState myState = new MergeSortedState();
+                myState.processorList = new Object[processorList.size()];
+                for (int i = 0; i < processorList.size(); i++) {
+                    myState.processorList[i] = processorList.get(i).capture(serdeProvider);
+                }
+                myState.nextProcessor = nextProcessor;
+                //Record which processors are in queue
+                myState.queueProcessorIndex = new ArrayList<>();
+                for (ElementAndProcessor enp : queue) {
+                    myState.queueProcessorIndex.add(processorList.indexOf(enp.processor));
+                }
+                myState.processor = processorList.indexOf(processor);
+                return myState;
+            }
+
+            @Override
+            public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+            {
+                MergeSortedState myState = (MergeSortedState) state;
+                checkArgument(myState.processorList.length == processorList.size());
+                for (int i = 0; i < myState.processorList.length; i++) {
+                    processorList.get(i).restore(myState.processorList[i], serdeProvider);
+                }
+                nextProcessor = myState.nextProcessor;
+                queue.clear();
+                for (Integer queueProcessorIndex : myState.queueProcessorIndex) {
+                    checkArgument(queueProcessorIndex < processorList.size(), "Processor index exceeded processor list.");
+                    queue.add(new ElementAndProcessor<>(processorList.get(queueProcessorIndex).getResult(), processorList.get(queueProcessorIndex)));
+                }
+                this.processor = processorList.get(myState.processor);
+            }
+
+            @Override
+            public Object captureResult(T result, BlockEncodingSerdeProvider serdeProvider)
+            {
+                for (int i = 0; i < processorList.size(); i++) {
+                    if (((ProcessWorkProcessor) processorList.get(i)).state.getType() == ProcessState.Type.RESULT && processorList.get(i).getResult() == result) {
+                        return i;
+                    }
+                }
+                throw new IllegalArgumentException("Unable to capture result.");
+            }
+
+            @Override
+            public T restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+            {
+                checkArgument(((int) resultState) < processorList.size());
+                ProcessWorkProcessor<T> targetProcessor = (ProcessWorkProcessor) processorList.get((int) resultState);
+                checkArgument(targetProcessor.state != null && targetProcessor.state.getType() == ProcessState.Type.RESULT);
+                return targetProcessor.getResult();
+            }
         });
+    }
+
+    private static class MergeSortedState
+            implements Serializable
+    {
+        private Object[] processorList;
+        private int nextProcessor;
+        private List<Integer> queueProcessorIndex;
+        private int processor;
     }
 
     static <T> WorkProcessor<T> yielding(WorkProcessor<T> processor, BooleanSupplier yieldSignal)
@@ -156,6 +272,7 @@ public final class WorkProcessorUtils
         return WorkProcessor.create(new YieldingProcess<>(processor, yieldSignal));
     }
 
+    @RestorableConfig(uncapturedFields = "yieldSignal")
     private static class YieldingProcess<T>
             implements WorkProcessor.Process<T>
     {
@@ -179,6 +296,30 @@ public final class WorkProcessorUtils
             lastProcessYielded = false;
 
             return getNextState(processor);
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            YieldingProcessState myState = new YieldingProcessState();
+            myState.processor = processor.capture(serdeProvider);
+            myState.lastProcessYielded = lastProcessYielded;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            YieldingProcessState myState = (YieldingProcessState) state;
+            this.processor.restore(myState.processor, serdeProvider);
+            this.lastProcessYielded = myState.lastProcessYielded;
+        }
+
+        private static class YieldingProcessState
+                implements Serializable
+        {
+            private Object processor;
+            private boolean lastProcessYielded;
         }
     }
 
@@ -233,31 +374,123 @@ public final class WorkProcessorUtils
         return ProcessState.yield();
     }
 
-    static <T, R> WorkProcessor<R> flatMap(WorkProcessor<T> processor, Function<T, WorkProcessor<R>> mapper)
+    static <T, R> WorkProcessor<R> flatMap(WorkProcessor<T> processor, WorkProcessor.RestorableFunction<T, WorkProcessor<R>> mapper)
     {
         requireNonNull(processor, "processor is null");
         requireNonNull(mapper, "mapper is null");
-        return processor.flatTransform(element ->
-        {
-            if (element == null) {
-                return TransformationState.finished();
-            }
+        return processor.flatTransform(
+                new Transformation<T, WorkProcessor<R>>()
+                {
+                    @RestorableConfig(uncapturedFields = "mapper")
+                    private final RestorableConfig restorableConfig = null;
 
-            return TransformationState.ofResult(mapper.apply(element));
-        });
+                    T savedElement;
+
+                    @Override
+                    public TransformationState<WorkProcessor<R>> process(@org.jetbrains.annotations.Nullable T element)
+                    {
+                        if (element == null) {
+                            return TransformationState.finished();
+                        }
+                        savedElement = element;
+                        return TransformationState.ofResult(mapper.apply(element));
+                    }
+
+                    @Override
+                    public Object captureResult(WorkProcessor<R> result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return result.capture(serdeProvider);
+                    }
+
+                    @Override
+                    public WorkProcessor<R> restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (savedElement != null) {
+                            WorkProcessor<R> restoredProcessor = mapper.apply(savedElement);
+                            restoredProcessor.restore(resultState, serdeProvider);
+                            return restoredProcessor;
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Object captureInput(T input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.captureInput(input, serdeProvider);
+                    }
+
+                    @Override
+                    public T restoreInput(Object inputState, T input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.restoreInput(inputState, serdeProvider);
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.captureInput(savedElement, serdeProvider);
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        this.savedElement = mapper.restoreInput(state, serdeProvider);
+                    }
+                });
     }
 
-    static <T, R> WorkProcessor<R> map(WorkProcessor<T> processor, Function<T, R> mapper)
+    static <T, R> WorkProcessor<R> map(WorkProcessor<T> processor, WorkProcessor.RestorableFunction<T, R> mapper)
     {
         requireNonNull(processor, "processor is null");
         requireNonNull(mapper, "mapper is null");
-        return processor.transform(element -> {
-            if (element == null) {
-                return TransformationState.finished();
-            }
+        return processor.transform(
+                new Transformation<T, R>()
+                {
+                    @Override
+                    public TransformationState<R> process(@org.jetbrains.annotations.Nullable T element)
+                    {
+                        if (element == null) {
+                            return TransformationState.finished();
+                        }
 
-            return TransformationState.ofResult(mapper.apply(element));
-        });
+                        return TransformationState.ofResult(mapper.apply(element));
+                    }
+
+                    @Override
+                    public Object captureResult(R result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.captureResult(result, serdeProvider);
+                    }
+
+                    @Override
+                    public R restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.restoreResult(resultState, serdeProvider);
+                    }
+
+                    @Override
+                    public Object captureInput(T input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.captureInput(input, serdeProvider);
+                    }
+
+                    @Override
+                    public T restoreInput(Object inputState, T input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return mapper.restoreInput(inputState, serdeProvider);
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                    }
+                });
     }
 
     static <T, R> WorkProcessor<R> flatTransform(WorkProcessor<T> processor, Transformation<T, WorkProcessor<R>> transformation)
@@ -270,25 +503,83 @@ public final class WorkProcessorUtils
     static <T> WorkProcessor<T> flatten(WorkProcessor<WorkProcessor<T>> processor)
     {
         requireNonNull(processor, "processor is null");
-        return processor.transform(nestedProcessor -> {
-            if (nestedProcessor == null) {
-                return TransformationState.finished();
-            }
+        return processor.transform(
+                new Transformation<WorkProcessor<T>, T>()
+                {
+                    @Override
+                    public TransformationState<T> process(@org.jetbrains.annotations.Nullable WorkProcessor<T> nestedProcessor)
+                    {
+                        if (nestedProcessor == null) {
+                            return TransformationState.finished();
+                        }
 
-            if (nestedProcessor.process()) {
-                if (nestedProcessor.isFinished()) {
-                    return TransformationState.needsMoreData();
-                }
+                        if (nestedProcessor.process()) {
+                            if (nestedProcessor.isFinished()) {
+                                return TransformationState.needsMoreData();
+                            }
 
-                return TransformationState.ofResult(nestedProcessor.getResult(), false);
-            }
+                            return TransformationState.ofResult(nestedProcessor.getResult(), false);
+                        }
 
-            if (nestedProcessor.isBlocked()) {
-                return TransformationState.blocked(nestedProcessor.getBlockedFuture());
-            }
+                        if (nestedProcessor.isBlocked()) {
+                            return TransformationState.blocked(nestedProcessor.getBlockedFuture());
+                        }
 
-            return TransformationState.yield();
-        });
+                        return TransformationState.yield();
+                    }
+
+                    @Override
+                    public Object captureInput(WorkProcessor<T> input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (input != null) {
+                            return input.capture(serdeProvider);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public WorkProcessor<T> restoreInput(Object inputState, WorkProcessor<T> input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (input != null) {
+                            input.restore(inputState, serdeProvider);
+                            return input;
+                        }
+                        else {
+                            throw new UnsupportedOperationException();
+                        }
+                    }
+
+                    @Override
+                    public Object captureResult(T result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (result != null) {
+                            checkArgument(processor.getResult().getResult() == result);
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public T restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if ((boolean) resultState) {
+                            checkArgument(processor.getResult().getResult() != null);
+                            return processor.getResult().getResult();
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                    }
+                });
     }
 
     static <T, R> WorkProcessor<R> transform(WorkProcessor<T> processor, Transformation<T, R> transformation)
@@ -297,6 +588,9 @@ public final class WorkProcessorUtils
         requireNonNull(transformation, "transformation is null");
         return create(new WorkProcessor.Process<R>()
         {
+            @RestorableConfig(stateClassName = "TransformState", uncapturedFields = {"element"})
+            private final RestorableConfig restorableConfig = null;
+
             T element;
 
             @Override
@@ -340,7 +634,49 @@ public final class WorkProcessorUtils
                     }
                 }
             }
+
+            @Override
+            public Object capture(BlockEncodingSerdeProvider serdeProvider)
+            {
+                TransformState myState = new TransformState();
+                myState.transformation = transformation.capture(serdeProvider);
+                myState.validElement = element != null;
+                myState.processor = processor.capture(serdeProvider);
+                return myState;
+            }
+
+            @Override
+            public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+            {
+                TransformState myState = (TransformState) state;
+                transformation.restore(myState.transformation, serdeProvider);
+                processor.restore(myState.processor, serdeProvider);
+                if (myState.validElement) {
+                    checkArgument(processor.getResult() != null);
+                    element = processor.getResult();
+                }
+            }
+
+            @Override
+            public Object captureResult(R result, BlockEncodingSerdeProvider serdeProvider)
+            {
+                return transformation.captureResult(result, serdeProvider);
+            }
+
+            @Override
+            public R restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+            {
+                return transformation.restoreResult(resultState, serdeProvider);
+            }
         });
+    }
+
+    private static class TransformState
+            implements Serializable
+    {
+        private Object transformation;
+        private Object processor;
+        private boolean validElement;
     }
 
     static <T> WorkProcessor<T> create(WorkProcessor.Process<T> process)
@@ -404,6 +740,59 @@ public final class WorkProcessorUtils
         {
             checkState(state != null && state.getType() == ProcessState.Type.RESULT, "process() must return true and must not be finished");
             return state.getResult();
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            ProcessWorkProcessorState myState = new ProcessWorkProcessorState();
+            if (state != null && state.getType() == ProcessState.Type.RESULT) {
+                T result = state.getResult();
+                myState.state = process.captureResult(result, serdeProvider);
+            }
+            else if (state != null && (state.getType() == ProcessState.Type.FINISHED || state.getType() == ProcessState.Type.YIELD)) {
+                myState.state = state.getType().toString();
+            }
+            if (process != null) {
+                myState.process = process.capture(serdeProvider);
+            }
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            ProcessWorkProcessorState myState = (ProcessWorkProcessorState) state;
+            if (myState.process != null) {
+                this.process.restore(myState.process, serdeProvider);
+            }
+            else {
+                checkState(myState.state instanceof String && myState.state.equals("FINISHED"));
+                this.process = null;
+            }
+            if (myState.state != null) {
+                if (myState.state instanceof String) {
+                    if (myState.state.equals("FINISHED")) {
+                        this.state = ProcessState.finished();
+                    }
+                    else if (myState.state.equals("YIELD")) {
+                        this.state = ProcessState.yield();
+                    }
+                }
+                else {
+                    this.state = ProcessState.ofResult(process.restoreResult(myState.state, serdeProvider));
+                }
+            }
+            else {
+                this.state = null;
+            }
+        }
+
+        private static class ProcessWorkProcessorState
+                implements Serializable
+        {
+            private Object process;
+            private Object state;
         }
     }
 

@@ -15,20 +15,31 @@ package io.prestosql.operator;
 
 import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Snapshot: work processors are restorable, so are all its inner objects (processes, functions, and transformations).
+ * In addition, functions and transformations are also responsible for capturing/restoring their input/output types,
+ * because the generic WorkProcessor and Process objects don't know those types.
+ */
 public interface WorkProcessor<T>
+        extends Restorable
 {
     /**
      * Call the method to progress the work.
@@ -81,12 +92,12 @@ public interface WorkProcessor<T>
         return WorkProcessorUtils.finishWhen(this, finishSignal);
     }
 
-    default <R> WorkProcessor<R> flatMap(Function<T, WorkProcessor<R>> mapper)
+    default <R> WorkProcessor<R> flatMap(RestorableFunction<T, WorkProcessor<R>> mapper)
     {
         return WorkProcessorUtils.flatMap(this, mapper);
     }
 
-    default <R> WorkProcessor<R> map(Function<T, R> mapper)
+    default <R> WorkProcessor<R> map(RestorableFunction<T, R> mapper)
     {
         return WorkProcessorUtils.map(this, mapper);
     }
@@ -132,22 +143,28 @@ public interface WorkProcessor<T>
         return WorkProcessorUtils.yieldingIteratorFrom(this);
     }
 
-    static <T> WorkProcessor<T> flatten(WorkProcessor<WorkProcessor<T>> processor)
-    {
-        return WorkProcessorUtils.flatten(processor);
-    }
-
     @SafeVarargs
     static <T> WorkProcessor<T> of(T... elements)
     {
+        // Snapshot: This is only used by
+        // TopNOperator: work processor is not involved until operator is finished, so no need for snapshot
+        // PageProcess: work processor is only used for intermediate result and don't need to be captured
+        checkArgument(elements.length <= 1);
         return fromIterator(Iterators.forArray(elements));
     }
 
+    // Snapshot: This is only used by PagesSortBenchmark, where snapshot is not relevant.
+    // When snapshot is required, this needs to be updated so the iterable can capture its content, e.g using RestorableIterator.
     static <T> WorkProcessor<T> fromIterable(Iterable<T> iterable)
     {
-        return WorkProcessorUtils.fromIterator(iterable.iterator());
+        return fromIterator(iterable.iterator());
     }
 
+    // Snapshot: this is used by:
+    // OrderByOperator: only used during "finish", so no need to take snapshot
+    // WindowOperator: RestorableIterator is used, so it can capture its content
+    // SpillableHashAggregationBuilder: to-do is added to that class to worry about iterator
+    // WorkProcessor.of: its caller should not involve snapshot
     static <T> WorkProcessor<T> fromIterator(Iterator<T> iterator)
     {
         return WorkProcessorUtils.fromIterator(iterator);
@@ -161,12 +178,13 @@ public interface WorkProcessor<T>
         return WorkProcessorUtils.create(process);
     }
 
-    static <T> WorkProcessor<T> mergeSorted(Iterable<WorkProcessor<T>> processorIterable, Comparator<T> comparator)
+    static <T> WorkProcessor<T> mergeSorted(List<WorkProcessor<T>> processorList, Comparator<T> comparator)
     {
-        return WorkProcessorUtils.mergeSorted(processorIterable, comparator);
+        return WorkProcessorUtils.mergeSorted(processorList, comparator);
     }
 
     interface Transformation<T, R>
+            extends Restorable
     {
         /**
          * Processes input elements and returns current transformation state.
@@ -183,9 +201,71 @@ public interface WorkProcessor<T>
          * @see TransformationState#finished()
          */
         TransformationState<R> process(@Nullable T element);
+
+        // The next 4 methods are used to capture/restore input and output of this transformation
+        default Object captureResult(R result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default R restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default Object captureInput(T input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default T restoreInput(Object inputState, T input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    interface RestorableFunction<T, R>
+            extends Function<T, R>, Restorable
+    {
+        // In addition to the Function that performs the conversion,
+        // the next 4 methods are used to capture/restore input and output of this function
+        default Object captureInput(@Nullable T input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default T restoreInput(Object inputState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default Object captureResult(@Nullable R result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default R restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    interface RestorableIterator<T>
+            extends Iterator<T>
+    {
+        default Object captureResult(@Nonnull T result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default T restoreResult(@Nonnull Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 
     interface Process<T>
+            extends Restorable
     {
         /**
          * Does some work and returns current state.
@@ -197,6 +277,27 @@ public interface WorkProcessor<T>
          * @see ProcessState#finished()
          */
         ProcessState<T> process();
+
+        @Override
+        default Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            return 0;
+        }
+
+        @Override
+        default void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+        }
+
+        default Object captureResult(@Nonnull T result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        default T restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 
     @Immutable

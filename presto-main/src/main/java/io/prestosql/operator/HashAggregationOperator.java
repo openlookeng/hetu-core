@@ -388,44 +388,7 @@ public class HashAggregationOperator
         inputProcessed = true;
 
         if (aggregationBuilder == null) {
-            // TODO: We ignore spillEnabled here if any aggregate has ORDER BY clause or DISTINCT because they are not yet implemented for spilling.
-            if (step.isOutputPartial() || !spillEnabled || hasOrderBy() || hasDistinct()) {
-                aggregationBuilder = new InMemoryHashAggregationBuilder(
-                        accumulatorFactories,
-                        step,
-                        expectedGroups,
-                        groupByTypes,
-                        groupByChannels,
-                        hashChannel,
-                        operatorContext,
-                        maxPartialMemory,
-                        joinCompiler,
-                        () -> {
-                            memoryContext.setBytes(((InMemoryHashAggregationBuilder) aggregationBuilder).getSizeInMemory());
-                            if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
-                                // do not yield on memory for partial aggregations
-                                return true;
-                            }
-                            return operatorContext.isWaitingForMemory().isDone();
-                        });
-            }
-            else {
-                verify(!useSystemMemory, "using system memory in spillable aggregations is not supported");
-                aggregationBuilder = new SpillableHashAggregationBuilder(
-                        accumulatorFactories,
-                        step,
-                        expectedGroups,
-                        groupByTypes,
-                        groupByChannels,
-                        hashChannel,
-                        operatorContext,
-                        memoryLimitForMerge,
-                        memoryLimitForMergeWithMemory,
-                        spillerFactory,
-                        joinCompiler);
-            }
-
-            // assume initial aggregationBuilder is not full
+            createAggregationBuilder();
         }
         else {
             checkState(!aggregationBuilder.isFull(), "Aggregation buffer is full");
@@ -437,6 +400,49 @@ public class HashAggregationOperator
             unfinishedWork = null;
         }
         aggregationBuilder.updateMemory();
+    }
+
+    public void createAggregationBuilder()
+    {
+        // TODO: We ignore spillEnabled here if any aggregate has ORDER BY clause or DISTINCT because they are not yet implemented for spilling.
+        if (step.isOutputPartial() || !spillEnabled || hasOrderBy() || hasDistinct()) {
+            //TODO-cp-I39B76 snapshot support
+            aggregationBuilder = new InMemoryHashAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    maxPartialMemory,
+                    joinCompiler,
+                    () -> {
+                        memoryContext.setBytes(((InMemoryHashAggregationBuilder) aggregationBuilder).getSizeInMemory());
+                        if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
+                            // do not yield on memory for partial aggregations
+                            return true;
+                        }
+                        return operatorContext.isWaitingForMemory().isDone();
+                    });
+        }
+        else {
+            verify(!useSystemMemory, "using system memory in spillable aggregations is not supported");
+            aggregationBuilder = new SpillableHashAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler);
+        }
+
+        // assume initial aggregationBuilder is not full
     }
 
     private boolean hasOrderBy()
@@ -638,7 +644,7 @@ public class HashAggregationOperator
         hashCollisionsCounter.restore(myState.hashCollisionsCounter, serdeProvider);
         if (myState.aggregationBuilder != null) {
             if (this.aggregationBuilder == null) {
-//                createAggregationBuilder(step.isOutputPartial(), spillEnabled, hasOrderBy(), hasDistinct());
+                createAggregationBuilder();
             }
             aggregationBuilder.restore(myState.aggregationBuilder, serdeProvider);
         }

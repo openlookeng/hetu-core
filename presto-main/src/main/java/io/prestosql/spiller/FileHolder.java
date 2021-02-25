@@ -71,4 +71,9 @@ final class FileHolder
             throw new UncheckedIOException(e);
         }
     }
+
+    public Path getFilePath()
+    {
+        return filePath;
+    }
 }

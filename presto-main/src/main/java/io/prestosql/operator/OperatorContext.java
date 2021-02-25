@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.AggregatedMemoryContext;
@@ -142,7 +143,7 @@ public class OperatorContext
         this.operatorMemoryContext = requireNonNull(operatorMemoryContext, "operatorMemoryContext is null");
         operatorMemoryContext.initializeLocalMemoryContexts(operatorType);
 
-        this.snapshotEnabled = false;
+        this.snapshotEnabled = SystemSessionProperties.isSnapshotEnabled(driverContext.getSession());
     }
 
     public int getOperatorId()

@@ -122,9 +122,11 @@ public class TaskContext
             boolean perOperatorCpuTimerEnabled,
             boolean cpuTimerEnabled,
             OptionalInt totalPartitions,
-            PlanNodeId consumerId)
+            PlanNodeId consumerId,
+            PagesSerdeFactory serdeFactory,
+            TaskSnapshotManager snapshotManager)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, null, null);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, snapshotManager);
         taskContext.initialize();
         return taskContext;
     }

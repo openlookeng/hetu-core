@@ -24,6 +24,7 @@ import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
@@ -86,8 +87,12 @@ public class MergingHashAggregationBuilder
 
     public WorkProcessor<Page> buildResult()
     {
+        //TODO-cp-I39B76 Only used by SpillableHashAggregationBuilder
         return sortedPages.flatTransform(new Transformation<Page, WorkProcessor<Page>>()
         {
+            @RestorableConfig(unsupported = true)
+            private final RestorableConfig restorableConfig = null;
+
             boolean reset = true;
             long memorySize;
 

@@ -13,6 +13,8 @@
  */
 package io.prestosql.util;
 
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.DriverYieldSignal;
@@ -23,8 +25,14 @@ import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
+import javax.annotation.Nullable;
+
+import java.io.Serializable;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiPredicate;
@@ -105,67 +113,224 @@ public final class MergeSortedPages
         PageBuilder pageBuilder = new PageBuilder(outputTypes);
         return pageWithPositions
                 .yielding(yieldSignal::isSet)
-                .transform(pageWithPosition -> {
-                    boolean finished = pageWithPosition == null;
-                    if (finished && pageBuilder.isEmpty()) {
-                        memoryContext.close();
-                        return TransformationState.finished();
-                    }
+                .transform(
+                        new WorkProcessor.Transformation<PageWithPosition, Page>()
+                        {
+                            @RestorableConfig(stateClassName = "BuildPageState",
+                                    uncapturedFields = {"val$outputTypes", "val$pageBreakPredicate", "val$outputChannels"})
+                            private final RestorableConfig restorableConfig = null;
 
-                    if (finished || pageBreakPredicate.test(pageBuilder, pageWithPosition)) {
-                        if (!updateMemoryAfterEveryPosition) {
-                            // update memory usage just before producing page to cap from top
-                            memoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
-                        }
+                            @Override
+                            public TransformationState<Page> process(@Nullable PageWithPosition pageWithPosition)
+                            {
+                                boolean finished = pageWithPosition == null;
+                                if (finished && pageBuilder.isEmpty()) {
+                                    memoryContext.close();
+                                    return TransformationState.finished();
+                                }
 
-                        Page page = pageBuilder.build();
-                        pageBuilder.reset();
-                        if (!finished) {
-                            pageWithPosition.appendTo(pageBuilder, outputChannels, outputTypes);
-                        }
+                                if (finished || pageBreakPredicate.test(pageBuilder, pageWithPosition)) {
+                                    if (!updateMemoryAfterEveryPosition) {
+                                        // update memory usage just before producing page to cap from top
+                                        memoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
+                                    }
 
-                        if (updateMemoryAfterEveryPosition) {
-                            memoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
-                        }
+                                    Page page = pageBuilder.build();
+                                    pageBuilder.reset();
+                                    if (!finished) {
+                                        pageWithPosition.appendTo(pageBuilder, outputChannels, outputTypes);
+                                    }
 
-                        return TransformationState.ofResult(page, !finished);
-                    }
+                                    if (updateMemoryAfterEveryPosition) {
+                                        memoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
+                                    }
 
-                    pageWithPosition.appendTo(pageBuilder, outputChannels, outputTypes);
+                                    return TransformationState.ofResult(page, !finished);
+                                }
 
-                    if (updateMemoryAfterEveryPosition) {
-                        memoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
-                    }
+                                pageWithPosition.appendTo(pageBuilder, outputChannels, outputTypes);
 
-                    return TransformationState.needsMoreData();
-                });
+                                if (updateMemoryAfterEveryPosition) {
+                                    memoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
+                                }
+
+                                return TransformationState.needsMoreData();
+                            }
+
+                            @Override
+                            public Object captureResult(Page result, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                if (result != null) {
+                                    SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(result);
+                                    return serializedPage.capture(serdeProvider);
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Page restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                if (resultState != null) {
+                                    return ((PagesSerde) serdeProvider).deserialize(SerializedPage.restoreSerializedPage(resultState));
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Object captureInput(PageWithPosition input, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                if (input != null) {
+                                    return input.capture(serdeProvider);
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public PageWithPosition restoreInput(Object inputState, PageWithPosition input, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                if (inputState != null) {
+                                    return PageWithPosition.restorePageWithPosition(inputState, serdeProvider);
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                BuildPageState myState = new BuildPageState();
+                                myState.pageBuilder = pageBuilder.capture(serdeProvider);
+                                myState.memoryContext = memoryContext.getBytes();
+                                return myState;
+                            }
+
+                            @Override
+                            public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                BuildPageState myState = (BuildPageState) state;
+                                pageBuilder.restore(myState.pageBuilder, serdeProvider);
+                                memoryContext.setBytes(myState.memoryContext);
+                            }
+                        });
+    }
+
+    private static class BuildPageState
+            implements Serializable
+    {
+        private Object pageBuilder;
+        private long memoryContext;
     }
 
     private static WorkProcessor<PageWithPosition> pageWithPositions(WorkProcessor<Page> pages, AggregatedMemoryContext aggregatedMemoryContext)
     {
-        return pages.flatMap(page -> {
-            LocalMemoryContext memoryContext = aggregatedMemoryContext.newLocalMemoryContext(MergeSortedPages.class.getSimpleName());
-            memoryContext.setBytes(page.getRetainedSizeInBytes());
-
-            return WorkProcessor.create(new WorkProcessor.Process<PageWithPosition>()
-            {
-                int position;
-
-                @Override
-                public ProcessState<PageWithPosition> process()
+        return pages.flatMap(
+                new WorkProcessor.RestorableFunction<Page, WorkProcessor<PageWithPosition>>()
                 {
-                    if (position >= page.getPositionCount()) {
-                        memoryContext.close();
-                        return ProcessState.finished();
+                    @Override
+                    public WorkProcessor<PageWithPosition> apply(Page page)
+                    {
+                        LocalMemoryContext memoryContext = aggregatedMemoryContext.newLocalMemoryContext(MergeSortedPages.class.getSimpleName());
+                        memoryContext.setBytes(page.getRetainedSizeInBytes());
+
+                        return WorkProcessor.create(new WorkProcessor.Process<PageWithPosition>()
+                        {
+                            @RestorableConfig(stateClassName = "PageWithPositionProcessorState", uncapturedFields = {"page", "this$0"})
+                            private final RestorableConfig restorableConfig = null;
+
+                            int position;
+
+                            @Override
+                            public ProcessState<PageWithPosition> process()
+                            {
+                                if (position >= page.getPositionCount()) {
+                                    memoryContext.close();
+                                    return ProcessState.finished();
+                                }
+
+                                return ProcessState.ofResult(new PageWithPosition(page, position++));
+                            }
+
+                            @Override
+                            public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                PageWithPositionProcessorState myState = new PageWithPositionProcessorState();
+                                myState.position = position;
+                                myState.memoryContext = memoryContext.getBytes();
+                                return myState;
+                            }
+
+                            @Override
+                            public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                PageWithPositionProcessorState myState = (PageWithPositionProcessorState) state;
+                                position = myState.position;
+                                memoryContext.setBytes(myState.memoryContext);
+                            }
+
+                            @Override
+                            public Object captureResult(PageWithPosition result, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                return result.capture(serdeProvider);
+                            }
+
+                            @Override
+                            public PageWithPosition restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                            {
+                                return PageWithPosition.restorePageWithPosition(resultState, serdeProvider);
+                            }
+                        });
                     }
 
-                    return ProcessState.ofResult(new PageWithPosition(page, position++));
-                }
-            });
-        });
+                    @Override
+                    public Object captureResult(WorkProcessor<PageWithPosition> result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (result != null) {
+                            return result.capture(serdeProvider);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Page restoreInput(Object inputState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (inputState != null) {
+                            SerializedPage serializedPage = SerializedPage.restoreSerializedPage(inputState);
+                            return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Object captureInput(Page input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (input != null) {
+                            SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(input);
+                            return serializedPage.capture(serdeProvider);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                    }
+                });
+    }
+
+    private static class PageWithPositionProcessorState
+            implements Serializable
+    {
+        private int position;
+        private long memoryContext;
     }
 
     public static class PageWithPosition
+            implements Restorable
     {
         private final Page page;
         private final int position;
@@ -194,6 +359,29 @@ public final class MergeSortedPages
                 Block block = page.getBlock(outputChannels.get(i));
                 type.appendTo(block, position, pageBuilder.getBlockBuilder(i));
             }
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            PageWithPositionState myState = new PageWithPositionState();
+            SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(page);
+            myState.page = serializedPage.capture(serdeProvider);
+            myState.position = position;
+            return myState;
+        }
+
+        public static PageWithPosition restorePageWithPosition(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            PageWithPositionState myState = (PageWithPositionState) state;
+            return new PageWithPosition(((PagesSerde) serdeProvider).deserialize(SerializedPage.restoreSerializedPage(myState.page)), myState.position);
+        }
+
+        private static class PageWithPositionState
+                implements Serializable
+        {
+            private Object page;
+            private int position;
         }
     }
 }

@@ -17,10 +17,14 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.operator.window.WindowPartition;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.util.Mergeable;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,8 +55,9 @@ public class WindowInfo
     }
 
     static class DriverWindowInfoBuilder
+            implements Restorable
     {
-        private final ImmutableList.Builder<IndexInfo> indexInfosBuilder = ImmutableList.builder();
+        private final List<IndexInfo> indexInfosBuilder = new ArrayList<>();
         private IndexInfoBuilder currentIndexInfoBuilder;
 
         public void addIndex(PagesIndex index)
@@ -78,7 +83,7 @@ public class WindowInfo
                 currentIndexInfoBuilder = null;
             }
 
-            List<IndexInfo> indexInfos = indexInfosBuilder.build();
+            List<IndexInfo> indexInfos = ImmutableList.copyOf(indexInfosBuilder);
             if (indexInfos.size() == 0) {
                 return new DriverWindowInfo(0.0, 0.0, 0.0, 0, 0, 0);
             }
@@ -110,6 +115,31 @@ public class WindowInfo
                     totalPartitionsCount,
                     totalRowsCount,
                     indexInfos.size());
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            DriverWindowInfoBuilderState state = new DriverWindowInfoBuilderState();
+            state.indexInfosBuilder = indexInfosBuilder;
+            state.currentIndexInfoBuilder = currentIndexInfoBuilder;
+            return state;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            DriverWindowInfoBuilderState myState = (DriverWindowInfoBuilderState) state;
+            indexInfosBuilder.clear();
+            indexInfosBuilder.addAll(myState.indexInfosBuilder);
+            currentIndexInfoBuilder = (IndexInfoBuilder) myState.currentIndexInfoBuilder;
+        }
+
+        private static class DriverWindowInfoBuilderState
+                implements Serializable
+        {
+            private List<IndexInfo> indexInfosBuilder;
+            private Object currentIndexInfoBuilder;
         }
     }
 
@@ -178,10 +208,11 @@ public class WindowInfo
     }
 
     private static class IndexInfoBuilder
+            implements Serializable
     {
         private final long rowsNumber;
         private final long sizeInBytes;
-        private final ImmutableList.Builder<Integer> partitionsSizes = ImmutableList.builder();
+        private final List<Integer> partitionsSizes = new ArrayList<>();
 
         public IndexInfoBuilder(long rowsNumber, long sizeInBytes)
         {
@@ -196,7 +227,7 @@ public class WindowInfo
 
         public Optional<IndexInfo> build()
         {
-            List<Integer> partitions = partitionsSizes.build();
+            List<Integer> partitions = ImmutableList.copyOf(partitionsSizes);
             if (partitions.size() == 0) {
                 return Optional.empty();
             }
@@ -210,6 +241,7 @@ public class WindowInfo
 
     @Immutable
     public static class IndexInfo
+            implements Serializable
     {
         private final long totalRowsCount;
         private final long sizeInBytes;

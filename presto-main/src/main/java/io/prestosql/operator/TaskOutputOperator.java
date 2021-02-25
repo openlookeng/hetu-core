@@ -15,20 +15,22 @@ package io.prestosql.operator;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.execution.buffer.OutputBuffer;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.execution.buffer.PageSplitterUtil.splitPage;
 import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
@@ -49,9 +51,15 @@ public class TaskOutputOperator
         }
 
         @Override
-        public OperatorFactory createOutputOperator(int operatorId, PlanNodeId planNodeId, List<Type> types, Function<Page, Page> pagePreprocessor, PagesSerdeFactory serdeFactory)
+        public OperatorFactory createOutputOperator(
+                int operatorId,
+                PlanNodeId planNodeId,
+                List<Type> types,
+                Function<Page, Page> pagePreprocessor,
+                TaskContext taskContext)
         {
-            return new TaskOutputOperatorFactory(operatorId, planNodeId, outputBuffer, pagePreprocessor, serdeFactory);
+            outputBuffer.setTaskContext(taskContext);
+            return new TaskOutputOperatorFactory(operatorId, planNodeId, outputBuffer, pagePreprocessor);
         }
     }
 
@@ -62,50 +70,69 @@ public class TaskOutputOperator
         private final PlanNodeId planNodeId;
         private final OutputBuffer outputBuffer;
         private final Function<Page, Page> pagePreprocessor;
-        private final PagesSerdeFactory serdeFactory;
+        // Snapshot: When a factory is duplicated, factory instances share the same OutputBuffer.
+        // All these factory instances now share this duplicateCount, so only the last factory that receives "noMoreOperators"
+        // (the one that decrements the count to 0) should inform OutputBuffer about "setNoMoreInputChannels".
+        private final AtomicInteger duplicateCount;
 
-        public TaskOutputOperatorFactory(int operatorId, PlanNodeId planNodeId, OutputBuffer outputBuffer, Function<Page, Page> pagePreprocessor, PagesSerdeFactory serdeFactory)
+        public TaskOutputOperatorFactory(int operatorId, PlanNodeId planNodeId, OutputBuffer outputBuffer, Function<Page, Page> pagePreprocessor)
+        {
+            this(operatorId, planNodeId, outputBuffer, pagePreprocessor, new AtomicInteger(1));
+        }
+
+        private TaskOutputOperatorFactory(int operatorId, PlanNodeId planNodeId, OutputBuffer outputBuffer, Function<Page, Page> pagePreprocessor, AtomicInteger duplicateCount)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
             this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
-            this.serdeFactory = requireNonNull(serdeFactory, "serdeFactory is null");
+            this.duplicateCount = requireNonNull(duplicateCount, "duplicateCount is null");
         }
 
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TaskOutputOperator.class.getSimpleName());
-            return new TaskOutputOperator(operatorContext, outputBuffer, pagePreprocessor, serdeFactory);
+            String id = operatorContext.getUniqueId();
+            outputBuffer.addInputChannel(id);
+            return new TaskOutputOperator(id, operatorContext, outputBuffer, pagePreprocessor);
         }
 
         @Override
         public void noMoreOperators()
         {
+            if (duplicateCount.decrementAndGet() == 0) {
+                outputBuffer.setNoMoreInputChannels();
+            }
         }
 
         @Override
         public OperatorFactory duplicate()
         {
-            return new TaskOutputOperatorFactory(operatorId, planNodeId, outputBuffer, pagePreprocessor, serdeFactory);
+            checkState(duplicateCount.get() > 0);
+            duplicateCount.incrementAndGet();
+            return new TaskOutputOperatorFactory(operatorId, planNodeId, outputBuffer, pagePreprocessor, duplicateCount);
         }
     }
 
+    private final String id;
     private final OperatorContext operatorContext;
     private final OutputBuffer outputBuffer;
     private final Function<Page, Page> pagePreprocessor;
     private final SingleInputSnapshotState snapshotState;
+    private final boolean isStage0;
     private final PagesSerde serde;
     private boolean finished;
 
-    public TaskOutputOperator(OperatorContext operatorContext, OutputBuffer outputBuffer, Function<Page, Page> pagePreprocessor, PagesSerdeFactory serdeFactory)
+    public TaskOutputOperator(String id, OperatorContext operatorContext, OutputBuffer outputBuffer, Function<Page, Page> pagePreprocessor)
     {
+        this.id = id;
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
         this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
-        this.serde = requireNonNull(serdeFactory, "serdeFactory is null").createPagesSerde();
+        this.serde = requireNonNull(operatorContext.getDriverContext().getSerde(), "serde is null");
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
+        this.isStage0 = operatorContext.getDriverContext().getPipelineContext().getTaskContext().getTaskId().getStageId().getId() == 0;
     }
 
     @Override
@@ -154,10 +181,16 @@ public class TaskOutputOperator
             return;
         }
 
-        page = pagePreprocessor.apply(page);
+        if (!(page instanceof MarkerPage)) {
+            page = pagePreprocessor.apply(page);
+        }
+        else if (isStage0) {
+            // Do not add marker to final output.
+            return;
+        }
 
         List<SerializedPage> serializedPages = splitPage(page, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
-                .map(serde::serialize)
+                .map(p -> serde.serialize(p).setOrigin(id))
                 .collect(toImmutableList());
 
         outputBuffer.enqueue(serializedPages);

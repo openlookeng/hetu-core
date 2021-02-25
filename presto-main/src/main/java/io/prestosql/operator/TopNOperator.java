@@ -197,6 +197,8 @@ public class TopNOperator
         topNProcessor.addInput(page);
     }
 
+    // TopNOperator doesn't capture TopNPages
+    @RestorableConfig(unsupported = true)
     private class TopNPages
             implements WorkProcessor.Transformation<Page, Page>
     {
