@@ -53,7 +53,7 @@ public class TestHetuConfig
                 .setSplitCacheMapEnabled(false)
                 .setSplitCacheStateUpdateInterval(new Duration(2, TimeUnit.SECONDS))
                 .setTraceStackVisible(false)
-                .setIndexToPreload(null));
+                .setIndexToPreload(""));
     }
 
     @Test
