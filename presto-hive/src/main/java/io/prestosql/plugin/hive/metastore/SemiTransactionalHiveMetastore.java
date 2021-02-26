@@ -895,9 +895,15 @@ public class SemiTransactionalHiveMetastore
     private boolean canUpdateStats(ConnectorSession session, HiveACIDWriteType acidWriteType)
     {
         //Skip stats update for Update/Delete/Vacuum
-        boolean updateStats = HiveSessionProperties.isCollectColumnStatisticsOnWrite(session) &&
-                !HiveACIDWriteType.isUpdateOrDelete(acidWriteType) &&
-                !HiveACIDWriteType.isVacuum(acidWriteType);
+        boolean updateStats;
+        if (HiveACIDWriteType.VACUUM_UNIFY == acidWriteType) {
+            updateStats = false;
+        }
+        else {
+            updateStats = HiveSessionProperties.isCollectColumnStatisticsOnWrite(session) &&
+                    !HiveACIDWriteType.isUpdateOrDelete(acidWriteType) &&
+                    !(HiveACIDWriteType.VACUUM == acidWriteType);
+        }
         return updateStats;
     }
 

@@ -159,7 +159,7 @@ public class HivePageSink
                 bucketProperty.isPresent() ||
                         (handle.getTableStorageFormat() == HiveStorageFormat.ORC &&
                                 HiveACIDWriteType.isRowIdNeeded(acidWriteType) &&
-                                HiveACIDWriteType.VACUUM_MERGE != acidWriteType &&
+                                HiveACIDWriteType.VACUUM_UNIFY != acidWriteType &&
                                 !isInsertOnlyTable()),
                 isVacuumOperationValid() && !isInsertOnlyTable(),
                 pageIndexerFactory,
@@ -381,18 +381,18 @@ public class HivePageSink
             });
 
             List<ColumnHandle> inputColumns = new ArrayList<>(HivePageSink.this.inputColumns);
-            if (isInsertOnlyTable() || acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+            if (isInsertOnlyTable() || acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
                 //Insert only tables Just need to merge contents together. No processing required.
                 //During vacuum merge, all buckets will be merged to one.
                 //There is no need to sort again. sort_by is valid only on bucketed table,
-                //for which Vacuum_merge is not valid.
+                //for which VACUUM_UNIFY is not valid.
                 List<HiveSplitWrapper> multiSplits = hiveSplits.stream()
                         .map(HiveSplitWrapper::wrap)
                         .collect(toList());
                 if (isInsertOnlyTable()) {
                     Collections.sort(multiSplits, this::compareInsertOnlySplits);
                 }
-                else if (acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+                else if (acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
                     HiveColumnHandle rowIdHandle = HiveColumnHandle.updateRowIdHandle();
                     inputColumns.add(rowIdHandle);
                 }
@@ -737,7 +737,7 @@ public class HivePageSink
             if (bucketBlock != null) {
                 bucketNumber = OptionalInt.of(bucketBlock.getInt(position, 0));
             }
-            else if (acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+            else if (acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
                 bucketNumber = OptionalInt.of(0);
             }
             else if (isVacuumOperationValid() && isInsertOnlyTable()) {
@@ -800,7 +800,7 @@ public class HivePageSink
 
     private Block buildBucketBlock(Page page)
     {
-        if (acidWriteType == HiveACIDWriteType.VACUUM_MERGE) {
+        if (acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
             //There is no pre bucket block in case of merge
             return null;
         }
