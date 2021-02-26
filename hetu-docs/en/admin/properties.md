@@ -559,7 +559,14 @@ Heuristic index is external index module that which can be used to filter to out
 > -   **Default value:** `10s`
 >
 > The delay to wait before async loading task starts to load index cache from indexstore.
- 
+
+### `hetu.heuristicindex.filter.cache.preload-indices`
+
+> - **Type**：`string`
+> - **Default value：** ``
+>
+> Preload the specified indices (comma-separated) when the server starts. Put `ALL` to load all indices.
+
 ### `hetu.heuristicindex.indexstore.uri`
  
 > -   **Type:** `string`

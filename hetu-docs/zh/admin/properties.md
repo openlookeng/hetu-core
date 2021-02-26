@@ -490,6 +490,13 @@
 > 
 > 在异步加载索引到缓存前等待的时长。
 
+### `hetu.heuristicindex.filter.cache.preload-indices`
+
+> - 类型：`string`
+> - **默认值：** ``
+>
+> 在服务器启动时预加载指定名称的索引(用逗号分隔), 当值为`ALL`时将预载入全部索引。
+
 ### `hetu.heuristicindex.indexstore.uri`
 
 > - 类型：`string`

@@ -12,15 +12,18 @@ The Heuristic Indexer allows creating indexes on existing data but stores the in
   - New index types not supported by the underlying data source can be created
   - Index data does not use the storage space of the data source
 
+## Use case(s)
 
-## Use cases
-
-**Currently, Heuristic Index is only supports the Hive connector with 
+**Note: Currently, Heuristic Index only supports the Hive connector with 
 tables using ORC storage format.**
+
+1. BloomIndex, MinMaxIndex and BtreeIndex can be used on a coordinator for filtering splits during scheduling
+2. When reading ORC files, to filter Stripes, MinMaxIndex can be used or BloomIndex can be used on workers
+2. BitmapIndex can used on workers for filtering rows when reading ORC files
 
 ### 1. Filtering scheduled Splits during query execution
 
-*Index types supported: Bloom Index, Btree Index, MinMax Index*
+*Index types supported: BloomIndex, BtreeIndex, MinMaxIndex*
 
 When the engine needs to read data from a data source it schedules Splits. 
 However, not all Splits will return data if a predicate is applied.
@@ -33,7 +36,7 @@ By keeping an external index for the predicate column, the Heuristic Indexer can
 
 ### 2. Filtering Stripes when reading ORC files
 
-*Index types supported: Bloom Index, MinMax Index*
+*Index types supported: BloomIndex, MinMaxIndex*
 
 Similar to Split filtering above, when using the Hive connector to read ORC tables,
 Stripes can be filtered out based on the specified predicate. This reduces the amount
@@ -41,13 +44,13 @@ of data read and improves query performance.
 
 ### 3. Filtering rows when reading ORC files
 
-*Index types supported: Bitmap Index*
+*Index types supported: BitmapIndex*
 
 Going one level lower, once the rows are read, they must be filtered if a predicate is present. 
 This involves reading rows and then using the Filter operator to discard
 rows that do not match the predicate.
 
-By creating a Bitmap Index for the predicate column, the Heuristic Indexer will only read 
+By creating a BitmapIndex for the predicate column, the Heuristic Indexer will only read 
 rows which match the predicate, before the Filter operator is even applied. This can reduce
 memory and cpu usage and result in improved query performance, especially at higher concurrency.
 
@@ -69,7 +72,7 @@ In `etc/config.properties`, add these lines:
 Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
 **Note**：
-- `LOCAL` filesystem type is NOT supported anymore.
+- `LOCAL` filesystem type is NOT supported.
 - `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster.
 - All nodes should be configured to use the same filesystem profile.
 - Heuristic Index can be disabled while the engine is running by setting: `set session heuristicindex_filter_enabled=false;`
@@ -122,7 +125,7 @@ Subsequent queries will utilize the index to reduce the amount of data read
 | hetu.heuristicindex.filter.cache.loading-delay    | 10s                 | No      | The delay to wait before async loading task starts to load index cache from indexstore|
 | hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | No      | Directory under which all index files are stored|
 | hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| No      | This property defines the filesystem profile used to read and write index|
-| hetu.heuristicindex.filter.cache.preload.indices  |                     | No      | Preload the specified indices (comma-separated) when the server starts. Put `ALL` to load all indices|
+| hetu.heuristicindex.filter.cache.preload-indices  |                     | No      | Preload the specified indices (comma-separated) when the server starts. Put `ALL` to load all indices|
 
 Heuristic indexer now uses Hetu Metastore to manage its metadata. Please check [Hetu Metastore](../admin/meta-store.md) for more information.
 
@@ -134,12 +137,12 @@ See [Heuristic Index Statements](./hindex-statements.md).
 
 ## Supported Index Types
 
-| Index ID | Filtering type  | Best Column type                           | Supported query operators             | Notes                     | Example                                                                                                                                                                                                           |
-|----------|-----------------|--------------------------------------------|---------------------------------------|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [Bloom](./bloom.md)    | Split<br>Stripe | High cardinality<br>(such as an ID column) | `=` `IN`                                  |                           | `create index idx using bloom on hive.hindex.users (id);`<br>`select name from hive.hindex.users where id=123`                                                                                                    |
-| [Btree](./btree.md)    | Split           | High cardinality<br>(such as an ID column) | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` | Table must be partitioned | `create index idx using btree on hive.hindex.users (id) where regionkey IN (1,4) with ("level"='partition')`<br>(assuming table is partitioned on regionkey)<br>`select name from hive.hindex.users where id>123` |
-| [MinMax](./minmax.md)   | Split<br>Stripe | Column which table is sorted on            | `=` `>` `>=` `<` `<=` |                           | `create index idx using bloom on hive.hindex.users (age);`<br>(assuming users is sorted by age)<br>`select name from hive.hindex.users where age>25`                                                              |
-| [Bitmap](./bitmap.md)   | Row             | Low cardinality<br>(such as Gender column) | `=` `IN`                                  |                           | `create index idx using bitmap on hive.hindex.users (gender);`<br>`select name from hive.hindex.users where gender='female'`                                                                                      |
+| Index ID | Filtering type  | Best Column type                           | Supported query operators             | Example                                                                                                                                                                                                           |
+|----------|-----------------|--------------------------------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Bloom](./bloom.md)    | Split<br>Stripe | High cardinality<br>(such as an ID column) | `=` `IN`                                  | `create index idx using bloom on hive.hindex.users (id);`<br>`select name from hive.hindex.users where id=123`                                                                                                    |
+| [Btree](./btree.md)    | Split           | High cardinality<br>(such as an ID column) | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` | `create index idx using btree on hive.hindex.users (id) where regionkey IN (1,4)`<br>`select name from hive.hindex.users where id>123` |
+| [MinMax](./minmax.md)   | Split<br>Stripe | Column which table is sorted on            | `=` `>` `>=` `<` `<=` | `create index idx using bloom on hive.hindex.users (age);`<br>(assuming users is sorted by age)<br>`select name from hive.hindex.users where age>25`                                                              |
+| [Bitmap](./bitmap.md)   | Row             | Low cardinality<br>(such as Gender column) | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` | `create index idx using bitmap on hive.hindex.users (gender);`<br>`select name from hive.hindex.users where gender='female'`                                                                                      |
 
 **Note:** unsupported operators will still function correctly but will not benefit from the index.
 
@@ -162,30 +165,30 @@ Example queries:
 
 1. `SELECT id FROM employees WHERE site = 'lab';`
 
-    In this query `site` has a low cardinality (i.e. not many sites) so **Bitmap Index** will help.
+    In this query `site` has a low cardinality (i.e. not many sites) so **BitmapIndex** will help.
 
 2. `SELECT * FROM visited WHERE id = '34857' AND date < '2020-01-01';`
 
-    In this query `id` has a high cardinality (i.e. IDs are likely unique)
-    and table is partitioned on `date` so **Btree Index** will help.
+    In this query `id` has a high cardinality (i.e. IDs are likely unique).
+    **BloomIndex** or **BtreeIndex** will help.
     
 3. `SELECT * FROM salaries WHERE salary > 50251.40;`
 
     In this query `salary` has a high cardinality (i.e. salary of employees
     will slightly vary) and assuming `salaries` table is sorted on `salary`, 
-    **MinMax Index** will help.
+    **MinMaxIndex** will help.
 
 4. `SELECT * FROM assets WHERE id = 50;`
 
-    In this query `id` has a high cardinality (i.e. IDs are likely unique)
-    but the table is not partitioned, so **Bloom Index** will help.
+    In this query `id` has a high cardinality (i.e. IDs are likely unique).
+   **BloomIndex** or **BtreeIndex** will help.
 
 5. `SELECT * FROM phoneRecords WHERE phone='1234567890' and type = 'outgoing' and date > '2020-01-01';`
 
     In this query `phone` has a high cardinality (i.e. there are many phone numbers, even if they
     made multiple calls), `type` has low cardinality (only outgoing or incoming),
-    and the data is partitioned on date. Creating a **Btree Index** on `phone`
-    and a **Bitmap Index** on `type` will help.
+    and the data is partitioned on date. Creating a **BloomIndex** or **BtreeIndex** on `phone`
+    and a **BitmapIndex** on `type` will help.
 
 ## Adding your own Index Type
 
