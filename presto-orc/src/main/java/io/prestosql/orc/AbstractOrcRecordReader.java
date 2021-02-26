@@ -342,19 +342,17 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         if (!andDomainMap.isEmpty()) {
             List<Iterator<Integer>> matchings = new ArrayList<>(andDomainMap.size());
             for (Map.Entry<Index, Domain> e : andDomainMap.entrySet()) {
-                Iterator<Integer> lookUpRes = e.getKey().lookUp(e.getValue());
-                if (lookUpRes != null) {
-                    matchings.add(lookUpRes);
+                try {
+                    Iterator<Integer> lookUpRes = e.getKey().lookUp(e.getValue());
+                    if (lookUpRes != null) {
+                        matchings.add(lookUpRes);
+                    }
+                    else if (!e.getKey().matches(e.getValue())) {
+                        return true;
+                    }
                 }
-                else {
-                    try {
-                        if (!e.getKey().matches(e.getValue())) {
-                            return true;
-                        }
-                    }
-                    catch (UnsupportedOperationException uoe2) {
-                        return false;
-                    }
+                catch (UnsupportedOperationException uoe2) {
+                    return false;
                 }
             }
             if (!matchings.isEmpty()) {
@@ -366,22 +364,20 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
         if (!orDomainMap.isEmpty()) {
             for (Map.Entry<Index, Domain> e : orDomainMap.entrySet()) {
-                Iterator<Integer> thisStripeMatchingRows = e.getKey().lookUp(e.getValue());
-                if (thisStripeMatchingRows != null) {
-                    if (thisStripeMatchingRows.hasNext()) {
-                        /* any one matched; then include the stripe */
-                        return false;
-                    }
-                }
-                else {
-                    try {
-                        if (e.getKey().matches(e.getValue())) {
+                try {
+                    Iterator<Integer> thisStripeMatchingRows = e.getKey().lookUp(e.getValue());
+                    if (thisStripeMatchingRows != null) {
+                        if (thisStripeMatchingRows.hasNext()) {
+                            /* any one matched; then include the stripe */
                             return false;
                         }
                     }
-                    catch (UnsupportedOperationException uoe2) {
+                    else if (e.getKey().matches(e.getValue())) {
                         return false;
                     }
+                }
+                catch (UnsupportedOperationException uoe2) {
+                    return false;
                 }
             }
             return true;
