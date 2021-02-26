@@ -18,7 +18,13 @@ BitMap索引在拥有较少不同值数量的列上比较适用，例如：性�
 
 ## 支持的运算符
 
-    =   Equality
+    =       Equality
+    >       Greater than
+    >=      Greater than or equal
+    <       Less than
+    <=      Less than or equal
+    BETWEEN Between range
+    IN      IN set
     
 ## 支持的列类型
     "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
@@ -37,4 +43,10 @@ create index idx using bitmap on hive.hindex.users (gender) where regionkey in (
 使用:
 ```sql
 select name from hive.hindex.users where gender="female"
+select * from hive.hindex.users where id>123
+select * from hive.hindex.users where id<123
+select * from hive.hindex.users where id>=123
+select * from hive.hindex.users where id<=123
+select * from hive.hindex.users where id between (100, 200)
+select * from hive.hindex.users where id in (123, 199)
 ```

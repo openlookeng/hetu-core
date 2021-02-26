@@ -18,6 +18,25 @@
         <org.slf4j.version>1.7.30</org.slf4j.version>
     </properties>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!--disable resusefork so the same JVM is not shared by testcases.
+                    Hindex relies on a static cache in SplitFiltering.java, if multiple
+                    testcases spawn multiple testservers via DistributedQueryRunner
+                    there will be conflicts because all testservers will use the same
+                    cache instance; this is only an issue during unit testing, in production
+                    multiple servers do not share JVMs-->
+                    <forkCount>2</forkCount>
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>

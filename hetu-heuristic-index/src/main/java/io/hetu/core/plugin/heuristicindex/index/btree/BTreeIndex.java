@@ -250,6 +250,8 @@ public class BTreeIndex
                         concurrentNavigableMap = dataMap.subMap(key, true, dataMap.lastKey(), true);
                         result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
                         break;
+                    default:
+                        throw new UnsupportedOperationException("Expression not supported");
                 }
             }
         }
@@ -270,6 +272,8 @@ public class BTreeIndex
                         }
                     }
                     break;
+                default:
+                    throw new UnsupportedOperationException("Expression not supported");
             }
         }
         else {

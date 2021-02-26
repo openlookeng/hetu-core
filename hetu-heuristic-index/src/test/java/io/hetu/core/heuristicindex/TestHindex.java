@@ -35,9 +35,7 @@ public class TestHindex
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
-        String[] testerData = createTableDataTypeWithQuery(tableName, dataType);
-        tableName = testerData[0];
-        String testerQuery = testerData[1];
+        String testerQuery = createTableDataTypeWithQuery(tableName, dataType);
 
         // Get splits and result
         Pair<Integer, MaterializedResult> resultPairBeforeIndex = getSplitAndMaterializedResult(testerQuery);
@@ -101,7 +99,7 @@ public class TestHindex
             throws InterruptedException
     {
         String tableName = getNewTableName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
         String indexName = getNewIndexName();
 
@@ -166,7 +164,7 @@ public class TestHindex
             throws InterruptedException
     {
         String tableName = getNewTableName();
-        tableName = createTable2(tableName);
+        createTable2(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
         String indexName = getNewIndexName();
 
@@ -240,7 +238,7 @@ public class TestHindex
             throws InterruptedException
     {
         String tableName = getNewTableName();
-        tableName = createTableNullData(tableName);
+        createTableNullData(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
         String indexName = getNewIndexName();
 
@@ -297,7 +295,7 @@ public class TestHindex
     {
         String tableName = getNewTableName();
         String testerQuery = "SELECT * FROM " + tableName + " WHERE id = 2";
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         // Get splits and result
         Pair<Integer, MaterializedResult> resultPairBeforeIndex = getSplitAndMaterializedResult(testerQuery);
@@ -345,7 +343,7 @@ public class TestHindex
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         String testerQuery = "SELECT * FROM " + tableName + " WHERE id = 2";
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         // Get splits and result
         Pair<Integer, MaterializedResult> resultPairBeforeIndex = getSplitAndMaterializedResult(testerQuery);
@@ -389,7 +387,7 @@ public class TestHindex
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
-        tableName = createTable1(tableName);
+        createTable1(tableName);
 
         // Create index
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
@@ -480,53 +478,32 @@ public class TestHindex
         }
     }
 
-    @Test
-    public void testBtreeIndexMultiPartitionedColumn()
+    @Test(dataProvider = "queryOperatorTest")
+    public void testQueryOperator(String testerQuery, String indexType)
             throws InterruptedException
     {
         String tableName = getNewTableName();
-        tableName = createBtreeTableMultiPart1(tableName);
+        createTable1(tableName);
+        testerQuery = "SELECT * FROM " + tableName + " WHERE " + testerQuery;
+        String indexName = getNewIndexName();
 
-        String indexName1 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName +
-                " (key1) WITH (level=partition) WHERE key3 = 222");
+        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
+            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                    indexType + " ON " + tableName + " (id) WITH (level='table')");
+        }
+        else {
+            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                    indexType + " ON " + tableName + " (id)");
+        }
 
-        String testerQuery1 = "SELECT * FROM " + tableName + " WHERE key1 = 2";
-
-        Pair<Integer, MaterializedResult> resultPairLoadingIndex1 = getSplitAndMaterializedResult(testerQuery1);
-        int splitsLoadingIndex1 = resultPairLoadingIndex1.getFirst();
-        MaterializedResult resultLoadingIndex1 = resultPairLoadingIndex1.getSecond();
-
-        // Wait before continuing
-        Thread.sleep(1000);
-
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded1 = getSplitAndMaterializedResult(testerQuery1);
-        int splitsIndexLoaded1 = resultPairIndexLoaded1.getFirst();
-        MaterializedResult resultIndexLoaded1 = resultPairIndexLoaded1.getSecond();
-
-        assertEquals(splitsLoadingIndex1, splitsIndexLoaded1);
-        assertTrue(verifyEqualResults(resultLoadingIndex1, resultIndexLoaded1), "The results should be equal.");
-
-        // Create second index and do query again on different keys
-
-        String indexName2 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
-                " (key2) WITH (level=partition) WHERE key5 = 22222");
-
-        String testerQuery2 = "SELECT * FROM " + tableName + " WHERE key2 = 22";
-
-        Pair<Integer, MaterializedResult> resultPairLoadingIndex2 = getSplitAndMaterializedResult(testerQuery2);
-        int splitsLoadingIndex2 = resultPairLoadingIndex2.getFirst();
-        MaterializedResult resultLoadingIndex2 = resultPairLoadingIndex2.getSecond();
+        MaterializedResult resultLoadingIndex = computeActual(testerQuery);
 
         // Wait before continuing
         Thread.sleep(1000);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded2 = getSplitAndMaterializedResult(testerQuery2);
-        int splitsIndexLoaded2 = resultPairIndexLoaded2.getFirst();
-        MaterializedResult resultIndexLoaded2 = resultPairIndexLoaded2.getSecond();
+        MaterializedResult resultIndexLoaded = computeActual(testerQuery);
 
-        assertEquals(splitsLoadingIndex2, splitsIndexLoaded2);
-        assertTrue(verifyEqualResults(resultLoadingIndex2, resultIndexLoaded2), "The results should be equal.");
+        assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded),
+                "The results should be equal for " + testerQuery + " " + indexType);
     }
 }

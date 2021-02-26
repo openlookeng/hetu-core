@@ -24,6 +24,12 @@ such as a Gender column.
 ## Supported operators
 
     =       Equality
+    >       Greater than
+    >=      Greater than or equal
+    <       Less than
+    <=      Less than or equal
+    BETWEEN Between range
+    IN      IN set
 
 ## Supported column types
     "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
@@ -42,4 +48,10 @@ create index idx using bitmap on hive.hindex.users (gender) where regionkey in (
 Using index:
 ```sql
 select name from hive.hindex.users where gender="female"
+select * from hive.hindex.users where id>123
+select * from hive.hindex.users where id<123
+select * from hive.hindex.users where id>=123
+select * from hive.hindex.users where id<=123
+select * from hive.hindex.users where id between (100, 200)
+select * from hive.hindex.users where id in (123, 199)
 ```
