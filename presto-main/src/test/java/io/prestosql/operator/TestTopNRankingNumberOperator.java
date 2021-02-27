@@ -28,7 +28,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,6 +44,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.GroupByHashYieldAssertion.createPagesWithDistinctHashKeys;
 import static io.prestosql.operator.GroupByHashYieldAssertion.finishOperatorWithYieldingGroupByHash;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithStateComparison;
 import static io.prestosql.operator.TopNRankingNumberOperator.TopNRankingNumberOperatorFactory;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -191,6 +195,231 @@ public class TestTopNRankingNumberOperator
                 .row(0.1, 3L, 1L)
                 .build();
         assertOperatorEquals(operatorFactory, driverContext, input, denseRankNumberExpected);
+    }
+
+    @Test
+    public void testPartitionedSnapshot()
+    {
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(true, Ints.asList(0), BIGINT, DOUBLE);
+        List<Page> input = rowPagesBuilder
+                .row(1L, 0.1)
+                .row(2L, 0.1)
+                .row(3L, 0.1)
+                .row(3L, 0.1)
+                .pageBreak()
+                .row(1L, 0.2)
+                .pageBreak()
+                .row(1L, 0.2)
+                .row(1L, 0.2)
+                .row(2L, 0.3)
+                .row(2L, 0.4)
+                .pageBreak()
+                .row(2L, 0.3)
+                .build();
+        // row_number() over(partition by 0 order by 1) top 3
+        TopNRankingNumberOperatorFactory operatorFactory = new TopNRankingNumberOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(BIGINT, DOUBLE),
+                Ints.asList(1, 0),
+                Ints.asList(0),
+                ImmutableList.of(BIGINT),
+                Ints.asList(1),
+                ImmutableList.of(SortOrder.ASC_NULLS_LAST),
+                3,
+                false,
+                Optional.empty(),
+                10,
+                joinCompiler,
+                Optional.of(RankingFunction.ROW_NUMBER));
+        MaterializedResult rowNumberExpected = resultBuilder(driverContext.getSession(), DOUBLE, BIGINT, BIGINT)
+                .row(0.1, 1L, 1L)
+                .row(0.2, 1L, 2L)
+                .row(0.2, 1L, 3L)
+                .row(0.1, 2L, 1L)
+                .row(0.3, 2L, 2L)
+                .row(0.3, 2L, 3L)
+                .row(0.1, 3L, 1L)
+                .row(0.1, 3L, 2L)
+                .build();
+        assertOperatorEqualsWithStateComparison(operatorFactory, driverContext, input, rowNumberExpected, createExpectedMappingRestore());
+        // rank() over(partition by 0 order by 1) top 3
+        operatorFactory = new TopNRankingNumberOperatorFactory(
+                1,
+                new PlanNodeId("test"),
+                ImmutableList.of(BIGINT, DOUBLE),
+                Ints.asList(1, 0),
+                Ints.asList(0),
+                ImmutableList.of(BIGINT),
+                Ints.asList(1),
+                ImmutableList.of(SortOrder.ASC_NULLS_LAST),
+                3,
+                false,
+                Optional.empty(),
+                10,
+                joinCompiler,
+                Optional.of(RankingFunction.RANK));
+        MaterializedResult rankNumberExpected = resultBuilder(driverContext.getSession(), DOUBLE, BIGINT, BIGINT)
+                .row(0.1, 1L, 1L)
+                .row(0.2, 1L, 2L)
+                .row(0.2, 1L, 2L)
+                .row(0.2, 1L, 2L)
+                .row(0.1, 2L, 1L)
+                .row(0.3, 2L, 2L)
+                .row(0.3, 2L, 2L)
+                .row(0.1, 3L, 1L)
+                .row(0.1, 3L, 1L)
+                .build();
+        assertOperatorEqualsWithStateComparison(operatorFactory, driverContext, input, rankNumberExpected, createExpectedMappingRestore());
+        // dense_rank() over(partition by 0 order by 1) top 3
+        operatorFactory = new TopNRankingNumberOperatorFactory(
+                2,
+                new PlanNodeId("test"),
+                ImmutableList.of(BIGINT, DOUBLE),
+                Ints.asList(1, 0),
+                Ints.asList(0),
+                ImmutableList.of(BIGINT),
+                Ints.asList(1),
+                ImmutableList.of(SortOrder.ASC_NULLS_LAST),
+                3,
+                false,
+                Optional.empty(),
+                10,
+                joinCompiler,
+                Optional.of(RankingFunction.DENSE_RANK));
+        MaterializedResult denseRankNumberExpected = resultBuilder(driverContext.getSession(), DOUBLE, BIGINT, BIGINT)
+                .row(0.1, 1L, 1L)
+                .row(0.2, 1L, 2L)
+                .row(0.2, 1L, 2L)
+                .row(0.2, 1L, 2L)
+                .row(0.1, 2L, 1L)
+                .row(0.3, 2L, 2L)
+                .row(0.3, 2L, 2L)
+                .row(0.4, 2L, 3L)
+                .row(0.1, 3L, 1L)
+                .row(0.1, 3L, 1L)
+                .build();
+        assertOperatorEqualsWithStateComparison(operatorFactory, driverContext, input, denseRankNumberExpected, createExpectedMappingRestoreDenseRank());
+    }
+
+    //For Rank and RowNumber RowHeap
+    private Map<String, Object> createExpectedMappingRestore()
+    {
+        Map<String, Object> operatorSnapshotMapping = new HashMap<>();
+
+        operatorSnapshotMapping.put("operatorContext", 0);
+        operatorSnapshotMapping.put("localUserMemoryContext", 51816L);
+
+        //TopNRankingNumberOperator.groupByHash
+        Map<String, Object> groupByHashMapping = new HashMap<>();
+        Map<String, Object> values = new HashMap<>();
+        Map<String, Object> groupIds = new HashMap<>();
+        Map<String, Object> valuesByGroupId = new HashMap<>();
+        operatorSnapshotMapping.put("groupByHash", groupByHashMapping);
+        groupByHashMapping.put("hashCapacity", 16);
+        groupByHashMapping.put("maxFill", 12);
+        groupByHashMapping.put("mask", 15);
+        groupByHashMapping.put("values", values);
+        groupByHashMapping.put("groupIds", groupIds);
+        groupByHashMapping.put("nullGroupId", -1);
+        groupByHashMapping.put("valuesByGroupId", valuesByGroupId);
+        groupByHashMapping.put("nextGroupId", 3);
+        groupByHashMapping.put("hashCollisions", 0L);
+        groupByHashMapping.put("expectedHashCollisions", 0.0);
+        groupByHashMapping.put("preallocatedMemoryInBytes", 0L);
+        groupByHashMapping.put("currentPageSizeInBytes", 356L);
+        values.put("array", long[][].class);
+        values.put("capacity", 1024);
+        values.put("segments", 1);
+        groupIds.put("array", int[][].class);
+        groupIds.put("capacity", 1024);
+        groupIds.put("segments", 1);
+        valuesByGroupId.put("array", long[][].class);
+        valuesByGroupId.put("capacity", 1024);
+        valuesByGroupId.put("segments", 1);
+
+        //TopNRankingNumberOperator.groupedTopNBuilder
+        Map<String, Object> groupedTopNBuilderMapping = new HashMap<>();
+        Map<String, Object> groupedRowsMapping = new HashMap<>();
+        Map<String, Object> pageReferencesMapping = new HashMap<>();
+        List<Integer> emptyPageReferenceSlots = new ArrayList<>();
+        operatorSnapshotMapping.put("groupedTopNBuilder", groupedTopNBuilderMapping);
+        groupedTopNBuilderMapping.put("groupByHash", groupByHashMapping);
+        groupedTopNBuilderMapping.put("groupedRows", groupedRowsMapping);
+        groupedTopNBuilderMapping.put("pageReferences", pageReferencesMapping);
+        groupedTopNBuilderMapping.put("emptyPageReferenceSlots", emptyPageReferenceSlots);
+        groupedTopNBuilderMapping.put("memorySizeInBytes", 2128L);
+        groupedTopNBuilderMapping.put("currentPageCount", 2);
+        groupedRowsMapping.put("array", Object[][].class);
+        groupedRowsMapping.put("capacity", 1024);
+        groupedRowsMapping.put("segments", 1);
+        pageReferencesMapping.put("array", Object[][].class);
+        pageReferencesMapping.put("capacity", 1024);
+        pageReferencesMapping.put("segments", 1);
+
+        operatorSnapshotMapping.put("finishing", false);
+
+        return operatorSnapshotMapping;
+    }
+
+    //For DenseRankRowHeap
+    private Map<String, Object> createExpectedMappingRestoreDenseRank()
+    {
+        Map<String, Object> operatorSnapshotMapping = new HashMap<>();
+
+        operatorSnapshotMapping.put("operatorContext", 0);
+        operatorSnapshotMapping.put("localUserMemoryContext", 51812L);
+
+        //TopNRankingNumberOperator.groupByHash
+        Map<String, Object> groupByHashMapping = new HashMap<>();
+        Map<String, Object> values = new HashMap<>();
+        Map<String, Object> groupIds = new HashMap<>();
+        Map<String, Object> valuesByGroupId = new HashMap<>();
+        operatorSnapshotMapping.put("groupByHash", groupByHashMapping);
+        groupByHashMapping.put("hashCapacity", 16);
+        groupByHashMapping.put("maxFill", 12);
+        groupByHashMapping.put("mask", 15);
+        groupByHashMapping.put("values", values);
+        groupByHashMapping.put("groupIds", groupIds);
+        groupByHashMapping.put("nullGroupId", -1);
+        groupByHashMapping.put("valuesByGroupId", valuesByGroupId);
+        groupByHashMapping.put("nextGroupId", 3);
+        groupByHashMapping.put("hashCollisions", 0L);
+        groupByHashMapping.put("expectedHashCollisions", 0.0);
+        groupByHashMapping.put("preallocatedMemoryInBytes", 0L);
+        groupByHashMapping.put("currentPageSizeInBytes", 356L);
+        values.put("array", long[][].class);
+        values.put("capacity", 1024);
+        values.put("segments", 1);
+        groupIds.put("array", int[][].class);
+        groupIds.put("capacity", 1024);
+        groupIds.put("segments", 1);
+        valuesByGroupId.put("array", long[][].class);
+        valuesByGroupId.put("capacity", 1024);
+        valuesByGroupId.put("segments", 1);
+
+        //TopNRankingNumberOperator.groupedTopNBuilder
+        Map<String, Object> groupedTopNBuilderMapping = new HashMap<>();
+        Map<String, Object> groupedRowsMapping = new HashMap<>();
+        Map<String, Object> pageReferencesMapping = new HashMap<>();
+        List<Integer> emptyPageReferenceSlots = new ArrayList<>();
+        operatorSnapshotMapping.put("groupedTopNBuilder", groupedTopNBuilderMapping);
+        groupedTopNBuilderMapping.put("groupByHash", groupByHashMapping);
+        groupedTopNBuilderMapping.put("groupedRows", groupedRowsMapping);
+        groupedTopNBuilderMapping.put("pageReferences", pageReferencesMapping);
+        groupedTopNBuilderMapping.put("emptyPageReferenceSlots", emptyPageReferenceSlots);
+        groupedTopNBuilderMapping.put("memorySizeInBytes", 2124L);
+        groupedTopNBuilderMapping.put("currentPageCount", 2);
+        groupedRowsMapping.put("array", Object[][].class);
+        groupedRowsMapping.put("capacity", 1024);
+        groupedRowsMapping.put("segments", 1);
+        pageReferencesMapping.put("array", Object[][].class);
+        pageReferencesMapping.put("capacity", 1024);
+        pageReferencesMapping.put("segments", 1);
+
+        operatorSnapshotMapping.put("finishing", false);
+
+        return operatorSnapshotMapping;
     }
 
     @Test(dataProvider = "partial")

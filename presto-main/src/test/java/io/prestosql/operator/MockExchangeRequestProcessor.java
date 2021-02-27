@@ -47,7 +47,7 @@ import static io.prestosql.client.PrestoHeaders.PRESTO_BUFFER_COMPLETE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_PAGE_NEXT_TOKEN;
 import static io.prestosql.client.PrestoHeaders.PRESTO_PAGE_TOKEN;
 import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
-import static io.prestosql.execution.buffer.TestingPagesSerdeFactory.testingPagesSerde;
+import static io.prestosql.testing.TestingPagesSerdeFactory.testingPagesSerde;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 

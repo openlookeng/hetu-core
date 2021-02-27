@@ -15,11 +15,15 @@ package io.prestosql.operator.project;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.collect.Iterators.transform;
@@ -29,6 +33,7 @@ import static io.prestosql.operator.PageAssertions.assertPageEquals;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.RealType.REAL;
+import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.lang.Math.toIntExact;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -117,6 +122,39 @@ public class TestMergingPageOutput
         assertPageEquals(TYPES, output.getOutput(), smallPage);
         assertFalse(output.needsInput());
         assertSame(output.getOutput(), bigPage);
+    }
+
+    @Test
+    public void testFlushOnBigPageSnapshot()
+    {
+        Page smallPage = createSequencePage(TYPES, 10);
+        Page bigPage = createSequencePage(TYPES, 100);
+
+        MergingPageOutput output = new MergingPageOutput(TYPES, bigPage.getSizeInBytes(), bigPage.getPositionCount(), Integer.MAX_VALUE);
+
+        assertTrue(output.needsInput());
+        assertNull(output.getOutput());
+
+        output.addInput(createPagesIterator(smallPage));
+        assertFalse(output.needsInput());
+        assertNull(output.getOutput());
+        assertTrue(output.needsInput());
+
+        Object snapshot = output.capture(TestingPagesSerdeFactory.testingPagesSerde());
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+
+        output.addInput(createPagesIterator(bigPage));
+        assertFalse(output.needsInput());
+        assertPageEquals(TYPES, output.getOutput(), smallPage);
+        assertFalse(output.needsInput());
+        assertSame(output.getOutput(), bigPage);
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("finishing", false);
+        return expectedMapping;
     }
 
     @Test

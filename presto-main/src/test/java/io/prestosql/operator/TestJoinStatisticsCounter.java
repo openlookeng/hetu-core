@@ -14,7 +14,13 @@
 package io.prestosql.operator;
 
 import io.prestosql.operator.LookupJoinOperators.JoinType;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.testng.Assert.assertEquals;
@@ -112,6 +118,152 @@ public class TestJoinStatisticsCounter
         info = counter.get();
         assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 2, 3), info.getLogHistogramProbes());
         assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 111, 1001101), info.getLogHistogramOutput());
+    }
+
+    @Test
+    public void testRecordSnapshot()
+    {
+        JoinStatisticsCounter counter = new JoinStatisticsCounter(JoinType.INNER);
+        JoinOperatorInfo info = counter.get();
+        assertEquals(makeHistogramArray(0, 0, 0, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 0, 0, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+
+        // 0 to 4 buckets
+        counter.recordProbe(0);
+        info = counter.get();
+        assertEquals(makeHistogramArray(1, 0, 0, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 0, 0, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(0);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 0, 0, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 0, 0, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+
+        counter.recordProbe(1);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 1, 0, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 1, 0, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(1);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 0, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 0, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+
+        counter.recordProbe(2);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 1, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 2, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(2);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 0, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 0, 0, 0, 0, 0), info.getLogHistogramOutput());
+
+        counter.recordProbe(3);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 1, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 3, 0, 0, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(3);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 0, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 0, 0, 0, 0), info.getLogHistogramOutput());
+
+        counter.recordProbe(4);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 1, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 4, 0, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(4);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 0, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 0, 0, 0), info.getLogHistogramOutput());
+
+        Object snapshot = counter.capture(null);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+
+        // 5 to 10
+        counter.recordProbe(5);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 1, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 5, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(6);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 2, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 11, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(10);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 0, 0), info.getLogHistogramOutput());
+
+        // 11 to 100
+        counter.recordProbe(11);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 1, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 11, 0), info.getLogHistogramOutput());
+        counter.recordProbe(100);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 2, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 111, 0), info.getLogHistogramOutput());
+
+        counter.restore(snapshot, null);
+
+        // 5 to 10
+        counter.recordProbe(5);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 1, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 5, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(6);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 2, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 11, 0, 0), info.getLogHistogramOutput());
+        counter.recordProbe(10);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 0, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 0, 0), info.getLogHistogramOutput());
+
+        // 11 to 100
+        counter.recordProbe(11);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 1, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 11, 0), info.getLogHistogramOutput());
+        counter.recordProbe(100);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 2, 0), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 111, 0), info.getLogHistogramOutput());
+
+        // 101 and more
+        counter.recordProbe(101);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 2, 1), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 111, 101), info.getLogHistogramOutput());
+        counter.recordProbe(1000);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 2, 2), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 111, 1101), info.getLogHistogramOutput());
+        counter.recordProbe(1000000);
+        info = counter.get();
+        assertEquals(makeHistogramArray(2, 2, 2, 2, 2, 3, 2, 3), info.getLogHistogramProbes());
+        assertEquals(makeHistogramArray(0, 2, 4, 6, 8, 21, 111, 1001101), info.getLogHistogramOutput());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        List<Long> logHistogramCounter = new ArrayList<>();
+        logHistogramCounter.add(2L);
+        logHistogramCounter.add(0L);
+        logHistogramCounter.add(2L);
+        logHistogramCounter.add(2L);
+        logHistogramCounter.add(2L);
+        logHistogramCounter.add(4L);
+        logHistogramCounter.add(2L);
+        logHistogramCounter.add(6L);
+        logHistogramCounter.add(2L);
+        logHistogramCounter.add(8L);
+        logHistogramCounter.add(0L);
+        logHistogramCounter.add(0L);
+        logHistogramCounter.add(0L);
+        logHistogramCounter.add(0L);
+        logHistogramCounter.add(0L);
+        logHistogramCounter.add(0L);
+        expectedMapping.put("logHistogramCounters", logHistogramCounter);
+        return expectedMapping;
     }
 
     private long[] makeHistogramArray(long... longArray)

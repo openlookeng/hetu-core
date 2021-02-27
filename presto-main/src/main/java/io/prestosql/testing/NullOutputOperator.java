@@ -13,12 +13,12 @@
  */
 package io.prestosql.testing;
 
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.OutputFactory;
+import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.RestorableConfig;
@@ -37,7 +37,12 @@ public class NullOutputOperator
             implements OutputFactory
     {
         @Override
-        public OperatorFactory createOutputOperator(int operatorId, PlanNodeId planNodeId, List<Type> types, Function<Page, Page> pagePreprocessor, PagesSerdeFactory serdeFactory)
+        public OperatorFactory createOutputOperator(
+                int operatorId,
+                PlanNodeId planNodeId,
+                List<Type> types,
+                Function<Page, Page> pagePreprocessor,
+                TaskContext taskContext)
         {
             return new NullOutputOperatorFactory(operatorId, planNodeId);
         }

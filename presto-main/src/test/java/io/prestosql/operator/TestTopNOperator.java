@@ -26,7 +26,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -35,6 +38,7 @@ import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleStateComparison;
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
 import static io.prestosql.spi.block.SortOrder.DESC_NULLS_LAST;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -131,6 +135,70 @@ public class TestTopNOperator
                 .build();
 
         assertOperatorEquals(operatorFactory, driverContext, input, expected);
+    }
+
+    @Test
+    public void testMultiFieldKeySnapshot()
+    {
+        List<Page> input = rowPagesBuilder(VARCHAR, BIGINT)
+                .row("a", 1L)
+                .row("b", 2L)
+                .pageBreak()
+                .row("f", 3L)
+                .row("a", 4L)
+                .pageBreak()
+                .row("d", 5L)
+                .row("d", 7L)
+                .row("e", 6L)
+                .build();
+
+        OperatorFactory operatorFactory = topNOperatorFactory(
+                ImmutableList.of(VARCHAR, BIGINT),
+                3,
+                ImmutableList.of(0, 1),
+                ImmutableList.of(DESC_NULLS_LAST, DESC_NULLS_LAST));
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT)
+                .row("f", 3L)
+                .row("e", 6L)
+                .row("d", 7L)
+                .build();
+
+        assertOperatorEqualsWithSimpleStateComparison(operatorFactory, driverContext, input, expected, createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        Map<String, Object> workProcessorOperatorMapping = new HashMap<>();
+        Map<String, Object> topNBuilderMapping = new HashMap<>();
+        Map<String, Object> groupedRowsMapping = new HashMap<>();
+        Map<String, Object> pageReferencesMapping = new HashMap<>();
+        List<Integer> emptyPageReferenceSlots = new ArrayList<>();
+
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("workProcessorOperator", workProcessorOperatorMapping);
+
+        workProcessorOperatorMapping.put("localUserMemoryContext", 19152L);
+        workProcessorOperatorMapping.put("topNBuilder", topNBuilderMapping);
+        workProcessorOperatorMapping.put("outputIterator", false);
+
+        topNBuilderMapping.put("groupByHash", 1);
+        topNBuilderMapping.put("groupedRows", groupedRowsMapping);
+        topNBuilderMapping.put("pageReferences", pageReferencesMapping);
+        topNBuilderMapping.put("emptyPageReferenceSlots", emptyPageReferenceSlots);
+        topNBuilderMapping.put("memorySizeInBytes", 2496L);
+        topNBuilderMapping.put("currentPageCount", 2);
+
+        groupedRowsMapping.put("array", Object[][].class);
+        groupedRowsMapping.put("capacity", 1024);
+        groupedRowsMapping.put("segments", 1);
+
+        pageReferencesMapping.put("array", Object[][].class);
+        pageReferencesMapping.put("capacity", 1024);
+        pageReferencesMapping.put("segments", 1);
+
+        return expectedMapping;
     }
 
     @Test

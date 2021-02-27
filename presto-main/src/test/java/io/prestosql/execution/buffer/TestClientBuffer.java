@@ -460,7 +460,7 @@ public class TestClientBuffer
         }
 
         @Override
-        public synchronized List<SerializedPageReference> getPages(DataSize maxSize)
+        public synchronized List<SerializedPageReference> getPages(ClientBuffer client, DataSize maxSize)
         {
             long maxBytes = maxSize.toBytes();
             List<SerializedPageReference> pages = new ArrayList<>();

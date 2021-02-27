@@ -50,7 +50,9 @@ import io.prestosql.protocol.SmileModule;
 import io.prestosql.server.HttpRemoteTaskFactory;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.TaskUpdateRequest;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.ErrorCode;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
@@ -74,7 +76,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -95,6 +100,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.protocol.SmileCodecBinder.smileCodecBinder;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_MISMATCH;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.lang.Math.min;
 import static java.lang.String.format;
@@ -170,6 +176,28 @@ public class TestHttpRemoteTask
         httpRemoteTaskFactory.stop();
     }
 
+    @Test(timeOut = 30000)
+    public void testEmptyTaskSource()
+            throws Exception
+    {
+        AtomicLong lastActivityNanos = new AtomicLong(System.nanoTime());
+        TestingTaskResource testingTaskResource = new TestingTaskResource(lastActivityNanos, FailureScenario.NO_FAILURE);
+
+        HttpRemoteTaskFactory httpRemoteTaskFactory = createHttpRemoteTaskFactory(testingTaskResource);
+
+        RemoteTask remoteTask = createRemoteTask(httpRemoteTaskFactory);
+
+        testingTaskResource.setInitialTaskInfo(remoteTask.getTaskInfo());
+        remoteTask.start();
+
+        remoteTask.noMoreSplits(TABLE_SCAN_NODE_ID, Lifespan.taskWide());
+        poll(() -> testingTaskResource.getRequests().size() > 0);
+        assertEquals(testingTaskResource.getRequests().get(0).getSources().size(), 1);
+        assertEquals(testingTaskResource.getRequests().get(0).getSources().get(0).getSplits().size(), 0);
+
+        httpRemoteTaskFactory.stop();
+    }
+
     private void runTest(FailureScenario failureScenario)
             throws Exception
     {
@@ -214,7 +242,9 @@ public class TestHttpRemoteTask
                 OptionalInt.empty(),
                 createInitialEmptyOutputBuffers(OutputBuffers.BufferType.BROADCAST),
                 new NodeTaskMap.PartitionedSplitCountTracker(i -> {}),
-                true, Optional.empty());
+                true,
+                Optional.empty(),
+                new QuerySnapshotManager(new QueryId("test"), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
     }
 
     private static HttpRemoteTaskFactory createHttpRemoteTaskFactory(TestingTaskResource testingTaskResource)
@@ -329,7 +359,7 @@ public class TestHttpRemoteTask
         private final AtomicLong lastActivityNanos;
         private final FailureScenario failureScenario;
 
-        private AtomicReference<TestingHttpClient> httpClient = new AtomicReference<>();
+        private final AtomicReference<TestingHttpClient> httpClient = new AtomicReference<>();
 
         private TaskInfo initialTaskInfo;
         private TaskStatus initialTaskStatus;
@@ -338,6 +368,8 @@ public class TestHttpRemoteTask
         private String taskInstanceId = INITIAL_TASK_INSTANCE_ID;
 
         private long statusFetchCounter;
+
+        private final List<TaskUpdateRequest> requests = Collections.synchronizedList(new ArrayList<>());
 
         public TestingTaskResource(AtomicLong lastActivityNanos, FailureScenario failureScenario)
         {
@@ -374,6 +406,10 @@ public class TestHttpRemoteTask
                 TaskUpdateRequest taskUpdateRequest,
                 @Context UriInfo uriInfo)
         {
+            if (taskUpdateRequest.getSources().size() > 0) {
+                requests.add(taskUpdateRequest);
+            }
+
             for (TaskSource source : taskUpdateRequest.getSources()) {
                 taskSourceMap.compute(source.getPlanNodeId(), (planNodeId, taskSource) -> taskSource == null ? source : taskSource.update(source));
             }
@@ -388,6 +424,11 @@ public class TestHttpRemoteTask
                 return null;
             }
             return new TaskSource(source.getPlanNodeId(), source.getSplits(), source.getNoMoreSplitsForLifespan(), source.isNoMoreSplits());
+        }
+
+        public synchronized List<TaskUpdateRequest> getRequests()
+        {
+            return requests;
         }
 
         @GET

@@ -15,6 +15,7 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -62,6 +63,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
+import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -69,6 +71,10 @@ import static io.prestosql.testing.TestingHandles.TEST_TABLE_HANDLE;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
@@ -100,11 +106,16 @@ public class TestDriver
         scheduledExecutor.shutdownNow();
     }
 
+    private ValuesOperator createValuesOperator(OperatorContext operatorContext, List<Page> pages)
+    {
+        return new ValuesOperator(operatorContext, pages, 0);
+    }
+
     @Test
     public void testNormalFinish()
     {
         List<Type> types = ImmutableList.of(VARCHAR, BIGINT, BIGINT);
-        ValuesOperator source = new ValuesOperator(driverContext.addOperatorContext(0, new PlanNodeId("test"), "values"), rowPagesBuilder(types)
+        ValuesOperator source = createValuesOperator(driverContext.addOperatorContext(0, new PlanNodeId("test"), "values"), rowPagesBuilder(types)
                 .addSequencePage(10, 20, 30, 40)
                 .build());
 
@@ -128,7 +139,7 @@ public class TestDriver
     {
         List<Type> types = ImmutableList.of(VARCHAR, BIGINT, BIGINT);
         OperatorContext operatorContext = driverContext.addOperatorContext(0, new PlanNodeId("test"), "values");
-        ValuesOperator source = new ValuesOperator(operatorContext, rowPagesBuilder(types)
+        ValuesOperator source = createValuesOperator(operatorContext, rowPagesBuilder(types)
                 .addSequencePage(10, 20, 30, 40)
                 .build());
 
@@ -146,7 +157,7 @@ public class TestDriver
     public void testAbruptFinish()
     {
         List<Type> types = ImmutableList.of(VARCHAR, BIGINT, BIGINT);
-        ValuesOperator source = new ValuesOperator(driverContext.addOperatorContext(0, new PlanNodeId("test"), "values"), rowPagesBuilder(types)
+        ValuesOperator source = createValuesOperator(driverContext.addOperatorContext(0, new PlanNodeId("test"), "values"), rowPagesBuilder(types)
                 .addSequencePage(10, 20, 30, 40)
                 .build());
 
@@ -341,6 +352,42 @@ public class TestDriver
         }
     }
 
+    @Test
+    public void testAllowMarker()
+            throws Exception
+    {
+        DriverContext context = createTaskContext(executor, scheduledExecutor, TEST_SNAPSHOT_SESSION)
+                .addPipelineContext(0, true, true, false)
+                .addDriverContext();
+        OperatorContext operatorContext = mock(OperatorContext.class);
+        when(operatorContext.isWaitingForMemory()).thenReturn(Futures.immediateFuture(null));
+        when(operatorContext.isWaitingForRevocableMemory()).thenReturn(Futures.immediateFuture(null));
+        when(operatorContext.isMemoryRevokingRequested()).thenReturn(false);
+        Operator op1 = mock(Operator.class);
+        Operator op2 = mock(Operator.class);
+        when(op1.getOperatorContext()).thenReturn(operatorContext);
+        when(op1.isBlocked()).thenReturn(Futures.immediateFuture(null));
+        when(op2.getOperatorContext()).thenReturn(operatorContext);
+        when(op2.isBlocked()).thenReturn(Futures.immediateFuture(null));
+        Driver driver = Driver.createDriver(context, op1, op2);
+
+        when(op2.needsInput()).thenReturn(false);
+        when(op2.allowMarker()).thenReturn(false);
+        driver.process().get();
+        verify(op1, never()).getOutput();
+        verify(op1, never()).pollMarker();
+
+        when(op2.allowMarker()).thenReturn(true);
+        driver.process().get();
+        verify(op1, never()).getOutput();
+        verify(op1).pollMarker(); // New invocation
+
+        when(op2.needsInput()).thenReturn(true);
+        driver.process().get();
+        verify(op1).getOutput(); // New invocation
+        verify(op1).pollMarker(); // Same as before (no new invocation)
+    }
+
     private void assertDriverInterrupted(Throwable cause)
     {
         checkArgument(cause instanceof PrestoException, "Expected root cause exception to be an instance of PrestoException");
@@ -476,6 +523,7 @@ public class TestDriver
         }
     }
 
+    @RestorableConfig(unsupported = true)
     private static class AlwaysBlockedMemoryRevokingTableScanOperator
             extends TableScanOperator
     {
@@ -501,6 +549,7 @@ public class TestDriver
         }
     }
 
+    @RestorableConfig(unsupported = true)
     private static class NotBlockedTableScanOperator
             extends TableScanOperator
     {

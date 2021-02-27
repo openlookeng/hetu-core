@@ -14,6 +14,7 @@
  */
 package io.prestosql.seedstore;
 
+import com.google.common.collect.ImmutableSet;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
@@ -113,8 +114,8 @@ public class TestSeedStoreManager
         seedStoreManager.addSeed(location2, true);
         Collection<Seed> result = seedStoreManager.getAllSeeds();
         Assert.assertEquals(result.size(), 2);
-        Assert.assertTrue(result.stream().filter(s -> s.getLocation().equals(location1)).findAny().isPresent());
-        Assert.assertTrue(result.stream().filter(s -> s.getLocation().equals(location2)).findAny().isPresent());
+        Assert.assertTrue(result.stream().anyMatch(s -> s.getLocation().equals(location1)));
+        Assert.assertTrue(result.stream().anyMatch(s -> s.getLocation().equals(location2)));
 
         long timestamp1Old = result.stream().filter(s -> s.getLocation().equals(location1)).findAny().get().getTimestamp();
         long timestamp2Old = result.stream().filter(s -> s.getLocation().equals(location2)).findAny().get().getTimestamp();
@@ -285,7 +286,7 @@ public class TestSeedStoreManager
             implements SeedStore
     {
         private static final int INITIAL_SIZE = 0;
-        private Set<Seed> seeds;
+        private final Set<Seed> seeds;
 
         /**
          * Constructor for the mock seed store
@@ -296,7 +297,7 @@ public class TestSeedStoreManager
         }
 
         @Override
-        public Collection<Seed> add(Collection<Seed> seedsToAdd)
+        public synchronized Collection<Seed> add(Collection<Seed> seedsToAdd)
         {
             // overwrite all seeds
             this.seeds.removeAll(seedsToAdd);
@@ -305,13 +306,13 @@ public class TestSeedStoreManager
         }
 
         @Override
-        public Collection<Seed> get()
+        public synchronized Collection<Seed> get()
         {
-            return seeds;
+            return ImmutableSet.copyOf(seeds);
         }
 
         @Override
-        public Collection<Seed> remove(Collection<Seed> seedsToRemove)
+        public synchronized Collection<Seed> remove(Collection<Seed> seedsToRemove)
         {
             this.seeds.removeAll(seedsToRemove);
             return this.seeds;

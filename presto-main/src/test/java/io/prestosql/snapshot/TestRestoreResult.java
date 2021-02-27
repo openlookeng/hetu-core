@@ -1,0 +1,49 @@
+/*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.prestosql.snapshot;
+
+import io.prestosql.testing.assertions.Assert;
+import org.testng.annotations.Test;
+
+public class TestRestoreResult
+{
+    /**
+     * Test getters, setters, equals and hashcode
+     */
+    @Test
+    public void testBasics()
+    {
+        // Test getters and setters
+        long snapshotId = 1;
+        int resumeId = 2;
+        RestoreResult restoreResult = new RestoreResult();
+        restoreResult.setSnapshotResult(snapshotId, resumeId, SnapshotResult.IN_PROGRESS);
+        Assert.assertEquals(restoreResult.getSnapshotId(), snapshotId);
+        Assert.assertEquals(restoreResult.getResumeId(), resumeId);
+        Assert.assertEquals(restoreResult.getSnapshotResult(), SnapshotResult.IN_PROGRESS);
+        restoreResult.setSnapshotResult(snapshotId, resumeId, SnapshotResult.SUCCESSFUL);
+        Assert.assertEquals(restoreResult.getSnapshotResult(), SnapshotResult.SUCCESSFUL);
+
+        // Test equals
+        RestoreResult restoreResult2 = new RestoreResult(snapshotId, resumeId, SnapshotResult.SUCCESSFUL);
+        RestoreResult restoreResult3 = new RestoreResult(snapshotId, resumeId, SnapshotResult.FAILED);
+        Assert.assertTrue(restoreResult.equals(restoreResult2));
+        Assert.assertFalse(restoreResult.equals(restoreResult3));
+
+        // Test hashcode
+        Assert.assertEquals(restoreResult.hashCode(), restoreResult2.hashCode());
+        Assert.assertEquals(restoreResult.hashCode(), restoreResult3.hashCode());
+    }
+}

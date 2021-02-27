@@ -15,8 +15,11 @@ package io.prestosql.operator;
 
 import io.airlift.slice.XxHash64;
 import io.prestosql.operator.OperationTimer.OperationTiming;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.function.Consumer;
 
@@ -46,6 +49,28 @@ public class TestOperationTimer
             doSomething();
             timing.record(timer::end);
         }
+    }
+
+    @Test
+    public void testOperationTimingSnapshot()
+    {
+        OperationTiming operationTiming = new OperationTiming();
+        operationTiming.record(100L, 100L);
+        Object snapshot = operationTiming.capture(null);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+        operationTiming.record(99L, 99L);
+        operationTiming.restore(snapshot, null);
+        snapshot = operationTiming.capture(null);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("calls", 1L);
+        expectedMapping.put("wallNanos", 100L);
+        expectedMapping.put("cpuNanos", 100L);
+        return expectedMapping;
     }
 
     @Test

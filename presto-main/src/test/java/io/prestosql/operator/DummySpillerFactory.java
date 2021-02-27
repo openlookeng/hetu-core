@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
@@ -38,6 +39,9 @@ public class DummySpillerFactory
     {
         return new Spiller()
         {
+            @RestorableConfig(unsupported = true)
+            private final RestorableConfig restorableConfig = null;
+
             private final List<Iterable<Page>> spills = new ArrayList<>();
 
             @Override

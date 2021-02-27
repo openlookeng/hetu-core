@@ -16,7 +16,6 @@ package io.prestosql.spiller;
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
-import io.prestosql.execution.buffer.TestingPagesSerdeFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
@@ -31,6 +30,7 @@ import java.util.Optional;
 import static io.prestosql.operator.PageAssertions.assertPageEquals;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -41,7 +41,7 @@ public class TestSpillCipherPagesSerde
     public void test()
     {
         SpillCipher cipher = new AesSpillCipher();
-        PagesSerde serde = new TestingPagesSerdeFactory().createPagesSerdeForSpill(Optional.of(cipher));
+        PagesSerde serde = TESTING_SERDE_FACTORY.createPagesSerdeForSpill(Optional.of(cipher));
         List<Type> types = ImmutableList.of(VARCHAR);
         Page emptyPage = new Page(VARCHAR.createBlockBuilder(null, 0).build());
         assertPageEquals(types, serde.deserialize(serde.serialize(emptyPage)), emptyPage);

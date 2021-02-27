@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
@@ -48,8 +49,10 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -76,6 +79,7 @@ import static io.prestosql.operator.OperatorAssertion.assertPagesEqualIgnoreOrde
 import static io.prestosql.operator.OperatorAssertion.dropChannel;
 import static io.prestosql.operator.OperatorAssertion.toMaterializedResult;
 import static io.prestosql.operator.OperatorAssertion.toPages;
+import static io.prestosql.operator.OperatorAssertion.toPagesCompareStateSimple;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -90,6 +94,7 @@ import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -109,7 +114,7 @@ public class TestHashAggregationOperator
 
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
-    private JoinCompiler joinCompiler = new JoinCompiler(createTestMetadataManager());
+    private final JoinCompiler joinCompiler = new JoinCompiler(createTestMetadataManager());
     private DummySpillerFactory spillerFactory;
 
     @BeforeMethod
@@ -213,6 +218,249 @@ public class TestHashAggregationOperator
         assertPagesEqualIgnoreOrder(driverContext, pages, expected, hashEnabled, Optional.of(hashChannels.size()));
 
         assertTrue(spillEnabled == (spillerFactory.getSpillsCount() > 0), format("Spill state mismatch. Expected spill: %s, spill count: %s", spillEnabled, spillerFactory.getSpillsCount()));
+    }
+
+    @Test
+    public void testHashAggregationSnapshot()
+    {
+        // make operator produce multiple pages during finish phase
+        long memoryLimitForMerge = 0;
+        long memoryLimitForMergeWithMemory = 0;
+        int numberOfRows = 40_000;
+        Metadata metadata = createTestMetadataManager();
+        InternalAggregationFunction countVarcharColumn = metadata.getAggregateFunctionImplementation(
+                new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction countBooleanColumn = metadata.getAggregateFunctionImplementation(
+                new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN)));
+        InternalAggregationFunction maxVarcharColumn = metadata.getAggregateFunctionImplementation(
+                new Signature("max", AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
+        List<Integer> hashChannels = Ints.asList(1);
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(false, hashChannels, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN);
+        List<Page> input = rowPagesBuilder
+                .addSequencePage(numberOfRows, 100, 0, 100_000, 0, 500)
+                .addSequencePage(numberOfRows, 100, 0, 200_000, 0, 500)
+                .addSequencePage(numberOfRows, 100, 0, 300_000, 0, 500)
+                .build();
+
+        HashAggregationOperatorFactory operatorFactory = new HashAggregationOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR),
+                hashChannels,
+                ImmutableList.of(),
+                Step.SINGLE,
+                false,
+                ImmutableList.of(COUNT.bind(ImmutableList.of(0), Optional.empty()),
+                        LONG_SUM.bind(ImmutableList.of(3), Optional.empty()),
+                        LONG_AVERAGE.bind(ImmutableList.of(3), Optional.empty()),
+                        maxVarcharColumn.bind(ImmutableList.of(2), Optional.empty()),
+                        countVarcharColumn.bind(ImmutableList.of(0), Optional.empty()),
+                        countBooleanColumn.bind(ImmutableList.of(4), Optional.empty())),
+                rowPagesBuilder.getHashChannel(),
+                Optional.empty(),
+                100_000,
+                Optional.of(new DataSize(16, MEGABYTE)),
+                false,
+                succinctBytes(memoryLimitForMerge),
+                succinctBytes(memoryLimitForMergeWithMemory),
+                spillerFactory,
+                joinCompiler,
+                false);
+
+        DriverContext driverContext = createDriverContext(memoryLimitForMerge);
+
+        MaterializedResult.Builder expectedBuilder = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT, BIGINT, DOUBLE, VARCHAR, BIGINT, BIGINT);
+        for (int i = 0; i < numberOfRows; ++i) {
+            expectedBuilder.row(Integer.toString(i), 3L, 3L * i, (double) i, Integer.toString(300_000 + i), 3L, 3L);
+        }
+        MaterializedResult expected = expectedBuilder.build();
+
+        List<Page> pages = toPagesCompareStateSimple(operatorFactory, driverContext, input, false, createExpectedMapping());
+
+        assertGreaterThan(pages.size(), 1, "Expected more than one output page");
+        assertPagesEqualIgnoreOrder(driverContext, pages, expected, false, Optional.of(hashChannels.size()));
+
+        assertFalse(spillerFactory.getSpillsCount() > 0, format("Spill state mismatch. Expected spill: %s, spill count: %s", false, spillerFactory.getSpillsCount()));
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        Map<String, Object> hashCollisionsCounterMapping = new HashMap<>();
+        Map<String, Object> aggregationBuilderMapping = new HashMap<>();
+        Map<String, Object> groupByHashMapping = new HashMap<>();
+        List<Map<String, Object>> aggregatorsMapping = new ArrayList<>();
+        Map<String, Object> currentPageBuilderMapping = new HashMap<>();
+        Map<String, Object> groupAddressByGroupIdMapping = new HashMap<>();
+
+        Map<String, Object> aggregator0Mapping = new HashMap<>();
+        Map<String, Object> aggregator1Mapping = new HashMap<>();
+        Map<String, Object> aggregator2Mapping = new HashMap<>();
+        Map<String, Object> aggregator3Mapping = new HashMap<>();
+        Map<String, Object> aggregator4Mapping = new HashMap<>();
+        Map<String, Object> aggregator5Mapping = new HashMap<>();
+
+        List<Map<String, Object>> blockBuildersMapping = new ArrayList<>();
+
+        List<List<Object>> aggregator0AggregationMapping = new ArrayList<>();
+        List<List<Object>> aggregator1AggregationMapping = new ArrayList<>();
+        List<List<Object>> aggregator2AggregationMapping = new ArrayList<>();
+        List<List<Object>> aggregator3AggregationMapping = new ArrayList<>();
+        List<List<Object>> aggregator4AggregationMapping = new ArrayList<>();
+        List<List<Object>> aggregator5AggregationMapping = new ArrayList<>();
+
+        Map<String, Object> variableWidthBlockBuilderMapping = new HashMap<>();
+
+        //TODO-cp-I2DSGQ: change expectedMapping after implementation of operatorContext capture
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("hashCollisionsCounter", hashCollisionsCounterMapping);
+        expectedMapping.put("aggregationBuilder", aggregationBuilderMapping);
+        expectedMapping.put("memoryContext", 10355419L);
+        expectedMapping.put("inputProcessed", true);
+        expectedMapping.put("finishing", false);
+        expectedMapping.put("finished", false);
+
+        hashCollisionsCounterMapping.put("hashCollisions", 0L);
+        hashCollisionsCounterMapping.put("expectedHashCollisions", 0.0);
+
+        aggregationBuilderMapping.put("groupByHash", groupByHashMapping);
+        aggregationBuilderMapping.put("aggregators", aggregatorsMapping);
+        aggregationBuilderMapping.put("full", false);
+
+        groupByHashMapping.put("currentPageBuilder", currentPageBuilderMapping);
+        groupByHashMapping.put("completedPagesMemorySize", 0L);
+        groupByHashMapping.put("hashCapacity", 262144);
+        groupByHashMapping.put("maxFill", 196608);
+        groupByHashMapping.put("mask", 262143);
+        groupByHashMapping.put("groupAddressByHash", long[].class);
+        groupByHashMapping.put("groupIdsByHash", int[].class);
+        groupByHashMapping.put("rawHashByHashPosition", byte[].class);
+        groupByHashMapping.put("groupAddressByGroupId", groupAddressByGroupIdMapping);
+        groupByHashMapping.put("nextGroupId", 40000);
+        groupByHashMapping.put("dictionaryLookBack", null);
+        groupByHashMapping.put("hashCollisions", 7228L);
+        groupByHashMapping.put("expectedHashCollisions", 0.0);
+        groupByHashMapping.put("preallocatedMemoryInBytes", 0L);
+        groupByHashMapping.put("currentPageSizeInBytes", 1703144L);
+
+        aggregatorsMapping.add(aggregator0Mapping);
+        aggregatorsMapping.add(aggregator1Mapping);
+        aggregatorsMapping.add(aggregator2Mapping);
+        aggregatorsMapping.add(aggregator3Mapping);
+        aggregatorsMapping.add(aggregator4Mapping);
+        aggregatorsMapping.add(aggregator5Mapping);
+
+        currentPageBuilderMapping.put("blockBuilders", blockBuildersMapping);
+        currentPageBuilderMapping.put("pageBuilderStatus", 388890L);
+        currentPageBuilderMapping.put("declaredPositions", 40000);
+
+        groupAddressByGroupIdMapping.put("array", long[][].class);
+        groupAddressByGroupIdMapping.put("capacity", 197632);
+        groupAddressByGroupIdMapping.put("segments", 193);
+
+        aggregator0Mapping.put("step", "SINGLE");
+        aggregator0Mapping.put("aggregation", aggregator0AggregationMapping);
+        aggregator1Mapping.put("step", "SINGLE");
+        aggregator1Mapping.put("aggregation", aggregator1AggregationMapping);
+        aggregator2Mapping.put("step", "SINGLE");
+        aggregator2Mapping.put("aggregation", aggregator2AggregationMapping);
+        aggregator3Mapping.put("step", "SINGLE");
+        aggregator3Mapping.put("aggregation", aggregator3AggregationMapping);
+        aggregator4Mapping.put("step", "SINGLE");
+        aggregator4Mapping.put("aggregation", aggregator4AggregationMapping);
+        aggregator5Mapping.put("step", "SINGLE");
+        aggregator5Mapping.put("aggregation", aggregator5AggregationMapping);
+
+        blockBuildersMapping.add(variableWidthBlockBuilderMapping);
+
+        Map<String, Object> aggregation0Array0 = new HashMap<>();
+        List<Object> aggregation0StateList = new ArrayList<>();
+        aggregation0StateList.add(aggregation0Array0);
+        aggregation0Array0.put("array", long[][].class);
+        aggregation0Array0.put("capacity", 40960);
+        aggregation0Array0.put("segments", 40);
+        aggregation0StateList.add(39999L);
+        aggregator0AggregationMapping.add(aggregation0StateList);
+
+        Map<String, Object> aggregation1Array0 = new HashMap<>();
+        Map<String, Object> aggregation1Array1 = new HashMap<>();
+        List<Object> aggregation1StateList = new ArrayList<>();
+        aggregation1StateList.add(aggregation1Array0);
+        aggregation1StateList.add(aggregation1Array1);
+        aggregation1Array0.put("array", long[][].class);
+        aggregation1Array0.put("capacity", 40960);
+        aggregation1Array0.put("segments", 40);
+        aggregation1Array1.put("array", boolean[][].class);
+        aggregation1Array1.put("capacity", 40960);
+        aggregation1Array1.put("segments", 40);
+        aggregation1StateList.add(39999L);
+        aggregator1AggregationMapping.add(aggregation1StateList);
+
+        Map<String, Object> aggregation2Array0 = new HashMap<>();
+        Map<String, Object> aggregation2Array1 = new HashMap<>();
+        List<Object> aggregation2StateList = new ArrayList<>();
+        aggregation2StateList.add(aggregation2Array0);
+        aggregation2StateList.add(aggregation2Array1);
+        aggregation2Array0.put("array", double[][].class);
+        aggregation2Array0.put("capacity", 40960);
+        aggregation2Array0.put("segments", 40);
+        aggregation2Array1.put("array", long[][].class);
+        aggregation2Array1.put("capacity", 40960);
+        aggregation2Array1.put("segments", 40);
+        aggregation2StateList.add(39999L);
+        aggregator2AggregationMapping.add(aggregation2StateList);
+
+        Map<String, Object> aggregation3Array0 = new HashMap<>();
+        Map<String, Object> aggregation3Array1 = new HashMap<>();
+        Map<String, Object> blockObjectBigArrayState = new HashMap<>();
+        List<Object> aggregation3StateList = new ArrayList<>();
+        aggregation3StateList.add(aggregation3Array0);
+        aggregation3StateList.add(aggregation3Array1);
+        aggregation3Array0.put("array", int[][].class);
+        aggregation3Array0.put("capacity", 40960);
+        aggregation3Array0.put("segments", 40);
+        aggregation3Array1.put("array", blockObjectBigArrayState);
+        aggregation3Array1.put("sizeOfBlocks", 2504108L);
+        blockObjectBigArrayState.put("array", 1);
+        blockObjectBigArrayState.put("capacity", 40960);
+        aggregation3StateList.add(39999L);
+        aggregator3AggregationMapping.add(aggregation3StateList);
+
+        Map<String, Object> aggregation4Array0 = new HashMap<>();
+        List<Object> aggregation4StateList = new ArrayList<>();
+        aggregation4StateList.add(aggregation4Array0);
+        aggregation4Array0.put("array", long[][].class);
+        aggregation4Array0.put("capacity", 40960);
+        aggregation4Array0.put("segments", 40);
+        aggregation4StateList.add(39999L);
+        aggregator4AggregationMapping.add(aggregation4StateList);
+
+        Map<String, Object> aggregation5Array0 = new HashMap<>();
+        List<Object> aggregation5StateList = new ArrayList<>();
+        aggregation5StateList.add(aggregation5Array0);
+        aggregation5Array0.put("array", long[][].class);
+        aggregation5Array0.put("capacity", 40960);
+        aggregation5Array0.put("segments", 40);
+        aggregation5StateList.add(39999L);
+        aggregator5AggregationMapping.add(aggregation5StateList);
+
+        Map<String, Object> variableWidthBlockBuilderStatusMapping = new HashMap<>();
+        variableWidthBlockBuilderMapping.put("blockBuilderStatus", variableWidthBlockBuilderStatusMapping);
+        variableWidthBlockBuilderMapping.put("initialized", true);
+        variableWidthBlockBuilderMapping.put("initialEntryCount", 8);
+        variableWidthBlockBuilderMapping.put("initialSliceOutputSize", 256);
+        variableWidthBlockBuilderMapping.put("sliceOutput", byte[].class);
+        variableWidthBlockBuilderMapping.put("hasNullValue", false);
+        variableWidthBlockBuilderMapping.put("valueIsNull", boolean[].class);
+        variableWidthBlockBuilderMapping.put("offsets", int[].class);
+        variableWidthBlockBuilderMapping.put("positions", 40000);
+        variableWidthBlockBuilderMapping.put("currentEntrySize", 0);
+        variableWidthBlockBuilderMapping.put("arraysRetainedSizeInBytes", 209991L);
+
+        variableWidthBlockBuilderStatusMapping.put("pageBuilderStatus", 388890L);
+        variableWidthBlockBuilderStatusMapping.put("currentSize", 388890);
+
+        return expectedMapping;
     }
 
     @Test(dataProvider = "hashEnabledAndMemoryLimitForMergeValues")
@@ -755,6 +1003,7 @@ public class TestHashAggregationOperator
         return ((InMemoryHashAggregationBuilder) aggregationBuilder).getCapacity();
     }
 
+    @RestorableConfig(unsupported = true)
     private static class FailingSpillerFactory
             implements SpillerFactory
     {
@@ -763,6 +1012,9 @@ public class TestHashAggregationOperator
         {
             return new Spiller()
             {
+                @RestorableConfig(unsupported = true)
+                private final RestorableConfig restorableConfig = null;
+
                 @Override
                 public ListenableFuture<?> spill(Iterator<Page> pageIterator)
                 {

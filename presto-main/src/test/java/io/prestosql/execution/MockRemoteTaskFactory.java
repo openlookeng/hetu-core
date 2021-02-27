@@ -37,6 +37,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskStats;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
@@ -85,6 +86,8 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
 import static io.prestosql.testing.TestingHandles.TEST_TABLE_HANDLE;
+import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static io.prestosql.util.Failures.toFailures;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -131,7 +134,8 @@ public class MockRemoteTaskFactory
         for (Split sourceSplit : splits) {
             initialSplits.put(sourceId, sourceSplit);
         }
-        return createRemoteTask(TEST_SESSION, taskId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST), partitionedSplitCountTracker, true, Optional.empty());
+        return createRemoteTask(TEST_SESSION, taskId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST),
+                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
     }
 
     @Override
@@ -144,7 +148,9 @@ public class MockRemoteTaskFactory
             OptionalInt totalPartitions,
             OutputBuffers outputBuffers,
             PartitionedSplitCountTracker partitionedSplitCountTracker,
-            boolean summarizeTaskInfo, Optional<PlanNodeId> parent)
+            boolean summarizeTaskInfo,
+            Optional<PlanNodeId> parent,
+            QuerySnapshotManager snapshotManager)
     {
         return new MockRemoteTask(taskId, fragment, node.getNodeIdentifier(), executor, scheduledExecutor, initialSplits, totalPartitions, partitionedSplitCountTracker);
     }
@@ -197,8 +203,16 @@ public class MockRemoteTaskFactory
                     executor,
                     scheduledExecutor,
                     new DataSize(1, MEGABYTE),
-                    spillSpaceTracker);
-            this.taskContext = queryContext.addTaskContext(taskStateMachine, TEST_SESSION, true, true, totalPartitions, Optional.empty());
+                    spillSpaceTracker,
+                    NOOP_SNAPSHOT_UTILS);
+            this.taskContext = queryContext.addTaskContext(
+                    taskStateMachine,
+                    TEST_SESSION,
+                    true,
+                    true,
+                    totalPartitions,
+                    Optional.empty(),
+                    TESTING_SERDE_FACTORY);
 
             this.location = URI.create("fake://task/" + taskId);
 
@@ -404,13 +418,19 @@ public class MockRemoteTaskFactory
         @Override
         public void cancel()
         {
-            taskStateMachine.cancel();
+            taskStateMachine.cancel(TaskState.CANCELED);
+        }
+
+        @Override
+        public void cancelToResume()
+        {
+            taskStateMachine.cancel(TaskState.CANCELED_TO_RESUME);
         }
 
         @Override
         public void abort()
         {
-            taskStateMachine.abort();
+            taskStateMachine.cancel(TaskState.ABORTED);
             clearSplits();
         }
 

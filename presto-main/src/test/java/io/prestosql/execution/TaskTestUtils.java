@@ -142,7 +142,8 @@ public final class TaskTestUtils
         PageFunctionCompiler pageFunctionCompiler = new PageFunctionCompiler(metadata, 0);
         NodeInfo nodeInfo = new NodeInfo("test");
 
-        SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
+        FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
+        SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
 

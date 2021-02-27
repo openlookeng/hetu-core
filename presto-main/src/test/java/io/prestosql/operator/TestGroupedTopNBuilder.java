@@ -15,21 +15,27 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.RowPagesBuilder;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.window.RankingFunction;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import org.openjdk.jol.info.ClassLayout;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -154,6 +160,102 @@ public class TestGroupedTopNBuilder
         }
 
         assertBuilderSize(groupByHash, types, ImmutableList.of(0, 0, 0, 0), ImmutableList.of(0, 0, 0, 0), groupedTopNBuilder.getEstimatedSizeInBytes());
+    }
+
+    @Test
+    public void testMultiGroupTopNSnapshot()
+    {
+        PagesSerde serde = TestingPagesSerdeFactory.testingPagesSerde();
+        List<Type> types = ImmutableList.of(BIGINT, DOUBLE);
+        List<Page> input = rowPagesBuilder(types)
+                .row(1L, 0.3)
+                .row(2L, 0.2)
+                .row(3L, 0.9)
+                .row(3L, 0.1)
+                .pageBreak()
+                .row(1L, 0.4)
+                .pageBreak()
+                .row(1L, 0.5)
+                .row(1L, 0.6)
+                .row(4L, 0.6)
+                .row(2L, 0.8)
+                .row(2L, 0.7)
+                .pageBreak()
+                .row(2L, 0.9)
+                .build();
+
+        for (Page page : input) {
+            page.compact();
+        }
+
+        GroupByHash groupByHash = createGroupByHash(ImmutableList.of(types.get(0)), ImmutableList.of(0), NOOP);
+        GroupedTopNBuilder groupedTopNBuilder = new GroupedTopNBuilder(
+                types,
+                new SimplePageWithPositionComparator(types, ImmutableList.of(1), ImmutableList.of(ASC_NULLS_LAST)),
+                2,
+                true,
+                Optional.of(RankingFunction.ROW_NUMBER),
+                groupByHash);
+        assertBuilderSize(groupByHash, types, ImmutableList.of(), ImmutableList.of(), groupedTopNBuilder.getEstimatedSizeInBytes());
+
+        // add 4 rows for the first page and created three heaps with 1, 1, 2 rows respectively
+        assertTrue(groupedTopNBuilder.processPage(input.get(0)).process());
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4), ImmutableList.of(1, 1, 2), groupedTopNBuilder.getEstimatedSizeInBytes());
+
+        // add 1 row for the second page and the three heaps become 2, 1, 2 rows respectively
+        assertTrue(groupedTopNBuilder.processPage(input.get(1)).process());
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1), ImmutableList.of(2, 1, 2), groupedTopNBuilder.getEstimatedSizeInBytes());
+
+        Object snapshot = groupedTopNBuilder.capture(serde);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+
+        // add 2 new rows for the third page (which will be compacted into two rows only) and we have four heaps with 2, 2, 2, 1 rows respectively
+        assertTrue(groupedTopNBuilder.processPage(input.get(2)).process());
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2), ImmutableList.of(2, 2, 2, 1), groupedTopNBuilder.getEstimatedSizeInBytes());
+
+        // restore to state before adding third page.
+        groupedTopNBuilder.restore(snapshot, serde);
+        snapshot = groupedTopNBuilder.capture(serde);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+
+        // add 2 new rows for the third page again after restore
+        assertTrue(groupedTopNBuilder.processPage(input.get(2)).process());
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2), ImmutableList.of(2, 2, 2, 1), groupedTopNBuilder.getEstimatedSizeInBytes());
+
+        // the last page will be discarded
+        assertTrue(groupedTopNBuilder.processPage(input.get(3)).process());
+        assertBuilderSize(groupByHash, types, ImmutableList.of(4, 1, 2, 0), ImmutableList.of(2, 2, 2, 1), groupedTopNBuilder.getEstimatedSizeInBytes());
+
+        Iterator<Page> resultIterator = groupedTopNBuilder.buildResult();
+        List<Page> output = new ArrayList<>();
+        while (resultIterator.hasNext()) {
+            output.add(resultIterator.next());
+        }
+        assertEquals(output.size(), 1);
+
+        Page expected = rowPagesBuilder(BIGINT, DOUBLE, BIGINT)
+                .row(1L, 0.3, 1)
+                .row(1L, 0.4, 2)
+                .row(2L, 0.2, 1)
+                .row(2L, 0.7, 2)
+                .row(3L, 0.1, 1)
+                .row(3L, 0.9, 2)
+                .row(4L, 0.6, 1)
+                .build()
+                .get(0);
+
+        assertPageEquals(ImmutableList.of(BIGINT, DOUBLE, BIGINT), output.get(0), expected);
+
+        assertBuilderSize(groupByHash, types, ImmutableList.of(0, 0, 0, 0), ImmutableList.of(0, 0, 0, 0), groupedTopNBuilder.getEstimatedSizeInBytes());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("emptyPageReferenceSlots", new ArrayList<>());
+        expectedMapping.put("memorySizeInBytes", 992L);
+        expectedMapping.put("currentPageCount", 2);
+        return expectedMapping;
     }
 
     @Test(dataProvider = "produceRowNumbers")

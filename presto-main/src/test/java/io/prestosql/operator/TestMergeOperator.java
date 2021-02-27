@@ -19,9 +19,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.testing.TestingHttpClient;
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.execution.Lifespan;
-import io.prestosql.execution.buffer.TestingPagesSerdeFactory;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
@@ -64,10 +62,9 @@ public class TestMergeOperator
     private static final String TASK_2_ID = "task2";
     private static final String TASK_3_ID = "task3";
 
-    private AtomicInteger operatorId = new AtomicInteger();
+    private final AtomicInteger operatorId = new AtomicInteger();
 
     private ScheduledExecutorService executor;
-    private PagesSerdeFactory serdeFactory;
     private HttpClient httpClient;
     private ExchangeClientFactory exchangeClientFactory;
     private OrderingCompiler orderingCompiler;
@@ -78,7 +75,6 @@ public class TestMergeOperator
     public void setUp()
     {
         executor = newSingleThreadScheduledExecutor(daemonThreadsNamed("test-merge-operator-%s"));
-        serdeFactory = new TestingPagesSerdeFactory();
 
         taskBuffers = CacheBuilder.newBuilder().build(CacheLoader.from(TestingTaskBuffer::new));
         httpClient = new TestingHttpClient(new TestingExchangeHttpClientHandler(taskBuffers), executor);
@@ -89,7 +85,6 @@ public class TestMergeOperator
     @AfterMethod(alwaysRun = true)
     public void tearDown()
     {
-        serdeFactory = null;
         orderingCompiler = null;
 
         httpClient.close();
@@ -336,7 +331,6 @@ public class TestMergeOperator
                 mergeOperatorId,
                 new PlanNodeId("plan_node_id" + mergeOperatorId),
                 exchangeClientFactory,
-                serdeFactory,
                 orderingCompiler,
                 sourceTypes,
                 outputChannels,

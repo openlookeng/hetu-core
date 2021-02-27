@@ -22,6 +22,7 @@ import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.MemoryPool;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spiller.SpillSpaceTracker;
@@ -33,6 +34,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 
 public final class TestingTaskContext
 {
@@ -67,13 +70,16 @@ public final class TestingTaskContext
 
     private static TaskContext createTaskContext(QueryContext queryContext, Session session, TaskStateMachine taskStateMachine)
     {
-        return queryContext.addTaskContext(
+        TaskContext taskContext = queryContext.addTaskContext(
                 taskStateMachine,
                 session,
                 true,
                 true,
                 OptionalInt.empty(),
-                Optional.empty());
+                Optional.empty(),
+                TESTING_SERDE_FACTORY);
+        taskContext.getSnapshotManager().setTotalComponents(100);
+        return taskContext;
     }
 
     public static Builder builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session)
@@ -93,6 +99,7 @@ public final class TestingTaskContext
         private DataSize memoryPoolSize = new DataSize(1, GIGABYTE);
         private DataSize maxSpillSize = new DataSize(1, GIGABYTE);
         private DataSize queryMaxSpillSize = new DataSize(1, GIGABYTE);
+        private SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
 
         private Builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session)
         {
@@ -138,6 +145,12 @@ public final class TestingTaskContext
             return this;
         }
 
+        public Builder setSnapshotUtils(SnapshotUtils snapshotUtils)
+        {
+            this.snapshotUtils = snapshotUtils;
+            return this;
+        }
+
         public TaskContext build()
         {
             MemoryPool memoryPool = new MemoryPool(new MemoryPoolId("test"), memoryPoolSize);
@@ -151,7 +164,8 @@ public final class TestingTaskContext
                     notificationExecutor,
                     yieldExecutor,
                     queryMaxSpillSize,
-                    spillSpaceTracker);
+                    spillSpaceTracker,
+                    snapshotUtils);
 
             return createTaskContext(queryContext, session, taskStateMachine);
         }

@@ -37,9 +37,7 @@ import io.prestosql.plugin.hive.metastore.thrift.MockThriftMetastoreClient;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastore;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastoreConfig;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreClient;
-import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
-import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.TypeManager;
@@ -148,7 +146,7 @@ public class TestHiveWriterFactory
                 new HiveSessionProperties(hiveConfig, new OrcFileWriterConfig(), new ParquetFileWriterConfig()),
                 new HiveWriterStats(),
                 getDefaultOrcFileWriterFactory(hiveConfig));
-        HiveWriter hiveWriter = hiveWriterFactory.createWriter(new Page(3, new Block[0]), 0, OptionalInt.empty(), Optional.empty());
+        HiveWriter hiveWriter = hiveWriterFactory.createWriter(ImmutableList.of(), OptionalInt.empty(), Optional.empty());
         assertEquals(((SortingFileWriter) hiveWriter.getFileWriter()).getTempFilePrefix().getName(), ".tmp-sort.bucket_00000");
     }
 
