@@ -44,7 +44,9 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
+import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static org.testng.Assert.assertTrue;
 
 public class MemoryLocalQueryRunner
@@ -85,7 +87,8 @@ public class MemoryLocalQueryRunner
                 localQueryRunner.getExecutor(),
                 localQueryRunner.getScheduler(),
                 new DataSize(4, GIGABYTE),
-                spillSpaceTracker);
+                spillSpaceTracker,
+                NOOP_SNAPSHOT_UTILS);
 
         TaskContext taskContext = queryContext
                 .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0), localQueryRunner.getExecutor()),
@@ -93,7 +96,8 @@ public class MemoryLocalQueryRunner
                         false,
                         false,
                         OptionalInt.empty(),
-                        Optional.empty());
+                        Optional.empty(),
+                        TESTING_SERDE_FACTORY);
 
         // Use NullOutputFactory to avoid coping out results to avoid affecting benchmark results
         ImmutableList.Builder<Page> output = ImmutableList.builder();

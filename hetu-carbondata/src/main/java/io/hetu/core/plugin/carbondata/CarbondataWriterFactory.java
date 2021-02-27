@@ -31,7 +31,6 @@ import io.prestosql.plugin.hive.OrcFileWriterFactory;
 import io.prestosql.plugin.hive.metastore.HivePageSinkMetadataProvider;
 import io.prestosql.plugin.hive.metastore.SortingColumn;
 import io.prestosql.spi.NodeManager;
-import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.TypeManager;
@@ -120,13 +119,13 @@ public class CarbondataWriterFactory
     }
 
     @Override
-    public HiveWriter createWriter(Page partitionColumns, int position, OptionalInt bucketNumber, Optional<Options> vacuumOptions)
+    public HiveWriter createWriter(List<String> partitionValues, OptionalInt bucketNumber, Optional<Options> vacuumOptions)
     {
         /* set Additional JobConf */
         JobConf jobConf = getSuperJobConf();
 
         additionalJobConf.forEach((k, v) -> jobConf.set(k, v));
-        return super.createWriter(partitionColumns, position, bucketNumber, vacuumOptions);
+        return super.createWriter(partitionValues, bucketNumber, vacuumOptions);
     }
 
     protected void checkWriteMode(LocationService.WriteInfo writeInfo)

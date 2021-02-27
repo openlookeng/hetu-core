@@ -21,6 +21,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.client.QueryResults;
 import io.prestosql.client.QueryStatusInfo;
 import io.prestosql.execution.QueryManager;
@@ -189,6 +190,9 @@ public class ExecutingStatementResource
 
         query = queries.computeIfAbsent(queryId, id -> {
             ExchangeClient exchangeClient = exchangeClientSupplier.get(new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), ExecutingStatementResource.class.getSimpleName()));
+            if (SystemSessionProperties.isSnapshotEnabled(session)) {
+                exchangeClient.setSnapshotEnabled();
+            }
             return Query.create(
                     session,
                     slug,

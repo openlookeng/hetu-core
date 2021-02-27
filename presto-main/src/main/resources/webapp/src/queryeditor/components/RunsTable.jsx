@@ -346,7 +346,10 @@ let CellRenderers = {
           </a>
         );
       }
-    } else if (run.state === 'RUNNING' || run.state === RunStateConstants.QUEUED) {
+    } else if (run.state === 'RUNNING'
+        || run.state === RunStateConstants.QUEUED
+        || run.state === RunStateConstants.RESCHEDULING
+        || run.state === RunStateConstants.RESUMING) {
       let progressFromStats = getProgressFromStats(run.queryStats);
       return (
         <div className={classNames({
