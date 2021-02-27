@@ -20,8 +20,10 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers;
@@ -29,6 +31,7 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.JoinNode;
@@ -71,6 +74,7 @@ import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
+import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -80,6 +84,8 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public final class SqlStageExecution
 {
+    private static final Logger log = Logger.get(SqlStageExecution.class);
+
     private final StageStateMachine stateMachine;
     private final RemoteTaskFactory remoteTaskFactory;
     private final NodeTaskMap nodeTaskMap;
@@ -122,6 +128,8 @@ public final class SqlStageExecution
 
     private PlanNodeId parentId;
 
+    private final QuerySnapshotManager snapshotManager;
+
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
             URI location,
@@ -134,7 +142,8 @@ public final class SqlStageExecution
             ExecutorService executor,
             FailureDetector failureDetector,
             SplitSchedulerStats schedulerStats,
-            DynamicFilterService dynamicFilterService)
+            DynamicFilterService dynamicFilterService,
+            QuerySnapshotManager snapshotManager)
     {
         requireNonNull(stageId, "stageId is null");
         requireNonNull(location, "location is null");
@@ -154,12 +163,20 @@ public final class SqlStageExecution
                 summarizeTaskInfo,
                 executor,
                 failureDetector,
-                dynamicFilterService);
+                dynamicFilterService,
+                snapshotManager);
         sqlStageExecution.initialize();
         return sqlStageExecution;
     }
 
-    private SqlStageExecution(StageStateMachine stateMachine, RemoteTaskFactory remoteTaskFactory, NodeTaskMap nodeTaskMap, boolean summarizeTaskInfo, Executor executor, FailureDetector failureDetector, DynamicFilterService dynamicFilterService)
+    private SqlStageExecution(StageStateMachine stateMachine,
+            RemoteTaskFactory remoteTaskFactory,
+            NodeTaskMap nodeTaskMap,
+            boolean summarizeTaskInfo,
+            Executor executor,
+            FailureDetector failureDetector,
+            DynamicFilterService dynamicFilterService,
+            QuerySnapshotManager snapshotManager)
     {
         this.stateMachine = stateMachine;
         this.remoteTaskFactory = requireNonNull(remoteTaskFactory, "remoteTaskFactory is null");
@@ -168,6 +185,7 @@ public final class SqlStageExecution
         this.executor = requireNonNull(executor, "executor is null");
         this.failureDetector = requireNonNull(failureDetector, "failureDetector is null");
         this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
+        this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
 
         ImmutableMap.Builder<PlanFragmentId, RemoteSourceNode> fragmentToExchangeSource = ImmutableMap.builder();
         for (RemoteSourceNode remoteSourceNode : stateMachine.getFragment().getRemoteSourceNodes()) {
@@ -295,6 +313,12 @@ public final class SqlStageExecution
     {
         stateMachine.transitionToCanceled();
         getAllTasks().forEach(RemoteTask::cancel);
+    }
+
+    public synchronized void cancelToResume()
+    {
+        stateMachine.transitionToRescheduling();
+        getAllTasks().forEach(RemoteTask::cancelToResume);
     }
 
     public synchronized void abort()
@@ -466,6 +490,12 @@ public final class SqlStageExecution
     {
         checkArgument(!allTasks.contains(taskId), "A task with id %s already exists", taskId);
 
+        if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession())) {
+            // Snapshot: inform snapshot manager so it knows about all tasks,
+            // and can determine if a snapshot is complete for all tasks.
+            snapshotManager.addNewTask(taskId);
+        }
+
         ImmutableMultimap.Builder<PlanNodeId, Split> initialSplits = ImmutableMultimap.builder();
         initialSplits.putAll(sourceSplits);
 
@@ -489,7 +519,8 @@ public final class SqlStageExecution
                 outputBuffers,
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
-                Optional.ofNullable(parentId));
+                Optional.ofNullable(parentId),
+                snapshotManager);
 
         completeSources.forEach(task::noMoreSplits);
 
@@ -536,7 +567,14 @@ public final class SqlStageExecution
                 return;
             }
 
+            boolean isSnapshotEnabled = isSnapshotEnabled(stateMachine.getSession());
+
             TaskState taskState = taskStatus.getState();
+            if (taskState == TaskState.RESUMABLE_FAILURE) {
+                log.debug("Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                stateMachine.transitionToResumableFailure();
+                return;
+            }
             if (taskState == TaskState.FAILED) {
                 RuntimeException failure = taskStatus.getFailures().stream()
                         .findFirst()
@@ -546,6 +584,11 @@ public final class SqlStageExecution
                 stateMachine.transitionToFailed(failure);
             }
             else if (taskState == TaskState.ABORTED) {
+                if (isSnapshotEnabled) {
+                    log.debug("Task %s on node %s was aborted prematually. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                    stateMachine.transitionToResumableFailure();
+                    return;
+                }
                 // A task should only be in the aborted state if the STAGE is done (ABORTED or FAILED)
                 stateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, "A task is in the ABORTED state but stage is " + stageState));
             }
@@ -559,6 +602,10 @@ public final class SqlStageExecution
                 }
                 if (finishedTasks.containsAll(allTasks)) {
                     stateMachine.transitionToFinished();
+                    if (isSnapshotEnabled) {
+                        // Snapshot: when tasks finish, inform snapshot manager, so they no longer need to be tracked
+                        snapshotManager.updateFinishedQueryComponents(finishedTasks);
+                    }
                 }
             }
         }

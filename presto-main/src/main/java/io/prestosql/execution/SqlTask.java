@@ -24,6 +24,7 @@ import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.LazyOutputBuffer;
@@ -37,6 +38,9 @@ import io.prestosql.operator.PipelineContext;
 import io.prestosql.operator.PipelineStatus;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskStats;
+import io.prestosql.snapshot.RestoreResult;
+import io.prestosql.snapshot.SnapshotResult;
+import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
 import org.joda.time.DateTime;
@@ -63,6 +67,7 @@ import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.connector.DataCenterUtility.loadDCCatalogForUpdateTask;
 import static io.prestosql.execution.TaskState.ABORTED;
+import static io.prestosql.execution.TaskState.CANCELED_TO_RESUME;
 import static io.prestosql.execution.TaskState.FAILED;
 import static io.prestosql.util.Failures.toFailures;
 import static java.util.Objects.requireNonNull;
@@ -88,6 +93,7 @@ public class SqlTask
     private final AtomicReference<TaskHolder> taskHolderReference = new AtomicReference<>(new TaskHolder());
     private final AtomicBoolean needsPlan = new AtomicBoolean(true);
     private final Metadata metadata;
+    private boolean isSnapshotEnabled;
 
     public static SqlTask createSqlTask(
             TaskId taskId,
@@ -135,6 +141,8 @@ public class SqlTask
                 // because we haven't created the task context that holds the the memory context yet.
                 () -> queryContext.getTaskContextByTaskId(taskId).localSystemMemoryContext());
         taskStateMachine = new TaskStateMachine(taskId, taskNotificationExecutor);
+
+        log.debug("Created new SqlTask object for task %s, with instanceId %s", taskId, taskInstanceId);
     }
 
     // this is a separate method to ensure that the `this` reference is not leaked during construction
@@ -149,6 +157,13 @@ public class SqlTask
             {
                 if (!newState.isDone()) {
                     return;
+                }
+
+                // Snapshot: For tasks finished in other ways, they are then transitioned to ABORTED.
+                // For tasks canceled to resume, there will be no further communication with this task,
+                // so need to transition to ABORTED manually.
+                if (newState == CANCELED_TO_RESUME) {
+                    taskStateMachine.cancel(ABORTED);
                 }
 
                 // Update failed tasks counter
@@ -332,13 +347,30 @@ public class SqlTask
         Set<PlanNodeId> noMoreSplits = getNoMoreSplits(taskHolder);
 
         TaskStatus taskStatus = createTaskStatus(taskHolder);
+
+        if (!isSnapshotEnabled || taskHolder.taskExecution == null) {
+            return new TaskInfo(
+                    taskStatus,
+                    lastHeartbeat.get(),
+                    outputBuffer.getInfo(),
+                    noMoreSplits,
+                    taskStats,
+                    needsPlan.get());
+        }
+
+        // Add snapshot result
+        TaskSnapshotManager snapshotManager = taskHolder.taskExecution.getTaskContext().getSnapshotManager();
+        Map<Long, SnapshotResult> snapshotCaptureResult = snapshotManager.getSnapshotCaptureResult();
+        Optional<RestoreResult> snapshotRestoreResult = Optional.ofNullable(snapshotManager.getSnapshotRestoreResult());
         return new TaskInfo(
                 taskStatus,
                 lastHeartbeat.get(),
                 outputBuffer.getInfo(),
                 noMoreSplits,
                 taskStats,
-                needsPlan.get());
+                needsPlan.get(),
+                snapshotCaptureResult,
+                snapshotRestoreResult);
     }
 
     public ListenableFuture<TaskStatus> getTaskStatus(TaskState callersCurrentState)
@@ -393,6 +425,7 @@ public class SqlTask
                     taskExecution = sqlTaskExecutionFactory.create(session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);
+                    isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(session);
                 }
             }
 
@@ -443,15 +476,9 @@ public class SqlTask
         taskStateMachine.failed(cause);
     }
 
-    public TaskInfo cancel()
+    public TaskInfo cancel(TaskState targetState)
     {
-        taskStateMachine.cancel();
-        return getTaskInfo();
-    }
-
-    public TaskInfo abort()
-    {
-        taskStateMachine.abort();
+        taskStateMachine.cancel(targetState);
         return getTaskInfo();
     }
 
@@ -534,5 +561,10 @@ public class SqlTask
     public QueryContext getQueryContext()
     {
         return queryContext;
+    }
+
+    public boolean isSnapshotEnabled()
+    {
+        return isSnapshotEnabled;
     }
 }

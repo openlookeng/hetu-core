@@ -38,6 +38,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -105,20 +106,20 @@ public class CachedSqlQueryExecution
     private final BeginTableWrite beginTableWrite;
 
     public CachedSqlQueryExecution(QueryPreparer.PreparedQuery preparedQuery, QueryStateMachine stateMachine,
-                                   String slug, Metadata metadata, CubeManager cubeManager, AccessControl accessControl, SqlParser sqlParser, SplitManager splitManager,
-                                   NodePartitioningManager nodePartitioningManager, NodeScheduler nodeScheduler,
-                                   List<PlanOptimizer> planOptimizers, PlanFragmenter planFragmenter, RemoteTaskFactory remoteTaskFactory,
-                                   LocationFactory locationFactory, int scheduleSplitBatchSize, ExecutorService queryExecutor,
-                                   ScheduledExecutorService schedulerExecutor, FailureDetector failureDetector, NodeTaskMap nodeTaskMap,
-                                   QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
-                                   StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
-                                   DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
-                                   HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider)
+            String slug, Metadata metadata, CubeManager cubeManager, AccessControl accessControl, SqlParser sqlParser, SplitManager splitManager,
+            NodePartitioningManager nodePartitioningManager, NodeScheduler nodeScheduler,
+            List<PlanOptimizer> planOptimizers, PlanFragmenter planFragmenter, RemoteTaskFactory remoteTaskFactory,
+            LocationFactory locationFactory, int scheduleSplitBatchSize, ExecutorService queryExecutor,
+            ScheduledExecutorService schedulerExecutor, FailureDetector failureDetector, NodeTaskMap nodeTaskMap,
+            QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
+            StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
+            DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
+            HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider, SnapshotUtils snapshotUtils)
     {
         super(preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
-                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider);
+                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider, snapshotUtils);
         this.cache = cache;
         this.beginTableWrite = new BeginTableWrite(metadata);
     }
@@ -363,7 +364,7 @@ public class CachedSqlQueryExecution
         private final Analysis analysis;
         private final Metadata metadata;
         private final Map<String, TableHandle> tables;
-        private Map<ConnectorTransactionHandle, ConnectorTransactionHandle> connectorTransactionHandleMap; // Old ConnectorTransactionHandle from cached plan to new ConnectorTransactionHandle from metadata
+        private final Map<ConnectorTransactionHandle, ConnectorTransactionHandle> connectorTransactionHandleMap; // Old ConnectorTransactionHandle from cached plan to new ConnectorTransactionHandle from metadata
 
         TableHandleRewriter(Session session, Analysis analysis, Metadata metadata)
         {

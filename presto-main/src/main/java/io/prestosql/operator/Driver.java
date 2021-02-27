@@ -22,9 +22,12 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.ScheduledSplit;
 import io.prestosql.execution.TaskSource;
+import io.prestosql.execution.TaskState;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.UpdatablePageSource;
@@ -67,6 +70,9 @@ public class Driver
     private static final Logger log = Logger.get(Driver.class);
 
     private final DriverContext driverContext;
+    private final boolean isSnapshotEnabled;
+    // Snapshot: whether completion of this driver has been reported to the snapshot manager. Make sure it's done once.
+    private boolean reportedFinish;
     private final List<Operator> activeOperators;
     // this is present only for debugging
     @SuppressWarnings("unused")
@@ -92,7 +98,7 @@ public class Driver
 
     private enum State
     {
-        ALIVE, NEED_DESTRUCTION, DESTROYED
+        ALIVE, NEED_DESTRUCTION, CANCEL_TO_RESUME, DESTROYED
     }
 
     public static Driver createDriver(DriverContext driverContext, List<Operator> operators)
@@ -120,6 +126,7 @@ public class Driver
     private Driver(DriverContext driverContext, List<Operator> operators)
     {
         this.driverContext = requireNonNull(driverContext, "driverContext is null");
+        this.isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(driverContext.getSession());
         this.allOperators = ImmutableList.copyOf(requireNonNull(operators, "operators is null"));
         checkArgument(allOperators.size() > 1, "At least two operators are required");
         this.activeOperators = new ArrayList<>(operators);
@@ -167,11 +174,23 @@ public class Driver
         return sourceOperator.map(SourceOperator::getSourceId);
     }
 
+    public void reportFinishedDriver()
+    {
+        if (isSnapshotEnabled && !reportedFinish) {
+            TaskSnapshotManager snapshotManager = driverContext.getPipelineContext().getTaskContext().getSnapshotManager();
+            snapshotManager.updateFinishedComponents(allOperators);
+            reportedFinish = true;
+        }
+    }
+
     @Override
     public void close()
     {
         // mark the service for destruction
-        if (!state.compareAndSet(State.ALIVE, State.NEED_DESTRUCTION)) {
+        State targetState = driverContext.getPipelineContext().getTaskContext().getState() == TaskState.CANCELED_TO_RESUME
+                ? State.CANCEL_TO_RESUME // Snapshot: if task state is cancel-to-resume, then make sure operators are aware
+                : State.NEED_DESTRUCTION;
+        if (!state.compareAndSet(State.ALIVE, targetState)) {
             return;
         }
 
@@ -375,19 +394,31 @@ public class Driver
                 }
 
                 // if the current operator is not finished and next operator isn't blocked and needs input...
-                if (!current.isFinished() && !getBlockedFuture(next).isPresent() && next.needsInput()) {
+                if (!current.isFinished() && !getBlockedFuture(next).isPresent()) {
                     // get an output page from current operator
-                    Page page = current.getOutput();
-                    current.getOperatorContext().recordGetOutput(operationTimer, page);
+                    Page page = null;
+                    if (next.needsInput()) {
+                        page = current.getOutput();
+                        current.getOperatorContext().recordGetOutput(operationTimer, page);
+                        if (current instanceof SourceOperator) {
+                            movedPage = true;
+                        }
+                    }
+                    else if (isSnapshotEnabled && next.allowMarker()) {
+                        // Snapshot: even when operators don't need (data) input, they may still allow markers to pass through.
+                        // In particular, when join operators wait for build side to finish, they don't need inputs,
+                        // but they need to receive and process markers, for snapshots to complete.
+                        page = current.pollMarker();
+                        current.getOperatorContext().recordGetOutput(operationTimer, page);
+                        if (current instanceof SourceOperator) {
+                            movedPage = true;
+                        }
+                    }
 
                     // if we got an output page, add it to the next operator
                     if (page != null && page.getPositionCount() != 0) {
                         next.addInput(page);
                         next.getOperatorContext().recordAddInput(operationTimer, page);
-                        movedPage = true;
-                    }
-
-                    if (current instanceof SourceOperator) {
                         movedPage = true;
                     }
                 }
@@ -404,7 +435,7 @@ public class Driver
                 if (activeOperators.get(index).isFinished()) {
                     // close and remove this operator and all source operators
                     List<Operator> finishedOperators = this.activeOperators.subList(0, index + 1);
-                    Throwable throwable = closeAndDestroyOperators(finishedOperators);
+                    Throwable throwable = closeAndDestroyOperators(finishedOperators, false);
                     finishedOperators.clear();
                     if (throwable != null) {
                         throwIfUnchecked(throwable);
@@ -415,6 +446,16 @@ public class Driver
                         Operator newRootOperator = activeOperators.get(0);
                         newRootOperator.finish();
                         newRootOperator.getOperatorContext().recordFinish(operationTimer);
+                        if (isSnapshotEnabled) {
+                            // These join "builder" operators will not finish until the probe side finishes.
+                            // This prevents the driver from being marked as finished, so snapshot manager
+                            // continues to expect snapshots from this driver.
+                            // Report the driver as being complete to the snapshot manager.
+                            Operator last = activeOperators.get(activeOperators.size() - 1);
+                            if (last instanceof HashBuilderOperator || last instanceof SpatialIndexBuilderOperator || last instanceof NestedLoopBuildOperator) {
+                                reportFinishedDriver();
+                            }
+                        }
                     }
                     break;
                 }
@@ -500,14 +541,17 @@ public class Driver
     {
         checkLockHeld("Lock must be held to call destroyIfNecessary");
 
-        if (!state.compareAndSet(State.NEED_DESTRUCTION, State.DESTROYED)) {
-            return;
+        boolean toResume = state.compareAndSet(State.CANCEL_TO_RESUME, State.DESTROYED);
+        if (!toResume) {
+            if (!state.compareAndSet(State.NEED_DESTRUCTION, State.DESTROYED)) {
+                return;
+            }
         }
 
         // if we get an error while closing a driver, record it and we will throw it at the end
         Throwable inFlightException = null;
         try {
-            inFlightException = closeAndDestroyOperators(activeOperators);
+            inFlightException = closeAndDestroyOperators(activeOperators, toResume);
             if (driverContext.getMemoryUsage() > 0) {
                 log.error("Driver still has memory reserved after freeing all operator memory.");
             }
@@ -535,7 +579,7 @@ public class Driver
         }
     }
 
-    private Throwable closeAndDestroyOperators(List<Operator> operators)
+    private Throwable closeAndDestroyOperators(List<Operator> operators, boolean toResume)
     {
         // record the current interrupted status (and clear the flag); we'll reset it later
         boolean wasInterrupted = Thread.interrupted();
@@ -544,7 +588,16 @@ public class Driver
         try {
             for (Operator operator : operators) {
                 try {
-                    operator.close();
+                    if (toResume) {
+                        // Snapshot: different ways to cancel operators. They may choose different strategies.
+                        // e.g. for table-writer, normal cancel should remove any data that's been written,
+                        // but cancel-to-resume should keep partial data, so it can be used after resume.
+                        // TODO-cp-I2BZ0A: may revisit this
+                        operator.cancelToResume();
+                    }
+                    else {
+                        operator.close();
+                    }
                 }
                 catch (InterruptedException t) {
                     // don't record the stack
@@ -707,8 +760,9 @@ public class Driver
         // This can happen if new sources are added while we're holding the lock here doing work.
         // NOTE: this is separate duplicate code to make debugging lock reacquisition easier
         // The first condition is for processing the pending updates if this driver is still ALIVE
-        // The second condition is to destroy the driver if the state is NEED_DESTRUCTION
-        while (((pendingTaskSourceUpdates.get() != null && state.get() == State.ALIVE) || state.get() == State.NEED_DESTRUCTION)
+        // The second condition is to destroy the driver if the state is NEED_DESTRUCTION or CANCEL_TO_RESUME.
+        while (((pendingTaskSourceUpdates.get() != null && state.get() == State.ALIVE)
+                || state.get() == State.NEED_DESTRUCTION || state.get() == State.CANCEL_TO_RESUME)
                 && exclusiveLock.tryLock()) {
             try {
                 try {

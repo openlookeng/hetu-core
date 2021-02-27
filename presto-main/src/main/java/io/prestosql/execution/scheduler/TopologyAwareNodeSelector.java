@@ -102,6 +102,18 @@ public class TopologyAwareNodeSelector
     }
 
     @Override
+    public int selectableNodeCount()
+    {
+        NodeMap map = nodeMap.get().get();
+        if (includeCoordinator) {
+            return map.getNodesByHostAndPort().size();
+        }
+        return (int) map.getNodesByHostAndPort().values().stream()
+                .filter(node -> !map.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .count();
+    }
+
+    @Override
     public InternalNode selectCurrentNode()
     {
         // TODO: this is a hack to force scheduling on the coordinator

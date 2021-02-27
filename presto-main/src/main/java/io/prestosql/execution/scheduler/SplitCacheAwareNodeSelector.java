@@ -57,7 +57,7 @@ public class SplitCacheAwareNodeSelector
     private final int minCandidates;
     private final int maxSplitsPerNode;
     private final int maxPendingSplitsPerTask;
-    private NodeSelector defaultNodeSelector;
+    private final NodeSelector defaultNodeSelector;
 
     public SplitCacheAwareNodeSelector(
             InternalNodeManager nodeManager,
@@ -89,6 +89,18 @@ public class SplitCacheAwareNodeSelector
     public List<InternalNode> allNodes()
     {
         return ImmutableList.copyOf(nodeMap.get().get().getNodesByHostAndPort().values());
+    }
+
+    @Override
+    public int selectableNodeCount()
+    {
+        NodeMap map = nodeMap.get().get();
+        if (includeCoordinator) {
+            return map.getNodesByHostAndPort().size();
+        }
+        return (int) map.getNodesByHostAndPort().values().stream()
+                .filter(node -> !map.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .count();
     }
 
     @Override

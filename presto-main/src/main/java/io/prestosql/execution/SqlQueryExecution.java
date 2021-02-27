@@ -45,6 +45,9 @@ import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.snapshot.MarkerAnnouncer;
+import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -93,6 +96,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -109,6 +113,9 @@ import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.NORMAL;
+import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.RESUME;
+import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.SNAPSHOT;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTERS;
 import static io.prestosql.statestore.StateStoreConstants.QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING;
 import static java.util.Objects.requireNonNull;
@@ -150,6 +157,7 @@ public class SqlQueryExecution
     private final DynamicFilterService dynamicFilterService;
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final StateStoreProvider stateStoreProvider;
+    private final QuerySnapshotManager snapshotManager;
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -179,7 +187,8 @@ public class SqlQueryExecution
             WarningCollector warningCollector,
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
-            StateStoreProvider stateStoreProvider)
+            StateStoreProvider stateStoreProvider,
+            SnapshotUtils snapshotUtils)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -202,6 +211,11 @@ public class SqlQueryExecution
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
             this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+
+            this.snapshotManager = new QuerySnapshotManager(
+                    stateMachine.getQueryId(),
+                    requireNonNull(snapshotUtils, "snapshotUtils is null"),
+                    stateMachine.getSession());
 
             checkArgument(scheduleSplitBatchSize > 0, "scheduleSplitBatchSize must be greater than 0");
             this.scheduleSplitBatchSize = scheduleSplitBatchSize;
@@ -244,7 +258,10 @@ public class SqlQueryExecution
                     return;
                 }
 
-                // query is now done, so abort any work that is still running
+                // Snapshot: query is now done, so clear its entries in the snapshot manager
+                if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession())) {
+                    snapshotManager.doneQuery();
+                }
                 SqlQueryScheduler scheduler = queryScheduler.get();
                 if (scheduler != null) {
                     scheduler.abort();
@@ -467,7 +484,19 @@ public class SqlQueryExecution
                     // query already started or finished
                     return;
                 }
-
+                stateMachine.addStateChangeListener(state -> {
+                    if (state == QueryState.RESUMING) {
+                        // Snapshot: old stages/tasks have finished. Ready to resume.
+                        try {
+                            resumeQuery(plan);
+                        }
+                        catch (Throwable e) {
+                            fail(e);
+                            throwIfInstanceOf(e, Error.class);
+                            log.warn(e, "Encountered error while rescheduling query");
+                        }
+                    }
+                });
                 // if query is not finished, start the scheduler, otherwise cancel it
                 SqlQueryScheduler scheduler = queryScheduler.get();
 
@@ -478,8 +507,69 @@ public class SqlQueryExecution
             catch (Throwable e) {
                 fail(e);
                 throwIfInstanceOf(e, Error.class);
+                log.warn(e, "Encountered error while scheduling query");
             }
         }
+    }
+
+    private void resumeQuery(PlanRoot plan)
+    {
+        SqlQueryScheduler oldScheduler = queryScheduler.get();
+        try {
+            // Wait for previous scheduler to finish.
+            // This is important, otherwise the old schedule may close split sources after the new scheduler has started.
+            oldScheduler.doneScheduling().get();
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        log.debug("Rescheduling query %s from a resumable task failure.", getQueryId());
+        PartitioningHandle partitioningHandle = plan.getRoot().getFragment().getPartitioningScheme().getPartitioning().getHandle();
+        OutputBuffers rootOutputBuffers = createInitialEmptyOutputBuffers(partitioningHandle)
+                .withBuffer(OUTPUT_BUFFER_ID, BROADCAST_PARTITION_ID)
+                .withNoMoreBufferIds();
+
+        // Check if there is a snapshot we can restore to, or restart from beginning,
+        // and update marker split sources so they know where to resume from.
+        // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
+        OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
+        MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
+        // TODO-cp-I2D61F: provide proper valuesResumeId
+        int resumeId = 1;
+        announcer.resumeSnapshot(snapshotId.orElse(0), resumeId);
+
+        // Create a new scheduler, to schedule new stages and tasks
+        DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
+        StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
+                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, resumeId, announcer.currentSnapshotId());
+        // build the stage execution objects (this doesn't schedule execution)
+        SqlQueryScheduler scheduler = createSqlQueryScheduler(
+                stateMachine,
+                locationFactory,
+                executionPlan,
+                nodePartitioningManager,
+                nodeScheduler,
+                remoteTaskFactory,
+                stateMachine.getSession(),
+                plan.isSummarizeTaskInfos(),
+                scheduleSplitBatchSize,
+                queryExecutor,
+                schedulerExecutor,
+                failureDetector,
+                rootOutputBuffers,
+                nodeTaskMap,
+                executionPolicy,
+                schedulerStats,
+                dynamicFilterService,
+                heuristicIndexerManager,
+                snapshotManager,
+                oldScheduler.getStageTaskCounts());
+        queryScheduler.set(scheduler);
+
+        log.debug("Restarting query %s from a resumable task failure.", getQueryId());
+        scheduler.start();
+        stateMachine.transitionToStarting();
     }
 
     @Override
@@ -542,14 +632,14 @@ public class SqlQueryExecution
     // This method was introduced separate logical planning from query analyzing stage
     // and allow plans to be overwritten by CachedSqlQueryExecution
     protected Plan createPlan(Analysis analysis,
-                              Session session,
-                              List<PlanOptimizer> planOptimizers,
-                              PlanNodeIdAllocator idAllocator,
-                              Metadata metadata,
-                              TypeAnalyzer typeAnalyzer,
-                              StatsCalculator statsCalculator,
-                              CostCalculator costCalculator,
-                              WarningCollector warningCollector)
+            Session session,
+            List<PlanOptimizer> planOptimizers,
+            PlanNodeIdAllocator idAllocator,
+            Metadata metadata,
+            TypeAnalyzer typeAnalyzer,
+            StatsCalculator statsCalculator,
+            CostCalculator costCalculator,
+            WarningCollector warningCollector)
     {
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
         return logicalPlanner.plan(analysis);
@@ -578,7 +668,17 @@ public class SqlQueryExecution
 
         // plan the execution on the active nodes
         DistributedExecutionPlanner distributedPlanner = new DistributedExecutionPlanner(splitManager, metadata);
-        StageExecutionPlan outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), stateMachine.getSession());
+        StageExecutionPlan outputStageExecutionPlan;
+        Session session = stateMachine.getSession();
+        if (SystemSessionProperties.isSnapshotEnabled(session)) {
+            // Snapshot: need to plan different when snapshot is enabled.
+            // See the "plan" method for difference between the different modes.
+            MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(session);
+            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, SNAPSHOT, null, 0, announcer.currentSnapshotId());
+        }
+        else {
+            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, NORMAL, null, 0, 0);
+        }
         stateMachine.endDistributedPlanning();
 
         // ensure split sources are closed
@@ -620,7 +720,9 @@ public class SqlQueryExecution
                 executionPolicy,
                 schedulerStats,
                 dynamicFilterService,
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                snapshotManager,
+                null);
 
         queryScheduler.set(scheduler);
 
@@ -815,6 +917,7 @@ public class SqlQueryExecution
         private final Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache;
         private final HeuristicIndexerManager heuristicIndexerManager;
         private final StateStoreProvider stateStoreProvider;
+        private final SnapshotUtils snapshotUtils;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -841,7 +944,8 @@ public class SqlQueryExecution
                 CostCalculator costCalculator,
                 DynamicFilterService dynamicFilterService,
                 HeuristicIndexerManager heuristicIndexerManager,
-                StateStoreProvider stateStoreProvider)
+                StateStoreProvider stateStoreProvider,
+                SnapshotUtils snapshotUtils)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -868,6 +972,7 @@ public class SqlQueryExecution
             this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
+            this.snapshotUtils = requireNonNull(snapshotUtils, "snapshotUtils is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -927,7 +1032,8 @@ public class SqlQueryExecution
                     dynamicFilterService,
                     this.cache,
                     heuristicIndexerManager,
-                    stateStoreProvider);
+                    stateStoreProvider,
+                    snapshotUtils);
         }
     }
 }

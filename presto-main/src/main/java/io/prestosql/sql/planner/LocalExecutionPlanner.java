@@ -29,7 +29,6 @@ import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.DataSize;
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.cube.CubeManager;
@@ -165,6 +164,7 @@ import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.LambdaDefinitionExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpillerFactory;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
@@ -264,7 +264,6 @@ import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
 import static io.prestosql.SystemSessionProperties.getTaskWriterCount;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
-import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
 import static io.prestosql.SystemSessionProperties.isSpillReuseExchange;
@@ -307,6 +306,7 @@ import static io.prestosql.sql.planner.SystemPartitioningHandle.COORDINATOR_DIST
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_BROADCAST_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
+import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_PASSTHROUGH_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SCALED_WRITER_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toSymbol;
@@ -550,7 +550,7 @@ public class LocalExecutionPlanner
                                 plan.getId(),
                                 outputTypes,
                                 pagePreprocessor,
-                                new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), isExchangeCompressionEnabled(session))))
+                                taskContext))
                         .build(),
                 context.getDriverInstanceCount(),
                 physicalOperation.getPipelineExecutionStrategy());
@@ -565,7 +565,55 @@ public class LocalExecutionPlanner
                 .map(LocalPlannerAware.class::cast)
                 .forEach(LocalPlannerAware::localPlannerComplete);
 
+        // calculate total number of components to be captured and add to snapshotManager
+        if (SystemSessionProperties.isSnapshotEnabled(session)) {
+            taskContext.getSnapshotManager().setTotalComponents(calculateTotalCountOfTaskComponentToBeCaptured(taskContext, context));
+        }
+
         return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor, producerCTEId);
+    }
+
+    private static int calculateTotalCountOfTaskComponentToBeCaptured(TaskContext taskContext, LocalExecutionPlanContext context)
+    {
+        int totalCount = 0;
+        boolean outputPipelineIsTableScan = false;
+        for (DriverFactory df : context.getDriverFactories()) {
+            // Don't include operators in table-scan pipelines
+            if (!isTableScanPipeline(df)) {
+                if (isOuterJoinFromTableScanPipeline(df, context)) {
+                    // See Gitee issue Checkpoint - handle LookupOuterOperator pipelines
+                    // https://gitee.com/open_lookeng/dashboard/issues?id=I2LMIW
+                    // For outer pipelines forked from table-scan, only count the lookup-outer operator
+                    totalCount += df.getDriverInstances().orElse(1);
+                }
+                else {
+                    totalCount += df.getDriverInstances().orElse(1) * df.getOperatorFactories().size();
+                }
+            }
+            else if (df.isOutputDriver()) {
+                outputPipelineIsTableScan = true;
+            }
+        }
+
+        int stageId = taskContext.getTaskId().getStageId().getId();
+        // No OutputBuffer state needs to be captured for stage 0
+        // If output pipeline is not also source pipeline, then OutputBuffer state needs to be captured
+        if (stageId > 0 && !outputPipelineIsTableScan) {
+            totalCount++;
+        }
+        return totalCount;
+    }
+
+    private static boolean isTableScanPipeline(DriverFactory driverFactory)
+    {
+        OperatorFactory first = driverFactory.getOperatorFactories().get(0);
+        return first instanceof TableScanOperatorFactory || first instanceof ScanFilterAndProjectOperatorFactory;
+    }
+
+    private static boolean isOuterJoinFromTableScanPipeline(DriverFactory driverFactory, LocalExecutionPlanContext context)
+    {
+        OperatorFactory first = driverFactory.getOperatorFactories().get(0);
+        return first instanceof LookupOuterOperatorFactory && isTableScanPipeline(context.outerToJoinMap.get(driverFactory));
     }
 
     private static void addLookupOuterDrivers(LocalExecutionPlanContext context)
@@ -592,7 +640,8 @@ public class LocalExecutionPlanner
                             .map(OperatorFactory::duplicate)
                             .forEach(newOperators::add);
 
-                    context.addDriverFactory(false, factory.isOutputDriver(), newOperators.build(), OptionalInt.of(1), outerOperatorFactoryResult.get().getBuildExecutionStrategy());
+                    DriverFactory outerFactory = context.addDriverFactory(false, factory.isOutputDriver(), newOperators.build(), OptionalInt.of(1), outerOperatorFactoryResult.get().getBuildExecutionStrategy());
+                    context.outerToJoinMap.put(outerFactory, factory);
                 }
             }
         }
@@ -621,6 +670,10 @@ public class LocalExecutionPlanner
         private final PlanNodeId consumerId;
         private final Optional<PlanFragmentId> producerCTEId;
         private final Optional<PlanNodeId> producerCTEParentId;
+
+        // Snapshot: record pipeline that corresponds to the lookup-outer pipeline.
+        // This is used to help determine if a lookup-outer pipeline should be treated as a tabel-scan pipeine.
+        private final Map<DriverFactory, DriverFactory> outerToJoinMap = new HashMap<>();
 
         public LocalExecutionPlanContext(TaskContext taskContext, TypeProvider types, Metadata metadata, DynamicFilterCacheManager dynamicFilterCacheManager,
                 Optional<PlanFragmentId> producerCTEId,
@@ -653,7 +706,7 @@ public class LocalExecutionPlanner
             this.cteCtx = cteCtx;
         }
 
-        public void addDriverFactory(boolean inputDriver, boolean outputDriver, List<OperatorFactory> operatorFactories, OptionalInt driverInstances, PipelineExecutionStrategy pipelineExecutionStrategy)
+        public DriverFactory addDriverFactory(boolean inputDriver, boolean outputDriver, List<OperatorFactory> operatorFactories, OptionalInt driverInstances, PipelineExecutionStrategy pipelineExecutionStrategy)
         {
             if (pipelineExecutionStrategy == GROUPED_EXECUTION) {
                 OperatorFactory firstOperatorFactory = operatorFactories.get(0);
@@ -669,7 +722,9 @@ public class LocalExecutionPlanner
                 operatorFactories = WorkProcessorPipelineSourceOperator.convertOperators(getNextOperatorId(), operatorFactories);
             }
 
-            driverFactories.add(new DriverFactory(getNextPipelineId(), inputDriver, outputDriver, operatorFactories, driverInstances, pipelineExecutionStrategy));
+            DriverFactory driverFactory = new DriverFactory(getNextPipelineId(), inputDriver, outputDriver, operatorFactories, driverInstances, pipelineExecutionStrategy);
+            driverFactories.add(driverFactory);
+            return driverFactory;
         }
 
         private List<DriverFactory> getDriverFactories()
@@ -888,7 +943,6 @@ public class LocalExecutionPlanner
                     context.getNextOperatorId(),
                     node.getId(),
                     exchangeClientSupplier,
-                    new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), isExchangeCompressionEnabled(session)),
                     orderingCompiler,
                     types,
                     outputChannels,
@@ -907,8 +961,7 @@ public class LocalExecutionPlanner
             OperatorFactory operatorFactory = new ExchangeOperatorFactory(
                     context.getNextOperatorId(),
                     node.getId(),
-                    exchangeClientSupplier,
-                    new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), isExchangeCompressionEnabled(session)));
+                    exchangeClientSupplier);
 
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION);
         }
@@ -1634,15 +1687,10 @@ public class LocalExecutionPlanner
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
         }
 
-        @Override
-        public PhysicalOperation visitValues(ValuesNode node, LocalExecutionPlanContext context)
+        private Page valuesPage(ValuesNode node, LocalExecutionPlanContext context)
         {
-            // a values node must have a single driver
-            context.setDriverInstanceCount(1);
-
             if (node.getRows().isEmpty()) {
-                OperatorFactory operatorFactory = new ValuesOperatorFactory(context.getNextOperatorId(), node.getId(), ImmutableList.of());
-                return new PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION);
+                return null;
             }
 
             List<Type> outputTypes = getSymbolTypes(node.getOutputSymbols(), context.getTypes());
@@ -1655,8 +1703,41 @@ public class LocalExecutionPlanner
                     writeNativeValue(outputTypes.get(i), pageBuilder.getBlockBuilder(i), result);
                 }
             }
+            return pageBuilder.build();
+        }
 
-            OperatorFactory operatorFactory = new ValuesOperatorFactory(context.getNextOperatorId(), node.getId(), ImmutableList.of(pageBuilder.build()));
+        @Override
+        public PhysicalOperation visitValues(ValuesNode node, LocalExecutionPlanContext context)
+        {
+            // a values node must have a single driver
+            context.setDriverInstanceCount(1);
+
+            List<Page> pages;
+            int from = 0;
+            if (SystemSessionProperties.isSnapshotEnabled(context.taskContext.getSession())) {
+                ImmutableList.Builder builder = ImmutableList.builder();
+                // Always include the data page, for debugging purposes
+                Page page = valuesPage(node, context);
+                if (page != null) {
+                    builder.add(page);
+                }
+                if (node.getResumeSnapshotId() != null) {
+                    builder.add(MarkerPage.resumePage(node.getResumeSnapshotId(), node.getResumeId()));
+                    from = 1; // Skip data page if resuming from a snapshot, because data page would have been sent
+                }
+                builder.add(MarkerPage.snapshotPage(node.getNextSnapshotId()));
+                pages = builder.build();
+            }
+            else {
+                Page page = valuesPage(node, context);
+                pages = page == null ? ImmutableList.of() : ImmutableList.of(page);
+            }
+
+            OperatorFactory operatorFactory = new ValuesOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    pages,
+                    from);
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION);
         }
 
@@ -2913,6 +2994,8 @@ public class LocalExecutionPlanner
 
             int operatorsCount = subContext.getDriverInstanceCount().orElse(1);
             List<Type> types = getSourceOperatorTypes(node, context.getTypes());
+            // Snapshot: current implementation depends on the fact that local-merge only uses pass-through exchangers
+            checkArgument(node.getPartitioningScheme().getPartitioning().getHandle().equals(FIXED_PASSTHROUGH_DISTRIBUTION));
             LocalExchangeFactory exchangeFactory = new LocalExchangeFactory(
                     node.getPartitioningScheme().getPartitioning().getHandle(),
                     operatorsCount,
@@ -2920,7 +3003,8 @@ public class LocalExecutionPlanner
                     ImmutableList.of(),
                     Optional.empty(),
                     source.getPipelineExecutionStrategy(),
-                    maxLocalExchangeBufferSize);
+                    maxLocalExchangeBufferSize,
+                    true);
 
             List<OperatorFactory> operatorFactories = new ArrayList<>(source.getOperatorFactories());
             List<Symbol> expectedLayout = node.getInputs().get(0);
@@ -2993,7 +3077,9 @@ public class LocalExecutionPlanner
                     channels,
                     hashChannel,
                     exchangeSourcePipelineExecutionStrategy,
-                    maxLocalExchangeBufferSize);
+                    maxLocalExchangeBufferSize,
+                    false);
+            int totalSinkCount = 0;
             for (int i = 0; i < node.getSources().size(); i++) {
                 DriverFactoryParameters driverFactoryParameters = driverFactoryParametersList.get(i);
                 PhysicalOperation source = driverFactoryParameters.getSource();
@@ -3015,6 +3101,7 @@ public class LocalExecutionPlanner
                         operatorFactories,
                         subContext.getDriverInstanceCount(),
                         exchangeSourcePipelineExecutionStrategy);
+                totalSinkCount += subContext.getDriverInstanceCount().orElse(1);
             }
 
             // the main driver is not an input... the exchange sources are the input for the plan
@@ -3024,7 +3111,7 @@ public class LocalExecutionPlanner
             verify(context.getDriverInstanceCount().getAsInt() == localExchangeFactory.getBufferCount(),
                     "driver instance count must match the number of exchange partitions");
 
-            return new PhysicalOperation(new LocalExchangeSourceOperatorFactory(context.getNextOperatorId(), node.getId(), localExchangeFactory), makeLayout(node), context, exchangeSourcePipelineExecutionStrategy);
+            return new PhysicalOperation(new LocalExchangeSourceOperatorFactory(context.getNextOperatorId(), node.getId(), localExchangeFactory, totalSinkCount), makeLayout(node), context, exchangeSourcePipelineExecutionStrategy);
         }
 
         @Override

@@ -18,12 +18,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.SetThreadName;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.BufferState;
@@ -34,11 +37,19 @@ import io.prestosql.operator.Driver;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.DriverFactory;
 import io.prestosql.operator.DriverStats;
+import io.prestosql.operator.LookupJoinOperatorFactory;
+import io.prestosql.operator.LookupSourceFactory;
+import io.prestosql.operator.OperatorFactory;
+import io.prestosql.operator.PartitionedOutputOperator;
 import io.prestosql.operator.PipelineContext;
 import io.prestosql.operator.PipelineExecutionStrategy;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.operator.TaskOutputOperator;
+import io.prestosql.operator.exchange.LocalExchangeSinkOperator;
+import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
 
 import javax.annotation.Nullable;
@@ -48,9 +59,11 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -114,6 +127,16 @@ public class SqlTaskExecution
     private final TaskStateMachine taskStateMachine;
     private final TaskContext taskContext;
     private final OutputBuffer outputBuffer;
+    // Records which (source) splits are being processed for the given plan node.
+    // When a snapshot marker is received, we wait for all in-progress splits to finish,
+    // then broadcast the marker to all partitions of the output buffer.
+    @GuardedBy("this")
+    private final Map<PlanNodeId, Set<ScheduledSplit>> inProgressSplits = new HashMap<>();
+    // When a marker is received but there are in-progress sources for the given plan node,
+    // then buffer the marker and subsequent sources.
+    @GuardedBy("this")
+    private final Map<PlanNodeId, LinkedList<TaskSource>> pendingSources = new HashMap<>();
+    private final boolean snapshotEnabled;
 
     private final TaskHandle taskHandle;
     private final TaskExecutor taskExecutor;
@@ -183,6 +206,7 @@ public class SqlTaskExecution
         this.taskId = taskStateMachine.getTaskId();
         this.taskContext = requireNonNull(taskContext, "taskContext is null");
         this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
+        snapshotEnabled = SystemSessionProperties.isSnapshotEnabled(taskContext.getSession());
 
         this.taskExecutor = requireNonNull(taskExecutor, "driverExecutor is null");
         this.notificationExecutor = requireNonNull(notificationExecutor, "notificationExecutor is null");
@@ -340,13 +364,41 @@ public class SqlTaskExecution
                         source.isNoMoreSplits()))
                 .collect(toList());
 
+        // update maxAcknowledgedSplit
+        maxAcknowledgedSplit = sources.stream()
+                .flatMap(source -> source.getSplits().stream())
+                .mapToLong(ScheduledSplit::getSequenceId)
+                .max()
+                .orElse(maxAcknowledgedSplit);
+
         // update task with new sources
         for (TaskSource source : sources) {
             if (driverRunnerFactoriesWithSplitLifeCycle.containsKey(source.getPlanNodeId())) {
-                schedulePartitionedSource(source);
+                if (snapshotEnabled) {
+                    // Snapshot: only source splits (split lifecycle) may contain markers.
+                    // Some source splits can't be scheduled until others finish, so need to keep track of pending ones.
+                    // Need to maintain order between marker splits and other source ones.
+                    pendingSources.computeIfAbsent(source.getPlanNodeId(), p -> new LinkedList<>()).add(source);
+                }
+                else {
+                    schedulePartitionedSource(source);
+                }
             }
             else {
                 scheduleUnpartitionedSource(source, updatedUnpartitionedSources);
+            }
+        }
+
+        if (snapshotEnabled) {
+            for (LinkedList<TaskSource> sourcesForPlanNode : pendingSources.values()) {
+                while (!sourcesForPlanNode.isEmpty()) {
+                    // Schedule sources that can be scheduled, and stop when a marker is encountered but there are pending splits
+                    TaskSource source = processMarkerSource(sourcesForPlanNode);
+                    if (source == null) {
+                        break;
+                    }
+                    schedulePartitionedSource(source);
+                }
             }
         }
 
@@ -355,13 +407,81 @@ public class SqlTaskExecution
             driverSplitRunnerFactory.closeDriverFactoryIfFullyCreated();
         }
 
-        // update maxAcknowledgedSplit
-        maxAcknowledgedSplit = sources.stream()
-                .flatMap(source -> source.getSplits().stream())
-                .mapToLong(ScheduledSplit::getSequenceId)
-                .max()
-                .orElse(maxAcknowledgedSplit);
         return updatedUnpartitionedSources;
+    }
+
+    private TaskSource processMarkerSource(LinkedList<TaskSource> sources)
+    {
+        TaskSource source = sources.remove();
+        if (source.getSplits().isEmpty()) {
+            // Empty source. It can be processed regardless of marker/pending-splits situation.
+            return source;
+        }
+
+        Set<ScheduledSplit> readySplits = getReadySplits(source);
+        if (readySplits.isEmpty()) {
+            // Source doesn't have any splits that are ready to be processed.
+            // Add back the source removed earlier
+            sources.addFirst(source);
+            return null;
+        }
+
+        boolean hasLeft = readySplits.size() < source.getSplits().size();
+        if (hasLeft) {
+            // Replace removed source with a new one with a subset of the splits. Need to maintain order in the set.
+            Set<ScheduledSplit> remainingSplits = Sets.newLinkedHashSet(source.getSplits());
+            remainingSplits.removeAll(readySplits);
+            sources.addFirst(new TaskSource(
+                    source.getPlanNodeId(),
+                    remainingSplits,
+                    source.getNoMoreSplitsForLifespan(),
+                    source.isNoMoreSplits()));
+        }
+
+        // Process marker splits by broadcasting it; collect data splits and return them to be scheduled.
+        Set<ScheduledSplit> dataSplits = new HashSet<>();
+        for (ScheduledSplit split : readySplits) {
+            if (split.getSplit().getConnectorSplit() instanceof MarkerSplit) {
+                MarkerSplit marker = (MarkerSplit) split.getSplit().getConnectorSplit();
+                // All previous sources have been processed fully. Broadcast the marker.
+                DriverSplitRunnerFactory partitionedDriverRunnerFactory = driverRunnerFactoriesWithSplitLifeCycle.get(source.getPlanNodeId());
+                partitionedDriverRunnerFactory.broadcastMarker(split.getSplit().getLifespan(), marker.toMarkerPage());
+            }
+            else {
+                dataSplits.add(split);
+            }
+        }
+
+        // Ensure that no-more-splits-for-lifespan and no-more-splits values are processed if the source is fully processed
+        return new TaskSource(
+                source.getPlanNodeId(),
+                dataSplits,
+                hasLeft ? ImmutableSet.of() : source.getNoMoreSplitsForLifespan(),
+                !hasLeft && source.isNoMoreSplits());
+    }
+
+    // Return all splits that are ready to be processed.
+    // This includes all splits up until a marker follows a data split.
+    private Set<ScheduledSplit> getReadySplits(TaskSource source)
+    {
+        Set<ScheduledSplit> inProgress = inProgressSplits.computeIfAbsent(source.getPlanNodeId(), p -> new HashSet<>());
+        Set<ScheduledSplit> readySplits = new HashSet<>();
+
+        for (ScheduledSplit split : source.getSplits()) {
+            if (split.getSplit().getConnectorSplit() instanceof MarkerSplit) {
+                if (!inProgress.isEmpty()) {
+                    // Need to wait for previous sources to finish.
+                    // The marker source is left at the top of the queue.
+                    break;
+                }
+            }
+            else {
+                inProgress.add(split);
+            }
+            readySplits.add(split);
+        }
+
+        return readySplits;
     }
 
     @GuardedBy("this")
@@ -570,6 +690,28 @@ public class SqlTaskExecution
                         checkTaskCompletion();
 
                         splitMonitor.splitCompletedEvent(taskId, getDriverStats());
+
+                        if (snapshotEnabled) {
+                            if (splitRunner.partitionedSplit != null) {
+                                boolean tryScheduling;
+                                synchronized (SqlTaskExecution.this) {
+                                    // Drivers for splits with split lifecycle has a non-null split.
+                                    // When the driver has finished successfully, remove its split from in-progress list.
+                                    Set<ScheduledSplit> inProgress = inProgressSplits.get(splitRunner.partitionedSplit.getPlanNodeId());
+                                    inProgress.remove(splitRunner.partitionedSplit);
+                                    tryScheduling = inProgress.isEmpty() && !pendingSources.get(splitRunner.partitionedSplit.getPlanNodeId()).isEmpty();
+                                }
+                                if (tryScheduling) {
+                                    // There are pending sources that can be scheduled now.
+                                    // Call "addSources" instead of "updateSources" so that "checkTaskCompletion" is invoked as well
+                                    addSources(Collections.emptyList());
+                                }
+                            }
+                            else {
+                                // Report finished drivers to snapshot manager, but only for non-source pipelines. Source pipeline operators don't store their states.
+                                splitRunner.driver.reportFinishedDriver();
+                            }
+                        }
                     }
                 }
 
@@ -1007,6 +1149,38 @@ public class SqlTaskExecution
         public void splitsAdded(int count)
         {
             pipelineContext.splitsAdded(count);
+        }
+
+        // Called when a marker split is ready to be process (all its proceeding data splits have been fully processed).
+        // The marker is broadcasted to the output of the pipeline (output buffer or local-exchange-sink)
+        public void broadcastMarker(Lifespan lifespan, MarkerPage markerPage)
+        {
+            List<OperatorFactory> factories = driverFactory.getOperatorFactories();
+            for (OperatorFactory factory : factories) {
+                // See Gitee issue Checkpoint - handle LookupOuterOperator pipelines
+                // https://gitee.com/open_lookeng/dashboard/issues?id=I2LMIW
+                // For table-scan pipelines with outer-join, ask lookup-outer to process marker,
+                // before adding marker to output
+                if (factory instanceof LookupJoinOperatorFactory) {
+                    LookupSourceFactory lookupSourceFactory = ((LookupJoinOperatorFactory) factory).getLookupSourceFactory(lifespan);
+                    lookupSourceFactory.processMarkerForTableScanOuterJoin(markerPage);
+                }
+            }
+            // Ask the last OperatorFactory (e.g. TaskOutput or PartitionedOutput or LocalExchangeSink)
+            // to send marker page to all their consumers, bypassing the entire source pipeline
+            OperatorFactory last = factories.get(factories.size() - 1);
+            if (last instanceof TaskOutputOperator.TaskOutputOperatorFactory) {
+                outputBuffer.enqueue(Collections.singletonList(SerializedPage.forMarker(markerPage)));
+            }
+            else if (last instanceof PartitionedOutputOperator.PartitionedOutputOperatorFactory) {
+                outputBuffer.enqueue(0, Collections.singletonList(SerializedPage.forMarker(markerPage)));
+            }
+            else if (last instanceof LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory) {
+                ((LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory) last).broadcastMarker(lifespan, markerPage);
+            }
+            else {
+                checkState(false, "Unexpected output operator factory: " + last.getClass().getName());
+            }
         }
     }
 

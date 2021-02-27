@@ -45,6 +45,7 @@ import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.units.Duration.nanosSince;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CURRENT_STATE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_MAX_WAIT;
+import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
 import static io.prestosql.protocol.AdaptingJsonResponseHandler.createAdaptingJsonResponseHandler;
 import static io.prestosql.protocol.FullSmileResponseHandler.createFullSmileResponseHandler;
 import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
@@ -148,7 +149,7 @@ class ContinuousTaskStatusFetcher
             return;
         }
 
-        Request request = setContentTypeHeaders(isBinaryEncoding, prepareGet())
+        Request request = addInstanceIdHeader(setContentTypeHeaders(isBinaryEncoding, prepareGet()))
                 .setUri(uriBuilderFrom(taskStatus.getSelf()).appendPath("status").build())
                 .setHeader(CONTENT_TYPE, JSON_UTF_8.toString())
                 .setHeader(PRESTO_CURRENT_STATE, taskStatus.getState().toString())
@@ -167,6 +168,13 @@ class ContinuousTaskStatusFetcher
         future = httpClient.executeAsync(request, responseHandler);
         currentRequestStartNanos.set(System.nanoTime());
         Futures.addCallback(future, new SimpleHttpResponseHandler<>(this, request.getUri(), stats), executor);
+    }
+
+    private Request.Builder addInstanceIdHeader(Request.Builder builder)
+    {
+        // Add task instance id to all task related requests,
+        // so receiver can verify if the instance id matches
+        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, taskStatus.get().getTaskInstanceId());
     }
 
     TaskStatus getTaskStatus()
@@ -238,11 +246,8 @@ class ContinuousTaskStatusFetcher
                 // never update if the task has reached a terminal state
                 return false;
             }
-            if (newValue.getVersion() < oldValue.getVersion()) {
-                // don't update to an older version (same version is ok)
-                return false;
-            }
-            return true;
+            // don't update to an older version (same version is ok)
+            return newValue.getVersion() >= oldValue.getVersion();
         });
 
         if (taskMismatch.get()) {

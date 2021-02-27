@@ -29,6 +29,9 @@ public interface NodeSelector
 
     List<InternalNode> allNodes();
 
+    // Snapshot: when include-coordinator is false, allNodes() may still include coordinators, but this function doesn't
+    int selectableNodeCount();
+
     InternalNode selectCurrentNode();
 
     default List<InternalNode> selectRandomNodes(int limit)

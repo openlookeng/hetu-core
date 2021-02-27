@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryExecution.QueryOutputInfo;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.warnings.WarningCollector;
@@ -78,6 +79,8 @@ import static io.prestosql.execution.QueryState.FINISHED;
 import static io.prestosql.execution.QueryState.FINISHING;
 import static io.prestosql.execution.QueryState.PLANNING;
 import static io.prestosql.execution.QueryState.QUEUED;
+import static io.prestosql.execution.QueryState.RESCHEDULING;
+import static io.prestosql.execution.QueryState.RESUMING;
 import static io.prestosql.execution.QueryState.RUNNING;
 import static io.prestosql.execution.QueryState.STARTING;
 import static io.prestosql.execution.QueryState.TERMINAL_QUERY_STATES;
@@ -104,6 +107,7 @@ public class QueryStateMachine
     private final TransactionManager transactionManager;
     private final Metadata metadata;
     private final QueryOutputManager outputManager;
+    private final boolean isSnapshotEnabled;
 
     private final AtomicReference<VersionedMemoryPoolId> memoryPool = new AtomicReference<>(new VersionedMemoryPoolId(GENERAL_POOL, 0));
 
@@ -174,6 +178,7 @@ public class QueryStateMachine
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.queryStateTimer = new QueryStateTimer(ticker);
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(session);
 
         this.queryState = new StateMachine<>("query " + query, executor, QUEUED, TERMINAL_QUERY_STATES);
         this.finalQueryInfo = new StateMachine<>("finalQueryInfo-" + queryId, executor, Optional.empty());
@@ -749,13 +754,34 @@ public class QueryStateMachine
     public boolean transitionToStarting()
     {
         queryStateTimer.beginStarting();
-        return queryState.setIf(STARTING, currentState -> currentState.ordinal() < STARTING.ordinal());
+        return queryState.setIf(STARTING, currentState -> {
+            if (currentState.ordinal() < STARTING.ordinal()) {
+                return true;
+            }
+            if (currentState == RESUMING) {
+                // Snapshot: Also allow to go from "resuming".
+                // Inform outputManager to reset some fields.
+                outputManager.resetForResume();
+                return true;
+            }
+            return false;
+        });
     }
 
     public boolean transitionToRunning()
     {
         queryStateTimer.beginRunning();
         return queryState.setIf(RUNNING, currentState -> currentState.ordinal() < RUNNING.ordinal());
+    }
+
+    public boolean transitionToRescheduling()
+    {
+        return queryState.setIf(RESCHEDULING, currentState -> currentState == RUNNING);
+    }
+
+    public boolean transitionToResuming()
+    {
+        return queryState.setIf(RESUMING, currentState -> currentState == RESCHEDULING);
     }
 
     public boolean transitionToFinishing()
@@ -963,7 +989,8 @@ public class QueryStateMachine
         }
         return getAllStages(rootStage).stream()
                 .map(StageInfo::getState)
-                .allMatch(state -> (state == StageState.RUNNING) || state.isDone());
+                // Snapshot: RESCHEDULING, although a done state for stage, should not be deemed as "scheduled".
+                .allMatch(state -> (state == StageState.RUNNING) || state.isDone() && state != StageState.RESCHEDULING);
     }
 
     void setRunningAsync(boolean runningAsync)
@@ -996,6 +1023,12 @@ public class QueryStateMachine
         QueryInfo queryInfo = getQueryInfo(stageInfo);
         if (queryInfo.isFinalQueryInfo()) {
             finalQueryInfo.compareAndSet(Optional.empty(), Optional.of(queryInfo));
+        }
+        else if (isSnapshotEnabled) {
+            if (queryInfo.getState() == RESCHEDULING && queryInfo.areAllStagesDone()) {
+                // Snapsoht: All remote tasks have been cancelled. Can start scheduling new ones.
+                transitionToResuming();
+            }
         }
         return queryInfo;
     }
@@ -1158,6 +1191,13 @@ public class QueryStateMachine
                 outputInfoListeners = ImmutableList.copyOf(this.outputInfoListeners);
             }
             queryOutputInfo.ifPresent(info -> fireStateChanged(info, outputInfoListeners));
+        }
+
+        private void resetForResume()
+        {
+            // Snapshot: Preprare to restart, by allowing receival of exchange locations
+            this.noMoreExchangeLocations = false;
+            this.exchangeLocations.clear();
         }
 
         public void updateOutputLocations(Set<URI> newExchangeLocations, boolean noMoreExchangeLocations)

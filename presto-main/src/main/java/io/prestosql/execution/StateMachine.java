@@ -101,6 +101,16 @@ public class StateMachine<T>
      */
     public T set(T newState)
     {
+        return setImpl(newState, false);
+    }
+
+    public T forceSet(T newState)
+    {
+        return setImpl(newState, true);
+    }
+
+    public T setImpl(T newState, boolean canUpdateTerminalState)
+    {
         checkState(!Thread.holdsLock(lock), "Can not set state while holding the lock");
         requireNonNull(newState, "newState is null");
 
@@ -112,7 +122,7 @@ public class StateMachine<T>
                 return state;
             }
 
-            checkState(!isTerminalState(state), "%s can not transition from %s to %s", name, state, newState);
+            checkState(canUpdateTerminalState || !isTerminalState(state), "%s can not transition from %s to %s", name, state, newState);
 
             oldState = state;
             state = newState;
